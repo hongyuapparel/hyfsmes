@@ -1,0 +1,44 @@
+---
+description: 字号规范 - 新页面必须使用设计系统变量，禁止硬编码
+globs: frontend/**/*.{vue,css,scss}
+alwaysApply: false
+---
+
+# 字号规范
+
+## 仅允许 4 档字号
+
+| 变量 | 尺寸 | 用途 |
+|------|------|------|
+| `--font-size-title` | 20px | 页面主标题、板块标题、品牌名 |
+| `--font-size-subtitle` | 16px | 卡片标题、弹窗标题 |
+| `--font-size-body` | 14px | 正文、表格、表单、按钮 |
+| `--font-size-caption` | 12px | 标签、提示、次要信息 |
+
+## 禁止
+
+- 禁止写死 `font-size: 14px`、`18px` 等任意数值
+- 禁止使用 Tailwind 字号类（如 `text-lg`、`text-2xl`）在 frontend 中
+
+## 正确写法
+
+```css
+/* ✅ 使用变量 */
+.page-title { font-size: var(--font-size-title); }
+.page-desc { font-size: var(--font-size-body); }
+.card-title { font-size: var(--font-size-subtitle); }
+.tag { font-size: var(--font-size-caption); }
+```
+
+```vue
+<style scoped>
+.page-desc {
+  font-size: var(--font-size-body);
+  color: var(--color-text-muted);
+}
+</style>
+```
+
+## 兼容旧变量名
+
+仍可使用 `--font-size-h1`（=title）、`--font-size-h3`（=subtitle）、`--font-size-small`（=body）、`--font-size-xsmall`（=caption）。

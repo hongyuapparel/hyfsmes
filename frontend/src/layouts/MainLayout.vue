@@ -1,0 +1,385 @@
+<template>
+  <div class="main-layout">
+    <div class="layout-body">
+      <!-- 左侧整体：顶条品牌区 + 侧边栏菜单，同步收起/展开 -->
+      <div
+        class="sidebar-wrapper"
+        :class="{ collapsed: appStore.sidebarCollapsed }"
+      >
+        <div class="sidebar-brand">
+          <div class="brand-logo">
+            <el-icon :size="24"><Lightning /></el-icon>
+          </div>
+          <span v-show="!appStore.sidebarCollapsed" class="brand-name">鸿宇服饰</span>
+        </div>
+        <el-menu
+          :default-active="activeMenu"
+          :collapse="appStore.sidebarCollapsed"
+          :collapse-transition="false"
+          :unique-opened="true"
+          :show-timeout="0"
+          :hide-timeout="0"
+          router
+          class="sidebar-menu"
+        >
+          <template v-for="item in allowedMenus" :key="item.path">
+            <el-sub-menu
+              v-if="item.children?.length"
+              :index="item.path"
+              popper-class="sidebar-submenu-popper"
+              :popper-offset="0"
+            >
+              <template #title>
+                <el-icon v-if="item.icon" class="menu-icon">
+                  <component :is="iconMap[item.icon]" />
+                </el-icon>
+                <span class="menu-title">{{ item.title }}</span>
+              </template>
+              <el-menu-item
+                v-for="child in item.children"
+                :key="child.path"
+                :index="child.path"
+              >
+                <span class="menu-title">{{ child.title }}</span>
+              </el-menu-item>
+            </el-sub-menu>
+            <el-menu-item v-else :index="item.path">
+              <el-icon v-if="item.icon" class="menu-icon">
+                <component :is="iconMap[item.icon]" />
+              </el-icon>
+              <span class="menu-title">{{ item.title }}</span>
+            </el-menu-item>
+          </template>
+        </el-menu>
+      </div>
+      <!-- 右侧：顶条 + 主内容 -->
+      <div class="content-wrapper">
+        <header class="layout-header">
+          <div class="header-left-section">
+            <el-button
+              :icon="appStore.sidebarCollapsed ? Expand : Fold"
+              class="header-toggle"
+              text
+              @click="appStore.toggleSidebar"
+            />
+            <AppTabs />
+          </div>
+          <div class="header-actions">
+            <el-tag v-if="healthStatus" type="success" size="small">{{ healthStatus }}</el-tag>
+            <span class="user-name">{{ authStore.user?.displayName || authStore.user?.username }}</span>
+            <el-button text type="primary" @click="handleLogout">退出</el-button>
+          </div>
+        </header>
+        <main class="layout-main">
+          <router-view v-slot="{ Component, route }">
+            <keep-alive>
+              <component :is="Component" :key="route.fullPath" />
+            </keep-alive>
+          </router-view>
+        </main>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  Expand,
+  Fold,
+  Lightning,
+  HomeFilled,
+  UserFilled,
+  ShoppingCart,
+  OfficeBuilding,
+  Box,
+  Coin,
+  Shop,
+  Avatar,
+  Briefcase,
+  Setting,
+} from '@element-plus/icons-vue'
+import { useAppStore } from '@/stores/app'
+import { useAuthStore } from '@/stores/auth'
+import AppTabs from './AppTabs.vue'
+import { menuConfig } from '@/router/menu'
+import { getHealth } from '@/api/health'
+import type { MenuItem } from '@/router/menu'
+
+const route = useRoute()
+const router = useRouter()
+const appStore = useAppStore()
+const authStore = useAuthStore()
+const healthStatus = ref('')
+
+const iconMap = {
+  HomeFilled,
+  UserFilled,
+  ShoppingCart,
+  OfficeBuilding,
+  Box,
+  Coin,
+  Shop,
+  Avatar,
+  Briefcase,
+  Setting,
+} as const
+
+const allowedMenus = computed(() => {
+  const allowed = authStore.permissionRoutes
+  if (!allowed.length) return []
+  return menuConfig
+    .map((item) => {
+      if (item.children) {
+        const children = item.children.filter((c) => allowed.includes(c.path))
+        if (!children.length && !allowed.includes(item.path)) return null
+        return { ...item, children }
+      }
+      return allowed.includes(item.path) ? item : null
+    })
+    .filter(Boolean) as MenuItem[]
+})
+
+const pageTitle = computed(() => {
+  const t = route.meta?.title as string
+  return t || 'ERP 后台'
+})
+
+const activeMenu = computed(() => route.path)
+
+function handleLogout() {
+  authStore.logout()
+  router.push('/login')
+}
+
+onMounted(async () => {
+  try {
+    const res = await getHealth()
+    healthStatus.value = res.data?.status === 'ok' ? '后端正常' : ''
+  } catch {
+    healthStatus.value = '后端未连接'
+  }
+})
+</script>
+
+<style scoped>
+.main-layout {
+  height: 100vh;
+  display: flex;
+}
+
+.layout-body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* 左侧整体：品牌区 + 菜单，同步收起/展开，无卡顿 */
+.sidebar-wrapper {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: #071327;
+  color: var(--color-white);
+  flex-shrink: 0;
+  transition: width 0.2s ease;
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 1px 0 4px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+
+.sidebar-wrapper.collapsed {
+  width: 64px;
+}
+
+.sidebar-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 16px;
+  height: 60px;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-wrapper.collapsed .sidebar-brand {
+  justify-content: center;
+  padding: 0 8px;
+}
+
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 8px;
+  background: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-white);
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  color: var(--color-white);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 右侧：顶条 + 主内容 */
+.content-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.layout-header {
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  background: var(--color-white);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.header-left-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.header-toggle {
+  padding: 0;
+  min-width: auto;
+  height: 36px;
+  background-color: transparent;
+  border: none;
+}
+
+.header-toggle:hover,
+.header-toggle:focus {
+  background-color: transparent;
+}
+
+.page-title {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.user-name {
+  font-size: var(--font-size-body);
+  color: var(--color-text-muted);
+}
+
+.layout-main {
+  padding: var(--space-sm);
+  background: var(--color-bg);
+  overflow: auto;
+}
+
+/* 侧边菜单：紧凑布局、小圆角 */
+.sidebar-wrapper :deep(.el-menu) {
+  background-color: transparent;
+  border-right: none;
+  padding: 8px 8px;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar {
+  width: 5px;
+}
+
+.sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+.sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-wrapper.collapsed :deep(.el-menu) {
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sidebar-wrapper.collapsed :deep(.el-menu-item),
+.sidebar-wrapper.collapsed :deep(.el-sub-menu > .el-sub-menu__title) {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  padding: 0 !important;
+  margin: 1px 0;
+  justify-content: center;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sidebar-wrapper.collapsed :deep(.el-sub-menu) {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.sidebar-wrapper :deep(.el-menu-item),
+.sidebar-wrapper :deep(.el-sub-menu__title) {
+  color: rgba(255, 255, 255, 0.8);
+  border-radius: 6px;
+  margin: 1px 2px;
+  padding-left: 12px;
+  padding-right: 12px;
+  min-height: 36px;
+  height: auto;
+}
+
+.sidebar-wrapper :deep(.el-menu-item.is-active),
+.sidebar-wrapper :deep(.el-menu-item:hover),
+.sidebar-wrapper :deep(.el-sub-menu__title:hover) {
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+}
+
+.sidebar-wrapper :deep(.el-menu-item.is-active) {
+  font-weight: 600;
+}
+
+.sidebar-wrapper :deep(.el-sub-menu__title i) {
+  color: inherit;
+}
+
+.sidebar-wrapper.collapsed .menu-icon {
+  margin-right: 0;
+}
+
+.menu-icon {
+  margin-right: 8px;
+  font-size: var(--font-size-subtitle);
+}
+
+.menu-title {
+  font-size: var(--font-size-body);
+}
+</style>
