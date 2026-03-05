@@ -114,7 +114,7 @@ watch(
 
 .app-tabs :deep(.el-tabs__nav-wrap) {
   margin-bottom: 0;
-  padding-left: 6px;
+  padding-left: 10px;
 }
 
 .app-tabs :deep(.el-tabs__nav) {

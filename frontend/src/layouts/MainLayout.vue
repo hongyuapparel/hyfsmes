@@ -257,7 +257,6 @@ onMounted(async () => {
   gap: 12px;
   flex: 1;
   padding-top: 4px;
-  padding-left: 8px;
 }
 
 .header-toggle {
