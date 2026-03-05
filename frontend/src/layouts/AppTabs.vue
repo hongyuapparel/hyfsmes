@@ -101,8 +101,6 @@ watch(
   align-items: center;
   flex: 1;
   min-width: 0;
-  margin-top: 4px;
-  margin-left: 4px;
 }
 
 .app-tabs-inner {
@@ -116,10 +114,13 @@ watch(
 
 .app-tabs :deep(.el-tabs__nav-wrap) {
   margin-bottom: 0;
+  padding-left: 6px;
 }
 
 .app-tabs :deep(.el-tabs__nav) {
   border: none;
+  margin-top: 4px;
+  margin-left: 0;
 }
 
 .app-tabs :deep(.el-tabs__item) {
@@ -143,6 +144,14 @@ watch(
 
 .app-tabs :deep(.el-tabs__item .is-icon-close) {
   margin-left: 4px;
+}
+
+/* Element Plus card 模式会把第一个 tab 的左边框去掉，
+   官方未提供配置项，这里仅恢复设计系统统一的边框样式 */
+.app-tabs :deep(.el-tabs--card > .el-tabs__header .el-tabs__item:first-child) {
+  border-left-width: 1px;
+  border-left-style: solid;
+  border-left-color: var(--color-border);
 }
 </style>
 
