@@ -269,24 +269,48 @@ a:hover {
   max-width: none;
 }
 
-/* 顶部筛选输入框：有值时在内部左侧显示「字段名：值」 */
-.filter-input-with-label {
+/* ========== 10. 顶部筛选输入框：选中后显示「字段名：值」 ========== */
+.filter-input.has-value {
   position: relative;
 }
 
-.filter-input-with-label.has-value::before {
-  content: attr(data-label) '：';
+.filter-input.has-value .el-input__wrapper {
+  padding-left: 88px;
+}
+
+.filter-input-order-no.has-value::before,
+.filter-input-sku-code.has-value::before,
+.filter-input-product-customer.has-value::before,
+.filter-input-product-sku-code.has-value::before,
+.filter-input-customer-company.has-value::before {
   position: absolute;
-  left: 14px;
+  left: 16px;
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-text-muted);
   font-size: 12px;
   pointer-events: none;
+  z-index: 1;
 }
 
-.filter-input-with-label.has-value :deep(.el-input__wrapper) {
-  padding-left: 96px;
+.filter-input-order-no.has-value::before {
+  content: '订单号：';
+}
+
+.filter-input-sku-code.has-value::before {
+  content: 'SKU编号：';
+}
+
+.filter-input-product-customer.has-value::before {
+  content: '客户：';
+}
+
+.filter-input-product-sku-code.has-value::before {
+  content: 'SKU编号：';
+}
+
+.filter-input-customer-company.has-value::before {
+  content: '公司名称：';
 }
 
 /* Element Plus 按钮：圆角参考「新增用户」按钮，所有尺寸统一 */

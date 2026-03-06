@@ -6,19 +6,28 @@ import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Controller('dicts')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission('/orders/edit')
+// 复用订单列表菜单权限，确保有「订单管理」权限的用户即可加载下拉字典
+@RequirePermission('/orders/list')
 export class DictsController {
   constructor(private readonly systemOptionsService: SystemOptionsService) {}
 
   /**
-   * 字典下拉接口
+   * 字典下拉接口（扁平，供合作方式等下拉）
    * GET /dicts?type=collaboration|materialType|orderType|sampleType
-   *
-   * 目前全部复用 system-options 表，不在前端硬编码
+   * 与「订单设置」同源 system-options 表，仅读权限用 /orders/list
    */
   @Get()
   findByType(@Query('type') type: string) {
     return this.systemOptionsService.findByType(type || '');
+  }
+
+  /**
+   * 字典树形接口（供订单相关页面树形下拉复用）
+   * GET /dicts/tree?type=order_types|product_groups|...
+   */
+  @Get('tree')
+  findTreeByType(@Query('type') type: string) {
+    return this.systemOptionsService.findTreeByType(type || '');
   }
 }
 

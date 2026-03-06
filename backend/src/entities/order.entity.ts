@@ -45,6 +45,10 @@ export class Order {
   @Column({ name: 'sale_price', type: 'decimal', precision: 10, scale: 2, default: 0 })
   salePrice: string;
 
+  /** 合作方式（如成品、来料等，取值由系统配置） */
+  @Column({ name: 'collaboration_type', length: 64, default: '' })
+  collaborationType: string;
+
   /**
    * 标签/样品类型：
    * 如：sample / first_sample / revised_sample / pre_production / photo_sample / bulk 等
@@ -53,9 +57,9 @@ export class Order {
   @Column({ name: 'label', length: 64, default: '' })
   label: string;
 
-  /** 二次工艺 */
-  @Column({ name: 'secondary_process', length: 255, default: '' })
-  secondaryProcess: string;
+  /** 工艺项目（原二次工艺） */
+  @Column({ name: 'process_item', length: 255, default: '' })
+  processItem: string;
 
   /**
    * 当前状态：

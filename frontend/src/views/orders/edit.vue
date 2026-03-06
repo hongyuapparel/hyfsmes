@@ -21,6 +21,32 @@
         </div>
       </template>
 
+      <el-row :gutter="16" class="a-area-row">
+        <el-col :xs="24" :md="4" class="a-area-image-col">
+          <div
+            class="order-image-block"
+            @click="triggerOrderImageUpload"
+          >
+            <div class="image-preview-wrap" v-if="form.imageUrl">
+              <el-image :src="form.imageUrl" fit="cover" :preview-src-list="[form.imageUrl]" />
+              <el-button text type="danger" size="small" class="image-remove" @click.stop="form.imageUrl = ''">
+                移除
+              </el-button>
+            </div>
+            <div v-else class="image-placeholder">
+              <span>选择SKU后显示</span>
+              <span class="image-upload-hint">点击上传图片</span>
+            </div>
+          </div>
+          <input
+            ref="orderImageFileInputRef"
+            type="file"
+            accept="image/jpeg,image/png,image/gif,image/webp"
+            class="hidden-file-input"
+            @change="onOrderImageFileChange"
+          />
+        </el-col>
+        <el-col :xs="24" :md="20">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="basic-form" label-position="left">
         <el-row :gutter="16">
           <el-col :xs="24" :sm="12" :md="8">
@@ -163,9 +189,6 @@
               <el-input v-model="form.merchandiserPhone" placeholder="自动带出后可修改" />
             </el-form-item>
           </el-col>
-        </el-row>
-
-        <el-row :gutter="16">
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="业务员">
               <el-select
@@ -184,48 +207,10 @@
               </el-select>
             </el-form-item>
           </el-col>
-
-          <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="加工厂">
-              <el-select
-                v-model="form.factoryName"
-                placeholder="选择加工厂"
-                filterable
-                clearable
-                :remote-method="searchSuppliers"
-                remote
-                :loading="supplierLoading"
-              >
-                <el-option
-                  v-for="s in supplierOptions"
-                  :key="s.id"
-                  :label="s.name"
-                  :value="s.name"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-
-        <el-row :gutter="16" class="image-row">
-          <el-col :xs="24" :sm="12" :md="8">
-            <div class="image-field">
-              <div class="image-preview-wrap" v-if="form.imageUrl">
-                <el-image :src="form.imageUrl" fit="cover" :preview-src-list="[form.imageUrl]" />
-                <el-button text type="danger" size="small" class="image-remove" @click="form.imageUrl = ''">
-                  移除
-                </el-button>
-              </div>
-              <div v-else class="image-placeholder">
-                <span>暂无图片</span>
-              </div>
-              <div class="image-actions">
-                <el-input v-model="form.imageUrl" placeholder="可粘贴图片 URL" size="small" />
-              </div>
-            </div>
-          </el-col>
         </el-row>
       </el-form>
+        </el-col>
+      </el-row>
     </el-card>
 
     <!-- B 区：颜色 / 数量 -->
@@ -254,12 +239,16 @@
           <template #header>
             <el-input v-model="sizeHeaders[sIndex]" size="small" />
           </template>
-          <template #default="{ row }">
+          <template #default="{ row, $index }">
             <el-input-number
               v-model="row.quantities[sIndex]"
               :min="0"
               :controls="false"
               class="qty-input"
+              :ref="(el) => setColorCellRef(el, $index, sIndex)"
+              @focus="setActiveColorCell($index, sIndex)"
+              @keydown.stop="onColorCellKeydown($event, $index, sIndex)"
+              @paste.stop.prevent="onColorCellPaste($event, $index, sIndex)"
             />
           </template>
         </el-table-column>
@@ -409,12 +398,16 @@
           <template #header>
             <span>{{ sizeHeaders[sIndex] }}</span>
           </template>
-          <template #default="{ row }">
+          <template #default="{ row, $index }">
             <el-input-number
               v-model="row.sizeValues[sIndex]"
               :min="0"
               :controls="false"
               class="qty-input"
+              :ref="(el) => setSizeInfoCellRef(el, $index, sIndex)"
+              @focus="setActiveSizeInfoCell($index, sIndex)"
+              @keydown.stop="onSizeInfoCellKeydown($event, $index, sIndex)"
+              @paste.stop.prevent="onSizeInfoCellPaste($event, $index, sIndex)"
             />
           </template>
         </el-table-column>
@@ -594,7 +587,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage } from 'element-plus'
@@ -607,7 +600,7 @@ import {
 } from '@/api/orders'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadImage } from '@/api/uploads'
-import { getSystemOptions, getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 
 const route = useRoute()
 const router = useRouter()
@@ -640,7 +633,6 @@ const form = reactive<OrderFormPayload>({
   salePrice: '',
   orderDate: '',
   customerDueDate: '',
-  factoryName: '',
   imageUrl: '',
   colorSizeRows: [],
   colorSizeHeaders: [],
@@ -661,7 +653,13 @@ const rules: FormRules = {
 }
 
 // SKU 下拉
-const skuOptions = ref<{ id: number; skuCode: string; customerName?: string; imageUrl?: string }[]>([])
+const skuOptions = ref<{
+  id: number
+  skuCode: string
+  customerId?: number | null
+  customerName?: string
+  imageUrl?: string
+}[]>([])
 const skuLoading = ref(false)
 
 async function searchSkus(keyword: string) {
@@ -671,7 +669,9 @@ async function searchSkus(keyword: string) {
       params: { keyword: keyword || undefined, pageSize: 20 },
       skipGlobalErrorHandler: true,
     })
-    const data = res.data as { list?: { id: number; skuCode: string; customerName?: string; imageUrl?: string }[] }
+    const data = res.data as {
+      list?: { id: number; skuCode: string; customerId?: number | null; customerName?: string; imageUrl?: string }[]
+    }
     skuOptions.value = data.list ?? []
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('SKU 下拉加载失败', getErrorMessage(e))
@@ -684,6 +684,14 @@ function onSkuChange(sku: string) {
   const item = skuOptions.value.find((x) => x.skuCode === sku)
   if (item?.imageUrl && !form.imageUrl) {
     form.imageUrl = item.imageUrl
+  }
+  // SKU 关联了客户时，自动同步到订单表单
+  if (item?.customerId && item.customerName) {
+    form.customerId = item.customerId
+    form.customerName = item.customerName
+    if (!customerOptions.value.some((c) => c.id === item.customerId)) {
+      customerOptions.value.unshift({ id: item.customerId, companyName: item.customerName })
+    }
   }
 }
 
@@ -747,14 +755,19 @@ const collaborationOptions = ref<{ label: string; value: string }[]>([])
 // 订单类型采用树形结构，与「订单设置 > 订单类型」一致
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
 
-function toOrderTypeTreeSelect(nodes: SystemOptionTreeNode[], parentPath = ''): { label: string; value: string; children?: any[] }[] {
+function toOrderTypeTreeSelect(
+  nodes: SystemOptionTreeNode[],
+  parentPath = '',
+): { label: string; value: string; children?: any[]; disabled?: boolean }[] {
   return nodes.map((n) => {
     const path = parentPath ? `${parentPath} > ${n.value}` : n.value
     const children = n.children?.length ? toOrderTypeTreeSelect(n.children, path) : []
+    const hasChildren = children.length > 0
     return {
       label: n.value,
       value: path,
-      children: children.length ? children : undefined,
+      children: hasChildren ? children : undefined,
+      disabled: hasChildren,
     }
   })
 }
@@ -765,26 +778,32 @@ const orderTypeTreeSelectProps = {
   label: 'label',
   value: 'value',
   children: 'children',
-  disabled: (node: { children?: unknown[] }) =>
-    Array.isArray(node.children) && node.children.length > 0,
+  disabled: 'disabled',
 }
 
 async function loadDicts() {
-  try {
-    const [collabRes, orderTypeTreeRes] = await Promise.all([
-      request.get<{ id: number; value: string }[]>('/dicts', {
-        params: { type: 'collaboration' },
-        skipGlobalErrorHandler: true,
-      }),
-      // 订单类型：使用 system-options 树形数据，与设置页保持一致
-      getSystemOptionsTree('order_types'),
-    ])
-    const cv = collabRes.data ?? []
-    const tree = orderTypeTreeRes.data ?? []
-    collaborationOptions.value = cv.map((i) => ({ label: i.value, value: i.value }))
+  // 合作方式、订单类型分别加载，与订单列表筛选项同源（订单类型用同一接口），互不影响
+  const [collabSettled, orderTypeSettled] = await Promise.allSettled([
+    request.get<Array<{ id: number; value: string } | string>>('/dicts', {
+      params: { type: 'collaboration' },
+      skipGlobalErrorHandler: true,
+    }),
+    getSystemOptionsTree('order_types'),
+  ])
+  if (collabSettled.status === 'fulfilled') {
+    const cv = collabSettled.value.data ?? []
+    collaborationOptions.value = cv.map((item: any) => {
+      const v = typeof item === 'string' ? item : item?.value
+      return { label: v, value: v }
+    })
+  } else if (!isErrorHandled(collabSettled.reason)) {
+    console.warn('合作方式加载失败', getErrorMessage(collabSettled.reason))
+  }
+  if (orderTypeSettled.status === 'fulfilled') {
+    const tree = orderTypeSettled.value.data ?? []
     orderTypeTree.value = Array.isArray(tree) ? tree : []
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) console.warn('字典加载失败', getErrorMessage(e))
+  } else if (!isErrorHandled(orderTypeSettled.reason)) {
+    console.warn('订单类型加载失败', getErrorMessage(orderTypeSettled.reason))
   }
 }
 
@@ -799,6 +818,110 @@ interface ColorRow {
 }
 
 const colorRows = ref<ColorRow[]>([])
+
+// B 区表格编辑能力：单元格引用与键盘导航、批量粘贴
+type InputComponentInstance = HTMLElement | { focus?: () => void } | null
+
+const colorCellRefs = ref<InputComponentInstance[][]>([])
+const activeColorCell = ref<{ row: number; col: number } | null>(null)
+
+function setColorCellRef(el: unknown, rowIndex: number, colIndex: number) {
+  if (!colorCellRefs.value[rowIndex]) colorCellRefs.value[rowIndex] = []
+  let target: InputComponentInstance = null
+  if (el && typeof el === 'object') {
+    const anyEl = el as any
+    if (anyEl.$el) {
+      target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+    } else {
+      target = anyEl as InputComponentInstance
+    }
+  }
+  colorCellRefs.value[rowIndex][colIndex] = target
+}
+
+function setActiveColorCell(rowIndex: number, colIndex: number) {
+  activeColorCell.value = { row: rowIndex, col: colIndex }
+}
+
+function focusColorCell(rowIndex: number, colIndex: number) {
+  if (rowIndex < 0 || colIndex < 0) return
+  const row = colorCellRefs.value[rowIndex]
+  const cell = row?.[colIndex]
+  if (cell && typeof cell.focus === 'function') {
+    nextTick(() => {
+      cell.focus && cell.focus()
+      activeColorCell.value = { row: rowIndex, col: colIndex }
+    })
+  }
+}
+
+function onColorCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
+  const rowsCount = colorRows.value.length
+  const colsCount = sizeHeaders.value.length
+  let targetRow = rowIndex
+  let targetCol = colIndex
+
+  if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
+    targetCol = colIndex + 1
+    if (targetCol >= colsCount) {
+      targetCol = 0
+      targetRow = rowIndex + 1
+    }
+  } else if (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
+    targetCol = colIndex - 1
+    if (targetCol < 0) {
+      targetCol = colsCount - 1
+      targetRow = rowIndex - 1
+    }
+  } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+    targetRow = rowIndex + 1
+  } else if (e.key === 'ArrowUp') {
+    targetRow = rowIndex - 1
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter') {
+    // 已在上面分别处理
+  } else {
+    // 其他按键交给输入框本身处理
+    return
+  }
+
+  e.preventDefault()
+
+  if (targetRow < 0 || targetRow >= rowsCount || targetCol < 0 || targetCol >= colsCount) {
+    return
+  }
+
+  focusColorCell(targetRow, targetCol)
+}
+
+function parseClipboardText(text: string): string[][] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.split('\t'))
+    .filter((row) => row.some((cell) => cell.trim() !== ''))
+}
+
+function onColorCellPaste(e: ClipboardEvent, startRow: number, startCol: number) {
+  const text = e.clipboardData?.getData('text/plain') ?? ''
+  if (!text) return
+
+  const matrix = parseClipboardText(text)
+  if (!matrix.length) return
+
+  const maxRows = colorRows.value.length
+  const maxCols = sizeHeaders.value.length
+
+  matrix.forEach((rowValues, rOffset) => {
+    const rowIndex = startRow + rOffset
+    if (rowIndex >= maxRows) return
+    rowValues.forEach((value, cOffset) => {
+      const colIndex = startCol + cOffset
+      if (colIndex >= maxCols) return
+      const clean = value.replace(/[^\d.-]/g, '')
+      const num = Number(clean)
+      colorRows.value[rowIndex].quantities[colIndex] = Number.isNaN(num) ? 0 : num
+    })
+  })
+}
 
 function normalizeColorRows() {
   const len = sizeHeaders.value.length
@@ -876,12 +999,15 @@ function removeMaterialRow(index: number) {
 
 async function loadMaterialTypes() {
   try {
-    const res = await request.get<{ id: number; value: string }[]>('/dicts', {
+    const res = await request.get<Array<{ id: number; value: string } | string>>('/dicts', {
       params: { type: 'materialType' },
       skipGlobalErrorHandler: true,
     })
     const list = res.data ?? []
-    materialTypeOptions.value = list.map((i) => ({ label: i.value, value: i.value }))
+    materialTypeOptions.value = list.map((item: any) => {
+      const v = typeof item === 'string' ? item : item?.value
+      return { label: v, value: v }
+    })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('物料类型加载失败', getErrorMessage(e))
   }
@@ -901,6 +1027,100 @@ interface SizeInfoRow {
 }
 
 const sizeInfoRows = ref<SizeInfoRow[]>([])
+
+// D 区表格编辑能力：单元格引用与键盘导航、批量粘贴
+const sizeInfoCellRefs = ref<InputComponentInstance[][]>([])
+const activeSizeInfoCell = ref<{ row: number; col: number } | null>(null)
+
+function setSizeInfoCellRef(el: unknown, rowIndex: number, colIndex: number) {
+  if (!sizeInfoCellRefs.value[rowIndex]) sizeInfoCellRefs.value[rowIndex] = []
+  let target: InputComponentInstance = null
+  if (el && typeof el === 'object') {
+    const anyEl = el as any
+    if (anyEl.$el) {
+      target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+    } else {
+      target = anyEl as InputComponentInstance
+    }
+  }
+  sizeInfoCellRefs.value[rowIndex][colIndex] = target
+}
+
+function setActiveSizeInfoCell(rowIndex: number, colIndex: number) {
+  activeSizeInfoCell.value = { row: rowIndex, col: colIndex }
+}
+
+function focusSizeInfoCell(rowIndex: number, colIndex: number) {
+  if (rowIndex < 0 || colIndex < 0) return
+  const row = sizeInfoCellRefs.value[rowIndex]
+  const cell = row?.[colIndex]
+  if (cell && typeof cell.focus === 'function') {
+    nextTick(() => {
+      cell.focus && cell.focus()
+      activeSizeInfoCell.value = { row: rowIndex, col: colIndex }
+    })
+  }
+}
+
+function onSizeInfoCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
+  const rowsCount = sizeInfoRows.value.length
+  const colsCount = sizeHeaders.value.length
+  let targetRow = rowIndex
+  let targetCol = colIndex
+
+  if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
+    targetCol = colIndex + 1
+    if (targetCol >= colsCount) {
+      targetCol = 0
+      targetRow = rowIndex + 1
+    }
+  } else if (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
+    targetCol = colIndex - 1
+    if (targetCol < 0) {
+      targetCol = colsCount - 1
+      targetRow = rowIndex - 1
+    }
+  } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+    targetRow = rowIndex + 1
+  } else if (e.key === 'ArrowUp') {
+    targetRow = rowIndex - 1
+  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter') {
+    // 已在上面分别处理
+  } else {
+    return
+  }
+
+  e.preventDefault()
+
+  if (targetRow < 0 || targetRow >= rowsCount || targetCol < 0 || targetCol >= colsCount) {
+    return
+  }
+
+  focusSizeInfoCell(targetRow, targetCol)
+}
+
+function onSizeInfoCellPaste(e: ClipboardEvent, startRow: number, startCol: number) {
+  const text = e.clipboardData?.getData('text/plain') ?? ''
+  if (!text) return
+
+  const matrix = parseClipboardText(text)
+  if (!matrix.length) return
+
+  const maxRows = sizeInfoRows.value.length
+  const maxCols = sizeHeaders.value.length
+
+  matrix.forEach((rowValues, rOffset) => {
+    const rowIndex = startRow + rOffset
+    if (rowIndex >= maxRows) return
+    rowValues.forEach((value, cOffset) => {
+      const colIndex = startCol + cOffset
+      if (colIndex >= maxCols) return
+      const clean = value.replace(/[^\d.-]/g, '')
+      const num = Number(clean)
+      sizeInfoRows.value[rowIndex].sizeValues[colIndex] = Number.isNaN(num) ? 0 : num
+    })
+  })
+}
 
 function normalizeSizeInfoRows() {
   const metaLen = sizeMetaHeaders.value.length
@@ -1063,7 +1283,28 @@ async function onAttachmentFileChange(e: Event) {
 function removeAttachment(index: number) {
   attachments.value.splice(index, 1)
 }
-// 加工厂（供应商）
+
+// 订单图片点击上传
+const orderImageFileInputRef = ref<HTMLInputElement | null>(null)
+
+function triggerOrderImageUpload() {
+  orderImageFileInputRef.value?.click()
+}
+
+async function onOrderImageFileChange(e: Event) {
+  const input = e.target as HTMLInputElement
+  const file = input.files?.[0]
+  input.value = ''
+  if (!file) return
+  try {
+    const url = await uploadImage(file)
+    form.imageUrl = url
+  } catch (err: unknown) {
+    if (!isErrorHandled(err)) ElMessage.error(getErrorMessage(err))
+  }
+}
+
+// 供应商（C 区物料、E 区工艺用）
 const supplierOptions = ref<{ id: number; name: string }[]>([])
 const supplierLoading = ref(false)
 
@@ -1109,6 +1350,8 @@ async function collectPayload(): Promise<OrderFormPayload> {
   await formRef.value?.validate()
   return {
     ...form,
+    // 后端 orders 表用 label 字段存订单类型；确保保存/回显不丢失
+    label: form.orderType || '',
     colorSizeRows: colorRows.value.map((row) => ({
       colorName: row.colorName,
       quantities: [...row.quantities],
@@ -1205,15 +1448,19 @@ async function loadDetail() {
     form.merchandiser = d.merchandiser ?? ''
     form.merchandiserPhone = (d as any).merchandiserPhone ?? ''
     form.collaborationType = (d as any).collaborationType ?? ''
-    form.orderType = (d as any).orderType ?? ''
+    // 兼容：详情返回 label（DB 字段）或 orderType（前端字段）
+    form.orderType = (d as any).orderType ?? d.label ?? ''
     form.label = d.label ?? ''
-    form.secondaryProcess = d.secondaryProcess ?? ''
+    // 客户下拉若无当前客户，会显示 raw id；补一条 option 让 el-select 正常展示
+    if (form.customerId && form.customerName && !customerOptions.value.some((c) => c.id === form.customerId)) {
+      customerOptions.value.unshift({ id: form.customerId, companyName: form.customerName })
+    }
+  form.secondaryProcess = d.secondaryProcess ?? ''
     form.quantity = d.quantity ?? 0
     form.exFactoryPrice = d.exFactoryPrice ?? ''
     form.salePrice = d.salePrice ?? ''
     form.orderDate = d.orderDate ?? ''
     form.customerDueDate = d.customerDueDate ?? ''
-    form.factoryName = d.factoryName ?? ''
     form.imageUrl = d.imageUrl ?? ''
     // B 区
     sizeHeaders.value = (d as any).colorSizeHeaders && Array.isArray((d as any).colorSizeHeaders)
@@ -1344,17 +1591,53 @@ onMounted(async () => {
   gap: var(--space-xs);
 }
 
-.basic-form {
-  margin-top: var(--space-sm);
+.a-area-row {
+  align-items: flex-start;
 }
 
-.image-row {
-  margin-top: var(--space-md);
+.a-area-image-col {
+  flex-shrink: 0;
 }
 
-.image-field {
+.order-image-block {
+  width: 96px;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: var(--radius);
+}
+
+.order-image-block .image-preview-wrap {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  position: relative;
+}
+
+.order-image-block .image-placeholder {
+  width: 96px;
+  height: 96px;
+  border-radius: var(--radius);
+  border: 1px dashed var(--color-border);
   display: flex;
-  gap: var(--space-sm);
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--color-text-muted, #909399);
+  text-align: center;
+  padding: 4px;
+}
+
+.image-upload-hint {
+  font-size: 10px;
+  color: var(--color-primary, #409eff);
+}
+
+.basic-form {
+  margin-top: 0;
 }
 
 .image-preview-wrap {

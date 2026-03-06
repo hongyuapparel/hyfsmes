@@ -97,12 +97,86 @@ const rules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
 }
 
-const treeData = computed(() => {
-  return permissions.value.map((p) => ({
-    id: p.id,
-    name: `${p.name} (${p.routePath || '/'})`,
-    children: [],
-  }))
+interface TreeNode {
+  id: number | string
+  name: string
+  children?: TreeNode[]
+}
+
+interface PageNode extends TreeNode {
+  routePath: string
+}
+
+const treeData = computed<TreeNode[]>(() => {
+  const pageMap = new Map<string, PageNode>()
+
+  const getPageNode = (routePath: string, displayName: string): PageNode => {
+    const key = routePath || '/'
+    let node = pageMap.get(key)
+    if (!node) {
+      const pathLabel = key || '/'
+      node = {
+        id: `page:${key}`,
+        name: `${displayName || '页面'} (${pathLabel})`,
+        routePath: key,
+        children: [],
+      }
+      pageMap.set(key, node)
+    } else if (!node.name && displayName) {
+      node.name = `${displayName} (${key || '/'})`
+    }
+    return node
+  }
+
+  for (const p of permissions.value) {
+    const routePath = p.routePath || '/'
+    const pageNode = getPageNode(routePath, p.name)
+    const children = pageNode.children ?? (pageNode.children = [])
+
+    if (p.type === 'menu') {
+      children.push({
+        id: p.id,
+        name: '板块可见（菜单）',
+      })
+    } else {
+      let actionGroup = children.find((c) => c.id === `action:${routePath}`)
+      if (!actionGroup) {
+        actionGroup = {
+          id: `action:${routePath}`,
+          name: '编辑/操作权限',
+          children: [],
+        }
+        children.push(actionGroup)
+      }
+      ;(actionGroup.children ?? (actionGroup.children = [])).push({
+        id: p.id,
+        name: p.name,
+      })
+    }
+  }
+
+  const roots: TreeNode[] = []
+  const allPages = Array.from(pageMap.values())
+
+  const findParent = (path: string): PageNode | null => {
+    if (!path || path === '/') return null
+    const parts = path.split('/').filter(Boolean)
+    if (parts.length <= 1) return pageMap.get('/') ?? null
+    const parentPath = '/' + parts.slice(0, parts.length - 1).join('/')
+    return pageMap.get(parentPath) ?? null
+  }
+
+  for (const page of allPages) {
+    const parent = findParent(page.routePath)
+    if (!parent) {
+      roots.push(page)
+    } else {
+      const parentChildren = parent.children ?? (parent.children = [])
+      parentChildren.push(page)
+    }
+  }
+
+  return roots
 })
 
 async function load() {
@@ -181,7 +255,9 @@ async function savePermissions() {
   if (!selectedRoleId.value) return
   const half = treeRef.value?.getHalfCheckedKeys?.() ?? []
   const full = treeRef.value?.getCheckedKeys?.() ?? []
-  const ids = [...new Set([...(half as number[]), ...(full as number[])])]
+  const ids = [
+    ...new Set([...(half as Array<number | string>), ...(full as Array<number | string>)]),
+  ].filter((id): id is number => typeof id === 'number')
   saving.value = true
   try {
     await setRolePermissions(selectedRoleId.value, ids)

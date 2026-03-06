@@ -47,39 +47,49 @@
         </div>
       </aside>
       <!-- 右侧：产品详情 -->
-      <main class="products-main">
+      <main ref="productsMainRef" class="products-main">
         <!-- 顶部筛选 -->
-        <div class="filter-bar">
-          <div
-            class="filter-bar-item filter-input-with-label"
-            :class="{ 'has-value': !!filter.companyName }"
-            data-label="客户"
+        <div ref="filterBarRef" class="filter-bar">
+          <el-input
+            v-model="filter.companyName"
+            placeholder="客户"
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getTextFilterStyle('客户：', filter.companyName, companyNameLabelVisible)"
+            :input-style="getFilterInputStyle(filter.companyName)"
+            @input="debouncedSearch"
+            @keyup.enter="onFilterChange(true)"
           >
-            <el-input
-              v-model="filter.companyName"
-              placeholder="客户"
-              clearable
-              size="large"
-              :input-style="getFilterInputStyle(filter.companyName)"
-              @input="debouncedSearch"
-              @keyup.enter="onFilterChange"
-            />
-          </div>
-          <div
-            class="filter-bar-item filter-input-with-label"
-            :class="{ 'has-value': !!filter.skuCode }"
-            data-label="SKU编号"
+            <template #prefix>
+              <span
+                v-if="filter.companyName && companyNameLabelVisible"
+                :style="{ color: ACTIVE_FILTER_COLOR }"
+              >
+                客户：
+              </span>
+            </template>
+          </el-input>
+          <el-input
+            v-model="filter.skuCode"
+            placeholder="SKU编号"
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getTextFilterStyle('SKU编号：', filter.skuCode, skuCodeLabelVisible)"
+            :input-style="getFilterInputStyle(filter.skuCode)"
+            @input="debouncedSearch"
+            @keyup.enter="onFilterChange(true)"
           >
-            <el-input
-              v-model="filter.skuCode"
-              placeholder="SKU编号"
-              clearable
-              size="large"
-              :input-style="getFilterInputStyle(filter.skuCode)"
-              @input="debouncedSearch"
-              @keyup.enter="onFilterChange"
-            />
-          </div>
+            <template #prefix>
+              <span
+                v-if="filter.skuCode && skuCodeLabelVisible"
+                :style="{ color: ACTIVE_FILTER_COLOR }"
+              >
+                SKU编号：
+              </span>
+            </template>
+          </el-input>
           <el-select
             v-model="filter.salesperson"
             placeholder="业务员"
@@ -87,12 +97,16 @@
             filterable
             size="large"
             class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.salesperson)"
+            :style="getFilterSelectAutoWidthStyle(filter.salesperson)"
             @change="onFilterChange"
           >
+            <template #label="{ label }">
+              <span v-if="filter.salesperson">业务员：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
             <el-option v-for="s in salespeople" :key="s" :label="s" :value="s" />
           </el-select>
-          <el-button type="primary" size="large" @click="onFilterChange">筛选</el-button>
+          <el-button type="primary" size="large" @click="onFilterChange(true)">筛选</el-button>
           <el-button size="large" @click="resetFilter">清空</el-button>
 
           <div class="filter-actions">
@@ -110,6 +124,7 @@
           border
           stripe
           :fit="true"
+          :height="tableHeight"
           :row-style="() => ({ height: '34px' })"
           :cell-style="getCellStyle"
           :header-cell-style="getHeaderCellStyle"
@@ -164,7 +179,7 @@
         </el-table>
 
         <!-- 分页 -->
-        <div class="pagination-wrap">
+        <div ref="paginationWrapRef" class="pagination-wrap">
           <el-pagination
             v-model:current-page="pagination.page"
             v-model:page-size="pagination.pageSize"
@@ -250,10 +265,8 @@
             filterable
             default-expand-all
             :render-after-expand="false"
-            :fit-input-width="false"
-            popper-class="product-group-tree-dropdown"
             node-key="value"
-            :props="productGroupTreeSelectProps"
+            :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
             size="default"
             style="width: 100%"
           />
@@ -301,7 +314,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, watch, onMounted, computed, nextTick, onBeforeUnmount } from 'vue'
 import { ArrowLeft, ArrowRight, ArrowDown } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { PRODUCT_FIELDS_SORTED } from '@/fields'
@@ -347,13 +360,20 @@ const imageFileInputRef = ref<HTMLInputElement | null>(null)
 const imageDragOver = ref(false)
 const imageUploading = ref(false)
 
+const productsMainRef = ref<HTMLElement | null>(null)
+const filterBarRef = ref<HTMLElement | null>(null)
+const paginationWrapRef = ref<HTMLElement | null>(null)
+const tableHeight = ref<number | undefined>(undefined)
+let tableResizeObserver: ResizeObserver | null = null
+
 const filter = reactive({ companyName: '', skuCode: '', productGroup: '', salesperson: '' })
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const sort = reactive({ sortBy: 'id', sortOrder: 'asc' as 'asc' | 'desc' })
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_ITEM_WIDTH = 120
-const FILTER_MAX_WIDTH = 260
+const FILTER_AUTO_MIN_WIDTH = 140
+const FILTER_AUTO_MAX_WIDTH = 320
+const FILTER_CHAR_PX = 14
 const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
 const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
 
@@ -365,18 +385,28 @@ function getFilterSelectStyle(v: unknown) {
   return v ? activeSelectStyle : undefined
 }
 
-function getSmartFilterSelectStyle(v: unknown) {
-  const text = typeof v === 'string' ? v : v == null ? '' : String(v)
-  const len = text.length
-  const base = FILTER_ITEM_WIDTH
-  const width = len ? Math.min(base + len * 8, FILTER_MAX_WIDTH) : base
-  const colorStyle = v ? activeSelectStyle : {}
+function getFilterSelectAutoWidthStyle(v: unknown) {
+  if (!v) return undefined
+  const text = String(v)
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
   return {
-    ...colorStyle,
+    ...activeSelectStyle,
     width: `${width}px`,
     flex: `0 0 ${width}px`,
   }
 }
+
+function getTextFilterStyle(labelPrefix: string, value: unknown, showLabel: boolean) {
+  if (!value || !showLabel) return undefined
+  const text = `${labelPrefix}${String(value)}`
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return { width: `${width}px`, flex: `0 0 ${width}px` }
+}
+
+const companyNameLabelVisible = ref(false)
+const skuCodeLabelVisible = ref(false)
 
 /** 左侧分组树数据（含每节点产品数量）；根节点为「全部分组」 */
 interface GroupTreeNode {
@@ -412,14 +442,6 @@ const groupTreeWithCounts = computed(() => {
   const totalFromMap = Object.values(map).reduce((s, n) => s + n, 0)
   return [{ path: '', label: '全部分组', count: totalFromMap, children: children.length ? children : undefined }]
 })
-
-const productGroupTreeSelectProps = {
-  label: 'label',
-  value: 'value',
-  children: 'children',
-  disabled: (node: { children?: unknown[] }) =>
-    Array.isArray(node.children) && node.children.length > 0,
-}
 
 /** 扁平化分组树（含层级深度），供侧边 el-menu 渲染 */
 const flatGroupNodes = computed<FlatGroupNode[]>(() => {
@@ -469,8 +491,6 @@ const tableFields = computed(() => {
     ? (src as { code: string; label: string; type: string; sortable?: boolean; visible?: number }[])
     : []
   return list
-    // 产品列表中不显示「产品分组」这一列，避免与左侧分组重复
-    .filter((f) => f.code !== 'productGroup')
     .filter((f) => (f as { visible?: number }).visible !== 0)
     .sort((a, b) => ((a as { order?: number }).order ?? 0) - ((b as { order?: number }).order ?? 0))
     .map((f) => ({
@@ -513,28 +533,6 @@ const formRules = computed<FormRules>(() => {
   }
   return r
 })
-
-function getHeaderCellStyle() {
-  return {
-    whiteSpace: 'nowrap',
-  }
-}
-
-function getCellStyle() {
-  return {
-    padding: '4px 10px',
-    whiteSpace: 'nowrap',
-  }
-}
-
-function getColumnMinWidth(f: { code: string; type: string }): number {
-  if (f.type === 'image') return 90
-  if (f.type === 'date') return 120
-  if (f.code === 'productName') return 180
-  if (f.code === 'productGroup') return 150
-  if (f.code === 'companyName') return 150
-  return 110
-}
 
 function formatDate(v: string | null | undefined) {
   if (!v) return '-'
@@ -677,21 +675,34 @@ function debouncedSearch() {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     searchTimer = null
-    onFilterChange()
+    onFilterChange(false)
   }, 400)
 }
 
-function onFilterChange() {
+function onFilterChange(byUser = false) {
+  if (byUser) {
+    if (filter.companyName && String(filter.companyName).trim()) companyNameLabelVisible.value = true
+    if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
+  }
   pagination.page = 1
   load()
 }
 
 /** 转为树形选择器数据：label 为节点名，value 为完整路径（仅叶节点可选时用于存储） */
-function toProductGroupTreeSelect(nodes: SystemOptionTreeNode[], parentPath = ''): { label: string; value: string; children: { label: string; value: string; children: unknown[] }[] }[] {
+function toProductGroupTreeSelect(
+  nodes: SystemOptionTreeNode[],
+  parentPath = '',
+): { label: string; value: string; children?: { label: string; value: string; children?: unknown[] }[]; disabled?: boolean }[] {
   return nodes.map((n) => {
     const path = parentPath ? `${parentPath} > ${n.value}` : n.value
     const children = n.children?.length ? toProductGroupTreeSelect(n.children, path) : []
-    return { label: n.value, value: path, children }
+    const hasChildren = children.length > 0
+    return {
+      label: n.value,
+      value: path,
+      children: hasChildren ? children : undefined,
+      disabled: hasChildren,
+    }
   })
 }
 
@@ -726,6 +737,8 @@ async function loadOptions() {
 }
 
 function resetFilter() {
+  companyNameLabelVisible.value = false
+  skuCodeLabelVisible.value = false
   filter.companyName = ''
   filter.skuCode = ''
   filter.productGroup = ''
@@ -747,6 +760,46 @@ function onSortChange({ prop, order }: { prop?: string; order?: string }) {
     sort.sortOrder = 'asc'
   }
   load()
+}
+
+function getHeaderCellStyle() {
+  return {
+    whiteSpace: 'nowrap',
+  }
+}
+
+function getCellStyle() {
+  return {
+    padding: '4px 10px',
+    whiteSpace: 'nowrap',
+  }
+}
+
+function getColumnMinWidth(f: { code: string; type: string }): number {
+  if (f.type === 'image') return 96
+  if (f.type === 'date') return 120
+  if (f.code === 'productName') return 180
+  if (f.code === 'productGroup') return 160
+  if (f.code === 'companyName') return 160
+  if (f.code === 'skuCode') return 120
+  return 110
+}
+
+function updateTableHeight() {
+  const main = productsMainRef.value
+  if (!main) return
+  const mainH = main.clientHeight
+  const filterH = filterBarRef.value?.offsetHeight ?? 0
+  const paginationH = paginationWrapRef.value?.offsetHeight ?? 0
+
+  const cs = window.getComputedStyle(main)
+  const gap = parseFloat(cs.rowGap || cs.gap || '0') || 0
+  const paddingTop = parseFloat(cs.paddingTop || '0') || 0
+  const paddingBottom = parseFloat(cs.paddingBottom || '0') || 0
+
+  // filter + table + pagination 为纵向排列，gap 大约出现两次
+  const available = mainH - paddingTop - paddingBottom - filterH - paginationH - gap * 2
+  tableHeight.value = Math.max(240, Math.floor(available))
 }
 
 async function openCreate() {
@@ -830,10 +883,39 @@ async function batchDelete() {
   }
 }
 
-onMounted(() => {
+watch(
+  () => filter.companyName,
+  (v) => {
+    if (!v || !String(v).trim()) companyNameLabelVisible.value = false
+  },
+)
+watch(
+  () => filter.skuCode,
+  (v) => {
+    if (!v || !String(v).trim()) skuCodeLabelVisible.value = false
+  },
+)
+
+onMounted(async () => {
   loadFieldDefinitions()
   load()
   loadOptions()
+
+  await nextTick()
+  updateTableHeight()
+
+  tableResizeObserver = new ResizeObserver(() => updateTableHeight())
+  if (productsMainRef.value) tableResizeObserver.observe(productsMainRef.value)
+  if (filterBarRef.value) tableResizeObserver.observe(filterBarRef.value)
+  if (paginationWrapRef.value) tableResizeObserver.observe(paginationWrapRef.value)
+
+  window.addEventListener('resize', updateTableHeight)
+})
+
+onBeforeUnmount(() => {
+  tableResizeObserver?.disconnect()
+  tableResizeObserver = null
+  window.removeEventListener('resize', updateTableHeight)
 })
 </script>
 
@@ -843,12 +925,17 @@ onMounted(() => {
   padding: var(--space-sm);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
 }
 
 .products-layout {
   display: flex;
   gap: var(--space-sm);
   min-height: 400px;
+  flex: 1;
+  min-height: 0;
 }
 
 .products-sidebar {
@@ -959,6 +1046,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: var(--space-xs);
+  min-height: 0;
 }
 .filter-actions {
   margin-left: auto;
@@ -970,6 +1058,9 @@ onMounted(() => {
   margin-top: var(--space-sm);
   display: flex;
   justify-content: flex-end;
+}
+.products-table :deep(.el-table__header .cell) {
+  white-space: nowrap;
 }
 .column-config-hint {
   margin: 0 0 var(--space-md);

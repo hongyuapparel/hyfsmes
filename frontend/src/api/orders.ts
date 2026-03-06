@@ -21,10 +21,14 @@ export interface OrderListItem {
   exFactoryPrice: string
   /** 销售价 */
   salePrice: string
+  /** 订单类型（列表展示用） */
+  orderType?: string
+  /** 合作方式（展示在 SKU 行后面） */
+  collaborationType?: string
   /** 标签/样品类型 */
   label: string
-  /** 二次工艺 */
-  secondaryProcess: string
+  /** 工艺项目（原二次工艺） */
+  processItem: string
   /** 当前状态 */
   status: string
   /** 当前状态时间 */
@@ -55,7 +59,8 @@ export interface OrderListQuery {
   skuCode?: string
   customer?: string
   orderType?: string
-  secondaryProcess?: string
+  /** 工艺项目（原二次工艺） */
+  processItem?: string
   salesperson?: string
   merchandiser?: string
   orderDateStart?: string
@@ -72,6 +77,16 @@ export function getOrders(params?: OrderListQuery) {
   return request.get<OrderListRes>('/orders', { params })
 }
 
+export interface OrderStatusCountsRes {
+  total: number
+  byStatus: Record<string, number>
+}
+
+/** 状态 Tab 数量统计（与列表筛选同源，但忽略 status） */
+export function getOrderStatusCounts(params?: Omit<OrderListQuery, 'status' | 'page' | 'pageSize'>) {
+  return request.get<OrderStatusCountsRes>('/orders/status-counts', { params })
+}
+
 /** 订单编辑页表单字段（仅 A 区，后续可扩展） */
 export interface OrderFormPayload {
   skuCode?: string
@@ -84,7 +99,8 @@ export interface OrderFormPayload {
   collaborationType?: string
   orderType?: string
   label?: string
-  secondaryProcess?: string
+  /** 工艺项目（原二次工艺） */
+  processItem?: string
   quantity?: number
   exFactoryPrice?: string
   salePrice?: string
@@ -162,12 +178,17 @@ export function submitOrder(id: number) {
 }
 
 /** 批量删除订单 */
-export function batchDeleteOrders(ids: number[]) {
+export function deleteOrders(ids: number[]) {
   return request.post<void>('/orders/batch-delete', { ids })
 }
 
-/** 批量审单（仅待审单） */
+/** 待审单批量审核 */
 export function reviewOrders(ids: number[]) {
   return request.post<void>('/orders/review', { ids })
+}
+
+/** 批量复制为草稿 */
+export function copyOrdersToDraft(ids: number[]) {
+  return request.post<OrderDetail[]>('/orders/copy-to-draft', { ids })
 }
 

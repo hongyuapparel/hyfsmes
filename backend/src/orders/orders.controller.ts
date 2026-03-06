@@ -22,7 +22,7 @@ export class OrdersController {
     @Query('skuCode') skuCode?: string,
     @Query('customer') customer?: string,
     @Query('orderType') orderType?: string,
-    @Query('secondaryProcess') secondaryProcess?: string,
+    @Query('processItem') processItem?: string,
     @Query('salesperson') salesperson?: string,
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
@@ -39,7 +39,7 @@ export class OrdersController {
       skuCode,
       customer,
       orderType,
-      secondaryProcess,
+      processItem,
       salesperson,
       merchandiser,
       orderDateStart,
@@ -52,6 +52,46 @@ export class OrdersController {
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
     return this.ordersService.findAll(query);
+  }
+
+  /**
+   * 各状态订单数量（用于状态 Tab 显示数量）
+   * GET /orders/status-counts
+   *
+   * 说明：
+   * - 使用与列表相同的筛选条件
+   * - 忽略 status（即统计所有状态的分布）
+   */
+  @Get('status-counts')
+  getStatusCounts(
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('customer') customer?: string,
+    @Query('orderType') orderType?: string,
+    @Query('processItem') processItem?: string,
+    @Query('salesperson') salesperson?: string,
+    @Query('merchandiser') merchandiser?: string,
+    @Query('orderDateStart') orderDateStart?: string,
+    @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('customerDueStart') customerDueStart?: string,
+    @Query('customerDueEnd') customerDueEnd?: string,
+    @Query('factory') factory?: string,
+  ) {
+    const query: OrderListQuery = {
+      orderNo,
+      skuCode,
+      customer,
+      orderType,
+      processItem,
+      salesperson,
+      merchandiser,
+      orderDateStart,
+      orderDateEnd,
+      customerDueStart,
+      customerDueEnd,
+      factory,
+    };
+    return this.ordersService.countByStatus(query);
   }
 
   /**
@@ -93,23 +133,33 @@ export class OrdersController {
   /**
    * 批量删除订单
    * POST /orders/batch-delete
+   * body: { ids: number[] }
    */
   @Post('batch-delete')
   @RequirePermission('orders_delete')
-  batchDelete(@Body() body: { ids?: number[] }) {
-    const ids = Array.isArray(body?.ids) ? body.ids : [];
-    return this.ordersService.batchDelete(ids);
+  batchDelete(@Body('ids') ids: number[]) {
+    return this.ordersService.deleteMany(ids ?? []);
   }
 
   /**
-   * 批量审单（仅待审单状态）
+   * 待审单批量审核
    * POST /orders/review
+   * body: { ids: number[] }
    */
   @Post('review')
   @RequirePermission('orders_review')
-  review(@Body() body: { ids?: number[] }) {
-    const ids = Array.isArray(body?.ids) ? body.ids : [];
-    return this.ordersService.review(ids);
+  review(@Body('ids') ids: number[]) {
+    return this.ordersService.reviewMany(ids ?? []);
+  }
+
+  /**
+   * 批量复制为草稿
+   * POST /orders/copy-to-draft
+   * body: { ids: number[] }
+   */
+  @Post('copy-to-draft')
+  copyToDraft(@Body('ids') ids: number[]) {
+    return this.ordersService.copyManyToDraft(ids ?? []);
   }
 }
 

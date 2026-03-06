@@ -65,7 +65,7 @@ export const useAuthStore = defineStore('auth', () => {
     return permissionRoutes.value.includes(path)
   }
 
-  function hasPermissionCode(code: string): boolean {
+  function hasPermission(code: string): boolean {
     if (!permissionCodes.value.length) return false
     return permissionCodes.value.includes(code)
   }
@@ -82,6 +82,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchUser,
     logout,
     hasRoutePermission,
-    hasPermissionCode,
+    hasPermission,
   }
 })

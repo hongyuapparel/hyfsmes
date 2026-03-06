@@ -24,6 +24,7 @@ export const menuConfig: MenuItem[] = [
     children: [
       { path: '/production/purchase', title: '采购管理' },
       { path: '/production/pattern', title: '纸样管理' },
+      { path: '/production/process', title: '工艺管理' },
       { path: '/production/cutting', title: '裁床管理' },
       { path: '/production/sewing', title: '车缝管理' },
       { path: '/production/finishing', title: '尾部管理' },

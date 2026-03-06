@@ -2,21 +2,26 @@
   <div class="page-card">
     <!-- 顶部筛选 -->
     <div class="filter-bar">
-      <div
-        class="filter-bar-item filter-input-with-label"
-        :class="{ 'has-value': !!filter.companyName }"
-        data-label="公司名称"
+      <el-input
+        v-model="filter.companyName"
+        placeholder="公司名称"
+        clearable
+        size="large"
+        class="filter-bar-item"
+        :style="getTextFilterStyle('公司名称：', filter.companyName, companyNameLabelVisible)"
+        :input-style="getFilterInputStyle(filter.companyName)"
+        @input="debouncedSearch"
+        @keyup.enter="onFilterChange(true)"
       >
-        <el-input
-          v-model="filter.companyName"
-          placeholder="公司名称"
-          clearable
-          size="large"
-          :input-style="getFilterInputStyle(filter.companyName)"
-          @input="debouncedSearch"
-          @keyup.enter="onFilterChange"
-        />
-      </div>
+        <template #prefix>
+          <span
+            v-if="filter.companyName && companyNameLabelVisible"
+            :style="{ color: ACTIVE_FILTER_COLOR }"
+          >
+            公司名称：
+          </span>
+        </template>
+      </el-input>
       <el-select
         v-model="filter.salesperson"
         placeholder="业务员"
@@ -24,12 +29,16 @@
         filterable
         size="large"
         class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.salesperson)"
+        :style="getFilterSelectAutoWidthStyle(filter.salesperson)"
         @change="onFilterChange"
       >
+        <template #label="{ label }">
+          <span v-if="filter.salesperson">业务员：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="s in salespeople" :key="s" :label="s" :value="s" />
       </el-select>
-      <el-button type="primary" size="large" @click="onFilterChange">筛选</el-button>
+      <el-button type="primary" size="large" @click="onFilterChange(true)">筛选</el-button>
       <el-button size="large" @click="resetFilter">清空</el-button>
 
       <div class="filter-actions">
@@ -224,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, watch, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { CUSTOMER_FIELDS_SORTED } from '@/fields'
 import {
@@ -259,8 +268,9 @@ const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const sort = reactive({ sortBy: 'id', sortOrder: 'asc' as 'asc' | 'desc' })
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_ITEM_WIDTH = 120
-const FILTER_MAX_WIDTH = 260
+const FILTER_AUTO_MIN_WIDTH = 140
+const FILTER_AUTO_MAX_WIDTH = 320
+const FILTER_CHAR_PX = 14
 const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
 const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
 
@@ -272,18 +282,27 @@ function getFilterSelectStyle(v: unknown) {
   return v ? activeSelectStyle : undefined
 }
 
-function getSmartFilterSelectStyle(v: unknown) {
-  const text = typeof v === 'string' ? v : v == null ? '' : String(v)
-  const len = text.length
-  const base = FILTER_ITEM_WIDTH
-  const width = len ? Math.min(base + len * 8, FILTER_MAX_WIDTH) : base
-  const colorStyle = v ? activeSelectStyle : {}
+function getFilterSelectAutoWidthStyle(v: unknown) {
+  if (!v) return undefined
+  const text = String(v)
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
   return {
-    ...colorStyle,
+    ...activeSelectStyle,
     width: `${width}px`,
     flex: `0 0 ${width}px`,
   }
 }
+
+function getTextFilterStyle(labelPrefix: string, value: unknown, showLabel: boolean) {
+  if (!value || !showLabel) return undefined
+  const text = `${labelPrefix}${String(value)}`
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return { width: `${width}px`, flex: `0 0 ${width}px` }
+}
+
+const companyNameLabelVisible = ref(false)
 
 const form = reactive<Record<string, string | null>>({})
 const formRules = computed<FormRules>(() => {
@@ -324,11 +343,14 @@ function debouncedSearch() {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     searchTimer = null
-    onFilterChange()
+    onFilterChange(false)
   }, 400)
 }
 
-function onFilterChange() {
+function onFilterChange(byUser = false) {
+  if (byUser && filter.companyName && String(filter.companyName).trim()) {
+    companyNameLabelVisible.value = true
+  }
   pagination.page = 1
   load()
 }
@@ -345,6 +367,7 @@ async function loadOptions() {
 }
 
 function resetFilter() {
+  companyNameLabelVisible.value = false
   filter.companyName = ''
   filter.salesperson = ''
   pagination.page = 1
@@ -519,6 +542,13 @@ function closeXiaomanAndRefresh() {
   xiaomanDialogVisible.value = false
   load()
 }
+
+watch(
+  () => filter.companyName,
+  (v) => {
+    if (!v || !String(v).trim()) companyNameLabelVisible.value = false
+  },
+)
 
 onMounted(() => {
   load()

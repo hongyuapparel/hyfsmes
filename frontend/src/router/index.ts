@@ -57,6 +57,13 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/orders/list.vue'),
             meta: { title: '订单列表', permissionPath: '/orders/list' },
           },
+          {
+            path: 'edit/:id?',
+            name: 'OrdersEdit',
+            component: () => import('@/views/orders/edit.vue'),
+            // 复用订单列表的菜单权限，避免额外配置独立菜单项
+            meta: { title: '订单编辑', permissionPath: '/orders/list' },
+          },
         ],
       },
       {
@@ -76,6 +83,12 @@ const routes: RouteRecordRaw[] = [
             name: 'ProductionPattern',
             component: () => import('@/views/production/pattern.vue'),
             meta: { title: '纸样管理', permissionPath: '/production/pattern' },
+          },
+          {
+            path: 'process',
+            name: 'ProductionProcess',
+            component: () => import('@/views/production/process.vue'),
+            meta: { title: '工艺管理', permissionPath: '/production/process' },
           },
           {
             path: 'cutting',

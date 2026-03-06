@@ -20,6 +20,7 @@ import { ProductsModule } from './products/products.module';
 import { FieldDefinitionsModule } from './field-definitions/field-definitions.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { OrdersModule } from './orders/orders.module';
+import { DictsModule } from './dicts/dicts.module';
 
 @Module({
   imports: [
@@ -45,6 +46,7 @@ import { OrdersModule } from './orders/orders.module';
     FieldDefinitionsModule,
     UploadsModule,
     OrdersModule,
+    DictsModule,
   ],
 })
 export class AppModule {}

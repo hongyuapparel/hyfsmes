@@ -9,7 +9,7 @@
             :key="tab.value"
             :label="tab.value"
           >
-            {{ tab.label }}
+            {{ getStatusTabLabel(tab) }}
           </el-radio-button>
         </el-radio-group>
       </div>
@@ -20,36 +20,46 @@
 
     <!-- 筛选区：与客户管理 / 产品列表保持同一设计 -->
     <div class="filter-bar">
-      <div
-        class="filter-bar-item filter-input-with-label"
-        :class="{ 'has-value': !!filter.orderNo }"
-        data-label="订单号"
+      <el-input
+        v-model="filter.orderNo"
+        placeholder="订单号"
+        clearable
+        size="large"
+        class="filter-bar-item"
+        :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
+        :input-style="getFilterInputStyle(filter.orderNo)"
+        @input="debouncedSearch"
+        @keyup.enter="onSearch(true)"
       >
-        <el-input
-          v-model="filter.orderNo"
-          placeholder="订单号"
-          clearable
-          size="large"
-          :input-style="getFilterInputStyle(filter.orderNo)"
-          @input="debouncedSearch"
-          @keyup.enter="onSearch"
-        />
-      </div>
-      <div
-        class="filter-bar-item filter-input-with-label"
-        :class="{ 'has-value': !!filter.skuCode }"
-        data-label="SKU编号"
+        <template #prefix>
+          <span
+            v-if="filter.orderNo && orderNoLabelVisible"
+            :style="{ color: ACTIVE_FILTER_COLOR }"
+          >
+            订单号：
+          </span>
+        </template>
+      </el-input>
+      <el-input
+        v-model="filter.skuCode"
+        placeholder="SKU编号"
+        clearable
+        size="large"
+        class="filter-bar-item"
+        :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
+        :input-style="getFilterInputStyle(filter.skuCode)"
+        @input="debouncedSearch"
+        @keyup.enter="onSearch(true)"
       >
-        <el-input
-          v-model="filter.skuCode"
-          placeholder="SKU编号"
-          clearable
-          size="large"
-          :input-style="getFilterInputStyle(filter.skuCode)"
-          @input="debouncedSearch"
-          @keyup.enter="onSearch"
-        />
-      </div>
+        <template #prefix>
+          <span
+            v-if="filter.skuCode && skuCodeLabelVisible"
+            :style="{ color: ACTIVE_FILTER_COLOR }"
+          >
+            SKU编号：
+          </span>
+        </template>
+      </el-input>
       <el-select
         v-model="filter.customer"
         placeholder="客户"
@@ -57,7 +67,7 @@
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.customer)"
+        :style="getFilterSelectAutoWidthStyle(filter.customer)"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -79,32 +89,36 @@
         clearable
         default-expand-all
         :render-after-expand="false"
-        :fit-input-width="false"
-        popper-class="order-type-tree-dropdown"
         node-key="value"
-        :props="orderTypeTreeSelectProps"
+        :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         size="large"
-        class="filter-bar-item order-type-filter"
-        :style="getSmartFilterSelectStyle(filter.orderType)"
+        class="filter-bar-item"
+        :style="getFilterSelectAutoWidthStyle(
+          filter.orderType && `订单类型：${getOrderTypeDisplayLabel(filter.orderType)}`,
+        )"
         @change="onSearch"
       >
-        <template #label="{ label }">
-          <span v-if="filter.orderType">订单类型：{{ label }}</span>
-          <span v-else>{{ label }}</span>
+        <template #prefix>
+          <span
+            v-if="filter.orderType"
+            :style="{ color: 'var(--el-color-primary)' }"
+          >
+            订单类型：
+          </span>
         </template>
       </el-tree-select>
       <el-select
-        v-model="filter.secondaryProcess"
-        placeholder="二次工艺"
+        v-model="filter.processItem"
+        placeholder="工艺项目"
         filterable
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.secondaryProcess)"
+        :style="getFilterSelectAutoWidthStyle(filter.processItem)"
         @change="onSearch"
       >
         <template #label="{ label }">
-          <span v-if="filter.secondaryProcess">二次工艺：{{ label }}</span>
+          <span v-if="filter.processItem">工艺项目：{{ label }}</span>
           <span v-else>{{ label }}</span>
         </template>
         <el-option
@@ -121,7 +135,7 @@
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.salesperson)"
+        :style="getFilterSelectAutoWidthStyle(filter.salesperson)"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -142,7 +156,7 @@
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.merchandiser)"
+        :style="getFilterSelectAutoWidthStyle(filter.merchandiser)"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -189,7 +203,7 @@
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getSmartFilterSelectStyle(filter.factory)"
+        :style="getFilterSelectAutoWidthStyle(filter.factory)"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -205,23 +219,28 @@
       </el-select>
 
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
+        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button
-          v-if="canDeleteOrders"
+          v-if="canDeleteOrders && hasSelection"
           type="danger"
           size="large"
-          :disabled="!selectedOrderIds.length"
           @click="onBatchDelete"
         >
           删除
         </el-button>
         <el-button
-          v-if="currentStatus === 'pending_review' && canReviewOrders"
-          type="primary"
-          plain
+          v-if="hasSelection"
+          type="warning"
           size="large"
-          :disabled="!selectedOrderIds.length"
+          @click="onBatchCopyToDraft"
+        >
+          复制为草稿
+        </el-button>
+        <el-button
+          v-if="canReviewOrders && isPendingReviewTab && hasSelection"
+          type="success"
+          size="large"
           @click="onBatchReview"
         >
           审单
@@ -239,25 +258,39 @@
           class="order-card"
         >
           <div class="order-card-header">
-            <div class="order-card-image">
-              <el-image
-                v-if="item.imageUrl"
-                :src="item.imageUrl"
-                fit="cover"
-                :preview-src-list="[item.imageUrl]"
+            <div class="order-card-header-top">
+              <span class="order-no" :title="item.orderNo">{{ item.orderNo }}</span>
+              <el-checkbox
+                v-model="cardSelected[item.id]"
+                size="large"
+                class="card-checkbox"
+                @change="onCardSelectChange"
               />
-              <div v-else class="image-placeholder">图片</div>
             </div>
-            <div class="order-card-main">
-              <div class="order-card-title-row">
-                <span class="order-no" :title="item.orderNo">{{ item.orderNo }}</span>
-                <el-checkbox v-model="cardSelected[item.id]" size="large" class="card-checkbox" @change="onCardSelectChange" />
+            <div class="order-card-header-main">
+              <div class="order-card-image">
+                <el-image
+                  v-if="item.imageUrl"
+                  :src="item.imageUrl"
+                  fit="cover"
+                  :preview-src-list="[item.imageUrl]"
+                />
+                <div v-else class="image-placeholder">图片</div>
               </div>
-              <span class="sku-line">SKU：{{ item.skuCode || '-' }}</span>
-              <div class="order-card-meta">
-                <span>客户交期：{{ formatDate(item.customerDueDate) }}</span>
-                <span>当前状态：{{ getStatusLabel(item.status) }}</span>
-                <span v-if="item.statusTime">状态时间：{{ formatDateTime(item.statusTime) }}</span>
+              <div class="order-card-main">
+                <span class="sku-line">
+                  SKU：{{ item.skuCode || '-' }}
+                  <template v-if="item.collaborationType">
+                    · {{ item.collaborationType }}
+                  </template>
+                </span>
+                <div class="order-card-meta">
+                  <span>客户交期：{{ formatDate(item.customerDueDate) }}</span>
+                  <span>当前状态：{{ getStatusLabel(item.status) }}</span>
+                  <span v-if="item.status !== 'draft' && item.orderDate">
+                    下单时间：{{ formatDateTime(item.orderDate) }}
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -276,36 +309,41 @@
             </div>
             <div class="field-row">
               <span class="field-label">数量：</span>
-              <span class="field-value">{{ item.quantity }}</span>
+              <span class="field-value">{{ item.quantity }} 件</span>
             </div>
             <div class="field-row">
               <span class="field-label">出厂价：</span>
-              <span class="field-value">{{ item.exFactoryPrice }}</span>
+              <span class="field-value price-value">￥{{ item.exFactoryPrice }}</span>
             </div>
             <div class="field-row">
               <span class="field-label">销售价：</span>
-              <span class="field-value">{{ item.salePrice }}</span>
+              <span class="field-value price-value">￥{{ item.salePrice }}</span>
             </div>
-            <div class="field-row">
-              <span class="field-label">标签：</span>
-              <span class="field-value ellipsis">{{ item.label || '-' }}</span>
-            </div>
-            <div class="field-row">
-              <span class="field-label">二次工艺：</span>
-              <span class="field-value ellipsis">{{ item.secondaryProcess || '-' }}</span>
+            <div v-if="orderTypeDisplay(item) || item.processItem" class="field-row order-tags-row">
+              <el-tag
+                v-if="orderTypeDisplay(item)"
+                size="small"
+                effect="light"
+                class="order-type-tag"
+              >
+                {{ orderTypeDisplay(item) }}
+              </el-tag>
+              <el-tag
+                v-if="item.processItem"
+                size="small"
+                effect="plain"
+                class="process-item-tag"
+              >
+                {{ item.processItem }}
+              </el-tag>
             </div>
           </div>
           <div class="order-card-footer">
-            <div class="footer-factory ellipsis" :title="item.factoryName || '-'">加工厂：{{ item.factoryName || '-' }}</div>
+            <div v-if="item.factoryName" class="footer-factory ellipsis" :title="item.factoryName">加工厂：{{ item.factoryName }}</div>
             <div class="footer-actions">
               <el-tooltip content="编辑" placement="top">
                 <el-button link type="primary" size="small" circle class="action-btn" @click="openEdit(item)">
                   <el-icon><Edit /></el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip content="复制" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="copyOrder(item)">
-                  <el-icon><DocumentCopy /></el-icon>
                 </el-button>
               </el-tooltip>
               <el-tooltip content="下载" placement="top">
@@ -362,14 +400,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watchEffect, onMounted, computed } from 'vue'
+import { ref, reactive, watch, watchEffect, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, DocumentCopy, Download, Printer, Clock } from '@element-plus/icons-vue'
-import { getOrders, type OrderListItem, type OrderListQuery, batchDeleteOrders, reviewOrders } from '@/api/orders'
+import { Edit, Download, Printer, Clock } from '@element-plus/icons-vue'
+import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, copyOrdersToDraft, type OrderListItem, type OrderListQuery } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getCustomers, type CustomerItem, getSalespeople, getMerchandisers } from '@/api/customers'
-import { getSystemOptions, getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getDictOptions, getDictTree } from '@/api/dicts'
+import { type SystemOptionTreeNode } from '@/api/system-options'
 import { useAuthStore } from '@/stores/auth'
 
 const router = useRouter()
@@ -402,34 +441,40 @@ const merchandiserOptions = ref<string[]>([])
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
   parentPath = '',
-): { label: string; value: string; children?: any[] }[] {
+): { label: string; value: string; children?: any[]; disabled?: boolean }[] {
   return nodes.map((n) => {
     const path = parentPath ? `${parentPath} > ${n.value}` : n.value
     const children = n.children?.length ? toOrderTypeTreeSelect(n.children, path) : []
+    const hasChildren = children.length > 0
     return {
       label: n.value,
       value: path,
-      children: children.length ? children : undefined,
+      children: hasChildren ? children : undefined,
+      // 有子分组的父节点禁用，只允许选择叶子节点
+      disabled: hasChildren,
     }
   })
 }
 
 const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
 
-const orderTypeTreeSelectProps = {
-  label: 'label',
-  value: 'value',
-  children: 'children',
-  disabled: (node: { children?: unknown[] }) =>
-    Array.isArray(node.children) && node.children.length > 0,
+function getOrderTypeDisplayLabel(v: string | undefined): string {
+  if (!v) return ''
+  const parts = v
+    .split('>')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : v
 }
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_ITEM_WIDTH = '120px'
-const FILTER_MAX_WIDTH = 260
+const DATE_RANGE_WIDTH_EMPTY = '140px'
+const DATE_RANGE_WIDTH_FILLED = '220px'
+const FILTER_AUTO_MIN_WIDTH = 140
+const FILTER_AUTO_MAX_WIDTH = 320
+const FILTER_CHAR_PX = 14
 const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
 const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
-const rangeBaseStyle = { width: FILTER_ITEM_WIDTH, flex: `0 0 ${FILTER_ITEM_WIDTH}` }
 
 function getFilterInputStyle(v: unknown) {
   return v ? activeInputStyle : undefined
@@ -439,23 +484,45 @@ function getFilterSelectStyle(v: unknown) {
   return v ? activeSelectStyle : undefined
 }
 
-function getSmartFilterSelectStyle(v: unknown) {
-  const text = typeof v === 'string' ? v : v == null ? '' : String(v)
-  const len = text.length
-  const base = parseInt(FILTER_ITEM_WIDTH, 10) || 120
-  const width = len ? Math.min(base + len * 8, FILTER_MAX_WIDTH) : base
-  const colorStyle = v ? activeSelectStyle : {}
+function getFilterSelectAutoWidthStyle(v: unknown) {
+  if (!v) return undefined
+  const text = String(v)
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
   return {
-    ...colorStyle,
+    ...activeSelectStyle,
+    width: `${width}px`,
+    flex: `0 0 ${width}px`,
+  }
+}
+
+function getOrderNoFilterStyle(orderNo: unknown, showLabel: boolean) {
+  if (!orderNo || !showLabel) return undefined
+  const text = `订单号：${String(orderNo)}`
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return {
+    width: `${width}px`,
+    flex: `0 0 ${width}px`,
+  }
+}
+
+function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
+  if (!skuCode || !showLabel) return undefined
+  const text = `SKU编号：${String(skuCode)}`
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return {
     width: `${width}px`,
     flex: `0 0 ${width}px`,
   }
 }
 
 function getFilterRangeStyle(v: [string, string] | null) {
-  return v && v.length === 2
-    ? { ...rangeBaseStyle, ...activeSelectStyle }
-    : rangeBaseStyle
+  const hasValue = v && v.length === 2
+  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
+  const base = { width, flex: `0 0 ${width}` }
+  return hasValue ? { ...base, ...activeSelectStyle } : base
 }
 
 const filter = reactive({
@@ -463,7 +530,7 @@ const filter = reactive({
   skuCode: '',
   customer: '',
   orderType: '',
-  secondaryProcess: '',
+  processItem: '',
   salesperson: '',
   merchandiser: '',
   factory: '',
@@ -471,6 +538,11 @@ const filter = reactive({
 
 const orderDateRange = ref<[string, string] | null>(null)
 const customerDueRange = ref<[string, string] | null>(null)
+
+/** 订单号前缀「订单号：」仅在回车或点击搜索后显示 */
+const orderNoLabelVisible = ref(false)
+/** SKU编号前缀「SKU编号：」仅在回车或点击搜索后显示 */
+const skuCodeLabelVisible = ref(false)
 
 const pagination = reactive({
   page: 1,
@@ -481,6 +553,8 @@ const pagination = reactive({
 const currentStatus = ref<'all' | string>('all')
 const list = ref<OrderListItem[]>([])
 const loading = ref(false)
+const statusCounts = ref<Record<string, number>>({})
+const statusTotal = ref<number>(0)
 
 const viewDialog = reactive<{ visible: boolean; order: OrderListItem | null }>({
   visible: false,
@@ -491,27 +565,33 @@ const logDialog = reactive<{ visible: boolean }>({
   visible: false,
 })
 
-/** 卡片勾选状态与批量操作 */
+/** 卡片勾选状态 + 批量操作 */
 const cardSelected = ref<Record<number, boolean>>({})
-const selectedOrderIds = computed<number[]>(() =>
-  Object.entries(cardSelected.value)
-    .filter(([, checked]) => checked)
-    .map(([id]) => Number(id)),
-)
-
-const canDeleteOrders = computed(() => authStore.hasPermissionCode('orders_delete'))
-const canReviewOrders = computed(() => authStore.hasPermissionCode('orders_review'))
-
-function onCardSelectChange() {
-  // 预留：如需实时联动其它 UI，可在此处理
-}
+const selectedIds = computed(() => {
+  const map = cardSelected.value
+  return list.value.filter((item) => map[item.id]).map((item) => item.id)
+})
+const hasSelection = computed(() => selectedIds.value.length > 0)
+const isPendingReviewTab = computed(() => currentStatus.value === 'pending_review')
+const canDeleteOrders = computed(() => authStore.hasPermission('orders_delete'))
+const canReviewOrders = computed(() => authStore.hasPermission('orders_review'))
 
 function resetSelection() {
   cardSelected.value = {}
 }
 
+function onCardSelectChange() {
+  // 选中状态变化时，selectedIds 由计算属性自动更新
+}
+
 function getStatusLabel(status: string): string {
   return STATUS_LABEL_MAP[status] || status || '-'
+}
+
+/** 订单类型展示值：后端列表返回 label 字段存订单类型，兼容 orderType */
+function orderTypeDisplay(item: OrderListItem): string {
+  const v = item.orderType ?? item.label
+  return (v && String(v).trim()) ? String(v).trim() : ''
 }
 
 async function loadOptions() {
@@ -520,9 +600,9 @@ async function loadOptions() {
     const [custRes, salesRes, orderTypeRes, secondaryRes, factoryRes] = await Promise.all([
       getCustomers({ page: 1, pageSize: 200 }),
       getSalespeople(),
-      getSystemOptionsTree('order_types'),
-      getSystemOptions('secondary_processes'),
-      getSystemOptions('factories'),
+      getDictTree('order_types'),
+      getDictOptions('secondary_processes'),
+      getDictOptions('factories'),
     ])
 
     const custList = (custRes.data?.list ?? []) as CustomerItem[]
@@ -579,7 +659,7 @@ function buildQuery(): OrderListQuery {
     skuCode: filter.skuCode || undefined,
     customer: filter.customer || undefined,
     orderType: filter.orderType || undefined,
-    secondaryProcess: filter.secondaryProcess || undefined,
+    processItem: filter.processItem || undefined,
     salesperson: filter.salesperson || undefined,
     merchandiser: filter.merchandiser || undefined,
     factory: filter.factory || undefined,
@@ -600,16 +680,45 @@ function buildQuery(): OrderListQuery {
   return q
 }
 
+function buildCountQuery(): Omit<OrderListQuery, 'status' | 'page' | 'pageSize'> {
+  const q: Omit<OrderListQuery, 'status' | 'page' | 'pageSize'> = {
+    orderNo: filter.orderNo || undefined,
+    skuCode: filter.skuCode || undefined,
+    customer: filter.customer || undefined,
+    orderType: filter.orderType || undefined,
+    processItem: filter.processItem || undefined,
+    salesperson: filter.salesperson || undefined,
+    merchandiser: filter.merchandiser || undefined,
+    factory: filter.factory || undefined,
+  }
+  if (orderDateRange.value && orderDateRange.value.length === 2) {
+    q.orderDateStart = orderDateRange.value[0]
+    q.orderDateEnd = orderDateRange.value[1]
+  }
+  if (customerDueRange.value && customerDueRange.value.length === 2) {
+    q.customerDueStart = customerDueRange.value[0]
+    q.customerDueEnd = customerDueRange.value[1]
+  }
+  return q
+}
+
+function getStatusTabLabel(tab: (typeof STATUS_TABS)[number]) {
+  const count = tab.value === 'all' ? statusTotal.value : (statusCounts.value[tab.value] ?? 0)
+  return `${tab.label}(${count})`
+}
+
 async function load() {
   loading.value = true
   try {
-    const res = await getOrders(buildQuery())
-    const data = res.data
+    const [listRes, countsRes] = await Promise.all([getOrders(buildQuery()), getOrderStatusCounts(buildCountQuery())])
+    const data = listRes.data
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
-      resetSelection()
     }
+    const countsData = countsRes.data
+    statusTotal.value = countsData?.total ?? 0
+    statusCounts.value = countsData?.byStatus ?? {}
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -617,7 +726,12 @@ async function load() {
   }
 }
 
-function onSearch() {
+/** @param byUser 仅当用户按回车或点击搜索按钮时为 true，输入防抖触发时为 false */
+function onSearch(byUser = false) {
+  if (byUser) {
+    if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
+    if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
+  }
   pagination.page = 1
   load()
 }
@@ -627,16 +741,18 @@ function debouncedSearch() {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
     searchTimer = null
-    onSearch()
+    onSearch(false)
   }, 400)
 }
 
 function onReset() {
+  orderNoLabelVisible.value = false
+  skuCodeLabelVisible.value = false
   filter.orderNo = ''
   filter.skuCode = ''
   filter.customer = ''
   filter.orderType = ''
-  filter.secondaryProcess = ''
+  filter.processItem = ''
   filter.salesperson = ''
   filter.merchandiser = ''
   filter.factory = ''
@@ -650,6 +766,7 @@ function onReset() {
 
 function onStatusChange() {
   pagination.page = 1
+  resetSelection()
   load()
 }
 
@@ -658,12 +775,65 @@ function onPageSizeChange() {
   load()
 }
 
-function openEdit(order: OrderListItem) {
-  router.push({ name: 'OrdersEdit', params: { id: order.id } })
+async function onBatchDelete() {
+  if (!hasSelection.value) return
+  try {
+    await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 条订单吗？`, '提示', {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    await deleteOrders(selectedIds.value)
+    ElMessage.success('已删除选中订单')
+    pagination.page = 1
+    await load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '删除失败'))
+  }
 }
 
-function copyOrder(_order: OrderListItem) {
-  ElMessage.info('复制订单功能将在编辑/创建订单表单完成后一并实现')
+async function onBatchReview() {
+  if (!hasSelection.value || !isPendingReviewTab.value) return
+  try {
+    await ElMessageBox.confirm(`确定审核选中的 ${selectedIds.value.length} 条订单吗？`, '审核确认', {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    await reviewOrders(selectedIds.value)
+    ElMessage.success('审核成功')
+    pagination.page = 1
+    await load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '审核失败'))
+  }
+}
+
+async function onBatchCopyToDraft() {
+  if (!hasSelection.value) return
+  try {
+    await ElMessageBox.confirm(`确定将选中的 ${selectedIds.value.length} 条订单复制为草稿吗？`, '复制为草稿', {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  try {
+    await copyOrdersToDraft(selectedIds.value)
+    ElMessage.success('已复制为草稿')
+    pagination.page = 1
+    await load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '复制失败'))
+  }
+}
+
+function openEdit(order: OrderListItem) {
+  router.push({ name: 'OrdersEdit', params: { id: order.id } })
 }
 
 function downloadExcel() {
@@ -682,46 +852,23 @@ function onCreateOrder() {
   router.push({ name: 'OrdersEdit' })
 }
 
-async function onBatchDelete() {
-  if (!selectedOrderIds.value.length) return
-  try {
-    await ElMessageBox.confirm(`确定删除选中的 ${selectedOrderIds.value.length} 个订单？`, '提示', {
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    await batchDeleteOrders(selectedOrderIds.value)
-    ElMessage.success('已删除所选订单')
-    await load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '删除失败'))
-  }
-}
-
-async function onBatchReview() {
-  if (!selectedOrderIds.value.length) return
-  try {
-    await ElMessageBox.confirm(`确定审核通过选中的 ${selectedOrderIds.value.length} 个订单？`, '提示', {
-      type: 'warning',
-    })
-  } catch {
-    return
-  }
-  try {
-    await reviewOrders(selectedOrderIds.value)
-    ElMessage.success('已审核所选订单')
-    await load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '审单失败'))
-  }
-}
-
 onMounted(() => {
   load()
   loadOptions()
 })
+
+watch(
+  () => filter.orderNo,
+  (v) => {
+    if (!v || !String(v).trim()) orderNoLabelVisible.value = false
+  },
+)
+watch(
+  () => filter.skuCode,
+  (v) => {
+    if (!v || !String(v).trim()) skuCodeLabelVisible.value = false
+  },
+)
 
 watchEffect(() => {
   // 预留：当筛选条件发生明显变化时，可在此埋点或做其它处理
@@ -776,11 +923,6 @@ watchEffect(() => {
   margin-left: auto;
 }
 
-.filter-bar-actions :deep(.el-button + .el-button) {
-  margin-left: 0;
-}
-
-
 .orders-card-list {
   min-height: 200px;
 }
@@ -805,6 +947,20 @@ watchEffect(() => {
 }
 
 .order-card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.order-card-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.order-card-header-main {
   display: flex;
   gap: 10px;
   min-width: 0;
@@ -849,11 +1005,12 @@ watchEffect(() => {
 .card-checkbox {
   flex-shrink: 0;
   margin: 0;
+  padding: 4px;
+  cursor: pointer;
 }
 
 .card-checkbox :deep(.el-checkbox__inner) {
-  width: 18px;
-  height: 18px;
+  transform: scale(1.2);
 }
 
 .order-no {
@@ -914,9 +1071,28 @@ watchEffect(() => {
   white-space: nowrap;
 }
 
+/* 订单类型 + 工艺 同一行：左侧标签（仅值），右侧工艺 */
+.order-tags-row {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-tags-row :deep(.el-tag) {
+  max-width: 100%;
+}
+
+.order-tags-row .order-type-tag,
+.order-tags-row .process-item-tag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .order-card-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
   border-top: 1px dashed var(--color-border);
@@ -932,6 +1108,7 @@ watchEffect(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  margin-right: auto;
 }
 
 .footer-actions {

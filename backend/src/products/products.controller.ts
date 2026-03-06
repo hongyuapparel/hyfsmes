@@ -21,6 +21,36 @@ import { ProductsService } from './products.service';
 export class ProductsController {
   constructor(private productsService: ProductsService) {}
 
+  /**
+   * SKU 下拉（供订单编辑页 remote 下拉使用）
+   * GET /products/skus?keyword=&pageSize=
+   *
+   * 注意：订单编辑页属于订单模块场景，因此只要求 /orders/list 权限
+   */
+  @Get('skus')
+  @RequirePermission('/orders/list')
+  async findSkus(
+    @Query('keyword') keyword?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const size = pageSize ? parseInt(pageSize, 10) : 20;
+    const res = await this.productsService.findAll({
+      skuCode: keyword?.trim() || undefined,
+      page: 1,
+      pageSize: Number.isFinite(size) && size > 0 ? size : 20,
+      sortBy: 'id',
+      sortOrder: 'desc',
+    });
+    const list = (res.list ?? []).map((p) => ({
+      id: p.id,
+      skuCode: p.skuCode,
+      customerId: p.customerId ?? null,
+      customerName: p.customer?.companyName ?? '',
+      imageUrl: p.imageUrl ?? '',
+    }));
+    return { list };
+  }
+
   @Get()
   findAll(
     @Query('companyName') companyName?: string,
