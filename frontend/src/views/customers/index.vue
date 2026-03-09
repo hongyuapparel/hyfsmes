@@ -43,7 +43,11 @@
 
       <div class="filter-actions">
         <el-button type="primary" size="large" @click="openCreate">新建客户</el-button>
-        <el-button size="large" :disabled="!selectedIds.length" @click="batchDelete">删除</el-button>
+        <el-tooltip content="删除" placement="top">
+        <el-button type="danger" size="large" circle :disabled="!selectedIds.length" @click="batchDelete">
+          <el-icon><Delete /></el-icon>
+        </el-button>
+      </el-tooltip>
         <el-button type="primary" plain size="large" @click="openXiaomanImport">从小满导入</el-button>
       </div>
     </div>
@@ -251,6 +255,7 @@ import {
   type XiaomanImportRes,
 } from '@/api/customers'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { Delete } from '@element-plus/icons-vue'
 
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const formRef = ref<FormInstance>()

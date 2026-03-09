@@ -3,8 +3,13 @@ import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { TOKEN_KEY } from '@/constants'
 
+// 开发环境未配置时走 Vite 代理 /api -> 后端，避免 404
+const baseURL =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.DEV ? '/api' : '')
+
 const request = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  baseURL,
   timeout: 15000,
 })
 
@@ -36,6 +41,7 @@ function extractErrorMessage(err: AxiosError): string {
   if (Array.isArray(msg)) return msg[0] ?? '请求失败'
   if (typeof msg === 'string') return msg
   if (err.response?.status === 403) return '无权限访问'
+  if (err.response?.status === 404) return '接口不存在(404)，请确认后端已启动且端口、路由正确'
   if (err.response?.status && err.response.status >= 500) return '服务器错误，请稍后重试'
   if (err.code === 'ERR_NETWORK' || !err.response) return '无法连接服务器，请检查网络或后端是否启动'
   return '操作失败'
@@ -57,7 +63,7 @@ request.interceptors.response.use(
     } else {
       const status = err.response?.status
       const skip = (err.config as { skipGlobalErrorHandler?: boolean })?.skipGlobalErrorHandler
-      const shouldShow = !skip && (status === 400 || status === 403 || (status != null && status >= 500) || !err.response)
+      const shouldShow = !skip && (status === 400 || status === 403 || status === 404 || (status != null && status >= 500) || !err.response)
       if (shouldShow) {
         ElMessage.error(msg)
         ;(err as AxiosError & { errorHandled?: boolean }).errorHandled = true

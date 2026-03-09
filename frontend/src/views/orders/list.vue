@@ -341,26 +341,57 @@
           <div class="order-card-footer">
             <div v-if="item.factoryName" class="footer-factory ellipsis" :title="item.factoryName">加工厂：{{ item.factoryName }}</div>
             <div class="footer-actions">
-              <el-tooltip content="编辑" placement="top">
-                <el-button link type="primary" size="small" circle class="action-btn" @click="openEdit(item)">
-                  <el-icon><Edit /></el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip content="下载" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="downloadExcel">
-                  <el-icon><Download /></el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip content="打印" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="printOrder(item)">
-                  <el-icon><Printer /></el-icon>
-                </el-button>
-              </el-tooltip>
-              <el-tooltip content="操作记录" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="openOperationLog(item)">
-                  <el-icon><Clock /></el-icon>
-                </el-button>
-              </el-tooltip>
+              <span class="footer-action-item">
+                <el-tooltip content="编辑" placement="top">
+                  <el-button link type="primary" size="small" circle class="action-btn" @click="openEdit(item)">
+                    <el-icon><Edit /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </span>
+              <span class="footer-action-item">
+                <el-tooltip content="订单成本" placement="top">
+                  <el-button link size="small" circle class="action-btn" @click="openCost(item)">
+                    <el-icon><Coin /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </span>
+              <span class="footer-action-item">
+                <el-tooltip content="订单详情" placement="top">
+                  <el-button link size="small" circle class="action-btn" @click="openView(item)">
+                    <el-icon><Document /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </span>
+              <span class="footer-action-item">
+                <el-tooltip content="订单备注" placement="top">
+                  <el-badge :value="item.remarkCount ?? 0" :hidden="!(item.remarkCount ?? 0)" :max="99" class="remark-badge">
+                    <el-button link size="small" circle class="action-btn" @click="openRemark(item)">
+                      <el-icon><ChatDotRound /></el-icon>
+                    </el-button>
+                  </el-badge>
+                </el-tooltip>
+              </span>
+              <span class="footer-action-item">
+                <el-tooltip content="下载" placement="top">
+                  <el-button link size="small" circle class="action-btn" @click="downloadExcel">
+                    <el-icon><Download /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </span>
+              <span class="footer-action-item">
+                <el-tooltip content="操作记录" placement="top">
+                  <el-button link size="small" circle class="action-btn" @click="openOperationLog(item)">
+                    <el-icon><Clock /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </span>
+              <span class="footer-action-item">
+                <el-tooltip content="打印" placement="top">
+                  <el-button link size="small" circle class="action-btn" @click="printOrder(item)">
+                    <el-icon><Printer /></el-icon>
+                  </el-button>
+                </el-tooltip>
+              </span>
             </div>
           </div>
         </div>
@@ -390,10 +421,91 @@
       </template>
     </el-dialog>
 
-    <el-dialog v-model="logDialog.visible" title="操作记录" width="520">
-      <el-empty description="操作记录功能将于后续步骤实现" />
+    <el-dialog v-model="logDialog.visible" title="操作记录" width="640">
+      <div v-if="logDialog.order" class="log-order-brief">
+        <div class="log-order-no">订单号：{{ logDialog.order.orderNo }}</div>
+        <div class="log-order-meta">
+          <span>客户：{{ logDialog.order.customerName || '-' }}</span>
+          <span>SKU：{{ logDialog.order.skuCode || '-' }}</span>
+        </div>
+      </div>
+      <el-skeleton v-if="logDialog.loading" animated :rows="4" />
+      <el-empty
+        v-else-if="!logDialog.logs.length"
+        description="暂无操作记录"
+      />
+      <el-timeline v-else class="operation-log-timeline">
+        <el-timeline-item
+          v-for="log in logDialog.logs"
+          :key="log.id"
+        >
+          <div class="operation-log-item">
+            <div class="operation-log-header">
+              <span class="operation-log-operator">操作账号：{{ log.operatorUsername }}</span>
+              <span class="operation-log-action">操作类型：{{ getActionLabel(log.action) }}</span>
+            </div>
+            <div class="operation-log-row">
+              <span class="operation-log-label">修改日期：</span>
+              <span class="operation-log-value">{{ formatDateTime(log.createdAt) }}</span>
+            </div>
+            <div class="operation-log-row">
+              <span class="operation-log-label">修改内容：</span>
+              <span class="operation-log-value">{{ log.detail }}</span>
+            </div>
+          </div>
+        </el-timeline-item>
+      </el-timeline>
       <template #footer>
         <el-button @click="logDialog.visible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="remarkDialog.visible" title="订单备注" width="640">
+      <div v-if="remarkDialog.order" class="remark-order-brief">
+        <div class="remark-order-no">订单号：{{ remarkDialog.order.orderNo }}</div>
+        <div class="remark-order-meta">
+          <span>客户：{{ remarkDialog.order.customerName || '-' }}</span>
+          <span>SKU：{{ remarkDialog.order.skuCode || '-' }}</span>
+        </div>
+      </div>
+      <el-skeleton v-if="remarkDialog.loading" animated :rows="4" />
+      <div v-else class="remark-content">
+        <div class="remark-list">
+          <el-empty v-if="!remarkDialog.list.length" description="暂无备注" />
+          <el-timeline v-else>
+            <el-timeline-item
+              v-for="item in remarkDialog.list"
+              :key="item.id"
+            >
+              <div class="remark-item">
+                <div class="remark-item-header">
+                  <span class="remark-operator">账号：{{ item.operatorUsername }}</span>
+                  <span class="remark-time">{{ formatDateTime(item.createdAt) }}</span>
+                </div>
+                <div class="remark-item-content">
+                  {{ item.content }}
+                </div>
+              </div>
+            </el-timeline-item>
+          </el-timeline>
+        </div>
+        <div class="remark-editor">
+          <div class="remark-editor-label">新增备注：</div>
+          <el-input
+            v-model="remarkDialog.content"
+            type="textarea"
+            :rows="3"
+            maxlength="500"
+            show-word-limit
+            placeholder="填写本次特殊情况说明"
+          />
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="remarkDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="remarkDialog.submitting" @click="onSubmitRemark">
+          提交备注
+        </el-button>
       </template>
     </el-dialog>
   </div>
@@ -403,8 +515,8 @@
 import { ref, reactive, watch, watchEffect, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Edit, Download, Printer, Clock } from '@element-plus/icons-vue'
-import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, copyOrdersToDraft, type OrderListItem, type OrderListQuery } from '@/api/orders'
+import { Edit, Download, Printer, Clock, Coin, Document, ChatDotRound } from '@element-plus/icons-vue'
+import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, copyOrdersToDraft, getOrderLogs, getOrderRemarks, addOrderRemark, type OrderListItem, type OrderListQuery, type OrderOperationLogItem, type OrderRemarkItem } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getCustomers, type CustomerItem, getSalespeople, getMerchandisers } from '@/api/customers'
 import { getDictOptions, getDictTree } from '@/api/dicts'
@@ -417,8 +529,8 @@ const STATUS_TABS = [
   { label: '全部', value: 'all' },
   { label: '草稿', value: 'draft' },
   { label: '待审单', value: 'pending_review' },
-  { label: '待纸样', value: 'pending_pattern' },
   { label: '待采购', value: 'pending_purchase' },
+  { label: '待纸样', value: 'pending_pattern' },
   { label: '待裁床', value: 'pending_cutting' },
   { label: '待车缝', value: 'pending_sewing' },
   { label: '待尾部', value: 'pending_finishing' },
@@ -429,6 +541,19 @@ const STATUS_LABEL_MAP: Record<string, string> = STATUS_TABS.reduce((acc, cur) =
   if (cur.value !== 'all') acc[cur.value] = cur.label
   return acc
 }, {} as Record<string, string>)
+
+const ACTION_LABEL_MAP: Record<string, string> = {
+  create: '创建草稿',
+  update: '修改',
+  submit: '提交',
+  review: '审核',
+  delete: '删除',
+  copy_to_draft: '复制为草稿',
+}
+
+function getActionLabel(action: string): string {
+  return ACTION_LABEL_MAP[action] ?? action
+}
 
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
 
@@ -561,8 +686,32 @@ const viewDialog = reactive<{ visible: boolean; order: OrderListItem | null }>({
   order: null,
 })
 
-const logDialog = reactive<{ visible: boolean }>({
+const logDialog = reactive<{
+  visible: boolean
+  loading: boolean
+  order: OrderListItem | null
+  logs: OrderOperationLogItem[]
+}>({
   visible: false,
+  loading: false,
+  order: null,
+  logs: [],
+})
+
+const remarkDialog = reactive<{
+  visible: boolean
+  loading: boolean
+  submitting: boolean
+  order: OrderListItem | null
+  list: OrderRemarkItem[]
+  content: string
+}>({
+  visible: false,
+  loading: false,
+  submitting: false,
+  order: null,
+  list: [],
+  content: '',
 })
 
 /** 卡片勾选状态 + 批量操作 */
@@ -836,6 +985,60 @@ function openEdit(order: OrderListItem) {
   router.push({ name: 'OrdersEdit', params: { id: order.id } })
 }
 
+function openView(order: OrderListItem) {
+  viewDialog.order = order
+  viewDialog.visible = true
+}
+
+function openCost(order: OrderListItem) {
+  router.push(`/orders/cost/${order.id}`)
+}
+
+async function openRemark(order: OrderListItem) {
+  remarkDialog.visible = true
+  remarkDialog.order = order
+  remarkDialog.loading = true
+  remarkDialog.list = []
+  remarkDialog.content = ''
+  try {
+    const res = await getOrderRemarks(order.id)
+    remarkDialog.list = res.data ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) {
+      ElMessage.error(getErrorMessage(e, '备注加载失败'))
+    }
+  } finally {
+    remarkDialog.loading = false
+  }
+}
+
+async function onSubmitRemark() {
+  const order = remarkDialog.order
+  const content = remarkDialog.content?.trim()
+  if (!order) return
+  if (!content) {
+    ElMessage.warning('请先填写备注内容')
+    return
+  }
+  remarkDialog.submitting = true
+  try {
+    const res = await addOrderRemark(order.id, content)
+    const created = res.data
+    if (created) {
+      remarkDialog.list.unshift(created)
+      order.remarkCount = (order.remarkCount ?? 0) + 1
+    }
+    remarkDialog.content = ''
+    ElMessage.success('备注已提交')
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) {
+      ElMessage.error(getErrorMessage(e, '备注提交失败'))
+    }
+  } finally {
+    remarkDialog.submitting = false
+  }
+}
+
 function downloadExcel() {
   ElMessage.info('下载 Excel 功能将在后续统一实现')
 }
@@ -844,8 +1047,21 @@ function printOrder(_order: OrderListItem) {
   window.print()
 }
 
-function openOperationLog(order: OrderListItem) {
-  ElMessage.info(`后续将在此查看订单 ${order.orderNo} 的操作记录`)
+async function openOperationLog(order: OrderListItem) {
+  logDialog.visible = true
+  logDialog.order = order
+  logDialog.loading = true
+  logDialog.logs = []
+  try {
+    const res = await getOrderLogs(order.id)
+    logDialog.logs = res.data ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) {
+      ElMessage.error(getErrorMessage(e, '操作记录加载失败'))
+    }
+  } finally {
+    logDialog.loading = false
+  }
 }
 
 function onCreateOrder() {
@@ -1114,8 +1330,14 @@ watchEffect(() => {
 .footer-actions {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
   flex-shrink: 0;
+}
+
+.footer-actions .footer-action-item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .footer-actions .action-btn {
@@ -1124,6 +1346,16 @@ watchEffect(() => {
 
 .footer-actions .action-btn :deep(.el-icon) {
   font-size: 16px;
+}
+
+.remark-badge {
+  display: inline-block;
+}
+.remark-badge :deep(.el-badge__content) {
+  font-size: 10px;
+  line-height: 1;
+  min-width: 14px;
+  height: 14px;
 }
 
 .pagination-wrap {
@@ -1142,5 +1374,119 @@ watchEffect(() => {
   font-size: 12px;
   max-height: 400px;
   overflow: auto;
+}
+
+.log-order-brief {
+  margin-bottom: var(--space-sm);
+  font-size: 13px;
+  color: var(--color-text, #303133);
+}
+
+.log-order-no {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.log-order-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-muted, #909399);
+}
+
+.operation-log-item {
+  font-size: 13px;
+}
+
+.operation-log-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.operation-log-operator,
+.operation-log-action {
+  font-weight: 500;
+}
+
+.operation-log-row {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 2px;
+}
+
+.operation-log-label {
+  flex-shrink: 0;
+  color: var(--color-text-muted, #909399);
+}
+
+.operation-log-value {
+  flex: 1;
+  word-break: break-all;
+}
+
+.remark-order-brief {
+  margin-bottom: var(--space-sm);
+  font-size: 13px;
+  color: var(--color-text, #303133);
+}
+
+.remark-order-no {
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.remark-order-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--color-text-muted, #909399);
+}
+
+.remark-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.remark-list {
+  max-height: 260px;
+  overflow: auto;
+}
+
+.remark-item {
+  font-size: 13px;
+}
+
+.remark-item-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 2px;
+}
+
+.remark-operator {
+  font-weight: 500;
+}
+
+.remark-time {
+  font-size: 12px;
+  color: var(--color-text-muted, #909399);
+}
+
+.remark-item-content {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.remark-editor {
+  margin-top: var(--space-sm);
+}
+
+.remark-editor-label {
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--color-text, #303133);
 }
 </style>

@@ -2,7 +2,8 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
-import { OrdersService, OrderListQuery, OrderEditPayload } from './orders.service';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { OrdersService, OrderListQuery, OrderEditPayload, OrderActor } from './orders.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -108,8 +109,9 @@ export class OrdersController {
    * POST /orders
    */
   @Post()
-  createDraft(@Body() body: OrderEditPayload) {
-    return this.ordersService.createDraft(body);
+  createDraft(@Body() body: OrderEditPayload, @CurrentUser() user: { userId: number; username: string }) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.createDraft(body, actor);
   }
 
   /**
@@ -117,8 +119,13 @@ export class OrdersController {
    * PUT /orders/:id
    */
   @Put(':id')
-  updateDraft(@Param('id', ParseIntPipe) id: number, @Body() body: OrderEditPayload) {
-    return this.ordersService.updateDraft(id, body);
+  updateDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: OrderEditPayload,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.updateDraft(id, body, actor);
   }
 
   /**
@@ -126,8 +133,9 @@ export class OrdersController {
    * POST /orders/:id/submit
    */
   @Post(':id/submit')
-  submit(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.submit(id);
+  submit(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.submit(id, actor);
   }
 
   /**
@@ -137,8 +145,12 @@ export class OrdersController {
    */
   @Post('batch-delete')
   @RequirePermission('orders_delete')
-  batchDelete(@Body('ids') ids: number[]) {
-    return this.ordersService.deleteMany(ids ?? []);
+  batchDelete(
+    @Body('ids') ids: number[],
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.deleteMany(ids ?? [], actor);
   }
 
   /**
@@ -148,8 +160,12 @@ export class OrdersController {
    */
   @Post('review')
   @RequirePermission('orders_review')
-  review(@Body('ids') ids: number[]) {
-    return this.ordersService.reviewMany(ids ?? []);
+  review(
+    @Body('ids') ids: number[],
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.reviewMany(ids ?? [], actor);
   }
 
   /**
@@ -158,8 +174,45 @@ export class OrdersController {
    * body: { ids: number[] }
    */
   @Post('copy-to-draft')
-  copyToDraft(@Body('ids') ids: number[]) {
-    return this.ordersService.copyManyToDraft(ids ?? []);
+  copyToDraft(
+    @Body('ids') ids: number[],
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.copyManyToDraft(ids ?? [], actor);
+  }
+
+  /**
+   * 获取订单操作记录
+   * GET /orders/:id/logs
+   */
+  @Get(':id/logs')
+  getLogs(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.getLogs(id);
+  }
+
+  /**
+   * 获取订单备注列表
+   * GET /orders/:id/remarks
+   */
+  @Get(':id/remarks')
+  getRemarks(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.getRemarks(id);
+  }
+
+  /**
+   * 新增订单备注
+   * POST /orders/:id/remarks
+   * body: { content: string }
+   */
+  @Post(':id/remarks')
+  addRemark(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('content') content: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.addRemark(id, actor, content);
   }
 }
 

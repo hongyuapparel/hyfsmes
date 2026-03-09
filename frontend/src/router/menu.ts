@@ -51,6 +51,7 @@ export const menuConfig: MenuItem[] = [
       { path: '/settings/users', title: '用户管理' },
       { path: '/settings/roles', title: '角色与权限' },
       { path: '/settings/orders', title: '订单设置' },
+      { path: '/settings/suppliers', title: '供应商设置' },
     ],
   },
 ]

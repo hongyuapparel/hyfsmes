@@ -1,9 +1,11 @@
 <template>
   <div class="option-list">
-    <div class="option-toolbar">
+    <div v-if="!hideTopLevelButton" class="option-toolbar">
       <el-button type="primary" size="small" @click="openAdd(null)">添加顶级分组</el-button>
     </div>
-    <div v-if="treeData.length === 0" class="option-empty">暂无配置，点击「添加顶级分组」新增</div>
+    <div v-if="treeData.length === 0" class="option-empty">
+      {{ hideTopLevelButton ? '暂无配置' : '暂无配置，点击「添加顶级分组」新增' }}
+    </div>
     <el-table
       v-else
       :data="treeData"
@@ -20,7 +22,11 @@
           <el-button link type="primary" size="small" @click="openAdd(row.id)">新建下级分组</el-button>
           <el-button link size="small" :disabled="!canMoveUp(row)" @click="moveRow(row, -1)">上移</el-button>
           <el-button link size="small" :disabled="!canMoveDown(row)" @click="moveRow(row, 1)">下移</el-button>
-          <el-button link type="danger" size="small" @click="remove(row)">删除</el-button>
+          <el-tooltip content="删除" placement="top">
+          <el-button link type="danger" size="small" circle @click="remove(row)">
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -51,11 +57,17 @@ import {
   type SystemOptionTreeNode,
 } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { Delete } from '@element-plus/icons-vue'
 
-const props = defineProps<{
-  type: string
-  label: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    type: string
+    label: string
+    /** 为 true 时隐藏「添加顶级分组」，仅允许在现有节点下新建下级（如部门-工种固定根时使用） */
+    hideTopLevelButton?: boolean
+  }>(),
+  { hideTopLevelButton: false },
+)
 
 const treeData = ref<SystemOptionTreeNode[]>([])
 const dialogVisible = ref(false)

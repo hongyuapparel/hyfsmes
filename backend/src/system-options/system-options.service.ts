@@ -38,12 +38,84 @@ export class SystemOptionsService {
     return result;
   }
 
+  /** 仅返回一级（根）节点值，供类型等单层下拉 */
+  async findRootsByType(optionType: string): Promise<string[]> {
+    const list = await this.repo.find({
+      where: { optionType, parentId: IsNull() },
+      order: { sortOrder: 'ASC', id: 'ASC' },
+    });
+    return list.map((o) => o.value);
+  }
+
+  /** 按父节点值返回直接子节点值列表（如某供应商类型下的业务范围） */
+  async findChildrenValuesByParentValue(
+    optionType: string,
+    parentValue: string,
+  ): Promise<string[]> {
+    const parent = await this.repo.findOne({
+      where: { optionType, value: parentValue, parentId: IsNull() },
+    });
+    if (!parent) return [];
+    const list = await this.repo.find({
+      where: { optionType, parentId: parent.id },
+      order: { sortOrder: 'ASC', id: 'ASC' },
+    });
+    return list.map((o) => o.value);
+  }
+
   /** 按类型获取扁平列表（含 parentId），供管理页建树 */
   async findAllByType(optionType: string): Promise<SystemOption[]> {
     return this.repo.find({
       where: { optionType },
       order: { parentId: 'ASC', sortOrder: 'ASC', id: 'ASC' },
     });
+  }
+
+  /** 懒加载树：仅返回根节点，带 hasChildren 标记 */
+  async findRootsForLazyTree(
+    optionType: string,
+  ): Promise<{ id: number; value: string; sortOrder: number; hasChildren: boolean }[]> {
+    const roots = await this.repo.find({
+      where: { optionType, parentId: IsNull() },
+      order: { sortOrder: 'ASC', id: 'ASC' },
+    });
+    const result: { id: number; value: string; sortOrder: number; hasChildren: boolean }[] = [];
+    for (const r of roots) {
+      const childCount = await this.repo.count({
+        where: { optionType, parentId: r.id },
+      });
+      result.push({
+        id: r.id,
+        value: r.value,
+        sortOrder: r.sortOrder,
+        hasChildren: childCount > 0,
+      });
+    }
+    return result;
+  }
+
+  /** 懒加载树：按父节点 id 返回子节点，带 hasChildren 标记 */
+  async findChildrenByParentId(
+    optionType: string,
+    parentId: number,
+  ): Promise<{ id: number; value: string; sortOrder: number; hasChildren: boolean }[]> {
+    const list = await this.repo.find({
+      where: { optionType, parentId },
+      order: { sortOrder: 'ASC', id: 'ASC' },
+    });
+    const result: { id: number; value: string; sortOrder: number; hasChildren: boolean }[] = [];
+    for (const o of list) {
+      const childCount = await this.repo.count({
+        where: { optionType, parentId: o.id },
+      });
+      result.push({
+        id: o.id,
+        value: o.value,
+        sortOrder: o.sortOrder,
+        hasChildren: childCount > 0,
+      });
+    }
+    return result;
   }
 
   /** 按类型获取树形结构 */

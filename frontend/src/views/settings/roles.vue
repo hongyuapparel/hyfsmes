@@ -18,9 +18,11 @@
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="danger" size="small" :disabled="row.code === 'admin'" @click="remove(row)">
-            删除
+          <el-tooltip content="删除" placement="top">
+          <el-button link type="danger" size="small" circle :disabled="row.code === 'admin'" @click="remove(row)">
+            <el-icon><Delete /></el-icon>
           </el-button>
+        </el-tooltip>
         </template>
       </el-table-column>
     </el-table>
@@ -28,23 +30,56 @@
     <h3 class="section-title">权限配置</h3>
     <div class="toolbar">
       <span>选择角色：</span>
-      <el-select v-model="selectedRoleId" placeholder="选择角色" filterable style="width: 200px" @change="loadRolePermissions">
+      <el-select
+        v-model="selectedRoleId"
+        placeholder="选择角色"
+        filterable
+        style="width: 200px"
+        @change="loadRolePermissions"
+      >
         <el-option v-for="r in list" :key="r.id" :label="r.name" :value="r.id" />
       </el-select>
       <el-button type="primary" :disabled="!selectedRoleId" :loading="saving" @click="savePermissions">
         保存权限
       </el-button>
     </div>
-    <el-tree
-      :key="selectedRoleId ?? 0"
-      ref="treeRef"
-      :data="treeData"
-      show-checkbox
-      node-key="id"
-      :default-checked-keys="checkedIds"
-      :props="{ label: 'name', children: 'children' }"
-      class="perm-tree"
-    />
+    <el-tabs v-model="permTab" type="border-card" class="perm-tabs">
+      <el-tab-pane label="菜单可见" name="menu">
+        <div class="perm-tab-desc">勾选后，该菜单/页面在侧栏展示并可进入。</div>
+        <el-tree
+          :key="'menu-' + (selectedRoleId ?? 0)"
+          ref="menuTreeRef"
+          :data="menuTreeData"
+          show-checkbox
+          node-key="id"
+          :default-checked-keys="menuCheckedKeys"
+          :props="{ label: 'name', children: 'children' }"
+          class="perm-tree"
+        />
+      </el-tab-pane>
+      <el-tab-pane label="操作权限" name="action">
+        <div class="perm-tab-desc">按页面分组的操作权限（如删除、审核等），可搜索。</div>
+        <div class="perm-toolbar">
+          <el-input
+            v-model="actionKeyword"
+            placeholder="搜索权限名称"
+            clearable
+            style="width: 220px"
+            :prefix-icon="Search"
+          />
+        </div>
+        <el-tree
+          :key="'action-' + (selectedRoleId ?? 0)"
+          ref="actionTreeRef"
+          :data="filteredActionTreeData"
+          show-checkbox
+          node-key="id"
+          :default-checked-keys="actionCheckedKeys"
+          :props="{ label: 'name', children: 'children' }"
+          class="perm-tree"
+        />
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑角色' : '新增角色'" width="400" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80">
@@ -75,6 +110,7 @@ import {
   setRolePermissions,
   type RoleItem,
 } from '@/api/roles'
+import { Search, Delete } from '@element-plus/icons-vue'
 import { getPermissions, type PermissionItem } from '@/api/permissions'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
@@ -83,7 +119,10 @@ const permissions = ref<PermissionItem[]>([])
 const selectedRoleId = ref<number | null>(null)
 const checkedIds = ref<number[]>([])
 const saving = ref(false)
-const treeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
+const permTab = ref<'menu' | 'action'>('menu')
+const actionKeyword = ref('')
+const menuTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
+const actionTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -107,57 +146,44 @@ interface PageNode extends TreeNode {
   routePath: string
 }
 
-const treeData = computed<TreeNode[]>(() => {
-  const pageMap = new Map<string, PageNode>()
+const menuPermissionIds = computed(() =>
+  permissions.value.filter((p) => p.type === 'menu').map((p) => p.id),
+)
+const actionPermissionIds = computed(() =>
+  permissions.value.filter((p) => p.type === 'action').map((p) => p.id),
+)
+const menuCheckedKeys = computed(() =>
+  checkedIds.value.filter((id) => menuPermissionIds.value.includes(id)),
+)
+const actionCheckedKeys = computed(() =>
+  checkedIds.value.filter((id) => actionPermissionIds.value.includes(id)),
+)
 
+const menuTreeData = computed<TreeNode[]>(() => {
+  const pageMap = new Map<string, PageNode>()
   const getPageNode = (routePath: string, displayName: string): PageNode => {
     const key = routePath || '/'
     let node = pageMap.get(key)
     if (!node) {
-      const pathLabel = key || '/'
       node = {
         id: `page:${key}`,
-        name: `${displayName || '页面'} (${pathLabel})`,
+        name: `${displayName || '页面'} (${key || '/'})`,
         routePath: key,
         children: [],
       }
       pageMap.set(key, node)
-    } else if (!node.name && displayName) {
+    } else if (displayName) {
       node.name = `${displayName} (${key || '/'})`
     }
     return node
   }
-
-  for (const p of permissions.value) {
+  const menuPerms = permissions.value.filter((p) => p.type === 'menu')
+  for (const p of menuPerms) {
     const routePath = p.routePath || '/'
-    const pageNode = getPageNode(routePath, p.name)
-    const children = pageNode.children ?? (pageNode.children = [])
-
-    if (p.type === 'menu') {
-      children.push({
-        id: p.id,
-        name: '板块可见（菜单）',
-      })
-    } else {
-      let actionGroup = children.find((c) => c.id === `action:${routePath}`)
-      if (!actionGroup) {
-        actionGroup = {
-          id: `action:${routePath}`,
-          name: '编辑/操作权限',
-          children: [],
-        }
-        children.push(actionGroup)
-      }
-      ;(actionGroup.children ?? (actionGroup.children = [])).push({
-        id: p.id,
-        name: p.name,
-      })
-    }
+    getPageNode(routePath, p.name)
   }
-
   const roots: TreeNode[] = []
   const allPages = Array.from(pageMap.values())
-
   const findParent = (path: string): PageNode | null => {
     if (!path || path === '/') return null
     const parts = path.split('/').filter(Boolean)
@@ -165,18 +191,56 @@ const treeData = computed<TreeNode[]>(() => {
     const parentPath = '/' + parts.slice(0, parts.length - 1).join('/')
     return pageMap.get(parentPath) ?? null
   }
-
+  for (const page of allPages) {
+    const menuPerm = menuPerms.find((p) => (p.routePath || '/') === page.routePath)
+    const permNode = menuPerm ? { id: menuPerm.id, name: menuPerm.name } : null
+    const childPages = allPages.filter((p) => findParent(p.routePath)?.routePath === page.routePath)
+    page.children = [...(permNode ? [permNode] : []), ...childPages]
+  }
   for (const page of allPages) {
     const parent = findParent(page.routePath)
-    if (!parent) {
-      roots.push(page)
-    } else {
-      const parentChildren = parent.children ?? (parent.children = [])
-      parentChildren.push(page)
-    }
+    if (!parent) roots.push(page)
   }
-
   return roots
+})
+
+const actionTreeData = computed<TreeNode[]>(() => {
+  const menuByPath = new Map<string, string>()
+  for (const p of permissions.value) {
+    if (p.type === 'menu') menuByPath.set(p.routePath || '/', p.name)
+  }
+  const group = new Map<string, PermissionItem[]>()
+  for (const p of permissions.value) {
+    if (p.type !== 'action') continue
+    const key = p.routePath || '/'
+    if (!group.has(key)) group.set(key, [])
+    group.get(key)!.push(p)
+  }
+  return Array.from(group.entries()).map(([path, actions]) => ({
+    id: `action-group:${path}`,
+    name: `${menuByPath.get(path) || path} (${path})`,
+    children: actions.map((a) => ({ id: a.id, name: a.name })),
+  }))
+})
+
+const filteredActionTreeData = computed(() => {
+  const kw = actionKeyword.value.trim().toLowerCase()
+  if (!kw) return actionTreeData.value
+  const filterNode = (nodes: TreeNode[]): TreeNode[] => {
+    const out: TreeNode[] = []
+    for (const n of nodes) {
+      if (typeof n.id === 'number') {
+        if (n.name.toLowerCase().includes(kw)) out.push(n)
+      } else {
+        const filtered = n.children ? filterNode(n.children) : []
+        if (filtered.length || n.name.toLowerCase().includes(kw)) {
+          out.push({ ...n, children: filtered.length ? filtered : n.children })
+        }
+      }
+    }
+    return out
+  }
+  return filterNode(actionTreeData.value)
 })
 
 async function load() {
@@ -253,14 +317,21 @@ async function remove(row: RoleItem) {
 
 async function savePermissions() {
   if (!selectedRoleId.value) return
-  const half = treeRef.value?.getHalfCheckedKeys?.() ?? []
-  const full = treeRef.value?.getCheckedKeys?.() ?? []
-  const ids = [
-    ...new Set([...(half as Array<number | string>), ...(full as Array<number | string>)]),
-  ].filter((id): id is number => typeof id === 'number')
+  const halfMenu = (menuTreeRef.value?.getHalfCheckedKeys?.() ?? []) as Array<number | string>
+  const fullMenu = (menuTreeRef.value?.getCheckedKeys?.() ?? []) as Array<number | string>
+  const halfAction = (actionTreeRef.value?.getHalfCheckedKeys?.() ?? []) as Array<number | string>
+  const fullAction = (actionTreeRef.value?.getCheckedKeys?.() ?? []) as Array<number | string>
+  const menuIds = [...new Set([...halfMenu, ...fullMenu])].filter((id): id is number => typeof id === 'number')
+  let actionIds = [...new Set([...halfAction, ...fullAction])].filter((id): id is number => typeof id === 'number')
+  if (actionKeyword.value.trim()) {
+    const prevActionIds = new Set(checkedIds.value.filter((id) => actionPermissionIds.value.includes(id)))
+    actionIds = [...new Set([...actionIds, ...prevActionIds])]
+  }
+  const ids = [...new Set([...menuIds, ...actionIds])]
   saving.value = true
   try {
     await setRolePermissions(selectedRoleId.value, ids)
+    checkedIds.value = ids
     ElMessage.success('保存成功')
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
@@ -296,5 +367,16 @@ onMounted(async () => {
 }
 .perm-tree {
   margin-top: 12px;
+}
+.perm-tabs {
+  margin-top: 12px;
+}
+.perm-tab-desc {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+.perm-toolbar {
+  margin-bottom: 12px;
 }
 </style>

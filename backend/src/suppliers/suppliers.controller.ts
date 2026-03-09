@@ -1,17 +1,54 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  Post,
+  Put,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { SystemOptionsService } from '../system-options/system-options.service';
 import { SuppliersService } from './suppliers.service';
+
+const SUPPLIER_TYPE_OPTION_TYPE = 'supplier_types';
 
 @Controller('suppliers')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission('/orders/edit')
+@RequirePermission('/suppliers')
 export class SuppliersController {
-  constructor(private readonly suppliersService: SuppliersService) {}
+  constructor(
+    private readonly suppliersService: SuppliersService,
+    private readonly systemOptionsService: SystemOptionsService,
+  ) {}
 
   /**
-   * 下拉搜索供应商
+   * 供应商类型下拉选项（一级节点，来自系统设置-供应商设置）
+   * GET /suppliers/options
+   */
+  @Get('options')
+  getTypeOptions() {
+    return this.systemOptionsService.findRootsByType(SUPPLIER_TYPE_OPTION_TYPE);
+  }
+
+  /**
+   * 某供应商类型下的业务范围下拉选项（该类型下的二级节点）
+   * GET /suppliers/options/business-scope?type=面料
+   */
+  @Get('options/business-scope')
+  getBusinessScopeOptions(@Query('type') type: string) {
+    return this.systemOptionsService.findChildrenValuesByParentValue(
+      SUPPLIER_TYPE_OPTION_TYPE,
+      type || '',
+    );
+  }
+
+  /**
+   * 下拉搜索供应商（订单编辑等调用，需具备 /suppliers 权限）
    * GET /suppliers?keyword=&page=&pageSize=
    */
   @Get()
@@ -25,6 +62,81 @@ export class SuppliersController {
       page ? parseInt(page, 10) : 1,
       pageSize ? parseInt(pageSize, 10) : 20,
     );
+  }
+
+  /**
+   * 供应商管理页：列表
+   */
+  @Get('items')
+  getList(
+    @Query('name') name?: string,
+    @Query('type') type?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.suppliersService.getList({
+      name,
+      type,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
+
+  @Get('items/:id')
+  getOne(@Param('id') id: string) {
+    return this.suppliersService.getOne(Number(id));
+  }
+
+  @Post('items')
+  create(
+    @Body('name') name: string,
+    @Body('type') type?: string,
+    @Body('businessScope') businessScope?: string,
+    @Body('cooperationDate') cooperationDate?: string,
+    @Body('contactPerson') contactPerson?: string,
+    @Body('contactInfo') contactInfo?: string,
+    @Body('factoryAddress') factoryAddress?: string,
+    @Body('settlementTime') settlementTime?: string,
+  ) {
+    return this.suppliersService.create({
+      name,
+      type,
+      businessScope,
+      cooperationDate,
+      contactPerson,
+      contactInfo,
+      factoryAddress,
+      settlementTime,
+    });
+  }
+
+  @Put('items/:id')
+  update(
+    @Param('id') id: string,
+    @Body('name') name?: string,
+    @Body('type') type?: string,
+    @Body('businessScope') businessScope?: string,
+    @Body('cooperationDate') cooperationDate?: string,
+    @Body('contactPerson') contactPerson?: string,
+    @Body('contactInfo') contactInfo?: string,
+    @Body('factoryAddress') factoryAddress?: string,
+    @Body('settlementTime') settlementTime?: string,
+  ) {
+    return this.suppliersService.update(Number(id), {
+      name,
+      type,
+      businessScope,
+      cooperationDate,
+      contactPerson,
+      contactInfo,
+      factoryAddress,
+      settlementTime,
+    });
+  }
+
+  @Delete('items/:id')
+  remove(@Param('id') id: string) {
+    return this.suppliersService.remove(Number(id));
   }
 }
 

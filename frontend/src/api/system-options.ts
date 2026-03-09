@@ -24,6 +24,25 @@ export function getSystemOptionsTree(type: string) {
   return request.get<SystemOptionTreeNode[]>('/system-options/tree', { params: { type } })
 }
 
+/** 懒加载树：根节点（含 hasChildren） */
+export interface SystemOptionLazyNode {
+  id: number
+  value: string
+  sortOrder: number
+  hasChildren: boolean
+}
+
+export function getSystemOptionsRoots(type: string) {
+  return request.get<SystemOptionLazyNode[]>('/system-options/roots', { params: { type } })
+}
+
+/** 懒加载树：子节点 */
+export function getSystemOptionsChildren(type: string, parentId: number) {
+  return request.get<SystemOptionLazyNode[]>('/system-options/children', {
+    params: { type, parent_id: parentId },
+  })
+}
+
 export function createSystemOption(data: {
   type: string
   value: string

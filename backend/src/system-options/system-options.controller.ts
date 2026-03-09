@@ -17,7 +17,7 @@ import { SystemOptionsService } from './system-options.service';
 
 @Controller('system-options')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission('/settings/orders')
+@RequirePermission(['/settings/orders', '/settings/suppliers'])
 export class SystemOptionsController {
   constructor(private service: SystemOptionsService) {}
 
@@ -37,6 +37,22 @@ export class SystemOptionsController {
   @Get('tree')
   findTreeByType(@Query('type') type: string) {
     return this.service.findTreeByType(type || '');
+  }
+
+  /** 懒加载树：根节点（含 hasChildren） */
+  @Get('roots')
+  findRootsForLazyTree(@Query('type') type: string) {
+    return this.service.findRootsForLazyTree(type || '');
+  }
+
+  /** 懒加载树：子节点（含 hasChildren） */
+  @Get('children')
+  findChildrenByParentId(
+    @Query('type') type: string,
+    @Query('parent_id') parentIdStr?: string,
+  ) {
+    const parentId = parentIdStr ? parseInt(parentIdStr, 10) : 0;
+    return this.service.findChildrenByParentId(type || '', Number.isNaN(parentId) ? 0 : parentId);
   }
 
   @Post()

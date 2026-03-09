@@ -112,7 +112,11 @@
           <div class="filter-actions">
             <el-button size="large" @click="openColumnConfig">列设置</el-button>
             <el-button type="primary" size="large" @click="openCreate">新建SKU</el-button>
-            <el-button size="large" :disabled="!selectedIds.length" @click="batchDelete">删除</el-button>
+            <el-tooltip content="删除" placement="top">
+            <el-button type="danger" size="large" circle :disabled="!selectedIds.length" @click="batchDelete">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </el-tooltip>
           </div>
         </div>
 
@@ -315,7 +319,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, onMounted, computed, nextTick, onBeforeUnmount } from 'vue'
-import { ArrowLeft, ArrowRight, ArrowDown } from '@element-plus/icons-vue'
+import { ArrowLeft, ArrowRight, ArrowDown, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { PRODUCT_FIELDS_SORTED } from '@/fields'
 import {

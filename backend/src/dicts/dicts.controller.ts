@@ -13,7 +13,7 @@ export class DictsController {
 
   /**
    * 字典下拉接口（扁平，供合作方式等下拉）
-   * GET /dicts?type=collaboration|materialType|orderType|sampleType
+   * GET /dicts?type=collaboration|material_types|order_types|...
    * 与「订单设置」同源 system-options 表，仅读权限用 /orders/list
    */
   @Get()

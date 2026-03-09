@@ -22,7 +22,10 @@ export class PermissionGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const required = this.reflector.get<string>(REQUIRE_PERMISSION, context.getHandler());
+    const required = this.reflector.get<string | string[]>(
+      REQUIRE_PERMISSION,
+      context.getHandler(),
+    );
     if (!required) return true;
 
     const request = context.switchToHttp().getRequest();
@@ -38,7 +41,10 @@ export class PermissionGuard implements CanActivate {
     });
     const routes = perms.map((p) => p.permission?.routePath).filter(Boolean);
     const codes = perms.map((p) => p.permission?.code).filter(Boolean);
-    const allowed = routes.includes(required) || codes.includes(required);
+    const requiredList = Array.isArray(required) ? required : [required];
+    const allowed = requiredList.some(
+      (r) => routes.includes(r) || codes.includes(r),
+    );
     if (!allowed) throw new ForbiddenException('无权限访问');
     return true;
   }

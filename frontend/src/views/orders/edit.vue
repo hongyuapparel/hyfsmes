@@ -214,7 +214,7 @@
     </el-card>
 
     <!-- B 区：颜色 / 数量 -->
-    <el-card class="block-card">
+    <el-card ref="bTableRef" class="block-card">
       <template #header>
         <div class="block-header">
           <span class="block-title">B 颜色 / 数量</span>
@@ -224,56 +224,139 @@
           </div>
         </div>
       </template>
-      <el-table :data="colorRows" border>
-        <el-table-column label="颜色名称" min-width="120">
-          <template #default="{ row }">
-            <el-input v-model="row.colorName" placeholder="颜色名称" />
+      <el-table
+        :data="colorRows"
+        border
+        show-summary
+        sum-text="合计"
+        :summary-method="bSummaryMethod"
+      >
+        <el-table-column label="颜色名称" min-width="120" align="center">
+          <template #default="{ row, $index }">
+            <div
+              v-if="editingCell?.rowIndex === $index && editingCell?.col === 'color'"
+              class="b-cell-edit"
+              @blur="onBCellBlur"
+            >
+              <el-input
+                ref="colorNameInputRef"
+                v-model="row.colorName"
+                placeholder="颜色名称"
+                size="small"
+                borderless
+                @keydown.enter="editingCell = null"
+              />
+            </div>
+            <div
+              v-else
+              class="b-cell-text"
+              tabindex="0"
+              @click="startEditBCell($index, 'color')"
+              @focus="startEditBCell($index, 'color')"
+            >
+              {{ row.colorName || '—' }}
+            </div>
           </template>
         </el-table-column>
         <el-table-column
           v-for="(size, sIndex) in sizeHeaders"
-          :key="size"
+          :key="'size-' + sIndex"
           :label="size"
           min-width="90"
+          align="center"
         >
           <template #header>
-            <el-input v-model="sizeHeaders[sIndex]" size="small" />
+            <div class="b-header-cell">
+              <el-input
+                v-model="sizeHeaders[sIndex]"
+                size="small"
+                class="b-header-input"
+                @click.stop
+              />
+              <el-tooltip v-if="sizeHeaders.length > 1" content="删除此列" placement="top">
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  class="b-header-remove"
+                  @click.stop="removeSizeColumn(sIndex)"
+                >
+                  <el-icon><CircleClose /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </template>
           <template #default="{ row, $index }">
-            <el-input-number
-              v-model="row.quantities[sIndex]"
-              :min="0"
-              :controls="false"
-              class="qty-input"
-              :ref="(el) => setColorCellRef(el, $index, sIndex)"
-              @focus="setActiveColorCell($index, sIndex)"
-              @keydown.stop="onColorCellKeydown($event, $index, sIndex)"
-              @paste.stop.prevent="onColorCellPaste($event, $index, sIndex)"
-            />
+            <div
+              v-if="editingCell?.rowIndex === $index && editingCell?.col === sIndex"
+              class="b-cell-edit"
+              @blur="onBCellBlur"
+            >
+              <el-input-number
+                v-model="row.quantities[sIndex]"
+                :min="0"
+                :controls="false"
+                class="qty-input"
+                size="small"
+                :ref="(el) => setColorCellRef(el, $index, sIndex)"
+                @focus="setActiveColorCell($index, sIndex)"
+                @keydown.stop="onColorCellKeydown($event, $index, sIndex)"
+                @paste.stop.prevent="onColorCellPaste($event, $index, sIndex)"
+              />
+            </div>
+            <div
+              v-else
+              class="b-cell-text"
+              tabindex="0"
+              @click="startEditBCell($index, sIndex)"
+              @focus="startEditBCell($index, sIndex)"
+            >
+              {{ row.quantities[sIndex] ?? 0 }}
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="合计" width="80">
+        <el-table-column label="合计" width="80" align="center">
           <template #default="{ row }">
             {{ calcRowTotal(row) }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-model="row.remark" placeholder="备注" />
+        <el-table-column label="备注" min-width="120" align="center">
+          <template #default="{ row, $index }">
+            <div
+              v-if="editingCell?.rowIndex === $index && editingCell?.col === 'remark'"
+              class="b-cell-edit"
+              @blur="onBCellBlur"
+            >
+              <el-input
+                ref="remarkInputRef"
+                v-model="row.remark"
+                placeholder="备注"
+                size="small"
+                borderless
+                @keydown.enter="editingCell = null"
+              />
+            </div>
+            <div
+              v-else
+              class="b-cell-text"
+              tabindex="0"
+              @click="startEditBCell($index, 'remark')"
+              @focus="startEditBCell($index, 'remark')"
+            >
+              {{ row.remark || '—' }}
+            </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right" align="center">
           <template #default="{ $index }">
-            <el-button link type="danger" size="small" @click="removeColorRow($index)">删除</el-button>
+            <el-tooltip content="删除" placement="top">
+              <el-button link type="danger" size="small" circle @click="removeColorRow($index)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
-      <div class="b-summary">
-        <span v-for="(sum, idx) in sizeTotals" :key="idx" class="b-summary-item">
-          {{ sizeHeaders[idx] }}：{{ sum }}
-        </span>
-        <span class="b-summary-item b-summary-total">总数：{{ grandTotal }}</span>
-      </div>
     </el-card>
 
     <!-- C 区：物料信息 -->
@@ -358,7 +441,11 @@
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ $index }">
-            <el-button link type="danger" size="small" @click="removeMaterialRow($index)">删除</el-button>
+            <el-tooltip content="删除" placement="top">
+              <el-button link type="danger" size="small" circle @click="removeMaterialRow($index)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -413,7 +500,11 @@
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ $index }">
-            <el-button link type="danger" size="small" @click="removeSizeInfoRow($index)">删除</el-button>
+            <el-tooltip content="删除" placement="top">
+              <el-button link type="danger" size="small" circle @click="removeSizeInfoRow($index)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -435,9 +526,6 @@
               placeholder="选择工艺项目"
               filterable
               clearable
-              :remote-method="searchProcessItems"
-              remote
-              :loading="processLoading"
             >
               <el-option
                 v-for="p in processOptions"
@@ -475,7 +563,11 @@
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
           <template #default="{ $index }">
-            <el-button link type="danger" size="small" @click="removeProcessRow($index)">删除</el-button>
+            <el-tooltip content="删除" placement="top">
+              <el-button link type="danger" size="small" circle @click="removeProcessRow($index)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
           </template>
         </el-table-column>
       </el-table>
@@ -530,7 +622,11 @@
             />
           </div>
           <div class="packaging-footer">
-            <el-button link type="danger" size="small" @click="removePackagingHeader(idx)">删除列</el-button>
+            <el-tooltip content="删除列" placement="top">
+              <el-button link type="danger" size="small" circle @click="removePackagingHeader(idx)">
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
           </div>
         </div>
       </div>
@@ -562,15 +658,18 @@
           class="attachment-item"
         >
           <el-image :src="url" fit="cover" :preview-src-list="attachments" />
-          <el-button
-            text
-            type="danger"
-            size="small"
-            class="attachment-remove"
-            @click="removeAttachment(idx)"
-          >
-            删除
-          </el-button>
+          <el-tooltip content="删除" placement="top">
+            <el-button
+              link
+              type="danger"
+              size="small"
+              class="attachment-remove"
+              circle
+              @click="removeAttachment(idx)"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </el-tooltip>
         </div>
         <div v-if="!attachments.length" class="attachments-empty">暂无附件，可点击右上角选择上传</div>
       </div>
@@ -599,8 +698,10 @@ import {
   type OrderFormPayload,
 } from '@/api/orders'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
 import { uploadImage } from '@/api/uploads'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { Delete, CircleClose } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -819,8 +920,12 @@ interface ColorRow {
 
 const colorRows = ref<ColorRow[]>([])
 
-// B 区表格编辑能力：单元格引用与键盘导航、批量粘贴
+// B 区表格编辑能力：点击才编辑、单元格引用与键盘导航、批量粘贴
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
+
+type BEditCol = number | 'color' | 'remark'
+const editingCell = ref<{ rowIndex: number; col: BEditCol } | null>(null)
+const bTableRef = ref<{ $el?: HTMLElement } | null>(null)
 
 const colorCellRefs = ref<InputComponentInstance[][]>([])
 const activeColorCell = ref<{ row: number; col: number } | null>(null)
@@ -843,16 +948,44 @@ function setActiveColorCell(rowIndex: number, colIndex: number) {
   activeColorCell.value = { row: rowIndex, col: colIndex }
 }
 
-function focusColorCell(rowIndex: number, colIndex: number) {
-  if (rowIndex < 0 || colIndex < 0) return
-  const row = colorCellRefs.value[rowIndex]
-  const cell = row?.[colIndex]
-  if (cell && typeof cell.focus === 'function') {
+const colorNameInputRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null)
+const remarkInputRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null)
+
+function startEditBCell(rowIndex: number, col: BEditCol) {
+  editingCell.value = { rowIndex, col }
+  if (typeof col === 'number') {
+    nextTick(() => focusColorCell(rowIndex, col))
+  } else {
     nextTick(() => {
-      cell.focus && cell.focus()
-      activeColorCell.value = { row: rowIndex, col: colIndex }
+      const ref = col === 'color' ? colorNameInputRef.value : remarkInputRef.value
+      const input = ref?.$el?.querySelector?.('input') ?? (ref as any)?.$el
+      if (input?.focus) input.focus()
+      else if (typeof ref?.focus === 'function') ref.focus()
     })
   }
+}
+
+function onBCellBlur() {
+  setTimeout(() => {
+    const el = bTableRef.value?.$el ?? bTableRef.value
+    const container = el && 'closest' in el ? (el as HTMLElement) : null
+    if (!container?.contains(document.activeElement)) {
+      editingCell.value = null
+    }
+  }, 0)
+}
+
+function focusColorCell(rowIndex: number, colIndex: number) {
+  if (rowIndex < 0 || colIndex < 0) return
+  editingCell.value = { rowIndex, col: colIndex }
+  nextTick(() => {
+    const row = colorCellRefs.value[rowIndex]
+    const cell = row?.[colIndex]
+    if (cell && typeof cell.focus === 'function') {
+      cell.focus && cell.focus()
+      activeColorCell.value = { row: rowIndex, col: colIndex }
+    }
+  })
 }
 
 function onColorCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
@@ -954,6 +1087,20 @@ function addSizeColumn() {
   normalizeSizeInfoRows()
 }
 
+function removeSizeColumn(sIndex: number) {
+  if (sizeHeaders.value.length <= 1) return
+  sizeHeaders.value.splice(sIndex, 1)
+  colorRows.value.forEach((row) => {
+    if (Array.isArray(row.quantities)) row.quantities.splice(sIndex, 1)
+  })
+  const cur = editingCell.value
+  if (cur && typeof cur.col === 'number') {
+    if (cur.col === sIndex) editingCell.value = null
+    else if (cur.col > sIndex) editingCell.value = { ...cur, col: cur.col - 1 }
+  }
+  normalizeSizeInfoRows()
+}
+
 const sizeTotals = computed(() => {
   const len = sizeHeaders.value.length
   const sums = Array(len).fill(0) as number[]
@@ -970,6 +1117,14 @@ const grandTotal = computed(() => sizeTotals.value.reduce((s, n) => s + n, 0))
 
 function calcRowTotal(row: ColorRow) {
   return (row.quantities ?? []).reduce((s, n) => s + (Number(n) || 0), 0)
+}
+
+/** B 区表尾合计行：列顺序为 颜色名称 | 尺码1..N | 合计 | 备注 | 操作 */
+function bSummaryMethod() {
+  const totals = sizeTotals.value
+  const total = grandTotal.value
+  const row: (string | number)[] = ['合计', ...totals, total, '', '']
+  return row
 }
 
 // C 区：物料信息
@@ -1000,7 +1155,7 @@ function removeMaterialRow(index: number) {
 async function loadMaterialTypes() {
   try {
     const res = await request.get<Array<{ id: number; value: string } | string>>('/dicts', {
-      params: { type: 'materialType' },
+      params: { type: 'material_types' },
       skipGlobalErrorHandler: true,
     })
     const list = res.data ?? []
@@ -1165,8 +1320,8 @@ interface ProcessRow {
 }
 
 const processItems = ref<ProcessRow[]>([])
+/** 工艺项目下拉选项：与「供应商设置」中「工艺供应商」的业务范围一致 */
 const processOptions = ref<string[]>([])
-const processLoading = ref(false)
 
 function addProcessRow() {
   processItems.value.push({})
@@ -1176,23 +1331,13 @@ function removeProcessRow(index: number) {
   processItems.value.splice(index, 1)
 }
 
-async function searchProcessItems(keyword: string) {
-  processLoading.value = true
+/** 从供应商设置加载「工艺供应商」下的业务范围作为工艺项目选项 */
+async function loadProcessOptions() {
   try {
-    const res = await request.get('/process-items', {
-      params: { keyword: keyword || undefined },
-      skipGlobalErrorHandler: true,
-    })
-    const list = (res.data as { list?: { value: string }[] } | string[] | undefined) ?? []
-    if (Array.isArray(list) && list.length && typeof list[0] === 'string') {
-      processOptions.value = list as string[]
-    } else if (Array.isArray((list as any).list)) {
-      processOptions.value = ((list as any).list as { value: string }[]).map((i) => i.value)
-    }
+    const res = await getSupplierBusinessScopeOptions('工艺供应商')
+    processOptions.value = res.data ?? []
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) console.warn('工艺项目加载失败', getErrorMessage(e))
-  } finally {
-    processLoading.value = false
+    if (!isErrorHandled(e)) console.warn('工艺项目选项加载失败', getErrorMessage(e))
   }
 }
 
@@ -1532,6 +1677,10 @@ onMounted(async () => {
   await Promise.all([loadDicts(), loadUserOptions(), loadMaterialTypes()])
   // 初始化 SKU 下拉，让用户下拉时能直接看到产品列表
   await searchSkus('')
+  // C 区 / E 区供应商下拉初始列表
+  await searchSuppliers('')
+  // E 区工艺项目下拉：与「供应商设置」中「工艺供应商」的业务范围一致
+  await loadProcessOptions()
   await loadDetail()
 })
 </script>
@@ -1695,21 +1844,52 @@ onMounted(async () => {
   width: 100%;
 }
 
-.b-summary {
-  margin-top: var(--space-sm);
+/* B 区：点击才编辑、表头删列 */
+.b-cell-text {
+  min-height: 28px;
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-sm);
-  font-size: 13px;
-  color: var(--color-text-muted, #909399);
+  align-items: center;
+  justify-content: center;
+  cursor: text;
+  outline: none;
+  padding: 0 8px;
 }
-
-.b-summary-item {
-  min-width: 80px;
+.b-cell-text:focus {
+  outline: none;
 }
-
-.b-summary-total {
-  font-weight: 600;
+.b-cell-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+.b-cell-edit .el-input,
+.b-cell-edit .el-input-number {
+  width: 100%;
+}
+.b-header-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding-right: 24px;
+}
+.b-header-input {
+  width: 100%;
+  text-align: center;
+}
+.b-header-remove {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  padding: 2px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.b-header-cell:hover .b-header-remove {
+  opacity: 1;
 }
 
 .packaging-grid {

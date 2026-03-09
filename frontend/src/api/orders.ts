@@ -45,6 +45,8 @@ export interface OrderListItem {
   createdAt: string
   /** 更新时间 */
   updatedAt: string
+  /** 备注条数（列表接口附带，用于角标展示） */
+  remarkCount?: number
 }
 
 export interface OrderListRes {
@@ -160,6 +162,39 @@ export type OrderDetail = OrderListItem & OrderFormPayload
 /** 获取订单详情（编辑回显） */
 export function getOrderDetail(id: number) {
   return request.get<OrderDetail>(`/orders/${id}`)
+}
+
+export interface OrderOperationLogItem {
+  id: number
+  orderId: number
+  orderNo: string
+  operatorUsername: string
+  action: string
+  detail: string
+  createdAt: string
+}
+
+/** 获取订单操作记录 */
+export function getOrderLogs(id: number) {
+  return request.get<OrderOperationLogItem[]>(`/orders/${id}/logs`)
+}
+
+export interface OrderRemarkItem {
+  id: number
+  orderId: number
+  operatorUsername: string
+  content: string
+  createdAt: string
+}
+
+/** 获取订单备注列表 */
+export function getOrderRemarks(id: number) {
+  return request.get<OrderRemarkItem[]>(`/orders/${id}/remarks`)
+}
+
+/** 新增订单备注 */
+export function addOrderRemark(id: number, content: string) {
+  return request.post<OrderRemarkItem>(`/orders/${id}/remarks`, { content })
 }
 
 /** 新建草稿 */

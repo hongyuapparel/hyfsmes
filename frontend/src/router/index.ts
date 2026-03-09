@@ -64,6 +64,12 @@ const routes: RouteRecordRaw[] = [
             // 复用订单列表的菜单权限，避免额外配置独立菜单项
             meta: { title: '订单编辑', permissionPath: '/orders/list' },
           },
+          {
+            path: 'cost/:id',
+            name: 'OrdersCost',
+            component: () => import('@/views/orders/cost.vue'),
+            meta: { title: '订单成本', permissionPath: '/orders/list' },
+          },
         ],
       },
       {
@@ -113,9 +119,15 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'inventory',
         component: RouterViewWrapper,
-        redirect: '/inventory/finished',
+        redirect: '/inventory/pending',
         meta: { title: '库存管理', permissionPath: '/inventory' },
         children: [
+          {
+            path: 'pending',
+            name: 'InventoryPending',
+            component: () => import('@/views/inventory/pending.vue'),
+            meta: { title: '待入库', permissionPath: '/inventory/pending' },
+          },
           {
             path: 'finished',
             name: 'InventoryFinished',
@@ -185,6 +197,12 @@ const routes: RouteRecordRaw[] = [
             name: 'SettingsOrders',
             component: () => import('@/views/settings/order-settings.vue'),
             meta: { title: '订单设置', permissionPath: '/settings/orders' },
+          },
+          {
+            path: 'suppliers',
+            name: 'SettingsSuppliers',
+            component: () => import('@/views/settings/supplier-settings.vue'),
+            meta: { title: '供应商设置', permissionPath: '/settings/suppliers' },
           },
         ],
       },

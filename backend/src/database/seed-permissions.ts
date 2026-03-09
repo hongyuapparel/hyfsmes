@@ -14,6 +14,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_production_sewing', name: '车缝管理', routePath: '/production/sewing', type: 'menu' },
   { code: 'menu_production_finishing', name: '尾部管理', routePath: '/production/finishing', type: 'menu' },
   { code: 'menu_inventory', name: '库存管理', routePath: '/inventory', type: 'menu' },
+  { code: 'menu_inventory_pending', name: '待入库', routePath: '/inventory/pending', type: 'menu' },
   { code: 'menu_inventory_finished', name: '成品库存', routePath: '/inventory/finished', type: 'menu' },
   { code: 'menu_inventory_accessories', name: '辅料库存', routePath: '/inventory/accessories', type: 'menu' },
   { code: 'menu_inventory_fabric', name: '面料库存', routePath: '/inventory/fabric', type: 'menu' },
@@ -25,6 +26,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_settings_roles', name: '角色管理', routePath: '/settings/roles', type: 'menu' },
   { code: 'menu_settings_permissions', name: '权限配置', routePath: '/settings/permissions', type: 'menu' },
   { code: 'menu_settings_products', name: '产品设置', routePath: '/settings/products', type: 'menu' },
+  { code: 'menu_settings_suppliers', name: '供应商设置', routePath: '/settings/suppliers', type: 'menu' },
   // 操作级权限：订单列表勾选后的批量操作
   { code: 'orders_delete', name: '订单列表-删除订单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_review', name: '订单列表-审核待审单', routePath: '/orders/list', type: 'action' },

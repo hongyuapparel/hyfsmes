@@ -11,9 +11,9 @@ export type DictType =
   | 'collaboration'
   | 'order_types'
   | 'product_groups'
+  | 'material_types'
   | 'secondary_processes'
   | 'factories'
-  | 'materialType'
 
 export function getDictOptions(type: DictType) {
   return request.get<string[]>('/dicts', { params: { type } })
