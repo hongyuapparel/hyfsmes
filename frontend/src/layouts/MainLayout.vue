@@ -98,6 +98,7 @@ import {
   Shop,
   Avatar,
   Briefcase,
+  Link,
   Setting,
 } from '@element-plus/icons-vue'
 import { useAppStore } from '@/stores/app'
@@ -123,6 +124,7 @@ const iconMap = {
   Shop,
   Avatar,
   Briefcase,
+  Link,
   Setting,
 } as const
 
@@ -382,5 +384,22 @@ onMounted(async () => {
 
 .menu-title {
   font-size: var(--font-size-body);
+}
+</style>
+
+<!-- 打印时只保留主内容区，不打印侧栏与顶栏 -->
+<style>
+@media print {
+  .main-layout .sidebar-wrapper,
+  .main-layout .layout-header {
+    display: none;
+  }
+  .main-layout .content-wrapper {
+    width: 100%;
+  }
+  .main-layout .layout-main {
+    padding: 0;
+    overflow: visible;
+  }
 }
 </style>

@@ -45,17 +45,19 @@ export class Order {
   @Column({ name: 'sale_price', type: 'decimal', precision: 10, scale: 2, default: 0 })
   salePrice: string;
 
-  /** 合作方式（如成品、来料等，取值由系统配置） */
-  @Column({ name: 'collaboration_type', length: 64, default: '' })
-  collaborationType: string;
+  /**
+   * 合作方式 ID（system_options.id，option_type='collaboration'）
+   * 通过 system_options 表改名后，历史订单展示会自动同步
+   */
+  @Column({ name: 'collaboration_type_id', type: 'int', nullable: true })
+  collaborationTypeId: number | null;
 
   /**
-   * 标签/样品类型：
-   * 如：sample / first_sample / revised_sample / pre_production / photo_sample / bulk 等
-   * 具体取值由系统配置，后端不做强校验，仅存字符串
+   * 订单类型 ID（system_options.id，option_type='order_types'）
+   * 通过 system_options 表改名后，历史订单展示会自动同步
    */
-  @Column({ name: 'label', length: 64, default: '' })
-  label: string;
+  @Column({ name: 'order_type_id', type: 'int', nullable: true })
+  orderTypeId: number | null;
 
   /** 工艺项目（原二次工艺） */
   @Column({ name: 'process_item', length: 255, default: '' })

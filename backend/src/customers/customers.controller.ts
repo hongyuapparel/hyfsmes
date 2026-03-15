@@ -16,6 +16,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CustomersService } from './customers.service';
+import { CurrentUser } from '../auth/current-user.decorator';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -77,18 +78,30 @@ export class CustomersController {
         keyword?.trim() || undefined,
       );
     } catch (e) {
-      const msg = e instanceof Error ? e.message : '小满列表获取失败';
+      let msg =
+        e instanceof Error ? e.message : '小满列表获取失败';
+      if (e instanceof Error && e.message.toLowerCase().includes('fetch failed')) {
+        msg = '无法连接小满接口，请检查服务器网络或 XIAOMAN_API_BASE_URL 配置';
+      }
       this.logger.warn(`小满列表请求失败: ${msg}`);
       throw new BadRequestException(msg);
     }
   }
 
   @Post('xiaoman/import')
-  async importFromXiaoman(@Body('companyIds') companyIds: number[]) {
+  async importFromXiaoman(
+    @Body('companyIds') companyIds: number[],
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
     try {
-      return await this.customersService.importFromXiaoman(companyIds ?? []);
+      return await this.customersService.importFromXiaoman(companyIds ?? [], user);
     } catch (e) {
-      throw new BadRequestException((e instanceof Error ? e.message : '导入失败'));
+      let msg =
+        e instanceof Error ? e.message : '导入失败';
+      if (e instanceof Error && e.message.toLowerCase().includes('fetch failed')) {
+        msg = '无法连接小满接口，请检查服务器网络或 XIAOMAN_API_BASE_URL 配置';
+      }
+      throw new BadRequestException(msg);
     }
   }
 
@@ -108,7 +121,7 @@ export class CustomersController {
       contact_info?: string;
       cooperation_date?: string;
       salesperson?: string;
-      product_group?: string;
+      product_group_id?: number | null;
     },
   ) {
     return this.customersService.create(body);
@@ -125,7 +138,7 @@ export class CustomersController {
       contact_info?: string;
       cooperation_date?: string;
       salesperson?: string;
-      product_group?: string;
+      product_group_id?: number | null;
     },
   ) {
     return this.customersService.update(id, body);

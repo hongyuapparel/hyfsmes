@@ -66,6 +66,7 @@
     >
       <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
       <el-table-column prop="quantity" label="数量" width="90" align="right" />
       <el-table-column prop="createdAt" label="登记时间" width="160" align="center" />

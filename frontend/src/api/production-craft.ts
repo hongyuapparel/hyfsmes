@@ -8,8 +8,10 @@ export interface CraftListItem {
   imageUrl: string
   supplierName: string
   processItem: string
-  orderType: string
-  collaborationType: string
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId: number | null
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId: number | null
   purchaseStatus: string
   craftStatus: string
   completedAt: string | null
@@ -26,8 +28,10 @@ export interface CraftListQuery {
   tab?: string
   supplier?: string
   processItem?: string
-  orderType?: string
-  collaborationType?: string
+  /** 订单类型 ID */
+  orderTypeId?: number
+  /** 合作方式 ID */
+  collaborationTypeId?: number
   orderDateStart?: string
   orderDateEnd?: string
   page?: number

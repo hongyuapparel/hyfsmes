@@ -6,6 +6,7 @@ import { OrderPattern } from '../entities/order-pattern.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
+import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
 import { ProductionPatternController } from './production-pattern.controller';
 import { ProductionPatternService } from './production-pattern.service';
 
@@ -13,6 +14,7 @@ import { ProductionPatternService } from './production-pattern.service';
   imports: [
     TypeOrmModule.forFeature([Order, OrderPattern, OrderExt, User, RolePermission]),
     AuthModule,
+    OrderWorkflowModule,
   ],
   controllers: [ProductionPatternController],
   providers: [ProductionPatternService],

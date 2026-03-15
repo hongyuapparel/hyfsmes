@@ -1,5 +1,5 @@
 import request from './request'
-import type { SystemOptionTreeNode } from './system-options'
+import type { SystemOptionTreeNode, SystemOptionItem } from './system-options'
 
 /**
  * 订单相关“设置项下拉”的统一读取入口。
@@ -21,5 +21,10 @@ export function getDictOptions(type: DictType) {
 
 export function getDictTree(type: DictType) {
   return request.get<SystemOptionTreeNode[]>('/dicts/tree', { params: { type } })
+}
+
+/** 获取带 id 的完整字典项列表（用于按 optionId 存储与筛选） */
+export function getDictItems(type: DictType) {
+  return request.get<SystemOptionItem[]>('/dicts/list', { params: { type } })
 }
 

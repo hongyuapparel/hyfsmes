@@ -6,6 +6,14 @@ export class FabricStock {
   @PrimaryGeneratedColumn()
   id: number;
 
+  /** 客户 ID，可选，关联 customers.id */
+  @Column({ name: 'customer_id', type: 'int', nullable: true })
+  customerId: number | null;
+
+  /** 客户名称（冗余字段，方便筛选与展示） */
+  @Column({ name: 'customer_name', length: 255, default: '' })
+  customerName: string;
+
   /** 面料名称/编号 */
   @Column({ name: 'name', length: 128, default: '' })
   name: string;

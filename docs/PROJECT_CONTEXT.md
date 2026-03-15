@@ -30,6 +30,7 @@
 | 产品 / 款式管理 | 产品档案、规格、工艺等 | `frontend/src/views/products/*` | `backend/src/products/*`, `backend/src/process-items/*` | `TODO` |
 | 供应商管理 | 供应商信息 | `frontend/src/views/suppliers/*` | `backend/src/suppliers/*` | `TODO` |
 | 仓储 / 出入库 | 入库、出库、库存查看（如已实现） | `TODO` | `TODO` | `TODO` |
+| 财务管理 | 收入流水（按部门+银行账号录入）、支出流水（可关联订单/供应商或填明细）、财务设置（支出类型、银行账号） | `frontend/src/views/finance/income.vue`, `expense.vue`, `frontend/src/views/settings/finance-settings.vue` | `backend/src/finance-income/*`, `backend/src/finance-expense/*` | `TODO` |
 | 其它模块 | 例如健康检查、文件上传、小满对接等 | `TODO` | `TODO` | `TODO` |
 
 > 使用建议：  
@@ -66,6 +67,7 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2025-03`：财务管理新增「收入流水」「支出流水」：收入按部门+银行账号手动录入（不关联订单），支出可关联订单/供应商或仅填明细；系统设置中新增「财务设置」维护支出类型、银行账号（system_options 只存 ID，改名历史同步）。
 - `2025-xx-xx`：完成「订单列表卡片信息重构」，下单时间、合作方式、工艺标签等展示规则见 `docs/ORDER_STATUS_FLOW_DESIGN.md` 第 X 节。  
 - `2025-xx-xx`：客户模块接入字段配置，与产品页共用字段配置中心，细节见 `docs/FIELD_CONFIG_DESIGN.md`。  
 - `TODO`：请在实际完成后，用一行中文简单描述改动与影响模块。

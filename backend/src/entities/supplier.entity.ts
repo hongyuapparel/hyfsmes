@@ -13,13 +13,13 @@ export class Supplier {
   @Column({ name: 'name', length: 255 })
   name: string;
 
-  /** 供应商类型：面料、辅料、工艺、生产加工等 */
-  @Column({ name: 'type', length: 64, default: '' })
-  type: string;
+  /** 供应商类型 ID（关联 system_options.id，optionType = supplier_types 且 parentId IS NULL） */
+  @Column({ name: 'supplier_type_id', type: 'int', nullable: true })
+  supplierTypeId: number | null;
 
-  /** 业务范围 */
-  @Column({ name: 'business_scope', length: 255, default: '' })
-  businessScope: string;
+  /** 业务范围 ID（关联 system_options.id，optionType = supplier_types 且 parentId = supplier_type_id） */
+  @Column({ name: 'business_scope_id', type: 'int', nullable: true })
+  businessScopeId: number | null;
 
   /** 合作日期 */
   @Column({ name: 'cooperation_date', type: 'date', nullable: true })

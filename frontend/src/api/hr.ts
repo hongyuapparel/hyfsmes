@@ -4,8 +4,10 @@ export interface EmployeeItem {
   id: number
   employeeNo: string
   name: string
-  department: string
-  jobTitle: string
+  departmentId: number | null
+  jobTitleId: number | null
+  departmentName?: string
+  jobTitleName?: string
   entryDate: string | null
   contactPhone: string
   status: string
@@ -18,7 +20,8 @@ export interface EmployeeItem {
 
 export function getEmployeeList(params?: {
   name?: string
-  department?: string
+  departmentId?: number
+  jobTitleId?: number
   status?: string
   page?: number
   pageSize?: number

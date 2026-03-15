@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
+import { OrderExt } from '../entities/order-ext.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
@@ -13,7 +14,7 @@ import { ProductionFinishingService } from './production-finishing.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderFinishing, OrderCutting, OrderSewing, InboundPending, User, RolePermission]),
+    TypeOrmModule.forFeature([Order, OrderFinishing, OrderCutting, OrderExt, OrderSewing, InboundPending, User, RolePermission]),
     AuthModule,
   ],
   controllers: [ProductionFinishingController],

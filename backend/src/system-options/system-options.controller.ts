@@ -17,7 +17,7 @@ import { SystemOptionsService } from './system-options.service';
 
 @Controller('system-options')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission(['/settings/orders', '/settings/suppliers'])
+@RequirePermission(['/settings/orders', '/settings/suppliers', '/settings/inventory', '/settings/finance'])
 export class SystemOptionsController {
   constructor(private service: SystemOptionsService) {}
 

@@ -5,7 +5,7 @@
     </div>
     <el-table :data="list" border stripe>
       <el-table-column prop="id" label="ID" width="70" />
-      <el-table-column prop="username" label="用户名" width="120" />
+      <el-table-column prop="username" label="登录账号" width="140" />
       <el-table-column prop="displayName" label="显示名" width="120" />
       <el-table-column label="角色" width="120">
         <template #default="{ row }">{{ row.role?.name ?? '-' }}</template>
@@ -38,8 +38,8 @@
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="400" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80">
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" :disabled="isEdit" placeholder="登录账号" />
+        <el-form-item label="登录账号" prop="username">
+          <el-input v-model="form.username" placeholder="登录账号（建议手机号）" />
         </el-form-item>
         <el-form-item v-if="!isEdit" label="密码" prop="password">
           <el-input v-model="form.password" type="password" placeholder="初始密码" show-password />
@@ -142,6 +142,7 @@ async function submitUser() {
   try {
     if (isEdit.value) {
       await updateUser(editId.value, {
+        username: form.value.username,
         display_name: form.value.displayName,
         role_id: form.value.roleId,
       })

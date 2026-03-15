@@ -19,7 +19,7 @@ export function createUser(data: { username: string; password: string; display_n
   return request.post('/users', data)
 }
 
-export function updateUser(id: number, data: { display_name?: string; role_id?: number; status?: string }) {
+export function updateUser(id: number, data: { username?: string; display_name?: string; role_id?: number; status?: string }) {
   return request.patch(`/users/${id}`, data)
 }
 

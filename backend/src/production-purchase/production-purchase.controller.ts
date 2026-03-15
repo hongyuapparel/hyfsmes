@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { ProductionPurchaseService, PurchaseListQuery } from './production-purchase.service';
 
 @Controller('production/purchase')
@@ -19,18 +20,19 @@ export class ProductionPurchaseController {
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
     @Query('supplier') supplier?: string,
-    @Query('orderType') orderType?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const query: PurchaseListQuery = {
       tab,
       orderNo,
       skuCode,
       supplier,
-      orderType,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
       orderDateStart,
       orderDateEnd,
       page: page ? parseInt(page, 10) : 1,
@@ -47,13 +49,21 @@ export class ProductionPurchaseController {
     @Body('orderId') orderId: number,
     @Body('materialIndex') materialIndex: number,
     @Body('actualPurchaseQuantity') actualPurchaseQuantity: number,
-    @Body('purchaseAmount') purchaseAmount: string,
+    @Body('unitPrice') unitPrice: string,
+    @Body('otherCost') otherCost: string,
+    @Body('remark') remark: string | null,
+    @Body('imageUrl') imageUrl: string | null,
+    @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.purchaseService.registerPurchase(
       Number(orderId),
       Number(materialIndex),
       Number(actualPurchaseQuantity),
-      purchaseAmount == null ? '0' : String(purchaseAmount),
+      unitPrice == null ? '0' : String(unitPrice),
+      otherCost == null ? '0' : String(otherCost),
+      remark,
+      imageUrl,
+      user?.userId,
     );
   }
 }

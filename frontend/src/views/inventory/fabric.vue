@@ -1,61 +1,141 @@
 <template>
   <div class="page-card inventory-fabric-page">
-    <div class="filter-bar">
-      <el-input
-        v-model="filter.name"
-        placeholder="面料名称"
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getTextFilterStyle('名称：', filter.name, nameLabelVisible)"
-        :input-style="getFilterInputStyle(filter.name)"
-        @input="debouncedSearch"
-        @keyup.enter="onSearch(true)"
-      >
-        <template #prefix>
-          <span
-            v-if="filter.name && nameLabelVisible"
-            :style="{ color: ACTIVE_FILTER_COLOR }"
+    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
+      <el-tab-pane label="库存" name="stock">
+        <div class="filter-bar">
+          <el-input
+            v-model="filter.name"
+            placeholder="面料名称"
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getTextFilterStyle('名称：', filter.name, nameLabelVisible)"
+            :input-style="getFilterInputStyle(filter.name)"
+            @input="debouncedSearch"
+            @keyup.enter="onSearch(true)"
           >
-            名称：
-          </span>
-        </template>
-      </el-input>
-      <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button type="primary" size="large" @click="openForm(null)">新增面料</el-button>
-      </div>
-    </div>
+            <template #prefix>
+              <span
+                v-if="filter.name && nameLabelVisible"
+                :style="{ color: ACTIVE_FILTER_COLOR }"
+              >
+                名称：
+              </span>
+            </template>
+          </el-input>
+          <el-select
+            v-model="filter.customerName"
+            placeholder="客户"
+            filterable
+            clearable
+            size="large"
+            class="filter-bar-item"
+            @change="onSearch(true)"
+          >
+            <el-option
+              v-for="opt in customerOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+          <div class="filter-bar-actions">
+            <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
+            <el-button size="large" @click="onReset">清空</el-button>
+            <el-button type="primary" size="large" @click="openForm(null)">新增面料</el-button>
+          </div>
+        </div>
 
-    <el-table v-loading="loading" :data="list" border stripe class="fabric-table">
-      <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="quantity" label="数量" width="100" align="right" />
-      <el-table-column prop="unit" label="单位" width="70" align="center" />
-      <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="createdAt" label="创建时间" width="160" align="center">
-        <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
-      </el-table-column>
-      <el-table-column label="操作" width="160" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
-          <el-button link type="warning" size="small" @click="openOutboundDialog(row)">出库</el-button>
-          <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+        <el-table v-loading="loading" :data="list" border stripe class="fabric-table">
+          <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="quantity" label="数量" width="100" align="right" />
+          <el-table-column prop="unit" label="单位" width="70" align="center" />
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="createdAt" label="创建时间" width="160" align="center">
+            <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
+          </el-table-column>
+          <el-table-column label="操作" width="160" align="center" fixed="right">
+            <template #default="{ row }">
+              <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
+              <el-button link type="warning" size="small" @click="openOutboundDialog(row)">出库</el-button>
+              <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 40, 60]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+        <div class="pagination-wrap">
+          <el-pagination
+            v-model:current-page="pagination.page"
+            v-model:page-size="pagination.pageSize"
+            :total="pagination.total"
+            :page-sizes="[20, 40, 60]"
+            layout="total, sizes, prev, pager, next"
+            @current-change="load"
+            @size-change="onPageSizeChange"
+          />
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="出库记录" name="outbounds">
+        <div class="filter-bar">
+          <el-input v-model="outboundFilter.name" placeholder="面料名称" clearable size="large" class="filter-bar-item" @keyup.enter="onOutboundSearch(true)" />
+          <el-select v-model="outboundFilter.customerName" placeholder="客户" filterable clearable size="large" class="filter-bar-item" @change="onOutboundSearch(true)">
+            <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+          </el-select>
+          <el-date-picker
+            v-model="outboundFilter.dateRange"
+            type="daterange"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            value-format="YYYY-MM-DD"
+            size="large"
+            class="filter-bar-item"
+            @change="onOutboundSearch(true)"
+          />
+          <div class="filter-bar-actions">
+            <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
+            <el-button size="large" @click="onOutboundReset">清空</el-button>
+          </div>
+        </div>
+
+        <el-table v-loading="outboundLoading2" :data="outboundList" border stripe class="fabric-table">
+          <el-table-column prop="createdAt" label="时间" width="160" align="center" />
+          <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip />
+          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
+          <el-table-column label="出库数量" width="110" align="right">
+            <template #default="{ row }">{{ row.quantity }} {{ row.unit }}</template>
+          </el-table-column>
+          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
+          <el-table-column label="照片" width="90" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.photoUrl"
+                :src="row.photoUrl"
+                fit="cover"
+                style="width: 56px; height: 56px; border-radius: 6px"
+                :preview-src-list="[row.photoUrl]"
+                preview-teleported
+              />
+              <span v-else>-</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-wrap">
+          <el-pagination
+            v-model:current-page="outboundPagination.page"
+            v-model:page-size="outboundPagination.pageSize"
+            :total="outboundPagination.total"
+            :page-sizes="[20, 40, 60]"
+            layout="total, sizes, prev, pager, next"
+            @current-change="loadOutbounds"
+            @size-change="onOutboundPageSizeChange"
+          />
+        </div>
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog
       v-model="formDialog.visible"
@@ -171,6 +251,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { getCustomers, type CustomerItem } from '@/api/customers'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import {
   getFabricList,
@@ -178,7 +259,9 @@ import {
   updateFabric,
   deleteFabric,
   fabricOutbound,
+  getFabricOutboundRecords,
   type FabricItem,
+  type FabricOutboundRecord,
 } from '@/api/inventory'
 import { uploadOutboundImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -199,11 +282,22 @@ function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
   return { width: `${width}px`, flex: `0 0 ${width}px` }
 }
 
-const filter = reactive({ name: '' })
+const filter = reactive({ name: '', customerName: '' })
 const nameLabelVisible = ref(false)
 const list = ref<FabricItem[]>([])
+const customerOptions = ref<{ label: string; value: string }[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+
+const pageTab = ref<'stock' | 'outbounds'>('stock')
+const outboundFilter = reactive<{
+  name: string
+  customerName: string
+  dateRange: [string, string] | []
+}>({ name: '', customerName: '', dateRange: [] })
+const outboundList = ref<FabricOutboundRecord[]>([])
+const outboundLoading2 = ref(false)
+const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
 
 const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
   visible: false,
@@ -255,6 +349,7 @@ async function load() {
   try {
     const res = await getFabricList({
       name: filter.name || undefined,
+      customerName: filter.customerName || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -267,6 +362,13 @@ async function load() {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
     loading.value = false
+  }
+}
+
+function onPageTabChange() {
+  if (pageTab.value === 'outbounds') {
+    outboundPagination.page = 1
+    loadOutbounds()
   }
 }
 
@@ -288,8 +390,22 @@ function debouncedSearch() {
 function onReset() {
   nameLabelVisible.value = false
   filter.name = ''
+  filter.customerName = ''
   pagination.page = 1
   load()
+}
+
+async function loadCustomerOptions() {
+  try {
+    const res = await getCustomers({ page: 1, pageSize: 200, sortBy: 'companyName', sortOrder: 'asc' })
+    const list = (res.data?.list ?? []) as CustomerItem[]
+    customerOptions.value = list.map((c) => ({
+      label: c.companyName,
+      value: c.companyName,
+    }))
+  } catch (e: unknown) {
+    console.warn('客户选项加载失败')
+  }
 }
 
 function onPageSizeChange() {
@@ -426,6 +542,46 @@ async function submitOutbound() {
 }
 
 onMounted(() => load())
+
+async function loadOutbounds() {
+  outboundLoading2.value = true
+  try {
+    const [startDate, endDate] = Array.isArray(outboundFilter.dateRange) && outboundFilter.dateRange.length === 2 ? outboundFilter.dateRange : ['', '']
+    const res = await getFabricOutboundRecords({
+      name: outboundFilter.name || undefined,
+      customerName: outboundFilter.customerName || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
+      page: outboundPagination.page,
+      pageSize: outboundPagination.pageSize,
+    })
+    const data = res.data
+    outboundList.value = data?.list ?? []
+    outboundPagination.total = data?.total ?? 0
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    outboundLoading2.value = false
+  }
+}
+
+function onOutboundSearch(_byUser = false) {
+  outboundPagination.page = 1
+  loadOutbounds()
+}
+
+function onOutboundReset() {
+  outboundFilter.name = ''
+  outboundFilter.customerName = ''
+  outboundFilter.dateRange = []
+  outboundPagination.page = 1
+  loadOutbounds()
+}
+
+function onOutboundPageSizeChange() {
+  outboundPagination.page = 1
+  loadOutbounds()
+}
 </script>
 
 <style scoped>

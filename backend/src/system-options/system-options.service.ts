@@ -47,6 +47,16 @@ export class SystemOptionsService {
     return list.map((o) => o.value);
   }
 
+  /** 按一级节点值返回其 id（如按「生产加工厂」取供应商类型 id） */
+  async findRootIdByValue(optionType: string, value: string): Promise<number | null> {
+    if (!value?.trim()) return null;
+    const option = await this.repo.findOne({
+      where: { optionType, value: value.trim(), parentId: IsNull() },
+      select: ['id'],
+    });
+    return option?.id ?? null;
+  }
+
   /** 按父节点值返回直接子节点值列表（如某供应商类型下的业务范围） */
   async findChildrenValuesByParentValue(
     optionType: string,
@@ -118,6 +128,76 @@ export class SystemOptionsService {
     return result;
   }
 
+  /**
+   * 产品分组：根据 system_options.id 解析完整路径（父 > 子），用于列表/详情展示，改名后自动同步
+   */
+  async getProductGroupPathById(id: number | null): Promise<string> {
+    if (id == null) return '';
+    const map = await this.getProductGroupPathsByIds([id]);
+    return map[id] ?? '';
+  }
+
+  /**
+   * 产品分组：批量根据 ID 解析路径，返回 id -> 路径
+   */
+  async getProductGroupPathsByIds(ids: number[]): Promise<Record<number, string>> {
+    const set = new Set(ids.filter((n) => typeof n === 'number' && !Number.isNaN(n)));
+    if (set.size === 0) return {};
+    const list = await this.repo.find({
+      where: { optionType: 'product_groups' },
+      order: { parentId: 'ASC', sortOrder: 'ASC', id: 'ASC' },
+    });
+    const byId = new Map(list.map((o) => [o.id, o]));
+    const cache = new Map<number, string>();
+    const buildPath = (nodeId: number): string => {
+      if (cache.has(nodeId)) return cache.get(nodeId)!;
+      const node = byId.get(nodeId);
+      if (!node) return '';
+      const parts: string[] = [];
+      let cur: SystemOption | undefined = node;
+      while (cur) {
+        parts.unshift(cur.value);
+        cur = cur.parentId != null ? byId.get(cur.parentId) : undefined;
+      }
+      const path = parts.join(' > ');
+      cache.set(nodeId, path);
+      return path;
+    };
+    const result: Record<number, string> = {};
+    for (const id of set) {
+      const path = buildPath(id);
+      if (path) result[id] = path;
+    }
+    return result;
+  }
+
+  /**
+   * 通用：根据 optionType + 一组 ID 返回「id -> 当前名称」映射。
+   * 用于部门、岗位等配置项按 ID 解析展示名称，改名后历史数据自动同步。
+   */
+  async getOptionLabelsByIds(
+    optionType: string,
+    ids: number[],
+  ): Promise<Record<number, string>> {
+    const set = new Set(
+      ids.filter((n) => typeof n === 'number' && !Number.isNaN(n)),
+    );
+    if (set.size === 0) return {};
+
+    const list = await this.repo.find({
+      where: { optionType },
+      order: { parentId: 'ASC', sortOrder: 'ASC', id: 'ASC' },
+    });
+    const byId = new Map(list.map((o) => [o.id, o.value]));
+
+    const result: Record<number, string> = {};
+    for (const id of set) {
+      const label = byId.get(id);
+      if (label) result[id] = label;
+    }
+    return result;
+  }
+
   /** 按类型获取树形结构 */
   async findTreeByType(optionType: string): Promise<SystemOptionTree[]> {
     const list = await this.repo.find({
@@ -153,10 +233,14 @@ export class SystemOptionsService {
   ): Promise<SystemOption> {
     const opt = await this.repo.findOne({ where: { id } });
     if (!opt) throw new NotFoundException('选项不存在');
+
     if (dto.value !== undefined) opt.value = dto.value;
     if (dto.sortOrder !== undefined) opt.sortOrder = dto.sortOrder;
     if (dto.parentId !== undefined) opt.parentId = dto.parentId;
-    return this.repo.save(opt);
+    const saved = await this.repo.save(opt);
+
+    // 仓库：业务表只存 warehouse_id，列表/详情展示时按 ID 查当前名称，故此处无需按名称同步更新业务表，改名即自动同步。
+    return saved;
   }
 
   async remove(id: number): Promise<void> {
@@ -178,4 +262,5 @@ export class SystemOptionsService {
       await this.repo.update({ id, optionType, parentId: parentCondition }, { sortOrder });
     }
   }
+
 }

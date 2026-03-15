@@ -23,6 +23,17 @@ export interface XiaomanCompanyDetail {
   tel?: string[];
   product_group_ids?: number[];
   product_group_names?: string;
+  /** 主联系人姓名（字段名按小满返回结构做 best effort 兼容） */
+  main_contact_name?: string;
+  main_contact?: { name?: string } | null;
+  contacts?: { name?: string; nickname?: string; nick_name?: string }[] | null;
+  customers?: {
+    customer_id?: number;
+    name?: string;
+    nickname?: string;
+    nick_name?: string;
+    main_customer_flag?: number;
+  }[];
 }
 
 @Injectable()
@@ -81,13 +92,92 @@ export class XiaomanService {
     const token = await this.getToken();
     const baseUrl = this.getBaseUrl();
     const kw = keyword?.trim();
-    // 有关键词时：拉取更多数据做本地过滤（API 可能不支持 keyword）
-    const fetchSize = kw ? Math.min(100, pageSize * 5) : pageSize;
-    const startIndex = kw ? 0 : (page - 1) * pageSize;
-    let url = `${baseUrl}/v1/company/list?count=${fetchSize}&start_index=${startIndex}&removed=0&all=1`;
-    if (kw) {
-      url += `&keyword=${encodeURIComponent(kw)}`;
+    const hasKeyword = !!kw;
+
+    // 只取「客户列表」中的客户（all=0 排除公海）
+    const baseParams = '&removed=0&all=0';
+
+    // 有搜索关键词：由于小满接口文档未说明 keyword 的行为，实际测试发现它不会按关键字过滤，
+    // 所以这里改为「全量拉取 + 本地模糊匹配」，保证你能搜到任何客户。
+    if (hasKeyword) {
+      const MAX_FETCH = 5000;
+      const PAGE_SIZE_FOR_FETCH = 500;
+      let fetched: XiaomanCompanyItem[] = [];
+      let startIndex = 0;
+      let totalItem = 0;
+
+      // eslint-disable-next-line no-constant-condition
+      while (true) {
+        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${startIndex}${baseParams}`;
+        const res = await fetch(url, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const text = await res.text();
+        let json: {
+          code?: number;
+          message?: string;
+          data?: { list?: XiaomanCompanyItem[]; totalItem?: number };
+        };
+        try {
+          json = JSON.parse(text) as typeof json;
+        } catch {
+          throw new Error(`小满 API 响应格式异常 (${res.status})`);
+        }
+        if (json.code !== 200) {
+          const msg = json.message || `小满客户列表获取失败 (code: ${json.code})`;
+          throw new Error(msg);
+        }
+        if (!json.data) {
+          throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围');
+        }
+        const pageList = json.data.list ?? [];
+        totalItem = json.data.totalItem ?? totalItem;
+        fetched = fetched.concat(pageList);
+
+        if (fetched.length >= totalItem || fetched.length >= MAX_FETCH || pageList.length < PAGE_SIZE_FOR_FETCH) {
+          break;
+        }
+        startIndex += PAGE_SIZE_FOR_FETCH;
+      }
+
+      if (!fetched.length) {
+        return { list: [], total: 0 };
+      }
+
+      const lower = kw.toLowerCase();
+      let filtered = fetched.filter(
+        (c) =>
+          (c.name || '').toLowerCase().includes(lower) ||
+          (c.short_name || '').toLowerCase().includes(lower) ||
+          (c.serial_id || '').toLowerCase().includes(lower),
+      );
+
+      // 如果基础字段没有命中，再退回到详情级别做一次“全字段”搜索
+      if (!filtered.length) {
+        try {
+          const details = await this.getCompanyDetailsBatch(fetched.map((c) => c.company_id));
+          filtered = fetched.filter((item, idx) => {
+            const d = details[idx];
+            if (!d) return false;
+            // 将详情对象序列化为字符串，在所有字段中做一次包含判断，尽量贴近小满网页搜索效果
+            const text = JSON.stringify(d).toLowerCase();
+            return text.includes(lower);
+          });
+        } catch {
+          // 如果详情搜索失败，不影响主流程，只是返回空结果
+          filtered = [];
+        }
+      }
+
+      const total = filtered.length;
+      const sliceStart = (page - 1) * pageSize;
+      const sliceEnd = sliceStart + pageSize;
+      return { list: filtered.slice(sliceStart, sliceEnd), total };
     }
+
+    // 无搜索关键词：直接按页码从小满取一页即可
+    const startIndex = (page - 1) * pageSize;
+    const url = `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${startIndex}${baseParams}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
@@ -109,20 +199,12 @@ export class XiaomanService {
     if (!json.data) {
       throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围');
     }
-    let list = json.data.list ?? [];
-    let total = json.data.totalItem ?? 0;
-    if (kw && list.length > 0) {
-      const lower = kw.toLowerCase();
-      list = list.filter(
-        (c) =>
-          (c.name || '').toLowerCase().includes(lower) ||
-          (c.short_name || '').toLowerCase().includes(lower) ||
-          (c.serial_id || '').toLowerCase().includes(lower),
-      );
-      total = list.length;
-    }
+    const list = json.data.list ?? [];
+    const total = json.data.totalItem ?? list.length;
     return { list, total };
   }
+
+  private detailLoggedOnce = false;
 
   async getCompanyDetail(companyId: number): Promise<XiaomanCompanyDetail | null> {
     const token = await this.getToken();
@@ -131,8 +213,20 @@ export class XiaomanService {
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const json = (await res.json()) as { code?: number; data?: XiaomanCompanyDetail };
+    const text = await res.text();
+    let json: { code?: number; data?: XiaomanCompanyDetail };
+    try {
+      json = JSON.parse(text) as typeof json;
+    } catch {
+      return null;
+    }
     if (json.code !== 200 || !json.data) return null;
+    // 只打印一次，用于确认联系人与合作日期的真实字段名
+    if (!this.detailLoggedOnce) {
+      this.detailLoggedOnce = true;
+      // eslint-disable-next-line no-console
+      console.log('[Xiaoman DEBUG] company detail raw:', JSON.stringify(json.data, null, 2));
+    }
     return json.data;
   }
 

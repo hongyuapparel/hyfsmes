@@ -9,7 +9,7 @@
             :key="tab.value"
             :label="tab.value"
           >
-            {{ tab.label }}
+            {{ getTabLabel(tab) }}
           </el-radio-button>
         </el-radio-group>
       </div>
@@ -60,6 +60,15 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
+        <el-button
+          v-if="hasSelection && canAssignSelection"
+          type="primary"
+          size="large"
+          @click="openAssignDialog"
+        >
+          分单
+        </el-button>
         <el-button
           v-if="hasSelection && canRegisterSelection"
           type="primary"
@@ -102,15 +111,112 @@
         </template>
       </el-table-column>
       <el-table-column prop="factoryName" label="加工厂" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="quantity" label="订单数量" width="96" align="right" />
+      <el-table-column label="订单数量" width="96" align="right">
+        <template #default="{ row }">
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ row.quantity }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
+                  <thead>
+                    <tr>
+                      <th class="qty-header">尺码</th>
+                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
+                      <td class="qty-label">{{ r.label }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
+        </template>
+      </el-table-column>
       <el-table-column label="裁床数量" width="96" align="right">
         <template #default="{ row }">
-          {{ row.cutTotal != null ? row.cutTotal : '-' }}
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ row.cutTotal != null ? row.cutTotal : '-' }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
+                  <thead>
+                    <tr>
+                      <th class="qty-header">尺码</th>
+                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
+                      <td class="qty-label">{{ r.label }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
         </template>
       </el-table-column>
       <el-table-column label="车缝数量" width="96" align="right">
         <template #default="{ row }">
-          {{ row.sewingQuantity != null ? row.sewingQuantity : '-' }}
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ row.sewingQuantity != null ? row.sewingQuantity : '-' }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
+                  <thead>
+                    <tr>
+                      <th class="qty-header">尺码</th>
+                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
+                      <td class="qty-label">{{ r.label }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
         </template>
       </el-table-column>
       <el-table-column prop="timeRating" label="时效判定" width="90" align="center" />
@@ -128,11 +234,81 @@
       />
     </div>
 
-    <!-- 登记车缝完成弹窗：车缝数量、次品数量、次品说明 -->
+    <!-- 分单弹窗：分单时间、交期、加工厂、车缝加工费 -->
+    <el-dialog
+      v-model="assignDialog.visible"
+      title="分单"
+      width="460"
+      destroy-on-close
+      @close="resetAssignForm"
+    >
+      <el-form
+        ref="assignFormRef"
+        :model="assignForm"
+        :rules="assignRules"
+        label-width="100px"
+        class="assign-form"
+      >
+        <el-form-item label="分单时间" prop="distributedAt">
+          <el-date-picker
+            v-model="assignForm.distributedAt"
+            type="datetime"
+            value-format="YYYY-MM-DD HH:mm:ss"
+            placeholder="选择分单时间"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="交期" prop="factoryDueDate">
+          <el-date-picker
+            v-model="assignForm.factoryDueDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="加工厂需交货给我们的日期"
+            style="width: 100%"
+          />
+        </el-form-item>
+        <el-form-item label="加工厂" prop="factoryName">
+          <el-select
+            v-model="assignForm.factoryName"
+            placeholder="请选择生产加工厂"
+            filterable
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="s in factorySuppliers"
+              :key="s.id"
+              :label="s.name"
+              :value="s.name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="车缝加工费" prop="sewingFee">
+          <el-input
+            v-model="assignForm.sewingFee"
+            placeholder="0"
+            clearable
+            style="width: 100%"
+          >
+            <template #prefix>
+              <span class="currency-prefix">¥</span>
+            </template>
+          </el-input>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="assignDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="assignDialog.submitting" @click="submitAssign">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 登记车缝完成弹窗：尺寸细数（订单/裁床只读，车缝可填）、次品、说明 -->
     <el-dialog
       v-model="registerDialog.visible"
       title="登记车缝完成"
-      width="460"
+      width="720"
       destroy-on-close
       @close="resetRegisterForm"
     >
@@ -140,9 +316,42 @@
         <div class="register-brief">
           <div>订单号：{{ registerDialog.row.orderNo }}</div>
           <div>SKU：{{ registerDialog.row.skuCode }}</div>
-          <div>订单数量：{{ registerDialog.row.quantity }}</div>
-          <div v-if="registerDialog.row.cutTotal != null">裁床数量：{{ registerDialog.row.cutTotal }}</div>
         </div>
+        <div v-if="registerFormCompleteLoading" class="register-loading">加载尺寸细数...</div>
+        <template v-else-if="registerForm.headers?.length">
+          <div class="register-qty-title">尺寸细数</div>
+          <el-table :data="registerSizeTableRows" border size="small" class="register-qty-table" style="width: 100%">
+            <el-table-column prop="label" label="" width="90" align="right" />
+            <el-table-column
+              v-for="(h, idx) in registerForm.headers"
+              :key="idx"
+              :label="h"
+              min-width="100"
+              align="center"
+            >
+              <template #default="{ row }">
+                <template v-if="row.key === 'order' || row.key === 'cut'">
+                  {{ row.values[idx] != null ? row.values[idx] : '-' }}
+                </template>
+                <template v-else-if="row.key === 'sewing' && idx === registerForm.headers.length - 1 && registerForm.headers.length > 1">
+                  {{ registerSewingTotal }}
+                </template>
+                <template v-else>
+                  <el-input-number
+                    v-model="registerForm.sewingQuantities[idx]"
+                    :min="0"
+                    :max="registerForm.cutRow[idx] != null ? Number(registerForm.cutRow[idx]) : undefined"
+                    :precision="0"
+                    controls-position="right"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </template>
+              </template>
+            </el-table-column>
+          </el-table>
+          <p class="register-qty-sum">车缝数量合计：{{ registerSewingTotal }}</p>
+        </template>
         <el-form
           ref="registerFormRef"
           :model="registerForm"
@@ -150,22 +359,13 @@
           label-width="100px"
           class="register-form"
         >
-          <el-form-item label="车缝数量" prop="sewingQuantity">
-            <el-input-number
-              v-model="registerForm.sewingQuantity"
-              :min="0"
-              :precision="0"
-              controls-position="right"
-              style="width: 100%"
-            />
-          </el-form-item>
           <el-form-item label="次品数量" prop="defectQuantity">
             <el-input-number
               v-model="registerForm.defectQuantity"
               :min="0"
               :precision="0"
               controls-position="right"
-              style="width: 100%"
+              style="width: 160px"
             />
           </el-form-item>
           <el-form-item label="次品说明" prop="defectReason">
@@ -195,10 +395,15 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import {
   getSewingItems,
+  assignSewing,
+  getCompleteFormData,
   completeSewing,
+  exportSewingItems,
   type SewingListItem,
   type SewingListQuery,
 } from '@/api/production-sewing'
+import { getSupplierList, type SupplierItem } from '@/api/suppliers'
+import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const SEWING_TABS = [
@@ -206,6 +411,8 @@ const SEWING_TABS = [
   { label: '等待车缝', value: 'pending' },
   { label: '车缝完成', value: 'completed' },
 ] as const
+
+type SewingTabConfig = (typeof SEWING_TABS)[number]
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
 const FILTER_AUTO_MIN_WIDTH = 140
@@ -236,28 +443,79 @@ const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 
 const currentTab = ref<string>('all')
+const tabCounts = ref<Record<string, number>>({})
+const tabTotal = ref(0)
 const list = ref<SewingListItem[]>([])
 const loading = ref(false)
+const exporting = ref(false)
+const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
+const sizePopoverLoadingId = ref<number | null>(null)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<SewingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+const canAssignSelection = computed(() =>
+  selectedRows.value.length > 0 && selectedRows.value.some((r) => r.sewingStatus !== 'completed'),
+)
 const canRegisterSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.sewingStatus !== 'completed'),
 )
+
+const factorySuppliers = ref<SupplierItem[]>([])
+const assignDialog = reactive<{ visible: boolean; submitting: boolean }>({ visible: false, submitting: false })
+const assignFormRef = ref<FormInstance>()
+const assignForm = reactive({
+  distributedAt: '',
+  factoryDueDate: '',
+  factoryName: '',
+  sewingFee: '',
+})
+const assignRules: FormRules = {
+  factoryName: [{ required: true, message: '请选择加工厂', trigger: 'change' }],
+}
+
+function getTabLabel(tab: SewingTabConfig): string {
+  const counts = tabCounts.value
+  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  return `${tab.label}(${count})`
+}
 
 const registerDialog = reactive<{
   visible: boolean
   submitting: boolean
   row: SewingListItem | null
 }>({ visible: false, submitting: false, row: null })
+const registerFormCompleteLoading = ref(false)
 const registerFormRef = ref<FormInstance>()
-const registerForm = reactive({
-  sewingQuantity: 0,
+const registerForm = reactive<{
+  headers: string[]
+  orderRow: (number | null)[]
+  cutRow: (number | null)[]
+  sewingQuantities: number[]
+  defectQuantity: number
+  defectReason: string
+}>({
+  headers: [],
+  orderRow: [],
+  cutRow: [],
+  sewingQuantities: [],
   defectQuantity: 0,
   defectReason: '',
 })
+const registerSizeTableRows = computed(() => {
+  const h = registerForm.headers
+  if (!h.length) return []
+  return [
+    { key: 'order', label: '订单数量', values: registerForm.orderRow },
+    { key: 'cut', label: '裁床数量', values: registerForm.cutRow },
+    { key: 'sewing', label: '车缝数量', values: registerForm.sewingQuantities },
+  ]
+})
+const registerSewingTotal = computed(() =>
+  registerForm.sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0),
+)
 const registerRules: FormRules = {
-  sewingQuantity: [{ required: true, message: '请输入车缝数量', trigger: 'blur' }],
+  defectQuantity: [],
+  defectReason: [],
 }
 
 function formatDateTime(v: string | null | undefined): string {
@@ -265,6 +523,78 @@ function formatDateTime(v: string | null | undefined): string {
   const d = new Date(v)
   if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleString('zh-CN')
+}
+
+function nowDatetimeStr(): string {
+  const d = new Date()
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  const h = String(d.getHours()).padStart(2, '0')
+  const min = String(d.getMinutes()).padStart(2, '0')
+  const s = String(d.getSeconds()).padStart(2, '0')
+  return `${y}-${m}-${day} ${h}:${min}:${s}`
+}
+
+async function loadFactorySuppliers() {
+  try {
+    const res = await getSupplierList({ type: '生产加工厂', pageSize: 500 })
+    factorySuppliers.value = res.data?.list ?? []
+  } catch {
+    factorySuppliers.value = []
+  }
+}
+
+async function onShowQtyPopover(row: SewingListItem) {
+  const id = row.orderId
+  if (sizeBreakdownCache.value[id] || sizePopoverLoadingId.value === id) return
+  sizePopoverLoadingId.value = id
+  try {
+    const res = await getOrderSizeBreakdown(id)
+    sizeBreakdownCache.value[id] = res.data ?? { headers: [], rows: [] }
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '尺码明细加载失败'))
+  } finally {
+    if (sizePopoverLoadingId.value === id) sizePopoverLoadingId.value = null
+  }
+}
+
+function openAssignDialog() {
+  if (selectedRows.value.length === 0) return
+  assignForm.distributedAt = nowDatetimeStr()
+  assignForm.factoryDueDate = ''
+  assignForm.factoryName = selectedRows.value[0]?.factoryName ?? ''
+  assignForm.sewingFee = ''
+  assignDialog.visible = true
+}
+
+function resetAssignForm() {
+  assignFormRef.value?.clearValidate()
+}
+
+async function submitAssign() {
+  await assignFormRef.value?.validate().catch(() => {})
+  if (selectedRows.value.length === 0) return
+  assignDialog.submitting = true
+  try {
+    for (const row of selectedRows.value) {
+      await assignSewing({
+        orderId: row.orderId,
+        distributedAt: assignForm.distributedAt || nowDatetimeStr(),
+        factoryDueDate: assignForm.factoryDueDate || '',
+        factoryName: assignForm.factoryName,
+        sewingFee: assignForm.sewingFee?.trim() || '0',
+      })
+    }
+    ElMessage.success('分单成功')
+    assignDialog.visible = false
+    await load()
+    void loadTabCounts()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '分单失败'))
+  } finally {
+    assignDialog.submitting = false
+  }
 }
 
 function buildQuery(): SewingListQuery {
@@ -275,6 +605,26 @@ function buildQuery(): SewingListQuery {
     page: pagination.page,
     pageSize: pagination.pageSize,
   }
+}
+
+async function loadTabCounts() {
+  const base = buildQuery()
+  base.page = 1
+  base.pageSize = 1
+  const counts: Record<string, number> = {}
+  await Promise.all(
+    SEWING_TABS.map(async (tab) => {
+      try {
+        const res = await getSewingItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }),
+  )
+  tabCounts.value = counts
+  tabTotal.value = counts.all ?? 0
 }
 
 async function load() {
@@ -293,6 +643,28 @@ async function load() {
   }
 }
 
+async function onExport() {
+  const query = buildQuery()
+  const { page, pageSize, ...rest } = query
+  exporting.value = true
+  try {
+    const res = await exportSewingItems(rest)
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `车缝管理_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
+  } finally {
+    exporting.value = false
+  }
+}
+
 function onSearch(byUser = false) {
   if (byUser) {
     if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
@@ -300,6 +672,7 @@ function onSearch(byUser = false) {
   }
   pagination.page = 1
   load()
+  void loadTabCounts()
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -320,12 +693,14 @@ function onReset() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onTabChange() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onPageSizeChange() {
@@ -337,20 +712,51 @@ function onSelectionChange(rows: SewingListItem[]) {
   selectedRows.value = rows
 }
 
-function openRegisterDialog() {
+async function openRegisterDialog() {
   const pending = selectedRows.value.filter((r) => r.sewingStatus !== 'completed')
   if (pending.length === 0) return
   const row = pending[0]
   registerDialog.row = row
-  registerForm.sewingQuantity = row.quantity
+  registerForm.headers = []
+  registerForm.orderRow = []
+  registerForm.cutRow = []
+  registerForm.sewingQuantities = []
   registerForm.defectQuantity = 0
   registerForm.defectReason = ''
   registerDialog.visible = true
+  registerFormCompleteLoading.value = true
+  try {
+    const res = await getCompleteFormData(row.orderId)
+    const data = res.data
+    const headers = data?.headers ?? []
+    const orderRow = data?.orderRow ?? []
+    const cutRow = data?.cutRow ?? []
+    registerForm.headers = headers
+    registerForm.orderRow = orderRow
+    registerForm.cutRow = cutRow
+    const len = headers.length
+    // 车缝数量只存各尺码，合计列自动计算不参与编辑（合计 = 各码数之和）
+    const sizeCount = len > 1 ? len - 1 : 1
+    registerForm.sewingQuantities = cutRow
+      .slice(0, sizeCount)
+      .map((v) => (v != null ? Number(v) : 0))
+    while (registerForm.sewingQuantities.length < sizeCount) {
+      registerForm.sewingQuantities.push(0)
+    }
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
+    registerDialog.visible = false
+  } finally {
+    registerFormCompleteLoading.value = false
+  }
 }
 
 function resetRegisterForm() {
   registerDialog.row = null
-  registerForm.sewingQuantity = 0
+  registerForm.headers = []
+  registerForm.orderRow = []
+  registerForm.cutRow = []
+  registerForm.sewingQuantities = []
   registerForm.defectQuantity = 0
   registerForm.defectReason = ''
   registerFormRef.value?.clearValidate()
@@ -358,18 +764,25 @@ function resetRegisterForm() {
 
 async function submitRegister() {
   if (!registerDialog.row) return
+  const total = registerSewingTotal.value
+  if (total <= 0) {
+    ElMessage.warning('请填写车缝数量')
+    return
+  }
   await registerFormRef.value?.validate().catch(() => {})
   registerDialog.submitting = true
   try {
     await completeSewing({
       orderId: registerDialog.row.orderId,
-      sewingQuantity: registerForm.sewingQuantity,
+      sewingQuantity: total,
       defectQuantity: registerForm.defectQuantity,
       defectReason: registerForm.defectReason.trim(),
+      sewingQuantities: registerForm.headers.length ? registerForm.sewingQuantities : undefined,
     })
     ElMessage.success('车缝登记完成，订单已进入待尾部')
     registerDialog.visible = false
     await load()
+    void loadTabCounts()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
   } finally {
@@ -377,7 +790,11 @@ async function submitRegister() {
   }
 }
 
-onMounted(() => load())
+onMounted(() => {
+  loadFactorySuppliers()
+  load()
+  void loadTabCounts()
+})
 </script>
 
 <style scoped>
@@ -448,7 +865,77 @@ onMounted(() => load())
   margin-top: 4px;
 }
 
+.register-loading {
+  padding: var(--space-md);
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.register-qty-title {
+  font-weight: 600;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.register-qty-table {
+  margin-bottom: 8px;
+}
+
+.register-qty-sum {
+  margin: 0 0 var(--space-sm);
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
 .register-form {
   margin-top: var(--space-sm);
+}
+
+.qty-trigger {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.qty-popover {
+  font-size: 12px;
+}
+
+.qty-popover-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.qty-popover-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.qty-popover-table .qty-label {
+  padding: 2px 4px;
+  color: var(--color-text-muted, #909399);
+  white-space: nowrap;
+}
+
+.qty-popover-table .qty-value {
+  padding: 2px 4px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.qty-header {
+  padding: 2px 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.qty-popover-loading,
+.qty-popover-empty {
+  font-size: 12px;
+  color: var(--color-text-muted, #909399);
+}
+
+.currency-prefix {
+  color: var(--el-text-color-regular);
 }
 </style>

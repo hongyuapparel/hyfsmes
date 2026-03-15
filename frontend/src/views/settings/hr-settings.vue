@@ -1,0 +1,449 @@
+<template>
+  <div class="page-card">
+    <p class="settings-hint">
+      维护公司组织架构：左侧为部门树，右侧为选中部门下的岗位列表。人事管理等页面将复用这里的配置，通过 ID 关联，改名后历史数据自动同步。
+    </p>
+
+    <div class="settings-body">
+      <div class="org-tree-wrap">
+        <h3 class="section-title">部门</h3>
+        <div class="org-toolbar">
+          <el-button type="primary" size="small" @click="openDeptDialog(null)">新增顶级部门</el-button>
+          <el-button
+            size="small"
+            :disabled="!currentDept"
+            @click="openDeptDialog(currentDept!)"
+          >
+            新增子部门
+          </el-button>
+        </div>
+        <el-tree
+          v-loading="deptLoading"
+          :data="deptTree"
+          node-key="id"
+          highlight-current
+          default-expand-all
+          :props="{ label: 'label', children: 'children' }"
+          @current-change="onDeptChange"
+        >
+          <template #default="{ data }">
+            <span class="tree-node">
+              <span>{{ data.label }}</span>
+              <span class="tree-node-actions">
+                <el-button link type="primary" size="small" @click.stop="openDeptDialog(data)">
+                  编辑
+                </el-button>
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  @click.stop="removeDept(data)"
+                >
+                  删除
+                </el-button>
+              </span>
+            </span>
+          </template>
+        </el-tree>
+      </div>
+
+      <div class="org-jobs-wrap">
+        <h3 class="section-title">
+          岗位
+          <span v-if="currentDept" class="section-subtitle">
+            （当前部门：{{ currentDept.label }}）
+          </span>
+        </h3>
+        <p v-if="!currentDept" class="section-desc">请先在左侧选择一个部门，再维护该部门下的岗位。</p>
+        <template v-else>
+          <div class="org-toolbar">
+            <el-button type="primary" size="small" @click="openJobDialog(null)">新增岗位</el-button>
+          </div>
+          <el-table
+            v-loading="jobLoading"
+            :data="jobList"
+            size="small"
+            border
+            row-key="id"
+            class="jobs-table"
+          >
+            <el-table-column prop="label" label="岗位名称" min-width="160" />
+            <el-table-column prop="description" label="说明" min-width="200" show-overflow-tooltip />
+            <el-table-column prop="sortOrder" label="排序" width="80" />
+            <el-table-column label="操作" width="160" fixed="right">
+              <template #default="{ row }">
+                <el-button link type="primary" size="small" @click="openJobDialog(row)">编辑</el-button>
+                <el-button link type="danger" size="small" @click="removeJob(row)">删除</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </template>
+      </div>
+    </div>
+
+    <el-dialog v-model="deptDialog.visible" :title="deptDialogTitle" width="400px" @close="resetDeptDialog">
+      <el-form :model="deptForm" label-width="80px" size="default">
+        <el-form-item label="部门名称">
+          <el-input v-model="deptForm.label" placeholder="如：生产部 / 外贸部" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="deptDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="deptDialog.submitting" @click="submitDept">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="jobDialog.visible" :title="jobDialogTitle" width="400px" @close="resetJobDialog">
+      <el-form :model="jobForm" label-width="80px" size="default">
+        <el-form-item label="岗位名称">
+          <el-input v-model="jobForm.label" placeholder="如：版师 / 业务员 / 车缝工" />
+        </el-form-item>
+        <el-form-item label="说明">
+          <el-input
+            v-model="jobForm.description"
+            type="textarea"
+            :rows="2"
+            placeholder="选填：岗位职责说明"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="jobDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="jobDialog.submitting" @click="submitJob">
+          确定
+        </el-button>
+      </template>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import {
+  getSystemOptionsTree,
+  getSystemOptionsList,
+  createSystemOption,
+  updateSystemOption,
+  deleteSystemOption,
+  type SystemOptionTreeNode,
+  type SystemOptionItem,
+} from '@/api/system-options'
+import { getErrorMessage, isErrorHandled } from '@/api/request'
+
+const ORG_DEPT_TYPE = 'org_departments'
+const ORG_JOB_TYPE = 'org_jobs'
+
+interface DeptTreeNode {
+  id: number
+  label: string
+  sortOrder: number
+  parentId: number | null
+  children?: DeptTreeNode[]
+}
+
+interface JobItem {
+  id: number
+  label: string
+  sortOrder: number
+  parentId: number
+  description?: string
+}
+
+const deptLoading = ref(false)
+const jobLoading = ref(false)
+const deptTree = ref<DeptTreeNode[]>([])
+const currentDept = ref<DeptTreeNode | null>(null)
+const jobList = ref<JobItem[]>([])
+
+const deptDialog = reactive({ visible: false, submitting: false, editingId: 0, parentId: null as number | null })
+const deptForm = reactive({ label: '' })
+const deptDialogTitle = computed(() => (deptDialog.editingId ? '编辑部门' : deptDialog.parentId ? '新增子部门' : '新增顶级部门'))
+
+const jobDialog = reactive({ visible: false, submitting: false, editingId: 0 })
+const jobForm = reactive({ label: '', description: '' })
+const jobDialogTitle = computed(() => (jobDialog.editingId ? '编辑岗位' : '新增岗位'))
+
+async function loadDepartments() {
+  deptLoading.value = true
+  try {
+    const res = await getSystemOptionsTree(ORG_DEPT_TYPE)
+    const data = (res.data ?? []) as SystemOptionTreeNode[]
+    const convert = (nodes: SystemOptionTreeNode[]): DeptTreeNode[] =>
+      nodes.map((n) => ({
+        id: n.id,
+        label: n.value,
+        sortOrder: n.sortOrder,
+        parentId: n.parentId ?? null,
+        children: n.children ? convert(n.children) : [],
+      }))
+    deptTree.value = convert(data)
+    if (currentDept.value) {
+      const found = findDeptById(currentDept.value.id, deptTree.value)
+      currentDept.value = found ?? null
+    }
+  } catch (e: unknown) {
+    deptTree.value = []
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    deptLoading.value = false
+  }
+}
+
+function findDeptById(id: number, tree: DeptTreeNode[]): DeptTreeNode | null {
+  for (const n of tree) {
+    if (n.id === id) return n
+    if (n.children?.length) {
+      const found = findDeptById(id, n.children)
+      if (found) return found
+    }
+  }
+  return null
+}
+
+function onDeptChange(node: DeptTreeNode | null) {
+  currentDept.value = node
+  if (node) {
+    loadJobs(node.id)
+  } else {
+    jobList.value = []
+  }
+}
+
+async function loadJobs(deptId: number) {
+  jobLoading.value = true
+  try {
+    const res = await getSystemOptionsList(ORG_JOB_TYPE)
+    const all = (res.data ?? []) as SystemOptionItem[]
+    jobList.value = all
+      .filter((j) => j.parentId === deptId)
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+      .map((j) => ({
+        id: j.id,
+        label: j.value,
+        sortOrder: j.sortOrder,
+        parentId: j.parentId as number,
+      }))
+  } catch (e: unknown) {
+    jobList.value = []
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    jobLoading.value = false
+  }
+}
+
+function openDeptDialog(node: DeptTreeNode | null) {
+  if (node) {
+    deptDialog.editingId = node.id
+    deptDialog.parentId = null
+    deptForm.label = node.label
+  } else {
+    deptDialog.editingId = 0
+    deptDialog.parentId = currentDept.value ? currentDept.value.id : null
+    deptForm.label = ''
+  }
+  deptDialog.visible = true
+}
+
+function resetDeptDialog() {
+  deptDialog.editingId = 0
+  deptDialog.parentId = null
+  deptForm.label = ''
+}
+
+async function submitDept() {
+  const label = deptForm.label?.trim()
+  if (!label) {
+    ElMessage.warning('请输入部门名称')
+    return
+  }
+  deptDialog.submitting = true
+  try {
+    if (deptDialog.editingId) {
+      await updateSystemOption(deptDialog.editingId, { value: label })
+      ElMessage.success('保存成功')
+    } else {
+      await createSystemOption({
+        type: ORG_DEPT_TYPE,
+        value: label,
+        parent_id: deptDialog.parentId ?? undefined,
+      })
+      ElMessage.success('新增成功')
+    }
+    deptDialog.visible = false
+    await loadDepartments()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    deptDialog.submitting = false
+  }
+}
+
+async function removeDept(node: DeptTreeNode) {
+  try {
+    await ElMessageBox.confirm(
+      node.children?.length
+        ? `确定删除部门「${node.label}」及其所有子部门？`
+        : `确定删除部门「${node.label}」？`,
+      '提示',
+      { type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    await deleteSystemOption(node.id)
+    if (currentDept.value?.id === node.id) {
+      currentDept.value = null
+      jobList.value = []
+    }
+    await loadDepartments()
+    ElMessage.success('已删除')
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  }
+}
+
+function openJobDialog(row: JobItem | null) {
+  if (!currentDept.value) {
+    ElMessage.warning('请先选择部门')
+    return
+  }
+  if (row) {
+    jobDialog.editingId = row.id
+    jobForm.label = row.label
+    jobForm.description = row.description ?? ''
+  } else {
+    jobDialog.editingId = 0
+    jobForm.label = ''
+    jobForm.description = ''
+  }
+  jobDialog.visible = true
+}
+
+function resetJobDialog() {
+  jobDialog.editingId = 0
+  jobForm.label = ''
+  jobForm.description = ''
+}
+
+async function submitJob() {
+  if (!currentDept.value) {
+    ElMessage.warning('请先选择部门')
+    return
+  }
+  const label = jobForm.label?.trim()
+  if (!label) {
+    ElMessage.warning('请输入岗位名称')
+    return
+  }
+  jobDialog.submitting = true
+  try {
+    if (jobDialog.editingId) {
+      await updateSystemOption(jobDialog.editingId, { value: label })
+      ElMessage.success('保存成功')
+    } else {
+      const sortOrder = jobList.value.length
+      await createSystemOption({
+        type: ORG_JOB_TYPE,
+        value: label,
+        parent_id: currentDept.value.id,
+        sort_order: sortOrder,
+      })
+      ElMessage.success('新增成功')
+    }
+    jobDialog.visible = false
+    await loadJobs(currentDept.value.id)
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    jobDialog.submitting = false
+  }
+}
+
+async function removeJob(row: JobItem) {
+  try {
+    await ElMessageBox.confirm(`确定删除岗位「${row.label}」？`, '提示', { type: 'warning' })
+  } catch {
+    return
+  }
+  try {
+    await deleteSystemOption(row.id)
+    if (currentDept.value) await loadJobs(currentDept.value.id)
+    ElMessage.success('已删除')
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  }
+}
+
+onMounted(() => {
+  loadDepartments()
+})
+</script>
+
+<style scoped>
+.settings-hint {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-caption);
+  margin-bottom: var(--space-md);
+  line-height: 1.6;
+}
+
+.settings-body {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-lg);
+}
+
+.org-tree-wrap {
+  width: 260px;
+}
+
+.org-jobs-wrap {
+  flex: 1;
+}
+
+.section-title {
+  font-size: var(--font-size-subtitle);
+  margin-bottom: var(--space-xs);
+}
+
+.section-subtitle {
+  margin-left: 8px;
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.section-desc {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-sm);
+}
+
+.org-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-xs);
+}
+
+.tree-node {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.tree-node-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.jobs-table {
+  margin-top: var(--space-xs);
+}
+</style>
+

@@ -15,19 +15,23 @@ export class ProductionCraftController {
     @Query('tab') tab?: string,
     @Query('supplier') supplier?: string,
     @Query('processItem') processItem?: string,
-    @Query('orderType') orderType?: string,
-    @Query('collaborationType') collaborationType?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: CraftListQuery = {
       tab,
       supplier,
       processItem,
-      orderType,
-      collaborationType,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number)
+        ? undefined
+        : (collaborationTypeId as number),
       orderDateStart,
       orderDateEnd,
       page: page ? parseInt(page, 10) : 1,

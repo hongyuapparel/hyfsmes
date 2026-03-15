@@ -58,6 +58,12 @@ const routes: RouteRecordRaw[] = [
             meta: { title: '订单列表', permissionPath: '/orders/list' },
           },
           {
+            path: 'detail/:id',
+            name: 'OrdersDetail',
+            component: () => import('@/views/orders/detail.vue'),
+            meta: { title: '订单详情', permissionPath: '/orders/list' },
+          },
+          {
             path: 'edit/:id?',
             name: 'OrdersEdit',
             component: () => import('@/views/orders/edit.vue'),
@@ -150,9 +156,29 @@ const routes: RouteRecordRaw[] = [
       },
       {
         path: 'finance',
-        name: 'Finance',
-        component: () => import('@/views/finance/index.vue'),
+        component: RouterViewWrapper,
+        redirect: '/finance/income',
         meta: { title: '财务管理', permissionPath: '/finance' },
+        children: [
+          {
+            path: 'income',
+            name: 'FinanceIncome',
+            component: () => import('@/views/finance/income.vue'),
+            meta: { title: '收入流水', permissionPath: '/finance/income' },
+          },
+          {
+            path: 'expense',
+            name: 'FinanceExpense',
+            component: () => import('@/views/finance/expense.vue'),
+            meta: { title: '支出流水', permissionPath: '/finance/expense' },
+          },
+          {
+            path: 'order-sla-report',
+            name: 'FinanceOrderSlaReport',
+            component: () => import('@/views/finance/order-sla-report.vue'),
+            meta: { title: '订单时效', permissionPath: '/finance/order-sla-report' },
+          },
+        ],
       },
       {
         path: 'suppliers',
@@ -189,10 +215,6 @@ const routes: RouteRecordRaw[] = [
             meta: { title: '角色与权限', permissionPath: '/settings/roles' },
           },
           {
-            path: 'permissions',
-            redirect: '/settings/roles',
-          },
-          {
             path: 'orders',
             name: 'SettingsOrders',
             component: () => import('@/views/settings/order-settings.vue'),
@@ -204,12 +226,36 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/settings/supplier-settings.vue'),
             meta: { title: '供应商设置', permissionPath: '/settings/suppliers' },
           },
+          {
+            path: 'inventory',
+            name: 'SettingsInventory',
+            component: () => import('@/views/settings/inventory-settings.vue'),
+            meta: { title: '库存设置', permissionPath: '/settings/inventory' },
+          },
+          {
+            path: 'hr',
+            name: 'SettingsHr',
+            component: () => import('@/views/settings/hr-settings.vue'),
+            meta: { title: '组织与人事', permissionPath: '/settings/hr' },
+          },
+          {
+            path: 'finance',
+            name: 'SettingsFinance',
+            component: () => import('@/views/settings/finance-settings.vue'),
+            meta: { title: '财务设置', permissionPath: '/settings/finance' },
+          },
         ],
       },
       {
         path: 'settings-legacy',
         name: 'Settings',
         redirect: '/settings/users',
+      },
+      {
+        path: 'tools/foreign-tool',
+        name: 'ForeignTool',
+        component: () => import('@/views/tools/foreign-tool.vue'),
+        meta: { title: '外贸小工具', permissionPath: '/tools/foreign-tool' },
       },
     ],
   },

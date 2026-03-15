@@ -30,9 +30,13 @@ export class OrderFinishing {
   @Column({ name: 'tail_received_qty', type: 'int', default: 0 })
   tailReceivedQty: number;
 
-  /** 尾部出货数（发货数量） */
+  /** 尾部出货数（发货数量，可多次累加） */
   @Column({ name: 'tail_shipped_qty', type: 'int', default: 0 })
   tailShippedQty: number;
+
+  /** 尾部入库数（入库数量，可多次累加） */
+  @Column({ name: 'tail_inbound_qty', type: 'int', default: 0 })
+  tailInboundQty: number;
 
   /** 次品数 */
   @Column({ name: 'defect_quantity', type: 'int', default: 0 })

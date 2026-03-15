@@ -1,11 +1,27 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Order } from '../entities/order.entity';
-import { OrderExt, type OrderMaterialRow, type ColorSizeRow } from '../entities/order-ext.entity';
+import {
+  OrderExt,
+  type OrderMaterialRow,
+  type ColorSizeRow,
+  type SizeInfoRow,
+  type ProcessRow,
+  type PackagingCell,
+} from '../entities/order-ext.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { OrderRemark } from '../entities/order-remark.entity';
+import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { User } from '../entities/user.entity';
+import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
+import { OrderSewing } from '../entities/order-sewing.entity';
+import { OrderFinishing } from '../entities/order-finishing.entity';
+import { OrderStatus } from '../entities/order-status.entity';
+import { OrderStatusHistory } from '../entities/order-status-history.entity';
+import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
+import { SystemOptionsService } from '../system-options/system-options.service';
+import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   draft: '草稿',
@@ -25,8 +41,6 @@ export interface OrderListQuery {
   skuCode?: string;
   /** 客户名称（模糊） */
   customer?: string;
-  /** 订单类型（标签/大货/样品等，由前端/系统配置传入） */
-  orderType?: string;
   /** 工艺项目（原二次工艺） */
   processItem?: string;
   /** 业务员 */
@@ -45,45 +59,56 @@ export interface OrderListQuery {
   factory?: string;
   /** 状态（对应状态 Tab 的内部 code，可选） */
   status?: string;
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId?: number | null;
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId?: number | null;
   /** 分页 */
   page?: number;
   pageSize?: number;
 }
 
-/**
- * 订单编辑表单字段（当前仅覆盖 A 区必要字段）
- * 后续 B~H 区复杂结构可在此类型上继续扩展
- */
 export interface OrderEditPayload {
   skuCode?: string;
   customerId?: number | null;
   customerName?: string;
-  /** 合作方式（如成品、来料等） */
-  collaborationType?: string;
-  /**
-   * 订单类型（前端表单字段）。当前 DB 存在 orders.label 字段承载该值，
-   * 这里提供 orderType 只是为了避免前后端字段名不一致导致数据丢失。
-   */
-  orderType?: string;
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId?: number | null;
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId?: number | null;
   salesperson?: string;
   merchandiser?: string;
   quantity?: number;
   exFactoryPrice?: string;
   salePrice?: string;
-  /** 历史字段：等同于 orderType（DB 字段名为 label） */
-  label?: string;
   /** 工艺项目（原二次工艺） */
   processItem?: string;
   orderDate?: string | null;
   customerDueDate?: string | null;
   factoryName?: string;
   imageUrl?: string;
-  /** C 区物料列表（存 order_ext.materials） */
-  materials?: OrderMaterialRow[];
   /** B 区尺码表头（存 order_ext.colorSizeHeaders） */
   colorSizeHeaders?: string[];
   /** B 区颜色尺码数量行（存 order_ext.colorSizeRows） */
   colorSizeRows?: ColorSizeRow[];
+  /** C 区物料列表（存 order_ext.materials） */
+  materials?: OrderMaterialRow[];
+  /** D 区：尺寸信息表头（存 order_ext.sizeInfoMetaHeaders） */
+  sizeInfoMetaHeaders?: string[];
+  /** D 区：尺寸信息行（存 order_ext.sizeInfoRows） */
+  sizeInfoRows?: SizeInfoRow[];
+  /** E 区：工艺项目（存 order_ext.processItems） */
+  processItems?: ProcessRow[];
+  /** F 区：生产要求（存 order_ext.productionRequirement） */
+  productionRequirement?: string;
+  /** G 区：包装表头（存 order_ext.packagingHeaders） */
+  packagingHeaders?: string[];
+  /** G 区：包装单元格（存 order_ext.packagingCells） */
+  packagingCells?: PackagingCell[];
+  /** G 区：包装方式（存 order_ext.packagingMethod） */
+  packagingMethod?: string;
+  /** H 区：图片附件（存 order_ext.attachments） */
+  attachments?: string[];
 }
 
 export interface OrderActor {
@@ -102,9 +127,89 @@ export class OrdersService {
     private readonly orderLogRepo: Repository<OrderOperationLog>,
     @InjectRepository(OrderRemark)
     private readonly orderRemarkRepo: Repository<OrderRemark>,
+    @InjectRepository(OrderCostSnapshot)
+    private readonly orderCostSnapshotRepo: Repository<OrderCostSnapshot>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderCutting)
+    private readonly orderCuttingRepo: Repository<OrderCutting>,
+    @InjectRepository(OrderSewing)
+    private readonly orderSewingRepo: Repository<OrderSewing>,
+    @InjectRepository(OrderFinishing)
+    private readonly orderFinishingRepo: Repository<OrderFinishing>,
+    @InjectRepository(OrderStatus)
+    private readonly orderStatusRepo: Repository<OrderStatus>,
+    @InjectRepository(OrderStatusHistory)
+    private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
+    private readonly inventoryAccessoriesService: InventoryAccessoriesService,
+    private readonly systemOptionsService: SystemOptionsService,
+    private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
+
+  /** 持久化时只存 materialTypeId，不存 materialType（改名历史同步） */
+  private normalizeMaterialRows(rows: OrderMaterialRow[]): OrderMaterialRow[] {
+    return rows.map((row) => {
+      const { materialType: _drop, ...rest } = row;
+      return rest as OrderMaterialRow;
+    });
+  }
+
+  /** 按 materialTypeId 解析物料类型名称，供前端展示 */
+  private async enrichMaterialsWithMaterialTypeLabel(materials: OrderMaterialRow[]): Promise<OrderMaterialRow[]> {
+    if (!materials.length) return materials;
+    const options = await this.systemOptionsService.findAllByType('material_types');
+    const idToValue = new Map(options.map((o) => [o.id, o.value]));
+    return materials.map((row) => ({
+      ...row,
+      materialType: row.materialTypeId != null ? (idToValue.get(row.materialTypeId) ?? '') : '',
+    }));
+  }
+
+  /** 裁床明细行求和，供列表展示实裁总数 */
+  private sumActualCut(rows: ActualCutRow[] | null | undefined): number | null {
+    if (!rows || rows.length === 0) return null;
+    let sum = 0;
+    for (const row of rows) {
+      if (Array.isArray(row.quantities)) {
+        for (const q of row.quantities) {
+          if (typeof q === 'number' && Number.isFinite(q)) sum += q;
+        }
+      }
+    }
+    return sum;
+  }
+
+  private async autoOutboundAccessoriesByPackagingCells(
+    order: Order & { packagingCells?: PackagingCell[] },
+    actor: OrderActor,
+  ): Promise<void> {
+    const cells = Array.isArray((order as any).packagingCells) ? ((order as any).packagingCells as PackagingCell[]) : [];
+    if (!cells.length) return;
+    const orderQty = Number(order.quantity) || 0;
+    if (orderQty <= 0) return;
+
+    // 每个包装项默认按“1 个/件”出库；若同一辅料被选择多次，则按次数累计
+    const countById = new Map<number, number>();
+    cells.forEach((c) => {
+      const id = Number((c as any).accessoryId);
+      if (!id || Number.isNaN(id)) return;
+      countById.set(id, (countById.get(id) ?? 0) + 1);
+    });
+    if (!countById.size) return;
+
+    for (const [accessoryId, times] of countById.entries()) {
+      const qty = orderQty * (times || 1);
+      await this.inventoryAccessoriesService.outbound({
+        accessoryId,
+        quantity: qty,
+        outboundType: 'order_auto',
+        operatorUsername: actor.username,
+        remark: `订单自动出库：${order.orderNo}（${orderQty} * ${times}）`,
+        orderId: order.id,
+        orderNo: order.orderNo,
+      });
+    }
+  }
 
   private formatLogDetail(detail: string): string {
     if (!detail) return '';
@@ -122,6 +227,17 @@ export class OrdersService {
     return result;
   }
 
+  /** 订单状态变更时写入流转历史，供时效报表统计 */
+  private async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
+    const code = (statusCode ?? '').trim();
+    if (!code) return;
+    const status = await this.orderStatusRepo.findOne({ where: { code } });
+    if (!status) return;
+    await this.orderStatusHistoryRepo.save(
+      this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
+    );
+  }
+
   private async addLog(order: Order, actor: OrderActor, action: string, detail: string): Promise<void> {
     let operatorUsername = actor.username;
     try {
@@ -134,12 +250,37 @@ export class OrdersService {
       operatorUsername = actor.username;
     }
 
+    const normalizedDetail = this.formatLogDetail(detail);
+    if (!normalizedDetail?.trim()) return;
+
+    // 合并策略：同一订单 + 同一操作者 + 同一操作类型，在短时间内连续产生的记录合并为一条，避免刷屏
+    const MERGE_WINDOW_MS = 3000;
+    const since = new Date(Date.now() - MERGE_WINDOW_MS);
+    const latest = await this.orderLogRepo
+      .createQueryBuilder('l')
+      .where('l.order_id = :orderId', { orderId: order.id })
+      .andWhere('l.operator_username = :operatorUsername', { operatorUsername })
+      .andWhere('l.action = :action', { action })
+      .andWhere('l.created_at >= :since', { since })
+      .orderBy('l.created_at', 'DESC')
+      .getOne();
+
+    if (latest) {
+      const prev = this.formatLogDetail(latest.detail || '').trim();
+      const next = normalizedDetail.trim();
+      if (prev && prev !== next) {
+        latest.detail = this.formatLogDetail(`${prev}; ${next}`);
+        await this.orderLogRepo.save(latest);
+      }
+      return;
+    }
+
     const log = this.orderLogRepo.create({
       orderId: order.id,
       orderNo: order.orderNo,
       operatorUsername,
       action,
-      detail: this.formatLogDetail(detail),
+      detail: normalizedDetail,
     });
     await this.orderLogRepo.save(log);
   }
@@ -161,9 +302,6 @@ export class OrdersService {
     if (payload.customerName !== undefined && trim(payload.customerName) !== before.customerName) {
       changes.push(`客户名称: ${before.customerName || '-'} -> ${trim(payload.customerName) || '-'}`);
     }
-    if (payload.collaborationType !== undefined && trim(payload.collaborationType) !== before.collaborationType) {
-      changes.push(`合作方式: ${before.collaborationType || '-'} -> ${trim(payload.collaborationType) || '-'}`);
-    }
     if (payload.salesperson !== undefined && trim(payload.salesperson) !== before.salesperson) {
       changes.push(`业务员: ${before.salesperson || '-'} -> ${trim(payload.salesperson) || '-'}`);
     }
@@ -179,12 +317,8 @@ export class OrdersService {
     if (payload.salePrice !== undefined && this.normalizeDecimalInput(payload.salePrice) !== before.salePrice) {
       changes.push(`销售价: ${before.salePrice} -> ${this.normalizeDecimalInput(payload.salePrice)}`);
     }
-    if (payload.orderType !== undefined || payload.label !== undefined) {
-      const nextLabel = trim(payload.orderType) || trim(payload.label) || '';
-      if (nextLabel !== before.label) {
-        changes.push(`订单类型: ${before.label || '-'} -> ${nextLabel || '-'}`);
-      }
-    }
+    // 订单类型改动的文字描述后续可根据 orderTypeId 映射 system_options 生成；
+    // 这里先不记录具体值，避免依赖已删除的 label 字段。
     if (payload.processItem !== undefined && trim(payload.processItem) !== before.processItem) {
       changes.push(`工艺项目: ${before.processItem || '-'} -> ${trim(payload.processItem) || '-'}`);
     }
@@ -214,7 +348,6 @@ export class OrdersService {
       orderNo,
       skuCode,
       customer,
-      orderType,
       processItem,
       salesperson,
       merchandiser,
@@ -236,8 +369,13 @@ export class OrdersService {
     if (customer?.trim()) {
       qb.andWhere('o.customer_name LIKE :customer', { customer: `%${customer.trim()}%` });
     }
-    if (orderType?.trim()) {
-      qb.andWhere('o.label = :orderType', { orderType: orderType.trim() });
+    if (typeof query.orderTypeId === 'number') {
+      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: query.orderTypeId });
+    }
+    if (typeof query.collaborationTypeId === 'number') {
+      qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
+        collaborationTypeId: query.collaborationTypeId,
+      });
     }
     if (processItem?.trim()) {
       qb.andWhere('o.process_item LIKE :processItem', { processItem: `%${processItem.trim()}%` });
@@ -283,18 +421,56 @@ export class OrdersService {
   }
 
   /**
-   * 根据主键获取订单详情（含 order_ext.materials）
+   * 根据主键获取订单详情（含 order_ext 扩展字段）
    */
-  async findOne(id: number): Promise<Order & { materials?: OrderMaterialRow[]; colorSizeHeaders?: string[]; colorSizeRows?: ColorSizeRow[] }> {
+  async findOne(
+    id: number,
+  ): Promise<
+    Order & {
+      materials?: OrderMaterialRow[];
+      colorSizeHeaders?: string[];
+      colorSizeRows?: ColorSizeRow[];
+      sizeInfoMetaHeaders?: string[];
+      sizeInfoRows?: SizeInfoRow[];
+      processItems?: ProcessRow[];
+      productionRequirement?: string;
+      packagingHeaders?: string[];
+      packagingCells?: PackagingCell[];
+      packagingMethod?: string;
+      attachments?: string[];
+    }
+  > {
     const order = await this.orderRepo.findOne({ where: { id } });
     if (!order) {
       throw new NotFoundException('订单不存在');
     }
     const ext = await this.orderExtRepo.findOne({ where: { orderId: id } });
-    const materials = ext?.materials ?? [];
+    const rawMaterials = ext?.materials ?? [];
+    const materials = await this.enrichMaterialsWithMaterialTypeLabel(rawMaterials);
     const colorSizeHeaders = ext?.colorSizeHeaders ?? [];
     const colorSizeRows = ext?.colorSizeRows ?? [];
-    return { ...order, materials, colorSizeHeaders, colorSizeRows };
+    const sizeInfoMetaHeaders = ext?.sizeInfoMetaHeaders ?? [];
+    const sizeInfoRows = ext?.sizeInfoRows ?? [];
+    const processItems = ext?.processItems ?? [];
+    const productionRequirement = ext?.productionRequirement ?? '';
+    const packagingHeaders = ext?.packagingHeaders ?? [];
+    const packagingCells = ext?.packagingCells ?? [];
+    const packagingMethod = ext?.packagingMethod ?? '';
+    const attachments = ext?.attachments ?? [];
+    return {
+      ...order,
+      materials,
+      colorSizeHeaders,
+      colorSizeRows,
+      sizeInfoMetaHeaders,
+      sizeInfoRows,
+      processItems,
+      productionRequirement,
+      packagingHeaders,
+      packagingCells,
+      packagingMethod,
+      attachments,
+    };
   }
 
   /**
@@ -307,13 +483,15 @@ export class OrdersService {
       skuCode: payload.skuCode?.trim() || '',
       customerId: payload.customerId ?? null,
       customerName: payload.customerName?.trim() || '',
-      collaborationType: payload.collaborationType?.trim() || '',
+      collaborationTypeId:
+        typeof payload.collaborationTypeId === 'number' ? payload.collaborationTypeId : null,
       salesperson: payload.salesperson?.trim() || '',
       merchandiser: payload.merchandiser?.trim() || '',
       quantity: payload.quantity ?? 0,
       exFactoryPrice: this.normalizeDecimalInput(payload.exFactoryPrice),
       salePrice: this.normalizeDecimalInput(payload.salePrice),
-      label: payload.orderType?.trim() || payload.label?.trim() || '',
+      orderTypeId:
+        typeof payload.orderTypeId === 'number' ? payload.orderTypeId : null,
       processItem: payload.processItem?.trim() || '',
       orderDate: payload.orderDate ? new Date(payload.orderDate) : now,
       customerDueDate: payload.customerDueDate ? new Date(payload.customerDueDate) : null,
@@ -323,14 +501,51 @@ export class OrdersService {
       statusTime: now,
     });
     const saved = await this.orderRepo.save(entity);
-    const extPayload: Partial<{ orderId: number; materials: OrderMaterialRow[]; colorSizeHeaders: string[]; colorSizeRows: ColorSizeRow[] }> = { orderId: saved.id };
-    if (payload.materials && Array.isArray(payload.materials)) extPayload.materials = payload.materials;
+    const extPayload: Partial<OrderExt> = { orderId: saved.id };
+    if (payload.materials && Array.isArray(payload.materials)) extPayload.materials = this.normalizeMaterialRows(payload.materials);
     if (payload.colorSizeHeaders && Array.isArray(payload.colorSizeHeaders)) extPayload.colorSizeHeaders = payload.colorSizeHeaders;
     if (payload.colorSizeRows && Array.isArray(payload.colorSizeRows)) extPayload.colorSizeRows = payload.colorSizeRows;
-    if (extPayload.materials || extPayload.colorSizeHeaders || extPayload.colorSizeRows) {
-      await this.orderExtRepo.save(this.orderExtRepo.create(extPayload as { orderId: number; materials?: OrderMaterialRow[]; colorSizeHeaders?: string[]; colorSizeRows?: ColorSizeRow[] }));
+    if (payload.sizeInfoMetaHeaders && Array.isArray(payload.sizeInfoMetaHeaders)) {
+      extPayload.sizeInfoMetaHeaders = payload.sizeInfoMetaHeaders;
+    }
+    if (payload.sizeInfoRows && Array.isArray(payload.sizeInfoRows)) {
+      extPayload.sizeInfoRows = payload.sizeInfoRows;
+    }
+    if (payload.processItems && Array.isArray(payload.processItems)) {
+      extPayload.processItems = payload.processItems;
+    }
+    if (typeof payload.productionRequirement === 'string') {
+      extPayload.productionRequirement = payload.productionRequirement;
+    }
+    if (payload.packagingHeaders && Array.isArray(payload.packagingHeaders)) {
+      extPayload.packagingHeaders = payload.packagingHeaders;
+    }
+    if (payload.packagingCells && Array.isArray(payload.packagingCells)) {
+      extPayload.packagingCells = payload.packagingCells;
+    }
+    if (typeof payload.packagingMethod === 'string') {
+      extPayload.packagingMethod = payload.packagingMethod;
+    }
+    if (payload.attachments && Array.isArray(payload.attachments)) {
+      extPayload.attachments = payload.attachments;
+    }
+    if (
+      extPayload.materials ||
+      extPayload.colorSizeHeaders ||
+      extPayload.colorSizeRows ||
+      extPayload.sizeInfoMetaHeaders ||
+      extPayload.sizeInfoRows ||
+      extPayload.processItems ||
+      extPayload.productionRequirement ||
+      extPayload.packagingHeaders ||
+      extPayload.packagingCells ||
+      extPayload.packagingMethod ||
+      extPayload.attachments
+    ) {
+      await this.orderExtRepo.save(this.orderExtRepo.create(extPayload));
     }
     await this.addLog(saved, actor, 'create', '创建订单草稿');
+    await this.appendStatusHistory(saved.id, 'draft');
     return saved;
   }
 
@@ -343,14 +558,19 @@ export class OrdersService {
     if (payload.skuCode !== undefined) order.skuCode = payload.skuCode.trim();
     if (payload.customerId !== undefined) order.customerId = payload.customerId;
     if (payload.customerName !== undefined) order.customerName = payload.customerName.trim();
-    if (payload.collaborationType !== undefined) order.collaborationType = payload.collaborationType.trim();
+    if (payload.collaborationTypeId !== undefined) {
+      order.collaborationTypeId =
+        typeof payload.collaborationTypeId === 'number' ? payload.collaborationTypeId : null;
+    }
     if (payload.salesperson !== undefined) order.salesperson = payload.salesperson.trim();
     if (payload.merchandiser !== undefined) order.merchandiser = payload.merchandiser.trim();
     if (payload.quantity !== undefined) order.quantity = payload.quantity ?? 0;
     if (payload.exFactoryPrice !== undefined) order.exFactoryPrice = this.normalizeDecimalInput(payload.exFactoryPrice);
     if (payload.salePrice !== undefined) order.salePrice = this.normalizeDecimalInput(payload.salePrice);
-    if (payload.orderType !== undefined) order.label = payload.orderType.trim();
-    else if (payload.label !== undefined) order.label = payload.label.trim();
+    if (payload.orderTypeId !== undefined) {
+      order.orderTypeId =
+        typeof payload.orderTypeId === 'number' ? payload.orderTypeId : null;
+    }
     if (payload.processItem !== undefined) order.processItem = payload.processItem.trim();
     if (payload.orderDate !== undefined) {
       order.orderDate = payload.orderDate ? new Date(payload.orderDate) : null;
@@ -361,24 +581,55 @@ export class OrdersService {
     if (payload.factoryName !== undefined) order.factoryName = payload.factoryName.trim();
     if (payload.imageUrl !== undefined) order.imageUrl = payload.imageUrl.trim();
     const saved = await this.orderRepo.save(order);
-    if (payload.materials !== undefined || payload.colorSizeHeaders !== undefined || payload.colorSizeRows !== undefined) {
+    if (
+      payload.materials !== undefined ||
+      payload.colorSizeHeaders !== undefined ||
+      payload.colorSizeRows !== undefined ||
+      payload.sizeInfoMetaHeaders !== undefined ||
+      payload.sizeInfoRows !== undefined ||
+      payload.processItems !== undefined ||
+      payload.productionRequirement !== undefined ||
+      payload.packagingHeaders !== undefined ||
+      payload.packagingCells !== undefined ||
+      payload.packagingMethod !== undefined ||
+      payload.attachments !== undefined
+    ) {
       let ext = await this.orderExtRepo.findOne({ where: { orderId: id } });
       if (!ext) {
         ext = this.orderExtRepo.create({
           orderId: id,
-          materials: payload.materials ?? null,
+          materials: payload.materials && Array.isArray(payload.materials) ? this.normalizeMaterialRows(payload.materials) : null,
           colorSizeHeaders: payload.colorSizeHeaders ?? null,
           colorSizeRows: payload.colorSizeRows ?? null,
+          sizeInfoMetaHeaders: payload.sizeInfoMetaHeaders ?? null,
+          sizeInfoRows: payload.sizeInfoRows ?? null,
+          processItems: payload.processItems ?? null,
+          productionRequirement: payload.productionRequirement ?? null,
+          packagingHeaders: payload.packagingHeaders ?? null,
+          packagingCells: payload.packagingCells ?? null,
+          packagingMethod: payload.packagingMethod ?? null,
+          attachments: payload.attachments ?? null,
         });
       } else {
-        if (payload.materials !== undefined) ext.materials = payload.materials;
+        if (payload.materials !== undefined) ext.materials = Array.isArray(payload.materials) ? this.normalizeMaterialRows(payload.materials) : payload.materials;
         if (payload.colorSizeHeaders !== undefined) ext.colorSizeHeaders = payload.colorSizeHeaders;
         if (payload.colorSizeRows !== undefined) ext.colorSizeRows = payload.colorSizeRows;
+        if (payload.sizeInfoMetaHeaders !== undefined) ext.sizeInfoMetaHeaders = payload.sizeInfoMetaHeaders;
+        if (payload.sizeInfoRows !== undefined) ext.sizeInfoRows = payload.sizeInfoRows;
+        if (payload.processItems !== undefined) ext.processItems = payload.processItems;
+        if (payload.productionRequirement !== undefined) ext.productionRequirement = payload.productionRequirement ?? null;
+        if (payload.packagingHeaders !== undefined) ext.packagingHeaders = payload.packagingHeaders;
+        if (payload.packagingCells !== undefined) ext.packagingCells = payload.packagingCells;
+        if (payload.packagingMethod !== undefined) ext.packagingMethod = payload.packagingMethod ?? null;
+        if (payload.attachments !== undefined) ext.attachments = payload.attachments;
       }
       await this.orderExtRepo.save(ext);
     }
     const detail = this.buildUpdateChangesDescription(before, payload);
-    await this.addLog(saved, actor, 'update', detail);
+    // 若无关键字段变更，则不记录操作日志，避免产生冗余记录
+    if (detail && detail !== '无关键字段变更') {
+      await this.addLog(saved, actor, 'update', detail);
+    }
     return saved;
   }
 
@@ -393,10 +644,25 @@ export class OrdersService {
     }
     // 下单时间定义为“保存并提交”的时间
     order.orderDate = new Date();
-    order.status = 'pending_review';
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'submit',
+      actorUserId: actor.userId,
+    });
+    order.status = next ?? 'pending_review';
     order.statusTime = new Date();
     const saved = await this.orderRepo.save(order);
-    await this.addLog(saved, actor, 'submit', `状态: ${beforeStatus || '-'} -> ${saved.status}`);
+    // 状态未变化时不记录提交日志（例如：待审单 -> 待审单），避免冗余
+    if ((beforeStatus || '') !== (saved.status || '')) {
+      await this.addLog(saved, actor, 'submit', `状态: ${beforeStatus || '-'} -> ${saved.status}`);
+      await this.appendStatusHistory(saved.id, saved.status);
+    }
+
+    // 订单从草稿首次提交时，按包装辅料自动出库，避免重复提交导致重复扣减
+    if (beforeStatus === 'draft') {
+      await this.autoOutboundAccessoriesByPackagingCells(order as any, actor);
+    }
+
     return saved;
   }
 
@@ -414,26 +680,63 @@ export class OrdersService {
   }
 
   /**
-   * 待审单批量审核 -> 待纸样
+   * 待审单批量审核通过（按配置规则流转）
    */
   async reviewMany(ids: number[], actor: OrderActor): Promise<void> {
     if (!ids?.length) return;
-    const now = new Date();
     const orders = await this.orderRepo.findByIds(ids);
-    await this.orderRepo
-      .createQueryBuilder()
-      .update(Order)
-      .set({ status: 'pending_pattern', statusTime: now })
-      .where('id IN (:...ids)', { ids })
-      .andWhere('status = :status', { status: 'pending_review' })
-      .execute();
     for (const o of orders) {
-      await this.addLog(
-        { ...o, status: 'pending_pattern', statusTime: now } as Order,
-        actor,
-        'review',
-        '审核订单：pending_review -> pending_pattern',
-      );
+      if (o.status !== 'pending_review') continue;
+      const before = o.status;
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order: o as Order,
+        triggerCode: 'review_approve',
+        actorUserId: actor.userId,
+      });
+      const to = next ?? 'pending_purchase';
+      o.status = to;
+      o.statusTime = new Date();
+      await this.orderRepo.save(o as any);
+      if (before !== to) {
+        await this.addLog(o as any, actor, 'review', `审核订单：${before} -> ${to}`);
+        await this.appendStatusHistory(o.id, to);
+      }
+    }
+  }
+
+  /**
+   * 审核退回：待审单 -> 草稿（或按工作流配置回退）
+   * 同时自动新增一条备注记录退回原因。
+   */
+  async reviewRejectMany(ids: number[], reason: string, actor: OrderActor): Promise<void> {
+    if (!ids?.length) return;
+    const trimmedReason = (reason ?? '').trim();
+    if (!trimmedReason) {
+      throw new Error('退回原因不能为空');
+    }
+    const orders = await this.orderRepo.findByIds(ids);
+    for (const o of orders) {
+      if (o.status !== 'pending_review') continue;
+      const before = o.status;
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order: o as Order,
+        triggerCode: 'review_reject',
+        actorUserId: actor.userId,
+      });
+      const to = next ?? 'draft';
+      o.status = to;
+      o.statusTime = new Date();
+      await this.orderRepo.save(o as any);
+      await this.addRemark(o.id, actor, `审核退回原因：${trimmedReason}`);
+      if (before !== to) {
+        await this.addLog(
+          o as any,
+          actor,
+          'review',
+          `审核退回：${before} -> ${to}；原因：${trimmedReason}`,
+        );
+        await this.appendStatusHistory(o.id, to);
+      }
     }
   }
 
@@ -449,13 +752,13 @@ export class OrdersService {
         skuCode: src.skuCode?.trim() || '',
         customerId: src.customerId ?? null,
         customerName: src.customerName?.trim() || '',
-        collaborationType: src.collaborationType?.trim() || '',
+        collaborationTypeId: src.collaborationTypeId ?? null,
         salesperson: src.salesperson?.trim() || '',
         merchandiser: src.merchandiser?.trim() || '',
         quantity: src.quantity ?? 0,
         exFactoryPrice: this.normalizeDecimalInput(src.exFactoryPrice),
         salePrice: this.normalizeDecimalInput(src.salePrice),
-        label: src.label?.trim() || '',
+        orderTypeId: src.orderTypeId ?? null,
         processItem: src.processItem?.trim() || '',
         orderDate: src.orderDate ?? now,
         customerDueDate: src.customerDueDate ?? null,
@@ -465,6 +768,38 @@ export class OrdersService {
         statusTime: now,
       });
       const saved = await this.orderRepo.save(draft);
+      await this.appendStatusHistory(saved.id, 'draft');
+
+      // 复制扩展表 order_ext：B~H 区所有内容一并带入新草稿，方便在完整基础上修改
+      const srcExt = await this.orderExtRepo.findOne({ where: { orderId: src.id } });
+      if (srcExt) {
+        const newExt = this.orderExtRepo.create({
+          orderId: saved.id,
+          materials: srcExt.materials ?? null,
+          colorSizeHeaders: srcExt.colorSizeHeaders ?? null,
+          colorSizeRows: srcExt.colorSizeRows ?? null,
+          sizeInfoMetaHeaders: srcExt.sizeInfoMetaHeaders ?? null,
+          sizeInfoRows: srcExt.sizeInfoRows ?? null,
+          processItems: srcExt.processItems ?? null,
+          productionRequirement: srcExt.productionRequirement ?? null,
+          packagingHeaders: srcExt.packagingHeaders ?? null,
+          packagingCells: srcExt.packagingCells ?? null,
+          packagingMethod: srcExt.packagingMethod ?? null,
+          attachments: srcExt.attachments ?? null,
+        });
+        await this.orderExtRepo.save(newExt);
+      }
+
+      // 复制订单成本快照（成本页的物料/工艺/工序及利润率），新草稿可沿用原单成本信息
+      const srcCost = await this.orderCostSnapshotRepo.findOne({ where: { orderId: src.id } });
+      if (srcCost?.snapshot != null) {
+        const newCost = this.orderCostSnapshotRepo.create({
+          orderId: saved.id,
+          snapshot: srcCost.snapshot,
+        });
+        await this.orderCostSnapshotRepo.save(newCost);
+      }
+
       created.push(saved);
       await this.addLog(saved, actor, 'copy_to_draft', `从订单 ${src.orderNo} 复制为草稿`);
     }
@@ -511,24 +846,135 @@ export class OrdersService {
 
     const ids = list.map((o) => o.id);
     const remarkCountMap: Record<number, number> = {};
+    const cutTotalMap: Record<number, number | null> = {};
+    const sewingQtyMap: Record<number, number | null> = {};
+    const tailReceivedMap: Record<number, number | null> = {};
+    const tailShippedMap: Record<number, number | null> = {};
+
     if (ids.length > 0) {
-      const rows = await this.orderRemarkRepo
-        .createQueryBuilder('r')
-        .select('r.order_id', 'orderId')
-        .addSelect('COUNT(1)', 'count')
-        .where('r.order_id IN (:...ids)', { ids })
-        .groupBy('r.order_id')
-        .getRawMany<{ orderId: number; count: string }>();
-      rows.forEach((r) => {
+      const [remarkRows, cuttings, sewings, finishings] = await Promise.all([
+        this.orderRemarkRepo
+          .createQueryBuilder('r')
+          .select('r.order_id', 'orderId')
+          .addSelect('COUNT(1)', 'count')
+          .where('r.order_id IN (:...ids)', { ids })
+          .groupBy('r.order_id')
+          .getRawMany<{ orderId: number; count: string }>(),
+        this.orderCuttingRepo.find({ where: { orderId: In(ids) } }),
+        this.orderSewingRepo.find({ where: { orderId: In(ids) } }),
+        this.orderFinishingRepo.find({ where: { orderId: In(ids) } }),
+      ]);
+
+      remarkRows.forEach((r) => {
         remarkCountMap[r.orderId] = Number(r.count) || 0;
       });
+
+      cuttings.forEach((c) => {
+        cutTotalMap[c.orderId] = this.sumActualCut(c.actualCutRows);
+      });
+      sewings.forEach((s) => {
+        sewingQtyMap[s.orderId] = s.sewingQuantity ?? null;
+      });
+      finishings.forEach((f) => {
+        tailReceivedMap[f.orderId] = f.tailReceivedQty ?? null;
+        tailShippedMap[f.orderId] = f.tailShippedQty ?? null;
+      });
     }
+
     const listWithCount = list.map((o) => ({
       ...o,
       remarkCount: remarkCountMap[o.id] ?? 0,
+      // 数量追踪字段：供前端在数量气泡中展示
+      actualCutTotal: cutTotalMap[o.id] ?? null,
+      sewingQuantity: sewingQtyMap[o.id] ?? null,
+      tailReceivedQty: tailReceivedMap[o.id] ?? null,
+      tailShippedQty: tailShippedMap[o.id] ?? null,
     }));
 
     return { list: listWithCount, total, page, pageSize };
+  }
+
+  async getSizeBreakdown(orderId: number) {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+
+    const [ext, cutting, sewing, finishing] = await Promise.all([
+      this.orderExtRepo.findOne({ where: { orderId } }),
+      this.orderCuttingRepo.findOne({ where: { orderId } }),
+      this.orderSewingRepo.findOne({ where: { orderId } }),
+      this.orderFinishingRepo.findOne({ where: { orderId } }),
+    ]);
+
+    const headers = Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
+      ? [...ext.colorSizeHeaders, '合计']
+      : ['合计'];
+
+    const buildPerSizeFromRows = (rows: ColorSizeRow[] | ActualCutRow[] | null | undefined): number[] | null => {
+      if (!rows || rows.length === 0 || headers.length <= 1) return null;
+      const sizeLen = headers.length - 1;
+      const sums = Array(sizeLen).fill(0) as number[];
+      rows.forEach((row: any) => {
+        if (Array.isArray(row.quantities)) {
+          row.quantities.forEach((q: any, idx: number) => {
+            if (idx < sizeLen) {
+              const n = Number(q);
+              if (!Number.isNaN(n)) sums[idx] += n;
+            }
+          });
+        }
+      });
+      const total = sums.reduce((a, b) => a + b, 0);
+      return [...sums, total];
+    };
+
+    // 1）订单下单件数：来自 order_ext.colorSizeRows
+    const orderPerSize = buildPerSizeFromRows((ext as any)?.colorSizeRows ?? null);
+
+    // 2）实裁件数：来自 order_cutting.actualCutRows
+    const cutPerSize = buildPerSizeFromRows(cutting?.actualCutRows ?? null);
+
+    // 3）车缝数量：当前仅记录总件数
+    const sewingTotal = sewing?.sewingQuantity ?? null;
+    const sewingRow =
+      sewingTotal != null
+        ? [
+            ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
+            sewingTotal,
+          ]
+        : null;
+
+    // 4）尾部出货数：当前仅记录总件数（若无出货，则回退为尾部收货数）
+    const tailTotal =
+      finishing?.tailShippedQty != null
+        ? finishing.tailShippedQty
+        : finishing?.tailReceivedQty != null
+          ? finishing.tailReceivedQty
+          : null;
+    const tailRow =
+      tailTotal != null
+        ? [
+            ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
+            tailTotal,
+          ]
+        : null;
+
+    const rows: Array<{ label: string; values: (number | null)[] }> = [];
+    if (orderPerSize) {
+      rows.push({ label: '订单数量', values: orderPerSize });
+    }
+    if (cutPerSize) {
+      rows.push({ label: '实裁数量', values: cutPerSize });
+    }
+    if (sewingRow) {
+      rows.push({ label: '车缝数量', values: sewingRow });
+    }
+    if (tailRow) {
+      rows.push({ label: '尾部出货数', values: tailRow });
+    }
+
+    return { headers, rows };
   }
 
   async countByStatus(query: OrderListQuery) {
@@ -602,6 +1048,25 @@ export class OrdersService {
       content: trimmed,
     });
     return this.orderRemarkRepo.save(remark);
+  }
+
+  /** 获取订单成本快照（成本页回显） */
+  async getCostSnapshot(orderId: number): Promise<OrderCostSnapshot | null> {
+    await this.findOne(orderId);
+    const row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    return row ?? null;
+  }
+
+  /** 保存订单成本快照（成本页保存时写入） */
+  async saveCostSnapshot(orderId: number, payload: { snapshot: Record<string, unknown> }): Promise<OrderCostSnapshot> {
+    await this.findOne(orderId);
+    let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    if (row) {
+      row.snapshot = payload.snapshot ?? null;
+    } else {
+      row = this.orderCostSnapshotRepo.create({ orderId, snapshot: payload.snapshot ?? null });
+    }
+    return this.orderCostSnapshotRepo.save(row);
   }
 }
 

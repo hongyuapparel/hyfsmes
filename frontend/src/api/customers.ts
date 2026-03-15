@@ -1,6 +1,6 @@
 import request from './request'
 
-/** 客户项，字段与 customer-fields code 对应 */
+/** 客户项，字段与 customer-fields code 对应；productGroupId 为存库值，productGroup 为展示用路径 */
 export interface CustomerItem {
   id: number
   customerId: string
@@ -10,6 +10,7 @@ export interface CustomerItem {
   contactInfo: string
   cooperationDate: string | null
   salesperson: string
+  productGroupId: number | null
   productGroup: string
   createdAt: string
   updatedAt: string
@@ -74,7 +75,7 @@ export function getMerchandisers() {
 }
 
 export function getProductGroups() {
-  return request.get<string[]>('/customers/options/product-groups')
+  return request.get<{ id: number; path: string }[]>('/customers/options/product-groups')
 }
 
 /** 小满客户项 */
@@ -85,6 +86,8 @@ export interface XiaomanCompanyItem {
   short_name: string
   order_time: string
   create_time: string
+  /** 主联系人姓名（从公司详情推导） */
+  contactPerson?: string
 }
 
 export interface XiaomanListRes {

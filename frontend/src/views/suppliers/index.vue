@@ -22,23 +22,33 @@
         </template>
       </el-input>
       <el-select
-        v-model="filter.type"
+        v-model="filter.supplierTypeId"
         placeholder="供应商类型"
         clearable
         filterable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.type ? `供应商类型：${filter.type}` : '')"
+        :style="
+          getFilterSelectAutoWidthStyle(
+            filter.supplierTypeId != null
+              ? `供应商类型：${findSupplierTypeLabelById(filter.supplierTypeId)}`
+              : ''
+          )
+        "
         @change="onSearch"
       >
         <template #label>
-          {{ filter.type ? `供应商类型：${filter.type}` : '供应商类型' }}
+          {{
+            filter.supplierTypeId != null
+              ? `供应商类型：${findSupplierTypeLabelById(filter.supplierTypeId)}`
+              : '供应商类型'
+          }}
         </template>
         <el-option
           v-for="opt in supplierTypeOptions"
-          :key="opt"
-          :label="opt"
-          :value="opt"
+          :key="opt.id"
+          :label="opt.label"
+          :value="opt.id"
         />
       </el-select>
       <div class="filter-bar-actions">
@@ -50,8 +60,16 @@
 
     <el-table v-loading="loading" :data="list" border stripe class="suppliers-table">
       <el-table-column prop="name" label="供应商名称" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="type" label="供应商类型" width="100" show-overflow-tooltip />
-      <el-table-column prop="businessScope" label="业务范围" min-width="100" show-overflow-tooltip />
+      <el-table-column label="供应商类型" width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ findSupplierTypeLabelById(row.supplierTypeId) || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="业务范围" min-width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ findBusinessScopeLabelById(row.businessScopeId) || '-' }}
+        </template>
+      </el-table-column>
       <el-table-column prop="cooperationDate" label="合作日期" width="110" align="center">
         <template #default="{ row }">{{ formatDate(row.cooperationDate) }}</template>
       </el-table-column>
@@ -90,9 +108,9 @@
         <el-form-item label="供应商名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入供应商名称" clearable />
         </el-form-item>
-        <el-form-item label="供应商类型" prop="type">
+      <el-form-item label="供应商类型" prop="supplierTypeId">
           <el-select
-            v-model="form.type"
+          v-model="form.supplierTypeId"
             placeholder="请选择供应商类型"
             clearable
             filterable
@@ -101,28 +119,26 @@
           >
             <el-option
               v-for="opt in supplierTypeOptions"
-              :key="opt"
-              :label="opt"
-              :value="opt"
+            :key="opt.id"
+            :label="opt.label"
+            :value="opt.id"
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="业务范围" prop="businessScope">
+      <el-form-item label="业务范围" prop="businessScopeId">
           <el-select
-            v-model="form.businessScope"
+          v-model="form.businessScopeId"
             placeholder="先选供应商类型后可选或输入业务范围"
             clearable
             filterable
-            allow-create
-            default-first-option
             style="width: 100%"
-            :disabled="!form.type"
+          :disabled="!form.supplierTypeId"
           >
             <el-option
               v-for="opt in businessScopeOptions"
-              :key="opt"
-              :label="opt"
-              :value="opt"
+            :key="opt.id"
+            :label="opt.label"
+            :value="opt.id"
             />
           </el-select>
         </el-form-item>
@@ -171,19 +187,14 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import {
-  getSupplierList,
-  getSupplierTypeOptions,
-  getSupplierBusinessScopeOptions,
-  createSupplier,
-  updateSupplier,
-  deleteSupplier,
-  type SupplierItem,
-} from '@/api/suppliers'
+import { getSupplierList, createSupplier, updateSupplier, deleteSupplier, type SupplierItem } from '@/api/suppliers'
+import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
-const supplierTypeOptions = ref<string[]>([])
-const businessScopeOptions = ref<string[]>([])
+const supplierTypeOptions = ref<{ id: number; label: string }[]>([])
+const businessScopeOptions = ref<{ id: number; label: string }[]>([])
+const allSupplierOptions = ref<SystemOptionItem[]>([])
+const businessScopeByTypeId = ref<Record<number, { id: number; label: string }[]>>({})
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
 const FILTER_AUTO_MIN_WIDTH = 140
@@ -207,7 +218,7 @@ function getFilterSelectAutoWidthStyle(labelText: string) {
   return { width: `${width}px`, flex: `0 0 ${width}px`, color: ACTIVE_FILTER_COLOR }
 }
 
-const filter = reactive({ name: '', type: '' })
+const filter = reactive<{ name: string; supplierTypeId: number | null }>({ name: '', supplierTypeId: null })
 const nameLabelVisible = ref(false)
 const list = ref<SupplierItem[]>([])
 const loading = ref(false)
@@ -220,10 +231,19 @@ const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boo
 })
 const editId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
-const form = reactive({
+const form = reactive<{
+  name: string
+  supplierTypeId: number | null
+  businessScopeId: number | null
+  cooperationDate: string
+  contactPerson: string
+  contactInfo: string
+  factoryAddress: string
+  settlementTime: string
+}>({
   name: '',
-  type: '',
-  businessScope: '',
+  supplierTypeId: null,
+  businessScopeId: null,
   cooperationDate: '',
   contactPerson: '',
   contactInfo: '',
@@ -246,7 +266,7 @@ async function load() {
   try {
     const res = await getSupplierList({
       name: filter.name || undefined,
-      type: filter.type || undefined,
+      supplierTypeId: filter.supplierTypeId ?? undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -280,7 +300,7 @@ function debouncedSearch() {
 function onReset() {
   nameLabelVisible.value = false
   filter.name = ''
-  filter.type = ''
+  filter.supplierTypeId = null
   pagination.page = 1
   load()
 }
@@ -295,8 +315,8 @@ async function openForm(row: SupplierItem | null) {
   editId.value = row ? row.id : null
   if (row) {
     form.name = row.name
-    form.type = row.type ?? ''
-    form.businessScope = row.businessScope ?? ''
+    form.supplierTypeId = row.supplierTypeId ?? null
+    form.businessScopeId = row.businessScopeId ?? null
     form.cooperationDate = row.cooperationDate ?? ''
     form.contactPerson = row.contactPerson ?? ''
     form.contactInfo = row.contactInfo ?? ''
@@ -304,8 +324,8 @@ async function openForm(row: SupplierItem | null) {
     form.settlementTime = row.settlementTime ?? ''
   } else {
     form.name = ''
-    form.type = ''
-    form.businessScope = ''
+    form.supplierTypeId = null
+    form.businessScopeId = null
     form.cooperationDate = ''
     form.contactPerson = ''
     form.contactInfo = ''
@@ -328,8 +348,8 @@ async function submitForm() {
     if (formDialog.isEdit && editId.value != null) {
       await updateSupplier(editId.value, {
         name: form.name,
-        type: form.type,
-        businessScope: form.businessScope,
+        supplierTypeId: form.supplierTypeId,
+        businessScopeId: form.businessScopeId,
         cooperationDate: form.cooperationDate || undefined,
         contactPerson: form.contactPerson,
         contactInfo: form.contactInfo,
@@ -340,8 +360,8 @@ async function submitForm() {
     } else {
       await createSupplier({
         name: form.name,
-        type: form.type,
-        businessScope: form.businessScope,
+        supplierTypeId: form.supplierTypeId,
+        businessScopeId: form.businessScopeId,
         cooperationDate: form.cooperationDate || undefined,
         contactPerson: form.contactPerson,
         contactInfo: form.contactInfo,
@@ -374,32 +394,60 @@ async function onDelete(row: SupplierItem) {
   }
 }
 
-async function loadTypeOptions() {
+function findSupplierTypeLabelById(id: number | null | undefined): string {
+  if (id == null) return ''
+  const item = supplierTypeOptions.value.find((o) => o.id === id)
+  return item?.label ?? ''
+}
+
+function findBusinessScopeLabelById(id: number | null | undefined): string {
+  if (id == null) return ''
+  const allScopes: { id: number; label: string }[] = []
+  Object.values(businessScopeByTypeId.value).forEach((arr) => allScopes.push(...arr))
+  const item = allScopes.find((o) => o.id === id)
+  return item?.label ?? ''
+}
+
+async function loadSupplierOptions() {
   try {
-    const res = await getSupplierTypeOptions()
-    supplierTypeOptions.value = res.data ?? []
+    const res = await getSystemOptionsList('supplier_types')
+    const list = res.data ?? []
+    allSupplierOptions.value = list
+
+    const roots = list.filter((o) => o.parentId == null)
+    supplierTypeOptions.value = roots.map((r) => ({ id: r.id, label: r.value }))
+
+    const byParent: Record<number, { id: number; label: string }[]> = {}
+    for (const opt of list) {
+      if (opt.parentId == null) continue
+      const pid = opt.parentId
+      if (!byParent[pid]) byParent[pid] = []
+      byParent[pid].push({ id: opt.id, label: opt.value })
+    }
+    businessScopeByTypeId.value = byParent
   } catch {
+    allSupplierOptions.value = []
     supplierTypeOptions.value = []
+    businessScopeByTypeId.value = {}
   }
 }
 
-async function onFormTypeChange() {
-  form.businessScope = ''
-  if (!form.type) {
+function onFormTypeChange() {
+  if (!form.supplierTypeId) {
     businessScopeOptions.value = []
+    form.businessScopeId = null
     return
   }
-  try {
-    const res = await getSupplierBusinessScopeOptions(form.type)
-    businessScopeOptions.value = res.data ?? []
-  } catch {
-    businessScopeOptions.value = []
+  const arr = businessScopeByTypeId.value[form.supplierTypeId] ?? []
+  businessScopeOptions.value = arr
+  if (!arr.some((o) => o.id === form.businessScopeId)) {
+    form.businessScopeId = null
   }
 }
 
-onMounted(() => {
-  loadTypeOptions()
-  load()
+onMounted(async () => {
+  await loadSupplierOptions()
+  await load()
 })
 </script>
 

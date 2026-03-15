@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { ProductionPatternService, PatternListQuery } from './production-pattern.service';
+import type { Response } from 'express';
 
 @Controller('production/pattern')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -15,20 +16,24 @@ export class ProductionPatternController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
-    @Query('orderType') orderType?: string,
-    @Query('collaborationType') collaborationType?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
     @Query('purchaseStatus') purchaseStatus?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: PatternListQuery = {
       tab,
       orderNo,
       skuCode,
-      orderType,
-      collaborationType,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number)
+        ? undefined
+        : (collaborationTypeId as number),
       purchaseStatus,
       orderDateStart,
       orderDateEnd,
@@ -36,6 +41,80 @@ export class ProductionPatternController {
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
     return this.patternService.getPatternList(query);
+  }
+
+  @Get('items/export')
+  async exportItems(
+    @Query('tab') tab?: string,
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
+    @Query('purchaseStatus') purchaseStatus?: string,
+    @Query('orderDateStart') orderDateStart?: string,
+    @Query('orderDateEnd') orderDateEnd?: string,
+    @Res() res?: Response,
+  ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
+    const query: PatternListQuery = {
+      tab,
+      orderNo,
+      skuCode,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number)
+        ? undefined
+        : (collaborationTypeId as number),
+      purchaseStatus,
+      orderDateStart,
+      orderDateEnd,
+    };
+    const rows = await this.patternService.getPatternExportRows(query);
+    const header = [
+      '订单号',
+      'SKU',
+      '客户',
+      '业务员',
+      '跟单员',
+      '订单数量',
+      '客户交期',
+      '下单时间',
+      '纸样师',
+      '车版师',
+      '采购状态',
+      '纸样状态',
+      '纸样完成时间',
+    ];
+    const escape = (v: unknown) => {
+      const str = v == null ? '' : String(v);
+      const escaped = str.replace(/"/g, '""');
+      return `"${escaped}"`;
+    };
+    const lines = [header.map(escape).join(',')];
+    for (const r of rows) {
+      lines.push(
+        [
+          r.orderNo,
+          r.skuCode,
+          r.customerName,
+          r.salesperson,
+          r.merchandiser,
+          r.quantity,
+          r.customerDueDate ?? '',
+          r.orderDate ?? '',
+          r.patternMaster,
+          r.sampleMaker,
+          r.purchaseStatus,
+          r.patternStatus,
+          r.completedAt ?? '',
+        ].map(escape).join(','),
+      );
+    }
+    const csv = '\uFEFF' + lines.join('\n');
+    const filename = `pattern-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    res?.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res?.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res?.send(csv);
   }
 
   @Post('items/assign')

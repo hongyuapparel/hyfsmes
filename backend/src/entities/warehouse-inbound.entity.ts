@@ -14,9 +14,9 @@ export class WarehouseInbound {
   @JoinColumn({ name: 'order_id' })
   order: Order;
 
-  /** 入库仓库 */
-  @Column({ name: 'warehouse', length: 128, default: '' })
-  warehouse: string;
+  /** 入库仓库 ID（关联 system_options.id，optionType = 'warehouses'） */
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
 
   /** 部门 */
   @Column({ name: 'department', length: 128, default: '' })

@@ -55,17 +55,18 @@ export class ProductsController {
   findAll(
     @Query('companyName') companyName?: string,
     @Query('skuCode') skuCode?: string,
-    @Query('productGroup') productGroup?: string,
+    @Query('productGroupId') productGroupIdStr?: string,
     @Query('salesperson') salesperson?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
+    const productGroupId = productGroupIdStr ? parseInt(productGroupIdStr, 10) : undefined;
     return this.productsService.findAll({
       companyName,
       skuCode,
-      productGroup,
+      productGroupId: Number.isNaN(productGroupId as number) ? undefined : (productGroupId as number),
       salesperson,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
@@ -110,7 +111,7 @@ export class ProductsController {
     body: {
       sku_code?: string;
       image_url?: string;
-      product_group?: string;
+      product_group_id?: number | null;
       customer_id?: number | null;
       salesperson?: string;
     },
@@ -124,7 +125,7 @@ export class ProductsController {
     @Body()
     body: {
       image_url?: string;
-      product_group?: string;
+      product_group_id?: number | null;
       customer_id?: number | null;
       salesperson?: string;
     },

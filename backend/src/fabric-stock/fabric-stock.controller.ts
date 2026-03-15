@@ -23,11 +23,13 @@ export class FabricStockController {
   @Get('items')
   getList(
     @Query('name') name?: string,
+    @Query('customerName') customerName?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.service.getList({
       name,
+      customerName,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -74,5 +76,24 @@ export class FabricStockController {
     @Body('remark') remark: string,
   ) {
     return this.service.outbound(Number(id), Number(quantity), photoUrl ?? '', remark ?? '');
+  }
+
+  @Get('outbounds')
+  getOutbounds(
+    @Query('name') name?: string,
+    @Query('customerName') customerName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.getOutboundRecords({
+      name,
+      customerName,
+      startDate,
+      endDate,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
   }
 }

@@ -3,11 +3,18 @@ import request from './request'
 export interface PatternListItem {
   orderId: number
   orderNo: string
+  customerName: string
+  salesperson: string
+  merchandiser: string
+  quantity: number
   orderDate: string | null
+  customerDueDate: string | null
   skuCode: string
   imageUrl: string
-  orderType: string
-  collaborationType: string
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId: number | null
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId: number | null
   purchaseStatus: string
   patternStatus: string
   patternMaster: string
@@ -27,8 +34,10 @@ export interface PatternListQuery {
   tab?: string
   orderNo?: string
   skuCode?: string
-  orderType?: string
-  collaborationType?: string
+  /** 订单类型 ID */
+  orderTypeId?: number
+  /** 合作方式 ID */
+  collaborationTypeId?: number
   purchaseStatus?: string
   orderDateStart?: string
   orderDateEnd?: string
@@ -38,6 +47,15 @@ export interface PatternListQuery {
 
 export function getPatternItems(params?: PatternListQuery) {
   return request.get<PatternListRes>('/production/pattern/items', { params })
+}
+
+export function exportPatternItems(params?: Omit<PatternListQuery, 'page' | 'pageSize'>) {
+  return request.get<Blob>('/production/pattern/items/export', {
+    params,
+    responseType: 'blob',
+    // 导出失败时由调用方自行提示
+    skipGlobalErrorHandler: true,
+  } as any)
 }
 
 export function assignPattern(payload: {

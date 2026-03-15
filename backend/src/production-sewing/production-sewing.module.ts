@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
+import { OrderExt } from '../entities/order-ext.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
@@ -11,7 +12,7 @@ import { ProductionSewingService } from './production-sewing.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderSewing, OrderCutting, User, RolePermission]),
+    TypeOrmModule.forFeature([Order, OrderSewing, OrderCutting, OrderExt, User, RolePermission]),
     AuthModule,
   ],
   controllers: [ProductionSewingController],

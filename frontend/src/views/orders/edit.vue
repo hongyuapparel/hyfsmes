@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card order-edit-page">
+  <div class="page-card order-edit-page" v-loading="pageLoading">
     <div class="page-header">
       <div class="left">
         <el-button link type="primary" @click="goBack">返回列表</el-button>
@@ -7,9 +7,9 @@
         <span v-if="orderNo" class="sub-title">订单号：{{ orderNo }}</span>
       </div>
       <div class="right">
-        <el-button @click="onPrint" :disabled="!orderId">打印订单</el-button>
-        <el-button @click="onSaveDraft" :loading="saving">保存草稿</el-button>
-        <el-button type="primary" @click="onSaveAndSubmit" :loading="submitting">保存并提交</el-button>
+        <el-button @click="goBack">取消</el-button>
+        <el-button v-if="orderStatus === 'draft'" @click="onSaveDraft" :loading="saving">保存草稿</el-button>
+        <el-button type="primary" @click="onSaveAndSubmit" :loading="submitting">提交</el-button>
       </div>
     </div>
 
@@ -49,33 +49,26 @@
         <el-col :xs="24" :md="20">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" class="basic-form" label-position="left">
         <el-row :gutter="16">
-          <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="SKU" prop="skuCode">
-              <el-select
-                v-model="form.skuCode"
-                placeholder="选择 SKU"
-                filterable
-                remote
-                clearable
-                :remote-method="searchSkus"
-                :loading="skuLoading"
-                @visible-change="(visible: boolean) => visible && !skuOptions.length && searchSkus('')"
-                @change="onSkuChange"
-              >
-                <el-option
-                  v-for="item in skuOptions"
-                  :key="item.id"
-                  :label="item.skuCode"
-                  :value="item.skuCode"
+        <el-col :xs="24" :sm="12" :md="8">
+          <el-form-item label="SKU" prop="skuCode">
+            <el-input
+              v-model="form.skuCode"
+              placeholder="选择 SKU"
+              clearable
+            >
+              <template #suffix>
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  @click.stop="openSkuDialog"
                 >
-                  <div class="option-main">
-                    <span class="option-primary">{{ item.skuCode }}</span>
-                    <span class="option-secondary" v-if="item.customerName">{{ item.customerName }}</span>
-                  </div>
-                </el-option>
-              </el-select>
-            </el-form-item>
-          </el-col>
+                  选择
+                </el-button>
+              </template>
+            </el-input>
+          </el-form-item>
+        </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="订单号">
@@ -91,8 +84,18 @@
 
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="合作方式">
-              <el-select v-model="form.collaborationType" placeholder="选择合作方式" clearable filterable>
-                <el-option v-for="opt in collaborationOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+              <el-select
+                v-model="form.collaborationTypeId"
+                placeholder="选择合作方式"
+                clearable
+                filterable
+              >
+                <el-option
+                  v-for="opt in collaborationOptions"
+                  :key="opt.id"
+                  :label="opt.label"
+                  :value="opt.id"
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -100,7 +103,7 @@
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="订单类型">
               <el-tree-select
-                v-model="form.orderType"
+                v-model="form.orderTypeId"
                 :data="orderTypeTreeSelectData"
                 placeholder="选择订单类型"
                 filterable
@@ -178,7 +181,7 @@
                   v-for="u in merchandiserOptions"
                   :key="u.id"
                   :label="u.displayName || u.username"
-                  :value="u.username"
+                  :value="u.displayName || u.username"
                 />
               </el-select>
             </el-form-item>
@@ -202,7 +205,7 @@
                   v-for="u in salespersonOptions"
                   :key="u.id"
                   :label="u.displayName || u.username"
-                  :value="u.username"
+                  :value="u.displayName || u.username"
                 />
               </el-select>
             </el-form-item>
@@ -230,8 +233,9 @@
         show-summary
         sum-text="合计"
         :summary-method="bSummaryMethod"
+        header-align="center"
       >
-        <el-table-column label="颜色名称" min-width="120" align="center">
+        <el-table-column label="颜色名称" min-width="120" align="center" header-align="center">
           <template #default="{ row, $index }">
             <div
               v-if="editingCell?.rowIndex === $index && editingCell?.col === 'color'"
@@ -264,6 +268,7 @@
           :label="size"
           min-width="90"
           align="center"
+          header-align="center"
         >
           <template #header>
             <div class="b-header-cell">
@@ -271,6 +276,7 @@
                 v-model="sizeHeaders[sIndex]"
                 size="small"
                 class="b-header-input"
+                :input-style="{ textAlign: 'center' }"
                 @click.stop
               />
               <el-tooltip v-if="sizeHeaders.length > 1" content="删除此列" placement="top">
@@ -315,12 +321,12 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="合计" width="80" align="center">
+        <el-table-column label="合计" width="80" align="center" header-align="center">
           <template #default="{ row }">
             {{ calcRowTotal(row) }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="120" align="center">
+        <el-table-column label="备注" min-width="120" align="center" header-align="center">
           <template #default="{ row, $index }">
             <div
               v-if="editingCell?.rowIndex === $index && editingCell?.col === 'remark'"
@@ -347,7 +353,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right" align="center">
+        <el-table-column label="操作" width="80" fixed="right" align="center" header-align="center">
           <template #default="{ $index }">
             <el-tooltip content="删除" placement="top">
               <el-button link type="danger" size="small" circle @click="removeColorRow($index)">
@@ -367,26 +373,28 @@
           <el-button link type="primary" @click="addMaterialRow">新增物料</el-button>
         </div>
       </template>
-      <el-table :data="materials" border>
-        <el-table-column label="物料类型" min-width="120">
-          <template #default="{ row }">
+      <el-table :data="materials" border size="small" class="materials-table">
+        <el-table-column label="物料类型" min-width="120" header-align="center" align="center">
+          <template #default="{ row, $index }">
             <el-select
-              v-model="row.materialType"
+              v-model="row.materialTypeId"
               placeholder="选择物料类型"
               filterable
               clearable
+              :ref="(el) => setMaterialCellRef(el, $index, 0)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 0)"
             >
               <el-option
                 v-for="opt in materialTypeOptions"
-                :key="opt.value"
+                :key="opt.id"
                 :label="opt.label"
-                :value="opt.value"
+                :value="opt.id"
               />
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="供应商" min-width="140">
-          <template #default="{ row }">
+        <el-table-column label="供应商" min-width="140" header-align="center" align="center">
+          <template #default="{ row, $index }">
             <el-select
               v-model="row.supplierName"
               placeholder="选择或输入供应商"
@@ -394,6 +402,8 @@
               allow-create
               default-first-option
               @change="onSupplierChange(row)"
+              :ref="(el) => setMaterialCellRef(el, $index, 1)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 1)"
             >
               <el-option
                 v-for="s in supplierOptions"
@@ -404,42 +414,92 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="物料名称/颜色" min-width="160">
-          <template #default="{ row }">
-            <el-input v-model="row.materialName" placeholder="物料名称/颜色" />
+        <el-table-column label="物料名称" min-width="160" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input
+              v-model="row.materialName"
+              placeholder="物料名称"
+              :input-style="{ textAlign: 'center' }"
+              :ref="(el) => setMaterialCellRef(el, $index, 2)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 2)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="单件用量" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.usagePerPiece" :min="0" :controls="false" />
+        <el-table-column label="颜色" min-width="120" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input
+              v-model="row.color"
+              placeholder="颜色"
+              :input-style="{ textAlign: 'center' }"
+              :ref="(el) => setMaterialCellRef(el, $index, 3)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 3)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="损耗%" width="90">
-          <template #default="{ row }">
-            <el-input-number v-model="row.lossPercent" :min="0" :controls="false" />
+        <el-table-column label="单件用量" width="100" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-model="row.usagePerPiece"
+              :min="0"
+              :controls="false"
+              :input-style="{ textAlign: 'center' }"
+              @update:modelValue="recalcPurchaseQuantity(row)"
+              :ref="(el) => setMaterialCellRef(el, $index, 4)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 4)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="订单件数" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.orderPieces" :min="0" :controls="false" />
+        <el-table-column label="损耗%" width="90" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-model="row.lossPercent"
+              :min="0"
+              :controls="false"
+              :input-style="{ textAlign: 'center' }"
+              @update:modelValue="recalcPurchaseQuantity(row)"
+              :ref="(el) => setMaterialCellRef(el, $index, 5)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="采购总量" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.purchaseQuantity" :min="0" :controls="false" />
+        <el-table-column label="订单件数" width="100" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-model="row.orderPieces"
+              :min="0"
+              :controls="false"
+              :input-style="{ textAlign: 'center' }"
+              @update:modelValue="recalcPurchaseQuantity(row)"
+              :ref="(el) => setMaterialCellRef(el, $index, 6)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="裁片数量" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.cuttingQuantity" :min="0" :controls="false" />
+        <el-table-column label="采购总量" width="100" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input-number
+              v-model="row.purchaseQuantity"
+              :min="0"
+              :controls="false"
+              :input-style="{ textAlign: 'center' }"
+              :readonly="true"
+              :ref="(el) => setMaterialCellRef(el, $index, 7)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="120">
-          <template #default="{ row }">
-            <el-input v-model="row.remark" placeholder="备注" />
+        <el-table-column label="备注" min-width="120" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-input
+              v-model="row.remark"
+              placeholder="面料成分 / 克重等"
+              :input-style="{ textAlign: 'center' }"
+              :ref="(el) => setMaterialCellRef(el, $index, 8)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
+            />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right" header-align="center" align="center">
           <template #default="{ $index }">
             <el-tooltip content="删除" placement="top">
               <el-button link type="danger" size="small" circle @click="removeMaterialRow($index)">
@@ -459,28 +519,56 @@
           <div class="block-actions">
             <el-button link type="primary" @click="addSizeMetaColumn">新增部位列</el-button>
             <el-button link type="primary" @click="addSizeInfoRow">新增行</el-button>
+            <el-button link type="primary" @click="copySizeInfoToClipboard">复制到剪贴板</el-button>
           </div>
         </div>
       </template>
-      <el-table :data="sizeInfoRows" border>
+      <el-table :data="sizeInfoRows" border size="small" class="size-info-table" header-align="center">
         <el-table-column
           v-for="(header, idx) in sizeMetaHeaders"
           :key="'meta-' + idx"
           :label="header"
-          min-width="120"
+          min-width="100"
+          align="center"
+          header-align="center"
         >
           <template #header>
-            <el-input v-model="sizeMetaHeaders[idx]" size="small" />
+            <div class="b-header-cell">
+              <el-input
+                v-model="sizeMetaHeaders[idx]"
+                size="small"
+                class="b-header-input"
+                @click.stop
+              />
+              <el-tooltip v-if="sizeMetaHeaders.length > 1" content="删除此列" placement="top">
+                <el-button
+                  link
+                  type="danger"
+                  size="small"
+                  class="b-header-remove"
+                  @click.stop="removeSizeMetaColumn(idx)"
+                >
+                  <el-icon><CircleClose /></el-icon>
+                </el-button>
+              </el-tooltip>
+            </div>
           </template>
-          <template #default="{ row }">
-            <el-input v-model="row.metaValues[idx]" />
+          <template #default="{ row, $index }">
+            <el-input
+              v-model="row.metaValues[idx]"
+              :ref="(el) => setSizeGridCellRef(el, $index, idx)"
+              @keydown.stop="onSizeGridKeydown($event, $index, idx)"
+              @paste.stop.prevent="onSizeGridPaste($event, $index, idx)"
+            />
           </template>
         </el-table-column>
         <el-table-column
           v-for="(size, sIndex) in sizeHeaders"
           :key="'size-' + size"
           :label="size"
-          min-width="90"
+          min-width="72"
+          align="center"
+          header-align="center"
         >
           <template #header>
             <span>{{ sizeHeaders[sIndex] }}</span>
@@ -490,15 +578,14 @@
               v-model="row.sizeValues[sIndex]"
               :min="0"
               :controls="false"
-              class="qty-input"
-              :ref="(el) => setSizeInfoCellRef(el, $index, sIndex)"
-              @focus="setActiveSizeInfoCell($index, sIndex)"
-              @keydown.stop="onSizeInfoCellKeydown($event, $index, sIndex)"
-              @paste.stop.prevent="onSizeInfoCellPaste($event, $index, sIndex)"
+              size="small"
+              :ref="(el) => setSizeGridCellRef(el, $index, sizeMetaHeaders.length + sIndex)"
+              @keydown.stop="onSizeGridKeydown($event, $index, sizeMetaHeaders.length + sIndex)"
+              @paste.stop.prevent="onSizeGridPaste($event, $index, sizeMetaHeaders.length + sIndex)"
             />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="80" fixed="right">
+        <el-table-column label="操作" width="80" fixed="right" align="center" header-align="center">
           <template #default="{ $index }">
             <el-tooltip content="删除" placement="top">
               <el-button link type="danger" size="small" circle @click="removeSizeInfoRow($index)">
@@ -614,7 +701,18 @@
               v-model="packagingCells[idx].accessoryName"
               placeholder="选择/填写辅料"
               size="small"
-            />
+            >
+              <template #suffix>
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  @click.stop="openAccessoryDialog(idx)"
+                >
+                  选择
+                </el-button>
+              </template>
+            </el-input>
             <el-input
               v-model="packagingCells[idx].description"
               placeholder="信息备注"
@@ -642,6 +740,102 @@
         @change="onPackagingFileChange"
       />
     </el-card>
+
+    <el-dialog
+      v-model="accessoryDialogVisible"
+      title="选择辅料"
+      width="720px"
+    >
+      <div class="accessory-dialog-filter">
+        <el-input
+          v-model="accessoryKeyword"
+          placeholder="输入名称 / 类别 / 客户名进行模糊搜索"
+          clearable
+          size="small"
+        />
+      </div>
+      <el-table
+        v-loading="accessoryDialogLoading"
+        :data="filteredAccessoryItems"
+        height="360px"
+        border
+      >
+        <el-table-column label="图片" width="90">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.imageUrl"
+              :src="row.imageUrl"
+              fit="cover"
+              style="width: 64px; height: 64px"
+            />
+            <span v-else>无</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="name" label="名称" min-width="140" />
+        <el-table-column prop="category" label="类别" width="120" />
+        <el-table-column prop="customerName" label="客户" min-width="140" />
+        <el-table-column label="操作" width="90" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="onSelectAccessory(row)">选择</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="accessoryDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="skuDialogVisible"
+      title="选择 SKU"
+      width="720px"
+    >
+      <div class="sku-dialog-filter">
+        <el-input
+          v-model="skuKeyword"
+          placeholder="输入 SKU 编号或客户名称进行模糊搜索"
+          clearable
+          size="small"
+        />
+      </div>
+      <el-table
+        v-loading="skuDialogLoading"
+        :data="filteredSkuProducts"
+        height="360px"
+        border
+      >
+        <el-table-column label="图片" width="90">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.imageUrl"
+              :src="row.imageUrl"
+              fit="cover"
+              style="width: 64px; height: 64px"
+            />
+            <span v-else>无</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="skuCode" label="SKU 编号" min-width="140" />
+        <el-table-column prop="productName" label="产品名称" min-width="160" />
+        <el-table-column
+          prop="customer.companyName"
+          label="客户"
+          min-width="160"
+        >
+          <template #default="{ row }">
+            {{ row.customer?.companyName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="onSelectSku(row)">选择</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="skuDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
 
     <!-- H 区：图片附件 -->
     <el-card class="block-card">
@@ -701,19 +895,26 @@ import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
 import { uploadImage } from '@/api/uploads'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getDictItems } from '@/api/dicts'
 import { Delete, CircleClose } from '@element-plus/icons-vue'
+import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
+import { getProducts, type ProductItem } from '@/api/products'
 
 const route = useRoute()
 const router = useRouter()
 
 const formRef = ref<FormInstance>()
+const pageLoading = ref(false)
 
-const orderId = computed(() => {
-  const v = route.params.id
-  if (!v) return undefined
-  const n = Number(v)
-  return Number.isNaN(n) ? undefined : n
-})
+// 订单 ID：首次从路由参数初始化，之后在新建草稿成功后仅更新本地状态，避免再次路由跳转导致「新页面」感
+const orderId = ref<number | undefined>(undefined)
+// 订单当前状态：控制按钮显示（如提交后的订单不再显示「保存草稿」）
+const orderStatus = ref<string>('draft')
+const initialRouteId = route.params.id
+if (initialRouteId) {
+  const n = Number(initialRouteId)
+  orderId.value = Number.isNaN(n) ? undefined : n
+}
 
 const orderNo = ref('')
 
@@ -725,9 +926,8 @@ const form = reactive<OrderFormPayload>({
   salesperson: '',
   merchandiser: '',
   merchandiserPhone: '',
-  collaborationType: '',
-  orderType: '',
-  label: '',
+  orderTypeId: null,
+  collaborationTypeId: null,
   secondaryProcess: '',
   quantity: 0,
   exFactoryPrice: '',
@@ -753,47 +953,65 @@ const rules: FormRules = {
   customerId: [{ required: true, message: '请选择客户', trigger: 'change' }],
 }
 
-// SKU 下拉
-const skuOptions = ref<{
-  id: number
-  skuCode: string
-  customerId?: number | null
-  customerName?: string
-  imageUrl?: string
-}[]>([])
-const skuLoading = ref(false)
+// SKU 选择弹窗（从产品列表中选择）
+const skuDialogVisible = ref(false)
+const skuDialogLoading = ref(false)
+const skuKeyword = ref('')
+const skuProducts = ref<ProductItem[]>([])
 
-async function searchSkus(keyword: string) {
-  skuLoading.value = true
+const filteredSkuProducts = computed(() => {
+  const kw = skuKeyword.value.trim().toLowerCase()
+  if (!kw) return skuProducts.value
+  return skuProducts.value.filter((item) => {
+    const sku = item.skuCode?.toLowerCase?.() ?? ''
+    const customer = item.customer?.companyName?.toLowerCase?.() ?? ''
+    return sku.includes(kw) || customer.includes(kw)
+  })
+})
+
+async function loadSkuProducts() {
+  skuDialogLoading.value = true
   try {
-    const res = await request.get('/products/skus', {
-      params: { keyword: keyword || undefined, pageSize: 20 },
-      skipGlobalErrorHandler: true,
-    })
-    const data = res.data as {
-      list?: { id: number; skuCode: string; customerId?: number | null; customerName?: string; imageUrl?: string }[]
-    }
-    skuOptions.value = data.list ?? []
+    const res = await getProducts({ page: 1, pageSize: 200 })
+    const data = res.data
+    skuProducts.value = data?.list ?? []
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) console.warn('SKU 下拉加载失败', getErrorMessage(e))
+    if (!isErrorHandled(e)) console.warn('SKU 产品列表加载失败', getErrorMessage(e))
   } finally {
-    skuLoading.value = false
+    skuDialogLoading.value = false
   }
 }
 
-function onSkuChange(sku: string) {
-  const item = skuOptions.value.find((x) => x.skuCode === sku)
-  if (item?.imageUrl && !form.imageUrl) {
-    form.imageUrl = item.imageUrl
+/**
+ * 统一的 SKU 初始化入口。
+ * 当前仅在页面挂载时用于预加载产品列表，后续若需要按关键字远程搜索，可在此扩展查询参数。
+ */
+async function searchSkus(_keyword: string) {
+  if (!skuProducts.value.length) {
+    await loadSkuProducts()
   }
-  // SKU 关联了客户时，自动同步到订单表单
-  if (item?.customerId && item.customerName) {
-    form.customerId = item.customerId
-    form.customerName = item.customerName
-    if (!customerOptions.value.some((c) => c.id === item.customerId)) {
-      customerOptions.value.unshift({ id: item.customerId, companyName: item.customerName })
+}
+
+async function openSkuDialog() {
+  skuDialogVisible.value = true
+  if (!skuProducts.value.length) {
+    await loadSkuProducts()
+  }
+}
+
+function onSelectSku(row: ProductItem) {
+  form.skuCode = row.skuCode
+  if (row.imageUrl && !form.imageUrl) {
+    form.imageUrl = row.imageUrl
+  }
+  if (row.customerId && row.customer?.companyName) {
+    form.customerId = row.customerId
+    form.customerName = row.customer.companyName
+    if (!customerOptions.value.some((c) => c.id === row.customerId)) {
+      customerOptions.value.unshift({ id: row.customerId, companyName: row.customer.companyName })
     }
   }
+  skuDialogVisible.value = false
 }
 
 // 客户下拉
@@ -844,29 +1062,27 @@ async function loadUserOptions() {
   }
 }
 
-function onMerchandiserChange(username: string) {
-  const u = merchandiserOptions.value.find((x) => x.username === username)
+function onMerchandiserChange(val: string) {
+  const u = merchandiserOptions.value.find((x) => (x.displayName || x.username) === val)
   if (u?.mobile && !form.merchandiserPhone) {
     form.merchandiserPhone = u.mobile
   }
 }
 
 // 合作方式 / 订单类型
-const collaborationOptions = ref<{ label: string; value: string }[]>([])
+const collaborationOptions = ref<{ id: number; label: string }[]>([])
 // 订单类型采用树形结构，与「订单设置 > 订单类型」一致
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
 
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
-  parentPath = '',
-): { label: string; value: string; children?: any[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: any[]; disabled?: boolean }[] {
   return nodes.map((n) => {
-    const path = parentPath ? `${parentPath} > ${n.value}` : n.value
-    const children = n.children?.length ? toOrderTypeTreeSelect(n.children, path) : []
+    const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
     const hasChildren = children.length > 0
     return {
       label: n.value,
-      value: path,
+      value: n.id,
       children: hasChildren ? children : undefined,
       disabled: hasChildren,
     }
@@ -874,6 +1090,17 @@ function toOrderTypeTreeSelect(
 }
 
 const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
+
+function findOrderTypeLabelById(id: number | null | undefined): string {
+  if (!id) return ''
+  const stack: SystemOptionTreeNode[] = [...orderTypeTree.value]
+  while (stack.length) {
+    const node = stack.pop()!
+    if (node.id === id) return node.value
+    if (node.children?.length) stack.push(...node.children)
+  }
+  return ''
+}
 
 const orderTypeTreeSelectProps = {
   label: 'label',
@@ -885,18 +1112,15 @@ const orderTypeTreeSelectProps = {
 async function loadDicts() {
   // 合作方式、订单类型分别加载，与订单列表筛选项同源（订单类型用同一接口），互不影响
   const [collabSettled, orderTypeSettled] = await Promise.allSettled([
-    request.get<Array<{ id: number; value: string } | string>>('/dicts', {
-      params: { type: 'collaboration' },
-      skipGlobalErrorHandler: true,
-    }),
+    getDictItems('collaboration'),
     getSystemOptionsTree('order_types'),
   ])
   if (collabSettled.status === 'fulfilled') {
-    const cv = collabSettled.value.data ?? []
-    collaborationOptions.value = cv.map((item: any) => {
-      const v = typeof item === 'string' ? item : item?.value
-      return { label: v, value: v }
-    })
+    const items = collabSettled.value.data ?? []
+    collaborationOptions.value = items.map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
   } else if (!isErrorHandled(collabSettled.reason)) {
     console.warn('合作方式加载失败', getErrorMessage(collabSettled.reason))
   }
@@ -966,10 +1190,15 @@ function startEditBCell(rowIndex: number, col: BEditCol) {
 }
 
 function onBCellBlur() {
+  // 延迟到当前事件循环结束后再判断焦点，避免与表格内部的 focus/blur 冲突
   setTimeout(() => {
-    const el = bTableRef.value?.$el ?? bTableRef.value
-    const container = el && 'closest' in el ? (el as HTMLElement) : null
-    if (!container?.contains(document.activeElement)) {
+    const root = (bTableRef.value as any)?.$el ?? (bTableRef.value as any)
+    const container =
+      root instanceof HTMLElement
+        ? root
+        : (root?.$el instanceof HTMLElement ? root.$el : null)
+    const active = document.activeElement as HTMLElement | null
+    if (!container || !active || !container.contains(active)) {
       editingCell.value = null
     }
   }, 0)
@@ -1129,10 +1358,12 @@ function bSummaryMethod() {
 
 // C 区：物料信息
 interface MaterialRow {
+  materialTypeId?: number | null
   materialType?: string
   supplierName?: string
   materialName?: string
   color?: string
+  fabricWidth?: string
   usagePerPiece?: number | null
   lossPercent?: number | null
   orderPieces?: number | null
@@ -1142,53 +1373,12 @@ interface MaterialRow {
 }
 
 const materials = ref<MaterialRow[]>([])
-const materialTypeOptions = ref<{ label: string; value: string }[]>([])
+const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 
-function addMaterialRow() {
-  materials.value.push({})
-}
+const materialCellRefs = ref<InputComponentInstance[][]>([])
 
-function removeMaterialRow(index: number) {
-  materials.value.splice(index, 1)
-}
-
-async function loadMaterialTypes() {
-  try {
-    const res = await request.get<Array<{ id: number; value: string } | string>>('/dicts', {
-      params: { type: 'material_types' },
-      skipGlobalErrorHandler: true,
-    })
-    const list = res.data ?? []
-    materialTypeOptions.value = list.map((item: any) => {
-      const v = typeof item === 'string' ? item : item?.value
-      return { label: v, value: v }
-    })
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) console.warn('物料类型加载失败', getErrorMessage(e))
-  }
-}
-
-function onSupplierChange(_row: MaterialRow) {
-  // 预留：后续可在此实现“一键新建供应商”逻辑
-}
-
-// D 区：尺寸信息
-const defaultSizeMetaHeaders = ['部位', '英文部位', '量法', '纸样尺寸', '样衣尺寸', '公差']
-const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
-
-interface SizeInfoRow {
-  metaValues: string[]
-  sizeValues: number[]
-}
-
-const sizeInfoRows = ref<SizeInfoRow[]>([])
-
-// D 区表格编辑能力：单元格引用与键盘导航、批量粘贴
-const sizeInfoCellRefs = ref<InputComponentInstance[][]>([])
-const activeSizeInfoCell = ref<{ row: number; col: number } | null>(null)
-
-function setSizeInfoCellRef(el: unknown, rowIndex: number, colIndex: number) {
-  if (!sizeInfoCellRefs.value[rowIndex]) sizeInfoCellRefs.value[rowIndex] = []
+function setMaterialCellRef(el: unknown, rowIndex: number, colIndex: number) {
+  if (!materialCellRefs.value[rowIndex]) materialCellRefs.value[rowIndex] = []
   let target: InputComponentInstance = null
   if (el && typeof el === 'object') {
     const anyEl = el as any
@@ -1198,28 +1388,23 @@ function setSizeInfoCellRef(el: unknown, rowIndex: number, colIndex: number) {
       target = anyEl as InputComponentInstance
     }
   }
-  sizeInfoCellRefs.value[rowIndex][colIndex] = target
+  materialCellRefs.value[rowIndex][colIndex] = target
 }
 
-function setActiveSizeInfoCell(rowIndex: number, colIndex: number) {
-  activeSizeInfoCell.value = { row: rowIndex, col: colIndex }
-}
-
-function focusSizeInfoCell(rowIndex: number, colIndex: number) {
+function focusMaterialCell(rowIndex: number, colIndex: number) {
   if (rowIndex < 0 || colIndex < 0) return
-  const row = sizeInfoCellRefs.value[rowIndex]
+  const row = materialCellRefs.value[rowIndex]
   const cell = row?.[colIndex]
   if (cell && typeof cell.focus === 'function') {
     nextTick(() => {
       cell.focus && cell.focus()
-      activeSizeInfoCell.value = { row: rowIndex, col: colIndex }
     })
   }
 }
 
-function onSizeInfoCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
-  const rowsCount = sizeInfoRows.value.length
-  const colsCount = sizeHeaders.value.length
+function onMaterialCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
+  const rowsCount = materials.value.length
+  const colsCount = 9
   let targetRow = rowIndex
   let targetCol = colIndex
 
@@ -1239,8 +1424,6 @@ function onSizeInfoCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: num
     targetRow = rowIndex + 1
   } else if (e.key === 'ArrowUp') {
     targetRow = rowIndex - 1
-  } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Enter') {
-    // 已在上面分别处理
   } else {
     return
   }
@@ -1251,10 +1434,142 @@ function onSizeInfoCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: num
     return
   }
 
-  focusSizeInfoCell(targetRow, targetCol)
+  focusMaterialCell(targetRow, targetCol)
 }
 
-function onSizeInfoCellPaste(e: ClipboardEvent, startRow: number, startCol: number) {
+function addMaterialRow() {
+  materials.value.push({})
+}
+
+function removeMaterialRow(index: number) {
+  materials.value.splice(index, 1)
+}
+
+async function loadMaterialTypes() {
+  try {
+    const res = await getDictItems('material_types')
+    const list = res.data ?? []
+    materialTypeOptions.value = list.map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('物料类型加载失败', getErrorMessage(e))
+  }
+}
+
+function syncMaterialTypeIdsFromLabel() {
+  if (!materialTypeOptions.value.length || !materials.value.length) return
+  const map = new Map<string, number>()
+  materialTypeOptions.value.forEach((opt) => {
+    if (opt.label) map.set(String(opt.label), opt.id)
+  })
+  materials.value.forEach((row) => {
+    if ((row.materialTypeId == null || Number.isNaN(row.materialTypeId as any)) && row.materialType) {
+      const id = map.get(String(row.materialType))
+      if (id) {
+        row.materialTypeId = id
+      }
+    }
+  })
+}
+
+/** 自动计算采购总量：单件用量 * 订单件数 * (1 + 损耗%) */
+function recalcPurchaseQuantity(row: MaterialRow) {
+  const usage = Number(row.usagePerPiece) || 0
+  const lossPercent = Number(row.lossPercent) || 0
+  const pieces = Number(row.orderPieces) || 0
+  const lossRate = lossPercent / 100
+  const result = usage * pieces * (1 + lossRate)
+  row.purchaseQuantity = Number.isFinite(result) ? result : 0
+}
+
+function onSupplierChange(_row: MaterialRow) {
+  // 预留：后续可在此实现“一键新建供应商”逻辑
+}
+
+// D 区：尺寸信息（默认部位单位为 cm）
+const defaultSizeMetaHeaders = ['部位cm', '英文部位', '量法', '纸样尺寸', '样衣尺寸', '公差']
+const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
+
+interface SizeInfoRow {
+  metaValues: string[]
+  sizeValues: number[]
+}
+
+const sizeInfoRows = ref<SizeInfoRow[]>([])
+
+// D 区表格编辑能力：单元格引用与键盘导航、批量粘贴
+const sizeGridRefs = ref<InputComponentInstance[][]>([])
+
+function setSizeGridCellRef(el: unknown, rowIndex: number, colIndex: number) {
+  if (!sizeGridRefs.value[rowIndex]) sizeGridRefs.value[rowIndex] = []
+  let target: InputComponentInstance = null
+  if (el && typeof el === 'object') {
+    const anyEl = el as any
+    if (anyEl.$el) {
+      target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+    } else {
+      target = anyEl as InputComponentInstance
+    }
+  }
+  sizeGridRefs.value[rowIndex][colIndex] = target
+}
+
+function focusSizeGridCell(rowIndex: number, colIndex: number) {
+  if (rowIndex < 0 || colIndex < 0) return
+  const row = sizeGridRefs.value[rowIndex]
+  const cell = row?.[colIndex]
+  if (cell && typeof cell.focus === 'function') {
+    nextTick(() => {
+      cell.focus && cell.focus()
+    })
+  }
+}
+
+function onSizeGridKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
+  const rowsCount = sizeInfoRows.value.length
+  const colsCount = sizeMetaHeaders.value.length + sizeHeaders.value.length
+  let targetRow = rowIndex
+  let targetCol = colIndex
+
+  // 在任意单元格内按 Ctrl+C / Cmd+C，复制整个 D 区到剪贴板（含表头）
+  if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey)) {
+    e.preventDefault()
+    void copySizeInfoToClipboard()
+    return
+  }
+
+  if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
+    targetCol = colIndex + 1
+    if (targetCol >= colsCount) {
+      targetCol = 0
+      targetRow = rowIndex + 1
+    }
+  } else if (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey)) {
+    targetCol = colIndex - 1
+    if (targetCol < 0) {
+      targetCol = colsCount - 1
+      targetRow = rowIndex - 1
+    }
+  } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+    targetRow = rowIndex + 1
+  } else if (e.key === 'ArrowUp') {
+    targetRow = rowIndex - 1
+  } else {
+    return
+  }
+
+  e.preventDefault()
+
+  if (targetRow < 0 || targetRow >= rowsCount || targetCol < 0 || targetCol >= colsCount) {
+    return
+  }
+
+  focusSizeGridCell(targetRow, targetCol)
+}
+
+function onSizeGridPaste(e: ClipboardEvent, startRow: number, startCol: number) {
   const text = e.clipboardData?.getData('text/plain') ?? ''
   if (!text) return
 
@@ -1262,17 +1577,22 @@ function onSizeInfoCellPaste(e: ClipboardEvent, startRow: number, startCol: numb
   if (!matrix.length) return
 
   const maxRows = sizeInfoRows.value.length
-  const maxCols = sizeHeaders.value.length
+  const totalCols = sizeMetaHeaders.value.length + sizeHeaders.value.length
 
   matrix.forEach((rowValues, rOffset) => {
     const rowIndex = startRow + rOffset
     if (rowIndex >= maxRows) return
     rowValues.forEach((value, cOffset) => {
-      const colIndex = startCol + cOffset
-      if (colIndex >= maxCols) return
-      const clean = value.replace(/[^\d.-]/g, '')
-      const num = Number(clean)
-      sizeInfoRows.value[rowIndex].sizeValues[colIndex] = Number.isNaN(num) ? 0 : num
+      const gridCol = startCol + cOffset
+      if (gridCol >= totalCols) return
+      if (gridCol < sizeMetaHeaders.value.length) {
+        sizeInfoRows.value[rowIndex].metaValues[gridCol] = value ?? ''
+      } else {
+        const sizeCol = gridCol - sizeMetaHeaders.value.length
+        const clean = (value ?? '').replace(/[^\d.-]/g, '')
+        const num = Number(clean)
+        sizeInfoRows.value[rowIndex].sizeValues[sizeCol] = Number.isNaN(num) ? 0 : num
+      }
     })
   })
 }
@@ -1310,6 +1630,50 @@ function removeSizeInfoRow(index: number) {
 function addSizeMetaColumn() {
   sizeMetaHeaders.value.push(`字段${sizeMetaHeaders.value.length + 1}`)
   normalizeSizeInfoRows()
+}
+
+function removeSizeMetaColumn(mIndex: number) {
+  if (sizeMetaHeaders.value.length <= 1) return
+  sizeMetaHeaders.value.splice(mIndex, 1)
+  sizeInfoRows.value.forEach((row) => {
+    if (Array.isArray(row.metaValues)) row.metaValues.splice(mIndex, 1)
+  })
+  normalizeSizeInfoRows()
+}
+
+async function copySizeInfoToClipboard() {
+  const headers = [...sizeMetaHeaders.value, ...sizeHeaders.value]
+  const rows = sizeInfoRows.value.map((row) => {
+    const meta = sizeMetaHeaders.value.map((_, idx) => row.metaValues?.[idx] ?? '')
+    const sizes = sizeHeaders.value.map((_, idx) => String(row.sizeValues?.[idx] ?? 0))
+    return [...meta, ...sizes]
+  })
+  const lines = [headers, ...rows].map((r) => r.join('\t')).join('\n')
+  try {
+    const nav: any = navigator
+    if (nav?.clipboard?.writeText) {
+      await nav.clipboard.writeText(lines)
+      ElMessage.success('已复制到剪贴板，可直接粘贴到 Excel')
+    } else {
+      throw new Error('clipboard not available')
+    }
+  } catch {
+    // 回退方案：创建临时 textarea 复制
+    const textarea = document.createElement('textarea')
+    textarea.value = lines
+    textarea.style.position = 'fixed'
+    textarea.style.opacity = '0'
+    document.body.appendChild(textarea)
+    textarea.select()
+    try {
+      document.execCommand('copy')
+      ElMessage.success('已复制到剪贴板，可直接粘贴到 Excel')
+    } catch {
+      ElMessage.error('复制失败，请手动选择后复制')
+    } finally {
+      document.body.removeChild(textarea)
+    }
+  }
 }
 
 // E 区：工艺项目
@@ -1350,6 +1714,7 @@ const packagingHeaders = ref<string[]>([...defaultPackagingHeaders])
 
 interface PackagingCell {
   imageUrl?: string
+  accessoryId?: number | null
   accessoryName?: string
   description?: string
 }
@@ -1400,6 +1765,57 @@ async function onPackagingFileChange(e: Event) {
   } finally {
     activePackagingIndex.value = null
   }
+}
+
+// 包装辅料选择弹窗（从辅料库存中选择）
+const accessoryDialogVisible = ref(false)
+const accessoryDialogLoading = ref(false)
+const accessoryKeyword = ref('')
+const accessoryItems = ref<AccessoryItem[]>([])
+const accessoryTargetIndex = ref<number | null>(null)
+
+const filteredAccessoryItems = computed(() => {
+  const kw = accessoryKeyword.value.trim().toLowerCase()
+  if (!kw) return accessoryItems.value
+  return accessoryItems.value.filter((item) => {
+    const name = item.name?.toLowerCase?.() ?? ''
+    const category = item.category?.toLowerCase?.() ?? ''
+    const customer = item.customerName?.toLowerCase?.() ?? ''
+    return name.includes(kw) || category.includes(kw) || customer.includes(kw)
+  })
+})
+
+async function loadAccessoryItems() {
+  accessoryDialogLoading.value = true
+  try {
+    const res = await getAccessoriesList({ page: 1, pageSize: 200 })
+    const data = res.data
+    accessoryItems.value = data?.list ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('辅料库存加载失败', getErrorMessage(e))
+  } finally {
+    accessoryDialogLoading.value = false
+  }
+}
+
+async function openAccessoryDialog(index: number) {
+  accessoryTargetIndex.value = index
+  accessoryDialogVisible.value = true
+  if (!accessoryItems.value.length) {
+    await loadAccessoryItems()
+  }
+}
+
+function onSelectAccessory(row: AccessoryItem) {
+  if (accessoryTargetIndex.value == null) return
+  const cell = packagingCells.value[accessoryTargetIndex.value]
+  if (cell) {
+    cell.accessoryId = row.id ?? null
+    cell.accessoryName = row.name
+    // 选择辅料后，直接覆盖带出对应图片，避免再次上传
+    cell.imageUrl = row.imageUrl || ''
+  }
+  accessoryDialogVisible.value = false
 }
 
 // H 区：图片附件
@@ -1493,17 +1909,25 @@ async function collectPayload(): Promise<OrderFormPayload> {
     throw new Error('invalid form')
   }
   await formRef.value?.validate()
+  const processItemSummary = processItems.value
+    .map((p) => (p.processName ?? '').trim())
+    .filter((name, idx, arr) => name && arr.indexOf(name) === idx)
+    .join('、')
   return {
     ...form,
-    // 后端 orders 表用 label 字段存订单类型；确保保存/回显不丢失
-    label: form.orderType || '',
+    orderTypeId: (form as any).orderTypeId ?? null,
+    collaborationTypeId: (form as any).collaborationTypeId ?? null,
+    // 数量：以 B 区颜色/尺码合计为准，确保订单列表卡片数量一致
+    quantity: grandTotal.value,
+    // 工艺项目摘要（原二次工艺），用于列表卡片展示与筛选
+    processItem: processItemSummary,
     colorSizeRows: colorRows.value.map((row) => ({
       colorName: row.colorName,
       quantities: [...row.quantities],
       remark: row.remark,
     })),
     colorSizeHeaders: [...sizeHeaders.value],
-    materials: materials.value.map((m) => ({ ...m })),
+    materials: materials.value.map(({ materialType: _t, ...m }) => ({ ...m })),
     sizeInfoMetaHeaders: [...sizeMetaHeaders.value],
     sizeInfoRows: sizeInfoRows.value.map((r) => ({
       metaValues: [...r.metaValues],
@@ -1529,14 +1953,16 @@ async function onSaveDraft() {
     if (orderId.value) {
       const res = await updateOrderDraft(orderId.value, payload)
       ElMessage.success('草稿已保存')
+      orderStatus.value = (res.data as any)?.status ?? orderStatus.value
       orderNo.value = res.data?.orderNo ?? orderNo.value
     } else {
       const res = await createOrderDraft(payload)
       ElMessage.success('草稿已创建')
       const id = res.data?.id
+      orderStatus.value = (res.data as any)?.status ?? 'draft'
       orderNo.value = res.data?.orderNo ?? ''
       if (id) {
-        router.replace({ name: 'OrdersEdit', params: { id } })
+        orderId.value = id
       }
     }
   } catch (e: unknown) {
@@ -1554,16 +1980,18 @@ async function onSaveAndSubmit() {
     if (orderId.value) {
       await updateOrderDraft(orderId.value, payload)
       const res = await submitOrder(orderId.value)
-      ElMessage.success('已保存并提交')
+      ElMessage.success('提交成功')
       orderNo.value = res.data?.orderNo ?? orderNo.value
+      orderStatus.value = (res.data as any)?.status ?? orderStatus.value
     } else {
       const draftRes = await createOrderDraft(payload)
       const id = draftRes.data?.id
       if (id) {
+        orderId.value = id
         const res = await submitOrder(id)
         orderNo.value = res.data?.orderNo ?? draftRes.data?.orderNo ?? ''
-        ElMessage.success('已保存并提交')
-        router.replace({ name: 'OrdersEdit', params: { id } })
+        ElMessage.success('提交成功')
+        orderStatus.value = (res.data as any)?.status ?? orderStatus.value
       }
     }
   } catch (e: unknown) {
@@ -1585,6 +2013,7 @@ async function loadDetail() {
     const d = res.data
     if (!d) return
     orderNo.value = d.orderNo
+    orderStatus.value = (d as any).status ?? 'draft'
     form.skuCode = d.skuCode
     form.xiaomanOrderNo = (d as any).xiaomanOrderNo ?? ''
     form.customerId = d.customerId ?? null
@@ -1592,10 +2021,9 @@ async function loadDetail() {
     form.salesperson = d.salesperson ?? ''
     form.merchandiser = d.merchandiser ?? ''
     form.merchandiserPhone = (d as any).merchandiserPhone ?? ''
-    form.collaborationType = (d as any).collaborationType ?? ''
-    // 兼容：详情返回 label（DB 字段）或 orderType（前端字段）
-    form.orderType = (d as any).orderType ?? d.label ?? ''
-    form.label = d.label ?? ''
+    ;(form as any).collaborationTypeId = (d as any).collaborationTypeId ?? null
+    // 订单类型仅通过 ID 回显
+    ;(form as any).orderTypeId = (d as any).orderTypeId ?? null
     // 客户下拉若无当前客户，会显示 raw id；补一条 option 让 el-select 正常展示
     if (form.customerId && form.customerName && !customerOptions.value.some((c) => c.id === form.customerId)) {
       customerOptions.value.unshift({ id: form.customerId, companyName: form.customerName })
@@ -1619,10 +2047,12 @@ async function loadDetail() {
     normalizeColorRows()
     // C 区
     materials.value = ((d as any).materials ?? []).map((m: any) => ({
+      materialTypeId: m.materialTypeId ?? null,
       materialType: m.materialType ?? '',
       supplierName: m.supplierName ?? '',
       materialName: m.materialName ?? '',
       color: m.color ?? '',
+      fabricWidth: m.fabricWidth ?? '',
       usagePerPiece: m.usagePerPiece ?? null,
       lossPercent: m.lossPercent ?? null,
       orderPieces: m.orderPieces ?? null,
@@ -1653,6 +2083,7 @@ async function loadDetail() {
       : [...defaultPackagingHeaders]
     packagingCells.value = ((d as any).packagingCells ?? []).map((c: any) => ({
       imageUrl: c.imageUrl ?? '',
+      accessoryId: c.accessoryId ?? null,
       accessoryName: c.accessoryName ?? '',
       description: c.description ?? '',
     }))
@@ -1669,19 +2100,31 @@ function goBack() {
   router.push({ name: 'OrdersList' })
 }
 
-function onPrint() {
-  ElMessage.info('打印功能将在后续步骤中实现')
-}
-
 onMounted(async () => {
-  await Promise.all([loadDicts(), loadUserOptions(), loadMaterialTypes()])
-  // 初始化 SKU 下拉，让用户下拉时能直接看到产品列表
-  await searchSkus('')
-  // C 区 / E 区供应商下拉初始列表
-  await searchSuppliers('')
-  // E 区工艺项目下拉：与「供应商设置」中「工艺供应商」的业务范围一致
-  await loadProcessOptions()
-  await loadDetail()
+  if (orderId.value) {
+    pageLoading.value = true
+  }
+  try {
+    // 基础选项 + 订单详情并行加载，避免先渲染一整页空表单再等待详情返回
+    await Promise.all([
+      (async () => {
+        await loadDicts()
+        await loadUserOptions()
+        await loadMaterialTypes()
+        // 初始化 SKU 下拉，让用户下拉时能直接看到产品列表
+        await searchSkus('')
+        // C 区 / E 区供应商下拉初始列表
+        await searchSuppliers('')
+        // E 区工艺项目下拉：与「供应商设置」中「工艺供应商」的业务范围一致
+        await loadProcessOptions()
+      })(),
+      loadDetail(),
+    ])
+    // 物料类型：旧订单可能只存了 materialType 字符串，这里在字典和明细都加载完后做一次自动映射
+    syncMaterialTypeIdsFromLabel()
+  } finally {
+    pageLoading.value = false
+  }
 })
 </script>
 
@@ -1707,12 +2150,12 @@ onMounted(async () => {
 }
 
 .page-header .title {
-  font-size: 18px;
+  font-size: var(--font-size-title, 20px);
   font-weight: 600;
 }
 
 .page-header .sub-title {
-  font-size: 13px;
+  font-size: var(--font-size-caption, 12px);
   color: var(--color-text-muted, #909399);
 }
 
@@ -1741,47 +2184,24 @@ onMounted(async () => {
 }
 
 .a-area-row {
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .a-area-image-col {
   flex-shrink: 0;
+  display: flex;
 }
 
 .order-image-block {
-  width: 96px;
-  flex-shrink: 0;
+  width: 100%;
+  max-width: 220px;
+  flex: 1 0 auto;
   cursor: pointer;
   border-radius: var(--radius);
 }
 
-.order-image-block .image-preview-wrap {
-  width: 96px;
-  height: 96px;
-  border-radius: var(--radius);
-  overflow: hidden;
-  position: relative;
-}
-
-.order-image-block .image-placeholder {
-  width: 96px;
-  height: 96px;
-  border-radius: var(--radius);
-  border: 1px dashed var(--color-border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-  font-size: 11px;
-  line-height: 1.2;
-  color: var(--color-text-muted, #909399);
-  text-align: center;
-  padding: 4px;
-}
-
 .image-upload-hint {
-  font-size: 10px;
+  font-size: var(--font-size-caption, 12px);
   color: var(--color-primary, #409eff);
 }
 
@@ -1789,9 +2209,22 @@ onMounted(async () => {
   margin-top: 0;
 }
 
+/* A 区表单：统一字段宽度，保持每列控件等宽 */
+.basic-form :deep(.el-form-item__content) {
+  width: 100%;
+}
+
+.basic-form :deep(.el-input),
+.basic-form :deep(.el-select),
+.basic-form :deep(.el-date-editor),
+.basic-form :deep(.el-input-number),
+.basic-form :deep(.el-tree-select) {
+  width: 100%;
+}
+
 .image-preview-wrap {
-  width: 120px;
-  height: 120px;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius);
   overflow: hidden;
   position: relative;
@@ -1800,6 +2233,7 @@ onMounted(async () => {
 .image-preview-wrap :deep(.el-image) {
   width: 100%;
   height: 100%;
+  object-fit: cover;
 }
 
 .image-remove {
@@ -1809,15 +2243,19 @@ onMounted(async () => {
 }
 
 .image-placeholder {
-  width: 120px;
-  height: 120px;
+  width: 100%;
+  height: 100%;
   border-radius: var(--radius);
   border: 1px dashed var(--color-border);
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  gap: 4px;
+  font-size: var(--font-size-body, 14px);
   color: var(--color-text-muted, #909399);
+  text-align: center;
+  padding: 6px;
 }
 
 .image-actions {
@@ -1836,7 +2274,7 @@ onMounted(async () => {
 }
 
 .option-secondary {
-  font-size: 12px;
+  font-size: var(--font-size-caption, 12px);
   color: var(--color-text-muted, #909399);
 }
 
@@ -1890,6 +2328,46 @@ onMounted(async () => {
 }
 .b-header-cell:hover .b-header-remove {
   opacity: 1;
+}
+
+.materials-table :deep(.el-table__cell) {
+  padding: 4px 6px;
+}
+
+.materials-table :deep(.el-input),
+.materials-table :deep(.el-select),
+.materials-table :deep(.el-input-number) {
+  width: 100%;
+}
+
+.materials-table :deep(.el-input__inner),
+.materials-table :deep(.el-input-number__inner),
+.materials-table :deep(.el-select .el-select__selected-item) {
+  text-align: center;
+}
+
+.materials-table :deep(.el-select .el-select__wrapper) {
+  justify-content: center;
+}
+
+/* D 区尺寸信息：表头与内容居中，输入框随列宽收缩、不遮挡 */
+.size-info-table :deep(.el-table__cell) {
+  padding: 4px 6px;
+  min-width: 0;
+}
+.size-info-table :deep(.el-input),
+.size-info-table :deep(.el-input-number) {
+  width: 100%;
+  min-width: 0;
+}
+.size-info-table :deep(.el-input__wrapper),
+.size-info-table :deep(.el-input-number .el-input__wrapper) {
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.size-info-table :deep(.el-input__inner),
+.size-info-table :deep(.el-input-number .el-input__inner) {
+  text-align: center;
 }
 
 .packaging-grid {
@@ -1946,6 +2424,14 @@ onMounted(async () => {
   gap: var(--space-xs);
 }
 
+.accessory-dialog-filter {
+  margin-bottom: var(--space-sm);
+}
+
+.sku-dialog-filter {
+  margin-bottom: var(--space-sm);
+}
+
 .attachments {
   display: flex;
   flex-wrap: wrap;
@@ -1973,7 +2459,7 @@ onMounted(async () => {
 }
 
 .attachments-empty {
-  font-size: 13px;
+  font-size: var(--font-size-caption, 12px);
   color: var(--color-text-muted, #909399);
 }
 

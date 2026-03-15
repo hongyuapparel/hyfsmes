@@ -65,18 +65,30 @@ export class SuppliersController {
   }
 
   /**
-   * 供应商管理页：列表
+   * 供应商管理页：列表。支持按类型名称 type（如「生产加工厂」）或 supplierTypeId 筛选。
    */
   @Get('items')
-  getList(
+  async getList(
     @Query('name') name?: string,
-    @Query('type') type?: string,
+    @Query('supplierTypeId') supplierTypeIdStr?: string,
+    @Query('type') typeValue?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    let supplierTypeId: number | undefined =
+      supplierTypeIdStr != null && supplierTypeIdStr !== ''
+        ? Number(supplierTypeIdStr)
+        : undefined;
+    if (supplierTypeId == null && typeValue?.trim()) {
+      const resolvedId = await this.systemOptionsService.findRootIdByValue(
+        SUPPLIER_TYPE_OPTION_TYPE,
+        typeValue.trim(),
+      );
+      if (resolvedId != null) supplierTypeId = resolvedId;
+    }
     return this.suppliersService.getList({
       name,
-      type,
+      supplierTypeId,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -90,8 +102,8 @@ export class SuppliersController {
   @Post('items')
   create(
     @Body('name') name: string,
-    @Body('type') type?: string,
-    @Body('businessScope') businessScope?: string,
+    @Body('supplierTypeId') supplierTypeId?: number | null,
+    @Body('businessScopeId') businessScopeId?: number | null,
     @Body('cooperationDate') cooperationDate?: string,
     @Body('contactPerson') contactPerson?: string,
     @Body('contactInfo') contactInfo?: string,
@@ -100,8 +112,8 @@ export class SuppliersController {
   ) {
     return this.suppliersService.create({
       name,
-      type,
-      businessScope,
+      supplierTypeId,
+      businessScopeId,
       cooperationDate,
       contactPerson,
       contactInfo,
@@ -114,8 +126,8 @@ export class SuppliersController {
   update(
     @Param('id') id: string,
     @Body('name') name?: string,
-    @Body('type') type?: string,
-    @Body('businessScope') businessScope?: string,
+    @Body('supplierTypeId') supplierTypeId?: number | null,
+    @Body('businessScopeId') businessScopeId?: number | null,
     @Body('cooperationDate') cooperationDate?: string,
     @Body('contactPerson') contactPerson?: string,
     @Body('contactInfo') contactInfo?: string,
@@ -124,8 +136,8 @@ export class SuppliersController {
   ) {
     return this.suppliersService.update(Number(id), {
       name,
-      type,
-      businessScope,
+      supplierTypeId,
+      businessScopeId,
       cooperationDate,
       contactPerson,
       contactInfo,

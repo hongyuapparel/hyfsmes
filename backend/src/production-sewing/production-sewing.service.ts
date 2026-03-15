@@ -3,17 +3,29 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
+import { OrderExt } from '../entities/order-ext.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 
 export interface SewingListItem {
   orderId: number;
   orderNo: string;
+  customerName: string;
+  salesperson: string;
+  merchandiser: string;
+  /** 客户交期（货期） */
+  customerDueDate: string | null;
   skuCode: string;
   imageUrl: string;
   factoryName: string;
   quantity: number;
   /** 到车缝时间 */
   arrivedAt: string | null;
+  /** 分单时间 */
+  distributedAt: string | null;
+  /** 加工厂交期 */
+  factoryDueDate: string | null;
+  /** 车缝加工费（元） */
+  sewingFee: string;
   /** 完成时间 */
   completedAt: string | null;
   sewingStatus: string;
@@ -42,6 +54,8 @@ export class ProductionSewingService {
     private readonly sewingRepo: Repository<OrderSewing>,
     @InjectRepository(OrderCutting)
     private readonly cuttingRepo: Repository<OrderCutting>,
+    @InjectRepository(OrderExt)
+    private readonly orderExtRepo: Repository<OrderExt>,
   ) {}
 
   private sumActualCut(rows: ActualCutRow[] | null): number | null {
@@ -57,13 +71,72 @@ export class ProductionSewingService {
     return sum;
   }
 
-  async getSewingList(query: SewingListQuery): Promise<{
-    list: SewingListItem[];
-    total: number;
-    page: number;
-    pageSize: number;
+  /** 日期/时间字段从 DB 可能是 Date 或 string，统一转为列表用的字符串 */
+  private toDateOnlyString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    if (typeof v === 'string') return v.slice(0, 10) || null;
+    return null;
+  }
+
+  private toDateTimeString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (v instanceof Date) return v.toISOString().slice(0, 19).replace('T', ' ');
+    if (typeof v === 'string') return v.slice(0, 19).replace('T', ' ') || null;
+    return null;
+  }
+
+  /** 登记车缝完成弹窗用：订单数量/裁床数量按尺码（只读）、车缝数量由前端按尺码填写 */
+  async getCompleteFormData(orderId: number): Promise<{
+    headers: string[];
+    orderRow: (number | null)[];
+    cutRow: (number | null)[];
   }> {
-    const { tab = 'all', orderNo, skuCode, page = 1, pageSize = 20 } = query;
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+    const [ext, cutting] = await Promise.all([
+      this.orderExtRepo.findOne({ where: { orderId } }),
+      this.cuttingRepo.findOne({ where: { orderId } }),
+    ]);
+    const headers =
+      Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
+        ? [...ext.colorSizeHeaders, '合计']
+        : ['合计'];
+    const sizeLen = headers.length - 1;
+    const buildPerSize = (rows: { quantities?: number[] }[] | null | undefined): (number | null)[] | null => {
+      if (!rows || rows.length === 0 || sizeLen <= 0) return null;
+      const sums = Array(sizeLen).fill(0) as number[];
+      rows.forEach((row) => {
+        if (Array.isArray(row.quantities)) {
+          row.quantities.forEach((q: unknown, idx: number) => {
+            if (idx < sizeLen) {
+              const n = Number(q);
+              if (!Number.isNaN(n)) sums[idx] += n;
+            }
+          });
+        }
+      });
+      const total = sums.reduce((a, b) => a + b, 0);
+      return [...sums, total];
+    };
+    const orderRow = buildPerSize((ext as { colorSizeRows?: { quantities?: number[] }[] })?.colorSizeRows ?? null);
+    const cutRow = buildPerSize(cutting?.actualCutRows ?? null);
+    const cutTotal = this.sumActualCut(cutting?.actualCutRows ?? null);
+    return {
+      headers,
+      orderRow:
+        orderRow ??
+        (headers.length === 1 ? [order.quantity ?? 0] : [...Array(headers.length).fill(null)]),
+      cutRow:
+        cutRow ??
+        (headers.length === 1 ? [cutTotal != null ? cutTotal : null] : [...Array(headers.length).fill(null)]),
+    };
+  }
+
+  private async buildSewingRows(baseQuery: SewingListQuery): Promise<SewingListItem[]> {
+    const { tab = 'all', orderNo, skuCode } = baseQuery;
 
     const completedSewing = await this.sewingRepo.find({
       where: { status: 'completed' },
@@ -95,7 +168,7 @@ export class ProductionSewingService {
     const orders = await qb.getMany();
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) {
-      return { list: [], total: 0, page, pageSize };
+      return [];
     }
 
     const [sewings, cuttings] = await Promise.all([
@@ -113,23 +186,29 @@ export class ProductionSewingService {
       if (tab === 'pending' && sewingStatus === 'completed') continue;
       if (tab === 'completed' && sewingStatus !== 'completed') continue;
 
-      const arrivedAt = sewing?.arrivedAt
-        ? sewing.arrivedAt.toISOString().slice(0, 19).replace('T', ' ')
-        : order.status === 'pending_sewing' && order.statusTime
-          ? order.statusTime.toISOString().slice(0, 19).replace('T', ' ')
-          : null;
-      const completedAt = sewing?.completedAt
-        ? sewing.completedAt.toISOString().slice(0, 19).replace('T', ' ')
-        : null;
+      const arrivedAt =
+        this.toDateTimeString(sewing?.arrivedAt) ??
+        (order.status === 'pending_sewing' ? this.toDateTimeString(order.statusTime) : null);
+      const completedAt = this.toDateTimeString(sewing?.completedAt);
+      const distributedAt = this.toDateTimeString(sewing?.distributedAt);
+      const factoryDueDate = this.toDateOnlyString(sewing?.factoryDueDate);
+      const sewingFee = sewing?.sewingFee != null ? String(sewing.sewingFee) : '0';
 
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
+        customerName: order.customerName ?? '',
+        salesperson: order.salesperson ?? '',
+        merchandiser: order.merchandiser ?? '',
+        customerDueDate: this.toDateOnlyString(order.customerDueDate),
         skuCode: order.skuCode ?? '',
         imageUrl: order.imageUrl ?? '',
         factoryName: order.factoryName ?? '',
         quantity: order.quantity ?? 0,
         arrivedAt,
+        distributedAt,
+        factoryDueDate,
+        sewingFee,
         completedAt,
         sewingStatus: sewingStatus === 'completed' ? 'completed' : 'pending',
         cutTotal: this.sumActualCut(cutting?.actualCutRows ?? null),
@@ -138,19 +217,70 @@ export class ProductionSewingService {
       });
     }
 
+    return rows;
+  }
+
+  async getSewingList(query: SewingListQuery): Promise<{
+    list: SewingListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const { page = 1, pageSize = 20 } = query;
+    const rows = await this.buildSewingRows(query);
     const total = rows.length;
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-
     return { list, total, page, pageSize };
   }
 
-  /** 车缝登记完成：写入车缝数量、次品数量、次品说明，订单状态改为待尾部 */
+  async getSewingExportRows(query: SewingListQuery): Promise<SewingListItem[]> {
+    return this.buildSewingRows(query);
+  }
+
+  /** 分单：记录分单时间、加工厂交期、加工厂名称（写入订单）、车缝加工费 */
+  async assignSewing(
+    orderId: number,
+    distributedAt: Date,
+    factoryDueDate: Date | null,
+    factoryName: string,
+    sewingFee: string,
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+    if (order.status !== 'pending_sewing') {
+      throw new NotFoundException('仅待车缝订单可分单');
+    }
+
+    order.factoryName = (factoryName ?? '').trim();
+    await this.orderRepo.save(order);
+
+    let sewing = await this.sewingRepo.findOne({ where: { orderId } });
+    if (!sewing) {
+      sewing = this.sewingRepo.create({
+        orderId,
+        status: 'pending',
+        distributedAt,
+        factoryDueDate: factoryDueDate ?? null,
+        sewingFee: sewingFee ?? '0',
+      });
+    } else {
+      sewing.distributedAt = distributedAt;
+      sewing.factoryDueDate = factoryDueDate ?? null;
+      sewing.sewingFee = sewingFee ?? '0';
+    }
+    await this.sewingRepo.save(sewing);
+  }
+
+  /** 车缝登记完成：写入车缝数量（可按尺码）、次品数量、次品说明，订单状态改为待尾部 */
   async completeSewing(
     orderId: number,
     sewingQuantity: number,
     defectQuantity: number,
     defectReason: string,
+    sewingQuantities?: number[] | null,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -162,6 +292,12 @@ export class ProductionSewingService {
 
     const now = new Date();
     const arrivedAt = order.statusTime ?? now;
+    const totalQty =
+      Array.isArray(sewingQuantities) && sewingQuantities.length > 0
+        ? sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
+        : sewingQuantity;
+    const sewingQuantityRow =
+      Array.isArray(sewingQuantities) && sewingQuantities.length > 0 ? sewingQuantities : null;
 
     let sewing = await this.sewingRepo.findOne({ where: { orderId } });
     if (!sewing) {
@@ -170,7 +306,8 @@ export class ProductionSewingService {
         status: 'completed',
         arrivedAt,
         completedAt: now,
-        sewingQuantity,
+        sewingQuantity: totalQty,
+        sewingQuantityRow,
         defectQuantity: defectQuantity ?? 0,
         defectReason: (defectReason ?? '').trim(),
       });
@@ -178,7 +315,8 @@ export class ProductionSewingService {
       sewing.status = 'completed';
       sewing.arrivedAt = sewing.arrivedAt ?? arrivedAt;
       sewing.completedAt = now;
-      sewing.sewingQuantity = sewingQuantity;
+      sewing.sewingQuantity = totalQty;
+      sewing.sewingQuantityRow = sewingQuantityRow;
       sewing.defectQuantity = defectQuantity ?? 0;
       sewing.defectReason = (defectReason ?? '').trim();
     }

@@ -9,7 +9,7 @@
             :key="tab.value"
             :label="tab.value"
           >
-            {{ tab.label }}
+            {{ getTabLabel(tab) }}
           </el-radio-button>
         </el-radio-group>
       </div>
@@ -68,7 +68,7 @@
         @keyup.enter="onSearch(true)"
       />
       <el-tree-select
-        v-model="filter.orderType"
+        v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"
         placeholder="订单类型"
         filterable
@@ -79,14 +79,16 @@
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(
-          filter.orderType && `订单类型：${getOrderTypeDisplayLabel(filter.orderType)}`,
-        )"
+        :style="
+          getFilterSelectAutoWidthStyle(
+            filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`,
+          )
+        "
         @change="onSearch"
       >
         <template #prefix>
           <span
-            v-if="filter.orderType"
+            v-if="filter.orderTypeId"
             :style="{ color: ACTIVE_FILTER_COLOR }"
           >
             订单类型：
@@ -172,7 +174,11 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="orderType" label="订单类型" width="100" show-overflow-tooltip />
+      <el-table-column label="订单类型" width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ orderTypeDisplay(row) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="purchaseCompletedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">
           {{ formatDate(row.purchaseCompletedAt) }}
@@ -196,7 +202,7 @@
     <el-dialog
       v-model="registerDialog.visible"
       title="登记实际采购"
-      width="420"
+      width="560"
       destroy-on-close
       @close="resetRegisterForm"
     >
@@ -210,7 +216,7 @@
           ref="registerFormRef"
           :model="registerForm"
           :rules="registerRules"
-          label-width="100px"
+          label-width="110px"
           class="register-form"
         >
           <el-form-item label="实际采购数量" prop="actualPurchaseQuantity">
@@ -222,11 +228,44 @@
               style="width: 100%"
             />
           </el-form-item>
-          <el-form-item label="采购金额" prop="purchaseAmount">
+          <el-form-item label="单价">
+            <el-input
+              v-model="registerForm.unitPrice"
+              placeholder="元 / 单位"
+              clearable
+            >
+              <template #prepend>￥</template>
+            </el-input>
+          </el-form-item>
+          <el-form-item label="其他费用">
+            <el-input
+              v-model="registerForm.otherCost"
+              placeholder="如运费、杂费，元"
+              clearable
+            >
+              <template #prepend>￥</template>
+            </el-input>
+          </el-form-item>
+          <el-form-item label="采购总金额">
             <el-input
               v-model="registerForm.purchaseAmount"
-              placeholder="元"
-              clearable
+              placeholder="自动计算"
+              disabled
+            >
+              <template #prepend>￥</template>
+            </el-input>
+          </el-form-item>
+          <el-form-item label="采购凭证">
+            <ImageUploadArea v-model="registerForm.imageUrl" />
+          </el-form-item>
+          <el-form-item label="备注">
+            <el-input
+              v-model="registerForm.remark"
+              type="textarea"
+              :rows="3"
+              maxlength="200"
+              show-word-limit
+              placeholder="本次采购的补充说明"
             />
           </el-form-item>
         </el-form>
@@ -242,12 +281,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getPurchaseItems, registerPurchase, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
+import ImageUploadArea from '@/components/ImageUploadArea.vue'
 
 const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
@@ -255,28 +295,34 @@ const PURCHASE_TABS = [
   { label: '采购完成', value: 'completed' },
 ] as const
 
+type PurchaseTabConfig = (typeof PURCHASE_TABS)[number]
+
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
-  parentPath = '',
-): { label: string; value: string; children?: unknown[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: unknown[]; disabled?: boolean }[] {
   return nodes.map((n) => {
-    const path = parentPath ? `${parentPath} > ${n.value}` : n.value
-    const children = n.children?.length ? toOrderTypeTreeSelect(n.children, path) : []
+    const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
     const hasChildren = children.length > 0
     return {
       label: n.value,
-      value: path,
+      value: n.id,
       children: hasChildren ? children : undefined,
       disabled: hasChildren,
     }
   })
 }
 const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
-function getOrderTypeDisplayLabel(v: string | undefined): string {
-  if (!v) return ''
-  const parts = v.split('>').map((s) => s.trim()).filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : v
+
+function findOrderTypeLabelById(id: number | null | undefined): string {
+  if (!id) return ''
+  const stack: SystemOptionTreeNode[] = [...orderTypeTree.value]
+  while (stack.length) {
+    const node = stack.pop()!
+    if (node.id === id) return node.value
+    if (node.children?.length) stack.push(...node.children)
+  }
+  return ''
 }
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
@@ -323,18 +369,26 @@ const filter = reactive({
   orderNo: '',
   skuCode: '',
   supplier: '',
-  orderType: '',
+  orderTypeId: null as number | null,
 })
 const orderDateRange = ref<[string, string] | null>(null)
 const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 
 const currentTab = ref<string>('all')
+const tabCounts = ref<Record<string, number>>({})
+const tabTotal = ref(0)
 const list = ref<PurchaseItemRow[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PurchaseItemRow[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+
+function getTabLabel(tab: PurchaseTabConfig): string {
+  const counts = tabCounts.value
+  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  return `${tab.label}(${count})`
+}
 
 const registerDialog = reactive<{
   visible: boolean
@@ -344,11 +398,32 @@ const registerDialog = reactive<{
 const registerFormRef = ref<FormInstance>()
 const registerForm = reactive({
   actualPurchaseQuantity: 0,
+  unitPrice: '',
+  otherCost: '',
   purchaseAmount: '',
+  remark: '',
+  imageUrl: '',
 })
 const registerRules: FormRules = {
   actualPurchaseQuantity: [{ required: true, message: '请输入实际采购数量', trigger: 'blur' }],
 }
+
+watch(
+  () => [registerForm.actualPurchaseQuantity, registerForm.unitPrice, registerForm.otherCost] as const,
+  ([qty, unit, other]) => {
+    const q = Number(qty) || 0
+    const parseNumber = (v: string) => {
+      const cleaned = (v ?? '').replace(/[^\d.-]/g, '')
+      const n = Number(cleaned)
+      return Number.isNaN(n) ? 0 : n
+    }
+    const u = parseNumber(unit)
+    const o = parseNumber(other)
+    const total = q * u + o
+    registerForm.purchaseAmount = Number.isFinite(total) ? total.toFixed(2) : '0'
+  },
+  { immediate: true },
+)
 
 function formatDate(v: string | null | undefined): string {
   if (!v) return '-'
@@ -363,7 +438,7 @@ function buildQuery(): PurchaseListQuery {
     orderNo: filter.orderNo || undefined,
     skuCode: filter.skuCode || undefined,
     supplier: filter.supplier || undefined,
-    orderType: filter.orderType || undefined,
+    orderTypeId: filter.orderTypeId ?? undefined,
     page: pagination.page,
     pageSize: pagination.pageSize,
   }
@@ -372,6 +447,26 @@ function buildQuery(): PurchaseListQuery {
     q.orderDateEnd = orderDateRange.value[1]
   }
   return q
+}
+
+async function loadTabCounts() {
+  const base = buildQuery()
+  base.page = 1
+  base.pageSize = 1
+  const counts: Record<string, number> = {}
+  await Promise.all(
+    PURCHASE_TABS.map(async (tab) => {
+      try {
+        const res = await getPurchaseItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }),
+  )
+  tabCounts.value = counts
+  tabTotal.value = counts.all ?? 0
 }
 
 async function load() {
@@ -397,6 +492,7 @@ function onSearch(byUser = false) {
   }
   pagination.page = 1
   load()
+  void loadTabCounts()
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -414,18 +510,20 @@ function onReset() {
   filter.orderNo = ''
   filter.skuCode = ''
   filter.supplier = ''
-  filter.orderType = ''
+  filter.orderTypeId = null
   orderDateRange.value = null
   currentTab.value = 'all'
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onTabChange() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onPageSizeChange() {
@@ -442,7 +540,11 @@ function openRegisterDialog() {
   const row = selectedRows.value[0]
   registerDialog.row = row
   registerForm.actualPurchaseQuantity = row.actualPurchaseQuantity ?? row.planQuantity ?? 0
+  registerForm.unitPrice = row.purchaseUnitPrice ?? ''
+  registerForm.otherCost = row.purchaseOtherCost ?? ''
   registerForm.purchaseAmount = row.purchaseAmount ?? ''
+  registerForm.remark = row.purchaseRemark ?? ''
+  registerForm.imageUrl = row.purchaseImageUrl ?? ''
   registerDialog.visible = true
 }
 
@@ -450,6 +552,10 @@ function resetRegisterForm() {
   registerDialog.row = null
   registerForm.actualPurchaseQuantity = 0
   registerForm.purchaseAmount = ''
+  registerForm.unitPrice = ''
+  registerForm.otherCost = ''
+  registerForm.remark = ''
+  registerForm.imageUrl = ''
   registerFormRef.value?.clearValidate()
 }
 
@@ -462,11 +568,15 @@ async function submitRegister() {
       orderId: registerDialog.row.orderId,
       materialIndex: registerDialog.row.materialIndex,
       actualPurchaseQuantity: registerForm.actualPurchaseQuantity,
-      purchaseAmount: registerForm.purchaseAmount.trim() || '0',
+      unitPrice: registerForm.unitPrice.trim() || '0',
+      otherCost: registerForm.otherCost.trim() || '0',
+      remark: registerForm.remark.trim(),
+      imageUrl: registerForm.imageUrl.trim(),
     })
     ElMessage.success('登记成功')
     registerDialog.visible = false
     await load()
+    void loadTabCounts()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记失败'))
   } finally {
@@ -483,9 +593,18 @@ async function loadOptions() {
   }
 }
 
+function orderTypeDisplay(row: PurchaseItemRow): string {
+  if (typeof row.orderTypeId === 'number') {
+    const label = findOrderTypeLabelById(row.orderTypeId)
+    if (label && label.trim()) return label.trim()
+  }
+  return ''
+}
+
 onMounted(() => {
   loadOptions()
   load()
+  void loadTabCounts()
 })
 </script>
 
@@ -561,5 +680,10 @@ onMounted(() => {
 
 .register-form {
   margin-top: var(--space-sm);
+}
+
+.register-form :deep(.el-form-item__label) {
+  white-space: normal;
+  line-height: 1.3;
 }
 </style>

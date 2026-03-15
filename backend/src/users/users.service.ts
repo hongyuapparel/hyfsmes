@@ -3,12 +3,15 @@ import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../entities/user.entity';
+import { Order } from '../entities/order.entity';
 
 @Injectable()
 export class UsersService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(Order)
+    private orderRepo: Repository<Order>,
   ) {}
 
   async findAll() {
@@ -62,10 +65,36 @@ export class UsersService {
 
   async update(
     id: number,
-    dto: { displayName?: string; roleId?: number; status?: UserStatus },
+    dto: { username?: string; displayName?: string; roleId?: number; status?: UserStatus },
   ): Promise<User> {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('用户不存在');
+
+    // 允许修改用户名（登录账号），并做唯一性校验；同时联动更新依赖 username 的业务字段
+    if (dto.username !== undefined) {
+      const next = (dto.username ?? '').trim();
+      if (!next) throw new ConflictException('用户名不能为空');
+      if (next.length > 64) throw new ConflictException('用户名过长');
+      if (next !== user.username) {
+        const exists = await this.userRepo.findOne({ where: { username: next } });
+        if (exists) throw new ConflictException('用户名已存在');
+        const prev = user.username;
+        user.username = next;
+        // 订单表目前以字符串保存业务员/跟单员；更改用户名时做一次联动更新，避免历史单据丢失关联
+        await this.orderRepo
+          .createQueryBuilder()
+          .update(Order)
+          .set({ salesperson: next })
+          .where('salesperson = :prev', { prev })
+          .execute();
+        await this.orderRepo
+          .createQueryBuilder()
+          .update(Order)
+          .set({ merchandiser: next })
+          .where('merchandiser = :prev', { prev })
+          .execute();
+      }
+    }
     if (dto.displayName !== undefined) user.displayName = dto.displayName;
     if (dto.roleId !== undefined) user.roleId = dto.roleId;
     if (dto.status !== undefined) user.status = dto.status;

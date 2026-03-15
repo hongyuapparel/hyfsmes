@@ -5,16 +5,6 @@ import { Order } from '../entities/order.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 
-/** 已审单且需展示工艺的订单状态 */
-const CRAFT_ORDER_STATUSES = [
-  'pending_pattern',
-  'pending_purchase',
-  'pending_cutting',
-  'pending_sewing',
-  'pending_finishing',
-  'completed',
-];
-
 export interface CraftListItem {
   orderId: number;
   orderNo: string;
@@ -23,8 +13,10 @@ export interface CraftListItem {
   imageUrl: string;
   supplierName: string;
   processItem: string;
-  orderType: string;
-  collaborationType: string;
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId: number | null;
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId: number | null;
   purchaseStatus: string;
   craftStatus: string;
   completedAt: string | null;
@@ -34,8 +26,10 @@ export interface CraftListQuery {
   tab?: string;
   supplier?: string;
   processItem?: string;
-  orderType?: string;
-  collaborationType?: string;
+  /** 订单类型 ID */
+  orderTypeId?: number;
+  /** 合作方式 ID */
+  collaborationTypeId?: number;
   orderDateStart?: string;
   orderDateEnd?: string;
   page?: number;
@@ -81,28 +75,28 @@ export class ProductionCraftService {
       tab = 'all',
       supplier,
       processItem,
-      orderType,
-      collaborationType,
+      orderTypeId,
+      collaborationTypeId,
       orderDateStart,
       orderDateEnd,
       page = 1,
       pageSize = 20,
     } = query;
 
+    // 工艺管理：所有选择了工艺的订单都展示（不限制订单状态）
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .where('o.status IN (:...statuses)', { statuses: CRAFT_ORDER_STATUSES })
-      .andWhere("o.process_item IS NOT NULL AND o.process_item != ''");
+      .where("o.process_item IS NOT NULL AND o.process_item != ''");
 
     if (processItem?.trim()) {
       qb.andWhere('o.process_item LIKE :processItem', { processItem: `%${processItem.trim()}%` });
     }
-    if (orderType?.trim()) {
-      qb.andWhere('o.label = :orderType', { orderType: orderType.trim() });
+    if (typeof orderTypeId === 'number') {
+      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId });
     }
-    if (collaborationType?.trim()) {
-      qb.andWhere('o.collaboration_type = :collaborationType', {
-        collaborationType: collaborationType.trim(),
+    if (typeof collaborationTypeId === 'number') {
+      qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
+        collaborationTypeId,
       });
     }
     if (orderDateStart) {
@@ -147,8 +141,8 @@ export class ProductionCraftService {
         imageUrl: order.imageUrl ?? '',
         supplierName: this.firstSupplierName(materials) || '-',
         processItem: order.processItem?.trim() ?? '-',
-        orderType: order.label?.trim() ?? '',
-        collaborationType: order.collaborationType?.trim() ?? '',
+        orderTypeId: order.orderTypeId ?? null,
+        collaborationTypeId: order.collaborationTypeId ?? null,
         purchaseStatus: purchaseCompleted ? 'completed' : 'pending',
         craftStatus: craftStatus === 'completed' ? 'completed' : 'pending',
         completedAt: craft?.completedAt

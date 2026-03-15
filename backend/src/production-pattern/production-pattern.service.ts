@@ -4,15 +4,24 @@ import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
+import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 export interface PatternListItem {
   orderId: number;
   orderNo: string;
+  customerName: string;
+  salesperson: string;
+  merchandiser: string;
+  quantity: number;
   orderDate: string | null;
+  /** 客户交期（货期） */
+  customerDueDate: string | null;
   skuCode: string;
   imageUrl: string;
-  orderType: string;
-  collaborationType: string;
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId: number | null;
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId: number | null;
   /** 采购状态：completed | pending */
   purchaseStatus: string;
   patternStatus: string;
@@ -26,8 +35,10 @@ export interface PatternListQuery {
   tab?: string;
   orderNo?: string;
   skuCode?: string;
-  orderType?: string;
-  collaborationType?: string;
+  /** 订单类型 ID */
+  orderTypeId?: number;
+  /** 合作方式 ID */
+  collaborationTypeId?: number;
   purchaseStatus?: string;
   orderDateStart?: string;
   orderDateEnd?: string;
@@ -44,6 +55,7 @@ export class ProductionPatternService {
     private readonly patternRepo: Repository<OrderPattern>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
 
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
@@ -51,41 +63,30 @@ export class ProductionPatternService {
     return materials.every((m) => (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed');
   }
 
-  async getPatternList(query: PatternListQuery): Promise<{
-    list: PatternListItem[];
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
+  private async buildPatternRows(baseQuery: PatternListQuery): Promise<PatternListItem[]> {
     const {
       tab = 'all',
       orderNo,
       skuCode,
-      orderType,
-      collaborationType,
+      orderTypeId,
+      collaborationTypeId,
       purchaseStatus,
       orderDateStart,
       orderDateEnd,
-      page = 1,
-      pageSize = 20,
-    } = query;
+    } = baseQuery;
 
     const completedPatterns = await this.patternRepo.find({
       where: { status: 'completed' },
       select: ['orderId'],
     });
     const completedOrderIds = completedPatterns.map((p) => p.orderId);
-    const pendingPurchaseOrderIds =
-      completedOrderIds.length > 0
-        ? (await this.orderRepo.find({
-            where: { status: 'pending_purchase', id: In(completedOrderIds) },
-            select: ['id'],
-          })).map((o) => o.id)
-        : [];
 
+    // 纸样页视角：始终关心「待纸样」和「纸样已完成」的订单，
+    // 不再限制纸样已完成订单必须仍处于 pending_purchase 阶段，
+    // 否则订单后续流程推进后会在本页消失。
     const qb = this.orderRepo.createQueryBuilder('o').where(
       'o.status = :pendingPattern OR (o.id IN (:...completedIds))',
-      { pendingPattern: 'pending_pattern', completedIds: pendingPurchaseOrderIds.length ? pendingPurchaseOrderIds : [0] },
+      { pendingPattern: 'pending_pattern', completedIds: completedOrderIds.length ? completedOrderIds : [0] },
     );
 
     if (orderNo?.trim()) {
@@ -94,12 +95,12 @@ export class ProductionPatternService {
     if (skuCode?.trim()) {
       qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
     }
-    if (orderType?.trim()) {
-      qb.andWhere('o.label = :orderType', { orderType: orderType.trim() });
+    if (typeof orderTypeId === 'number') {
+      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId });
     }
-    if (collaborationType?.trim()) {
-      qb.andWhere('o.collaboration_type = :collaborationType', {
-        collaborationType: collaborationType.trim(),
+    if (typeof collaborationTypeId === 'number') {
+      qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
+        collaborationTypeId,
       });
     }
     if (orderDateStart) {
@@ -114,7 +115,7 @@ export class ProductionPatternService {
     const orders = await qb.getMany();
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) {
-      return { list: [], total: 0, page, pageSize };
+      return [];
     }
 
     const [patterns, extList] = await Promise.all([
@@ -142,11 +143,18 @@ export class ProductionPatternService {
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
+        customerName: order.customerName ?? '',
+        salesperson: order.salesperson ?? '',
+        merchandiser: order.merchandiser ?? '',
+        quantity: order.quantity ?? 0,
         orderDate: order.orderDate ? order.orderDate.toISOString().slice(0, 10) : null,
+        customerDueDate: order.customerDueDate
+          ? order.customerDueDate.toISOString().slice(0, 10)
+          : null,
         skuCode: order.skuCode ?? '',
         imageUrl: order.imageUrl ?? '',
-        orderType: order.label?.trim() ?? '',
-        collaborationType: order.collaborationType?.trim() ?? '',
+        orderTypeId: order.orderTypeId ?? null,
+        collaborationTypeId: order.collaborationTypeId ?? null,
         purchaseStatus: purchaseStatusStr,
         patternStatus: pStatus,
         patternMaster: pattern?.patternMaster ?? '',
@@ -158,11 +166,25 @@ export class ProductionPatternService {
       });
     }
 
+    return rows;
+  }
+
+  async getPatternList(query: PatternListQuery): Promise<{
+    list: PatternListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const { page = 1, pageSize = 20 } = query;
+    const rows = await this.buildPatternRows(query);
     const total = rows.length;
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-
     return { list, total, page, pageSize };
+  }
+
+  async getPatternExportRows(query: PatternListQuery): Promise<PatternListItem[]> {
+    return this.buildPatternRows(query);
   }
 
   async assignPattern(orderId: number, patternMaster: string, sampleMaker: string): Promise<void> {
@@ -216,8 +238,15 @@ export class ProductionPatternService {
     }
     await this.patternRepo.save(pattern);
 
-    order.status = 'pending_purchase';
-    order.statusTime = new Date();
-    await this.orderRepo.save(order);
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'pattern_completed',
+      actorUserId: 0,
+    });
+    if (next && next !== order.status) {
+      order.status = next;
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+    }
   }
 }

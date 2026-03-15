@@ -21,26 +21,25 @@
           </span>
         </template>
       </el-input>
-      <el-input
-        v-model="filter.department"
+      <el-select
+        v-model="filter.departmentId"
         placeholder="部门"
         clearable
+        filterable
         size="large"
         class="filter-bar-item"
-        :style="getTextFilterStyle('部门：', filter.department, departmentLabelVisible)"
-        :input-style="getFilterInputStyle(filter.department)"
-        @input="debouncedSearch"
-        @keyup.enter="onSearch(true)"
+        @change="onSearch(true)"
       >
-        <template #prefix>
-          <span
-            v-if="filter.department && departmentLabelVisible"
-            :style="{ color: ACTIVE_FILTER_COLOR }"
-          >
-            部门：
-          </span>
+        <template #label>
+          {{ filter.departmentId ? `部门：${getDepartmentLabel(filter.departmentId)}` : '部门' }}
         </template>
-      </el-input>
+        <el-option
+          v-for="d in flatDepartments"
+          :key="d.id"
+          :label="d.label"
+          :value="d.id"
+        />
+      </el-select>
       <el-select
         v-model="filter.status"
         placeholder="状态"
@@ -66,8 +65,8 @@
     <el-table v-loading="loading" :data="list" border stripe class="hr-table">
       <el-table-column prop="employeeNo" label="工号" width="100" show-overflow-tooltip />
       <el-table-column prop="name" label="姓名" width="100" show-overflow-tooltip />
-      <el-table-column prop="department" label="部门" width="100" show-overflow-tooltip />
-      <el-table-column prop="jobTitle" label="岗位" width="100" show-overflow-tooltip />
+      <el-table-column prop="departmentName" label="部门" width="120" show-overflow-tooltip />
+      <el-table-column prop="jobTitleName" label="岗位" width="120" show-overflow-tooltip />
       <el-table-column prop="entryDate" label="入职日期" width="110" align="center">
         <template #default="{ row }">{{ formatDate(row.entryDate) }}</template>
       </el-table-column>
@@ -119,11 +118,38 @@
         <el-form-item label="姓名" prop="name">
           <el-input v-model="form.name" placeholder="请输入姓名" clearable />
         </el-form-item>
-        <el-form-item label="部门" prop="department">
-          <el-input v-model="form.department" placeholder="部门" clearable />
+        <el-form-item label="部门" prop="departmentId">
+          <el-select
+            v-model="form.departmentId"
+            placeholder="选择部门"
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="d in flatDepartments"
+              :key="d.id"
+              :label="d.label"
+              :value="d.id"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="岗位" prop="jobTitle">
-          <el-input v-model="form.jobTitle" placeholder="岗位" clearable />
+        <el-form-item label="岗位" prop="jobTitleId">
+          <el-select
+            v-model="form.jobTitleId"
+            placeholder="先选择部门，再选择岗位"
+            clearable
+            filterable
+            style="width: 100%"
+            :disabled="!form.departmentId"
+          >
+            <el-option
+              v-for="j in jobOptionsForForm"
+              :key="j.id"
+              :label="j.label"
+              :value="j.id"
+            />
+          </el-select>
         </el-form-item>
         <el-form-item label="入职日期" prop="entryDate">
           <el-date-picker
@@ -175,16 +201,16 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onActivated, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import {
-  getEmployeeList,
-  createEmployee,
-  updateEmployee,
-  deleteEmployee,
-  type EmployeeItem,
-} from '@/api/hr'
+import { getEmployeeList, createEmployee, updateEmployee, deleteEmployee, type EmployeeItem } from '@/api/hr'
 import { getHrUserOptions, type HrUserOption } from '@/api/hr'
+import {
+  getSystemOptionsTree,
+  getSystemOptionsList,
+  type SystemOptionTreeNode,
+  type SystemOptionItem,
+} from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
@@ -213,13 +239,25 @@ function statusLabel(s: string) {
   return s === 'left' ? '离职' : '在职'
 }
 
-const filter = reactive({ name: '', department: '', status: '' })
+const filter = reactive({ name: '', departmentId: null as number | null, status: '' })
 const nameLabelVisible = ref(false)
-const departmentLabelVisible = ref(false)
 const list = ref<EmployeeItem[]>([])
-const userOptions = ref<UserItem[]>([])
+const userOptions = ref<HrUserOption[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+
+interface DeptOption {
+  id: number
+  label: string
+}
+const flatDepartments = ref<DeptOption[]>([])
+
+interface JobOption {
+  id: number
+  label: string
+  parentId: number | null
+}
+const allJobs = ref<JobOption[]>([])
 
 const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
   visible: false,
@@ -231,8 +269,8 @@ const formRef = ref<FormInstance>()
 const form = reactive({
   employeeNo: '',
   name: '',
-  department: '',
-  jobTitle: '',
+  departmentId: null as number | null,
+  jobTitleId: null as number | null,
   entryDate: '',
   contactPhone: '',
   status: 'active',
@@ -259,12 +297,61 @@ async function loadUsers() {
   }
 }
 
+async function loadDepartments() {
+  try {
+    const res = await getSystemOptionsTree('org_departments')
+    const tree = (res.data ?? []) as SystemOptionTreeNode[]
+    const out: DeptOption[] = []
+    const visit = (nodes: SystemOptionTreeNode[]) => {
+      for (const n of nodes) {
+        out.push({ id: n.id, label: n.value })
+        if (n.children?.length) visit(n.children)
+      }
+    }
+    visit(tree)
+    flatDepartments.value = out
+  } catch {
+    flatDepartments.value = []
+  }
+}
+
+function getDepartmentLabel(id: number | null): string {
+  if (id == null) return ''
+  const found = flatDepartments.value.find((d) => d.id === id)
+  return found ? found.label : ''
+}
+
+async function loadJobs() {
+  try {
+    const res = await getSystemOptionsList('org_jobs')
+    const list = (res.data ?? []) as SystemOptionItem[]
+    allJobs.value = list.map((j) => ({
+      id: j.id,
+      label: j.value,
+      parentId: j.parentId ?? null,
+    }))
+  } catch {
+    allJobs.value = []
+  }
+}
+
+const jobOptionsForForm = computed(() =>
+  allJobs.value.filter((j) => j.parentId === form.departmentId),
+)
+
+watch(
+  () => form.departmentId,
+  () => {
+    form.jobTitleId = null
+  },
+)
+
 async function load() {
   loading.value = true
   try {
     const res = await getEmployeeList({
       name: filter.name || undefined,
-      department: filter.department || undefined,
+      departmentId: filter.departmentId || undefined,
       status: filter.status || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
@@ -282,10 +369,9 @@ async function load() {
 }
 
 function onSearch(byUser = false) {
-  if (byUser) {
-    if (filter.name && String(filter.name).trim()) nameLabelVisible.value = true
-    if (filter.department && String(filter.department).trim()) departmentLabelVisible.value = true
-  }
+    if (byUser && filter.name && String(filter.name).trim()) {
+      nameLabelVisible.value = true
+    }
   pagination.page = 1
   load()
 }
@@ -301,9 +387,8 @@ function debouncedSearch() {
 
 function onReset() {
   nameLabelVisible.value = false
-  departmentLabelVisible.value = false
   filter.name = ''
-  filter.department = ''
+  filter.departmentId = null
   filter.status = ''
   pagination.page = 1
   load()
@@ -320,8 +405,8 @@ function openForm(row: EmployeeItem | null) {
   if (row) {
     form.employeeNo = row.employeeNo ?? ''
     form.name = row.name
-    form.department = row.department ?? ''
-    form.jobTitle = row.jobTitle ?? ''
+    form.departmentId = row.departmentId ?? null
+    form.jobTitleId = row.jobTitleId ?? null
     form.entryDate = row.entryDate ?? ''
     form.contactPhone = row.contactPhone ?? ''
     form.status = row.status === 'left' ? 'left' : 'active'
@@ -330,8 +415,8 @@ function openForm(row: EmployeeItem | null) {
   } else {
     form.employeeNo = ''
     form.name = ''
-    form.department = ''
-    form.jobTitle = ''
+    form.departmentId = null
+    form.jobTitleId = null
     form.entryDate = ''
     form.contactPhone = ''
     form.status = 'active'
@@ -353,8 +438,8 @@ async function submitForm() {
       await updateEmployee(editId.value, {
         employeeNo: form.employeeNo,
         name: form.name,
-        department: form.department,
-        jobTitle: form.jobTitle,
+        departmentId: form.departmentId,
+        jobTitleId: form.jobTitleId,
         entryDate: form.entryDate || undefined,
         contactPhone: form.contactPhone,
         status: form.status,
@@ -366,8 +451,8 @@ async function submitForm() {
       await createEmployee({
         employeeNo: form.employeeNo,
         name: form.name,
-        department: form.department,
-        jobTitle: form.jobTitle,
+        departmentId: form.departmentId,
+        jobTitleId: form.jobTitleId,
         entryDate: form.entryDate || undefined,
         contactPhone: form.contactPhone,
         status: form.status,
@@ -402,7 +487,15 @@ async function onDelete(row: EmployeeItem) {
 
 onMounted(() => {
   loadUsers()
+  loadDepartments()
+  loadJobs()
   load()
+})
+
+onActivated(() => {
+  // 当标签重新激活时，同步最新的部门与岗位配置，避免在配置页新增后这里还是旧数据
+  loadDepartments()
+  loadJobs()
 })
 </script>
 

@@ -43,48 +43,65 @@
         保存权限
       </el-button>
     </div>
-    <el-tabs v-model="permTab" type="border-card" class="perm-tabs">
-      <el-tab-pane label="菜单可见" name="menu">
-        <div class="perm-tab-desc">勾选后，该菜单/页面在侧栏展示并可进入。</div>
-        <el-tree
-          :key="'menu-' + (selectedRoleId ?? 0)"
-          ref="menuTreeRef"
-          :data="menuTreeData"
-          show-checkbox
-          node-key="id"
-          :default-checked-keys="menuCheckedKeys"
-          :props="{ label: 'name', children: 'children' }"
-          class="perm-tree"
-        />
-      </el-tab-pane>
-      <el-tab-pane label="操作权限" name="action">
-        <div class="perm-tab-desc">按页面分组的操作权限（如删除、审核等），可搜索。</div>
-        <div class="perm-toolbar">
-          <el-input
-            v-model="actionKeyword"
-            placeholder="搜索权限名称"
-            clearable
-            style="width: 220px"
-            :prefix-icon="Search"
-          />
-        </div>
-        <el-tree
-          :key="'action-' + (selectedRoleId ?? 0)"
-          ref="actionTreeRef"
-          :data="filteredActionTreeData"
-          show-checkbox
-          node-key="id"
-          :default-checked-keys="actionCheckedKeys"
-          :props="{ label: 'name', children: 'children' }"
-          class="perm-tree"
-        />
-      </el-tab-pane>
-    </el-tabs>
+    <div class="perm-section">
+      <div class="perm-tab-desc">勾选后，该菜单/页面在侧栏展示并可进入；点击「操作权限」可配置该页面的删除、编辑等操作权限。</div>
+      <el-tree
+        :key="'menu-' + (selectedRoleId ?? 0)"
+        ref="menuTreeRef"
+        :data="menuTreeData"
+        show-checkbox
+        node-key="id"
+        :default-expanded-keys="menuExpandedKeys"
+        :default-checked-keys="menuCheckedKeys"
+        :props="{ label: 'name', children: 'children' }"
+        class="perm-tree"
+      >
+        <template #default="{ node, data }">
+          <span class="tree-node-label">{{ data.name }}</span>
+          <el-button
+            v-if="hasActionPerms(data)"
+            link
+            type="primary"
+            size="small"
+            class="tree-node-action-btn"
+            @click.stop="openActionDialog(data)"
+          >
+            操作权限
+          </el-button>
+        </template>
+      </el-tree>
+    </div>
+
+    <!-- 操作权限弹窗：仅展示当前页面的操作权限勾选 -->
+    <el-dialog
+      v-model="actionDialogVisible"
+      :title="actionDialogTitle"
+      width="420px"
+      class="action-perm-dialog"
+      @closed="actionDialogClosed"
+    >
+      <div v-if="actionDialogItems.length" class="action-perm-list">
+        <el-checkbox-group v-model="actionDialogCheckedIds">
+          <div v-for="item in actionDialogItems" :key="item.id" class="action-perm-item">
+            <el-checkbox :label="item.id">{{ item.name }}</el-checkbox>
+          </div>
+        </el-checkbox-group>
+      </div>
+      <el-empty v-else description="该页面暂无操作权限项" />
+      <template #footer>
+        <el-button @click="actionDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmActionDialog">确定</el-button>
+      </template>
+    </el-dialog>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑角色' : '新增角色'" width="400" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80">
         <el-form-item label="编码" prop="code">
-          <el-input v-model="form.code" :disabled="isEdit && form.code === 'admin'" placeholder="如: warehouse" />
+          <el-input
+            v-model="form.code"
+            :disabled="isEdit && form.code === 'admin'"
+            placeholder="根据名称自动匹配，可修改"
+          />
         </el-form-item>
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="如: 仓库员" />
@@ -99,10 +116,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
   getRoles,
+  suggestRoleCode,
   createRole,
   updateRole,
   deleteRole,
@@ -110,7 +128,7 @@ import {
   setRolePermissions,
   type RoleItem,
 } from '@/api/roles'
-import { Search, Delete } from '@element-plus/icons-vue'
+import { Delete } from '@element-plus/icons-vue'
 import { getPermissions, type PermissionItem } from '@/api/permissions'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
@@ -119,10 +137,7 @@ const permissions = ref<PermissionItem[]>([])
 const selectedRoleId = ref<number | null>(null)
 const checkedIds = ref<number[]>([])
 const saving = ref(false)
-const permTab = ref<'menu' | 'action'>('menu')
-const actionKeyword = ref('')
 const menuTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
-const actionTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -136,14 +151,34 @@ const rules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
 }
 
+/** 新增时根据名称自动带出编码（与系统菜单/业务一致），防抖 300ms */
+let suggestCodeTimer: ReturnType<typeof setTimeout> | null = null
+watch(
+  () => [form.value.name, dialogVisible.value, isEdit.value] as const,
+  ([name, visible, edit]) => {
+    if (!visible || edit) return
+    const n = (name as string)?.trim()
+    if (!n) return
+    if (suggestCodeTimer) clearTimeout(suggestCodeTimer)
+    suggestCodeTimer = setTimeout(async () => {
+      suggestCodeTimer = null
+      try {
+        const res = await suggestRoleCode(n)
+        const code = res.data?.code
+        if (code != null && !isEdit.value && dialogVisible.value) form.value.code = code
+      } catch {
+        // 忽略建议接口失败，用户可手动填编码
+      }
+    }, 300)
+  },
+)
+
 interface TreeNode {
   id: number | string
   name: string
   children?: TreeNode[]
-}
-
-interface PageNode extends TreeNode {
-  routePath: string
+  /** 菜单节点对应的路由路径，用于操作权限弹窗 */
+  routePath?: string
 }
 
 const menuPermissionIds = computed(() =>
@@ -155,92 +190,133 @@ const actionPermissionIds = computed(() =>
 const menuCheckedKeys = computed(() =>
   checkedIds.value.filter((id) => menuPermissionIds.value.includes(id)),
 )
-const actionCheckedKeys = computed(() =>
-  checkedIds.value.filter((id) => actionPermissionIds.value.includes(id)),
+/**
+ * 订单列表页不在「操作权限」弹窗中展示的权限：
+ * - 草稿提交：全员允许，无需在此配置
+ * - 采购完成、纸样完成、裁床完成、车缝完成、待尾部发货申请、财务审核发货、待尾部入库申请、仓管接收入库：在订单链路设置中配置，不在此处展示
+ */
+const ORDER_LIST_ACTION_EXCLUDE_NAMES = [
+  '草稿提交',
+  '采购完成',
+  '纸样完成',
+  '裁床完成',
+  '车缝完成',
+  '待尾部发货申请',
+  '财务审核发货',
+  '待尾部入库申请',
+  '仓管接收入库',
+]
+
+/** 某页面对应的操作权限列表（用于弹窗） */
+function actionsForRoute(routePath: string): PermissionItem[] {
+  const path = routePath || '/'
+  let items = permissions.value.filter(
+    (p) => p.type === 'action' && (p.routePath || '/') === path,
+  )
+  if (path === '/orders/list') {
+    items = items.filter(
+      (p) => !ORDER_LIST_ACTION_EXCLUDE_NAMES.some((name) => p.name.includes(name)),
+    )
+  }
+  return items
+}
+
+function hasActionPerms(data: TreeNode): boolean {
+  return Boolean(data.routePath && actionsForRoute(data.routePath).length > 0)
+}
+
+const actionDialogVisible = ref(false)
+const actionDialogPageName = ref('')
+const actionDialogRoutePath = ref('')
+const actionDialogItems = ref<PermissionItem[]>([])
+const actionDialogCheckedIds = ref<number[]>([])
+
+const actionDialogTitle = computed(
+  () => `${actionDialogPageName.value || '页面'} - 操作权限`,
 )
 
+function openActionDialog(data: TreeNode) {
+  const path = data.routePath || '/'
+  const items = actionsForRoute(path)
+  actionDialogPageName.value = String(data.name).replace(/\s*\([^)]*\)\s*$/, '').trim() || path
+  actionDialogRoutePath.value = path
+  actionDialogItems.value = items
+  actionDialogCheckedIds.value = checkedIds.value.filter((id) =>
+    items.some((p) => p.id === id),
+  )
+  actionDialogVisible.value = true
+}
+
+function confirmActionDialog() {
+  const path = actionDialogRoutePath.value
+  const items = actionDialogItems.value
+  const idsForPage = new Set(items.map((p) => p.id))
+  checkedIds.value = [
+    ...checkedIds.value.filter((id) => !idsForPage.has(id)),
+    ...actionDialogCheckedIds.value,
+  ]
+  actionDialogVisible.value = false
+}
+
+function actionDialogClosed() {
+  actionDialogPageName.value = ''
+  actionDialogRoutePath.value = ''
+  actionDialogItems.value = []
+  actionDialogCheckedIds.value = []
+}
+
 const menuTreeData = computed<TreeNode[]>(() => {
-  const pageMap = new Map<string, PageNode>()
-  const getPageNode = (routePath: string, displayName: string): PageNode => {
-    const key = routePath || '/'
-    let node = pageMap.get(key)
+  // 仅使用后端返回的菜单型权限，避免一页出现两行
+  const menuPerms = permissions.value.filter((p) => p.type === 'menu')
+  // 按 routePath 构建层级结构，每个节点就是一个可勾选的菜单权限
+  const nodeByPath = new Map<string, TreeNode>()
+
+  const getNode = (p: PermissionItem): TreeNode => {
+    const path = p.routePath || '/'
+    let node = nodeByPath.get(path)
     if (!node) {
-      node = {
-        id: `page:${key}`,
-        name: `${displayName || '页面'} (${key || '/'})`,
-        routePath: key,
-        children: [],
-      }
-      pageMap.set(key, node)
-    } else if (displayName) {
-      node.name = `${displayName} (${key || '/'})`
+      node = { id: p.id, name: `${p.name} (${path || '/'})`, children: [], routePath: path }
+      nodeByPath.set(path, node)
+    } else {
+      node.id = p.id
+      node.name = `${p.name} (${path || '/'})`
+      node.routePath = path
     }
     return node
   }
-  const menuPerms = permissions.value.filter((p) => p.type === 'menu')
+
   for (const p of menuPerms) {
-    const routePath = p.routePath || '/'
-    getPageNode(routePath, p.name)
+    getNode(p)
   }
+
   const roots: TreeNode[] = []
-  const allPages = Array.from(pageMap.values())
-  const findParent = (path: string): PageNode | null => {
+  const allNodes = Array.from(nodeByPath.entries())
+
+  const findParentPath = (path: string): string | null => {
     if (!path || path === '/') return null
     const parts = path.split('/').filter(Boolean)
-    if (parts.length <= 1) return pageMap.get('/') ?? null
-    const parentPath = '/' + parts.slice(0, parts.length - 1).join('/')
-    return pageMap.get(parentPath) ?? null
+    if (parts.length <= 1) return '/'
+    return '/' + parts.slice(0, parts.length - 1).join('/')
   }
-  for (const page of allPages) {
-    const menuPerm = menuPerms.find((p) => (p.routePath || '/') === page.routePath)
-    const permNode = menuPerm ? { id: menuPerm.id, name: menuPerm.name } : null
-    const childPages = allPages.filter((p) => findParent(p.routePath)?.routePath === page.routePath)
-    page.children = [...(permNode ? [permNode] : []), ...childPages]
+
+  for (const [path, node] of allNodes) {
+    const parentPath = findParentPath(path)
+    if (!parentPath || !nodeByPath.has(parentPath)) {
+      roots.push(node)
+    } else {
+      const parent = nodeByPath.get(parentPath)!
+      parent.children = parent.children || []
+      parent.children.push(node)
+    }
   }
-  for (const page of allPages) {
-    const parent = findParent(page.routePath)
-    if (!parent) roots.push(page)
-  }
+
   return roots
 })
 
-const actionTreeData = computed<TreeNode[]>(() => {
-  const menuByPath = new Map<string, string>()
-  for (const p of permissions.value) {
-    if (p.type === 'menu') menuByPath.set(p.routePath || '/', p.name)
-  }
-  const group = new Map<string, PermissionItem[]>()
-  for (const p of permissions.value) {
-    if (p.type !== 'action') continue
-    const key = p.routePath || '/'
-    if (!group.has(key)) group.set(key, [])
-    group.get(key)!.push(p)
-  }
-  return Array.from(group.entries()).map(([path, actions]) => ({
-    id: `action-group:${path}`,
-    name: `${menuByPath.get(path) || path} (${path})`,
-    children: actions.map((a) => ({ id: a.id, name: a.name })),
-  }))
-})
-
-const filteredActionTreeData = computed(() => {
-  const kw = actionKeyword.value.trim().toLowerCase()
-  if (!kw) return actionTreeData.value
-  const filterNode = (nodes: TreeNode[]): TreeNode[] => {
-    const out: TreeNode[] = []
-    for (const n of nodes) {
-      if (typeof n.id === 'number') {
-        if (n.name.toLowerCase().includes(kw)) out.push(n)
-      } else {
-        const filtered = n.children ? filterNode(n.children) : []
-        if (filtered.length || n.name.toLowerCase().includes(kw)) {
-          out.push({ ...n, children: filtered.length ? filtered : n.children })
-        }
-      }
-    }
-    return out
-  }
-  return filterNode(actionTreeData.value)
+// 默认仅展开“主页 (/)"，其它菜单折叠
+const menuExpandedKeys = computed(() => {
+  const root = permissions.value.find((p) => p.type === 'menu' && (p.routePath || '/') === '/')
+  return root ? [root.id] : []
 })
 
 async function load() {
@@ -319,14 +395,8 @@ async function savePermissions() {
   if (!selectedRoleId.value) return
   const halfMenu = (menuTreeRef.value?.getHalfCheckedKeys?.() ?? []) as Array<number | string>
   const fullMenu = (menuTreeRef.value?.getCheckedKeys?.() ?? []) as Array<number | string>
-  const halfAction = (actionTreeRef.value?.getHalfCheckedKeys?.() ?? []) as Array<number | string>
-  const fullAction = (actionTreeRef.value?.getCheckedKeys?.() ?? []) as Array<number | string>
   const menuIds = [...new Set([...halfMenu, ...fullMenu])].filter((id): id is number => typeof id === 'number')
-  let actionIds = [...new Set([...halfAction, ...fullAction])].filter((id): id is number => typeof id === 'number')
-  if (actionKeyword.value.trim()) {
-    const prevActionIds = new Set(checkedIds.value.filter((id) => actionPermissionIds.value.includes(id)))
-    actionIds = [...new Set([...actionIds, ...prevActionIds])]
-  }
+  const actionIds = checkedIds.value.filter((id) => actionPermissionIds.value.includes(id))
   const ids = [...new Set([...menuIds, ...actionIds])]
   saving.value = true
   try {
@@ -365,10 +435,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
 }
-.perm-tree {
-  margin-top: 12px;
-}
-.perm-tabs {
+.perm-section {
   margin-top: 12px;
 }
 .perm-tab-desc {
@@ -376,7 +443,23 @@ onMounted(async () => {
   font-size: 13px;
   margin-bottom: 12px;
 }
-.perm-toolbar {
-  margin-bottom: 12px;
+.perm-tree {
+  margin-top: 12px;
+}
+.tree-node-label {
+  margin-right: 8px;
+}
+.tree-node-action-btn {
+  padding: 0 4px;
+}
+.action-perm-list {
+  max-height: 360px;
+  overflow-y: auto;
+}
+.action-perm-item {
+  margin-bottom: 8px;
+}
+.action-perm-item:last-child {
+  margin-bottom: 0;
 }
 </style>

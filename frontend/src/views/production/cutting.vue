@@ -9,7 +9,7 @@
             :key="tab.value"
             :label="tab.value"
           >
-            {{ tab.label }}
+            {{ getTabLabel(tab) }}
           </el-radio-button>
         </el-radio-group>
       </div>
@@ -60,6 +60,7 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
           v-if="hasSelection && canRegisterSelection"
           type="primary"
@@ -89,10 +90,118 @@
       </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="quantity" label="订单数量" width="96" align="right" />
+      <el-table-column label="图片" width="72" align="center">
+        <template #default="{ row }">
+          <el-image
+            v-if="row.imageUrl"
+            :src="row.imageUrl"
+            fit="cover"
+            class="table-thumb"
+            :preview-src-list="[row.imageUrl]"
+          />
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="订单数量" width="96" align="right">
+        <template #default="{ row }">
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ row.quantity }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
+                  <thead>
+                    <tr>
+                      <th class="qty-header">尺码</th>
+                      <th
+                        v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers"
+                        :key="hIdx"
+                        class="qty-header"
+                      >
+                        {{ h }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="r in sizeBreakdownCache[row.orderId].rows"
+                      :key="r.label"
+                    >
+                      <td class="qty-label">{{ r.label }}</td>
+                      <td
+                        v-for="(v, vIdx) in r.values"
+                        :key="vIdx"
+                        class="qty-value"
+                      >
+                        {{ v != null ? v : '-' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
+        </template>
+      </el-table-column>
       <el-table-column label="实裁数量" width="96" align="right">
         <template #default="{ row }">
-          {{ row.actualCutTotal != null ? row.actualCutTotal : '-' }}
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ row.actualCutTotal != null ? row.actualCutTotal : '-' }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
+                  <thead>
+                    <tr>
+                      <th class="qty-header">尺码</th>
+                      <th
+                        v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers"
+                        :key="hIdx"
+                        class="qty-header"
+                      >
+                        {{ h }}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr
+                      v-for="r in sizeBreakdownCache[row.orderId].rows"
+                      :key="r.label"
+                    >
+                      <td class="qty-label">{{ r.label }}</td>
+                      <td
+                        v-for="(v, vIdx) in r.values"
+                        :key="vIdx"
+                        class="qty-value"
+                      >
+                        {{ v != null ? v : '-' }}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
         </template>
       </el-table-column>
       <el-table-column prop="timeRating" label="时效判定" width="90" align="center" />
@@ -173,10 +282,13 @@ import { ElMessage } from 'element-plus'
 import {
   getCuttingItems,
   getOrderColorSize,
+  getCuttingQuantityBreakdown,
   completeCutting,
+  exportCuttingItems,
   type CuttingListItem,
   type CuttingListQuery,
   type ColorSizeRow,
+  type CuttingQuantityBreakdownRes,
 } from '@/api/production-cutting'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
@@ -185,6 +297,8 @@ const CUTTING_TABS = [
   { label: '等待裁床', value: 'pending' },
   { label: '裁床完成', value: 'completed' },
 ] as const
+
+type CuttingTabConfig = (typeof CUTTING_TABS)[number]
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
 const FILTER_AUTO_MIN_WIDTH = 140
@@ -215,14 +329,25 @@ const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 
 const currentTab = ref<string>('all')
+const tabCounts = ref<Record<string, number>>({})
+const tabTotal = ref(0)
 const list = ref<CuttingListItem[]>([])
 const loading = ref(false)
+const sizeBreakdownCache = ref<Record<number, CuttingQuantityBreakdownRes>>({})
+const sizePopoverLoadingId = ref<number | null>(null)
+const exporting = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<CuttingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
 const canRegisterSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.cuttingStatus !== 'completed'),
 )
+
+function getTabLabel(tab: CuttingTabConfig): string {
+  const counts = tabCounts.value
+  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  return `${tab.label}(${count})`
+}
 
 const registerDialog = reactive<{
   visible: boolean
@@ -256,6 +381,26 @@ function buildQuery(): CuttingListQuery {
   }
 }
 
+async function loadTabCounts() {
+  const base = buildQuery()
+  base.page = 1
+  base.pageSize = 1
+  const counts: Record<string, number> = {}
+  await Promise.all(
+    CUTTING_TABS.map(async (tab) => {
+      try {
+        const res = await getCuttingItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }),
+  )
+  tabCounts.value = counts
+  tabTotal.value = counts.all ?? 0
+}
+
 async function load() {
   loading.value = true
   try {
@@ -272,6 +417,42 @@ async function load() {
   }
 }
 
+async function onExport() {
+  const query = buildQuery()
+  const { page, pageSize, ...rest } = query
+  exporting.value = true
+  try {
+    const res = await exportCuttingItems(rest)
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `裁床管理_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
+  } finally {
+    exporting.value = false
+  }
+}
+
+async function onShowQtyPopover(row: CuttingListItem) {
+  const id = row.orderId
+  if (sizeBreakdownCache.value[id] || sizePopoverLoadingId.value === id) return
+  sizePopoverLoadingId.value = id
+  try {
+    const res = await getCuttingQuantityBreakdown(id)
+    sizeBreakdownCache.value[id] = res.data ?? { headers: [], rows: [] }
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '尺码明细加载失败'))
+  } finally {
+    if (sizePopoverLoadingId.value === id) sizePopoverLoadingId.value = null
+  }
+}
+
 function onSearch(byUser = false) {
   if (byUser) {
     if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
@@ -279,6 +460,7 @@ function onSearch(byUser = false) {
   }
   pagination.page = 1
   load()
+  void loadTabCounts()
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -299,12 +481,14 @@ function onReset() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onTabChange() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onPageSizeChange() {
@@ -370,6 +554,7 @@ async function submitRegister() {
     ElMessage.success('裁床登记完成，订单已进入待车缝')
     registerDialog.visible = false
     await load()
+    void loadTabCounts()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
   } finally {
@@ -377,7 +562,10 @@ async function submitRegister() {
   }
 }
 
-onMounted(() => load())
+onMounted(() => {
+  load()
+  void loadTabCounts()
+})
 </script>
 
 <style scoped>
@@ -449,5 +637,49 @@ onMounted(() => load())
 
 .cut-cost-form {
   margin-top: var(--space-sm);
+}
+
+.qty-trigger {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.qty-popover {
+  font-size: 12px;
+}
+
+.qty-popover-title {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.qty-popover-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.qty-popover-table .qty-label {
+  padding: 2px 4px;
+  color: var(--color-text-muted, #909399);
+  white-space: nowrap;
+}
+
+.qty-popover-table .qty-value {
+  padding: 2px 4px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.qty-header {
+  padding: 2px 4px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.qty-popover-loading,
+.qty-popover-empty {
+  font-size: 12px;
+  color: var(--color-text-muted, #909399);
 }
 </style>

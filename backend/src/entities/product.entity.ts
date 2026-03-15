@@ -19,8 +19,9 @@ export class Product {
   @Column({ name: 'image_url', length: 512, default: '' })
   imageUrl: string;
 
-  @Column({ name: 'product_group', length: 64, default: '' })
-  productGroup: string;
+  /** 产品分组 ID（system_options.id，option_type='product_groups'），改名后历史展示自动同步 */
+  @Column({ name: 'product_group_id', type: 'int', nullable: true })
+  productGroupId: number | null;
 
   @Column({ name: 'customer_id', type: 'int', nullable: true })
   customerId: number | null;

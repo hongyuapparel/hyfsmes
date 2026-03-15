@@ -11,7 +11,7 @@ export class PermissionsController {
 
   @Get()
   @UseGuards(PermissionGuard)
-  @RequirePermission('/settings/permissions')
+  @RequirePermission('/settings/roles')
   findAll() {
     return this.permissionsService.findAll();
   }

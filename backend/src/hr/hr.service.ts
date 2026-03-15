@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Employee } from '../entities/employee.entity';
 import { UsersService } from '../users/users.service';
+import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Injectable()
 export class HrService {
@@ -10,22 +11,27 @@ export class HrService {
     @InjectRepository(Employee)
     private readonly repo: Repository<Employee>,
     private readonly usersService: UsersService,
+    private readonly systemOptionsService: SystemOptionsService,
   ) {}
 
   async getList(params: {
     name?: string;
-    department?: string;
+    departmentId?: number;
+    jobTitleId?: number;
     status?: string;
     page?: number;
     pageSize?: number;
   }) {
-    const { name, department, status, page = 1, pageSize = 20 } = params;
+    const { name, departmentId, jobTitleId, status, page = 1, pageSize = 20 } = params;
     const qb = this.repo.createQueryBuilder('e').leftJoinAndSelect('e.user', 'u');
     if (name?.trim()) {
       qb.andWhere('e.name LIKE :name', { name: `%${name.trim()}%` });
     }
-    if (department?.trim()) {
-      qb.andWhere('e.department = :department', { department: department.trim() });
+    if (typeof departmentId === 'number' && !Number.isNaN(departmentId)) {
+      qb.andWhere('e.department_id = :departmentId', { departmentId });
+    }
+    if (typeof jobTitleId === 'number' && !Number.isNaN(jobTitleId)) {
+      qb.andWhere('e.job_title_id = :jobTitleId', { jobTitleId });
     }
     if (status?.trim()) {
       qb.andWhere('e.status = :status', { status: status.trim() });
@@ -36,7 +42,28 @@ export class HrService {
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getMany();
-    return { list, total, page, pageSize };
+
+    const departmentIds = Array.from(
+      new Set(list.map((e) => e.departmentId).filter((v) => v != null) as number[]),
+    );
+    const jobTitleIds = Array.from(
+      new Set(list.map((e) => e.jobTitleId).filter((v) => v != null) as number[]),
+    );
+
+    const [departmentLabels, jobTitleLabels] = await Promise.all([
+      this.systemOptionsService.getOptionLabelsByIds('org_departments', departmentIds),
+      this.systemOptionsService.getOptionLabelsByIds('org_jobs', jobTitleIds),
+    ]);
+
+    const withLabels = list.map((e) => ({
+      ...e,
+      departmentName:
+        (e.departmentId != null ? departmentLabels[e.departmentId] : '') || e.department || '',
+      jobTitleName:
+        (e.jobTitleId != null ? jobTitleLabels[e.jobTitleId] : '') || e.jobTitle || '',
+    }));
+
+    return { list: withLabels, total, page, pageSize };
   }
 
   async getOne(id: number): Promise<Employee> {
@@ -51,8 +78,8 @@ export class HrService {
   async create(dto: {
     employeeNo?: string;
     name: string;
-    department?: string;
-    jobTitle?: string;
+    departmentId?: number | null;
+    jobTitleId?: number | null;
     entryDate?: string;
     contactPhone?: string;
     status?: string;
@@ -62,8 +89,16 @@ export class HrService {
     const entity = this.repo.create({
       employeeNo: dto.employeeNo?.trim() ?? '',
       name: dto.name?.trim() ?? '',
-      department: dto.department?.trim() ?? '',
-      jobTitle: dto.jobTitle?.trim() ?? '',
+      department: '',
+      jobTitle: '',
+      departmentId:
+        typeof dto.departmentId === 'number' && !Number.isNaN(dto.departmentId)
+          ? dto.departmentId
+          : null,
+      jobTitleId:
+        typeof dto.jobTitleId === 'number' && !Number.isNaN(dto.jobTitleId)
+          ? dto.jobTitleId
+          : null,
       entryDate: dto.entryDate ? new Date(dto.entryDate) : null,
       contactPhone: dto.contactPhone?.trim() ?? '',
       status: dto.status?.trim() === 'left' ? 'left' : 'active',
@@ -78,8 +113,8 @@ export class HrService {
     dto: {
       employeeNo?: string;
       name?: string;
-      department?: string;
-      jobTitle?: string;
+      departmentId?: number | null;
+      jobTitleId?: number | null;
       entryDate?: string;
       contactPhone?: string;
       status?: string;
@@ -91,8 +126,18 @@ export class HrService {
     if (!item) throw new NotFoundException('人员不存在');
     if (dto.employeeNo !== undefined) item.employeeNo = dto.employeeNo?.trim() ?? '';
     if (dto.name !== undefined) item.name = dto.name?.trim() ?? '';
-    if (dto.department !== undefined) item.department = dto.department?.trim() ?? '';
-    if (dto.jobTitle !== undefined) item.jobTitle = dto.jobTitle?.trim() ?? '';
+    if (dto.departmentId !== undefined) {
+      item.departmentId =
+        typeof dto.departmentId === 'number' && !Number.isNaN(dto.departmentId)
+          ? dto.departmentId
+          : null;
+    }
+    if (dto.jobTitleId !== undefined) {
+      item.jobTitleId =
+        typeof dto.jobTitleId === 'number' && !Number.isNaN(dto.jobTitleId)
+          ? dto.jobTitleId
+          : null;
+    }
     if (dto.entryDate !== undefined) {
       item.entryDate = dto.entryDate ? new Date(dto.entryDate) : null;
     }

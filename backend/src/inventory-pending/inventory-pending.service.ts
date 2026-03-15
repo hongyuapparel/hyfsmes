@@ -9,6 +9,7 @@ export interface PendingListItem {
   id: number;
   orderId: number;
   orderNo: string;
+  customerName: string;
   skuCode: string;
   quantity: number;
   createdAt: string;
@@ -41,6 +42,7 @@ export class InventoryPendingService {
         'p.id AS id',
         'p.order_id AS orderId',
         'o.order_no AS orderNo',
+        'o.customer_name AS customerName',
         'p.sku_code AS skuCode',
         'p.quantity AS quantity',
         'p.created_at AS createdAt',
@@ -69,12 +71,21 @@ export class InventoryPendingService {
     const rows = await qb
       .offset((page - 1) * pageSize)
       .limit(pageSize)
-      .getRawMany<{ id: number; orderId: number; orderNo: string; skuCode: string; quantity: number; createdAt: Date }>();
+      .getRawMany<{
+        id: number;
+        orderId: number;
+        orderNo: string;
+        customerName: string;
+        skuCode: string;
+        quantity: number;
+        createdAt: Date;
+      }>();
 
     const list: PendingListItem[] = rows.map((r) => ({
       id: r.id,
       orderId: r.orderId,
       orderNo: r.orderNo ?? '',
+      customerName: r.customerName ?? '',
       skuCode: r.skuCode ?? '',
       quantity: r.quantity ?? 0,
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
@@ -83,8 +94,15 @@ export class InventoryPendingService {
     return { list, total, page, pageSize };
   }
 
-  /** 执行入库：选中记录填写仓库、部门、位置，写入成品库存并标记待入库完成；可选传 imageUrl */
-  async doInbound(ids: number[], warehouse: string, department: string, location: string, imageUrl?: string): Promise<void> {
+  /** 执行入库：选中记录填写仓库、库存类型、部门、位置，写入成品库存并标记待入库完成；可选传 imageUrl */
+  async doInbound(
+    ids: number[],
+    warehouseId: number | null,
+    inventoryTypeId: number | null,
+    department: string,
+    location: string,
+    imageUrl?: string,
+  ): Promise<void> {
     if (!ids?.length) {
       throw new NotFoundException('请选择待入库记录');
     }
@@ -95,14 +113,32 @@ export class InventoryPendingService {
       throw new NotFoundException('未找到有效的待入库记录');
     }
     const img = imageUrl?.trim() ?? '';
+
+    // 预加载订单以获取客户信息
+    const orderIds = Array.from(
+      new Set(pendings.map((p) => p.orderId).filter((id) => typeof id === 'number' && id > 0)),
+    );
+    const orders = orderIds.length
+      ? await this.orderRepo.find({
+          where: { id: In(orderIds) },
+        })
+      : [];
+    const orderMap = new Map<number, Order>();
+    for (const o of orders) {
+      orderMap.set(o.id, o);
+    }
     for (const p of pendings) {
+      const order = orderMap.get(p.orderId);
       const stock = this.stockRepo.create({
         orderId: p.orderId,
         skuCode: p.skuCode,
         quantity: p.quantity,
-        warehouse: warehouse?.trim() ?? '',
+        warehouseId: warehouseId != null ? Number(warehouseId) : null,
+        inventoryTypeId: inventoryTypeId != null ? Number(inventoryTypeId) : null,
         department: department?.trim() ?? '',
         location: location?.trim() ?? '',
+        customerId: order?.customerId ?? null,
+        customerName: order?.customerName?.trim() ?? '',
         imageUrl: img,
       });
       await this.stockRepo.save(stock);

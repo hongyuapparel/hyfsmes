@@ -62,7 +62,7 @@
         width="400"
         @close="form.value = ''"
       >
-        <el-form label-width="80">
+        <el-form label-width="110px">
           <el-form-item :label="parentId != null ? '业务范围' : '供应商类型'">
             <el-input
               v-model="form.value"

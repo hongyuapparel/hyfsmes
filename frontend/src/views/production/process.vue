@@ -9,7 +9,7 @@
             :key="tab.value"
             :label="tab.value"
           >
-            {{ tab.label }}
+            {{ getTabLabel(tab) }}
           </el-radio-button>
         </el-radio-group>
       </div>
@@ -38,7 +38,7 @@
         @keyup.enter="onSearch(true)"
       />
       <el-tree-select
-        v-model="filter.orderType"
+        v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"
         placeholder="订单类型"
         filterable
@@ -49,34 +49,40 @@
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(
-          filter.orderType && `订单类型：${getOrderTypeDisplayLabel(filter.orderType)}`,
-        )"
+        :style="
+          getFilterSelectAutoWidthStyle(
+            filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`,
+          )
+        "
         @change="onSearch"
       >
         <template #prefix>
-          <span v-if="filter.orderType" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
+          <span v-if="filter.orderTypeId" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
         </template>
       </el-tree-select>
       <el-select
-        v-model="filter.collaborationType"
+        v-model="filter.collaborationTypeId"
         placeholder="合作方式"
         filterable
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.collaborationType)"
+        :style="
+          getFilterSelectAutoWidthStyle(
+            filter.collaborationTypeId && `合作方式：${findCollaborationLabelById(filter.collaborationTypeId)}`,
+          )
+        "
         @change="onSearch"
       >
         <template #label="{ label }">
-          <span v-if="filter.collaborationType">合作方式：{{ label }}</span>
+          <span v-if="filter.collaborationTypeId">合作方式：{{ label }}</span>
           <span v-else>{{ label }}</span>
         </template>
         <el-option
           v-for="opt in collaborationOptions"
-          :key="opt.value"
+          :key="opt.id"
           :label="opt.label"
-          :value="opt.value"
+          :value="opt.id"
         />
       </el-select>
       <el-date-picker
@@ -136,8 +142,16 @@
       </el-table-column>
       <el-table-column prop="supplierName" label="供应商" min-width="100" show-overflow-tooltip />
       <el-table-column prop="processItem" label="工艺项目" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="orderType" label="订单类型" width="100" show-overflow-tooltip />
-      <el-table-column prop="collaborationType" label="合作方式" width="100" show-overflow-tooltip />
+      <el-table-column label="订单类型" width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ orderTypeDisplay(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="合作方式" width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ collaborationDisplay(row) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="purchaseStatus" label="采购状态" width="96" align="center">
         <template #default="{ row }">
           <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'info'" size="small">
@@ -169,7 +183,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getCraftItems, completeCraft, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getDictTree, getDictOptions } from '@/api/dicts'
+import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 
 const CRAFT_TABS = [
@@ -178,25 +192,37 @@ const CRAFT_TABS = [
   { label: '工艺完成', value: 'completed' },
 ] as const
 
+type CraftTabConfig = (typeof CRAFT_TABS)[number]
+
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
-const collaborationOptions = ref<{ label: string; value: string }[]>([])
+const collaborationOptions = ref<{ id: number; label: string }[]>([])
 
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
-  parentPath = '',
-): { label: string; value: string; children?: unknown[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: unknown[]; disabled?: boolean }[] {
   return nodes.map((n) => {
-    const path = parentPath ? `${parentPath} > ${n.value}` : n.value
-    const children = n.children?.length ? toOrderTypeTreeSelect(n.children, path) : []
+    const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
     const hasChildren = children.length > 0
-    return { label: n.value, value: path, children: hasChildren ? children : undefined, disabled: hasChildren }
+    return { label: n.value, value: n.id, children: hasChildren ? children : undefined, disabled: hasChildren }
   })
 }
 const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
-function getOrderTypeDisplayLabel(v: string | undefined): string {
-  if (!v) return ''
-  const parts = v.split('>').map((s) => s.trim()).filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : v
+
+function findOrderTypeLabelById(id: number | null | undefined): string {
+  if (!id) return ''
+  const stack: SystemOptionTreeNode[] = [...orderTypeTree.value]
+  while (stack.length) {
+    const node = stack.pop()!
+    if (node.id === id) return node.value
+    if (node.children?.length) stack.push(...node.children)
+  }
+  return ''
+}
+
+function findCollaborationLabelById(id: number | null | undefined): string {
+  if (!id) return ''
+  const found = collaborationOptions.value.find((opt) => opt.id === id)
+  return found?.label ?? ''
 }
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
@@ -228,12 +254,14 @@ function getFilterRangeStyle(v: [string, string] | null) {
 const filter = reactive({
   supplier: '',
   processItem: '',
-  orderType: '',
-  collaborationType: '',
+  orderTypeId: null as number | null,
+  collaborationTypeId: null as number | null,
 })
 const orderDateRange = ref<[string, string] | null>(null)
 
 const currentTab = ref<string>('all')
+const tabCounts = ref<Record<string, number>>({})
+const tabTotal = ref(0)
 const list = ref<CraftListItem[]>([])
 const loading = ref(false)
 const completing = ref(false)
@@ -243,6 +271,12 @@ const hasSelection = computed(() => selectedRows.value.length > 0)
 const canCompleteSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.craftStatus !== 'completed'),
 )
+
+function getTabLabel(tab: CraftTabConfig): string {
+  const counts = tabCounts.value
+  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  return `${tab.label}(${count})`
+}
 
 function formatDate(v: string | null | undefined): string {
   if (!v) return '-'
@@ -262,8 +296,8 @@ function buildQuery(): CraftListQuery {
     tab: currentTab.value,
     supplier: filter.supplier || undefined,
     processItem: filter.processItem || undefined,
-    orderType: filter.orderType || undefined,
-    collaborationType: filter.collaborationType || undefined,
+    orderTypeId: filter.orderTypeId ?? undefined,
+    collaborationTypeId: filter.collaborationTypeId ?? undefined,
     page: pagination.page,
     pageSize: pagination.pageSize,
   }
@@ -272,6 +306,26 @@ function buildQuery(): CraftListQuery {
     q.orderDateEnd = orderDateRange.value[1]
   }
   return q
+}
+
+async function loadTabCounts() {
+  const base = buildQuery()
+  base.page = 1
+  base.pageSize = 1
+  const counts: Record<string, number> = {}
+  await Promise.all(
+    CRAFT_TABS.map(async (tab) => {
+      try {
+        const res = await getCraftItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }),
+  )
+  tabCounts.value = counts
+  tabTotal.value = counts.all ?? 0
 }
 
 async function load() {
@@ -293,6 +347,7 @@ async function load() {
 function onSearch() {
   pagination.page = 1
   load()
+  void loadTabCounts()
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -304,19 +359,21 @@ function debouncedSearch() {
 function onReset() {
   filter.supplier = ''
   filter.processItem = ''
-  filter.orderType = ''
-  filter.collaborationType = ''
+  filter.orderTypeId = null
+  filter.collaborationTypeId = null
   orderDateRange.value = null
   currentTab.value = 'all'
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onTabChange() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onPageSizeChange() {
@@ -338,6 +395,7 @@ async function onConfirmComplete() {
     }
     ElMessage.success(`已确认完成 ${toComplete.length} 条`)
     await load()
+    void loadTabCounts()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
   } finally {
@@ -349,20 +407,40 @@ async function loadOptions() {
   try {
     const [orderTypeRes, collabRes] = await Promise.all([
       getDictTree('order_types'),
-      getDictOptions('collaboration'),
+      getDictItems('collaboration'),
     ])
     orderTypeTree.value = Array.isArray(orderTypeRes.data) ? orderTypeRes.data : []
-    const cv = collabRes.data ?? []
-    collaborationOptions.value = (Array.isArray(cv) ? cv : []).map((v: string) => ({ label: v, value: v }))
+    const items = collabRes.data ?? []
+    collaborationOptions.value = (Array.isArray(items) ? items : []).map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
   } catch {
     orderTypeTree.value = []
     collaborationOptions.value = []
   }
 }
 
+function orderTypeDisplay(row: CraftListItem): string {
+  if (typeof row.orderTypeId === 'number') {
+    const label = findOrderTypeLabelById(row.orderTypeId)
+    if (label && label.trim()) return label.trim()
+  }
+  return ''
+}
+
+function collaborationDisplay(row: CraftListItem): string {
+  if (typeof row.collaborationTypeId === 'number') {
+    const label = findCollaborationLabelById(row.collaborationTypeId)
+    if (label && label.trim()) return label.trim()
+  }
+  return ''
+}
+
 onMounted(() => {
   loadOptions()
   load()
+  void loadTabCounts()
 })
 </script>
 

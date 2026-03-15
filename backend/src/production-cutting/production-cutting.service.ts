@@ -8,8 +8,15 @@ import { OrderExt } from '../entities/order-ext.entity';
 export interface CuttingListItem {
   orderId: number;
   orderNo: string;
+  customerName: string;
+  salesperson: string;
+  merchandiser: string;
+  /** 客户交期（货期） */
+  customerDueDate: string | null;
   skuCode: string;
   quantity: number;
+  /** 订单主图，用于列表展示 */
+  imageUrl: string;
   /** 到裁床时间 */
   arrivedAt: string | null;
   /** 完成时间 */
@@ -54,30 +61,20 @@ export class ProductionCuttingService {
     return sum;
   }
 
-  async getCuttingList(query: CuttingListQuery): Promise<{
-    list: CuttingListItem[];
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
-    const { tab = 'all', orderNo, skuCode, page = 1, pageSize = 20 } = query;
+  private async buildCuttingRows(baseQuery: CuttingListQuery): Promise<CuttingListItem[]> {
+    const { tab = 'all', orderNo, skuCode } = baseQuery;
 
     const completedCutting = await this.cuttingRepo.find({
       where: { status: 'completed' },
       select: ['orderId'],
     });
     const completedOrderIds = completedCutting.map((c) => c.orderId);
-    const pendingSewingWithCutIds =
-      completedOrderIds.length > 0
-        ? (await this.orderRepo.find({
-            where: { status: 'pending_sewing', id: In(completedOrderIds) },
-            select: ['id'],
-          })).map((o) => o.id)
-        : [];
+    // 裁床完成 / 全部：包含所有已裁床完成的订单（不论当前是待车缝、待尾部或已完成），便于在裁床页查看历史
+    const completedIds = completedOrderIds.length > 0 ? completedOrderIds : [0];
 
     const qb = this.orderRepo.createQueryBuilder('o').where(
       'o.status = :pendingCutting OR (o.id IN (:...completedIds))',
-      { pendingCutting: 'pending_cutting', completedIds: pendingSewingWithCutIds.length ? pendingSewingWithCutIds : [0] },
+      { pendingCutting: 'pending_cutting', completedIds: completedIds },
     );
 
     if (orderNo?.trim()) {
@@ -92,7 +89,7 @@ export class ProductionCuttingService {
     const orders = await qb.getMany();
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) {
-      return { list: [], total: 0, page, pageSize };
+      return [];
     }
 
     const cuttings = await this.cuttingRepo.find({
@@ -119,8 +116,15 @@ export class ProductionCuttingService {
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
+        customerName: order.customerName ?? '',
+        salesperson: order.salesperson ?? '',
+        merchandiser: order.merchandiser ?? '',
+        customerDueDate: order.customerDueDate
+          ? order.customerDueDate.toISOString().slice(0, 10)
+          : null,
         skuCode: order.skuCode ?? '',
         quantity: order.quantity ?? 0,
+        imageUrl: order.imageUrl ?? '',
         arrivedAt,
         completedAt,
         cuttingStatus: cuttingStatus === 'completed' ? 'completed' : 'pending',
@@ -130,11 +134,64 @@ export class ProductionCuttingService {
       });
     }
 
+    return rows;
+  }
+
+  async getCuttingList(query: CuttingListQuery): Promise<{
+    list: CuttingListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const { page = 1, pageSize = 20 } = query;
+    const rows = await this.buildCuttingRows(query);
     const total = rows.length;
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-
     return { list, total, page, pageSize };
+  }
+
+  async getCuttingExportRows(query: CuttingListQuery): Promise<CuttingListItem[]> {
+    return this.buildCuttingRows(query);
+  }
+
+  /** 裁床列表用：订单数量/实裁数量按尺码明细（悬停展示，与订单列表数量追踪同结构） */
+  async getQuantityBreakdown(orderId: number): Promise<{ headers: string[]; rows: Array<{ label: string; values: (number | null)[] }> }> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+    const [ext, cutting] = await Promise.all([
+      this.orderExtRepo.findOne({ where: { orderId } }),
+      this.cuttingRepo.findOne({ where: { orderId } }),
+    ]);
+    const headers =
+      Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
+        ? [...ext.colorSizeHeaders, '合计']
+        : ['合计'];
+    const sizeLen = headers.length - 1;
+    const buildPerSize = (rows: { quantities?: number[] }[] | null | undefined): (number | null)[] | null => {
+      if (!rows || rows.length === 0 || sizeLen <= 0) return null;
+      const sums = Array(sizeLen).fill(0) as number[];
+      rows.forEach((row) => {
+        if (Array.isArray(row.quantities)) {
+          row.quantities.forEach((q: unknown, idx: number) => {
+            if (idx < sizeLen) {
+              const n = Number(q);
+              if (!Number.isNaN(n)) sums[idx] += n;
+            }
+          });
+        }
+      });
+      const total = sums.reduce((a, b) => a + b, 0);
+      return [...sums, total];
+    };
+    const orderPerSize = buildPerSize((ext as { colorSizeRows?: { quantities?: number[] }[] })?.colorSizeRows ?? null);
+    const cutPerSize = buildPerSize(cutting?.actualCutRows ?? null);
+    const rows: Array<{ label: string; values: (number | null)[] }> = [];
+    if (orderPerSize) rows.push({ label: '订单数量', values: orderPerSize });
+    if (cutPerSize) rows.push({ label: '实裁数量', values: cutPerSize });
+    return { headers, rows };
   }
 
   /** 获取订单 B 区颜色尺码（供裁床登记表单回显计划数量） */

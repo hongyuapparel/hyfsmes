@@ -12,6 +12,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { InventoryAccessoriesService } from './inventory-accessories.service';
 
 @Controller('inventory/accessories')
@@ -20,16 +21,24 @@ import { InventoryAccessoriesService } from './inventory-accessories.service';
 export class InventoryAccessoriesController {
   constructor(private readonly service: InventoryAccessoriesService) {}
 
+  /** 出库弹窗「领用人」下拉（全公司用户） */
+  @Get('user-options')
+  getUserOptions() {
+    return this.service.getUserOptions();
+  }
+
   @Get('items')
   getList(
     @Query('name') name?: string,
     @Query('category') category?: string,
+    @Query('customerName') customerName?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.service.getList({
       name,
       category,
+      customerName,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -48,8 +57,9 @@ export class InventoryAccessoriesController {
     @Body('unit') unit?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('customerName') customerName?: string,
   ) {
-    return this.service.create({ name, category, quantity, unit, remark, imageUrl });
+    return this.service.create({ name, category, quantity, unit, remark, imageUrl, customerName });
   }
 
   @Put('items/:id')
@@ -61,6 +71,7 @@ export class InventoryAccessoriesController {
     @Body('unit') unit?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('customerName') customerName?: string,
   ) {
     return this.service.update(Number(id), {
       name,
@@ -69,11 +80,59 @@ export class InventoryAccessoriesController {
       unit,
       remark,
       imageUrl,
+      customerName,
     });
   }
 
   @Delete('items/:id')
   remove(@Param('id') id: string) {
     return this.service.remove(Number(id));
+  }
+
+  /**
+   * 出库记录列表
+   * GET /inventory/accessories/outbounds
+   */
+  @Get('outbounds')
+  getOutbounds(
+    @Query('accessoryId') accessoryId?: string,
+    @Query('orderNo') orderNo?: string,
+    @Query('outboundType') outboundType?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.getOutboundRecords({
+      accessoryId: accessoryId ? Number(accessoryId) : undefined,
+      orderNo,
+      outboundType,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
+
+  /**
+   * 手动出库（领用/调整等）
+   * POST /inventory/accessories/outbounds
+   */
+  @Post('outbounds')
+  manualOutbound(
+    @Body('accessoryId') accessoryId: number,
+    @Body('quantity') quantity: number,
+    @Body('remark') remark: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const uid = user?.userId ?? 0;
+    const uname = user?.username ?? '';
+    return this.service.resolveOperatorLabel(uid, uname).then((operatorUsername) =>
+      this.service.outbound({
+        accessoryId: Number(accessoryId),
+        quantity: Number(quantity),
+        outboundType: 'manual',
+        operatorUsername,
+        remark,
+        orderId: null,
+        orderNo: '',
+      }),
+    );
   }
 }

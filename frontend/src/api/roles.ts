@@ -11,7 +11,14 @@ export function getRoles() {
   return request.get<RoleItem[]>('/roles')
 }
 
-export function createRole(data: { code: string; name: string }) {
+/** 根据角色名称获取系统建议的编码（与菜单/业务命名一致） */
+export function suggestRoleCode(name: string) {
+  return request.get<{ code: string | null }>('/roles/suggest-code', {
+    params: { name: (name || '').trim() },
+  })
+}
+
+export function createRole(data: { code?: string; name: string }) {
   return request.post('/roles', data)
 }
 

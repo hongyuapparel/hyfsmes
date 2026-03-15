@@ -26,12 +26,81 @@
         </div>
       </template>
       <el-table :data="materialRows" border size="small" class="cost-table">
-        <el-table-column label="物料类型" prop="materialType" min-width="90" show-overflow-tooltip />
-        <el-table-column label="供应商" prop="supplierName" min-width="100" show-overflow-tooltip />
-        <el-table-column label="物料名称/颜色" prop="materialName" min-width="120" show-overflow-tooltip />
-        <el-table-column label="单件用量" prop="usagePerPiece" width="82" align="right" />
-        <el-table-column label="损耗%" prop="lossPercent" width="72" align="right" />
-        <el-table-column label="采购总量" prop="purchaseQuantity" width="82" align="right" />
+        <el-table-column label="物料类型" min-width="90">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.materialTypeId"
+              placeholder="选择物料类型"
+              filterable
+              clearable
+              size="small"
+            >
+              <el-option
+                v-for="opt in materialTypeOptions"
+                :key="opt.id"
+                :label="opt.label"
+                :value="opt.id"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="供应商" min-width="100">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.supplierName"
+              placeholder="选择或输入供应商"
+              filterable
+              allow-create
+              default-first-option
+              :remote-method="searchSuppliers"
+              remote
+              :loading="supplierLoading"
+              size="small"
+            >
+              <el-option
+                v-for="s in supplierOptions"
+                :key="s.id"
+                :label="s.name"
+                :value="s.name"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="物料名称" min-width="140">
+          <template #default="{ row }">
+            <el-input v-model="row.materialName" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="颜色" min-width="100">
+          <template #default="{ row }">
+            <el-input v-model="row.color" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="幅宽(cm)" width="100" align="right">
+          <template #default="{ row }">
+            <el-input v-model="row.fabricWidth" size="small" placeholder="如 183cm" />
+          </template>
+        </el-table-column>
+        <el-table-column label="单件用量" width="82" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.usagePerPiece"
+              :min="0"
+              :controls="false"
+              size="small"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="损耗%" width="72" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.lossPercent"
+              :min="0"
+              :controls="false"
+              size="small"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="单价(元)" width="90" align="right">
           <template #default="{ row }">
             <el-input-number
@@ -49,7 +118,11 @@
             {{ formatMoney(materialAmount(row)) }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" prop="remark" min-width="80" show-overflow-tooltip />
+        <el-table-column label="备注" min-width="120">
+          <template #default="{ row }">
+            <el-input v-model="row.remark" size="small" />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="56" fixed="right" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" size="small" @click="removeMaterialRow($index)">
@@ -70,8 +143,46 @@
         </div>
       </template>
       <el-table :data="processItemRows" border size="small" class="cost-table">
-        <el-table-column label="工艺项目" prop="processName" min-width="120" show-overflow-tooltip />
-        <el-table-column label="供应商" prop="supplierName" min-width="100" show-overflow-tooltip />
+        <el-table-column label="工艺项目" min-width="120">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.processName"
+              placeholder="选择工艺项目"
+              filterable
+              allow-create
+              default-first-option
+              size="small"
+            >
+              <el-option
+                v-for="p in processOptions"
+                :key="p"
+                :label="p"
+                :value="p"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="供应商" min-width="100">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.supplierName"
+              placeholder="选择供应商"
+              filterable
+              clearable
+              :remote-method="searchSuppliers"
+              remote
+              :loading="supplierLoading"
+              size="small"
+            >
+              <el-option
+                v-for="s in supplierOptions"
+                :key="s.id"
+                :label="s.name"
+                :value="s.name"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
         <el-table-column label="单价(元)" width="90" align="right">
           <template #default="{ row }">
             <el-input-number
@@ -84,12 +195,26 @@
             />
           </template>
         </el-table-column>
+        <el-table-column label="数量" width="80" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.quantity"
+              :min="0"
+              :controls="false"
+              size="small"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="金额(元)" width="90" align="right">
           <template #default="{ row }">
             {{ formatMoney(processItemAmount(row)) }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" prop="remark" min-width="100" show-overflow-tooltip />
+        <el-table-column label="备注" min-width="100">
+          <template #default="{ row }">
+            <el-input v-model="row.remark" size="small" />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="56" fixed="right" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" size="small" @click="removeProcessItemRow($index)">
@@ -106,28 +231,100 @@
       <template #header>
         <div class="block-header">
           <span class="block-title">生产工序成本</span>
+          <el-button link type="primary" size="small" @click="addProductionRow">新增</el-button>
         </div>
       </template>
-      <div class="process-checkbox-wrap">
-        <el-checkbox-group v-model="selectedProcessIds">
-          <div class="process-grid">
-            <el-checkbox
-              v-for="p in productionProcesses"
-              :key="p.id"
-              :label="p.id"
-              class="process-checkbox"
+      <el-table :data="productionRows" border size="small" class="cost-table">
+        <el-table-column label="部门" min-width="100">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.department"
+              placeholder="选择部门"
+              filterable
+              allow-create
+              default-first-option
+              size="small"
             >
-              <template v-if="p.department || p.jobType">
-                {{ [p.department, p.jobType].filter(Boolean).join(' · ') }} · {{ p.name }}（{{ p.unitPrice }} 元）
-              </template>
-              <template v-else>
-                {{ p.name }}（{{ p.unitPrice }} 元）
-              </template>
-            </el-checkbox>
-          </div>
-        </el-checkbox-group>
-        <p v-if="!productionProcesses.length" class="empty-hint">暂无配置工序，请在系统设置中维护生产工序及单价。</p>
-      </div>
+              <el-option
+                v-for="d in departmentOptions"
+                :key="d"
+                :label="d"
+                :value="d"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="工种" min-width="100">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.jobType"
+              placeholder="选择工种"
+              filterable
+              allow-create
+              default-first-option
+              size="small"
+            >
+              <el-option
+                v-for="j in jobTypeOptions"
+                :key="j"
+                :label="getJobTypeLabel(j)"
+                :value="j"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="工序" min-width="140">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.processId"
+              placeholder="选择工序"
+              filterable
+              clearable
+              size="small"
+              @change="onProductionProcessChange(row)"
+            >
+              <el-option
+                v-for="p in productionProcesses"
+                :key="p.id"
+                :label="formatProductionProcessLabel(p)"
+                :value="p.id"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="单价(元)" width="90" align="right">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.unitPrice"
+              :min="0"
+              :precision="2"
+              :controls="false"
+              size="small"
+              class="price-input"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column label="小计(元)" width="90" align="right">
+          <template #default="{ row }">
+            {{ formatMoney(productionAmount(row)) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="120">
+          <template #default="{ row }">
+            <el-input v-model="row.remark" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="56" fixed="right" align="center">
+          <template #default="{ $index }">
+            <el-button link type="danger" size="small" @click="removeProductionRow($index)">
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <p v-if="!productionProcesses.length" class="empty-hint">
+        暂无配置工序，请在系统设置中维护生产工序部门/工种/工序及单价。
+      </p>
       <div class="subtotal">生产工序小计：<strong>{{ formatMoney(productionProcessTotal) }}</strong> 元</div>
     </el-card>
 
@@ -173,8 +370,15 @@
         </div>
       </div>
       <div class="result-actions">
-        <el-button @click="goBack">仅查看</el-button>
-        <el-button type="primary" :loading="applying" @click="applyToOrder">应用到订单</el-button>
+        <el-button @click="goBack">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="applying"
+          :disabled="!canSaveCost"
+          @click="applyToOrder"
+        >
+          保存
+        </el-button>
       </div>
     </el-card>
   </div>
@@ -185,12 +389,16 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
-import { getOrderDetail, updateOrderDraft, type OrderDetail } from '@/api/orders'
+import { getOrderDetail, getOrderCost, saveOrderCost, updateOrderDraft, type OrderDetail } from '@/api/orders'
 import { getProductionProcesses, type ProductionProcessItem } from '@/api/production-processes'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
+import request, { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getDictItems } from '@/api/dicts'
+import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 
 const orderId = computed(() => {
   const v = route.params.id
@@ -202,14 +410,22 @@ const order = ref<OrderDetail | null>(null)
 const materialRows = ref<MaterialRow[]>([])
 const processItemRows = ref<ProcessItemRow[]>([])
 const productionProcesses = ref<ProductionProcessItem[]>([])
-const selectedProcessIds = ref<number[]>([])
+const productionRows = ref<ProductionRow[]>([])
 const profitMargin = ref(0.15)
 const applying = ref(false)
 
+const materialTypeOptions = ref<{ id: number; label: string }[]>([])
+const supplierOptions = ref<{ id: number; name: string }[]>([])
+const supplierLoading = ref(false)
+const processOptions = ref<string[]>([])
+
 interface MaterialRow {
+  materialTypeId?: number | null
   materialType?: string
   supplierName?: string
   materialName?: string
+  color?: string
+  fabricWidth?: string
   usagePerPiece?: number | null
   lossPercent?: number | null
   orderPieces?: number | null
@@ -224,16 +440,28 @@ interface ProcessItemRow {
   supplierName?: string
   remark?: string
   unitPrice: number
+  quantity: number
+}
+
+interface ProductionRow {
+  processId?: number | null
+  department?: string
+  jobType?: string
+  processName?: string
+  remark?: string
+  unitPrice: number
 }
 
 function materialAmount(row: MaterialRow): number {
-  const qty = Number(row.purchaseQuantity) || 0
+  const usage = Number(row.usagePerPiece) || 0
+  const lossPercent = Number(row.lossPercent) || 0
   const price = Number(row.unitPrice) || 0
-  return qty * price
+  const lossRate = lossPercent / 100
+  return usage * (1 + lossRate) * price
 }
 
 function processItemAmount(row: ProcessItemRow): number {
-  const qty = order.value?.quantity ?? 0
+  const qty = Number(row.quantity) || 0
   const price = Number(row.unitPrice) || 0
   return qty * price
 }
@@ -244,13 +472,9 @@ const materialTotal = computed(() =>
 const processItemTotal = computed(() =>
   processItemRows.value.reduce((sum, row) => sum + processItemAmount(row), 0)
 )
-const productionProcessTotal = computed(() => {
-  const list = productionProcesses.value
-  return selectedProcessIds.value.reduce((sum, id) => {
-    const p = list.find((x) => x.id === id)
-    return sum + (p ? Number(p.unitPrice) || 0 : 0)
-  }, 0)
-})
+const productionProcessTotal = computed(() =>
+  productionRows.value.reduce((sum, row) => sum + productionAmount(row), 0)
+)
 const totalCost = computed(() => materialTotal.value + processItemTotal.value + productionProcessTotal.value)
 const computedExFactoryPrice = computed(() => {
   const cost = totalCost.value
@@ -261,6 +485,85 @@ const computedExFactoryPrice = computed(() => {
 
 function formatMoney(n: number): string {
   return Number.isNaN(n) ? '0.00' : n.toFixed(2)
+}
+
+const canSaveCost = computed(() => {
+  const roleName = authStore.user?.roleName
+  if (!roleName) return false
+  return roleName === '管理员' || roleName === '跟单员'
+})
+
+const departmentOptions = computed(() =>
+  Array.from(new Set(productionProcesses.value.map((p) => p.department).filter((v) => !!v)))
+)
+
+const jobTypeOptions = computed(() =>
+  Array.from(new Set(productionProcesses.value.map((p) => p.jobType).filter((v) => !!v)))
+)
+
+function productionAmount(row: ProductionRow): number {
+  const price = Number(row.unitPrice) || 0
+  return price
+}
+
+function getJobTypeLabel(v: string): string {
+  if (!v) return ''
+  const parts = v.split('>').map((s) => s.trim()).filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : v
+}
+
+async function loadMaterialTypes() {
+  try {
+    const res = await getDictItems('material_types')
+    const list = res.data ?? []
+    materialTypeOptions.value = list.map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('物料类型加载失败', getErrorMessage(e))
+  }
+}
+
+function syncMaterialTypeIdsFromLabel() {
+  if (!materialTypeOptions.value.length || !materialRows.value.length) return
+  const map = new Map<string, number>()
+  materialTypeOptions.value.forEach((opt) => {
+    if (opt.label) map.set(String(opt.label), opt.id)
+  })
+  materialRows.value.forEach((row) => {
+    if ((row.materialTypeId == null || Number.isNaN(row.materialTypeId as any)) && row.materialType) {
+      const id = map.get(String(row.materialType))
+      if (id) {
+        row.materialTypeId = id
+      }
+    }
+  })
+}
+
+async function searchSuppliers(keyword: string) {
+  supplierLoading.value = true
+  try {
+    const res = await request.get('/suppliers', {
+      params: { keyword: keyword || undefined, pageSize: 20 },
+      skipGlobalErrorHandler: true,
+    })
+    const data = res.data as { list?: { id: number; name: string }[] }
+    supplierOptions.value = data.list ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('供应商下拉加载失败', getErrorMessage(e))
+  } finally {
+    supplierLoading.value = false
+  }
+}
+
+async function loadProcessOptions() {
+  try {
+    const res = await getSupplierBusinessScopeOptions('工艺供应商')
+    processOptions.value = res.data ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('工艺项目选项加载失败', getErrorMessage(e))
+  }
 }
 
 function addMaterialRow() {
@@ -288,6 +591,7 @@ function addProcessItemRow() {
     supplierName: '',
     remark: '',
     unitPrice: 0,
+    quantity: order.value?.quantity ?? 0,
   })
 }
 
@@ -296,8 +600,19 @@ function removeProcessItemRow(index: number) {
 }
 
 function syncFromOrder(d: OrderDetail) {
-  const mats = (d.materials ?? []).map((m) => ({
-    ...m,
+  const mats = (d.materials ?? []).map((m: any) => ({
+    materialTypeId: m.materialTypeId ?? null,
+    materialType: m.materialType ?? '',
+    supplierName: m.supplierName ?? '',
+    materialName: m.materialName ?? '',
+    color: m.color ?? '',
+    fabricWidth: m.fabricWidth ?? '',
+    usagePerPiece: m.usagePerPiece ?? null,
+    lossPercent: m.lossPercent ?? null,
+    orderPieces: m.orderPieces ?? null,
+    purchaseQuantity: m.purchaseQuantity ?? null,
+    cuttingQuantity: m.cuttingQuantity ?? null,
+    remark: m.remark ?? '',
     unitPrice: 0,
   })) as MaterialRow[]
   materialRows.value = mats.length ? mats : [{ unitPrice: 0 } as MaterialRow]
@@ -305,6 +620,7 @@ function syncFromOrder(d: OrderDetail) {
   const procs = (d.processItems ?? []).map((p) => ({
     ...p,
     unitPrice: 0,
+    quantity: d.quantity ?? 0,
   })) as ProcessItemRow[]
   processItemRows.value = procs.length ? procs : [{ unitPrice: 0 } as ProcessItemRow]
 }
@@ -320,13 +636,90 @@ async function loadOrder() {
   }
 }
 
+async function loadCostSnapshot() {
+  if (!orderId.value) return
+  try {
+    const res = await getOrderCost(orderId.value)
+    const data = res.data
+    if (data?.snapshot && typeof data.snapshot === 'object') {
+      const s = data.snapshot
+      if (Array.isArray(s.materialRows) && s.materialRows.length) materialRows.value = s.materialRows as MaterialRow[]
+      if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows as ProcessItemRow[]
+      if (Array.isArray(s.productionRows) && s.productionRows.length) productionRows.value = s.productionRows as ProductionRow[]
+      if (typeof s.profitMargin === 'number') profitMargin.value = s.profitMargin
+    }
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
+  }
+}
+
 async function loadProcesses() {
   try {
     const res = await getProductionProcesses()
     productionProcesses.value = res.data ?? []
+    if (!productionRows.value.length) {
+      const first = productionProcesses.value[0]
+      productionRows.value.push({
+        processId: first?.id ?? null,
+        department: first?.department ?? '',
+        jobType: first?.jobType ?? '',
+        processName: first?.name ?? '',
+        remark: '',
+        unitPrice: first ? Number(first.unitPrice) || 0 : 0,
+      })
+    }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载生产工序失败'))
   }
+}
+
+function addProductionRow() {
+  productionRows.value.push({
+    processId: null,
+    department: '',
+    jobType: '',
+    processName: '',
+    remark: '',
+    unitPrice: 0,
+  })
+}
+
+function removeProductionRow(index: number) {
+  productionRows.value.splice(index, 1)
+}
+
+function syncProductionIdsFromName() {
+  if (!productionProcesses.value.length || !productionRows.value.length) return
+  const map = new Map<string, ProductionProcessItem>()
+  productionProcesses.value.forEach((p) => {
+    if (p.name) map.set(p.name, p)
+  })
+  productionRows.value.forEach((row) => {
+    if ((row.processId == null || Number.isNaN(row.processId as any)) && row.processName) {
+      const found = map.get(row.processName)
+      if (found) {
+        row.processId = found.id
+        row.department = found.department || row.department
+        row.jobType = found.jobType || row.jobType
+        row.unitPrice = Number(found.unitPrice) || row.unitPrice
+      }
+    }
+  })
+}
+
+function formatProductionProcessLabel(p: ProductionProcessItem): string {
+  // 下拉里只展示当前工序名称，部门/工种在表格前两列单独展示即可
+  return p.name
+}
+
+function onProductionProcessChange(row: ProductionRow) {
+  if (!row.processId) return
+  const found = productionProcesses.value.find((p) => p.id === row.processId)
+  if (!found) return
+  row.department = found.department || row.department
+  row.jobType = found.jobType || row.jobType
+  row.unitPrice = Number(found.unitPrice) || 0
+  row.processName = found.name
 }
 
 async function applyToOrder() {
@@ -340,9 +733,36 @@ async function applyToOrder() {
   try {
     await updateOrderDraft(orderId.value, { exFactoryPrice: price.toFixed(2) })
     if (order.value) order.value.exFactoryPrice = price.toFixed(2)
-    ElMessage.success('已将该出厂价写回订单')
+    await saveOrderCost(orderId.value, {
+      snapshot: {
+        materialRows: materialRows.value.map((row) => ({
+          materialTypeId: row.materialTypeId ?? null,
+          supplierName: row.supplierName ?? '',
+          materialName: row.materialName ?? '',
+          color: row.color ?? '',
+          fabricWidth: row.fabricWidth ?? '',
+          usagePerPiece: row.usagePerPiece ?? null,
+          lossPercent: row.lossPercent ?? null,
+          orderPieces: row.orderPieces ?? null,
+          purchaseQuantity: row.purchaseQuantity ?? null,
+          cuttingQuantity: row.cuttingQuantity ?? null,
+          remark: row.remark ?? '',
+          unitPrice: row.unitPrice,
+        })),
+        processItemRows: processItemRows.value,
+        productionRows: productionRows.value.map((row) => ({
+          processId: row.processId ?? null,
+          department: row.department ?? '',
+          jobType: row.jobType ?? '',
+          unitPrice: row.unitPrice,
+          remark: row.remark ?? '',
+        })),
+        profitMargin: profitMargin.value,
+      },
+    })
+    ElMessage.success('已保存成本并同步出厂价到订单')
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '应用失败'))
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
   } finally {
     applying.value = false
   }
@@ -352,9 +772,16 @@ function goBack() {
   router.push('/orders/list')
 }
 
-onMounted(() => {
-  loadOrder()
-  loadProcesses()
+onMounted(async () => {
+  await loadOrder()
+  await loadCostSnapshot()
+  await loadProcesses()
+  syncProductionIdsFromName()
+  await loadMaterialTypes()
+  // 物料类型：旧订单/快照里可能只有 materialType 字符串，这里在字典和明细都加载完后做一次自动映射
+  syncMaterialTypeIdsFromLabel()
+  loadProcessOptions()
+  searchSuppliers('')
 })
 </script>
 

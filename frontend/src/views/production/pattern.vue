@@ -9,7 +9,7 @@
             :key="tab.value"
             :label="tab.value"
           >
-            {{ tab.label }}
+            {{ getTabLabel(tab) }}
           </el-radio-button>
         </el-radio-group>
       </div>
@@ -58,7 +58,7 @@
         </template>
       </el-input>
       <el-tree-select
-        v-model="filter.orderType"
+        v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"
         placeholder="订单类型"
         filterable
@@ -69,34 +69,40 @@
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(
-          filter.orderType && `订单类型：${getOrderTypeDisplayLabel(filter.orderType)}`,
-        )"
+        :style="
+          getFilterSelectAutoWidthStyle(
+            filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`,
+          )
+        "
         @change="onSearch"
       >
         <template #prefix>
-          <span v-if="filter.orderType" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
+          <span v-if="filter.orderTypeId" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
         </template>
       </el-tree-select>
       <el-select
-        v-model="filter.collaborationType"
+        v-model="filter.collaborationTypeId"
         placeholder="合作方式"
         filterable
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.collaborationType)"
+        :style="
+          getFilterSelectAutoWidthStyle(
+            filter.collaborationTypeId && `合作方式：${findCollaborationLabelById(filter.collaborationTypeId)}`,
+          )
+        "
         @change="onSearch"
       >
         <template #label="{ label }">
-          <span v-if="filter.collaborationType">合作方式：{{ label }}</span>
+          <span v-if="filter.collaborationTypeId">合作方式：{{ label }}</span>
           <span v-else>{{ label }}</span>
         </template>
         <el-option
           v-for="opt in collaborationOptions"
-          :key="opt.value"
+          :key="opt.id"
           :label="opt.label"
-          :value="opt.value"
+          :value="opt.id"
         />
       </el-select>
       <el-select
@@ -132,13 +138,14 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
           v-if="hasSelection"
           type="primary"
           size="large"
           @click="openAssignDialog"
         >
-          分配纸样师和车板师
+          分配纸样师和车版师
         </el-button>
         <el-button
           v-if="hasSelection && canCompleteSelection"
@@ -178,7 +185,11 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="orderType" label="订单类型" width="100" show-overflow-tooltip />
+      <el-table-column label="订单类型" width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ orderTypeDisplay(row) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="purchaseStatus" label="采购状态" width="96" align="center">
         <template #default="{ row }">
           <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'info'" size="small">
@@ -186,9 +197,13 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="collaborationType" label="合作方式" width="100" show-overflow-tooltip />
+      <el-table-column label="合作方式" width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          {{ collaborationDisplay(row) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="patternMaster" label="纸样师" width="90" show-overflow-tooltip />
-      <el-table-column prop="sampleMaker" label="车板师" width="90" show-overflow-tooltip />
+      <el-table-column prop="sampleMaker" label="车版师" width="90" show-overflow-tooltip />
       <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
@@ -206,10 +221,10 @@
       />
     </div>
 
-    <!-- 分配纸样师和车板师弹窗 -->
+    <!-- 分配纸样师和车版师弹窗 -->
     <el-dialog
       v-model="assignDialog.visible"
-      title="分配纸样师和车板师"
+      title="分配纸样师和车版师"
       width="420"
       destroy-on-close
       @close="resetAssignForm"
@@ -221,10 +236,36 @@
         label-width="100px"
       >
         <el-form-item label="纸样师" prop="patternMaster">
-          <el-input v-model="assignForm.patternMaster" placeholder="请输入纸样师" clearable />
+          <el-select
+            v-model="assignForm.patternMaster"
+            placeholder="请选择纸样师"
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="e in patternMasterOptions"
+              :key="e.id"
+              :label="e.name"
+              :value="e.name"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="车板师" prop="sampleMaker">
-          <el-input v-model="assignForm.sampleMaker" placeholder="请输入车板师" clearable />
+        <el-form-item label="车版师" prop="sampleMaker">
+          <el-select
+            v-model="assignForm.sampleMaker"
+            placeholder="请选择车版师"
+            clearable
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="e in sampleMakerOptions"
+              :key="e.id"
+              :label="e.name"
+              :value="e.name"
+            />
+          </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -284,11 +325,12 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { getPatternItems, assignPattern, completePattern, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
+import { getPatternItems, assignPattern, completePattern, exportPatternItems, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getDictTree, getDictOptions } from '@/api/dicts'
+import { getDictTree, getDictItems } from '@/api/dicts'
 import { uploadImage } from '@/api/uploads'
 import type { SystemOptionTreeNode } from '@/api/system-options'
+import { getEmployeeList, type EmployeeItem } from '@/api/hr'
 
 const PATTERN_TABS = [
   { label: '全部', value: 'all' },
@@ -297,25 +339,37 @@ const PATTERN_TABS = [
   { label: '订单完成', value: 'completed' },
 ] as const
 
+type PatternTabConfig = (typeof PATTERN_TABS)[number]
+
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
-const collaborationOptions = ref<{ label: string; value: string }[]>([])
+const collaborationOptions = ref<{ id: number; label: string }[]>([])
 
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
-  parentPath = '',
-): { label: string; value: string; children?: unknown[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: unknown[]; disabled?: boolean }[] {
   return nodes.map((n) => {
-    const path = parentPath ? `${parentPath} > ${n.value}` : n.value
-    const children = n.children?.length ? toOrderTypeTreeSelect(n.children, path) : []
+    const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
     const hasChildren = children.length > 0
-    return { label: n.value, value: path, children: hasChildren ? children : undefined, disabled: hasChildren }
+    return { label: n.value, value: n.id, children: hasChildren ? children : undefined, disabled: hasChildren }
   })
 }
 const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
-function getOrderTypeDisplayLabel(v: string | undefined): string {
-  if (!v) return ''
-  const parts = v.split('>').map((s) => s.trim()).filter(Boolean)
-  return parts.length ? parts[parts.length - 1] : v
+
+function findOrderTypeLabelById(id: number | null | undefined): string {
+  if (!id) return ''
+  const stack: SystemOptionTreeNode[] = [...orderTypeTree.value]
+  while (stack.length) {
+    const node = stack.pop()!
+    if (node.id === id) return node.value
+    if (node.children?.length) stack.push(...node.children)
+  }
+  return ''
+}
+
+function findCollaborationLabelById(id: number | null | undefined): string {
+  if (!id) return ''
+  const found = collaborationOptions.value.find((opt) => opt.id === id)
+  return found?.label ?? ''
 }
 function purchaseStatusLabel(v: string): string {
   return v === 'completed' ? '已完成' : v === 'pending' ? '未完成' : v
@@ -364,8 +418,8 @@ function getFilterRangeStyle(v: [string, string] | null) {
 const filter = reactive({
   orderNo: '',
   skuCode: '',
-  orderType: '',
-  collaborationType: '',
+  orderTypeId: null as number | null,
+  collaborationTypeId: null as number | null,
   purchaseStatus: '',
 })
 const orderDateRange = ref<[string, string] | null>(null)
@@ -373,8 +427,11 @@ const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 
 const currentTab = ref<string>('all')
+const tabCounts = ref<Record<string, number>>({})
+const tabTotal = ref(0)
 const list = ref<PatternListItem[]>([])
 const loading = ref(false)
+const exporting = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PatternListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
@@ -382,13 +439,22 @@ const canCompleteSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.every((r) => r.patternStatus !== 'completed'),
 )
 
+function getTabLabel(tab: PatternTabConfig): string {
+  const counts = tabCounts.value
+  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  return `${tab.label}(${count})`
+}
+
 const assignDialog = reactive<{ visible: boolean; submitting: boolean }>({ visible: false, submitting: false })
 const assignFormRef = ref<FormInstance>()
 const assignForm = reactive({ patternMaster: '', sampleMaker: '' })
 const assignRules: FormRules = {
-  patternMaster: [{ required: true, message: '请输入纸样师', trigger: 'blur' }],
-  sampleMaker: [{ required: true, message: '请输入车板师', trigger: 'blur' }],
+  patternMaster: [{ required: true, message: '请选择纸样师', trigger: 'change' }],
+  sampleMaker: [{ required: true, message: '请选择车版师', trigger: 'change' }],
 }
+
+const patternMasterOptions = ref<EmployeeItem[]>([])
+const sampleMakerOptions = ref<EmployeeItem[]>([])
 
 const completeDialog = reactive<{ visible: boolean; submitting: boolean; row: PatternListItem | null }>({
   visible: false,
@@ -421,8 +487,8 @@ function buildQuery(): PatternListQuery {
     tab: currentTab.value,
     orderNo: filter.orderNo || undefined,
     skuCode: filter.skuCode || undefined,
-    orderType: filter.orderType || undefined,
-    collaborationType: filter.collaborationType || undefined,
+    orderTypeId: filter.orderTypeId ?? undefined,
+    collaborationTypeId: filter.collaborationTypeId ?? undefined,
     purchaseStatus: filter.purchaseStatus || undefined,
     page: pagination.page,
     pageSize: pagination.pageSize,
@@ -432,6 +498,26 @@ function buildQuery(): PatternListQuery {
     q.orderDateEnd = orderDateRange.value[1]
   }
   return q
+}
+
+async function loadTabCounts() {
+  const base = buildQuery()
+  base.page = 1
+  base.pageSize = 1
+  const counts: Record<string, number> = {}
+  await Promise.all(
+    PATTERN_TABS.map(async (tab) => {
+      try {
+        const res = await getPatternItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }),
+  )
+  tabCounts.value = counts
+  tabTotal.value = counts.all ?? 0
 }
 
 async function load() {
@@ -450,6 +536,28 @@ async function load() {
   }
 }
 
+async function onExport() {
+  const query = buildQuery()
+  const { page, pageSize, ...rest } = query
+  exporting.value = true
+  try {
+    const res = await exportPatternItems(rest)
+    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `纸样管理_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(a)
+    a.click()
+    document.body.removeChild(a)
+    window.URL.revokeObjectURL(url)
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
+  } finally {
+    exporting.value = false
+  }
+}
+
 function onSearch(byUser = false) {
   if (byUser) {
     if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
@@ -457,6 +565,7 @@ function onSearch(byUser = false) {
   }
   pagination.page = 1
   load()
+  void loadTabCounts()
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -470,20 +579,22 @@ function onReset() {
   skuCodeLabelVisible.value = false
   filter.orderNo = ''
   filter.skuCode = ''
-  filter.orderType = ''
-  filter.collaborationType = ''
+  filter.orderTypeId = null
+  filter.collaborationTypeId = null
   filter.purchaseStatus = ''
   orderDateRange.value = null
   currentTab.value = 'all'
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onTabChange() {
   pagination.page = 1
   selectedRows.value = []
   load()
+  void loadTabCounts()
 }
 
 function onPageSizeChange() {
@@ -523,6 +634,7 @@ async function submitAssign() {
     ElMessage.success('分配成功')
     assignDialog.visible = false
     await load()
+    void loadTabCounts()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '分配失败'))
   } finally {
@@ -581,6 +693,7 @@ async function submitComplete() {
     ElMessage.success('纸样已完成，订单已进入待采购')
     completeDialog.visible = false
     await load()
+    void loadTabCounts()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
   } finally {
@@ -592,20 +705,54 @@ async function loadOptions() {
   try {
     const [orderTypeRes, collabRes] = await Promise.all([
       getDictTree('order_types'),
-      getDictOptions('collaboration'),
+      getDictItems('collaboration'),
     ])
     orderTypeTree.value = Array.isArray(orderTypeRes.data) ? orderTypeRes.data : []
-    const cv = collabRes.data ?? []
-    collaborationOptions.value = (Array.isArray(cv) ? cv : []).map((v: string) => ({ label: v, value: v }))
+    const items = collabRes.data ?? []
+    collaborationOptions.value = (Array.isArray(items) ? items : []).map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
   } catch {
     orderTypeTree.value = []
     collaborationOptions.value = []
   }
 }
 
+function orderTypeDisplay(row: PatternListItem): string {
+  if (typeof row.orderTypeId === 'number') {
+    const label = findOrderTypeLabelById(row.orderTypeId)
+    if (label && label.trim()) return label.trim()
+  }
+  return ''
+}
+
+function collaborationDisplay(row: PatternListItem): string {
+  if (typeof row.collaborationTypeId === 'number') {
+    const label = findCollaborationLabelById(row.collaborationTypeId)
+    if (label && label.trim()) return label.trim()
+  }
+  return ''
+}
+
+async function loadPatternStaffOptions() {
+  try {
+    const res = await getEmployeeList({ status: 'active', page: 1, pageSize: 200 })
+    const data = res.data
+    const employees = data?.list ?? []
+    patternMasterOptions.value = employees.filter((e) => e.jobTitleName === '纸样师')
+    sampleMakerOptions.value = employees.filter((e) => e.jobTitleName === '车版师')
+  } catch {
+    patternMasterOptions.value = []
+    sampleMakerOptions.value = []
+  }
+}
+
 onMounted(() => {
   loadOptions()
   load()
+  void loadTabCounts()
+  void loadPatternStaffOptions()
 })
 </script>
 

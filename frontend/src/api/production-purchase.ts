@@ -7,7 +7,8 @@ export interface PurchaseItemRow {
   orderDate: string | null
   imageUrl: string
   skuCode: string
-  orderType: string
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId: number | null
   supplierName: string
   materialName: string
   planQuantity: number | null
@@ -15,6 +16,10 @@ export interface PurchaseItemRow {
   purchaseAmount: string | null
   purchaseStatus: string
   purchaseCompletedAt: string | null
+  purchaseUnitPrice: string | null
+  purchaseOtherCost: string | null
+  purchaseRemark: string | null
+  purchaseImageUrl: string | null
 }
 
 export interface PurchaseListRes {
@@ -29,7 +34,8 @@ export interface PurchaseListQuery {
   orderNo?: string
   skuCode?: string
   supplier?: string
-  orderType?: string
+  /** 订单类型 ID */
+  orderTypeId?: number
   orderDateStart?: string
   orderDateEnd?: string
   page?: number
@@ -44,7 +50,10 @@ export function registerPurchase(payload: {
   orderId: number
   materialIndex: number
   actualPurchaseQuantity: number
-  purchaseAmount: string
+  unitPrice: string
+  otherCost: string
+  remark: string
+  imageUrl: string
 }) {
   return request.post<void>('/production/purchase/items/register', payload)
 }

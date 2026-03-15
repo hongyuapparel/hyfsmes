@@ -9,6 +9,9 @@ import { AllExceptionsFilter } from './common/http-exception.filter';
 import { seedPermissions } from './database/seed-permissions';
 import { seedAdmin } from './database/seed-admin';
 import { seedFieldDefinitions } from './database/seed-field-definitions';
+import { seedOrderCostSnapshotsTable } from './database/seed-order-cost-snapshots';
+import { seedOrderSewingFactoryDueDate } from './database/seed-order-sewing-factory-due-date';
+import { seedOrderSewingQuantityRow } from './database/seed-order-sewing-quantity-row';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -31,6 +34,9 @@ async function bootstrap() {
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);
+    await seedOrderCostSnapshotsTable(dataSource);
+    await seedOrderSewingFactoryDueDate(dataSource);
+    await seedOrderSewingQuantityRow(dataSource);
   } catch (err) {
     console.error('[Seed] Failed:', err);
   }

@@ -36,17 +36,17 @@ export class SuppliersService {
    */
   async getList(params: {
     name?: string;
-    type?: string;
+    supplierTypeId?: number | null;
     page?: number;
     pageSize?: number;
   }) {
-    const { name, type, page = 1, pageSize = 20 } = params;
+    const { name, supplierTypeId, page = 1, pageSize = 20 } = params;
     const qb = this.supplierRepo.createQueryBuilder('s');
     if (name?.trim()) {
       qb.andWhere('s.name LIKE :name', { name: `%${name.trim()}%` });
     }
-    if (type?.trim()) {
-      qb.andWhere('s.type = :type', { type: type.trim() });
+    if (supplierTypeId != null) {
+      qb.andWhere('s.supplier_type_id = :supplierTypeId', { supplierTypeId });
     }
     qb.orderBy('s.id', 'DESC');
     const total = await qb.getCount();
@@ -65,8 +65,8 @@ export class SuppliersService {
 
   async create(dto: {
     name: string;
-    type?: string;
-    businessScope?: string;
+    supplierTypeId?: number | null;
+    businessScopeId?: number | null;
     cooperationDate?: string;
     contactPerson?: string;
     contactInfo?: string;
@@ -75,8 +75,10 @@ export class SuppliersService {
   }): Promise<Supplier> {
     const entity = this.supplierRepo.create({
       name: dto.name?.trim() ?? '',
-      type: dto.type?.trim() ?? '',
-      businessScope: dto.businessScope?.trim() ?? '',
+      supplierTypeId:
+        dto.supplierTypeId != null ? Number(dto.supplierTypeId) : null,
+      businessScopeId:
+        dto.businessScopeId != null ? Number(dto.businessScopeId) : null,
       cooperationDate: dto.cooperationDate ? new Date(dto.cooperationDate) : null,
       contactPerson: dto.contactPerson?.trim() ?? '',
       contactInfo: dto.contactInfo?.trim() ?? '',
@@ -90,8 +92,8 @@ export class SuppliersService {
     id: number,
     dto: {
       name?: string;
-      type?: string;
-      businessScope?: string;
+      supplierTypeId?: number | null;
+      businessScopeId?: number | null;
       cooperationDate?: string;
       contactPerson?: string;
       contactInfo?: string;
@@ -102,8 +104,14 @@ export class SuppliersService {
     const item = await this.supplierRepo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('供应商不存在');
     if (dto.name !== undefined) item.name = dto.name.trim();
-    if (dto.type !== undefined) item.type = dto.type?.trim() ?? '';
-    if (dto.businessScope !== undefined) item.businessScope = dto.businessScope?.trim() ?? '';
+    if (dto.supplierTypeId !== undefined) {
+      item.supplierTypeId =
+        dto.supplierTypeId != null ? Number(dto.supplierTypeId) : null;
+    }
+    if (dto.businessScopeId !== undefined) {
+      item.businessScopeId =
+        dto.businessScopeId != null ? Number(dto.businessScopeId) : null;
+    }
     if (dto.cooperationDate !== undefined) {
       item.cooperationDate = dto.cooperationDate ? new Date(dto.cooperationDate) : null;
     }

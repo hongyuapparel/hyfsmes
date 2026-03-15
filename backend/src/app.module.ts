@@ -22,15 +22,23 @@ import { OrderCutting } from './entities/order-cutting.entity';
 import { OrderPattern } from './entities/order-pattern.entity';
 import { OrderFinishing } from './entities/order-finishing.entity';
 import { OrderRemark } from './entities/order-remark.entity';
+import { OrderCostSnapshot } from './entities/order-cost-snapshot.entity';
 import { OrderSewing } from './entities/order-sewing.entity';
 import { ProductionProcess } from './entities/production-process.entity';
 import { InboundPending } from './entities/inbound-pending.entity';
 import { FinishedGoodsStock } from './entities/finished-goods-stock.entity';
+import { FinishedGoodsOutbound } from './entities/finished-goods-outbound.entity';
 import { InventoryAccessory } from './entities/inventory-accessory.entity';
+import { InventoryAccessoryOutbound } from './entities/inventory-accessory-outbound.entity';
 import { FabricStock } from './entities/fabric-stock.entity';
 import { FabricOutbound } from './entities/fabric-outbound.entity';
 import { Employee } from './entities/employee.entity';
 import { Supplier } from './entities/supplier.entity';
+import { OrderStatus } from './entities/order-status.entity';
+import { OrderStatusTransition } from './entities/order-status-transition.entity';
+import { OrderWorkflowChain } from './entities/order-workflow-chain.entity';
+import { OrderStatusSla } from './entities/order-status-sla.entity';
+import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { CustomersModule } from './customers/customers.module';
 import { ProductsModule } from './products/products.module';
 import { FieldDefinitionsModule } from './field-definitions/field-definitions.module';
@@ -50,6 +58,11 @@ import { InventoryAccessoriesModule } from './inventory-accessories/inventory-ac
 import { FabricStockModule } from './fabric-stock/fabric-stock.module';
 import { HrModule } from './hr/hr.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
+import { OrderStatusConfigModule } from './order-status-config/order-status-config.module';
+import { IncomeRecord } from './entities/income-record.entity';
+import { ExpenseRecord } from './entities/expense-record.entity';
+import { FinanceIncomeModule } from './finance-income/finance-income.module';
+import { FinanceExpenseModule } from './finance-expense/finance-expense.module';
 
 @Module({
   imports: [
@@ -61,8 +74,10 @@ import { SuppliersModule } from './suppliers/suppliers.module';
       username: process.env.MYSQL_USER || 'root',
       password: process.env.MYSQL_PASSWORD || '',
       database: process.env.MYSQL_DATABASE || 'erp',
-      entities: [User, Role, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, InboundPending, FinishedGoodsStock, InventoryAccessory, FabricStock, FabricOutbound, Employee, Supplier],
-      synchronize: process.env.NODE_ENV !== 'production',
+      entities: [User, Role, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCostSnapshot, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, InboundPending, FinishedGoodsStock, FinishedGoodsOutbound, InventoryAccessory, InventoryAccessoryOutbound, FabricStock, FabricOutbound, Employee, Supplier, OrderStatus, OrderStatusTransition, OrderWorkflowChain, OrderStatusSla, OrderStatusHistory, IncomeRecord, ExpenseRecord],
+      // 默认关闭，避免已有库在启动时重复建表/建索引导致启动失败。
+      // 如需同步结构：设置 TYPEORM_SYNCHRONIZE=true（仅建议本地开发库使用）。
+      synchronize: (process.env.TYPEORM_SYNCHRONIZE ?? '').toLowerCase() === 'true',
       charset: 'utf8mb4',
     }),
     HealthModule,
@@ -89,6 +104,9 @@ import { SuppliersModule } from './suppliers/suppliers.module';
     FabricStockModule,
     HrModule,
     SuppliersModule,
+    OrderStatusConfigModule,
+    FinanceIncomeModule,
+    FinanceExpenseModule,
   ],
 })
 export class AppModule {}

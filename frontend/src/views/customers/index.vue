@@ -43,27 +43,27 @@
 
       <div class="filter-actions">
         <el-button type="primary" size="large" @click="openCreate">新建客户</el-button>
-        <el-tooltip content="删除" placement="top">
-        <el-button type="danger" size="large" circle :disabled="!selectedIds.length" @click="batchDelete">
-          <el-icon><Delete /></el-icon>
-        </el-button>
-      </el-tooltip>
+        <el-tooltip v-if="selectedIds.length" content="删除" placement="top">
+          <el-button type="danger" size="large" circle @click="batchDelete">
+            <el-icon><Delete /></el-icon>
+          </el-button>
+        </el-tooltip>
         <el-button type="primary" plain size="large" @click="openXiaomanImport">从小满导入</el-button>
       </div>
     </div>
 
     <!-- 表格：字段驱动 -->
-    <el-table
-      ref="tableRef"
-      :data="list"
-      border
-      stripe
-      @selection-change="onSelectionChange"
-      @sort-change="onSortChange"
-    >
-      <el-table-column type="selection" width="50" />
-      <el-table-column
-        v-for="f in CUSTOMER_FIELDS_SORTED"
+      <el-table
+        ref="tableRef"
+        :data="list"
+        border
+        stripe
+        @selection-change="onSelectionChange"
+        @sort-change="onSortChange"
+      >
+        <el-table-column type="selection" width="50" />
+        <el-table-column
+          v-for="f in CUSTOMER_TABLE_FIELDS"
         :key="f.code"
         :prop="f.code"
         :label="f.label"
@@ -100,7 +100,7 @@
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑客户' : '新建客户'" width="520" class="customer-form-dialog" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100">
         <el-form-item
-          v-for="f in CUSTOMER_FIELDS_SORTED"
+          v-for="f in CUSTOMER_FORM_FIELDS"
           :key="f.code"
           :label="f.label"
           :prop="f.code"
@@ -122,19 +122,31 @@
             size="default"
             style="width: 100%"
           />
+          <el-tree-select
+            v-else-if="f.type === 'select' && f.optionsKey === 'productGroups'"
+            v-model="form[f.code]"
+            :data="productGroupTreeSelectData"
+            :placeholder="f.placeholder"
+            filterable
+            default-expand-all
+            :render-after-expand="false"
+            node-key="value"
+            :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
+            size="default"
+            style="width: 100%"
+          />
           <el-select
             v-else-if="f.type === 'select'"
             v-model="form[f.code]"
             :placeholder="f.placeholder"
             filterable
-            allow-create
-            default-first-option
+            clearable
             size="default"
             style="width: 100%"
           >
             <el-option
-              v-for="opt in (f.optionsKey === 'salespeople' ? salespeople : productGroups)"
-              :key="opt"
+              v-for="opt in (f.optionsKey === 'salespeople' ? salespeople : [])"
+              :key="String(opt)"
               :label="opt"
               :value="opt"
             />
@@ -203,8 +215,10 @@
             <el-table-column type="selection" width="50" />
             <el-table-column prop="serial_id" label="客户编号" min-width="120" show-overflow-tooltip />
             <el-table-column prop="name" label="公司名称" min-width="160" show-overflow-tooltip />
-            <el-table-column prop="order_time" label="合作日期" width="110">
-              <template #default="{ row }">{{ row.order_time ? row.order_time.split(' ')[0] : '-' }}</template>
+            <el-table-column prop="contactPerson" label="联系人" min-width="120" show-overflow-tooltip>
+              <template #default="{ row }">
+                {{ row.contactPerson || '-' }}
+              </template>
             </el-table-column>
           </el-table>
           <div class="xiaoman-pagination">
@@ -254,6 +268,7 @@ import {
   type XiaomanCompanyItem,
   type XiaomanImportRes,
 } from '@/api/customers'
+import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { Delete } from '@element-plus/icons-vue'
 
@@ -261,12 +276,33 @@ const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const formRef = ref<FormInstance>()
 const list = ref<CustomerItem[]>([])
 const salespeople = ref<string[]>([])
-const productGroups = ref<string[]>([])
+const productGroupOptions = ref<{ id: number; path: string }[]>([])
+const productGroupsTree = ref<SystemOptionTreeNode[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editId = ref(0)
 const submitLoading = ref(false)
 const selectedIds = ref<number[]>([])
+
+const CUSTOMER_TABLE_FIELDS = computed(() => CUSTOMER_FIELDS_SORTED.filter((f) => f.code !== 'cooperationDate'))
+const CUSTOMER_FORM_FIELDS = computed(() => CUSTOMER_FIELDS_SORTED.filter((f) => f.code !== 'cooperationDate'))
+
+function toProductGroupTreeSelect(
+  nodes: SystemOptionTreeNode[],
+): { label: string; value: number; children?: ReturnType<typeof toProductGroupTreeSelect>; disabled?: boolean }[] {
+  return nodes.map((n) => {
+    const children = n.children?.length ? toProductGroupTreeSelect(n.children) : []
+    const hasChildren = children.length > 0
+    return {
+      label: n.value,
+      value: n.id,
+      children: hasChildren ? children : undefined,
+      disabled: hasChildren,
+    }
+  })
+}
+
+const productGroupTreeSelectData = computed(() => toProductGroupTreeSelect(productGroupsTree.value))
 
 const filter = reactive({ companyName: '', salesperson: '' })
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -309,7 +345,7 @@ function getTextFilterStyle(labelPrefix: string, value: unknown, showLabel: bool
 
 const companyNameLabelVisible = ref(false)
 
-const form = reactive<Record<string, string | null>>({})
+const form = reactive<Record<string, string | number | null>>({})
 const formRules = computed<FormRules>(() => {
   const r: FormRules = {}
   for (const f of CUSTOMER_FIELDS_SORTED) {
@@ -362,12 +398,14 @@ function onFilterChange(byUser = false) {
 
 async function loadOptions() {
   try {
-    const [s, p] = await Promise.all([getSalespeople(), getProductGroups()])
+    const [s, p, treeRes] = await Promise.all([getSalespeople(), getProductGroups(), getSystemOptionsTree('product_groups')])
     salespeople.value = s.data ?? []
-    productGroups.value = p.data ?? []
+    productGroupOptions.value = p.data ?? []
+    productGroupsTree.value = treeRes.data ?? []
   } catch {
     salespeople.value = []
-    productGroups.value = []
+    productGroupOptions.value = []
+    productGroupsTree.value = []
   }
 }
 
@@ -415,6 +453,10 @@ function openEdit(row: CustomerItem) {
   isEdit.value = true
   editId.value = row.id
   for (const f of CUSTOMER_FIELDS_SORTED) {
+    if (f.code === 'productGroup') {
+      form.productGroup = row.productGroupId != null ? row.productGroupId : ''
+      continue
+    }
     const v = row[f.code as keyof CustomerItem]
     form[f.code] = v != null ? String(v) : ''
   }
@@ -439,11 +481,14 @@ async function submit() {
   await formRef.value?.validate()
   submitLoading.value = true
   try {
-    const payload: Record<string, string | null> = {}
+    const payload: Record<string, string | number | null> = {}
     for (const f of CUSTOMER_FIELDS_SORTED) {
       if (f.code === 'contactInfo') {
         const parts = [form.contactCountryCode, form.contactPhone].map((s) => (s ?? '').trim()).filter(Boolean)
         payload.contactInfo = parts.length ? parts.join(' ') : ''
+      } else if (f.code === 'productGroup') {
+        const v = form.productGroup
+        payload.product_group_id = (v === '' || v === null) ? null : (typeof v === 'number' ? v : parseInt(String(v), 10))
       } else {
         const v = form[f.code]
         // 空发 '' 不发 null，避免 Column 'country' cannot be null

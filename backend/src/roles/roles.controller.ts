@@ -7,6 +7,7 @@ import {
   Patch,
   Post,
   Put,
+  Query,
   UseGuards,
   ParseIntPipe,
 } from '@nestjs/common';
@@ -30,6 +31,14 @@ export class RolesController {
   @RequirePermission('/settings/roles')
   findAll() {
     return this.rolesService.findAll();
+  }
+
+  @Get('suggest-code')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('/settings/roles')
+  suggestCode(@Query('name') name?: string) {
+    const code = this.rolesService.suggestCode(name ?? '');
+    return { code: code ?? null };
   }
 
   @Post()
@@ -62,14 +71,14 @@ export class RolesController {
 
   @Get(':id/permissions')
   @UseGuards(PermissionGuard)
-  @RequirePermission('/settings/permissions')
+  @RequirePermission('/settings/roles')
   getPermissions(@Param('id', ParseIntPipe) id: number) {
     return this.permissionsService.getRolePermissionIds(id);
   }
 
   @Put(':id/permissions')
   @UseGuards(PermissionGuard)
-  @RequirePermission('/settings/permissions')
+  @RequirePermission('/settings/roles')
   setPermissions(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { permission_ids: number[] },

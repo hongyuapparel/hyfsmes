@@ -28,14 +28,16 @@ export class InventoryPendingController {
   @Post('inbound')
   doInbound(
     @Body('ids') ids: number[],
-    @Body('warehouse') warehouse: string,
+    @Body('warehouseId') warehouseId: number | null,
+    @Body('inventoryTypeId') inventoryTypeId: number | null,
     @Body('department') department: string,
     @Body('location') location: string,
     @Body('imageUrl') imageUrl?: string,
   ) {
     return this.service.doInbound(
       Array.isArray(ids) ? ids : [ids].filter(Number),
-      warehouse ?? '',
+      warehouseId != null ? Number(warehouseId) : null,
+      inventoryTypeId != null ? Number(inventoryTypeId) : null,
       department ?? '',
       location ?? '',
       imageUrl,

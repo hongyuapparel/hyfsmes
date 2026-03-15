@@ -39,10 +39,11 @@ export class UsersController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body()
-    body: { display_name?: string; role_id?: number; status?: string },
+    body: { username?: string; display_name?: string; role_id?: number; status?: string },
   ) {
     const status = body.status as UserStatus | undefined;
     return this.usersService.update(id, {
+      username: body.username,
       displayName: body.display_name,
       roleId: body.role_id,
       status: status as UserStatus | undefined,

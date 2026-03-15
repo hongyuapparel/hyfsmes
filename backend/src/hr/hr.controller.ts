@@ -23,14 +23,16 @@ export class HrController {
   @Get('items')
   getList(
     @Query('name') name?: string,
-    @Query('department') department?: string,
+    @Query('departmentId') departmentId?: string,
+    @Query('jobTitleId') jobTitleId?: string,
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.hrService.getList({
       name,
-      department,
+      departmentId: departmentId ? parseInt(departmentId, 10) : undefined,
+      jobTitleId: jobTitleId ? parseInt(jobTitleId, 10) : undefined,
       status,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
@@ -52,8 +54,8 @@ export class HrController {
   create(
     @Body('employeeNo') employeeNo?: string,
     @Body('name') name?: string,
-    @Body('department') department?: string,
-    @Body('jobTitle') jobTitle?: string,
+    @Body('departmentId') departmentId?: number | null,
+    @Body('jobTitleId') jobTitleId?: number | null,
     @Body('entryDate') entryDate?: string,
     @Body('contactPhone') contactPhone?: string,
     @Body('status') status?: string,
@@ -63,8 +65,8 @@ export class HrController {
     return this.hrService.create({
       employeeNo,
       name: name ?? '',
-      department,
-      jobTitle,
+      departmentId: departmentId ?? null,
+      jobTitleId: jobTitleId ?? null,
       entryDate,
       contactPhone,
       status,
@@ -78,8 +80,8 @@ export class HrController {
     @Param('id') id: string,
     @Body('employeeNo') employeeNo?: string,
     @Body('name') name?: string,
-    @Body('department') department?: string,
-    @Body('jobTitle') jobTitle?: string,
+    @Body('departmentId') departmentId?: number | null,
+    @Body('jobTitleId') jobTitleId?: number | null,
     @Body('entryDate') entryDate?: string,
     @Body('contactPhone') contactPhone?: string,
     @Body('status') status?: string,
@@ -89,8 +91,8 @@ export class HrController {
     return this.hrService.update(Number(id), {
       employeeNo,
       name,
-      department,
-      jobTitle,
+      departmentId: departmentId ?? null,
+      jobTitleId: jobTitleId ?? null,
       entryDate,
       contactPhone,
       status,

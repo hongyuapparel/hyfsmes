@@ -22,8 +22,9 @@ export class OrdersController {
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
     @Query('customer') customer?: string,
-    @Query('orderType') orderType?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('processItem') processItem?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
     @Query('salesperson') salesperson?: string,
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
@@ -35,12 +36,17 @@ export class OrdersController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: OrderListQuery = {
       orderNo,
       skuCode,
       customer,
-      orderType,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
       processItem,
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number)
+        ? undefined
+        : (collaborationTypeId as number),
       salesperson,
       merchandiser,
       orderDateStart,
@@ -68,8 +74,9 @@ export class OrdersController {
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
     @Query('customer') customer?: string,
-    @Query('orderType') orderType?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('processItem') processItem?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
     @Query('salesperson') salesperson?: string,
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
@@ -78,12 +85,17 @@ export class OrdersController {
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
   ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: OrderListQuery = {
       orderNo,
       skuCode,
       customer,
-      orderType,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
       processItem,
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number)
+        ? undefined
+        : (collaborationTypeId as number),
       salesperson,
       merchandiser,
       orderDateStart,
@@ -102,6 +114,15 @@ export class OrdersController {
   @Get(':id')
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.findOne(id);
+  }
+
+  /**
+   * 获取订单尺码数量追踪明细（列表数量悬停用）
+   * GET /orders/:id/size-breakdown
+   */
+  @Get(':id/size-breakdown')
+  getSizeBreakdown(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.getSizeBreakdown(id);
   }
 
   /**
@@ -166,6 +187,22 @@ export class OrdersController {
   ) {
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.reviewMany(ids ?? [], actor);
+  }
+
+  /**
+   * 待审单批量审核退回（退回为草稿并记录原因）
+   * POST /orders/review/reject
+   * body: { ids: number[]; reason: string }
+   */
+  @Post('review/reject')
+  @RequirePermission('orders_review')
+  reviewReject(
+    @Body('ids') ids: number[],
+    @Body('reason') reason: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.ordersService.reviewRejectMany(ids ?? [], reason, actor);
   }
 
   /**

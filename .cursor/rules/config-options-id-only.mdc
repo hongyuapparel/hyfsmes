@@ -1,0 +1,39 @@
+---
+description: 设置项与下拉配置一律「只存 ID、改名历史同步」，新增选项默认同此规范
+globs: frontend/**/*.{vue,ts},backend/**/*.ts,.cursor/rules/*.mdc
+alwaysApply: true
+---
+
+# 配置项 / 下拉选项：只存 ID 与改名历史同步
+
+## 原则
+
+- **只存 ID**：所有来自「订单设置 / 库存设置 / 供应商设置」等 system_options 或等价配置的下拉选项，业务表/JSON 中**只存储选项 ID**（如 `order_type_id`、`material_type_id`、`warehouse_id`、`inventory_type_id`、`product_group_id`、`supplier_type_id`、`business_scope_id`、成本快照中的 `processId` 等），不存储选项名称或路径。
+- **改名历史同步**：配置项名称在设置页修改后，所有历史数据展示处通过 ID 解析当前名称，自然呈现新名称，无需迁移旧数据。
+- **无冗余字段**：不在业务表或 JSON 中保留「名称」「路径」等冗余列；展示用名称由接口或前端在返回/展示时按 ID 解析。
+
+## 已落地的配置类型（参考实现）
+
+| 配置来源 | 业务存储字段 | 说明 |
+|---------|-------------|------|
+| order_types | order_type_id | 订单表 |
+| collaboration | collaboration_type_id | 订单表 |
+| product_groups | product_group_id | 产品表、客户表 |
+| material_types | materialTypeId（order_ext.materials 每行） | 后端保存时 strip materialType，返回时按 ID 填充 |
+| production_processes | processId（成本快照 productionRows） | 成本页只存 processId |
+| warehouses | warehouse_id | 入库表、成品库存表 |
+| inventory_types | inventory_type_id | 成品库存表 |
+| supplier_types | supplier_type_id, business_scope_id | 供应商表 |
+
+## 新增下拉/设置项时的默认规范
+
+1. **后端**：实体/JSON 只增加 `xxx_id`（或等价）字段，不增加 `xxx`、`xxxName`、`xxxPath` 等名称字段。
+2. **保存**：写入时只持久化 ID；若前端误传名称，后端应 strip 掉，不写入库。
+3. **返回**：列表/详情接口需要展示名称时，按 ID 查 system_options（或对应配置表）解析后填充到 DTO/响应中，标注为「仅展示、不持久化」。
+4. **前端**：下拉选项 `value` 为 ID，提交 payload 只带 ID；展示列用 ID 从选项列表解析出 label。
+5. **迁移**：若从「存名称」改为「只存 ID」，需提供一次性迁移脚本（路径/名称 → ID），并更新 `drop-old-string-columns.sql` 删除旧字符串列。
+
+## 禁止
+
+- 禁止在业务表或业务 JSON 中同时存「ID + 名称」或「ID + 路径」作为持久字段。
+- 禁止新增配置类型时仅存名称、不存 ID，导致改名后历史数据无法同步新名称。

@@ -35,6 +35,14 @@ export class Employee {
   @Column({ name: 'job_title', length: 128, default: '' })
   jobTitle: string;
 
+  /** 部门 ID（来自 system_options，改名后历史自动同步） */
+  @Column({ name: 'department_id', type: 'int', nullable: true })
+  departmentId: number | null;
+
+  /** 岗位 ID（来自 system_options，改名后历史自动同步） */
+  @Column({ name: 'job_title_id', type: 'int', nullable: true })
+  jobTitleId: number | null;
+
   /** 入职日期 */
   @Column({ name: 'entry_date', type: 'date', nullable: true })
   entryDate: Date | null;

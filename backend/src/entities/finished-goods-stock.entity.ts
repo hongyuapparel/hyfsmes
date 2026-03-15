@@ -6,6 +6,14 @@ export class FinishedGoodsStock {
   @PrimaryGeneratedColumn()
   id: number;
 
+  /** 客户 ID，可选，关联 customers.id（从订单冗余过来） */
+  @Column({ name: 'customer_id', type: 'int', nullable: true })
+  customerId: number | null;
+
+  /** 客户名称（冗余字段，方便筛选与展示） */
+  @Column({ name: 'customer_name', length: 255, default: '' })
+  customerName: string;
+
   @Column({ name: 'order_id', type: 'int' })
   orderId: number;
 
@@ -15,8 +23,13 @@ export class FinishedGoodsStock {
   @Column({ name: 'quantity', type: 'int', default: 0 })
   quantity: number;
 
-  @Column({ name: 'warehouse', length: 128, default: '' })
-  warehouse: string;
+  /** 仓库 ID（关联 system_options.id，optionType = 'warehouses'） */
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
+
+  /** 库存类型 ID（关联 system_options.id，optionType = 'inventory_types'） */
+  @Column({ name: 'inventory_type_id', type: 'int', nullable: true })
+  inventoryTypeId: number | null;
 
   @Column({ name: 'department', length: 128, default: '' })
   department: string;

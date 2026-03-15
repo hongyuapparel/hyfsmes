@@ -3,8 +3,8 @@ import request from './request'
 export interface SupplierItem {
   id: number
   name: string
-  type: string
-  businessScope: string
+  supplierTypeId: number | null
+  businessScopeId: number | null
   cooperationDate: string | null
   contactPerson: string
   contactInfo: string
@@ -14,9 +14,11 @@ export interface SupplierItem {
   updatedAt: string
 }
 
-/** 管理页列表（支持名称、类型筛选） */
+/** 管理页列表（支持名称、类型筛选）。type 为类型名称，如「生产加工厂」 */
 export function getSupplierList(params?: {
   name?: string
+  supplierTypeId?: number | null
+  /** 按类型名称筛选（如「生产加工厂」），与 supplierTypeId 二选一 */
   type?: string
   page?: number
   pageSize?: number
@@ -33,8 +35,8 @@ export function getSupplierOne(id: number) {
 
 export function createSupplier(body: {
   name: string
-  type?: string
-  businessScope?: string
+  supplierTypeId?: number | null
+  businessScopeId?: number | null
   cooperationDate?: string
   contactPerson?: string
   contactInfo?: string
@@ -48,8 +50,8 @@ export function updateSupplier(
   id: number,
   body: {
     name?: string
-    type?: string
-    businessScope?: string
+    supplierTypeId?: number | null
+    businessScopeId?: number | null
     cooperationDate?: string
     contactPerson?: string
     contactInfo?: string

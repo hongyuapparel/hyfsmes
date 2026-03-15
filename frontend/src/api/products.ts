@@ -1,11 +1,12 @@
 import request from './request'
 
-/** 产品项，字段与 product-fields code 对应 */
+/** 产品项，字段与 product-fields code 对应；productGroupId 为存库值，productGroup 为展示用路径 */
 export interface ProductItem {
   id: number
   productName: string
   skuCode: string
   imageUrl: string
+  productGroupId: number | null
   productGroup: string
   customerId: number | null
   salesperson: string
@@ -24,7 +25,7 @@ export interface ProductListRes {
 export interface ProductListQuery {
   companyName?: string
   skuCode?: string
-  productGroup?: string
+  productGroupId?: number | null
   salesperson?: string
   page?: number
   pageSize?: number
@@ -67,11 +68,11 @@ export function batchDeleteProducts(ids: number[]) {
 }
 
 export function getProductGroups() {
-  return request.get<string[]>('/products/options/product-groups')
+  return request.get<{ id: number; path: string }[]>('/products/options/product-groups')
 }
 
 export function getProductGroupCounts() {
-  return request.get<{ productGroup: string; count: number }[]>('/products/options/group-counts')
+  return request.get<{ productGroupId: number; productGroupPath: string; count: number }[]>('/products/options/group-counts')
 }
 
 export function getProductSalespeople() {

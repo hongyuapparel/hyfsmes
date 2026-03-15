@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
+import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 /** 已审单：非草稿、非待审单，即待纸样及之后的状态 */
 const PURCHASE_ORDER_STATUSES = [
@@ -21,7 +22,8 @@ export interface PurchaseItemRow {
   orderDate: string | null;
   imageUrl: string;
   skuCode: string;
-  orderType: string;
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId: number | null;
   supplierName: string;
   materialName: string;
   planQuantity: number | null;
@@ -29,6 +31,10 @@ export interface PurchaseItemRow {
   purchaseAmount: string | null;
   purchaseStatus: string;
   purchaseCompletedAt: string | null;
+  purchaseUnitPrice: string | null;
+  purchaseOtherCost: string | null;
+  purchaseRemark: string | null;
+  purchaseImageUrl: string | null;
 }
 
 export interface PurchaseListQuery {
@@ -37,7 +43,8 @@ export interface PurchaseListQuery {
   orderNo?: string;
   skuCode?: string;
   supplier?: string;
-  orderType?: string;
+  /** 订单类型 ID */
+  orderTypeId?: number;
   orderDateStart?: string;
   orderDateEnd?: string;
   page?: number;
@@ -51,7 +58,25 @@ export class ProductionPurchaseService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
+
+  /**
+   * 采购登记金额类字段统一归一化：
+   * - 空字符串 / null / undefined -> '0'
+   * - 其他值去两端空格后按原样返回
+   */
+  private normalizeDecimalInput(v: unknown): string {
+    if (v === null || v === undefined) return '0';
+    if (typeof v === 'number') {
+      return Number.isFinite(v) ? String(v) : '0';
+    }
+    if (typeof v === 'string') {
+      const t = v.trim();
+      return t || '0';
+    }
+    return '0';
+  }
 
   async getPurchaseItems(query: PurchaseListQuery): Promise<{
     list: PurchaseItemRow[];
@@ -64,7 +89,7 @@ export class ProductionPurchaseService {
       orderNo,
       skuCode,
       supplier,
-      orderType,
+      orderTypeId,
       orderDateStart,
       orderDateEnd,
       page = 1,
@@ -81,8 +106,8 @@ export class ProductionPurchaseService {
     if (skuCode?.trim()) {
       qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
     }
-    if (orderType?.trim()) {
-      qb.andWhere('o.label = :orderType', { orderType: orderType.trim() });
+    if (typeof orderTypeId === 'number') {
+      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId });
     }
     if (orderDateStart) {
       qb.andWhere('o.order_date >= :orderDateStart', { orderDateStart: `${orderDateStart} 00:00:00` });
@@ -109,7 +134,6 @@ export class ProductionPurchaseService {
       const ext = extMap.get(order.id);
       const materials: OrderMaterialRow[] = ext?.materials ?? [];
       const orderDate = order.orderDate ? order.orderDate.toISOString().slice(0, 10) : null;
-      const orderTypeLabel = order.label?.trim() ?? '';
 
       for (let i = 0; i < materials.length; i++) {
         const m = materials[i];
@@ -128,7 +152,7 @@ export class ProductionPurchaseService {
           orderDate: orderDate,
           imageUrl: order.imageUrl ?? '',
           skuCode: order.skuCode ?? '',
-          orderType: orderTypeLabel,
+          orderTypeId: order.orderTypeId ?? null,
           supplierName: supplierName || '-',
           materialName: (m.materialName ?? '').trim() || '-',
           planQuantity: m.purchaseQuantity ?? m.orderPieces ?? null,
@@ -136,6 +160,10 @@ export class ProductionPurchaseService {
           purchaseAmount: m.purchaseAmount ?? null,
           purchaseStatus: purchaseStatus === 'completed' ? 'completed' : 'pending',
           purchaseCompletedAt: m.purchaseCompletedAt ?? null,
+          purchaseUnitPrice: m.purchaseUnitPrice ?? null,
+          purchaseOtherCost: m.purchaseOtherCost ?? null,
+          purchaseRemark: m.purchaseRemark ?? null,
+          purchaseImageUrl: m.purchaseImageUrl ?? null,
         });
       }
     }
@@ -151,7 +179,11 @@ export class ProductionPurchaseService {
     orderId: number,
     materialIndex: number,
     actualPurchaseQuantity: number,
-    purchaseAmount: string,
+    unitPrice: string,
+    otherCost: string,
+    remark: string | null | undefined,
+    imageUrl: string | null | undefined,
+    actorUserId?: number,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -167,15 +199,46 @@ export class ProductionPurchaseService {
 
     const materials = [...ext.materials];
     const row = materials[materialIndex] as OrderMaterialRow;
-    const normalizedAmount = purchaseAmount === null || purchaseAmount === undefined || String(purchaseAmount).trim() === '' ? '0' : String(purchaseAmount).trim();
+
+    const normalizedQty = Number.isFinite(actualPurchaseQuantity) ? actualPurchaseQuantity : 0;
+    const normalizedUnit = Number(this.normalizeDecimalInput(unitPrice)) || 0;
+    const normalizedOther = Number(this.normalizeDecimalInput(otherCost)) || 0;
+    const total = normalizedQty * normalizedUnit + normalizedOther;
+    const totalStr = Number.isFinite(total) ? total.toFixed(2) : '0';
+
     materials[materialIndex] = {
       ...row,
       purchaseStatus: 'completed',
-      actualPurchaseQuantity,
-      purchaseAmount: normalizedAmount,
+      actualPurchaseQuantity: normalizedQty,
+      purchaseUnitPrice: this.normalizeDecimalInput(unitPrice),
+      purchaseOtherCost: this.normalizeDecimalInput(otherCost),
+      purchaseAmount: totalStr,
       purchaseCompletedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      purchaseRemark: (remark ?? '').trim() || null,
+      purchaseImageUrl: (imageUrl ?? '').trim() || null,
     };
     ext.materials = materials;
     await this.orderExtRepo.save(ext);
+
+    // 若该订单全部物料采购完成，则按配置规则流转
+    if (order.status === 'pending_purchase') {
+      const allCompleted = materials.length > 0 && materials.every((m) => (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed');
+      if (allCompleted) {
+        let next: string | null = await this.orderWorkflowService.resolveNextStatus({
+          order,
+          triggerCode: 'purchase_all_completed',
+          actorUserId: actorUserId ?? 0,
+        });
+        // 若未命中任何配置规则，则按默认样品/大货逻辑继续流转
+        if (!next) {
+          next = await this.orderWorkflowService.resolveFallbackNextStatusForPurchase(order);
+        }
+        if (next && next !== order.status) {
+          order.status = next;
+          order.statusTime = new Date();
+          await this.orderRepo.save(order);
+        }
+      }
+    }
   }
 }

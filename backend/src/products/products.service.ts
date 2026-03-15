@@ -10,7 +10,8 @@ import { SystemOptionsService } from '../system-options/system-options.service';
 export interface ProductListQuery {
   companyName?: string;
   skuCode?: string;
-  productGroup?: string;
+  /** 产品分组 ID（system_options.id） */
+  productGroupId?: number | null;
   salesperson?: string;
   page?: number;
   pageSize?: number;
@@ -36,7 +37,7 @@ export class ProductsService {
     const {
       companyName,
       skuCode,
-      productGroup,
+      productGroupId,
       salesperson,
       page = 1,
       pageSize = 20,
@@ -53,16 +54,15 @@ export class ProductsService {
     if (skuCode?.trim()) {
       qb.andWhere('p.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
     }
-    if (productGroup?.trim()) {
-      // 产品分组使用「前缀匹配」：父分组会包含其所有子分组
-      qb.andWhere('p.product_group LIKE :productGroup', { productGroup: `${productGroup.trim()}%` });
+    if (typeof productGroupId === 'number') {
+      qb.andWhere('p.product_group_id = :productGroupId', { productGroupId });
     }
     if (salesperson?.trim()) {
       qb.andWhere('p.salesperson = :salesperson', { salesperson: salesperson.trim() });
     }
 
     const sortColumn = this.toSnakeCase(sortBy);
-    const validSortColumns = ['id', 'sku_code', 'product_group', 'created_at', 'salesperson'];
+    const validSortColumns = ['id', 'sku_code', 'product_group_id', 'created_at', 'salesperson'];
     if (validSortColumns.includes(sortColumn)) {
       qb.orderBy(`p.${sortColumn}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     }
@@ -70,7 +70,14 @@ export class ProductsService {
     const total = await qb.getCount();
     const list = await qb.skip((page - 1) * pageSize).take(pageSize).getMany();
 
-    return { list, total, page, pageSize };
+    const ids = list.map((p) => p.productGroupId).filter((id): id is number => id != null);
+    const pathMap = ids.length ? await this.systemOptionsService.getProductGroupPathsByIds(ids) : {};
+    const listWithPath = list.map((p) => ({
+      ...p,
+      productGroup: p.productGroupId != null ? (pathMap[p.productGroupId] ?? '') : '',
+    }));
+
+    return { list: listWithPath, total, page, pageSize };
   }
 
   async findOne(id: number) {
@@ -79,7 +86,11 @@ export class ProductsService {
       relations: ['customer'],
     });
     if (!product) throw new NotFoundException('产品不存在');
-    return product;
+    const productGroup =
+      product.productGroupId != null
+        ? await this.systemOptionsService.getProductGroupPathById(product.productGroupId)
+        : '';
+    return { ...product, productGroup };
   }
 
   /** 检查 SKU 编号是否已存在（唯一性校验） */
@@ -108,7 +119,7 @@ export class ProductsService {
     product_name?: string;
     sku_code?: string;
     image_url?: string;
-    product_group?: string;
+    product_group_id?: number | null;
     customer_id?: number | null;
     salesperson?: string;
   }) {
@@ -120,11 +131,16 @@ export class ProductsService {
       productName: dto.product_name?.trim() ?? '',
       skuCode,
       imageUrl: dto.image_url ?? '',
-      productGroup: dto.product_group ?? '',
+      productGroupId: typeof dto.product_group_id === 'number' ? dto.product_group_id : null,
       customerId: dto.customer_id ?? null,
       salesperson: dto.salesperson ?? '',
     });
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    const productGroup =
+      saved.productGroupId != null
+        ? await this.systemOptionsService.getProductGroupPathById(saved.productGroupId)
+        : '';
+    return { ...saved, productGroup };
   }
 
   async update(
@@ -132,7 +148,7 @@ export class ProductsService {
     dto: {
       product_name?: string;
       image_url?: string;
-      product_group?: string;
+      product_group_id?: number | null;
       customer_id?: number | null;
       salesperson?: string;
     },
@@ -142,11 +158,17 @@ export class ProductsService {
 
     if (dto.product_name !== undefined) product.productName = dto.product_name;
     if (dto.image_url !== undefined) product.imageUrl = dto.image_url;
-    if (dto.product_group !== undefined) product.productGroup = dto.product_group;
+    if (dto.product_group_id !== undefined)
+      product.productGroupId = typeof dto.product_group_id === 'number' ? dto.product_group_id : null;
     if (dto.customer_id !== undefined) product.customerId = dto.customer_id;
     if (dto.salesperson !== undefined) product.salesperson = dto.salesperson;
 
-    return this.productRepo.save(product);
+    const saved = await this.productRepo.save(product);
+    const productGroup =
+      saved.productGroupId != null
+        ? await this.systemOptionsService.getProductGroupPathById(saved.productGroupId)
+        : '';
+    return { ...saved, productGroup };
   }
 
   async remove(id: number) {
@@ -160,31 +182,30 @@ export class ProductsService {
     await this.productRepo.delete(ids);
   }
 
-  /** 各产品分组下的产品数量（按 product_group 精确匹配） */
-  async getGroupCounts(): Promise<{ productGroup: string; count: number }[]> {
+  /** 各产品分组下的产品数量（按 product_group_id），返回 id + 路径 + count，改名后展示自动同步 */
+  async getGroupCounts(): Promise<{ productGroupId: number; productGroupPath: string; count: number }[]> {
     const rows = await this.productRepo
       .createQueryBuilder('p')
-      .select('p.product_group', 'productGroup')
+      .select('p.product_group_id', 'productGroupId')
       .addSelect('COUNT(*)', 'count')
-      .groupBy('p.product_group')
-      .getRawMany();
+      .where('p.product_group_id IS NOT NULL')
+      .groupBy('p.product_group_id')
+      .getRawMany<{ productGroupId: number; count: string }>();
+    const ids = rows.map((r) => r.productGroupId).filter((n) => typeof n === 'number');
+    const pathMap = ids.length ? await this.systemOptionsService.getProductGroupPathsByIds(ids) : {};
     return rows.map((r) => ({
-      productGroup: (r.productGroup ?? '') as string,
+      productGroupId: r.productGroupId,
+      productGroupPath: pathMap[r.productGroupId] ?? '',
       count: Number(r.count) || 0,
     }));
   }
 
-  /** 获取产品分组列表：来自系统配置 product_groups，无配置时回退到产品表去重 */
-  async getProductGroups(): Promise<string[]> {
-    const configured = await this.systemOptionsService.findByType('product_groups');
-    if (configured.length > 0) return configured;
-    const rows = await this.productRepo
-      .createQueryBuilder('p')
-      .select('DISTINCT p.product_group', 'productGroup')
-      .where('p.product_group != ""')
-      .orderBy('p.product_group')
-      .getRawMany();
-    return rows.map((r) => r.productGroup).filter(Boolean);
+  /** 获取产品分组列表：返回 id + 路径，供前端树/下拉用（value=id, label=path） */
+  async getProductGroups(): Promise<{ id: number; path: string }[]> {
+    const list = await this.systemOptionsService.findAllByType('product_groups');
+    if (list.length === 0) return [];
+    const pathMap = await this.systemOptionsService.getProductGroupPathsByIds(list.map((o) => o.id));
+    return list.map((o) => ({ id: o.id, path: pathMap[o.id] ?? o.value }));
   }
 
   /** 获取业务员列表：角色 code 为 salesperson 的用户 */

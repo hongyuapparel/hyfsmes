@@ -52,13 +52,24 @@ export class CustomersService {
       .take(pageSize)
       .getMany();
 
-    return { list, total, page, pageSize };
+    const ids = list.map((c) => c.productGroupId).filter((id): id is number => id != null);
+    const pathMap = ids.length ? await this.systemOptionsService.getProductGroupPathsByIds(ids) : {};
+    const listWithPath = list.map((c) => ({
+      ...c,
+      productGroup: c.productGroupId != null ? (pathMap[c.productGroupId] ?? '') : '',
+    }));
+
+    return { list: listWithPath, total, page, pageSize };
   }
 
   async findOne(id: number) {
     const customer = await this.customerRepo.findOne({ where: { id } });
     if (!customer) throw new NotFoundException('客户不存在');
-    return customer;
+    const productGroup =
+      customer.productGroupId != null
+        ? await this.systemOptionsService.getProductGroupPathById(customer.productGroupId)
+        : '';
+    return { ...customer, productGroup };
   }
 
   /** 获取下一个客户编号，格式 KH0001 递增，每个客户编号唯一 */
@@ -84,7 +95,7 @@ export class CustomersService {
     contact_info?: string;
     cooperation_date?: string;
     salesperson?: string;
-    product_group?: string;
+    product_group_id?: number | null;
   }) {
     const customerId = dto.customer_id?.trim() || (await this.getNextCustomerId());
     const exists = await this.customerRepo.findOne({ where: { customerId } });
@@ -98,9 +109,14 @@ export class CustomersService {
       contactInfo: dto.contact_info ?? '',
       cooperationDate: dto.cooperation_date ? new Date(dto.cooperation_date) : null,
       salesperson: dto.salesperson ?? '',
-      productGroup: dto.product_group ?? '',
+      productGroupId: typeof dto.product_group_id === 'number' ? dto.product_group_id : null,
     });
-    return this.customerRepo.save(customer);
+    const saved = await this.customerRepo.save(customer);
+    const productGroup =
+      saved.productGroupId != null
+        ? await this.systemOptionsService.getProductGroupPathById(saved.productGroupId)
+        : '';
+    return { ...saved, productGroup };
   }
 
   async update(
@@ -112,7 +128,7 @@ export class CustomersService {
       contact_info?: string;
       cooperation_date?: string;
       salesperson?: string;
-      product_group?: string;
+      product_group_id?: number | null;
     },
   ) {
     const customer = await this.customerRepo.findOne({ where: { id } });
@@ -123,14 +139,20 @@ export class CustomersService {
     if (dto.contact_person !== undefined) customer.contactPerson = dto.contact_person ?? '';
     if (dto.contact_info !== undefined) customer.contactInfo = dto.contact_info ?? '';
     if (dto.salesperson !== undefined) customer.salesperson = dto.salesperson ?? '';
-    if (dto.product_group !== undefined) customer.productGroup = dto.product_group ?? '';
+    if (dto.product_group_id !== undefined)
+      customer.productGroupId = typeof dto.product_group_id === 'number' ? dto.product_group_id : null;
     // 公司名称：不允许用 null/空 覆盖已有值
     if (dto.company_name !== undefined && dto.company_name != null && String(dto.company_name).trim() !== '') {
       customer.companyName = dto.company_name.trim();
     }
     if (dto.cooperation_date !== undefined) customer.cooperationDate = dto.cooperation_date ? new Date(dto.cooperation_date) : null;
 
-    return this.customerRepo.save(customer);
+    const saved = await this.customerRepo.save(customer);
+    const productGroup =
+      saved.productGroupId != null
+        ? await this.systemOptionsService.getProductGroupPathById(saved.productGroupId)
+        : '';
+    return { ...saved, productGroup };
   }
 
   async remove(id: number) {
@@ -166,17 +188,12 @@ export class CustomersService {
     return users.map((u) => (u.displayName?.trim() || u.username) || '').filter(Boolean);
   }
 
-  /** 获取产品分组列表：来自系统配置 product_groups，无配置时回退到客户表去重 */
-  async getProductGroups(): Promise<string[]> {
-    const configured = await this.systemOptionsService.findByType('product_groups');
-    if (configured.length > 0) return configured;
-    const rows = await this.customerRepo
-      .createQueryBuilder('c')
-      .select('DISTINCT c.product_group')
-      .where('c.product_group != ""')
-      .orderBy('c.product_group')
-      .getRawMany();
-    return rows.map((r) => r.product_group).filter(Boolean);
+  /** 获取产品分组列表：返回 id + 路径，供前端下拉用（value=id, label=path） */
+  async getProductGroups(): Promise<{ id: number; path: string }[]> {
+    const list = await this.systemOptionsService.findAllByType('product_groups');
+    if (list.length === 0) return [];
+    const pathMap = await this.systemOptionsService.getProductGroupPathsByIds(list.map((o) => o.id));
+    return list.map((o) => ({ id: o.id, path: pathMap[o.id] ?? o.value }));
   }
 
   private toSnakeCase(str: string): string {
@@ -185,11 +202,76 @@ export class CustomersService {
 
   /** 从小满获取客户列表（供前端选择），支持 keyword 模糊搜索 */
   async getXiaomanList(page = 1, pageSize = 20, keyword?: string) {
-    return this.xiaomanService.getCompanyList(page, pageSize, keyword);
+    const { list, total } = await this.xiaomanService.getCompanyList(page, pageSize, keyword);
+    if (!list.length) {
+      return { list: [], total };
+    }
+    // 为当前页公司补充主联系人姓名信息
+    const details = await this.xiaomanService.getCompanyDetailsBatch(list.map((c) => c.company_id));
+
+    const withContact = list.map((item, index) => {
+      const d = details[index];
+      let contactPerson = '';
+      let coopDate = item.order_time || '';
+      if (d) {
+        const anyDetail = d as unknown as {
+          main_contact_name?: string;
+          main_contact?: { name?: string } | null;
+          contacts?: { name?: string; contact_name?: string; nickname?: string; nick_name?: string }[] | null;
+          customers?: {
+            name?: string;
+            nickname?: string;
+            nick_name?: string;
+            main_customer_flag?: number;
+          }[];
+          contact_person?: string;
+          contact_name?: string;
+          contact_nickname?: string;
+          linkman?: string;
+          cooperation_date?: string;
+          cooperationDate?: string;
+          order_time?: string;
+        };
+        const mainCustomer =
+          (Array.isArray(anyDetail.customers) &&
+            (anyDetail.customers.find((c) => c.main_customer_flag === 1) ?? anyDetail.customers[0])) ||
+          null;
+        contactPerson =
+          anyDetail.main_contact_name?.trim() ||
+          anyDetail.main_contact?.name?.trim() ||
+          mainCustomer?.nickname?.trim() ||
+          mainCustomer?.nick_name?.trim() ||
+          mainCustomer?.name?.trim() ||
+          (Array.isArray(anyDetail.contacts) &&
+            (anyDetail.contacts[0]?.nickname?.trim() ||
+              anyDetail.contacts[0]?.nick_name?.trim() ||
+              anyDetail.contacts[0]?.name?.trim() ||
+              anyDetail.contacts[0]?.contact_name?.trim())) ||
+          anyDetail.contact_nickname?.trim() ||
+          anyDetail.contact_person?.trim() ||
+          anyDetail.contact_name?.trim() ||
+          anyDetail.linkman?.trim() ||
+          '';
+        const rawCoopDate =
+          anyDetail.cooperation_date ||
+          anyDetail.cooperationDate ||
+          d.order_time;
+        if (typeof rawCoopDate === 'string' && rawCoopDate.trim()) {
+          coopDate = rawCoopDate.split(' ')[0];
+        }
+      }
+      return { ...item, contactPerson, order_time: coopDate };
+    });
+    return { list: withContact, total };
   }
 
-  /** 从小满导入选中客户：客户编号、国家、合作日期、产品分组、联系电话 */
-  async importFromXiaoman(companyIds: number[]): Promise<{ imported: number; skipped: number; errors: string[] }> {
+  /** 从小满导入选中客户：客户编号、国家、联系人、合作日期、产品分组、联系电话
+   *  导入人自动记为业务员（当前登录账号）
+   */
+  async importFromXiaoman(
+    companyIds: number[],
+    currentUser?: { userId: number; username: string },
+  ): Promise<{ imported: number; skipped: number; errors: string[] }> {
     if (!companyIds?.length) return { imported: 0, skipped: 0, errors: [] };
     const details = await this.xiaomanService.getCompanyDetailsBatch(companyIds);
     let imported = 0;
@@ -208,10 +290,73 @@ export class CustomersService {
         skipped++;
         continue;
       }
-      const country = d.country ?? d.country_region?.country ?? '';
+      // 国家优先使用小满返回的中文名称，其次使用英文代码
+      const anyCountry = d as unknown as { country_name?: string; country?: string; country_region?: { country?: string } };
+      const country = anyCountry.country_name ?? anyCountry.country ?? anyCountry.country_region?.country ?? '';
       const contactInfo = Array.isArray(d.tel) ? d.tel.filter(Boolean).join('; ') : '';
-      const cooperationDate = d.order_time ? d.order_time.split(' ')[0] : null;
-      const productGroup = d.product_group_names ?? '';
+      const pathFromXiaoman = (d.product_group_names ?? '').trim();
+      let productGroupId: number | null = null;
+      if (pathFromXiaoman) {
+        const groups = await this.getProductGroups();
+        const match = groups.find((g) => g.path === pathFromXiaoman);
+        if (match) productGroupId = match.id;
+      }
+
+      // 主联系人姓名，同步到本地客户 contactPerson 字段，便于后续展示
+      const anyDetail = d as unknown as {
+        main_contact_name?: string;
+        main_contact?: { name?: string } | null;
+        contacts?: { name?: string; contact_name?: string; nickname?: string; nick_name?: string }[] | null;
+        customers?: {
+          name?: string;
+          nickname?: string;
+          nick_name?: string;
+          main_customer_flag?: number;
+        }[];
+        contact_person?: string;
+        contact_name?: string;
+        contact_nickname?: string;
+        linkman?: string;
+        cooperation_date?: string;
+        cooperationDate?: string;
+        order_time?: string;
+      };
+      const mainCustomer =
+        (Array.isArray(anyDetail.customers) &&
+          (anyDetail.customers.find((c) => c.main_customer_flag === 1) ?? anyDetail.customers[0])) ||
+        null;
+      const contactPerson =
+        anyDetail.main_contact_name?.trim() ||
+        anyDetail.main_contact?.name?.trim() ||
+        mainCustomer?.nickname?.trim() ||
+        mainCustomer?.nick_name?.trim() ||
+        mainCustomer?.name?.trim() ||
+        (Array.isArray(anyDetail.contacts) &&
+          (anyDetail.contacts[0]?.nickname?.trim() ||
+            anyDetail.contacts[0]?.nick_name?.trim() ||
+            anyDetail.contacts[0]?.name?.trim() ||
+            anyDetail.contacts[0]?.contact_name?.trim())) ||
+        anyDetail.contact_nickname?.trim() ||
+        anyDetail.contact_person?.trim() ||
+        anyDetail.contact_name?.trim() ||
+        anyDetail.linkman?.trim() ||
+        '';
+
+      const rawCoopDate =
+        anyDetail.cooperation_date ||
+        anyDetail.cooperationDate ||
+        d.order_time;
+      const cooperationDate =
+        typeof rawCoopDate === 'string' && rawCoopDate.trim() ? rawCoopDate.split(' ')[0] : null;
+
+      // 导入人作为默认业务员：优先用 displayName，其次 username
+      let salesperson = '';
+      if (currentUser?.userId) {
+        const user = await this.userRepo.findOne({ where: { id: currentUser.userId } });
+        if (user) {
+          salesperson = (user.displayName?.trim() || user.username || '').trim();
+        }
+      }
 
       try {
         await this.customerRepo.save(
@@ -219,11 +364,11 @@ export class CustomersService {
             customerId,
             country,
             companyName: d.name || d.short_name || customerId,
-            contactPerson: '',
+            contactPerson,
             contactInfo,
             cooperationDate: cooperationDate ? new Date(cooperationDate) : null,
-            salesperson: '',
-            productGroup,
+            salesperson,
+            productGroupId,
           }),
         );
         imported++;

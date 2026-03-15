@@ -17,14 +17,22 @@ export interface OrderListItem {
   merchandiser: string
   /** 数量 */
   quantity: number
+  /** 实裁总件数（来自裁床登记），可为空 */
+  actualCutTotal?: number | null
+  /** 车缝完成件数，可为空 */
+  sewingQuantity?: number | null
+  /** 尾部收货数（包装完成），可为空 */
+  tailReceivedQty?: number | null
+  /** 尾部出货数（发货数量），可为空 */
+  tailShippedQty?: number | null
   /** 出厂价 */
   exFactoryPrice: string
   /** 销售价 */
   salePrice: string
-  /** 订单类型（列表展示用） */
-  orderType?: string
-  /** 合作方式（展示在 SKU 行后面） */
-  collaborationType?: string
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId?: number | null
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId?: number | null
   /** 标签/样品类型 */
   label: string
   /** 工艺项目（原二次工艺） */
@@ -60,9 +68,12 @@ export interface OrderListQuery {
   orderNo?: string
   skuCode?: string
   customer?: string
-  orderType?: string
+  /** 订单类型 ID */
+  orderTypeId?: number
   /** 工艺项目（原二次工艺） */
   processItem?: string
+  /** 合作方式 ID */
+  collaborationTypeId?: number
   salesperson?: string
   merchandiser?: string
   orderDateStart?: string
@@ -98,9 +109,10 @@ export interface OrderFormPayload {
   salesperson?: string
   merchandiser?: string
   merchandiserPhone?: string
-  collaborationType?: string
-  orderType?: string
-  label?: string
+  /** 合作方式 ID（system_options.id, option_type='collaboration'） */
+  collaborationTypeId?: number | null
+  /** 订单类型 ID（system_options.id, option_type='order_types'） */
+  orderTypeId?: number | null
   /** 工艺项目（原二次工艺） */
   processItem?: string
   quantity?: number
@@ -119,10 +131,14 @@ export interface OrderFormPayload {
   colorSizeHeaders?: string[]
   /** C 区：物料信息 */
   materials?: Array<{
+    /** 物料类型 ID（system_options.id, option_type='material_types'） */
+    materialTypeId?: number | null
+    /** 物料类型名称（冗余显示字段） */
     materialType?: string
     supplierName?: string
     materialName?: string
     color?: string
+    fabricWidth?: string
     usagePerPiece?: number | null
     lossPercent?: number | null
     orderPieces?: number | null
@@ -149,6 +165,7 @@ export interface OrderFormPayload {
   packagingCells?: Array<{
     header: string
     imageUrl?: string
+    accessoryId?: number | null
     accessoryName?: string
     description?: string
   }>
@@ -162,6 +179,19 @@ export type OrderDetail = OrderListItem & OrderFormPayload
 /** 获取订单详情（编辑回显） */
 export function getOrderDetail(id: number) {
   return request.get<OrderDetail>(`/orders/${id}`)
+}
+
+export interface OrderSizeBreakdownRes {
+  headers: string[]
+  rows: Array<{
+    label: string
+    values: (number | null)[]
+  }>
+}
+
+/** 订单尺码数量追踪明细（列表数量悬停用） */
+export function getOrderSizeBreakdown(id: number) {
+  return request.get<OrderSizeBreakdownRes>(`/orders/${id}/size-breakdown`)
 }
 
 export interface OrderOperationLogItem {
@@ -197,6 +227,29 @@ export function addOrderRemark(id: number, content: string) {
   return request.post<OrderRemarkItem>(`/orders/${id}/remarks`, { content })
 }
 
+/** 订单成本快照（后端返回） */
+export interface OrderCostSnapshotRes {
+  id: number
+  orderId: number
+  snapshot: {
+    materialRows?: unknown[]
+    processItemRows?: unknown[]
+    productionRows?: unknown[]
+    profitMargin?: number
+  } | null
+  updatedAt: string
+}
+
+/** 获取订单成本快照（成本页回显） */
+export function getOrderCost(id: number) {
+  return request.get<OrderCostSnapshotRes | null>(`/orders/${id}/cost`)
+}
+
+/** 保存订单成本快照（成本页保存时写入） */
+export function saveOrderCost(id: number, payload: { snapshot: Record<string, unknown> }) {
+  return request.put<OrderCostSnapshotRes>(`/orders/${id}/cost`, payload)
+}
+
 /** 新建草稿 */
 export function createOrderDraft(payload: OrderFormPayload) {
   return request.post<OrderDetail>('/orders', payload)
@@ -220,6 +273,11 @@ export function deleteOrders(ids: number[]) {
 /** 待审单批量审核 */
 export function reviewOrders(ids: number[]) {
   return request.post<void>('/orders/review', { ids })
+}
+
+/** 待审单批量审核退回为草稿，并写入退回原因备注 */
+export function reviewRejectOrders(ids: number[], reason: string) {
+  return request.post<void>('/orders/review/reject', { ids, reason })
 }
 
 /** 批量复制为草稿 */

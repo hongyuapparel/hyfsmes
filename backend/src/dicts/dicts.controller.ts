@@ -29,5 +29,14 @@ export class DictsController {
   findTreeByType(@Query('type') type: string) {
     return this.systemOptionsService.findTreeByType(type || '');
   }
+
+  /**
+   * 字典完整列表（含 id / parentId），供需要使用 optionId 的业务页使用
+   * GET /dicts/list?type=collaboration|order_types|...
+   */
+  @Get('list')
+  findListByType(@Query('type') type: string) {
+    return this.systemOptionsService.findAllByType(type || '');
+  }
 }
 

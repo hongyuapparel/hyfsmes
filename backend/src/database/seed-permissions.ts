@@ -1,5 +1,6 @@
-import { DataSource } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { Permission } from '../entities/permission.entity';
+import { RolePermission } from '../entities/role-permission.entity';
 
 const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu' | 'action' }[] = [
   { code: 'menu_home', name: '主页', routePath: '/', type: 'menu' },
@@ -19,14 +20,20 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_inventory_accessories', name: '辅料库存', routePath: '/inventory/accessories', type: 'menu' },
   { code: 'menu_inventory_fabric', name: '面料库存', routePath: '/inventory/fabric', type: 'menu' },
   { code: 'menu_finance', name: '财务管理', routePath: '/finance', type: 'menu' },
+  { code: 'menu_finance_income', name: '收入流水', routePath: '/finance/income', type: 'menu' },
+  { code: 'menu_finance_expense', name: '支出流水', routePath: '/finance/expense', type: 'menu' },
+  { code: 'menu_finance_order_sla_report', name: '订单时效', routePath: '/finance/order-sla-report', type: 'menu' },
   { code: 'menu_suppliers', name: '供应商管理', routePath: '/suppliers', type: 'menu' },
   { code: 'menu_hr', name: '人事管理', routePath: '/hr', type: 'menu' },
+  { code: 'menu_foreign_tool', name: '外贸小工具', routePath: '/tools/foreign-tool', type: 'menu' },
   { code: 'menu_settings', name: '系统设置', routePath: '/settings', type: 'menu' },
   { code: 'menu_settings_users', name: '用户管理', routePath: '/settings/users', type: 'menu' },
-  { code: 'menu_settings_roles', name: '角色管理', routePath: '/settings/roles', type: 'menu' },
-  { code: 'menu_settings_permissions', name: '权限配置', routePath: '/settings/permissions', type: 'menu' },
-  { code: 'menu_settings_products', name: '产品设置', routePath: '/settings/products', type: 'menu' },
+  { code: 'menu_settings_roles', name: '角色与权限', routePath: '/settings/roles', type: 'menu' },
+  { code: 'menu_settings_orders', name: '订单设置', routePath: '/settings/orders', type: 'menu' },
   { code: 'menu_settings_suppliers', name: '供应商设置', routePath: '/settings/suppliers', type: 'menu' },
+  { code: 'menu_settings_inventory', name: '库存设置', routePath: '/settings/inventory', type: 'menu' },
+  { code: 'menu_settings_hr', name: '组织与人事', routePath: '/settings/hr', type: 'menu' },
+  { code: 'menu_settings_finance', name: '财务设置', routePath: '/settings/finance', type: 'menu' },
   // 操作级权限：订单列表勾选后的批量操作
   { code: 'orders_delete', name: '订单列表-删除订单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_review', name: '订单列表-审核待审单', routePath: '/orders/list', type: 'action' },
@@ -34,6 +41,10 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
 
 export async function seedPermissions(dataSource: DataSource): Promise<void> {
   const repo = dataSource.getRepository(Permission);
+  const rolePermRepo = dataSource.getRepository(RolePermission);
+  const deprecatedCodes = ['menu_settings_permissions', 'menu_settings_products'];
+  const deprecatedRoutes = ['/settings/permissions', '/settings/products'];
+
   for (const p of PERMISSIONS) {
     const exists = await repo.findOne({ where: { code: p.code } });
     if (!exists) {
@@ -45,7 +56,30 @@ export async function seedPermissions(dataSource: DataSource): Promise<void> {
           routePath: p.routePath,
         }),
       );
+    } else if (
+      exists.name !== p.name ||
+      exists.type !== p.type ||
+      exists.routePath !== p.routePath
+    ) {
+      await repo.update(
+        { id: exists.id },
+        {
+          name: p.name,
+          type: p.type,
+          routePath: p.routePath,
+        },
+      );
     }
   }
+
+  const deprecated = await repo.find({
+    where: [{ code: In(deprecatedCodes) }, { routePath: In(deprecatedRoutes) }],
+  });
+  const deprecatedIds = deprecated.map((p) => p.id);
+  if (deprecatedIds.length) {
+    await rolePermRepo.delete({ permissionId: In(deprecatedIds) });
+    await repo.delete({ id: In(deprecatedIds) });
+  }
+
   console.log('[Seed] Permissions seeded.');
 }

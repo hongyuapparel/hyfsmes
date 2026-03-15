@@ -28,6 +28,38 @@ export class OrderExt {
   /** B 区颜色尺码数量行，与前端 colorSizeRows 一致 */
   @Column({ name: 'color_size_rows', type: 'json', nullable: true })
   colorSizeRows: ColorSizeRow[] | null;
+
+  /** D 区：尺寸信息表头（与前端 sizeInfoMetaHeaders 一致） */
+  @Column({ name: 'size_info_meta_headers', type: 'json', nullable: true })
+  sizeInfoMetaHeaders: string[] | null;
+
+  /** D 区：尺寸信息行数据（与前端 sizeInfoRows 一致） */
+  @Column({ name: 'size_info_rows', type: 'json', nullable: true })
+  sizeInfoRows: SizeInfoRow[] | null;
+
+  /** E 区：工艺项目列表（与前端 processItems 一致） */
+  @Column({ name: 'process_items', type: 'json', nullable: true })
+  processItems: ProcessRow[] | null;
+
+  /** F 区：生产要求（长文本，仍放在扩展表中以保持 orders 表精简） */
+  @Column({ name: 'production_requirement', type: 'text', nullable: true })
+  productionRequirement: string | null;
+
+  /** G 区：包装表头 */
+  @Column({ name: 'packaging_headers', type: 'json', nullable: true })
+  packagingHeaders: string[] | null;
+
+  /** G 区：包装单元格（与前端 packagingCells 一致） */
+  @Column({ name: 'packaging_cells', type: 'json', nullable: true })
+  packagingCells: PackagingCell[] | null;
+
+  /** G 区：包装方式说明 */
+  @Column({ name: 'packaging_method', type: 'text', nullable: true })
+  packagingMethod: string | null;
+
+  /** H 区：图片附件列表 */
+  @Column({ name: 'attachments', type: 'json', nullable: true })
+  attachments: string[] | null;
 }
 
 export interface ColorSizeRow {
@@ -36,7 +68,15 @@ export interface ColorSizeRow {
   remark?: string;
 }
 
+export interface SizeInfoRow {
+  metaValues: string[];
+  sizeValues: number[];
+}
+
 export interface OrderMaterialRow {
+  /** 物料类型 ID（system_options.id，option_type='material_types'），仅存 ID 实现改名历史同步 */
+  materialTypeId?: number | null;
+  /** 物料类型名称：仅展示用，不持久化；接口返回时由 materialTypeId 解析填充 */
   materialType?: string;
   supplierName?: string;
   materialName?: string;
@@ -55,4 +95,27 @@ export interface OrderMaterialRow {
   purchaseAmount?: string | null;
   /** 采购完成时间（登记后写入） */
   purchaseCompletedAt?: string | null;
+  /** 单价（登记后写入） */
+  purchaseUnitPrice?: string | null;
+  /** 其他费用（登记后写入） */
+  purchaseOtherCost?: string | null;
+  /** 采购备注（登记后写入） */
+  purchaseRemark?: string | null;
+  /** 采购图片 URL（登记后写入） */
+  purchaseImageUrl?: string | null;
+}
+
+export interface ProcessRow {
+  processName?: string;
+  supplierName?: string;
+  remark?: string;
+}
+
+export interface PackagingCell {
+  header?: string;
+  imageUrl?: string;
+  /** 辅料库存 ID（从辅料库存选择时写入，用于出库扣减） */
+  accessoryId?: number | null;
+  accessoryName?: string;
+  description?: string;
 }

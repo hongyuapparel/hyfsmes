@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
+import { OrderExt } from '../entities/order-ext.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
@@ -11,6 +12,14 @@ export interface FinishingListItem {
   orderId: number;
   orderNo: string;
   skuCode: string;
+  /** 订单主图，列表展示用 */
+  imageUrl: string;
+  customerName: string;
+  salesperson: string;
+  merchandiser: string;
+  quantity: number;
+  /** 客户交期（货期） */
+  customerDueDate: string | null;
   /** 到尾部时间 */
   arrivedAt: string | null;
   /** 完成时间（包装完成） */
@@ -22,6 +31,8 @@ export interface FinishingListItem {
   sewingQuantity: number | null;
   tailReceivedQty: number | null;
   tailShippedQty: number | null;
+  /** 尾部入库数（可多次累加） */
+  tailInboundQty: number | null;
   defectQuantity: number | null;
 }
 
@@ -42,6 +53,8 @@ export class ProductionFinishingService {
     private readonly finishingRepo: Repository<OrderFinishing>,
     @InjectRepository(OrderCutting)
     private readonly cuttingRepo: Repository<OrderCutting>,
+    @InjectRepository(OrderExt)
+    private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(OrderSewing)
     private readonly sewingRepo: Repository<OrderSewing>,
     @InjectRepository(InboundPending)
@@ -61,13 +74,8 @@ export class ProductionFinishingService {
     return sum;
   }
 
-  async getFinishingList(query: FinishingListQuery): Promise<{
-    list: FinishingListItem[];
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
-    const { tab = 'all', orderNo, skuCode, page = 1, pageSize = 20 } = query;
+  private async buildFinishingRows(baseQuery: FinishingListQuery): Promise<FinishingListItem[]> {
+    const { tab = 'all', orderNo, skuCode } = baseQuery;
 
     const inboundFinishing = await this.finishingRepo.find({
       where: { status: 'inbound' },
@@ -99,7 +107,7 @@ export class ProductionFinishingService {
     const orders = await qb.getMany();
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) {
-      return { list: [], total: 0, page, pageSize };
+      return [];
     }
 
     const [finishings, cuttings, sewings] = await Promise.all([
@@ -134,6 +142,14 @@ export class ProductionFinishingService {
         orderId: order.id,
         orderNo: order.orderNo ?? '',
         skuCode: order.skuCode ?? '',
+        imageUrl: order.imageUrl ?? '',
+        customerName: order.customerName ?? '',
+        salesperson: order.salesperson ?? '',
+        merchandiser: order.merchandiser ?? '',
+        quantity: order.quantity ?? 0,
+        customerDueDate: order.customerDueDate
+          ? order.customerDueDate.toISOString().slice(0, 10)
+          : null,
         arrivedAt,
         completedAt,
         finishingStatus: fStatus,
@@ -141,15 +157,94 @@ export class ProductionFinishingService {
         sewingQuantity: sewing?.sewingQuantity ?? null,
         tailReceivedQty: finishing?.tailReceivedQty ?? null,
         tailShippedQty: finishing?.tailShippedQty ?? null,
+        tailInboundQty: finishing?.tailInboundQty ?? null,
         defectQuantity: finishing?.defectQuantity ?? null,
       });
     }
 
+    return rows;
+  }
+
+  async getFinishingList(query: FinishingListQuery): Promise<{
+    list: FinishingListItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const { page = 1, pageSize = 20 } = query;
+    const rows = await this.buildFinishingRows(query);
     const total = rows.length;
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-
     return { list, total, page, pageSize };
+  }
+
+  async getFinishingExportRows(query: FinishingListQuery): Promise<FinishingListItem[]> {
+    return this.buildFinishingRows(query);
+  }
+
+  /** 登记包装完成弹窗用：订单/裁床/车缝按尺码（只读），尾部收货数由前端按尺码填写 */
+  async getRegisterFormData(orderId: number): Promise<{
+    headers: string[];
+    orderRow: (number | null)[];
+    cutRow: (number | null)[];
+    sewingRow: (number | null)[];
+  }> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+    const [ext, cutting, sewing] = await Promise.all([
+      this.orderExtRepo.findOne({ where: { orderId } }),
+      this.cuttingRepo.findOne({ where: { orderId } }),
+      this.sewingRepo.findOne({ where: { orderId } }),
+    ]);
+    const headers =
+      Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
+        ? [...ext.colorSizeHeaders, '合计']
+        : ['合计'];
+    const sizeLen = headers.length - 1;
+    const buildPerSize = (rows: { quantities?: number[] }[] | null | undefined): (number | null)[] | null => {
+      if (!rows || rows.length === 0 || sizeLen <= 0) return null;
+      const sums = Array(sizeLen).fill(0) as number[];
+      rows.forEach((row) => {
+        if (Array.isArray(row.quantities)) {
+          row.quantities.forEach((q: unknown, idx: number) => {
+            if (idx < sizeLen) {
+              const n = Number(q);
+              if (!Number.isNaN(n)) sums[idx] += n;
+            }
+          });
+        }
+      });
+      const total = sums.reduce((a, b) => a + b, 0);
+      return [...sums, total];
+    };
+    const orderRow = buildPerSize((ext as { colorSizeRows?: { quantities?: number[] }[] })?.colorSizeRows ?? null);
+    const cutRow = buildPerSize(cutting?.actualCutRows ?? null);
+    const cutTotal = this.sumActualCut(cutting?.actualCutRows ?? null);
+    let sewingRow: (number | null)[];
+    const sewingQtyRow = sewing?.sewingQuantityRow;
+    if (Array.isArray(sewingQtyRow) && sewingQtyRow.length === headers.length) {
+      sewingRow = sewingQtyRow.map((n) => (typeof n === 'number' && Number.isFinite(n) ? n : null));
+    } else if (Array.isArray(sewingQtyRow) && sewingQtyRow.length > 0) {
+      const total = sewingQtyRow.reduce((a, b) => a + (Number(b) || 0), 0);
+      sewingRow = headers.length === 1 ? [total] : [...sewingQtyRow.slice(0, sizeLen), total];
+      while (sewingRow.length < headers.length) sewingRow.push(null);
+    } else {
+      const total = sewing?.sewingQuantity ?? 0;
+      sewingRow = headers.length === 1 ? [total] : [...Array(headers.length - 1).fill(null), total];
+    }
+    return {
+      headers,
+      orderRow:
+        orderRow ??
+        (headers.length === 1 ? [order.quantity ?? 0] : [...Array(headers.length).fill(null)]),
+      cutRow:
+        cutRow ??
+        (headers.length === 1 ? [cutTotal != null ? cutTotal : null] : [...Array(headers.length).fill(null)]),
+      sewingRow,
+    };
   }
 
   /** 登记包装完成：尾部收货数、次品数 */
@@ -178,6 +273,7 @@ export class ProductionFinishingService {
         completedAt: now,
         tailReceivedQty,
         tailShippedQty: 0,
+        tailInboundQty: 0,
         defectQuantity: defectQuantity ?? 0,
       });
     } else {
@@ -190,8 +286,8 @@ export class ProductionFinishingService {
     await this.finishingRepo.save(finishing);
   }
 
-  /** 发货：等待发货 -> 已发货，出货数 = 收货数 */
-  async ship(orderId: number): Promise<void> {
+  /** 发货：填本次出货数并累加，第一次发货后状态变为已发货 */
+  async ship(orderId: number, quantity: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -200,43 +296,79 @@ export class ProductionFinishingService {
     if (!finishing) {
       throw new NotFoundException('请先登记包装完成');
     }
-    if (finishing.status !== 'pending_ship') {
-      throw new NotFoundException('仅等待发货状态可操作发货');
+    if (finishing.status !== 'pending_ship' && finishing.status !== 'shipped') {
+      throw new NotFoundException('仅等待发货或已发货状态可操作发货');
     }
 
-    finishing.status = 'shipped';
-    finishing.tailShippedQty = finishing.tailReceivedQty;
+    const qty = Number(quantity) || 0;
+    if (qty <= 0) {
+      throw new NotFoundException('请填写本次出货数');
+    }
+    const received = finishing.tailReceivedQty ?? 0;
+    const defect = finishing.defectQuantity ?? 0;
+    const inbound = finishing.tailInboundQty ?? 0;
+    const newShipped = (finishing.tailShippedQty ?? 0) + qty;
+    if (newShipped + inbound + defect > received) {
+      throw new NotFoundException(
+        `出货数+入库数+次品数不能超过尾部收货数(${received})，当前出货将累加为${newShipped}`,
+      );
+    }
+
+    finishing.tailShippedQty = newShipped;
+    if (finishing.status === 'pending_ship') {
+      finishing.status = 'shipped';
+    }
     await this.finishingRepo.save(finishing);
   }
 
-  /** 入库：已发货 -> 已入库，订单状态改为已完成 */
-  async inbound(orderId: number): Promise<void> {
+  /** 入库：填本次入库数并累加；当 出货+入库+次品=尾部收货数 时订单完成 */
+  async inbound(orderId: number, quantity: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
     }
     const finishing = await this.finishingRepo.findOne({ where: { orderId } });
     if (!finishing) {
-      throw new NotFoundException('请先登记包装并发货');
+      throw new NotFoundException('请先登记包装完成');
     }
     if (finishing.status !== 'shipped') {
-      throw new NotFoundException('仅已发货状态可操作入库');
+      throw new NotFoundException('请先执行发货后再入库');
     }
 
-    finishing.status = 'inbound';
-    await this.finishingRepo.save(finishing);
+    const qty = Number(quantity) || 0;
+    if (qty <= 0) {
+      throw new NotFoundException('请填写本次入库数');
+    }
+    const received = finishing.tailReceivedQty ?? 0;
+    const shipped = finishing.tailShippedQty ?? 0;
+    const defect = finishing.defectQuantity ?? 0;
+    const newInbound = (finishing.tailInboundQty ?? 0) + qty;
 
-    order.status = 'completed';
-    order.statusTime = new Date();
-    await this.orderRepo.save(order);
+    if (shipped + newInbound + defect > received) {
+      throw new NotFoundException(
+        `出货数(${shipped})+入库数+次品数(${defect})不能超过尾部收货数(${received})`,
+      );
+    }
 
-    // 写入待入库表，供库存-待入库页使用
-    const pending = this.inboundPendingRepo.create({
-      orderId: order.id,
-      skuCode: order.skuCode ?? '',
-      quantity: finishing.tailShippedQty ?? 0,
-      status: 'pending',
-    });
-    await this.inboundPendingRepo.save(pending);
+    finishing.tailInboundQty = newInbound;
+    const total = shipped + newInbound + defect;
+    if (total === received) {
+      finishing.status = 'inbound';
+      await this.finishingRepo.save(finishing);
+
+      order.status = 'completed';
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+
+      const pending = this.inboundPendingRepo.create({
+        orderId: order.id,
+        skuCode: order.skuCode ?? '',
+        quantity: finishing.tailInboundQty ?? 0,
+        status: 'pending',
+      });
+      await this.inboundPendingRepo.save(pending);
+    } else {
+      await this.finishingRepo.save(finishing);
+    }
   }
 }

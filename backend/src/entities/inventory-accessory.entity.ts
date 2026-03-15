@@ -6,6 +6,14 @@ export class InventoryAccessory {
   @PrimaryGeneratedColumn()
   id: number;
 
+  /** 客户 ID，可选，关联 customers.id */
+  @Column({ name: 'customer_id', type: 'int', nullable: true })
+  customerId: number | null;
+
+  /** 客户名称（冗余字段，方便筛选与展示） */
+  @Column({ name: 'customer_name', length: 255, default: '' })
+  customerName: string;
+
   @Column({ length: 128 })
   name: string;
 

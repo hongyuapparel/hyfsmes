@@ -17,14 +17,14 @@
         </div>
         <div v-show="!sidebarCollapsed" class="sidebar-body">
           <el-menu
-            :default-active="currentGroupPath"
+            :default-active="String(currentGroupId)"
             class="group-menu"
             @select="onMenuSelect"
           >
             <el-menu-item
               v-for="node in flatGroupNodes"
-              :key="node.path === '' ? '__all__' : node.path"
-              :index="node.path"
+              :key="node.id === null ? '__all__' : node.id"
+              :index="node.id === null ? '0' : String(node.id)"
               class="group-menu-item"
               :style="{ paddingLeft: 12 + node.depth * 16 + 'px' }"
             >
@@ -112,11 +112,16 @@
           <div class="filter-actions">
             <el-button size="large" @click="openColumnConfig">列设置</el-button>
             <el-button type="primary" size="large" @click="openCreate">新建SKU</el-button>
-            <el-tooltip content="删除" placement="top">
-            <el-button type="danger" size="large" circle :disabled="!selectedIds.length" @click="batchDelete">
-              <el-icon><Delete /></el-icon>
-            </el-button>
-          </el-tooltip>
+            <el-tooltip v-if="selectedIds.length" content="删除" placement="top">
+              <el-button
+                type="danger"
+                size="large"
+                circle
+                @click="batchDelete"
+              >
+                <el-icon><Delete /></el-icon>
+              </el-button>
+            </el-tooltip>
           </div>
         </div>
 
@@ -221,10 +226,26 @@
           v-for="f in formFields"
           :key="f.code"
           :label="f.label"
-          :prop="f.code"
+          :prop="f.code === 'companyName' ? 'customerId' : f.code"
         >
+          <el-select
+            v-if="f.code === 'companyName'"
+            v-model="form.customerId"
+            placeholder="选择客户"
+            filterable
+            clearable
+            size="default"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="c in customers"
+              :key="c.id"
+              :label="c.companyName"
+              :value="c.id"
+            />
+          </el-select>
           <el-input
-            v-if="f.type === 'text'"
+            v-else-if="f.type === 'text'"
             v-model="form[f.code]"
             :placeholder="f.placeholder"
             :disabled="f.code === 'skuCode' && isEdit"
@@ -254,12 +275,6 @@
                 <span class="image-upload-hint">{{ imageDragOver ? '松开上传' : '点击上传、拖拽或粘贴图片' }}</span>
               </template>
             </div>
-            <el-input
-              v-model="form[f.code]"
-              placeholder="或直接输入图片URL"
-              size="small"
-              class="image-url-input"
-            />
           </div>
           <el-tree-select
             v-else-if="f.type === 'select' && f.code === 'productGroup'"
@@ -274,22 +289,6 @@
             size="default"
             style="width: 100%"
           />
-          <el-select
-            v-else-if="f.code === 'companyName'"
-            v-model="form.customerId"
-            placeholder="选择客户"
-            filterable
-            clearable
-            size="default"
-            style="width: 100%"
-          >
-            <el-option
-              v-for="c in customers"
-              :key="c.id"
-              :label="c.companyName"
-              :value="c.id"
-            />
-          </el-select>
           <el-select
             v-else-if="f.type === 'select'"
             v-model="form[f.code]"
@@ -348,9 +347,9 @@ import { checkSkuExists } from '@/api/products'
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const formRef = ref<FormInstance>()
 const list = ref<ProductItem[]>([])
-const productGroups = ref<string[]>([])
+const productGroupOptions = ref<{ id: number; path: string }[]>([])
 const productGroupsTree = ref<SystemOptionTreeNode[]>([])
-const groupCountsMap = ref<Record<string, number>>({})
+const groupCountsMap = ref<Record<number, number>>({})
 const sidebarCollapsed = ref(false)
 const salespeople = ref<string[]>([])
 const customers = ref<{ id: number; companyName: string }[]>([])
@@ -370,7 +369,12 @@ const paginationWrapRef = ref<HTMLElement | null>(null)
 const tableHeight = ref<number | undefined>(undefined)
 let tableResizeObserver: ResizeObserver | null = null
 
-const filter = reactive({ companyName: '', skuCode: '', productGroup: '', salesperson: '' })
+const filter = reactive<{ companyName: string; skuCode: string; productGroupId: number | null; salesperson: string }>({
+  companyName: '',
+  skuCode: '',
+  productGroupId: null,
+  salesperson: '',
+})
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const sort = reactive({ sortBy: 'id', sortOrder: 'asc' as 'asc' | 'desc' })
 
@@ -414,6 +418,7 @@ const skuCodeLabelVisible = ref(false)
 
 /** 左侧分组树数据（含每节点产品数量）；根节点为「全部分组」 */
 interface GroupTreeNode {
+  id: number | null
   path: string
   label: string
   count: number
@@ -421,6 +426,7 @@ interface GroupTreeNode {
 }
 
 interface FlatGroupNode {
+  id: number | null
   path: string
   label: string
   count: number
@@ -437,14 +443,14 @@ const groupTreeWithCounts = computed(() => {
       const path = parentPath ? `${parentPath} > ${n.value}` : n.value
       const childNodes = n.children?.length ? build(n.children, path) : []
       const childSum = childNodes.reduce((s, c) => s + c.count, 0)
-      const direct = map[path] ?? 0
+      const direct = map[n.id] ?? 0
       const count = direct + childSum
-      return { path, label: n.value, count, children: childNodes.length ? childNodes : undefined }
+      return { id: n.id, path, label: n.value, count, children: childNodes.length ? childNodes : undefined }
     })
   }
   const children = build(productGroupsTree.value)
   const totalFromMap = Object.values(map).reduce((s, n) => s + n, 0)
-  return [{ path: '', label: '全部分组', count: totalFromMap, children: children.length ? children : undefined }]
+  return [{ id: null, path: '', label: '全部分组', count: totalFromMap, children: children.length ? children : undefined }]
 })
 
 /** 扁平化分组树（含层级深度），供侧边 el-menu 渲染 */
@@ -456,6 +462,7 @@ const flatGroupNodes = computed<FlatGroupNode[]>(() => {
       const hasChildren = !!n.children?.length
       const isCollapsed = collapsed.includes(n.path)
       result.push({
+        id: n.id,
         path: n.path,
         label: n.label,
         count: n.count,
@@ -472,10 +479,15 @@ const flatGroupNodes = computed<FlatGroupNode[]>(() => {
   return flatten(groupTreeWithCounts.value)
 })
 
-const currentGroupPath = computed(() => filter.productGroup ?? '')
+const currentGroupId = computed(() => filter.productGroupId ?? 0)
 
 function onMenuSelect(index: string) {
-  filter.productGroup = index
+  if (index === '__all__' || index === '0') {
+    filter.productGroupId = null
+  } else {
+    const id = parseInt(index, 10)
+    filter.productGroupId = Number.isNaN(id) ? null : id
+  }
   pagination.page = 1
   load()
 }
@@ -512,7 +524,7 @@ const formFields = computed(() => {
     ? (src as { code: string; label: string; type: string; optionsKey?: string }[])
     : []
   return list
-    .filter((f) => f.code !== 'createdAt' && f.code !== 'companyName')
+    .filter((f) => f.code !== 'createdAt')
     .filter((f) => (f as { visible?: number }).visible !== 0)
     .sort((a, b) => ((a as { order?: number }).order ?? 0) - ((b as { order?: number }).order ?? 0))
 })
@@ -533,6 +545,10 @@ const formRules = computed<FormRules>(() => {
           trigger: 'blur',
         },
       ]
+    } else if (f.code === 'productGroup') {
+      r[f.code] = [{ required: true, message: `请选择${f.label}`, trigger: 'change' }]
+    } else if (f.code === 'imageUrl') {
+      r[f.code] = [{ required: true, message: '请上传产品图片', trigger: 'change' }]
     }
   }
   return r
@@ -646,7 +662,7 @@ async function moveColumn(f: { id: number; order: number }, delta: number) {
 }
 
 function getOptions(f: { optionsKey?: string }) {
-  if (f.optionsKey === 'productGroups') return productGroups.value.map((v) => ({ label: v, value: v }))
+  if (f.optionsKey === 'productGroups') return productGroupOptions.value.map((g) => ({ label: g.path, value: g.id }))
   if (f.optionsKey === 'salespeople') return salespeople.value.map((v) => ({ label: v, value: v }))
   if (f.optionsKey === 'customers') return customers.value.map((c) => ({ label: c.companyName, value: c.id }))
   return []
@@ -657,7 +673,7 @@ async function load() {
     const res = await getProducts({
       companyName: filter.companyName || undefined,
       skuCode: filter.skuCode || undefined,
-      productGroup: filter.productGroup || undefined,
+      productGroupId: filter.productGroupId ?? undefined,
       salesperson: filter.salesperson || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
@@ -692,18 +708,18 @@ function onFilterChange(byUser = false) {
   load()
 }
 
-/** 转为树形选择器数据：label 为节点名，value 为完整路径（仅叶节点可选时用于存储） */
+/** 转为树形选择器数据：value 为 system_options.id（存库），label 仅显示当前节点名称（不显示父级前缀），仅叶节点可选 */
 function toProductGroupTreeSelect(
   nodes: SystemOptionTreeNode[],
   parentPath = '',
-): { label: string; value: string; children?: { label: string; value: string; children?: unknown[] }[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: ReturnType<typeof toProductGroupTreeSelect>; disabled?: boolean }[] {
   return nodes.map((n) => {
     const path = parentPath ? `${parentPath} > ${n.value}` : n.value
     const children = n.children?.length ? toProductGroupTreeSelect(n.children, path) : []
     const hasChildren = children.length > 0
     return {
       label: n.value,
-      value: path,
+      value: n.id,
       children: hasChildren ? children : undefined,
       disabled: hasChildren,
     }
@@ -721,18 +737,18 @@ async function loadOptions() {
       getSystemOptionsTree('product_groups'),
       getProductGroupCounts(),
     ])
-    productGroups.value = ct.data ?? []
+    productGroupOptions.value = ct.data ?? []
     productGroupsTree.value = treeRes.data ?? []
     const countList = countsRes.data ?? []
-    groupCountsMap.value = countList.reduce<Record<string, number>>((acc, { productGroup, count }) => {
-      acc[productGroup] = count
+    groupCountsMap.value = countList.reduce<Record<number, number>>((acc, { productGroupId, count }) => {
+      acc[productGroupId] = count
       return acc
     }, {})
     salespeople.value = sp.data ?? []
     const custList = (custRes.data?.list ?? []) as CustomerItem[]
     customers.value = custList.map((c) => ({ id: c.id, companyName: c.companyName }))
   } catch {
-    productGroups.value = []
+    productGroupOptions.value = []
     productGroupsTree.value = []
     groupCountsMap.value = {}
     salespeople.value = []
@@ -745,7 +761,7 @@ function resetFilter() {
   skuCodeLabelVisible.value = false
   filter.companyName = ''
   filter.skuCode = ''
-  filter.productGroup = ''
+  filter.productGroupId = null
   filter.salesperson = ''
   pagination.page = 1
   load()
@@ -828,6 +844,10 @@ function openEdit(row: ProductItem) {
   form.customerId = row.customerId ?? null
   for (const f of formFields.value) {
     if (f.code === 'companyName') continue
+    if (f.code === 'productGroup') {
+      form.productGroup = row.productGroupId != null ? row.productGroupId : ''
+      continue
+    }
     const v = row[f.code as keyof ProductItem]
     form[f.code] = v != null ? (typeof v === 'number' ? v : String(v)) : ''
   }
@@ -853,6 +873,10 @@ async function submit() {
     }
     const body: Record<string, unknown> = {}
     for (const [k, v] of Object.entries(payload)) {
+      if (k === 'productGroup') {
+        body.product_group_id = v === '' || v === null ? null : v
+        continue
+      }
       const snake = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
       body[snake] = v
     }
@@ -1091,9 +1115,6 @@ onBeforeUnmount(() => {
 .image-upload-wrap {
   width: 100%;
   position: relative;
-}
-.image-url-input {
-  margin-top: var(--space-xs);
 }
 .image-file-input-hidden {
   position: absolute;

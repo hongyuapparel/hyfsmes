@@ -35,14 +35,25 @@ export const menuConfig: MenuItem[] = [
     title: '库存管理',
     icon: 'Box',
     children: [
+      { path: '/inventory/pending', title: '待入库' },
       { path: '/inventory/finished', title: '成品库存' },
       { path: '/inventory/accessories', title: '辅料库存' },
       { path: '/inventory/fabric', title: '面料库存' },
     ],
   },
-  { path: '/finance', title: '财务管理', icon: 'Coin' },
+  {
+    path: '/finance',
+    title: '财务管理',
+    icon: 'Coin',
+    children: [
+      { path: '/finance/income', title: '收入流水' },
+      { path: '/finance/expense', title: '支出流水' },
+      { path: '/finance/order-sla-report', title: '订单时效' },
+    ],
+  },
   { path: '/suppliers', title: '供应商管理', icon: 'Shop' },
   { path: '/hr', title: '人事管理', icon: 'Briefcase' },
+  { path: '/tools/foreign-tool', title: '外贸小工具', icon: 'Link' },
   {
     path: '/settings',
     title: '系统设置',
@@ -52,6 +63,9 @@ export const menuConfig: MenuItem[] = [
       { path: '/settings/roles', title: '角色与权限' },
       { path: '/settings/orders', title: '订单设置' },
       { path: '/settings/suppliers', title: '供应商设置' },
+      { path: '/settings/inventory', title: '库存设置' },
+      { path: '/settings/hr', title: '组织与人事' },
+      { path: '/settings/finance', title: '财务设置' },
     ],
   },
 ]
