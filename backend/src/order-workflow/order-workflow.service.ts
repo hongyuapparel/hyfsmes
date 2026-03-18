@@ -16,6 +16,8 @@ type RuleConditions = {
   productForm?: 'finished' | 'cut';
   /** 新版：精确到系统配置中的合作方式 ID 列表 */
   collaborationTypeIds?: number[];
+  /** 是否限定「仅有工艺项目」或「仅无工艺项目」；不传则不限制 */
+  hasProcessItem?: boolean;
 };
 
 @Injectable()
@@ -64,6 +66,7 @@ export class OrderWorkflowService {
     orderTypeId?: number | null;
     productForm?: 'finished' | 'cut';
     collaborationTypeId?: number | null;
+    hasProcessItem?: boolean;
   }> {
     const orderTypeValue = await this.getOptionValueById(order.orderTypeId ?? null);
     const collaborationValue = await this.getOptionValueById(order.collaborationTypeId ?? null);
@@ -87,17 +90,25 @@ export class OrderWorkflowService {
     const productForm =
       collaborationValue.includes('成品') ? 'finished' : collaborationValue.includes('裁片') ? 'cut' : undefined;
 
+    const hasProcessItem = !!(order.processItem && String(order.processItem).trim());
     return {
       orderType,
       orderTypeId: order.orderTypeId ?? null,
       productForm,
       collaborationTypeId: order.collaborationTypeId ?? null,
+      hasProcessItem,
     };
   }
 
   private matchConditions(
     conditionsJson: unknown,
-    tags: { orderType?: string; orderTypeId?: number | null; productForm?: string; collaborationTypeId?: number | null },
+    tags: {
+      orderType?: string;
+      orderTypeId?: number | null;
+      productForm?: string;
+      collaborationTypeId?: number | null;
+      hasProcessItem?: boolean;
+    },
   ): { ok: boolean; score: number } {
     if (!conditionsJson || typeof conditionsJson !== 'object') return { ok: true, score: 0 };
     const c = conditionsJson as RuleConditions;
@@ -121,6 +132,10 @@ export class OrderWorkflowService {
     if (Array.isArray(c.collaborationTypeIds) && c.collaborationTypeIds.length > 0) {
       const id = tags.collaborationTypeId ?? null;
       if (id == null || !c.collaborationTypeIds.includes(id)) return { ok: false, score: 0 };
+      score += 1;
+    }
+    if (c.hasProcessItem !== undefined) {
+      if (tags.hasProcessItem !== c.hasProcessItem) return { ok: false, score: 0 };
       score += 1;
     }
     return { ok: true, score };

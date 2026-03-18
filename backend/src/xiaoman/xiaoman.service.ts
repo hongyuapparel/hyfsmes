@@ -104,7 +104,7 @@ export class XiaomanService {
       const PAGE_SIZE_FOR_FETCH = 500;
       let fetched: XiaomanCompanyItem[] = [];
       let startIndex = 0;
-      let totalItem = 0;
+      let totalItem: number | null = null;
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
@@ -131,10 +131,15 @@ export class XiaomanService {
           throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围');
         }
         const pageList = json.data.list ?? [];
-        totalItem = json.data.totalItem ?? totalItem;
+        if (totalItem == null) {
+          const rawTotal = json.data.totalItem;
+          const parsed = typeof rawTotal === 'number' ? rawTotal : rawTotal != null ? Number(rawTotal) : NaN;
+          if (Number.isFinite(parsed) && parsed > 0) totalItem = parsed;
+        }
         fetched = fetched.concat(pageList);
 
-        if (fetched.length >= totalItem || fetched.length >= MAX_FETCH || pageList.length < PAGE_SIZE_FOR_FETCH) {
+        const reachedTotal = totalItem != null ? fetched.length >= totalItem : false;
+        if (reachedTotal || fetched.length >= MAX_FETCH || pageList.length < PAGE_SIZE_FOR_FETCH) {
           break;
         }
         startIndex += PAGE_SIZE_FOR_FETCH;
@@ -145,29 +150,12 @@ export class XiaomanService {
       }
 
       const lower = kw.toLowerCase();
-      let filtered = fetched.filter(
+      const filtered = fetched.filter(
         (c) =>
           (c.name || '').toLowerCase().includes(lower) ||
           (c.short_name || '').toLowerCase().includes(lower) ||
           (c.serial_id || '').toLowerCase().includes(lower),
       );
-
-      // 如果基础字段没有命中，再退回到详情级别做一次“全字段”搜索
-      if (!filtered.length) {
-        try {
-          const details = await this.getCompanyDetailsBatch(fetched.map((c) => c.company_id));
-          filtered = fetched.filter((item, idx) => {
-            const d = details[idx];
-            if (!d) return false;
-            // 将详情对象序列化为字符串，在所有字段中做一次包含判断，尽量贴近小满网页搜索效果
-            const text = JSON.stringify(d).toLowerCase();
-            return text.includes(lower);
-          });
-        } catch {
-          // 如果详情搜索失败，不影响主流程，只是返回空结果
-          filtered = [];
-        }
-      }
 
       const total = filtered.length;
       const sliceStart = (page - 1) * pageSize;

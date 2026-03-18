@@ -33,4 +33,12 @@ export class OrderPattern {
   /** 样品图片（确认完成时上传） */
   @Column({ name: 'sample_image_url', length: 512, default: '' })
   sampleImageUrl: string;
+
+  /** 纸样物料/裁片清单：默认从订单物料同步，可在纸样管理中增删改 */
+  @Column({ name: 'materials_json', type: 'json', nullable: true, select: false })
+  materialsJson: any[] | null;
+
+  /** 纸样物料备注（可选） */
+  @Column({ name: 'materials_remark', type: 'varchar', length: 500, nullable: true, select: false })
+  materialsRemark: string | null;
 }

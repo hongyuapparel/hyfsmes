@@ -14,6 +14,10 @@ export class OrderWorkflowChain {
   @Column({ name: 'enabled', type: 'tinyint', width: 1, default: 1 })
   enabled: boolean;
 
+  /** 链路列表排序（数字越小越靠前） */
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
+
   @CreateDateColumn({ name: 'created_at', type: 'datetime' })
   createdAt: Date;
 }

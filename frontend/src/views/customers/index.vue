@@ -200,9 +200,9 @@
               placeholder="公司名称或客户编号搜索"
               clearable
               class="xiaoman-search-input"
-              @keyup.enter="loadXiaomanList"
+              @keyup.enter="onXiaomanSearch"
             />
-            <el-button type="primary" @click="loadXiaomanList">搜索</el-button>
+            <el-button type="primary" @click="onXiaomanSearch">搜索</el-button>
           </div>
           <el-table
             ref="xiaomanTableRef"
@@ -558,6 +558,11 @@ async function loadXiaomanList() {
   } finally {
     xiaomanLoading.value = false
   }
+}
+
+function onXiaomanSearch() {
+  xiaomanPagination.page = 1
+  loadXiaomanList()
 }
 
 function onXiaomanSelectionChange(rows: XiaomanCompanyItem[]) {

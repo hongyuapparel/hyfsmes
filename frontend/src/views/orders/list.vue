@@ -183,23 +183,25 @@
         start-placeholder="下单时间"
         end-placeholder=""
         value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
         unlink-panels
         size="large"
-        class="filter-bar-item"
+        :class="['filter-bar-item', { 'range-single': !orderDateRange }]"
         :style="getFilterRangeStyle(orderDateRange)"
         @change="onSearch"
       />
       <el-date-picker
-        v-model="customerDueRange"
+        v-model="completedRange"
         type="daterange"
         range-separator=""
-        start-placeholder="客户交期"
+        start-placeholder="完成时间"
         end-placeholder=""
         value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
         unlink-panels
         size="large"
-        class="filter-bar-item"
-        :style="getFilterRangeStyle(customerDueRange)"
+        :class="['filter-bar-item', { 'range-single': !completedRange }]"
+        :style="getFilterRangeStyle(completedRange)"
         @change="onSearch"
       />
       <el-select
@@ -265,7 +267,17 @@
         >
           <div class="order-card-header">
             <div class="order-card-header-top">
-              <span class="order-no" :title="item.orderNo">{{ item.orderNo }}</span>
+              <div class="order-card-header-top-left">
+                <span class="order-no" :title="item.orderNo">{{ item.orderNo }}</span>
+                <el-tag
+                  class="order-status-tag"
+                  size="small"
+                  effect="light"
+                  :type="getStatusTagType(item.status)"
+                >
+                  {{ getStatusLabel(item.status) }}
+                </el-tag>
+              </div>
               <el-checkbox
                 v-model="cardSelected[item.id]"
                 size="large"
@@ -291,11 +303,11 @@
                   </template>
                 </span>
                 <div class="order-card-meta">
-                  <span>客户交期：{{ formatDate(item.customerDueDate) }}</span>
-                  <span>当前状态：{{ getStatusLabel(item.status) }}</span>
-                  <span v-if="item.status !== 'draft' && item.orderDate">
-                    下单时间：{{ formatDateTime(item.orderDate) }}
+                  <span>下单时间：{{ formatDateTime(item.orderDate) }}</span>
+                  <span :class="getCustomerDueDateClass(item.customerDueDate, item.status)">
+                    客户交期：{{ formatDate(item.customerDueDate) }}
                   </span>
+                  <span>完成时间：{{ formatDate(item.status === 'completed' ? item.statusTime : null) }}</span>
                 </div>
               </div>
             </div>
@@ -600,6 +612,7 @@
 import { ref, reactive, watch, watchEffect, onMounted, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { Edit, Download, Printer, Clock, Coin, Document, ChatDotRound } from '@element-plus/icons-vue'
 import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, reviewRejectOrders, copyOrdersToDraft, getOrderLogs, getOrderRemarks, addOrderRemark, getOrderSizeBreakdown, type OrderListItem, type OrderListQuery, type OrderOperationLogItem, type OrderRemarkItem, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -778,7 +791,7 @@ const filter = reactive({
 })
 
 const orderDateRange = ref<[string, string] | null>(null)
-const customerDueRange = ref<[string, string] | null>(null)
+const completedRange = ref<[string, string] | null>(null)
 
 /** 订单号前缀「订单号：」仅在回车或点击搜索后显示 */
 const orderNoLabelVisible = ref(false)
@@ -867,6 +880,36 @@ function onCardSelectChange() {
 function getStatusLabel(status: string): string {
   const map = STATUS_LABEL_MAP.value
   return map[status] || status || '-'
+}
+
+function getStatusTagType(
+  status: string,
+): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
+  const s = (status ?? '').toLowerCase()
+  if (s === 'completed') return 'success'
+  if (s === 'draft' || s === 'pending_review') return 'info'
+  if (!s) return 'info'
+  return 'warning'
+}
+
+function getCustomerDueDateClass(
+  customerDueDate: string | null | undefined,
+  status: string | null | undefined,
+): string | undefined {
+  const s = (status ?? '').toLowerCase()
+  if (s === 'completed' || s === 'draft') return undefined
+  if (!customerDueDate) return undefined
+  const d = new Date(customerDueDate)
+  if (Number.isNaN(d.getTime())) return undefined
+
+  const now = new Date()
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfDueDay = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diffDays = Math.floor((startOfDueDay.getTime() - startOfToday.getTime()) / 86400000)
+
+  if (diffDays < 0) return 'due-overdue'
+  if (diffDays <= 7) return 'due-soon'
+  return undefined
 }
 
 /** 订单类型展示值：后端列表返回 label 字段存订单类型，兼容 orderType */
@@ -971,9 +1014,9 @@ function buildQuery(): OrderListQuery {
     q.orderDateStart = orderDateRange.value[0]
     q.orderDateEnd = orderDateRange.value[1]
   }
-  if (customerDueRange.value && customerDueRange.value.length === 2) {
-    q.customerDueStart = customerDueRange.value[0]
-    q.customerDueEnd = customerDueRange.value[1]
+  if (completedRange.value && completedRange.value.length === 2) {
+    q.completedStart = completedRange.value[0]
+    q.completedEnd = completedRange.value[1]
   }
   return q
 }
@@ -993,9 +1036,9 @@ function buildCountQuery(): Omit<OrderListQuery, 'status' | 'page' | 'pageSize'>
     q.orderDateStart = orderDateRange.value[0]
     q.orderDateEnd = orderDateRange.value[1]
   }
-  if (customerDueRange.value && customerDueRange.value.length === 2) {
-    q.customerDueStart = customerDueRange.value[0]
-    q.customerDueEnd = customerDueRange.value[1]
+  if (completedRange.value && completedRange.value.length === 2) {
+    q.completedStart = completedRange.value[0]
+    q.completedEnd = completedRange.value[1]
   }
   return q
 }
@@ -1055,7 +1098,7 @@ function onReset() {
   filter.merchandiser = ''
   filter.factory = ''
   orderDateRange.value = null
-  customerDueRange.value = null
+  completedRange.value = null
   currentStatus.value = 'all'
   pagination.page = 1
   resetSelection()
@@ -1254,7 +1297,7 @@ async function openOperationLog(order: OrderListItem) {
 }
 
 function onCreateOrder() {
-  router.push({ name: 'OrdersEdit' })
+  router.push({ name: 'OrdersEdit', query: { new: '1' } })
 }
 
 /** 从 URL query 恢复筛选（如从主页待办跳转进入） */
@@ -1266,8 +1309,8 @@ function applyQueryFromRoute() {
   if (q.status != null && q.status !== '' && q.status !== 'all') {
     currentStatus.value = q.status
   }
-  if (q.customerDueStart != null && q.customerDueEnd != null) {
-    customerDueRange.value = [q.customerDueStart, q.customerDueEnd]
+  if (q.completedStart != null && q.completedEnd != null) {
+    completedRange.value = [q.completedStart, q.completedEnd]
   }
 }
 
@@ -1335,6 +1378,19 @@ watchEffect(() => {
 
 .filter-bar :deep(.el-form-item) {
   margin-bottom: 0;
+}
+
+.range-single.el-date-editor--daterange :deep(.el-range-separator) {
+  display: none;
+}
+.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
+  display: none;
+}
+.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
+  width: 100%;
+}
+.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
+  margin-left: 0;
 }
 
 .filter-bar-actions {
@@ -1565,6 +1621,27 @@ watchEffect(() => {
   font-size: var(--font-size-caption, 12px);
   color: var(--color-text-muted, #909399);
   min-width: 0;
+}
+
+.order-card-header-top-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.order-status-tag {
+  flex-shrink: 0;
+}
+
+.order-card-meta .due-overdue {
+  color: var(--el-color-danger);
+  font-weight: 600;
+}
+
+.order-card-meta .due-soon {
+  color: var(--el-color-warning);
+  font-weight: 600;
 }
 
 .footer-factory {

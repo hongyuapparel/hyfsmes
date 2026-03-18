@@ -20,6 +20,7 @@ export interface FinishingListItem {
   /** 尾部入库数 */
   tailInboundQty: number | null
   defectQuantity: number | null
+  remark: string | null
 }
 
 export interface FinishingListRes {
@@ -47,6 +48,7 @@ export interface FinishingRegisterFormDataRes {
   orderRow: (number | null)[]
   cutRow: (number | null)[]
   sewingRow: (number | null)[]
+  tailReceivedRow: (number | null)[]
 }
 
 export function getFinishingRegisterFormData(orderId: number) {
@@ -63,6 +65,26 @@ export function exportFinishingItems(params?: Omit<FinishingListQuery, 'page' | 
   } as any)
 }
 
+/** 待尾部：登记收货（仅收货数量） */
+export function registerFinishingReceive(payload: {
+  orderId: number
+  tailReceivedQty: number
+  tailReceivedQuantities?: number[]
+}) {
+  return request.post<void>('/production/finishing/items/register-receive', payload)
+}
+
+/** 尾部：登记包装完成（发货数、入库数、次品数、备注，三者之和=尾部收货数） */
+export function registerFinishingPackagingComplete(payload: {
+  orderId: number
+  tailShippedQty: number
+  tailInboundQty: number
+  defectQuantity: number
+  remark?: string
+}) {
+  return request.post<void>('/production/finishing/items/register-packaging-complete', payload)
+}
+
 export function registerFinishingPackaging(payload: {
   orderId: number
   tailReceivedQty: number
@@ -77,4 +99,9 @@ export function shipFinishingOrder(orderId: number, quantity: number) {
 
 export function inboundFinishingOrder(orderId: number, quantity: number) {
   return request.post<void>('/production/finishing/items/inbound', { orderId, quantity })
+}
+
+/** 财务审批通过：等待发货且已分配完毕时，订单完成 */
+export function financeApproveFinishingOrder(orderId: number) {
+  return request.post<void>(`/production/finishing/items/${orderId}/finance-approve`)
 }

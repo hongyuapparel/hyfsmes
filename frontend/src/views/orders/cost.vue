@@ -183,6 +183,16 @@
             </el-select>
           </template>
         </el-table-column>
+        <el-table-column label="部位" min-width="120">
+          <template #default="{ row }">
+            <el-input v-model="row.part" placeholder="如：前幅 / 后幅 / 袖子" size="small" />
+          </template>
+        </el-table-column>
+        <el-table-column label="工艺说明 / 备注" min-width="160">
+          <template #default="{ row }">
+            <el-input v-model="row.remark" placeholder="说明 / 备注" size="small" />
+          </template>
+        </el-table-column>
         <el-table-column label="单价(元)" width="90" align="right">
           <template #default="{ row }">
             <el-input-number
@@ -210,11 +220,6 @@
             {{ formatMoney(processItemAmount(row)) }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="100">
-          <template #default="{ row }">
-            <el-input v-model="row.remark" size="small" />
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="56" fixed="right" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" size="small" @click="removeProcessItemRow($index)">
@@ -226,15 +231,24 @@
       <div class="subtotal">工艺项目小计：<strong>{{ formatMoney(processItemTotal) }}</strong> 元</div>
     </el-card>
 
-    <!-- 生产工序成本 -->
+    <!-- 生产工序成本（部门/工种合并单元格，部门顺序：裁床→车缝→尾部） -->
     <el-card class="block-card table-card" shadow="never">
       <template #header>
         <div class="block-header">
           <span class="block-title">生产工序成本</span>
-          <el-button link type="primary" size="small" @click="addProductionRow">新增</el-button>
+          <div class="block-header-actions">
+            <el-button link type="primary" size="small" @click="openImportTemplateDialog">导入模板</el-button>
+            <el-button link type="primary" size="small" @click="addProductionRow">新增</el-button>
+          </div>
         </div>
       </template>
-      <el-table :data="productionRows" border size="small" class="cost-table">
+      <el-table
+        :data="productionRowsSorted"
+        border
+        size="small"
+        class="cost-table"
+        :span-method="productionSpanMethod"
+      >
         <el-table-column label="部门" min-width="100">
           <template #default="{ row }">
             <el-select
@@ -315,8 +329,8 @@
           </template>
         </el-table-column>
         <el-table-column label="操作" width="56" fixed="right" align="center">
-          <template #default="{ $index }">
-            <el-button link type="danger" size="small" @click="removeProductionRow($index)">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" @click="removeProductionRow(row)">
               <el-icon><Delete /></el-icon>
             </el-button>
           </template>
@@ -326,6 +340,34 @@
         暂无配置工序，请在系统设置中维护生产工序部门/工种/工序及单价。
       </p>
       <div class="subtotal">生产工序小计：<strong>{{ formatMoney(productionProcessTotal) }}</strong> 元</div>
+      <el-dialog
+        v-model="importTemplateDialog.visible"
+        title="导入工序模板"
+        width="400px"
+        @close="importTemplateDialog.templateId = null"
+      >
+        <p class="import-template-hint">选择服装类型模板，将其中工序一键填入下方表格，再按款式做个别增减。</p>
+        <el-select
+          v-model="importTemplateDialog.templateId"
+          placeholder="选择模板"
+          filterable
+          clearable
+          style="width: 100%"
+        >
+          <el-option
+            v-for="t in importTemplateOptions"
+            :key="t.id"
+            :label="t.name"
+            :value="t.id"
+          />
+        </el-select>
+        <template #footer>
+          <el-button @click="importTemplateDialog.visible = false">取消</el-button>
+          <el-button type="primary" :disabled="!importTemplateDialog.templateId" @click="applyImportTemplate">
+            确定导入
+          </el-button>
+        </template>
+      </el-dialog>
     </el-card>
 
     <!-- 汇总与出厂价 -->
@@ -391,6 +433,7 @@ import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { getOrderDetail, getOrderCost, saveOrderCost, updateOrderDraft, type OrderDetail } from '@/api/orders'
 import { getProductionProcesses, type ProductionProcessItem } from '@/api/production-processes'
+import { getProcessQuoteTemplates, getProcessQuoteTemplateItems } from '@/api/process-quote-templates'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems } from '@/api/dicts'
 import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
@@ -419,6 +462,9 @@ const supplierOptions = ref<{ id: number; name: string }[]>([])
 const supplierLoading = ref(false)
 const processOptions = ref<string[]>([])
 
+const importTemplateDialog = ref<{ visible: boolean; templateId: number | null }>({ visible: false, templateId: null })
+const importTemplateOptions = ref<{ id: number; name: string }[]>([])
+
 interface MaterialRow {
   materialTypeId?: number | null
   materialType?: string
@@ -438,6 +484,7 @@ interface MaterialRow {
 interface ProcessItemRow {
   processName?: string
   supplierName?: string
+  part?: string
   remark?: string
   unitPrice: number
   quantity: number
@@ -493,6 +540,9 @@ const canSaveCost = computed(() => {
   return roleName === '管理员' || roleName === '跟单员'
 })
 
+/** 部门固定显示顺序（生产工序成本表格合并与排序用） */
+const DEPARTMENT_ORDER = ['裁床', '车缝', '尾部']
+
 const departmentOptions = computed(() =>
   Array.from(new Set(productionProcesses.value.map((p) => p.department).filter((v) => !!v)))
 )
@@ -500,6 +550,67 @@ const departmentOptions = computed(() =>
 const jobTypeOptions = computed(() =>
   Array.from(new Set(productionProcesses.value.map((p) => p.jobType).filter((v) => !!v)))
 )
+
+/** 生产工序行按部门(裁床→车缝→尾部)、工种、工序排序，用于表格展示与合并 */
+const productionRowsSorted = computed(() => {
+  const rows = [...productionRows.value]
+  const orderMap = new Map(DEPARTMENT_ORDER.map((d, i) => [d, i]))
+  const depIndex = (d: string) => orderMap.get(d ?? '') ?? DEPARTMENT_ORDER.length
+  return rows.sort((a, b) => {
+    const da = depIndex(a.department)
+    const db = depIndex(b.department)
+    if (da !== db) return da - db
+    const jta = (a.jobType ?? '').toString()
+    const jtb = (b.jobType ?? '').toString()
+    if (jta !== jtb) return jta.localeCompare(jtb)
+    const pna = (a.processName ?? '').toString()
+    const pnb = (b.processName ?? '').toString()
+    return pna.localeCompare(pnb)
+  })
+})
+
+/** 生产工序表格合并：部门列、工种列连续相同则合并 */
+function productionSpanMethod({
+  row,
+  columnIndex,
+  rowIndex,
+}: {
+  row: ProductionRow
+  columnIndex: number
+  rowIndex: number
+}): { rowspan: number; colspan: number } {
+  const sorted = productionRowsSorted.value
+  if (columnIndex === 0) {
+    const dept = (row.department ?? '').toString()
+    if (rowIndex > 0 && (sorted[rowIndex - 1]?.department ?? '').toString() === dept) {
+      return { rowspan: 0, colspan: 0 }
+    }
+    let count = 0
+    for (let i = rowIndex; i < sorted.length; i++) {
+      if ((sorted[i].department ?? '').toString() === dept) count++
+      else break
+    }
+    return { rowspan: count, colspan: 1 }
+  }
+  if (columnIndex === 1) {
+    const dept = (row.department ?? '').toString()
+    const job = (row.jobType ?? '').toString()
+    if (rowIndex > 0) {
+      const prev = sorted[rowIndex - 1]
+      if ((prev?.department ?? '').toString() === dept && (prev?.jobType ?? '').toString() === job) {
+        return { rowspan: 0, colspan: 0 }
+      }
+    }
+    let count = 0
+    for (let i = rowIndex; i < sorted.length; i++) {
+      const r = sorted[i]
+      if ((r.department ?? '').toString() === dept && (r.jobType ?? '').toString() === job) count++
+      else break
+    }
+    return { rowspan: count, colspan: 1 }
+  }
+  return { rowspan: 1, colspan: 1 }
+}
 
 function productionAmount(row: ProductionRow): number {
   const price = Number(row.unitPrice) || 0
@@ -589,6 +700,7 @@ function addProcessItemRow() {
   processItemRows.value.push({
     processName: '',
     supplierName: '',
+    part: '',
     remark: '',
     unitPrice: 0,
     quantity: order.value?.quantity ?? 0,
@@ -684,8 +796,8 @@ function addProductionRow() {
   })
 }
 
-function removeProductionRow(index: number) {
-  productionRows.value.splice(index, 1)
+function removeProductionRow(row: ProductionRow) {
+  productionRows.value = productionRows.value.filter((r) => r !== row)
 }
 
 function syncProductionIdsFromName() {
@@ -772,6 +884,38 @@ function goBack() {
   router.push('/orders/list')
 }
 
+async function openImportTemplateDialog() {
+  importTemplateDialog.value = { visible: true, templateId: null }
+  try {
+    const res = await getProcessQuoteTemplates()
+    importTemplateOptions.value = (res.data ?? []).map((t) => ({ id: t.id, name: t.name }))
+  } catch {
+    importTemplateOptions.value = []
+  }
+}
+
+async function applyImportTemplate() {
+  const templateId = importTemplateDialog.value.templateId
+  if (templateId == null) return
+  try {
+    const res = await getProcessQuoteTemplateItems(templateId)
+    const items = res.data ?? []
+    const rows: ProductionRow[] = items.map((item) => ({
+      processId: item.processId,
+      department: item.department ?? '',
+      jobType: item.jobType ?? '',
+      processName: item.processName ?? '',
+      remark: '',
+      unitPrice: Number(item.unitPrice) || 0,
+    }))
+    productionRows.value.push(...rows)
+    importTemplateDialog.value.visible = false
+    ElMessage.success(`已导入 ${rows.length} 条工序，可按款式微调`)
+  } catch (e: unknown) {
+    ElMessage.error((e as { message?: string })?.message ?? '导入失败')
+  }
+}
+
 onMounted(async () => {
   await loadOrder()
   await loadCostSnapshot()
@@ -827,8 +971,21 @@ onMounted(async () => {
   justify-content: space-between;
 }
 
+.block-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .block-title {
   font-weight: 600;
+}
+
+.import-template-hint {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
+  margin: 0 0 var(--space-sm);
+  line-height: 1.5;
 }
 
 .summary-card .order-summary {
@@ -840,6 +997,22 @@ onMounted(async () => {
 
 .cost-table {
   font-size: var(--font-size-caption);
+}
+
+.cost-table :deep(.el-table__header-wrapper th),
+.cost-table :deep(.el-table__header-wrapper th .cell),
+.cost-table :deep(.el-table__body-wrapper td),
+.cost-table :deep(.el-table__body-wrapper td .cell) {
+  font-size: inherit;
+}
+
+.cost-table :deep(.el-input__inner),
+.cost-table :deep(.el-input__wrapper),
+.cost-table :deep(.el-select__wrapper),
+.cost-table :deep(.el-select__selected-item),
+.cost-table :deep(.el-select__placeholder),
+.cost-table :deep(.el-input-number .el-input__inner) {
+  font-size: inherit;
 }
 
 .cost-table :deep(.el-input-number) {

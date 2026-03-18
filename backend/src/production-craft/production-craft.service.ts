@@ -4,10 +4,15 @@ import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
+import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 export interface CraftListItem {
   orderId: number;
   orderNo: string;
+  /** 到工艺时间：订单进入待工艺状态的时间 */
+  arrivedAtCraft: string | null;
+  /** 工艺完成时间 */
+  completedAt: string | null;
   orderDate: string | null;
   skuCode: string;
   imageUrl: string;
@@ -19,7 +24,6 @@ export interface CraftListItem {
   collaborationTypeId: number | null;
   purchaseStatus: string;
   craftStatus: string;
-  completedAt: string | null;
 }
 
 export interface CraftListQuery {
@@ -45,7 +49,31 @@ export class ProductionCraftService {
     private readonly craftRepo: Repository<OrderCraft>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
+
+  private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 10) || null;
+    if (!(v instanceof Date) || Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private toDateTimeLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 19).replace('T', ' ') || null;
+    if (!(v instanceof Date) || Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    const hh = String(v.getHours()).padStart(2, '0');
+    const mm = String(v.getMinutes()).padStart(2, '0');
+    const ss = String(v.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+  }
 
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
     if (!materials || materials.length === 0) return false;
@@ -83,10 +111,11 @@ export class ProductionCraftService {
       pageSize = 20,
     } = query;
 
-    // 工艺管理：所有选择了工艺的订单都展示（不限制订单状态）
+    // 工艺管理：仅展示审单通过后的订单（排除草稿、待审单），且选择了工艺项目
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .where("o.process_item IS NOT NULL AND o.process_item != ''");
+      .where("o.process_item IS NOT NULL AND o.process_item != ''")
+      .andWhere('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review'] });
 
     if (processItem?.trim()) {
       qb.andWhere('o.process_item LIKE :processItem', { processItem: `%${processItem.trim()}%` });
@@ -133,10 +162,20 @@ export class ProductionCraftService {
       if (tab === 'completed' && craftStatus !== 'completed') continue;
 
       const purchaseCompleted = this.isPurchaseCompleted(materials);
+      const arrivedAtCraft =
+        craft?.arrivedAtCraft
+          ? this.toDateTimeLocalString(craft.arrivedAtCraft)
+          : order.statusTime
+            ? this.toDateTimeLocalString(order.statusTime)
+            : null;
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
-        orderDate: order.orderDate ? order.orderDate.toISOString().slice(0, 10) : null,
+        arrivedAtCraft,
+        completedAt: craft?.completedAt
+          ? this.toDateTimeLocalString(craft.completedAt)
+          : null,
+        orderDate: this.toDateOnlyLocalString(order.orderDate),
         skuCode: order.skuCode ?? '',
         imageUrl: order.imageUrl ?? '',
         supplierName: this.firstSupplierName(materials) || '-',
@@ -145,9 +184,6 @@ export class ProductionCraftService {
         collaborationTypeId: order.collaborationTypeId ?? null,
         purchaseStatus: purchaseCompleted ? 'completed' : 'pending',
         craftStatus: craftStatus === 'completed' ? 'completed' : 'pending',
-        completedAt: craft?.completedAt
-          ? craft.completedAt.toISOString().slice(0, 19).replace('T', ' ')
-          : null,
       });
     }
 
@@ -158,7 +194,7 @@ export class ProductionCraftService {
     return { list, total, page, pageSize };
   }
 
-  async completeCraft(orderId: number): Promise<void> {
+  async completeCraft(orderId: number, actorUserId: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -173,12 +209,31 @@ export class ProductionCraftService {
       craft = this.craftRepo.create({
         orderId,
         status: 'completed',
+        // 到工艺时间：优先取订单当前状态变更时间（进入工艺环节时应已更新），兜底为当前时间
+        arrivedAtCraft: order.statusTime ?? now,
         completedAt: now,
       });
     } else {
       craft.status = 'completed';
+      if (!craft.arrivedAtCraft) {
+        craft.arrivedAtCraft = order.statusTime ?? now;
+      }
       craft.completedAt = now;
     }
     await this.craftRepo.save(craft);
+
+    // 若订单当前为「待工艺」，按流程链路解析下一状态并更新订单
+    if (order.status === 'pending_craft') {
+      const nextStatus = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'craft_completed',
+        actorUserId,
+      });
+      if (nextStatus) {
+        order.status = nextStatus;
+        order.statusTime = now;
+        await this.orderRepo.save(order);
+      }
+    }
   }
 }

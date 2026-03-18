@@ -22,6 +22,10 @@ export class IncomeRecord {
   @Column({ name: 'amount', type: 'decimal', precision: 12, scale: 2 })
   amount: string;
 
+  /** 付款方/来源（选填） */
+  @Column({ name: 'payer', length: 100, default: '' })
+  payer: string;
+
   /**
    * 部门 ID（system_options.id，option_type='org_departments'）
    * 改名后历史展示自动同步
@@ -39,6 +43,10 @@ export class IncomeRecord {
   /** 备注 */
   @Column({ name: 'remark', length: 500, default: '' })
   remark: string;
+
+  /** 图片/附件 URL 数组（选填） */
+  @Column({ name: 'attachments', type: 'json', nullable: true })
+  attachments: string[] | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

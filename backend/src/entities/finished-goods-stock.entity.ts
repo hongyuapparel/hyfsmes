@@ -14,14 +14,19 @@ export class FinishedGoodsStock {
   @Column({ name: 'customer_name', length: 255, default: '' })
   customerName: string;
 
-  @Column({ name: 'order_id', type: 'int' })
-  orderId: number;
+  /** 订单 ID，可选（无订单号直接入库时为 null） */
+  @Column({ name: 'order_id', type: 'int', nullable: true })
+  orderId: number | null;
 
   @Column({ name: 'sku_code', length: 64, default: '' })
   skuCode: string;
 
   @Column({ name: 'quantity', type: 'int', default: 0 })
   quantity: number;
+
+  /** 出厂价（元） */
+  @Column({ name: 'unit_price', type: 'decimal', precision: 12, scale: 2, default: 0 })
+  unitPrice: string;
 
   /** 仓库 ID（关联 system_options.id，optionType = 'warehouses'） */
   @Column({ name: 'warehouse_id', type: 'int', nullable: true })

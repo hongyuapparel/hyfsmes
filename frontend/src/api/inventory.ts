@@ -7,6 +7,7 @@ export interface PendingListItem {
   orderNo: string
   customerName: string
   skuCode: string
+  imageUrl?: string
   quantity: number
   createdAt: string
 }
@@ -37,15 +38,17 @@ export function doPendingInbound(body: {
 /** 成品库存（含待入库/已入库） */
 export interface FinishedStockRow {
   id: number
-  orderId: number
+  orderId: number | null
   orderNo: string
-  customerName: string
+  customerName?: string
   skuCode: string
   quantity: number
+  unitPrice?: string
   warehouseId: number | null
   inventoryTypeId: number | null
   department: string
   location: string
+  imageUrl?: string
   createdAt: string
   type: 'pending' | 'stored'
 }
@@ -71,14 +74,57 @@ export function finishedOutbound(id: number, quantity: number) {
   return request.post<void>('/inventory/finished/outbound', { id, quantity })
 }
 
+export interface FinishedStockDetailRes {
+  stock: FinishedStockRow
+  orderNo: string
+  productImageUrl: string
+  colorImages: Array<{ colorName: string; imageUrl: string; updatedAt: string }>
+  adjustLogs: Array<{
+    id: number
+    operatorUsername: string
+    before: any
+    after: any
+    remark: string
+    createdAt: string
+  }>
+  colorSize: { headers: string[]; colors: string[] }
+}
+
+export function getFinishedStockDetail(id: number) {
+  return request.get<FinishedStockDetailRes>(`/inventory/finished/items/${id}`)
+}
+
+export function updateFinishedStockMeta(
+  id: number,
+  body: {
+    department?: string
+    inventoryTypeId?: number | null
+    warehouseId?: number | null
+    location?: string
+    remark?: string
+  }
+) {
+  return request.patch<FinishedStockRow>(`/inventory/finished/items/${id}`, body)
+}
+
+export function upsertFinishedStockColorImage(
+  id: number,
+  body: { colorName: string; imageUrl: string }
+) {
+  return request.put<void>(`/inventory/finished/items/${id}/color-images`, body)
+}
+
 export interface FinishedOutboundRecord {
   id: number
   finishedStockId: number
-  orderId: number
+  orderId: number | null
   orderNo: string
   skuCode: string
   customerName: string
   quantity: number
+  department: string
+  warehouseId: number | null
+  inventoryTypeId: number | null
   operatorUsername: string
   remark: string
   createdAt: string
@@ -100,9 +146,10 @@ export function getFinishedOutboundRecords(params?: {
 }
 
 export function createFinishedStock(body: {
-  orderNo: string
+  orderNo?: string
   skuCode: string
   quantity: number
+  unitPrice?: string | number
   warehouseId: number | null
   inventoryTypeId?: number | null
   department: string

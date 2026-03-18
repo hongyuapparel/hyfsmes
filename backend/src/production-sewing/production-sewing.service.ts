@@ -74,14 +74,29 @@ export class ProductionSewingService {
   /** 日期/时间字段从 DB 可能是 Date 或 string，统一转为列表用的字符串 */
   private toDateOnlyString(v: Date | string | null | undefined): string | null {
     if (v == null) return null;
-    if (v instanceof Date) return v.toISOString().slice(0, 10);
+    if (v instanceof Date) {
+      if (Number.isNaN(v.getTime())) return null;
+      const y = v.getFullYear();
+      const m = String(v.getMonth() + 1).padStart(2, '0');
+      const d = String(v.getDate()).padStart(2, '0');
+      return `${y}-${m}-${d}`;
+    }
     if (typeof v === 'string') return v.slice(0, 10) || null;
     return null;
   }
 
   private toDateTimeString(v: Date | string | null | undefined): string | null {
     if (v == null) return null;
-    if (v instanceof Date) return v.toISOString().slice(0, 19).replace('T', ' ');
+    if (v instanceof Date) {
+      if (Number.isNaN(v.getTime())) return null;
+      const y = v.getFullYear();
+      const m = String(v.getMonth() + 1).padStart(2, '0');
+      const d = String(v.getDate()).padStart(2, '0');
+      const hh = String(v.getHours()).padStart(2, '0');
+      const mm = String(v.getMinutes()).padStart(2, '0');
+      const ss = String(v.getSeconds()).padStart(2, '0');
+      return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+    }
     if (typeof v === 'string') return v.slice(0, 19).replace('T', ' ') || null;
     return null;
   }

@@ -92,6 +92,7 @@
         start-placeholder="下单时间"
         end-placeholder=""
         value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
         unlink-panels
         size="large"
         class="filter-bar-item"
@@ -123,8 +124,11 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="orderDate" label="下单时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDate(row.orderDate) }}</template>
+      <el-table-column prop="arrivedAtCraft" label="到工艺时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.arrivedAtCraft) }}</template>
+      </el-table-column>
+      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
@@ -159,9 +163,6 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
-      </el-table-column>
     </el-table>
 
     <div class="pagination-wrap">
@@ -181,6 +182,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCraftItems, completeCraft, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'

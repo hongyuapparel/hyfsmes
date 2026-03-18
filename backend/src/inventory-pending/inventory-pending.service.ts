@@ -4,6 +4,7 @@ import { In, Repository } from 'typeorm';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { Order } from '../entities/order.entity';
+import { Product } from '../entities/product.entity';
 
 export interface PendingListItem {
   id: number;
@@ -11,6 +12,7 @@ export interface PendingListItem {
   orderNo: string;
   customerName: string;
   skuCode: string;
+  imageUrl: string;
   quantity: number;
   createdAt: string;
 }
@@ -24,6 +26,8 @@ export class InventoryPendingService {
     private readonly stockRepo: Repository<FinishedGoodsStock>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
   ) {}
 
   async getList(params: {
@@ -37,6 +41,7 @@ export class InventoryPendingService {
     const qb = this.pendingRepo
       .createQueryBuilder('p')
       .innerJoin(Order, 'o', 'o.id = p.order_id')
+      .leftJoin(Product, 'pr', 'pr.sku_code = p.sku_code')
       .where('p.status = :status', { status: 'pending' })
       .select([
         'p.id AS id',
@@ -44,6 +49,7 @@ export class InventoryPendingService {
         'o.order_no AS orderNo',
         'o.customer_name AS customerName',
         'p.sku_code AS skuCode',
+        'pr.image_url AS imageUrl',
         'p.quantity AS quantity',
         'p.created_at AS createdAt',
       ]);
@@ -77,6 +83,7 @@ export class InventoryPendingService {
         orderNo: string;
         customerName: string;
         skuCode: string;
+        imageUrl: string;
         quantity: number;
         createdAt: Date;
       }>();
@@ -87,6 +94,7 @@ export class InventoryPendingService {
       orderNo: r.orderNo ?? '',
       customerName: r.customerName ?? '',
       skuCode: r.skuCode ?? '',
+      imageUrl: r.imageUrl ?? '',
       quantity: r.quantity ?? 0,
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
     }));

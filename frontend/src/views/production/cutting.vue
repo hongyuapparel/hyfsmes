@@ -153,7 +153,7 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column label="实裁数量" width="96" align="right">
+      <el-table-column label="裁床数量" width="96" align="right">
         <template #default="{ row }">
           <el-popover
             placement="top-start"
@@ -202,6 +202,16 @@
               </div>
             </div>
           </el-popover>
+        </template>
+      </el-table-column>
+      <el-table-column prop="actualFabricMeters" label="实际用布(米)" width="110" align="right">
+        <template #default="{ row }">
+          {{ row.actualFabricMeters != null && String(row.actualFabricMeters).trim() !== '' ? row.actualFabricMeters : '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="cuttingCost" label="裁剪成本(元)" width="110" align="right">
+        <template #default="{ row }">
+          {{ row.cuttingCost != null && String(row.cuttingCost).trim() !== '' ? row.cuttingCost : '-' }}
         </template>
       </el-table-column>
       <el-table-column prop="timeRating" label="时效判定" width="90" align="center" />
@@ -254,13 +264,63 @@
               />
             </template>
           </el-table-column>
+          <el-table-column label="合计" width="80" align="right">
+            <template #default="{ row }">
+              {{ actualCutRowTotal(row) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="remark" label="备注" min-width="80">
             <template #default="{ row }">
               <el-input v-model="row.remark" size="small" placeholder="备注" clearable />
             </template>
           </el-table-column>
         </el-table>
-        <el-form :model="registerForm" label-width="90px" class="cut-cost-form">
+        <div class="cut-grid-total">数量合计：<strong>{{ actualCutGrandTotal }}</strong></div>
+        <el-form :model="registerForm" label-width="110px" class="cut-cost-form">
+          <el-form-item label="裁剪部门">
+            <el-select
+              v-model="registerForm.cuttingDepartment"
+              placeholder="请选择"
+              filterable
+              clearable
+              style="width: 240px"
+              @change="onCuttingDepartmentChange"
+            >
+              <el-option :label="SELF_DEPARTMENT_LABEL" :value="SELF_DEPARTMENT_LABEL" />
+              <el-option
+                v-for="opt in cuttingDepartmentOptions"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="isSelfCutting" label="裁剪人">
+            <el-select
+              v-model="registerForm.cutterName"
+              placeholder="请选择裁剪人"
+              filterable
+              clearable
+              style="width: 240px"
+            >
+              <el-option
+                v-for="opt in cutterOptions"
+                :key="opt"
+                :label="opt"
+                :value="opt"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item v-if="isSelfCutting" label="实际用布(米)">
+            <el-input-number
+              v-model="registerForm.actualFabricMeters"
+              :min="0"
+              :precision="3"
+              :controls="false"
+              placeholder="米"
+              style="width: 240px"
+            />
+          </el-form-item>
           <el-form-item label="裁剪成本（元）">
             <el-input v-model="registerForm.cuttingCost" placeholder="元" clearable style="width: 160px" />
           </el-form-item>
@@ -291,6 +351,8 @@ import {
   type CuttingQuantityBreakdownRes,
 } from '@/api/production-cutting'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getSupplierList } from '@/api/suppliers'
+import { getEmployeeList } from '@/api/hr'
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },
@@ -358,11 +420,31 @@ const registerForm = reactive<{
   colorSizeHeaders: string[]
   actualCutRows: { colorName: string; quantities: number[]; remark?: string }[]
   cuttingCost: string
+  cuttingDepartment: string
+  cutterName: string
+  actualFabricMeters: number | null
 }>({
   colorSizeHeaders: [],
   actualCutRows: [],
   cuttingCost: '',
+  cuttingDepartment: '',
+  cutterName: '',
+  actualFabricMeters: null,
 })
+
+const SELF_DEPARTMENT_LABEL = '本厂'
+const cuttingDepartmentOptions = ref<string[]>([])
+const isSelfCutting = computed(() => (registerForm.cuttingDepartment ?? '').trim() === SELF_DEPARTMENT_LABEL)
+const cutterOptions = ref<string[]>([])
+
+function actualCutRowTotal(row: { quantities: number[] }): number {
+  const qs = Array.isArray(row?.quantities) ? row.quantities : []
+  return qs.reduce((sum, v) => sum + (Number(v) || 0), 0)
+}
+
+const actualCutGrandTotal = computed(() =>
+  (registerForm.actualCutRows ?? []).reduce((sum, r) => sum + actualCutRowTotal(r as any), 0),
+)
 
 function formatDateTime(v: string | null | undefined): string {
   if (!v) return '-'
@@ -524,6 +606,9 @@ async function openRegisterDialog() {
       while (r.quantities.length < len) r.quantities.push(0)
     })
     registerForm.cuttingCost = ''
+    registerForm.cuttingDepartment = SELF_DEPARTMENT_LABEL
+    registerForm.cutterName = ''
+    registerForm.actualFabricMeters = null
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     registerDialog.visible = false
@@ -535,10 +620,29 @@ function resetRegisterForm() {
   registerForm.colorSizeHeaders = []
   registerForm.actualCutRows = []
   registerForm.cuttingCost = ''
+  registerForm.cuttingDepartment = ''
+  registerForm.cutterName = ''
+  registerForm.actualFabricMeters = null
 }
 
 async function submitRegister() {
   if (!registerDialog.row) return
+  const dep = (registerForm.cuttingDepartment ?? '').trim()
+  if (!dep) {
+    ElMessage.warning('请选择裁剪部门')
+    return
+  }
+  if (dep === SELF_DEPARTMENT_LABEL && !(registerForm.cutterName ?? '').trim()) {
+    ElMessage.warning('本厂裁床请填写裁剪人')
+    return
+  }
+  if (dep === SELF_DEPARTMENT_LABEL) {
+    const meters = registerForm.actualFabricMeters
+    if (meters == null || Number.isNaN(Number(meters)) || Number(meters) <= 0) {
+      ElMessage.warning('本厂裁床请填写实际用布（米）')
+      return
+    }
+  }
   registerDialog.submitting = true
   try {
     const actualCutRows = registerForm.actualCutRows.map((r) => ({
@@ -550,6 +654,12 @@ async function submitRegister() {
       orderId: registerDialog.row.orderId,
       cuttingCost: registerForm.cuttingCost.trim() || '0',
       actualCutRows,
+      cuttingDepartment: dep,
+      cutterName: dep === SELF_DEPARTMENT_LABEL ? (registerForm.cutterName ?? '').trim() : null,
+      actualFabricMeters:
+        dep === SELF_DEPARTMENT_LABEL && registerForm.actualFabricMeters != null
+          ? String(registerForm.actualFabricMeters)
+          : null,
     })
     ElMessage.success('裁床登记完成，订单已进入待车缝')
     registerDialog.visible = false
@@ -562,9 +672,52 @@ async function submitRegister() {
   }
 }
 
+async function loadCuttingDepartments() {
+  try {
+    const res = await getSupplierList({ type: '生产加工厂', page: 1, pageSize: 200 })
+    const list = res.data?.list ?? []
+    const names = list.map((s) => (s.name ?? '').trim()).filter((v) => !!v)
+    // 去重 + 排序，且避免和“本厂”重复展示
+    const uniq = Array.from(new Set(names)).filter((n) => n !== SELF_DEPARTMENT_LABEL)
+    cuttingDepartmentOptions.value = uniq
+  } catch {
+    cuttingDepartmentOptions.value = []
+  }
+}
+
+async function loadCutterOptions() {
+  try {
+    const res = await getEmployeeList({ status: 'active', page: 1, pageSize: 500 })
+    const list = res.data?.list ?? []
+    const names = list
+      .filter((e) => {
+        const dept = (e.departmentName ?? '').trim()
+        const job = (e.jobTitleName ?? '').trim()
+        const status = (e.status ?? '').toLowerCase()
+        return dept === '裁床' && job === '电剪' && status === 'active'
+      })
+      .map((e) => (e.name ?? '').trim())
+      .filter((v) => !!v)
+    const uniq = Array.from(new Set(names))
+    cutterOptions.value = uniq.length ? uniq : ['电剪刀']
+  } catch {
+    cutterOptions.value = ['电剪刀']
+  }
+}
+
+function onCuttingDepartmentChange() {
+  const dep = (registerForm.cuttingDepartment ?? '').trim()
+  if (dep !== SELF_DEPARTMENT_LABEL) {
+    registerForm.cutterName = ''
+    registerForm.actualFabricMeters = null
+  }
+}
+
 onMounted(() => {
   load()
   void loadTabCounts()
+  void loadCuttingDepartments()
+  void loadCutterOptions()
 })
 </script>
 
@@ -681,5 +834,12 @@ onMounted(() => {
 .qty-popover-empty {
   font-size: 12px;
   color: var(--color-text-muted, #909399);
+}
+
+.cut-grid-total {
+  margin-top: 6px;
+  text-align: right;
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption, 12px);
 }
 </style>

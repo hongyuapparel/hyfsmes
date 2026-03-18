@@ -30,6 +30,12 @@ export class OrderFinishing {
   @Column({ name: 'tail_received_qty', type: 'int', default: 0 })
   tailReceivedQty: number;
 
+  /** 尾部收货数按尺码明细（与 B 区尺码列一致，最后一项为合计） */
+  // 兼容历史数据库：部分环境尚未执行 ALTER TABLE 脚本加列。
+  // select=false 可避免在未加列时因 SELECT 字段而报错。
+  @Column({ name: 'tail_received_qty_row', type: 'json', nullable: true, select: false })
+  tailReceivedQtyRow: number[] | null;
+
   /** 尾部出货数（发货数量，可多次累加） */
   @Column({ name: 'tail_shipped_qty', type: 'int', default: 0 })
   tailShippedQty: number;
@@ -41,4 +47,8 @@ export class OrderFinishing {
   /** 次品数 */
   @Column({ name: 'defect_quantity', type: 'int', default: 0 })
   defectQuantity: number;
+
+  /** 登记包装完成时的备注（发货/入库/次品分配说明等） */
+  @Column({ name: 'remark', type: 'varchar', length: 500, nullable: true })
+  remark: string | null;
 }

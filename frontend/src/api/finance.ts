@@ -5,11 +5,13 @@ export interface IncomeRecordItem {
   id: number
   occurDate: string
   amount: string
+  payer?: string
   departmentId: number | null
   bankAccountId: number | null
   departmentName: string
   bankAccountName: string
   remark: string
+  attachments?: string[] | null
   createdAt: string
   updatedAt: string
 }
@@ -21,13 +23,18 @@ export interface ExpenseRecordItem {
   amount: string
   expenseTypeId: number | null
   departmentId: number | null
+  bankAccountId?: number | null
+  payee?: string
+  styleNo?: string
   orderId: number | null
   supplierId: number | null
   expenseTypeName: string
   departmentName: string
+  bankAccountName?: string
   orderNo: string
   supplierName: string
   detail: string
+  attachments?: string[] | null
   createdAt: string
   updatedAt: string
 }
@@ -112,6 +119,7 @@ export function getExpenseOptions() {
   return request.get<{
     expenseTypes: { id: number; value: string }[]
     departments: { id: number; value: string }[]
+    bankAccounts?: { id: number; value: string }[]
   }>('/finance/expense/options')
 }
 

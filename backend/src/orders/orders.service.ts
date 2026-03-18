@@ -51,6 +51,10 @@ export interface OrderListQuery {
   orderDateStart?: string;
   /** 下单时间结束（YYYY-MM-DD） */
   orderDateEnd?: string;
+  /** 完成时间开始（YYYY-MM-DD，仅对已完成订单生效，取 status_time） */
+  completedStart?: string;
+  /** 完成时间结束（YYYY-MM-DD，仅对已完成订单生效，取 status_time） */
+  completedEnd?: string;
   /** 客户交期开始（YYYY-MM-DD） */
   customerDueStart?: string;
   /** 客户交期结束（YYYY-MM-DD） */
@@ -165,7 +169,7 @@ export class OrdersService {
     }));
   }
 
-  /** 裁床明细行求和，供列表展示实裁总数 */
+  /** 裁床明细行求和，供列表展示裁床总数 */
   private sumActualCut(rows: ActualCutRow[] | null | undefined): number | null {
     if (!rows || rows.length === 0) return null;
     let sum = 0;
@@ -353,6 +357,8 @@ export class OrdersService {
       merchandiser,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
       customerDueStart,
       customerDueEnd,
       factory,
@@ -397,6 +403,16 @@ export class OrdersService {
     }
     if (orderDateEnd) {
       qb.andWhere('o.order_date <= :orderDateEnd', { orderDateEnd: `${orderDateEnd} 23:59:59` });
+    }
+    if (completedStart || completedEnd) {
+      // 完成时间：取订单状态为 completed 时的 status_time
+      qb.andWhere('o.status = :completedStatus', { completedStatus: 'completed' });
+      if (completedStart) {
+        qb.andWhere('o.status_time >= :completedStart', { completedStart: `${completedStart} 00:00:00` });
+      }
+      if (completedEnd) {
+        qb.andWhere('o.status_time <= :completedEnd', { completedEnd: `${completedEnd} 23:59:59` });
+      }
     }
     if (customerDueStart) {
       qb.andWhere('o.customer_due_date >= :customerDueStart', { customerDueStart: `${customerDueStart} 00:00:00` });
@@ -630,6 +646,9 @@ export class OrdersService {
     if (detail && detail !== '无关键字段变更') {
       await this.addLog(saved, actor, 'update', detail);
     }
+
+    // 编辑保存后：按订单最新物料/工艺同步成本快照（保留成本页人工维护的单价/利润率/工序等信息）
+    await this.syncCostSnapshotFromOrder(id, { keepExistingPricing: true });
     return saved;
   }
 
@@ -663,6 +682,8 @@ export class OrdersService {
       await this.autoOutboundAccessoriesByPackagingCells(order as any, actor);
     }
 
+    // 提交后：仍按订单最新信息同步成本快照，避免“先改订单再提交”导致成本页结构滞后
+    await this.syncCostSnapshotFromOrder(id, { keepExistingPricing: true });
     return saved;
   }
 
@@ -798,6 +819,9 @@ export class OrdersService {
           snapshot: srcCost.snapshot,
         });
         await this.orderCostSnapshotRepo.save(newCost);
+      } else {
+        // 源订单未维护成本快照：为新草稿按订单最新物料/工艺生成一份“种子快照”
+        await this.syncCostSnapshotFromOrder(saved.id, { keepExistingPricing: true });
       }
 
       created.push(saved);
@@ -932,18 +956,29 @@ export class OrdersService {
     // 1）订单下单件数：来自 order_ext.colorSizeRows
     const orderPerSize = buildPerSizeFromRows((ext as any)?.colorSizeRows ?? null);
 
-    // 2）实裁件数：来自 order_cutting.actualCutRows
+    // 2）裁床数量：来自 order_cutting.actualCutRows
     const cutPerSize = buildPerSizeFromRows(cutting?.actualCutRows ?? null);
 
-    // 3）车缝数量：当前仅记录总件数
-    const sewingTotal = sewing?.sewingQuantity ?? null;
-    const sewingRow =
-      sewingTotal != null
-        ? [
-            ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
-            sewingTotal,
-          ]
-        : null;
+    // 3）车缝数量：优先使用按尺码明细（sewing_quantity_row），否则回退为总件数
+    let sewingRow: (number | null)[] | null = null;
+    const sewingQtyRow = sewing?.sewingQuantityRow ?? null;
+    if (Array.isArray(sewingQtyRow) && sewingQtyRow.length === headers.length) {
+      sewingRow = sewingQtyRow.map((n) => (typeof n === 'number' && Number.isFinite(n) ? n : null));
+    } else if (Array.isArray(sewingQtyRow) && sewingQtyRow.length > 0) {
+      const sizeLen = Math.max(0, headers.length - 1);
+      const total = sewingQtyRow.reduce((a, b) => a + (Number(b) || 0), 0);
+      sewingRow = headers.length === 1 ? [total] : [...sewingQtyRow.slice(0, sizeLen), total];
+      while (sewingRow.length < headers.length) sewingRow.push(null);
+    } else {
+      const sewingTotal = sewing?.sewingQuantity ?? null;
+      sewingRow =
+        sewingTotal != null
+          ? [
+              ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
+              sewingTotal,
+            ]
+          : null;
+    }
 
     // 4）尾部出货数：当前仅记录总件数（若无出货，则回退为尾部收货数）
     const tailTotal =
@@ -965,7 +1000,7 @@ export class OrdersService {
       rows.push({ label: '订单数量', values: orderPerSize });
     }
     if (cutPerSize) {
-      rows.push({ label: '实裁数量', values: cutPerSize });
+      rows.push({ label: '裁床数量', values: cutPerSize });
     }
     if (sewingRow) {
       rows.push({ label: '车缝数量', values: sewingRow });
@@ -975,6 +1010,30 @@ export class OrdersService {
     }
 
     return { headers, rows };
+  }
+
+  /** 颜色×尺码明细（用于待入库数量悬停展示） */
+  async getColorSizeBreakdown(orderId: number): Promise<{
+    headers: string[];
+    rows: Array<{ colorName: string; values: number[] }>;
+  }> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) {
+      throw new NotFoundException('订单不存在');
+    }
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const headers = Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0 ? ext.colorSizeHeaders : [];
+    const baseRows = Array.isArray(ext?.colorSizeRows) ? ext!.colorSizeRows! : [];
+    if (!headers.length || !baseRows.length) {
+      return { headers: [], rows: [] };
+    }
+    const rows = baseRows.map((r: any) => {
+      const quantities = Array.isArray(r?.quantities) ? r.quantities : [];
+      const values = headers.map((_, idx) => Math.max(0, Number(quantities[idx]) || 0));
+      const total = values.reduce((a, b) => a + b, 0);
+      return { colorName: String(r?.colorName ?? ''), values: [...values, total] };
+    });
+    return { headers: [...headers, '合计'], rows };
   }
 
   async countByStatus(query: OrderListQuery) {
@@ -1048,6 +1107,113 @@ export class OrdersService {
       content: trimmed,
     });
     return this.orderRemarkRepo.save(remark);
+  }
+
+  /**
+   * 按订单最新物料/工艺信息同步成本快照：
+   * - 以 order_ext.materials / processItems 作为结构源
+   * - 默认保留既有成本中的单价/利润率/生产工序等人工维护字段
+   */
+  private async syncCostSnapshotFromOrder(
+    orderId: number,
+    options?: { keepExistingPricing?: boolean },
+  ): Promise<void> {
+    const keepPricing = options?.keepExistingPricing !== false;
+    const [order, ext] = await Promise.all([
+      this.orderRepo.findOne({ where: { id: orderId } }),
+      this.orderExtRepo.findOne({ where: { orderId } }),
+    ]);
+    if (!order) return;
+
+    const sourceMaterials = Array.isArray((ext as any)?.materials) ? ((ext as any).materials as any[]) : [];
+    const sourceProcessItems = Array.isArray((ext as any)?.processItems) ? ((ext as any).processItems as any[]) : [];
+
+    const nextMaterialRows = sourceMaterials.map((m) => ({
+      materialTypeId: m?.materialTypeId ?? null,
+      supplierName: m?.supplierName ?? '',
+      materialName: m?.materialName ?? '',
+      color: m?.color ?? '',
+      fabricWidth: m?.fabricWidth ?? '',
+      usagePerPiece: m?.usagePerPiece ?? null,
+      lossPercent: m?.lossPercent ?? null,
+      orderPieces: m?.orderPieces ?? null,
+      purchaseQuantity: m?.purchaseQuantity ?? null,
+      cuttingQuantity: m?.cuttingQuantity ?? null,
+      remark: m?.remark ?? '',
+      unitPrice: 0,
+    }));
+
+    const nextProcessItemRows = sourceProcessItems.map((p) => ({
+      processName: p?.processName ?? '',
+      supplierName: p?.supplierName ?? '',
+      part: p?.part ?? '',
+      remark: p?.remark ?? '',
+      unitPrice: 0,
+      quantity: order.quantity ?? 0,
+    }));
+
+    const existing = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    const existingSnapshot =
+      existing?.snapshot && typeof existing.snapshot === 'object' ? (existing.snapshot as any) : null;
+
+    const mergedMaterialRows = keepPricing
+      ? nextMaterialRows.map((row) => {
+          const found = Array.isArray(existingSnapshot?.materialRows)
+            ? (existingSnapshot.materialRows as any[]).find((r) => this.isSameMaterialCostRow(r, row))
+            : null;
+          return found ? { ...row, unitPrice: Number(found.unitPrice) || 0 } : row;
+        })
+      : nextMaterialRows;
+
+    const mergedProcessItemRows = keepPricing
+      ? nextProcessItemRows.map((row) => {
+          const found = Array.isArray(existingSnapshot?.processItemRows)
+            ? (existingSnapshot.processItemRows as any[]).find((r) => this.isSameProcessItemCostRow(r, row))
+            : null;
+          return found
+            ? {
+                ...row,
+                unitPrice: Number(found.unitPrice) || 0,
+                // 若成本页手工调整过数量，则沿用；否则使用订单数量
+                quantity:
+                  typeof found.quantity === 'number' && Number.isFinite(found.quantity) ? found.quantity : row.quantity,
+              }
+            : row;
+        })
+      : nextProcessItemRows;
+
+    const nextSnapshot: Record<string, unknown> = {
+      materialRows: mergedMaterialRows.length ? mergedMaterialRows : [{ unitPrice: 0 } as any],
+      processItemRows: mergedProcessItemRows.length
+        ? mergedProcessItemRows
+        : [{ unitPrice: 0, quantity: order.quantity ?? 0 } as any],
+      productionRows: Array.isArray(existingSnapshot?.productionRows) ? existingSnapshot.productionRows : [],
+      profitMargin: typeof existingSnapshot?.profitMargin === 'number' ? existingSnapshot.profitMargin : 0.15,
+    };
+
+    if (existing) {
+      existing.snapshot = nextSnapshot;
+      await this.orderCostSnapshotRepo.save(existing);
+    } else {
+      await this.orderCostSnapshotRepo.save(this.orderCostSnapshotRepo.create({ orderId, snapshot: nextSnapshot }));
+    }
+  }
+
+  private isSameMaterialCostRow(a: any, b: any): boolean {
+    const key = (r: any) =>
+      [
+        String(r?.materialTypeId ?? ''),
+        String(r?.supplierName ?? ''),
+        String(r?.materialName ?? ''),
+        String(r?.color ?? ''),
+        String(r?.fabricWidth ?? ''),
+      ].join('|');
+    return key(a) === key(b);
+  }
+
+  private isSameProcessItemCostRow(a: any, b: any): boolean {
+    const key = (r: any) => [String(r?.processName ?? ''), String(r?.supplierName ?? ''), String(r?.part ?? '')].join('|');
+    return key(a) === key(b);
   }
 
   /** 获取订单成本快照（成本页回显） */

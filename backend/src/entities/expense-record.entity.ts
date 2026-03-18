@@ -34,6 +34,18 @@ export class ExpenseRecord {
   @Column({ name: 'department_id', type: 'int', nullable: true })
   departmentId: number | null;
 
+  /** 付款账号 ID（system_options.id，option_type='bank_accounts'） */
+  @Column({ name: 'bank_account_id', type: 'int', nullable: true })
+  bankAccountId: number | null;
+
+  /** 收款方/对方（选填） */
+  @Column({ name: 'payee', length: 100, default: '' })
+  payee: string;
+
+  /** 款号/外部单号（选填，用于对账/防重复） */
+  @Column({ name: 'style_no', length: 50, default: '' })
+  styleNo: string;
+
   /** 关联订单 ID（能匹配上系统订单时填写） */
   @Column({ name: 'order_id', type: 'int', nullable: true })
   orderId: number | null;
@@ -45,6 +57,10 @@ export class ExpenseRecord {
   /** 明细/备注（匹配不上的支出在此写清楚） */
   @Column({ name: 'detail', length: 500, default: '' })
   detail: string;
+
+  /** 图片/附件 URL 数组（选填） */
+  @Column({ name: 'attachments', type: 'json', nullable: true })
+  attachments: string[] | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

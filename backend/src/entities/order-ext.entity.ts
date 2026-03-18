@@ -108,6 +108,8 @@ export interface OrderMaterialRow {
 export interface ProcessRow {
   processName?: string;
   supplierName?: string;
+  /** 工艺部位，如：前幅/后幅/袖子等 */
+  part?: string;
   remark?: string;
 }
 

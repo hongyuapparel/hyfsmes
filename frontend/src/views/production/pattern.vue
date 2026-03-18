@@ -129,6 +129,7 @@
         start-placeholder="下单时间"
         end-placeholder=""
         value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
         unlink-panels
         size="large"
         class="filter-bar-item"
@@ -168,8 +169,11 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="orderDate" label="下单时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDate(row.orderDate) }}</template>
+      <el-table-column prop="arrivedAtPattern" label="到纸样时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.arrivedAtPattern) }}</template>
+      </el-table-column>
+      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
@@ -185,27 +189,14 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="订单类型" width="100" show-overflow-tooltip>
-        <template #default="{ row }">
-          {{ orderTypeDisplay(row) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="purchaseStatus" label="采购状态" width="96" align="center">
-        <template #default="{ row }">
-          <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'info'" size="small">
-            {{ row.purchaseStatus === 'completed' ? '已完成' : '未完成' }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="合作方式" width="100" show-overflow-tooltip>
-        <template #default="{ row }">
-          {{ collaborationDisplay(row) }}
-        </template>
-      </el-table-column>
       <el-table-column prop="patternMaster" label="纸样师" width="90" show-overflow-tooltip />
       <el-table-column prop="sampleMaker" label="车版师" width="90" show-overflow-tooltip />
-      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
+      <el-table-column label="纸样物料" width="98" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" size="small" @click="openMaterialsDialog(row)">
+            {{ canEditPatternMaterials ? '填写/编辑' : '查看' }}
+          </el-button>
+        </template>
       </el-table-column>
     </el-table>
 
@@ -276,7 +267,7 @@
       </template>
     </el-dialog>
 
-    <!-- 确认完成（上传样品图片）弹窗 -->
+    <!-- 确认完成（样品图片可选）弹窗 -->
     <el-dialog
       v-model="completeDialog.visible"
       title="确认完成"
@@ -288,9 +279,9 @@
         <div>订单号：{{ completeDialog.row.orderNo }}</div>
         <div>SKU：{{ completeDialog.row.skuCode }}</div>
       </div>
-      <div class="complete-hint">上传一张样品图片作为证据即可完成纸样</div>
+      <div class="complete-hint">样品图片可选：不上传也可以完成纸样</div>
       <el-form ref="completeFormRef" :model="completeForm" :rules="completeRules" label-width="100px">
-        <el-form-item label="样品图片" prop="sampleImageUrl" required>
+        <el-form-item label="样品图片" prop="sampleImageUrl">
           <div
             class="sample-image-upload"
             @click="triggerSampleImageUpload"
@@ -314,8 +305,106 @@
       </el-form>
       <template #footer>
         <el-button @click="completeDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="completeDialog.submitting" :disabled="!completeForm.sampleImageUrl" @click="submitComplete">
+        <el-button type="primary" :loading="completeDialog.submitting" @click="submitComplete">
           完成纸样
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 纸样物料/裁片清单弹窗 -->
+    <el-dialog
+      v-model="materialsDialog.visible"
+      title="纸样物料/裁片清单"
+      width="860"
+      destroy-on-close
+      @close="resetMaterialsDialog"
+    >
+      <div v-if="materialsDialog.row" class="materials-brief">
+        <div>订单号：{{ materialsDialog.row.orderNo }}</div>
+        <div>SKU：{{ materialsDialog.row.skuCode }}</div>
+      </div>
+
+      <div class="materials-actions">
+        <el-button size="small" :disabled="materialsDialog.loading || !canEditPatternMaterials" @click="addMaterialRow">
+          新增一行
+        </el-button>
+        <el-button
+          size="small"
+          :disabled="materialsDialog.loading || !canEditPatternMaterials"
+          @click="syncFromOrderMaterials"
+        >
+          从订单物料同步（覆盖当前）
+        </el-button>
+      </div>
+
+      <el-table v-loading="materialsDialog.loading" :data="materialsForm.materials" border size="small" class="materials-table">
+        <el-table-column label="物料类型" min-width="110">
+          <template #default="{ row }">
+            <el-select
+              v-model="row.materialTypeId"
+              placeholder="选择"
+              filterable
+              clearable
+              size="small"
+              style="width: 100%"
+              :disabled="!canEditPatternMaterials"
+            >
+              <el-option
+                v-for="opt in materialTypeOptions"
+                :key="opt.id"
+                :label="opt.label"
+                :value="opt.id"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="物料名称" min-width="180">
+          <template #default="{ row }">
+            <el-input v-model="row.materialName" size="small" :disabled="!canEditPatternMaterials" />
+          </template>
+        </el-table-column>
+        <el-table-column label="幅宽(cm)" width="120" align="right">
+          <template #default="{ row }">
+            <el-input v-model="row.fabricWidth" size="small" placeholder="如 183cm" :disabled="!canEditPatternMaterials" />
+          </template>
+        </el-table-column>
+        <el-table-column label="单件用量(米)" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-model="row.usagePerPiece" :min="0" :controls="false" size="small" :disabled="!canEditPatternMaterials" />
+          </template>
+        </el-table-column>
+        <el-table-column label="裁片数量" width="110" align="right">
+          <template #default="{ row }">
+            <el-input-number v-model="row.cuttingQuantity" :min="0" :controls="false" size="small" :disabled="!canEditPatternMaterials" />
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="140">
+          <template #default="{ row }">
+            <el-input v-model="row.remark" size="small" :disabled="!canEditPatternMaterials" />
+          </template>
+        </el-table-column>
+        <el-table-column v-if="canEditPatternMaterials" label="操作" width="70" fixed="right" align="center">
+          <template #default="{ $index }">
+            <el-button link type="danger" size="small" @click="removeMaterialRow($index)">删除</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="materials-remark">
+        <div class="materials-remark-label">总体备注</div>
+        <el-input v-model="materialsForm.remark" type="textarea" :rows="3" placeholder="可选" :disabled="!canEditPatternMaterials" />
+      </div>
+
+      <template #footer>
+        <el-button @click="materialsDialog.visible = false">取消</el-button>
+        <el-button
+          v-if="canEditPatternMaterials"
+          type="primary"
+          :loading="materialsDialog.saving"
+          :disabled="materialsDialog.loading"
+          @click="submitMaterials"
+        >
+          保存
         </el-button>
       </template>
     </el-dialog>
@@ -325,18 +414,31 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { getPatternItems, assignPattern, completePattern, exportPatternItems, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
+import {
+  getPatternItems,
+  assignPattern,
+  completePattern,
+  exportPatternItems,
+  getPatternMaterials,
+  savePatternMaterials,
+  type PatternListItem,
+  type PatternListQuery,
+  type PatternMaterialRow,
+} from '@/api/production-pattern'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import { uploadImage } from '@/api/uploads'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { getEmployeeList, type EmployeeItem } from '@/api/hr'
+import { getOrderDetail } from '@/api/orders'
+import { useAuthStore } from '@/stores/auth'
 
 const PATTERN_TABS = [
   { label: '全部', value: 'all' },
   { label: '待分单', value: 'pending_assign' },
   { label: '打样中', value: 'in_progress' },
-  { label: '订单完成', value: 'completed' },
+  { label: '样品完成', value: 'completed' },
 ] as const
 
 type PatternTabConfig = (typeof PATTERN_TABS)[number]
@@ -456,6 +558,17 @@ const assignRules: FormRules = {
 const patternMasterOptions = ref<EmployeeItem[]>([])
 const sampleMakerOptions = ref<EmployeeItem[]>([])
 
+const materialTypeOptions = ref<{ id: number; label: string }[]>([])
+
+const authStore = useAuthStore()
+const canEditPatternMaterials = computed(() => {
+  const roleName = (authStore.user?.roleName ?? '').trim()
+  if (!roleName) return false
+  // 约定：纸样相关角色允许编辑；管理员可协助维护
+  if (roleName === '超级管理员' || roleName === '管理员') return true
+  return roleName.includes('纸样')
+})
+
 const completeDialog = reactive<{ visible: boolean; submitting: boolean; row: PatternListItem | null }>({
   visible: false,
   submitting: false,
@@ -463,11 +576,18 @@ const completeDialog = reactive<{ visible: boolean; submitting: boolean; row: Pa
 })
 const completeFormRef = ref<FormInstance>()
 const completeForm = reactive({ sampleImageUrl: '' })
-const completeRules: FormRules = {
-  sampleImageUrl: [{ required: true, message: '请上传样品图片', trigger: 'change' }],
-}
+const completeRules: FormRules = {}
 const sampleImageFileInputRef = ref<HTMLInputElement | null>(null)
 const sampleImageUploading = ref(false)
+
+const materialsDialog = reactive<{ visible: boolean; loading: boolean; saving: boolean; row: PatternListItem | null }>({
+  visible: false,
+  loading: false,
+  saving: false,
+  row: null,
+})
+
+const materialsForm = reactive<{ materials: PatternMaterialRow[]; remark: string }>({ materials: [], remark: '' })
 
 function formatDate(v: string | null | undefined): string {
   if (!v) return '-'
@@ -701,6 +821,100 @@ async function submitComplete() {
   }
 }
 
+function resetMaterialsDialog() {
+  materialsDialog.row = null
+  materialsForm.materials = []
+  materialsForm.remark = ''
+}
+
+function normalizePatternMaterialRow(r: PatternMaterialRow): PatternMaterialRow {
+  return {
+    materialTypeId: r.materialTypeId ?? null,
+    materialName: (r.materialName ?? '').toString(),
+    fabricWidth: (r.fabricWidth ?? '').toString(),
+    usagePerPiece: r.usagePerPiece ?? null,
+    cuttingQuantity: r.cuttingQuantity ?? null,
+    remark: (r.remark ?? '').toString(),
+  }
+}
+
+function addMaterialRow() {
+  materialsForm.materials.push({
+    materialTypeId: null,
+    materialName: '',
+    fabricWidth: '',
+    usagePerPiece: null,
+    cuttingQuantity: null,
+    remark: '',
+  })
+}
+
+function removeMaterialRow(index: number) {
+  materialsForm.materials.splice(index, 1)
+}
+
+async function openMaterialsDialog(row: PatternListItem) {
+  materialsDialog.row = row
+  materialsDialog.visible = true
+  materialsDialog.loading = true
+  try {
+    const res = await getPatternMaterials(row.orderId)
+    const data = res.data
+    materialsForm.materials = (data?.materials ?? []).map(normalizePatternMaterialRow)
+    materialsForm.remark = data?.remark ?? ''
+    if (!materialsForm.materials.length) addMaterialRow()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载失败'))
+    if (!materialsForm.materials.length) addMaterialRow()
+  } finally {
+    materialsDialog.loading = false
+  }
+}
+
+async function syncFromOrderMaterials() {
+  if (!materialsDialog.row) return
+  materialsDialog.loading = true
+  try {
+    const res = await getOrderDetail(materialsDialog.row.orderId)
+    const mats = (res.data?.materials ?? []).map((m: any) => ({
+      materialTypeId: m.materialTypeId ?? null,
+      materialName: m.materialName ?? '',
+      fabricWidth: m.fabricWidth ?? '',
+      usagePerPiece: m.usagePerPiece ?? null,
+      cuttingQuantity: m.cuttingQuantity ?? null,
+      remark: m.remark ?? '',
+    })) as PatternMaterialRow[]
+    materialsForm.materials = mats.map(normalizePatternMaterialRow)
+    if (!materialsForm.materials.length) addMaterialRow()
+    ElMessage.success('已从订单物料同步，可在此基础上增删改')
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '同步失败'))
+  } finally {
+    materialsDialog.loading = false
+  }
+}
+
+async function submitMaterials() {
+  if (!materialsDialog.row) return
+  const payloadMaterials = (materialsForm.materials ?? [])
+    .map(normalizePatternMaterialRow)
+    .filter((r) => {
+      const hasType = r.materialTypeId != null
+      const hasName = (r.materialName ?? '').trim().length > 0
+      return hasType || hasName
+    })
+  materialsDialog.saving = true
+  try {
+    await savePatternMaterials(materialsDialog.row.orderId, { materials: payloadMaterials, remark: materialsForm.remark ?? '' })
+    ElMessage.success('已保存')
+    materialsDialog.visible = false
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
+  } finally {
+    materialsDialog.saving = false
+  }
+}
+
 async function loadOptions() {
   try {
     const [orderTypeRes, collabRes] = await Promise.all([
@@ -716,6 +930,19 @@ async function loadOptions() {
   } catch {
     orderTypeTree.value = []
     collaborationOptions.value = []
+  }
+}
+
+async function loadMaterialTypes() {
+  try {
+    const res = await getDictItems('material_types')
+    const list = res.data ?? []
+    materialTypeOptions.value = (Array.isArray(list) ? list : []).map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
+  } catch {
+    materialTypeOptions.value = []
   }
 }
 
@@ -750,6 +977,7 @@ async function loadPatternStaffOptions() {
 
 onMounted(() => {
   loadOptions()
+  void loadMaterialTypes()
   load()
   void loadTabCounts()
   void loadPatternStaffOptions()
@@ -878,5 +1106,42 @@ onMounted(() => {
   height: 0;
   opacity: 0;
   pointer-events: none;
+}
+
+.materials-brief {
+  margin-bottom: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--el-fill-color-light);
+  border-radius: var(--radius);
+  font-size: var(--font-size-caption, 12px);
+}
+
+.materials-brief > div + div {
+  margin-top: 4px;
+}
+
+.materials-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.materials-table :deep(.el-input-number) {
+  width: 100%;
+}
+
+.materials-table :deep(.el-input-number .el-input__inner) {
+  text-align: right;
+}
+
+.materials-remark {
+  margin-top: var(--space-sm);
+}
+
+.materials-remark-label {
+  margin-bottom: 6px;
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption, 12px);
 }
 </style>

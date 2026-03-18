@@ -68,18 +68,26 @@ export class FinanceExpenseController {
     @Body('amount') amount: number | string,
     @Body('expenseTypeId') expenseTypeId?: number | null,
     @Body('departmentId') departmentId?: number | null,
+    @Body('bankAccountId') bankAccountId?: number | null,
+    @Body('payee') payee?: string,
+    @Body('styleNo') styleNo?: string,
     @Body('orderId') orderId?: number | null,
     @Body('supplierId') supplierId?: number | null,
     @Body('detail') detail?: string,
+    @Body('attachments') attachments?: string[] | null,
   ) {
     return this.service.create({
       occurDate: occurDate!,
       amount: amount!,
       expenseTypeId,
       departmentId,
+      bankAccountId,
+      payee,
+      styleNo,
       orderId,
       supplierId,
       detail,
+      attachments,
     });
   }
 
@@ -90,18 +98,26 @@ export class FinanceExpenseController {
     @Body('amount') amount?: number | string,
     @Body('expenseTypeId') expenseTypeId?: number | null,
     @Body('departmentId') departmentId?: number | null,
+    @Body('bankAccountId') bankAccountId?: number | null,
+    @Body('payee') payee?: string,
+    @Body('styleNo') styleNo?: string,
     @Body('orderId') orderId?: number | null,
     @Body('supplierId') supplierId?: number | null,
     @Body('detail') detail?: string,
+    @Body('attachments') attachments?: string[] | null,
   ) {
     return this.service.update(id, {
       occurDate,
       amount,
       expenseTypeId,
       departmentId,
+      bankAccountId,
+      payee,
+      styleNo,
       orderId,
       supplierId,
       detail,
+      attachments,
     });
   }
 

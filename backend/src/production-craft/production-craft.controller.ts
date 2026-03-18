@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { ProductionCraftService, CraftListQuery } from './production-craft.service';
 
 @Controller('production/process')
@@ -41,7 +42,10 @@ export class ProductionCraftController {
   }
 
   @Post('items/complete')
-  complete(@Body('orderId') orderId: number) {
-    return this.craftService.completeCraft(Number(orderId));
+  complete(
+    @Body('orderId') orderId: number,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.craftService.completeCraft(Number(orderId), user.userId);
   }
 }

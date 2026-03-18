@@ -55,9 +55,9 @@ export class ProductionFinishingController {
       '裁床数量',
       '车缝数量',
       '尾部收货数',
-      '尾部出货数',
       '尾部入库数',
       '次品数',
+      '备注',
       '尾部状态',
     ];
     const escape = (v: unknown) => {
@@ -81,9 +81,9 @@ export class ProductionFinishingController {
           r.cutTotal ?? '',
           r.sewingQuantity ?? '',
           r.tailReceivedQty ?? '',
-          r.tailShippedQty ?? '',
           r.tailInboundQty ?? '',
           r.defectQuantity ?? '',
+          r.remark ?? '',
           r.finishingStatus,
         ].map(escape).join(','),
       );
@@ -98,6 +98,36 @@ export class ProductionFinishingController {
   @Get('items/:orderId/register-form-data')
   getRegisterFormData(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.finishingService.getRegisterFormData(orderId);
+  }
+
+  @Post('items/register-receive')
+  registerReceive(
+    @Body('orderId') orderId: number,
+    @Body('tailReceivedQty') tailReceivedQty: number,
+    @Body('tailReceivedQuantities') tailReceivedQuantities?: number[],
+  ) {
+    return this.finishingService.registerReceive(
+      Number(orderId),
+      Number(tailReceivedQty),
+      Array.isArray(tailReceivedQuantities) ? tailReceivedQuantities : null,
+    );
+  }
+
+  @Post('items/register-packaging-complete')
+  registerPackagingComplete(
+    @Body('orderId') orderId: number,
+    @Body('tailShippedQty') tailShippedQty: number,
+    @Body('tailInboundQty') tailInboundQty: number,
+    @Body('defectQuantity') defectQuantity: number,
+    @Body('remark') remark?: string,
+  ) {
+    return this.finishingService.registerPackagingComplete(
+      Number(orderId),
+      Number(tailShippedQty ?? 0),
+      Number(tailInboundQty ?? 0),
+      Number(defectQuantity ?? 0),
+      remark ?? null,
+    );
   }
 
   @Post('items/register')
@@ -127,5 +157,10 @@ export class ProductionFinishingController {
     @Body('quantity') quantity: number,
   ) {
     return this.finishingService.inbound(Number(orderId), Number(quantity ?? 0));
+  }
+
+  @Post('items/:orderId/finance-approve')
+  financeApprove(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.finishingService.financeApproveFinishing(orderId);
   }
 }

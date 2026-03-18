@@ -5,6 +5,8 @@ export interface PurchaseItemRow {
   materialIndex: number
   orderNo: string
   orderDate: string | null
+  /** 到待采购状态的时间 */
+  pendingPurchaseAt: string | null
   imageUrl: string
   skuCode: string
   /** 订单类型 ID（system_options.id, option_type='order_types'） */

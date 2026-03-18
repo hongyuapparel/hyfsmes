@@ -361,7 +361,7 @@ const ENCOURAGE_ITEMS: EncourageItem[] = [
   { text: '又是认真投入的一天。', icon: Sunny },
   { text: '节奏放稳一点，反而更容易做完。', icon: StarFilled },
   { text: '能动手在做，就已经比空想前进了一大步。✨', icon: CircleCheckFilled },
-  { text: '先搞定一件，再想下一件。', icon: MagicStick },
+  { text: '把手头这一件收个尾，再开始下一件，思路会更清楚。', icon: MagicStick },
   { text: '重要沟通留个记录，日后少扯皮。', icon: Present },
   { text: '稳扎稳打，你就是那个靠谱的人。', icon: TrendCharts },
   { text: '休息好了，再冲也不迟。', icon: Sunny },

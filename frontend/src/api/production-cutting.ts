@@ -15,6 +15,8 @@ export interface CuttingListItem {
   cuttingStatus: string
   actualCutTotal: number | null
   cuttingCost: string | null
+  /** 实际用布总米数（m，仅本厂裁床），可为空 */
+  actualFabricMeters?: string | null
   timeRating: string
 }
 
@@ -57,7 +59,7 @@ export function getOrderColorSize(orderId: number) {
   )
 }
 
-/** 裁床列表用：订单数量/实裁数量按尺码明细（与订单列表数量追踪同结构） */
+/** 裁床列表用：订单数量/裁床数量按尺码明细（与订单列表数量追踪同结构） */
 export interface CuttingQuantityBreakdownRes {
   headers: string[]
   rows: Array<{ label: string; values: (number | null)[] }>
@@ -73,6 +75,12 @@ export function completeCutting(payload: {
   orderId: number
   cuttingCost: string
   actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[]
+  /** 裁剪部门/加工厂：本厂或外发加工厂名称 */
+  cuttingDepartment?: string | null
+  /** 裁剪人：仅本厂裁床时填写 */
+  cutterName?: string | null
+  /** 实际用布总米数（m，仅本厂裁床） */
+  actualFabricMeters?: string | null
 }) {
   return request.post<void>('/production/cutting/items/complete', payload)
 }

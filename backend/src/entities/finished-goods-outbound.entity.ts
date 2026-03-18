@@ -11,8 +11,8 @@ export class FinishedGoodsOutbound {
   finishedStockId: number;
 
   @Index()
-  @Column({ name: 'order_id', type: 'int' })
-  orderId: number;
+  @Column({ name: 'order_id', type: 'int', nullable: true })
+  orderId: number | null;
 
   @Index()
   @Column({ name: 'order_no', length: 32, default: '' })
@@ -29,6 +29,18 @@ export class FinishedGoodsOutbound {
   /** 出库数量（正整数） */
   @Column({ type: 'int', default: 0 })
   quantity: number;
+
+  /** 部门（出库时从库存冗余） */
+  @Column({ name: 'department', length: 128, default: '' })
+  department: string;
+
+  /** 仓库 ID（出库时从库存冗余） */
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
+
+  /** 库存类型 ID（出库时从库存冗余） */
+  @Column({ name: 'inventory_type_id', type: 'int', nullable: true })
+  inventoryTypeId: number | null;
 
   /** 操作人（中文名或用户名） */
   @Column({ name: 'operator_username', length: 128, default: '' })

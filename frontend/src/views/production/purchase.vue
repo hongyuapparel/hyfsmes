@@ -102,6 +102,7 @@
         start-placeholder="下单时间"
         end-placeholder=""
         value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
         unlink-panels
         size="large"
         class="filter-bar-item"
@@ -132,12 +133,18 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="orderDate" label="下单时间" width="110" align="center">
+      <el-table-column prop="pendingPurchaseAt" label="到采购时间" width="155" align="center">
         <template #default="{ row }">
-          {{ formatDate(row.orderDate) }}
+          {{ formatDateTime(row.pendingPurchaseAt) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="purchaseCompletedAt" label="完成时间" width="155" align="center">
+        <template #default="{ row }">
+          {{ formatDateTime(row.purchaseCompletedAt) }}
         </template>
       </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
           <el-image
@@ -177,11 +184,6 @@
       <el-table-column label="订单类型" width="100" show-overflow-tooltip>
         <template #default="{ row }">
           {{ orderTypeDisplay(row) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="purchaseCompletedAt" label="完成时间" width="110" align="center">
-        <template #default="{ row }">
-          {{ formatDate(row.purchaseCompletedAt) }}
         </template>
       </el-table-column>
     </el-table>
@@ -283,6 +285,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getPurchaseItems, registerPurchase, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
@@ -430,6 +433,13 @@ function formatDate(v: string | null | undefined): string {
   const d = new Date(v)
   if (Number.isNaN(d.getTime())) return '-'
   return d.toLocaleDateString('zh-CN')
+}
+
+function formatDateTime(v: string | null | undefined): string {
+  if (!v) return '-'
+  const d = new Date(v)
+  if (Number.isNaN(d.getTime())) return '-'
+  return d.toLocaleString('zh-CN')
 }
 
 function buildQuery(): PurchaseListQuery {

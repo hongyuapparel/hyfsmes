@@ -1,14 +1,14 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { Order } from './order.entity';
 
-/** 裁床实裁数量行，与 B 区 colorSizeRows 结构一致 */
+/** 裁床数量行，与 B 区 colorSizeRows 结构一致 */
 export interface ActualCutRow {
   colorName?: string;
   quantities?: number[];
   remark?: string;
 }
 
-/** 订单裁床登记：实裁数量、裁剪成本、完成时间 */
+/** 订单裁床登记：裁床数量、裁剪成本、完成时间 */
 @Entity('order_cutting')
 export class OrderCutting {
   @PrimaryGeneratedColumn()
@@ -40,4 +40,16 @@ export class OrderCutting {
   /** 实际裁剪数量明细 JSON，与 B 区 colorSizeRows 同结构 */
   @Column({ name: 'actual_cut_rows', type: 'json', nullable: true })
   actualCutRows: ActualCutRow[] | null;
+
+  /** 裁剪部门/加工厂：本厂或外发加工厂名称（裁床管理登记用） */
+  @Column({ name: 'cutting_department', type: 'varchar', length: 128, nullable: true, select: false })
+  cuttingDepartment?: string | null;
+
+  /** 裁剪人：仅本厂裁床时填写 */
+  @Column({ name: 'cutter_name', type: 'varchar', length: 64, nullable: true, select: false })
+  cutterName?: string | null;
+
+  /** 实际用布总米数：仅本厂裁床时填写，用于对比纸样用量 */
+  @Column({ name: 'actual_fabric_meters', type: 'decimal', precision: 12, scale: 3, nullable: true, select: false })
+  actualFabricMeters?: string | null;
 }

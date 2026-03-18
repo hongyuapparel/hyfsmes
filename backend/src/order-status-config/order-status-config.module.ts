@@ -6,6 +6,7 @@ import { OrderWorkflowChain } from '../entities/order-workflow-chain.entity';
 import { OrderStatusSla } from '../entities/order-status-sla.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { Order } from '../entities/order.entity';
+import { SystemOptionsModule } from '../system-options/system-options.module';
 import { OrderStatusConfigService } from './order-status-config.service';
 import { OrderStatusConfigController } from './order-status-config.controller';
 
@@ -19,6 +20,7 @@ import { OrderStatusConfigController } from './order-status-config.controller';
       OrderStatusHistory,
       Order,
     ]),
+    SystemOptionsModule,
   ],
   providers: [OrderStatusConfigService],
   controllers: [OrderStatusConfigController],

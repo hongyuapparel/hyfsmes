@@ -29,6 +29,8 @@ export class OrdersController {
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
     @Query('customerDueStart') customerDueStart?: string,
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
@@ -51,6 +53,8 @@ export class OrdersController {
       merchandiser,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
       customerDueStart,
       customerDueEnd,
       factory,
@@ -81,6 +85,8 @@ export class OrdersController {
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
     @Query('customerDueStart') customerDueStart?: string,
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
@@ -100,6 +106,8 @@ export class OrdersController {
       merchandiser,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
       customerDueStart,
       customerDueEnd,
       factory,
@@ -123,6 +131,15 @@ export class OrdersController {
   @Get(':id/size-breakdown')
   getSizeBreakdown(@Param('id', ParseIntPipe) id: number) {
     return this.ordersService.getSizeBreakdown(id);
+  }
+
+  /**
+   * 获取订单颜色尺码数量明细（待入库数量悬停用）
+   * GET /orders/:id/color-size-breakdown
+   */
+  @Get(':id/color-size-breakdown')
+  getColorSizeBreakdown(@Param('id', ParseIntPipe) id: number) {
+    return this.ordersService.getColorSizeBreakdown(id);
   }
 
   /**

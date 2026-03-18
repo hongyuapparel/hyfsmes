@@ -23,6 +23,10 @@ export class Product {
   @Column({ name: 'product_group_id', type: 'int', nullable: true })
   productGroupId: number | null;
 
+  /** 适用人群 ID（system_options.id，option_type='applicable_people'），改名后历史展示自动同步 */
+  @Column({ name: 'applicable_people_id', type: 'int', nullable: true })
+  applicablePeopleId: number | null;
+
   @Column({ name: 'customer_id', type: 'int', nullable: true })
   customerId: number | null;
 

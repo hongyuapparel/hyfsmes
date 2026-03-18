@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
+import { OrderStatus } from '../entities/order-status.entity';
+import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
@@ -12,7 +14,7 @@ import { ProductionPatternService } from './production-pattern.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderPattern, OrderExt, User, RolePermission]),
+    TypeOrmModule.forFeature([Order, OrderPattern, OrderExt, OrderStatus, OrderStatusHistory, User, RolePermission]),
     AuthModule,
     OrderWorkflowModule,
   ],

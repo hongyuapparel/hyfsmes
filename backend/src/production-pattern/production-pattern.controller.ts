@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Res, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { ProductionPatternService, PatternListQuery } from './production-pattern.service';
+import { CurrentUser } from '../auth/current-user.decorator';
 import type { Response } from 'express';
 
 @Controller('production/pattern')
@@ -131,7 +132,25 @@ export class ProductionPatternController {
   }
 
   @Post('items/complete')
-  complete(@Body('orderId') orderId: number, @Body('sampleImageUrl') sampleImageUrl: string) {
-    return this.patternService.completePattern(Number(orderId), sampleImageUrl ?? '');
+  complete(
+    @Body('orderId') orderId: number,
+    @Body('sampleImageUrl') sampleImageUrl: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.patternService.completePattern(Number(orderId), sampleImageUrl ?? '', user?.userId);
+  }
+
+  @Get('items/:orderId/materials')
+  getMaterials(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.patternService.getPatternMaterials(orderId);
+  }
+
+  @Post('items/:orderId/materials')
+  saveMaterials(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body('materials') materials: any[],
+    @Body('remark') remark?: string,
+  ) {
+    return this.patternService.savePatternMaterials(orderId, Array.isArray(materials) ? materials : [], remark ?? null);
   }
 }

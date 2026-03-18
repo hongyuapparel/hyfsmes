@@ -7,6 +7,10 @@ export interface PatternListItem {
   salesperson: string
   merchandiser: string
   quantity: number
+  /** 到纸样时间：订单进入待纸样状态的时间 */
+  arrivedAtPattern: string | null
+  /** 纸样完成时间 */
+  completedAt: string | null
   orderDate: string | null
   customerDueDate: string | null
   skuCode: string
@@ -19,7 +23,6 @@ export interface PatternListItem {
   patternStatus: string
   patternMaster: string
   sampleMaker: string
-  completedAt: string | null
   sampleImageUrl: string
 }
 
@@ -68,4 +71,26 @@ export function assignPattern(payload: {
 
 export function completePattern(payload: { orderId: number; sampleImageUrl: string }) {
   return request.post<void>('/production/pattern/items/complete', payload)
+}
+
+export interface PatternMaterialRow {
+  materialTypeId?: number | null
+  materialName?: string
+  fabricWidth?: string
+  usagePerPiece?: number | null
+  cuttingQuantity?: number | null
+  remark?: string
+}
+
+export interface PatternMaterialsRes {
+  materials: PatternMaterialRow[]
+  remark: string | null
+}
+
+export function getPatternMaterials(orderId: number) {
+  return request.get<PatternMaterialsRes>(`/production/pattern/items/${orderId}/materials`)
+}
+
+export function savePatternMaterials(orderId: number, payload: { materials: PatternMaterialRow[]; remark?: string | null }) {
+  return request.post<void>(`/production/pattern/items/${orderId}/materials`, payload)
 }

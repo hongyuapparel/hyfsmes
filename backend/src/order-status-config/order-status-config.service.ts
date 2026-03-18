@@ -7,6 +7,7 @@ import { OrderWorkflowChain } from '../entities/order-workflow-chain.entity';
 import { OrderStatusSla } from '../entities/order-status-sla.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { Order } from '../entities/order.entity';
+import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Injectable()
 export class OrderStatusConfigService {
@@ -23,7 +24,31 @@ export class OrderStatusConfigService {
     private readonly historyRepo: Repository<OrderStatusHistory>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    private readonly systemOptionsService: SystemOptionsService,
   ) {}
+
+  /** 由于项目默认不启用 migrations/synchronize，需兼容数据库尚未加列的情况 */
+  private chainSortOrderSupport: boolean | null = null;
+
+  private async supportsChainSortOrder(): Promise<boolean> {
+    if (this.chainSortOrderSupport !== null) return this.chainSortOrderSupport;
+    try {
+      const rows = (await this.chainRepo.query(
+        `
+        SELECT COUNT(*) AS cnt
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'order_workflow_chains'
+          AND COLUMN_NAME = 'sort_order'
+        `,
+      )) as Array<{ cnt: number | string }>;
+      const cnt = Number(rows?.[0]?.cnt ?? 0);
+      this.chainSortOrderSupport = cnt > 0;
+    } catch {
+      this.chainSortOrderSupport = false;
+    }
+    return this.chainSortOrderSupport;
+  }
 
   async getAllStatuses(): Promise<OrderStatus[]> {
     return this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
@@ -37,6 +62,7 @@ export class OrderStatusConfigService {
       待审单: 'pending_review',
       待纸样: 'pending_pattern',
       待采购: 'pending_purchase',
+      待工艺: 'pending_craft',
       待裁床: 'pending_cutting',
       待车缝: 'pending_sewing',
       待尾部: 'pending_finishing',
@@ -128,11 +154,21 @@ export class OrderStatusConfigService {
     name?: string,
   ): Promise<{ chain: OrderWorkflowChain; steps: OrderStatusTransition[] }> {
     const chainName = (name ?? '').trim() || `流程链路-${new Date().toISOString().slice(0, 10)}`;
+    const canSort = await this.supportsChainSortOrder();
+    let nextSortOrder: number | undefined;
+    if (canSort) {
+      const max = await this.chainRepo
+        .createQueryBuilder('c')
+        .select('MAX(c.sortOrder)', 'max')
+        .getRawOne<{ max: string | null }>();
+      nextSortOrder = (max?.max ? Number(max.max) : 0) + 1;
+    }
     const chain = await this.chainRepo.save(
       this.chainRepo.create({
         name: chainName,
         conditionsJson: conditionsJson ?? null,
         enabled: true,
+        ...(nextSortOrder != null ? { sortOrder: nextSortOrder } : {}),
       }),
     );
 
@@ -157,7 +193,14 @@ export class OrderStatusConfigService {
   }
 
   async getChains(): Promise<Array<{ chain: OrderWorkflowChain; steps: OrderStatusTransition[] }>> {
-    const chains = await this.chainRepo.find({ order: { id: 'DESC' } });
+    const canSort = await this.supportsChainSortOrder();
+    const chains = canSort
+      ? await this.chainRepo.find({ order: { sortOrder: 'ASC', id: 'DESC' } })
+      : await this.chainRepo
+          .createQueryBuilder('c')
+          .select(['c.id', 'c.name', 'c.conditionsJson', 'c.enabled', 'c.createdAt'])
+          .orderBy('c.id', 'DESC')
+          .getMany();
     if (chains.length === 0) return [];
     const chainIds = chains.map((c) => c.id);
     const steps = await this.transitionRepo.find({
@@ -171,6 +214,23 @@ export class OrderStatusConfigService {
       byChain.get(key)!.push(s);
     }
     return chains.map((c) => ({ chain: c, steps: byChain.get(c.id) ?? [] }));
+  }
+
+  async reorderChains(orderedIds: number[]): Promise<{ success: true }> {
+    const canSort = await this.supportsChainSortOrder();
+    if (!canSort) {
+      // 数据库未加 sort_order 列时，降级为 no-op，避免前端页面报错
+      return { success: true };
+    }
+    const ids = (orderedIds ?? []).map((x) => Number(x)).filter((x) => Number.isFinite(x) && x > 0);
+    if (ids.length === 0) return { success: true };
+    const unique = Array.from(new Set(ids));
+
+    // 仅更新当前传入的链路排序：从 1 开始递增
+    await Promise.all(
+      unique.map((id, idx) => this.chainRepo.update({ id }, { sortOrder: idx + 1 })),
+    );
+    return { success: true };
   }
 
   async updateChain(
@@ -261,10 +321,25 @@ export class OrderStatusConfigService {
     startDate?: string;
     endDate?: string;
     statusId?: number;
+    orderDateFrom?: string;
+    orderDateTo?: string;
+    completedFrom?: string;
+    completedTo?: string;
   }): Promise<{
     list: Array<{
       orderId: number;
       orderNo: string;
+      skuCode: string;
+      collaborationTypeId: number | null;
+      collaborationTypeLabel: string;
+      orderTypeId: number | null;
+      orderTypeLabel: string;
+      quantity: number;
+      merchandiser: string;
+      salesperson: string;
+      customerName: string;
+      orderDate: string | null;
+      completedAt: string | null;
       statusId: number;
       statusLabel: string;
       enteredAt: string;
@@ -281,14 +356,21 @@ export class OrderStatusConfigService {
       .innerJoinAndSelect('h.status', 's')
       .orderBy('h.order_id', 'ASC')
       .addOrderBy('h.entered_at', 'ASC');
-    if (params.statusId != null) {
-      qb.andWhere('h.status_id = :statusId', { statusId: params.statusId });
+    if (params.orderDateFrom) {
+      qb.andWhere('o.order_date >= :orderDateFrom', { orderDateFrom: params.orderDateFrom });
     }
-    if (params.startDate) {
-      qb.andWhere('h.entered_at >= :startDate', { startDate: params.startDate });
+    if (params.orderDateTo) {
+      qb.andWhere('o.order_date <= :orderDateTo', { orderDateTo: params.orderDateTo + ' 23:59:59' });
     }
-    if (params.endDate) {
-      qb.andWhere('h.entered_at <= :endDate', { endDate: params.endDate + ' 23:59:59' });
+    if (params.completedFrom) {
+      qb.andWhere("o.status = 'completed' AND o.status_time >= :completedFrom", {
+        completedFrom: params.completedFrom,
+      });
+    }
+    if (params.completedTo) {
+      qb.andWhere("o.status = 'completed' AND o.status_time <= :completedTo", {
+        completedTo: params.completedTo + ' 23:59:59',
+      });
     }
     const rows = await qb.getMany();
     const slaMap = new Map<number, number>();
@@ -305,6 +387,17 @@ export class OrderStatusConfigService {
     const list: Array<{
       orderId: number;
       orderNo: string;
+      skuCode: string;
+      collaborationTypeId: number | null;
+      collaborationTypeLabel: string;
+      orderTypeId: number | null;
+      orderTypeLabel: string;
+      quantity: number;
+      merchandiser: string;
+      salesperson: string;
+      customerName: string;
+      orderDate: string | null;
+      completedAt: string | null;
       statusId: number;
       statusLabel: string;
       enteredAt: string;
@@ -314,28 +407,67 @@ export class OrderStatusConfigService {
       isOverdue: boolean;
     }> = [];
     const now = new Date();
+
+    const orders = Array.from(byOrder.values())
+      .map((hist) => (hist?.[0] as any)?.order as Order | undefined)
+      .filter((o) => o != null) as Order[];
+    const collaborationIds = Array.from(
+      new Set(orders.map((o) => o.collaborationTypeId).filter((v) => v != null) as number[]),
+    );
+    const orderTypeIds = Array.from(
+      new Set(orders.map((o) => o.orderTypeId).filter((v) => v != null) as number[]),
+    );
+    const [collaborationLabels, orderTypeLabels] = await Promise.all([
+      this.systemOptionsService.getOptionLabelsByIds('collaboration', collaborationIds),
+      this.systemOptionsService.getOptionLabelsByIds('order_types', orderTypeIds),
+    ]);
+
     for (const [, hist] of byOrder) {
       hist.sort((a, b) => a.enteredAt.getTime() - b.enteredAt.getTime());
-      for (let i = 0; i < hist.length; i++) {
-        const cur = hist[i];
-        const next = hist[i + 1];
-        const leftAt = next ? next.enteredAt : now;
-        const durationHours = (leftAt.getTime() - cur.enteredAt.getTime()) / (1000 * 60 * 60);
-        const limitHours = slaMap.get(cur.statusId) ?? null;
-        const isOverdue = limitHours != null && durationHours > limitHours;
-        list.push({
-          orderId: cur.orderId,
-          orderNo: (cur as any).order?.orderNo ?? '',
-          statusId: cur.statusId,
-          statusLabel: (cur as any).status?.label ?? '',
-          enteredAt: cur.enteredAt.toISOString(),
-          leftAt: next ? next.enteredAt.toISOString() : null,
-          durationHours: Math.round(durationHours * 100) / 100,
-          limitHours,
-          isOverdue,
-        });
-      }
+      const cur = hist[hist.length - 1];
+      if (!cur) continue;
+
+      // 仅保留“一单一行”，展示该单当前停留段（最后一次进入状态）数据
+      const leftAt = now;
+      const durationHours = (leftAt.getTime() - cur.enteredAt.getTime()) / (1000 * 60 * 60);
+      const limitHours = slaMap.get(cur.statusId) ?? null;
+      const isOverdue = limitHours != null && durationHours > limitHours;
+      const order = (cur as any).order as Order | undefined;
+      const collaborationTypeId = order?.collaborationTypeId ?? null;
+      const orderTypeId = order?.orderTypeId ?? null;
+      const completedAt =
+        order?.status === 'completed' && order.statusTime ? order.statusTime.toISOString() : null;
+
+      // 过滤：按“当前状态”与“当前进入时间”筛选（避免同一订单多段命中导致重复）
+      if (params.statusId != null && cur.statusId !== params.statusId) continue;
+      if (params.startDate && cur.enteredAt < new Date(params.startDate)) continue;
+      if (params.endDate && cur.enteredAt > new Date(params.endDate + ' 23:59:59')) continue;
+
+      list.push({
+        orderId: cur.orderId,
+        orderNo: order?.orderNo ?? '',
+        skuCode: order?.skuCode ?? '',
+        collaborationTypeId,
+        collaborationTypeLabel:
+          collaborationTypeId != null ? collaborationLabels[collaborationTypeId] ?? '' : '',
+        orderTypeId,
+        orderTypeLabel: orderTypeId != null ? orderTypeLabels[orderTypeId] ?? '' : '',
+        quantity: order?.quantity ?? 0,
+        merchandiser: order?.merchandiser ?? '',
+        salesperson: order?.salesperson ?? '',
+        customerName: order?.customerName ?? '',
+        orderDate: order?.orderDate ? order.orderDate.toISOString() : null,
+        completedAt,
+        statusId: cur.statusId,
+        statusLabel: (cur as any).status?.label ?? '',
+        enteredAt: cur.enteredAt.toISOString(),
+        leftAt: null,
+        durationHours: Math.round(durationHours * 100) / 100,
+        limitHours,
+        isOverdue,
+      });
     }
+    list.sort((a, b) => (a.enteredAt < b.enteredAt ? 1 : -1));
     const summary = { total: list.length, overdue: list.filter((x) => x.isOverdue).length };
     return { list, summary };
   }

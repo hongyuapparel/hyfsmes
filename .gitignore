@@ -7,11 +7,16 @@ frontend/node_modules/
 dist/
 build/
 *.local
+backend/dist/
+frontend/dist/
+backend/tsconfig.tsbuildinfo
 
 # Environment
 .env
 .env.local
+.env.*
 .env.*.local
+frontend/.env.*
 
 # IDE
 .idea/

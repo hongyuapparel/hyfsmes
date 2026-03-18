@@ -52,6 +52,19 @@
           <el-table-column prop="quantity" label="数量" width="100" align="right" />
           <el-table-column prop="unit" label="单位" width="70" align="center" />
           <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
+          <el-table-column label="图片" width="90" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.imageUrl"
+                :src="row.imageUrl"
+                fit="cover"
+                style="width: 56px; height: 56px; border-radius: 6px"
+                :preview-src-list="[row.imageUrl]"
+                preview-teleported
+              />
+              <span v-else class="text-placeholder">-</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
@@ -90,6 +103,7 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             value-format="YYYY-MM-DD"
+            :shortcuts="rangeShortcuts"
             size="large"
             class="filter-bar-item"
             @change="onOutboundSearch(true)"
@@ -251,6 +265,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, type CustomerItem } from '@/api/customers'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import {

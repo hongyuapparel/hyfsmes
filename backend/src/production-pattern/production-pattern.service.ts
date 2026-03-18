@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { OrderStatus } from '../entities/order-status.entity';
+import { OrderStatusHistory } from '../entities/order-status-history.entity';
 
 export interface PatternListItem {
   orderId: number;
@@ -13,6 +15,10 @@ export interface PatternListItem {
   salesperson: string;
   merchandiser: string;
   quantity: number;
+  /** 到纸样时间：订单进入待纸样状态的时间 */
+  arrivedAtPattern: string | null;
+  /** 纸样完成时间 */
+  completedAt: string | null;
   orderDate: string | null;
   /** 客户交期（货期） */
   customerDueDate: string | null;
@@ -27,7 +33,6 @@ export interface PatternListItem {
   patternStatus: string;
   patternMaster: string;
   sampleMaker: string;
-  completedAt: string | null;
   sampleImageUrl: string;
 }
 
@@ -46,6 +51,15 @@ export interface PatternListQuery {
   pageSize?: number;
 }
 
+export interface PatternMaterialRow {
+  materialTypeId?: number | null;
+  materialName?: string;
+  fabricWidth?: string;
+  usagePerPiece?: number | null;
+  cuttingQuantity?: number | null;
+  remark?: string;
+}
+
 @Injectable()
 export class ProductionPatternService {
   constructor(
@@ -55,12 +69,145 @@ export class ProductionPatternService {
     private readonly patternRepo: Repository<OrderPattern>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    @InjectRepository(OrderStatus)
+    private readonly orderStatusRepo: Repository<OrderStatus>,
+    @InjectRepository(OrderStatusHistory)
+    private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
     private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
+
+  private async hasPatternMaterialsColumns(): Promise<boolean> {
+    try {
+      const runner = this.patternRepo.manager.connection.createQueryRunner();
+      try {
+        const rows = await runner.query(
+          `
+          SELECT COUNT(*) as cnt
+          FROM information_schema.columns
+          WHERE table_schema = DATABASE()
+            AND table_name = 'order_pattern'
+            AND column_name IN ('materials_json', 'materials_remark')
+        `,
+        );
+        const cnt = Number(rows?.[0]?.cnt ?? 0);
+        return cnt >= 2;
+      } finally {
+        await runner.release();
+      }
+    } catch {
+      return false;
+    }
+  }
+
+  /** 状态变更时写入流转历史，供各模块读取进入时间 */
+  private async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
+    const code = (statusCode ?? '').trim();
+    if (!code) return;
+    const status = await this.orderStatusRepo.findOne({ where: { code } });
+    if (!status) return;
+    await this.orderStatusHistoryRepo.save(
+      this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
+    );
+  }
+
+  private async getEnteredAtMap(orderIds: number[], statusCode: string): Promise<Map<number, string>> {
+    const ids = Array.isArray(orderIds) ? orderIds.filter((v) => typeof v === 'number' && v > 0) : [];
+    const code = (statusCode ?? '').trim();
+    const map = new Map<number, string>();
+    if (!ids.length || !code) return map;
+    const rows = await this.orderStatusHistoryRepo
+      .createQueryBuilder('h')
+      .innerJoin(OrderStatus, 's', 's.id = h.statusId')
+      .select('h.orderId', 'orderId')
+      .addSelect('MIN(h.enteredAt)', 'enteredAt')
+      .where('h.orderId IN (:...ids)', { ids })
+      .andWhere('s.code = :code', { code })
+      .groupBy('h.orderId')
+      .getRawMany<{ orderId: number; enteredAt: string }>();
+    for (const r of rows) {
+      const orderId = Number((r as any).orderId);
+      const enteredAt = (r as any).enteredAt as string | undefined;
+      if (!Number.isNaN(orderId) && enteredAt) {
+        map.set(orderId, this.toDateTimeLocalString(enteredAt) ?? enteredAt);
+      }
+    }
+    return map;
+  }
+
+  private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 10) || null;
+    if (!(v instanceof Date) || Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private toDateTimeLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 19).replace('T', ' ') || null;
+    if (!(v instanceof Date) || Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    const hh = String(v.getHours()).padStart(2, '0');
+    const mm = String(v.getMinutes()).padStart(2, '0');
+    const ss = String(v.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+  }
 
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
     if (!materials || materials.length === 0) return false;
     return materials.every((m) => (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed');
+  }
+
+  private mapOrderMaterialsToPatternMaterials(materials: OrderMaterialRow[] | null | undefined): PatternMaterialRow[] {
+    const list = Array.isArray(materials) ? materials : [];
+    return list.map((m) => ({
+      materialTypeId: m.materialTypeId ?? null,
+      materialName: (m.materialName ?? '').trim(),
+      fabricWidth: (((m as any).fabricWidth ?? '') as string).trim(),
+      usagePerPiece: m.usagePerPiece ?? null,
+      cuttingQuantity: m.cuttingQuantity ?? null,
+      remark: (m.remark ?? '').trim(),
+    }));
+  }
+
+  async getPatternMaterials(orderId: number): Promise<{ materials: PatternMaterialRow[]; remark: string | null }> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const colsReady = await this.hasPatternMaterialsColumns();
+    if (!colsReady) {
+      const materials = this.mapOrderMaterialsToPatternMaterials(ext?.materials ?? null);
+      return { materials, remark: null };
+    }
+    const pattern = await this.patternRepo
+      .createQueryBuilder('p')
+      .addSelect(['p.materialsJson', 'p.materialsRemark'])
+      .where('p.orderId = :orderId', { orderId })
+      .getOne();
+    const saved = pattern?.materialsJson;
+    const materials = Array.isArray(saved) ? (saved as PatternMaterialRow[]) : this.mapOrderMaterialsToPatternMaterials(ext?.materials ?? null);
+    const remark = pattern?.materialsRemark ?? null;
+    return { materials, remark };
+  }
+
+  async savePatternMaterials(orderId: number, materials: PatternMaterialRow[], remark?: string | null): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const colsReady = await this.hasPatternMaterialsColumns();
+    if (!colsReady) {
+      throw new BadRequestException('数据库缺少纸样物料字段，请先执行脚本：backend/scripts/add-order-pattern-materials-json.sql');
+    }
+    let pattern = await this.patternRepo.findOne({ where: { orderId } });
+    if (!pattern) {
+      pattern = this.patternRepo.create({ orderId, status: 'pending_assign' });
+    }
+    pattern.materialsJson = Array.isArray(materials) ? materials : [];
+    pattern.materialsRemark = remark?.trim() || null;
+    await this.patternRepo.save(pattern);
   }
 
   private async buildPatternRows(baseQuery: PatternListQuery): Promise<PatternListItem[]> {
@@ -118,9 +265,10 @@ export class ProductionPatternService {
       return [];
     }
 
-    const [patterns, extList] = await Promise.all([
+    const [patterns, extList, arrivedAtPatternMap] = await Promise.all([
       this.patternRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
       this.orderExtRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
+      this.getEnteredAtMap(orderIds, 'pending_pattern'),
     ]);
     const patternMap = new Map(patterns.map((p) => [p.orderId, p]));
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
@@ -140,6 +288,9 @@ export class ProductionPatternService {
       if (tab === 'in_progress' && pStatus !== 'in_progress') continue;
       if (tab === 'completed' && pStatus !== 'completed') continue;
 
+      const arrivedAtPattern =
+        arrivedAtPatternMap.get(order.id) ??
+        (order.status === 'pending_pattern' && order.statusTime ? this.toDateTimeLocalString(order.statusTime) : null);
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
@@ -147,9 +298,13 @@ export class ProductionPatternService {
         salesperson: order.salesperson ?? '',
         merchandiser: order.merchandiser ?? '',
         quantity: order.quantity ?? 0,
-        orderDate: order.orderDate ? order.orderDate.toISOString().slice(0, 10) : null,
+        arrivedAtPattern,
+        completedAt: pattern?.completedAt
+          ? this.toDateTimeLocalString(pattern.completedAt)
+          : null,
+        orderDate: this.toDateOnlyLocalString(order.orderDate),
         customerDueDate: order.customerDueDate
-          ? order.customerDueDate.toISOString().slice(0, 10)
+          ? this.toDateOnlyLocalString(order.customerDueDate)
           : null,
         skuCode: order.skuCode ?? '',
         imageUrl: order.imageUrl ?? '',
@@ -159,9 +314,6 @@ export class ProductionPatternService {
         patternStatus: pStatus,
         patternMaster: pattern?.patternMaster ?? '',
         sampleMaker: pattern?.sampleMaker ?? '',
-        completedAt: pattern?.completedAt
-          ? pattern.completedAt.toISOString().slice(0, 19).replace('T', ' ')
-          : null,
         sampleImageUrl: pattern?.sampleImageUrl ?? '',
       });
     }
@@ -212,7 +364,7 @@ export class ProductionPatternService {
     await this.patternRepo.save(pattern);
   }
 
-  async completePattern(orderId: number, sampleImageUrl: string): Promise<void> {
+  async completePattern(orderId: number, sampleImageUrl: string, actorUserId?: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -241,12 +393,13 @@ export class ProductionPatternService {
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
       triggerCode: 'pattern_completed',
-      actorUserId: 0,
+      actorUserId: actorUserId ?? 0,
     });
     if (next && next !== order.status) {
       order.status = next;
       order.statusTime = new Date();
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 }

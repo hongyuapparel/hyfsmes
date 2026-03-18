@@ -91,6 +91,27 @@
             </template>
           </el-input>
           <el-select
+            v-model="filter.applicablePeopleId"
+            placeholder="适用人群"
+            clearable
+            filterable
+            size="large"
+            class="filter-bar-item"
+            :style="getFilterSelectAutoWidthStyle(filter.applicablePeopleId)"
+            @change="onFilterChange"
+          >
+            <template #label="{ label }">
+              <span v-if="filter.applicablePeopleId">适用人群：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
+            <el-option
+              v-for="opt in applicablePeopleOptions"
+              :key="opt.id"
+              :label="opt.value"
+              :value="opt.id"
+            />
+          </el-select>
+          <el-select
             v-model="filter.salesperson"
             placeholder="业务员"
             clearable
@@ -177,6 +198,7 @@
               </template>
               <span v-else-if="f.type === 'date'">{{ formatDate(row[f.code]) }}</span>
               <span v-else-if="f.code === 'companyName'">{{ row.customer?.companyName ?? '-' }}</span>
+              <span v-else-if="f.code === 'applicablePeople'">{{ row.applicablePeople ?? '-' }}</span>
               <span v-else>{{ row[f.code] ?? '-' }}</span>
             </template>
           </el-table-column>
@@ -339,7 +361,7 @@ import {
   type ProductItem,
 } from '@/api/products'
 import { getCustomers, type CustomerItem } from '@/api/customers'
-import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getSystemOptionsList, getSystemOptionsTree, type SystemOptionItem, type SystemOptionTreeNode } from '@/api/system-options'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { checkSkuExists } from '@/api/products'
@@ -353,6 +375,7 @@ const groupCountsMap = ref<Record<number, number>>({})
 const sidebarCollapsed = ref(false)
 const salespeople = ref<string[]>([])
 const customers = ref<{ id: number; companyName: string }[]>([])
+const applicablePeopleOptions = ref<SystemOptionItem[]>([])
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editId = ref(0)
@@ -369,10 +392,17 @@ const paginationWrapRef = ref<HTMLElement | null>(null)
 const tableHeight = ref<number | undefined>(undefined)
 let tableResizeObserver: ResizeObserver | null = null
 
-const filter = reactive<{ companyName: string; skuCode: string; productGroupId: number | null; salesperson: string }>({
+const filter = reactive<{
+  companyName: string
+  skuCode: string
+  productGroupId: number | null
+  applicablePeopleId: number | null
+  salesperson: string
+}>({
   companyName: '',
   skuCode: '',
   productGroupId: null,
+  applicablePeopleId: null,
   salesperson: '',
 })
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -663,6 +693,8 @@ async function moveColumn(f: { id: number; order: number }, delta: number) {
 
 function getOptions(f: { optionsKey?: string }) {
   if (f.optionsKey === 'productGroups') return productGroupOptions.value.map((g) => ({ label: g.path, value: g.id }))
+  if (f.optionsKey === 'applicablePeople')
+    return applicablePeopleOptions.value.map((o) => ({ label: o.value, value: o.id }))
   if (f.optionsKey === 'salespeople') return salespeople.value.map((v) => ({ label: v, value: v }))
   if (f.optionsKey === 'customers') return customers.value.map((c) => ({ label: c.companyName, value: c.id }))
   return []
@@ -674,6 +706,7 @@ async function load() {
       companyName: filter.companyName || undefined,
       skuCode: filter.skuCode || undefined,
       productGroupId: filter.productGroupId ?? undefined,
+      applicablePeopleId: filter.applicablePeopleId ?? undefined,
       salesperson: filter.salesperson || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
@@ -730,12 +763,13 @@ const productGroupTreeSelectData = computed(() => toProductGroupTreeSelect(produ
 
 async function loadOptions() {
   try {
-    const [ct, sp, custRes, treeRes, countsRes] = await Promise.all([
+    const [ct, sp, custRes, treeRes, countsRes, apRes] = await Promise.all([
       getProductGroups(),
       getProductSalespeople(),
       getCustomers({ pageSize: 200 }),
       getSystemOptionsTree('product_groups'),
       getProductGroupCounts(),
+      getSystemOptionsList('applicable_people'),
     ])
     productGroupOptions.value = ct.data ?? []
     productGroupsTree.value = treeRes.data ?? []
@@ -747,12 +781,14 @@ async function loadOptions() {
     salespeople.value = sp.data ?? []
     const custList = (custRes.data?.list ?? []) as CustomerItem[]
     customers.value = custList.map((c) => ({ id: c.id, companyName: c.companyName }))
+    applicablePeopleOptions.value = apRes.data ?? []
   } catch {
     productGroupOptions.value = []
     productGroupsTree.value = []
     groupCountsMap.value = {}
     salespeople.value = []
     customers.value = []
+    applicablePeopleOptions.value = []
   }
 }
 
@@ -762,6 +798,7 @@ function resetFilter() {
   filter.companyName = ''
   filter.skuCode = ''
   filter.productGroupId = null
+  filter.applicablePeopleId = null
   filter.salesperson = ''
   pagination.page = 1
   load()
@@ -848,6 +885,10 @@ function openEdit(row: ProductItem) {
       form.productGroup = row.productGroupId != null ? row.productGroupId : ''
       continue
     }
+    if (f.code === 'applicablePeople') {
+      form.applicablePeople = row.applicablePeopleId != null ? row.applicablePeopleId : ''
+      continue
+    }
     const v = row[f.code as keyof ProductItem]
     form[f.code] = v != null ? (typeof v === 'number' ? v : String(v)) : ''
   }
@@ -875,6 +916,10 @@ async function submit() {
     for (const [k, v] of Object.entries(payload)) {
       if (k === 'productGroup') {
         body.product_group_id = v === '' || v === null ? null : v
+        continue
+      }
+      if (k === 'applicablePeople') {
+        body.applicable_people_id = v === '' || v === null ? null : v
         continue
       }
       const snake = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)

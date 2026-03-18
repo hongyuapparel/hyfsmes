@@ -67,6 +67,11 @@ export class OrderStatusConfigController {
     return this.service.getChains();
   }
 
+  @Patch('chains/reorder')
+  async reorderChains(@Body() body: { orderedIds: number[] }) {
+    return this.service.reorderChains(body?.orderedIds ?? []);
+  }
+
   @Patch('chains/:id')
   async updateChain(
     @Param('id') id: number,
@@ -126,11 +131,19 @@ export class OrderStatusConfigController {
     @Query('start_date') startDate?: string,
     @Query('end_date') endDate?: string,
     @Query('status_id') statusId?: string,
+    @Query('order_date_from') orderDateFrom?: string,
+    @Query('order_date_to') orderDateTo?: string,
+    @Query('completed_from') completedFrom?: string,
+    @Query('completed_to') completedTo?: string,
   ) {
     return this.service.getSlaReport({
       startDate,
       endDate,
       statusId: statusId != null ? Number(statusId) : undefined,
+      orderDateFrom,
+      orderDateTo,
+      completedFrom,
+      completedTo,
     });
   }
 }

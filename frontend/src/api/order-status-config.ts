@@ -92,6 +92,7 @@ export function createOrderStatusTransitionsBatch(data: {
     nextDepartment?: string
     allowRoles?: string
     enabled?: boolean
+    conditionsJson?: unknown
   }>
 }) {
   return request.post<{ chain: OrderWorkflowChainItem; steps: OrderStatusTransitionItem[] }>('/order-status-config/transitions/batch', data)
@@ -101,9 +102,26 @@ export function getOrderWorkflowChains() {
   return request.get<OrderWorkflowChainWithSteps[]>('/order-status-config/chains')
 }
 
+export function reorderOrderWorkflowChains(data: { orderedIds: number[] }) {
+  return request.patch<{ success: true }>('/order-status-config/chains/reorder', data)
+}
+
 export function updateOrderWorkflowChain(
   id: number,
-  data: Partial<{ name: string; conditionsJson: unknown; enabled: boolean; steps: Array<{ fromStatus: string; toStatus: string; triggerType: string; triggerCode: string; enabled?: boolean }> }>,
+  data: Partial<{
+    name: string
+    conditionsJson: unknown
+    enabled: boolean
+    steps: Array<{
+      fromStatus: string
+      toStatus: string
+      triggerType: string
+      triggerCode: string
+      allowRoles?: string
+      enabled?: boolean
+      conditionsJson?: unknown
+    }>
+  }>,
 ) {
   return request.patch<OrderWorkflowChainWithSteps>(`/order-status-config/chains/${id}`, data)
 }
@@ -164,6 +182,17 @@ export function deleteOrderStatusSla(id: number) {
 export interface OrderSlaReportRow {
   orderId: number
   orderNo: string
+  skuCode: string
+  collaborationTypeId: number | null
+  collaborationTypeLabel: string
+  orderTypeId: number | null
+  orderTypeLabel: string
+  quantity: number
+  merchandiser: string
+  salesperson: string
+  customerName: string
+  orderDate: string | null
+  completedAt: string | null
   statusId: number
   statusLabel: string
   enteredAt: string
@@ -177,6 +206,10 @@ export function getOrderSlaReport(params?: {
   start_date?: string
   end_date?: string
   status_id?: number
+  order_date_from?: string
+  order_date_to?: string
+  completed_from?: string
+  completed_to?: string
 }) {
   return request.get<{ list: OrderSlaReportRow[]; summary: { total: number; overdue: number } }>(
     '/order-status-config/sla-report',

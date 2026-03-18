@@ -68,7 +68,75 @@
       <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
       <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="quantity" label="数量" width="90" align="right" />
+      <el-table-column label="图片" width="90" align="center">
+        <template #default="{ row }">
+          <el-image
+            v-if="row.imageUrl"
+            :src="row.imageUrl"
+            fit="cover"
+            style="width: 56px; height: 56px; border-radius: 6px"
+            :preview-src-list="[row.imageUrl]"
+            preview-teleported
+          />
+          <span v-else class="text-placeholder">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="数量" width="90" align="right">
+        <template #default="{ row }">
+          <el-tooltip
+            placement="top"
+            effect="light"
+            :show-after="250"
+            :hide-after="0"
+            :disabled="!row.orderId"
+            popper-class="pending-qty-popper"
+            @show="ensureColorSizeBreakdown(row.orderId)"
+          >
+            <template #content>
+              <div class="qty-tooltip">
+                <template v-if="colorSizeCache[row.orderId]?.loading">
+                  <div class="qty-tooltip-loading">加载中...</div>
+                </template>
+                <template v-else-if="colorSizeCache[row.orderId]?.error">
+                  <div class="qty-tooltip-error">明细加载失败</div>
+                </template>
+                <template v-else>
+                  <div v-if="(colorSizeCache[row.orderId]?.headers?.length ?? 0) === 0" class="qty-tooltip-empty">
+                    暂无明细
+                  </div>
+                  <div v-else class="qty-tooltip-grid">
+                    <div class="qty-tooltip-row qty-tooltip-head">
+                      <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
+                      <div
+                        v-for="(h, idx) in colorSizeCache[row.orderId].headers"
+                        :key="idx"
+                        class="qty-tooltip-cell"
+                      >
+                        {{ h }}
+                      </div>
+                    </div>
+                    <div
+                      v-for="(r, rIdx) in colorSizeCache[row.orderId].rows"
+                      :key="rIdx"
+                      class="qty-tooltip-row"
+                    >
+                      <div class="qty-tooltip-cell qty-tooltip-color">{{ r.colorName || '-' }}</div>
+                      <div
+                        v-for="(v, vIdx) in r.values"
+                        :key="vIdx"
+                        class="qty-tooltip-cell qty-tooltip-num"
+                      >
+                        {{ v }}
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </template>
+            <span class="qty-hover">{{ row.quantity }}</span>
+          </el-tooltip>
+        </template>
+      </el-table-column>
       <el-table-column prop="createdAt" label="登记时间" width="160" align="center" />
     </el-table>
 
@@ -97,14 +165,56 @@
         :rules="inboundRules"
         label-width="100px"
       >
-        <el-form-item label="仓库" prop="warehouse">
-          <el-input v-model="inboundForm.warehouse" placeholder="请输入仓库" clearable />
-        </el-form-item>
         <el-form-item label="部门" prop="department">
-          <el-input v-model="inboundForm.department" placeholder="请输入部门" clearable />
+          <el-select
+            v-model="inboundForm.department"
+            placeholder="请选择部门"
+            filterable
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in departmentOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
         </el-form-item>
-        <el-form-item label="位置登记" prop="location">
-          <el-input v-model="inboundForm.location" placeholder="请输入货物存放位置" clearable />
+        <el-form-item label="库存类型" prop="inventoryTypeId">
+          <el-select
+            v-model="inboundForm.inventoryTypeId"
+            placeholder="请选择库存类型"
+            filterable
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in inventoryTypeOptions"
+              :key="opt.id"
+              :label="opt.label"
+              :value="opt.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="仓库" prop="warehouseId">
+          <el-select
+            v-model="inboundForm.warehouseId"
+            placeholder="请选择仓库"
+            filterable
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in warehouseOptions"
+              :key="opt.id"
+              :label="opt.label"
+              :value="opt.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="存放地址" prop="location">
+          <el-input v-model="inboundForm.location" placeholder="请输入具体存放地址" clearable />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -121,6 +231,8 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getPendingList, doPendingInbound, type PendingListItem } from '@/api/inventory'
+import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
+import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
@@ -162,14 +274,48 @@ const inboundDialog = reactive<{ visible: boolean; submitting: boolean }>({
 })
 const inboundFormRef = ref<FormInstance>()
 const inboundForm = reactive({
-  warehouse: '',
+  warehouseId: null as number | null,
+  inventoryTypeId: null as number | null,
   department: '',
   location: '',
 })
 const inboundRules: FormRules = {
-  warehouse: [{ required: true, message: '请输入仓库', trigger: 'blur' }],
-  department: [{ required: true, message: '请输入部门', trigger: 'blur' }],
-  location: [{ required: true, message: '请输入位置登记', trigger: 'blur' }],
+  warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
+  department: [{ required: true, message: '请选择部门', trigger: 'change' }],
+  location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
+}
+
+const warehouseOptions = ref<{ id: number; label: string }[]>([])
+const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
+const departmentOptions = ref<{ value: string; label: string }[]>([])
+
+const colorSizeCache = reactive<Record<
+  number,
+  {
+    loading: boolean
+    error: boolean
+    headers: string[]
+    rows: Array<{ colorName: string; values: number[] }>
+  }
+>>({})
+
+async function ensureColorSizeBreakdown(orderId: number) {
+  if (!orderId) return
+  const existing = colorSizeCache[orderId]
+  if (existing && (existing.loading || existing.headers.length > 0 || existing.error)) return
+  colorSizeCache[orderId] = { loading: true, error: false, headers: [], rows: [] }
+  try {
+    const res = await getOrderColorSizeBreakdown(orderId)
+    const data = (res.data ?? { headers: [], rows: [] }) as OrderColorSizeBreakdownRes
+    colorSizeCache[orderId] = {
+      loading: false,
+      error: false,
+      headers: Array.isArray(data.headers) ? data.headers : [],
+      rows: Array.isArray(data.rows) ? data.rows : [],
+    }
+  } catch {
+    colorSizeCache[orderId] = { loading: false, error: true, headers: [], rows: [] }
+  }
 }
 
 async function load() {
@@ -236,7 +382,8 @@ function openInboundDialog() {
 }
 
 function resetInboundForm() {
-  inboundForm.warehouse = ''
+  inboundForm.warehouseId = null
+  inboundForm.inventoryTypeId = null
   inboundForm.department = ''
   inboundForm.location = ''
   inboundFormRef.value?.clearValidate()
@@ -250,7 +397,8 @@ async function submitInbound() {
   try {
     await doPendingInbound({
       ids,
-      warehouse: inboundForm.warehouse,
+      warehouseId: inboundForm.warehouseId,
+      inventoryTypeId: inboundForm.inventoryTypeId ?? undefined,
       department: inboundForm.department,
       location: inboundForm.location,
     })
@@ -265,8 +413,126 @@ async function submitInbound() {
   }
 }
 
-onMounted(() => load())
+async function loadWarehouseOptions() {
+  try {
+    const res = await getSystemOptionsList('warehouses')
+    const list = (res.data ?? []) as SystemOptionItem[]
+    warehouseOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
+  } catch {
+    warehouseOptions.value = []
+  }
+}
+
+async function loadDepartmentOptions() {
+  try {
+    const res = await getSystemOptionsList('org_departments')
+    const list = (res.data ?? []) as SystemOptionItem[]
+    departmentOptions.value = list.map((o) => ({ value: o.value, label: o.value }))
+  } catch {
+    departmentOptions.value = []
+  }
+}
+
+async function loadInventoryTypeOptions() {
+  try {
+    const res = await getSystemOptionsList('inventory_types')
+    const list = (res.data ?? []) as SystemOptionItem[]
+    inventoryTypeOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
+  } catch {
+    inventoryTypeOptions.value = []
+  }
+}
+
+onMounted(async () => {
+  await Promise.all([loadWarehouseOptions(), loadInventoryTypeOptions(), loadDepartmentOptions()])
+  await load()
+})
 </script>
+
+<style scoped>
+.qty-hover {
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.qty-tooltip {
+  max-width: 520px;
+}
+
+.qty-tooltip-loading,
+.qty-tooltip-error,
+.qty-tooltip-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.qty-tooltip-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.qty-tooltip-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(44px, auto);
+  align-items: center;
+  gap: 2px;
+}
+
+.qty-tooltip-cell {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.qty-tooltip-head .qty-tooltip-cell {
+  background: rgba(255, 255, 255, 0.18);
+  font-weight: 600;
+}
+
+.qty-tooltip-color {
+  min-width: 72px;
+  text-align: center;
+}
+
+.qty-tooltip-num {
+  text-align: center;
+}
+</style>
+
+<style>
+/* tooltip 弹层在 body 下，需用全局样式；通过 popper-class 精确作用范围 */
+.pending-qty-popper {
+  padding: 0;
+}
+
+.pending-qty-popper .el-popper__arrow::before {
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.pending-qty-popper .qty-tooltip {
+  padding: 10px 12px;
+}
+
+.pending-qty-popper .qty-tooltip-cell {
+  background: #f5f6f8;
+  color: var(--el-text-color-regular);
+  border: 1px solid var(--el-border-color-lighter);
+  text-align: center;
+}
+
+.pending-qty-popper .qty-tooltip-head .qty-tooltip-cell {
+  background: #eef1f6;
+  font-weight: 600;
+}
+</style>
 
 <style scoped>
 .inventory-pending-page .pending-table {

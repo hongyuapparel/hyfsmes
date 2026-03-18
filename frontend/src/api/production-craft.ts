@@ -3,6 +3,10 @@ import request from './request'
 export interface CraftListItem {
   orderId: number
   orderNo: string
+  /** 到工艺时间：订单进入待工艺状态的时间 */
+  arrivedAtCraft: string | null
+  /** 工艺完成时间 */
+  completedAt: string | null
   orderDate: string | null
   skuCode: string
   imageUrl: string
@@ -14,7 +18,6 @@ export interface CraftListItem {
   collaborationTypeId: number | null
   purchaseStatus: string
   craftStatus: string
-  completedAt: string | null
 }
 
 export interface CraftListRes {

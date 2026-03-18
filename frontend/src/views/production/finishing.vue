@@ -1,6 +1,6 @@
 <template>
   <div class="page-card finishing-page">
-    <!-- Tab：全部 / 等待发货 / 已发货 / 已入库 -->
+    <!-- Tab：全部 / 尾部完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
         <el-radio-group v-model="currentTab" size="large" @change="onTabChange">
@@ -62,31 +62,22 @@
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
-          v-if="hasSelection && canRegisterSelection"
+          v-if="hasSelection && canRegisterReceiveSelection"
           type="primary"
           size="large"
-          @click="openRegisterDialog"
+          @click="openReceiveDialog"
+        >
+          登记收货
+        </el-button>
+        <el-button
+          v-if="hasSelection && canPackagingCompleteSelection"
+          type="primary"
+          size="large"
+          @click="openPackagingCompleteDialog"
         >
           登记包装完成
         </el-button>
-        <el-button
-          v-if="hasSelection && canShipSelection"
-          type="success"
-          size="large"
-          :loading="shipping"
-          @click="onShip"
-        >
-          {{ shipButtonLabel }}
-        </el-button>
-        <el-button
-          v-if="hasSelection && canInboundSelection"
-          type="warning"
-          size="large"
-          :loading="inbounding"
-          @click="onInbound"
-        >
-          入库
-        </el-button>
+        <!-- 新流程：尾部不再处理发货/入库/财务审批，交由仓库模块 -->
       </div>
     </div>
 
@@ -228,42 +219,6 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column label="尾部出货数" width="100" align="right">
-        <template #default="{ row }">
-          <el-popover
-            placement="top-start"
-            trigger="hover"
-            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
-            :show-arrow="true"
-            @show="onShowQtyPopover(row)"
-          >
-            <template #reference>
-              <span class="qty-trigger">{{ row.tailShippedQty != null ? row.tailShippedQty : '-' }}</span>
-            </template>
-            <div class="qty-popover">
-              <div class="qty-popover-title">数量追踪</div>
-              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
-              <div v-else>
-                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
-                  <thead>
-                    <tr>
-                      <th class="qty-header">尺码</th>
-                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
-                      <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div v-else class="qty-popover-empty">暂无尺码明细</div>
-              </div>
-            </div>
-          </el-popover>
-        </template>
-      </el-table-column>
       <el-table-column label="尾部入库数" width="100" align="right">
         <template #default="{ row }">{{ row.tailInboundQty != null ? row.tailInboundQty : '-' }}</template>
       </el-table-column>
@@ -284,26 +239,26 @@
       />
     </div>
 
-    <!-- 登记包装完成弹窗：尺寸细数（订单/裁床/车缝只读，尾部收货可填）、次品数 -->
+    <!-- 登记收货弹窗：待尾部 tab 使用，支持按尺码填写收货数量 -->
     <el-dialog
-      v-model="registerDialog.visible"
-      title="登记包装完成"
+      v-model="receiveDialog.visible"
+      title="登记收货"
       width="720"
       destroy-on-close
-      @close="resetRegisterForm"
+      @close="resetReceiveForm"
     >
-      <template v-if="registerDialog.row">
+      <template v-if="receiveDialog.row">
         <div class="register-brief">
-          <div>订单号：{{ registerDialog.row.orderNo }}</div>
-          <div>SKU：{{ registerDialog.row.skuCode }}</div>
+          <div>订单号：{{ receiveDialog.row.orderNo }}</div>
+          <div>SKU：{{ receiveDialog.row.skuCode }}</div>
         </div>
-        <div v-if="registerFormLoading" class="register-loading">加载尺寸细数...</div>
-        <template v-else-if="registerForm.headers?.length">
+        <div v-if="receiveDialog.formLoading" class="register-loading">加载尺寸细数...</div>
+        <template v-else-if="receiveDialog.headers?.length">
           <div class="register-qty-title">尺寸细数</div>
-          <el-table :data="registerSizeTableRows" border size="small" class="register-qty-table" style="width: 100%">
+          <el-table :data="receiveSizeTableRows" border size="small" class="register-qty-table" style="width: 100%">
             <el-table-column prop="label" label="" width="90" align="right" />
             <el-table-column
-              v-for="(h, idx) in registerForm.headers"
+              v-for="(h, idx) in receiveDialog.headers"
               :key="idx"
               :label="h"
               min-width="100"
@@ -313,14 +268,14 @@
                 <template v-if="row.key === 'order' || row.key === 'cut' || row.key === 'sewing'">
                   {{ row.values[idx] != null ? row.values[idx] : '-' }}
                 </template>
-                <template v-else-if="row.key === 'tail' && idx === registerForm.headers.length - 1 && registerForm.headers.length > 1">
-                  {{ registerTailReceivedTotal }}
+                <template v-else-if="row.key === 'tail' && idx === receiveDialog.headers.length - 1 && receiveDialog.headers.length > 1">
+                  {{ receiveTailReceivedTotal }}
                 </template>
                 <template v-else>
                   <el-input-number
-                    v-model="registerForm.tailReceivedQuantities[idx]"
+                    v-model="receiveDialog.tailReceivedQuantities[idx]"
                     :min="0"
-                    :max="registerForm.sewingRow[idx] != null ? Number(registerForm.sewingRow[idx]) : undefined"
+                    :max="receiveDialog.sewingRow[idx] != null ? Number(receiveDialog.sewingRow[idx]) : undefined"
                     :precision="0"
                     controls-position="right"
                     size="small"
@@ -330,115 +285,125 @@
               </template>
             </el-table-column>
           </el-table>
-          <p class="register-qty-sum">尾部收货数合计：{{ registerTailReceivedTotal }}</p>
+          <p class="register-qty-sum">尾部收货数合计：{{ receiveTailReceivedTotal }}</p>
         </template>
-        <el-form
-          ref="registerFormRef"
-          :model="registerForm"
-          :rules="registerRules"
-          label-width="100px"
-          class="register-form"
-        >
-          <el-form-item label="次品数" prop="defectQuantity">
-            <el-input-number
-              v-model="registerForm.defectQuantity"
-              :min="0"
-              :precision="0"
-              controls-position="right"
-              style="width: 160px"
-            />
-          </el-form-item>
-        </el-form>
       </template>
       <template #footer>
-        <el-button @click="registerDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="registerDialog.submitting" @click="submitRegister">
+        <el-button @click="receiveDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="receiveDialog.submitting" @click="submitReceive">
           确定
         </el-button>
       </template>
     </el-dialog>
 
-    <!-- 发货弹窗：填写本次出货数（可小于尾部收货数，支持多次发货） -->
+    <!-- 登记包装完成弹窗：默认全部入库，生成待入库并完成订单 -->
     <el-dialog
-      v-model="shipDialog.visible"
-      title="发货"
-      width="560"
+      v-model="packagingCompleteDialog.visible"
+      title="登记包装完成"
+      width="800"
       destroy-on-close
-      @close="shipDialog.rows = []; shipDialog.quantities = []"
+      @close="packagingCompleteDialog.items = []"
     >
-      <p class="dialog-tip">出货数 + 入库数 + 次品数 = 尾部收货数 时可完成订单。请填写本次出货数。</p>
-      <el-table :data="shipDialog.rows" border size="small" max-height="320">
-        <el-table-column prop="orderNo" label="订单号" width="100" />
-        <el-table-column prop="skuCode" label="SKU" width="100" />
-        <el-table-column label="可发货数" width="90" align="right">
-          <template #default="{ row, $index }">{{ shipDialogMaxQty(row) }}</template>
-        </el-table-column>
-        <el-table-column label="本次出货数" min-width="140">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-model="shipDialog.quantities[$index]"
-              :min="1"
-              :max="shipDialogMaxQty(row)"
-              :precision="0"
-              controls-position="right"
-              size="small"
-              style="width: 120px"
-            />
+      <p class="dialog-tip">登记包装完成后将默认“全部入库”，自动生成一条仓库「待入库」记录，同时订单状态变为「订单完成」。后续发货/入库等由仓库模块处理。</p>
+      <div v-if="packagingCompleteDialog.formLoading" class="register-loading">加载尺寸细数...</div>
+      <template v-else>
+        <div
+          v-for="(item, itemIdx) in packagingCompleteDialog.items"
+          :key="item.row.orderId"
+          class="packaging-block"
+        >
+          <div class="register-brief">
+            <div>订单号：{{ item.row.orderNo }}</div>
+            <div>SKU：{{ item.row.skuCode }}</div>
+            <div>尾部收货数合计：{{ item.row.tailReceivedQty ?? 0 }}</div>
+          </div>
+          <template v-if="item.headers?.length">
+            <div class="register-qty-title">尾部收货数 / 入库数</div>
+            <el-table :data="packagingSizeTableRows(item)" border size="small" class="register-qty-table" style="width: 100%">
+              <el-table-column prop="label" label="" width="100" align="right" />
+              <el-table-column
+                v-for="(h, hIdx) in item.headers"
+                :key="hIdx"
+                :label="h"
+                min-width="90"
+                align="center"
+              >
+                <template #default="{ row }">
+                  <template v-if="row.key === 'tail_received'">
+                    {{ row.values[hIdx] != null ? row.values[hIdx] : '-' }}
+                  </template>
+                  <template v-else-if="row.key === 'inbound'">
+                    <template v-if="item.headers.length > 1 && hIdx === item.headers.length - 1">
+                      {{ row.values[hIdx] != null ? row.values[hIdx] : 0 }}
+                    </template>
+                    <el-input-number
+                      v-else
+                      v-model="item.inboundQuantities[hIdx]"
+                      :min="0"
+                      :max="maxPackagingQtyForSize(item, hIdx)"
+                      :precision="0"
+                      controls-position="right"
+                      size="small"
+                      style="width: 100%"
+                    />
+                  </template>
+                  <template v-else-if="row.key === 'defect'">
+                    <template v-if="item.headers.length > 1 && hIdx === item.headers.length - 1">
+                      {{ item.defectQuantity ?? 0 }}
+                    </template>
+                    <el-input-number
+                      v-else
+                      v-model="item.defectQuantity"
+                      :min="0"
+                      :max="item.row.tailReceivedQty ?? 0"
+                      :precision="0"
+                      controls-position="right"
+                      size="small"
+                      style="width: 100%"
+                    />
+                  </template>
+                  <template v-else>
+                    {{ row.values[hIdx] != null ? row.values[hIdx] : '-' }}
+                  </template>
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="packaging-extra">
+              <el-form-item label="备注" class="packaging-form-item">
+                <el-input
+                  v-model="item.remark"
+                  type="textarea"
+                  :rows="2"
+                  placeholder="选填"
+                  size="small"
+                  maxlength="200"
+                  show-word-limit
+                  style="width: 360px"
+                />
+              </el-form-item>
+            </div>
           </template>
-        </el-table-column>
-      </el-table>
+        </div>
+      </template>
       <template #footer>
-        <el-button @click="shipDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="shipping" @click="submitShipDialog">确定发货</el-button>
+        <el-button @click="packagingCompleteDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="packagingCompleteDialog.submitting" @click="submitPackagingComplete">
+          确定
+        </el-button>
       </template>
     </el-dialog>
 
-    <!-- 入库弹窗：填写本次入库数（支持部分入库，满足 出货+入库+次品=尾部收货数 时订单完成） -->
-    <el-dialog
-      v-model="inboundDialog.visible"
-      title="入库"
-      width="560"
-      destroy-on-close
-      @close="inboundDialog.rows = []; inboundDialog.quantities = []"
-    >
-      <p class="dialog-tip">出货数 + 入库数 + 次品数 = 尾部收货数 时订单将完成。请填写本次入库数。</p>
-      <el-table :data="inboundDialog.rows" border size="small" max-height="320">
-        <el-table-column prop="orderNo" label="订单号" width="100" />
-        <el-table-column prop="skuCode" label="SKU" width="100" />
-        <el-table-column label="可入库数" width="90" align="right">
-          <template #default="{ row }">{{ inboundDialogMaxQty(row) }}</template>
-        </el-table-column>
-        <el-table-column label="本次入库数" min-width="140">
-          <template #default="{ row, $index }">
-            <el-input-number
-              v-model="inboundDialog.quantities[$index]"
-              :min="1"
-              :max="inboundDialogMaxQty(row)"
-              :precision="0"
-              controls-position="right"
-              size="small"
-              style="width: 120px"
-            />
-          </template>
-        </el-table-column>
-      </el-table>
-      <template #footer>
-        <el-button @click="inboundDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="inbounding" @click="submitInboundDialog">确定入库</el-button>
-      </template>
-    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   getFinishingItems,
   getFinishingRegisterFormData,
-  registerFinishingPackaging,
-  shipFinishingOrder,
-  inboundFinishingOrder,
+  registerFinishingReceive,
+  registerFinishingPackagingComplete,
   exportFinishingItems,
   type FinishingListItem,
   type FinishingListQuery,
@@ -448,9 +413,9 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
-  { label: '等待发货', value: 'pending_ship' },
-  { label: '已发货', value: 'shipped' },
-  { label: '已入库', value: 'inbound' },
+  { label: '待尾部', value: 'pending_receive' },
+  { label: '尾部中', value: 'pending_assign' },
+  { label: '尾部完成', value: 'inbound' },
 ] as const
 
 type FinishingTabConfig = (typeof FINISHING_TABS)[number]
@@ -488,58 +453,22 @@ const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<FinishingListItem[]>([])
 const loading = ref(false)
-const shipping = ref(false)
-const inbounding = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
 const sizePopoverLoadingId = ref<number | null>(null)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<FinishingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
-const canRegisterSelection = computed(() =>
-  selectedRows.value.some((r) => r.finishingStatus === 'pending_ship' && r.tailReceivedQty == null),
+/** 待尾部 tab：可登记收货 */
+const canRegisterReceiveSelection = computed(() =>
+  selectedRows.value.length > 0 &&
+  selectedRows.value.every((r) => r.finishingStatus === 'pending_receive'),
 )
-/** 可发货：等待发货且已登记收货数，或已发货但仍有可发货数（追加发货） */
-const canShipSelection = computed(() => {
-  if (selectedRows.value.length === 0) return false
-  return selectedRows.value.every((r) => {
-    if (r.finishingStatus === 'pending_ship') return r.tailReceivedQty != null && r.tailReceivedQty >= 0
-    if (r.finishingStatus === 'shipped') return shipDialogMaxQty(r) > 0
-    return false
-  })
-})
-const shipButtonLabel = computed(() =>
-  selectedRows.value.some((r) => r.finishingStatus === 'pending_ship') ? '发货' : '追加发货',
+/** 尾部 tab：可登记包装完成（发货数、入库数、次品数、备注） */
+const canPackagingCompleteSelection = computed(() =>
+  selectedRows.value.length > 0 &&
+  selectedRows.value.every((r) => r.finishingStatus === 'pending_assign'),
 )
-const canInboundSelection = computed(() =>
-  selectedRows.value.every((r) => r.finishingStatus === 'shipped') && selectedRows.value.length > 0,
-)
-
-/** 可发货数 = 尾部收货数 - 已出货 - 已入库 - 次品 */
-function shipDialogMaxQty(row: FinishingListItem): number {
-  const received = row.tailReceivedQty ?? 0
-  const shipped = row.tailShippedQty ?? 0
-  const inbound = row.tailInboundQty ?? 0
-  const defect = row.defectQuantity ?? 0
-  return Math.max(0, received - shipped - inbound - defect)
-}
-
-/** 可入库数 = 尾部收货数 - 已出货 - 已入库 - 次品 */
-function inboundDialogMaxQty(row: FinishingListItem): number {
-  return shipDialogMaxQty(row)
-}
-
-const shipDialog = reactive<{
-  visible: boolean
-  rows: FinishingListItem[]
-  quantities: number[]
-}>({ visible: false, rows: [], quantities: [] })
-
-const inboundDialog = reactive<{
-  visible: boolean
-  rows: FinishingListItem[]
-  quantities: number[]
-}>({ visible: false, rows: [], quantities: [] })
 
 function getTabLabel(tab: FinishingTabConfig): string {
   const counts = tabCounts.value
@@ -547,43 +476,110 @@ function getTabLabel(tab: FinishingTabConfig): string {
   return `${tab.label}(${count})`
 }
 
-const registerDialog = reactive<{
+const receiveDialog = reactive<{
   visible: boolean
   submitting: boolean
+  formLoading: boolean
   row: FinishingListItem | null
-}>({ visible: false, submitting: false, row: null })
-const registerFormLoading = ref(false)
-const registerFormRef = ref<FormInstance>()
-const registerForm = reactive<{
   headers: string[]
   orderRow: (number | null)[]
   cutRow: (number | null)[]
   sewingRow: (number | null)[]
   tailReceivedQuantities: number[]
-  defectQuantity: number
 }>({
+  visible: false,
+  submitting: false,
+  formLoading: false,
+  row: null,
   headers: [],
   orderRow: [],
   cutRow: [],
   sewingRow: [],
   tailReceivedQuantities: [],
-  defectQuantity: 0,
 })
-const registerSizeTableRows = computed(() => {
-  const h = registerForm.headers
+const receiveSizeTableRows = computed(() => {
+  const h = receiveDialog.headers
   if (!h.length) return []
   return [
-    { key: 'order', label: '订单数量', values: registerForm.orderRow },
-    { key: 'cut', label: '裁床数量', values: registerForm.cutRow },
-    { key: 'sewing', label: '车缝数量', values: registerForm.sewingRow },
-    { key: 'tail', label: '尾部收货数', values: registerForm.tailReceivedQuantities },
+    { key: 'order', label: '订单数量', values: receiveDialog.orderRow },
+    { key: 'cut', label: '裁床数量', values: receiveDialog.cutRow },
+    { key: 'sewing', label: '车缝数量', values: receiveDialog.sewingRow },
+    { key: 'tail', label: '尾部收货数', values: receiveDialog.tailReceivedQuantities },
   ]
 })
-const registerTailReceivedTotal = computed(() =>
-  registerForm.tailReceivedQuantities.reduce((a, b) => a + (Number(b) || 0), 0),
+const receiveTailReceivedTotal = computed(() =>
+  receiveDialog.tailReceivedQuantities.reduce((a, b) => a + (Number(b) || 0), 0),
 )
-const registerRules: FormRules = {
-  defectQuantity: [],
+function resetReceiveForm() {
+  receiveDialog.row = null
+  receiveDialog.headers = []
+  receiveDialog.orderRow = []
+  receiveDialog.cutRow = []
+  receiveDialog.sewingRow = []
+  receiveDialog.tailReceivedQuantities = []
+}
+
+interface PackagingCompleteItem {
+  row: FinishingListItem
+  headers: string[]
+  orderRow: (number | null)[]
+  cutRow: (number | null)[]
+  sewingRow: (number | null)[]
+  tailReceivedRow: (number | null)[]
+  inboundQuantities: number[]
+  defectQuantity: number
+  remark: string
+}
+
+const packagingCompleteDialog = reactive<{
+  visible: boolean
+  submitting: boolean
+  formLoading: boolean
+  items: PackagingCompleteItem[]
+}>({ visible: false, submitting: false, formLoading: false, items: [] })
+
+function packagingSizeTableRows(item: PackagingCompleteItem) {
+  const received = item.row.tailReceivedQty ?? 0
+  const i = item.inboundQuantities
+  const sumI = i.reduce((a, b) => a + b, 0)
+  const valuesReceived =
+    Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
+      ? item.tailReceivedRow
+      : item.headers.length === 1
+        ? [received]
+        : [...Array(item.headers.length - 1).fill(null), received]
+  const valuesInbound = item.headers.length === 1 ? [...i] : [...i, sumI]
+  return [
+    { key: 'tail_received', label: '尾部收货数', values: valuesReceived },
+    { key: 'inbound', label: '入库数', values: valuesInbound },
+    { key: 'defect', label: '次品数', values: item.headers.length === 1 ? [item.defectQuantity ?? 0] : [...Array(item.headers.length - 1).fill(null), item.defectQuantity ?? 0] },
+  ]
+}
+
+function packagingSetZero(item: PackagingCompleteItem) {
+  item.inboundQuantities.fill(0)
+  item.defectQuantity = 0
+}
+
+function packagingSetInboundToReceived(item: PackagingCompleteItem) {
+  const total = item.row.tailReceivedQty ?? 0
+  const len = item.inboundQuantities.length
+  if (len === 0) return
+  // 默认入库数按收货细数回填（仅尺码列，合计列在表格中自动计算）
+  const sizeValues = Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
+    ? item.tailReceivedRow.slice(0, len).map((v) => (v != null ? Number(v) : 0))
+    : null
+  if (sizeValues) {
+    for (let i = 0; i < len; i++) item.inboundQuantities[i] = Math.max(0, Number(sizeValues[i]) || 0)
+  } else {
+    item.inboundQuantities[0] = total
+    for (let i = 1; i < len; i++) item.inboundQuantities[i] = 0
+  }
+  item.defectQuantity = 0
+}
+
+function maxPackagingQtyForSize(item: PackagingCompleteItem, _hIdx: number): number {
+  return item.row.tailReceivedQty ?? 0
 }
 
 function formatDateTime(v: string | null | undefined): string {
@@ -722,21 +718,18 @@ function onSelectionChange(rows: FinishingListItem[]) {
   selectedRows.value = rows
 }
 
-async function openRegisterDialog() {
-  const canReg = selectedRows.value.filter(
-    (r) => r.finishingStatus === 'pending_ship' && r.tailReceivedQty == null,
-  )
-  if (canReg.length === 0) return
-  const row = canReg[0]
-  registerDialog.row = row
-  registerForm.headers = []
-  registerForm.orderRow = []
-  registerForm.cutRow = []
-  registerForm.sewingRow = []
-  registerForm.tailReceivedQuantities = []
-  registerForm.defectQuantity = 0
-  registerDialog.visible = true
-  registerFormLoading.value = true
+async function openReceiveDialog() {
+  const rows = selectedRows.value.filter((r) => r.finishingStatus === 'pending_receive')
+  if (rows.length === 0) return
+  const row = rows[0]
+  receiveDialog.row = row
+  receiveDialog.headers = []
+  receiveDialog.orderRow = []
+  receiveDialog.cutRow = []
+  receiveDialog.sewingRow = []
+  receiveDialog.tailReceivedQuantities = []
+  receiveDialog.visible = true
+  receiveDialog.formLoading = true
   try {
     const res = await getFinishingRegisterFormData(row.orderId)
     const data = res.data
@@ -744,131 +737,122 @@ async function openRegisterDialog() {
     const orderRow = data?.orderRow ?? []
     const cutRow = data?.cutRow ?? []
     const sewingRow = data?.sewingRow ?? []
-    registerForm.headers = headers
-    registerForm.orderRow = orderRow
-    registerForm.cutRow = cutRow
-    registerForm.sewingRow = sewingRow
+    receiveDialog.headers = headers
+    receiveDialog.orderRow = orderRow
+    receiveDialog.cutRow = cutRow
+    receiveDialog.sewingRow = sewingRow
     const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-    registerForm.tailReceivedQuantities = sewingRow
+    receiveDialog.tailReceivedQuantities = sewingRow
       .slice(0, sizeCount)
       .map((v) => (v != null ? Number(v) : 0))
-    while (registerForm.tailReceivedQuantities.length < sizeCount) {
-      registerForm.tailReceivedQuantities.push(0)
+    while (receiveDialog.tailReceivedQuantities.length < sizeCount) {
+      receiveDialog.tailReceivedQuantities.push(0)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
-    registerDialog.visible = false
+    receiveDialog.visible = false
   } finally {
-    registerFormLoading.value = false
+    receiveDialog.formLoading = false
   }
 }
 
-function resetRegisterForm() {
-  registerDialog.row = null
-  registerForm.headers = []
-  registerForm.orderRow = []
-  registerForm.cutRow = []
-  registerForm.sewingRow = []
-  registerForm.tailReceivedQuantities = []
-  registerForm.defectQuantity = 0
-  registerFormRef.value?.clearValidate()
-}
-
-async function submitRegister() {
-  if (!registerDialog.row) return
-  const total = registerTailReceivedTotal.value
-  if (total <= 0) {
-    ElMessage.warning('请填写尾部收货数')
+async function submitReceive() {
+  if (!receiveDialog.row) return
+  const total = receiveTailReceivedTotal.value
+  if (!total || total < 1) {
+    ElMessage.warning('请填写尾部收货数（可按尺码填写）')
     return
   }
-  await registerFormRef.value?.validate().catch(() => {})
-  registerDialog.submitting = true
+  receiveDialog.submitting = true
   try {
-    await registerFinishingPackaging({
-      orderId: registerDialog.row.orderId,
+    await registerFinishingReceive({
+      orderId: receiveDialog.row.orderId,
       tailReceivedQty: total,
-      defectQuantity: registerForm.defectQuantity,
+      tailReceivedQuantities: receiveDialog.tailReceivedQuantities,
     })
-    ElMessage.success('登记成功')
-    registerDialog.visible = false
+    ElMessage.success('登记收货成功，订单已进入「尾部中」')
+    receiveDialog.visible = false
     await load()
     void loadTabCounts()
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记收货失败'))
   } finally {
-    registerDialog.submitting = false
+    receiveDialog.submitting = false
   }
 }
 
-function onShip() {
-  const toShip = selectedRows.value.filter((r) => {
-    if (r.finishingStatus === 'pending_ship') return r.tailReceivedQty != null
-    if (r.finishingStatus === 'shipped') return shipDialogMaxQty(r) > 0
-    return false
-  })
-  if (toShip.length === 0) return
-  shipDialog.rows = toShip
-  shipDialog.quantities = toShip.map((r) => shipDialogMaxQty(r))
-  shipDialog.visible = true
-}
-
-async function submitShipDialog() {
-  if (shipDialog.rows.length === 0) return
-  const invalid = shipDialog.rows.some((row, i) => {
-    const q = shipDialog.quantities[i] ?? 0
-    return q < 1 || q > shipDialogMaxQty(row)
-  })
-  if (invalid) {
-    ElMessage.warning('请填写有效的本次出货数（1～可发货数）')
-    return
-  }
-  shipping.value = true
+async function openPackagingCompleteDialog() {
+  const rows = selectedRows.value.filter((r) => r.finishingStatus === 'pending_assign')
+  if (rows.length === 0) return
+  packagingCompleteDialog.visible = true
+  packagingCompleteDialog.formLoading = true
+  packagingCompleteDialog.items = []
   try {
-    for (let i = 0; i < shipDialog.rows.length; i++) {
-      await shipFinishingOrder(shipDialog.rows[i].orderId, shipDialog.quantities[i] ?? 0)
+    for (const row of rows) {
+      const res = await getFinishingRegisterFormData(row.orderId)
+      const data = res.data
+      const headers = data?.headers ?? ['合计']
+      const orderRow = data?.orderRow ?? []
+      const cutRow = data?.cutRow ?? []
+      const sewingRow = data?.sewingRow ?? []
+      const tailReceivedRow = data?.tailReceivedRow ?? []
+      const sizeCount = headers.length > 1 ? headers.length - 1 : 1
+      const item: PackagingCompleteItem = {
+        row,
+        headers,
+        orderRow,
+        cutRow,
+        sewingRow,
+        tailReceivedRow,
+        inboundQuantities: Array(sizeCount).fill(0),
+        defectQuantity: 0,
+        remark: '',
+      }
+      // 默认全部入库：把收货总数放在第一个尺码列，其他列为 0（合计列由表格计算展示）
+      packagingSetInboundToReceived(item)
+      packagingCompleteDialog.items.push(item)
     }
-    ElMessage.success(`已发货 ${shipDialog.rows.length} 条`)
-    shipDialog.visible = false
-    await load()
-    void loadTabCounts()
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '发货失败'))
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
+    packagingCompleteDialog.visible = false
   } finally {
-    shipping.value = false
+    packagingCompleteDialog.formLoading = false
   }
 }
 
-function onInbound() {
-  const toInbound = selectedRows.value.filter((r) => r.finishingStatus === 'shipped')
-  if (toInbound.length === 0) return
-  inboundDialog.rows = toInbound
-  inboundDialog.quantities = toInbound.map((r) => inboundDialogMaxQty(r))
-  inboundDialog.visible = true
-}
-
-async function submitInboundDialog() {
-  if (inboundDialog.rows.length === 0) return
-  const invalid = inboundDialog.rows.some((row, i) => {
-    const q = inboundDialog.quantities[i] ?? 0
-    return q < 1 || q > inboundDialogMaxQty(row)
-  })
-  if (invalid) {
-    ElMessage.warning('请填写有效的本次入库数（1～可入库数）')
-    return
+async function submitPackagingComplete() {
+  if (packagingCompleteDialog.items.length === 0) return
+  for (const item of packagingCompleteDialog.items) {
+    const received = item.row.tailReceivedQty ?? 0
+    const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
+    const defect = Number(item.defectQuantity) || 0
+    if (sumInbound + defect !== received) {
+      ElMessage.warning(`订单 ${item.row.orderNo}：入库数合计(${sumInbound})+次品数(${defect}) 须等于尾部收货数(${received})`)
+      return
+    }
   }
-  inbounding.value = true
+  packagingCompleteDialog.submitting = true
   try {
-    for (let i = 0; i < inboundDialog.rows.length; i++) {
-      await inboundFinishingOrder(inboundDialog.rows[i].orderId, inboundDialog.quantities[i] ?? 0)
+    for (const item of packagingCompleteDialog.items) {
+      const received = item.row.tailReceivedQty ?? 0
+      const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
+      const defect = Number(item.defectQuantity) || 0
+      await registerFinishingPackagingComplete({
+        orderId: item.row.orderId,
+        tailShippedQty: 0,
+        tailInboundQty: sumInbound,
+        defectQuantity: defect,
+        remark: item.remark?.trim() || undefined,
+      })
     }
-    ElMessage.success('入库操作已提交；当出货+入库+次品=尾部收货数时订单将自动完成')
-    inboundDialog.visible = false
+    ElMessage.success('登记包装完成：已生成待入库，订单已完成')
+    packagingCompleteDialog.visible = false
     await load()
     void loadTabCounts()
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '入库失败'))
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记包装完成失败'))
   } finally {
-    inbounding.value = false
+    packagingCompleteDialog.submitting = false
   }
 }
 
@@ -966,6 +950,33 @@ onMounted(() => {
 
 .register-qty-table {
   margin-bottom: 8px;
+}
+
+.packaging-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: 8px;
+}
+
+.packaging-block {
+  margin-bottom: var(--space-md);
+}
+
+.packaging-block:last-child {
+  margin-bottom: 0;
+}
+
+.packaging-extra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-md);
+  margin-top: 8px;
+}
+
+.packaging-extra .packaging-form-item {
+  margin-bottom: 0;
 }
 
 .register-qty-sum {

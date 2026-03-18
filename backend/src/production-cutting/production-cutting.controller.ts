@@ -53,8 +53,9 @@ export class ProductionCuttingController {
       '到裁床时间',
       '裁床完成时间',
       '订单数量',
-      '实裁数量',
+      '裁床数量',
       '裁剪成本',
+      '实际用布(米)',
     ];
     const escape = (v: unknown) => {
       const str = v == null ? '' : String(v);
@@ -77,6 +78,7 @@ export class ProductionCuttingController {
           r.quantity,
           r.actualCutTotal ?? '',
           r.cuttingCost ?? '',
+          r.actualFabricMeters ?? '',
         ].map(escape).join(','),
       );
     }
@@ -102,11 +104,17 @@ export class ProductionCuttingController {
     @Body('orderId') orderId: number,
     @Body('cuttingCost') cuttingCost: string,
     @Body('actualCutRows') actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[],
+    @Body('cuttingDepartment') cuttingDepartment?: string,
+    @Body('cutterName') cutterName?: string,
+    @Body('actualFabricMeters') actualFabricMeters?: string,
   ) {
     return this.cuttingService.completeCutting(
       Number(orderId),
       cuttingCost ?? '0',
       Array.isArray(actualCutRows) ? actualCutRows : [],
+      cuttingDepartment ?? null,
+      cutterName ?? null,
+      actualFabricMeters ?? null,
     );
   }
 }

@@ -18,6 +18,10 @@ export class OrderCraft {
   @Column({ name: 'status', length: 32, default: 'pending' })
   status: string;
 
+  /** 到工艺时间：订单进入待工艺（pending_craft）的时间 */
+  @Column({ name: 'arrived_at_craft', type: 'datetime', nullable: true })
+  arrivedAtCraft: Date | null;
+
   /** 工艺完成时间 */
   @Column({ name: 'completed_at', type: 'datetime', nullable: true })
   completedAt: Date | null;

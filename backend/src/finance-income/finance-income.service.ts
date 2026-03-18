@@ -88,16 +88,22 @@ export class FinanceIncomeService {
   async create(dto: {
     occurDate: string;
     amount: number | string;
+    payer?: string;
     departmentId?: number | null;
     bankAccountId?: number | null;
     remark?: string;
+    attachments?: string[] | null;
   }) {
     const entity = this.repo.create({
       occurDate: new Date(dto.occurDate),
       amount: String(dto.amount),
+      payer: dto.payer?.trim() ?? '',
       departmentId: dto.departmentId != null ? Number(dto.departmentId) : null,
       bankAccountId: dto.bankAccountId != null ? Number(dto.bankAccountId) : null,
       remark: dto.remark?.trim() ?? '',
+      attachments: Array.isArray(dto.attachments)
+        ? dto.attachments.map((u) => String(u).trim()).filter(Boolean)
+        : null,
     });
     return this.repo.save(entity);
   }
@@ -107,18 +113,26 @@ export class FinanceIncomeService {
     dto: {
       occurDate?: string;
       amount?: number | string;
+      payer?: string;
       departmentId?: number | null;
       bankAccountId?: number | null;
       remark?: string;
+      attachments?: string[] | null;
     },
   ) {
     const r = await this.repo.findOne({ where: { id } });
     if (!r) throw new NotFoundException('收入记录不存在');
     if (dto.occurDate != null) r.occurDate = new Date(dto.occurDate);
     if (dto.amount != null) r.amount = String(dto.amount);
+    if (dto.payer !== undefined) r.payer = dto.payer?.trim() ?? '';
     if (dto.departmentId !== undefined) r.departmentId = dto.departmentId != null ? Number(dto.departmentId) : null;
     if (dto.bankAccountId !== undefined) r.bankAccountId = dto.bankAccountId != null ? Number(dto.bankAccountId) : null;
     if (dto.remark !== undefined) r.remark = dto.remark?.trim() ?? '';
+    if (dto.attachments !== undefined) {
+      r.attachments = Array.isArray(dto.attachments)
+        ? dto.attachments.map((u) => String(u).trim()).filter(Boolean)
+        : null;
+    }
     return this.repo.save(r);
   }
 

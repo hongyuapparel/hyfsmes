@@ -22,9 +22,11 @@ export interface CuttingListItem {
   /** 完成时间 */
   completedAt: string | null;
   cuttingStatus: string;
-  /** 实裁总数量（actualCutRows 各格汇总） */
+  /** 裁床总数量（actualCutRows 各格汇总） */
   actualCutTotal: number | null;
   cuttingCost: string | null;
+  /** 实际用布总米数（m，仅本厂裁床），可为空 */
+  actualFabricMeters: string | null;
   /** 时效判定：可选，暂返回 - */
   timeRating: string;
 }
@@ -47,6 +49,89 @@ export class ProductionCuttingService {
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
   ) {}
+
+  private async hasCuttingDepartmentAndCutter(): Promise<boolean> {
+    try {
+      const depRows = await this.cuttingRepo.query(
+        "SHOW COLUMNS FROM `order_cutting` LIKE 'cutting_department'",
+      );
+      const cutterRows = await this.cuttingRepo.query(
+        "SHOW COLUMNS FROM `order_cutting` LIKE 'cutter_name'",
+      );
+      return Array.isArray(depRows) && depRows.length > 0 && Array.isArray(cutterRows) && cutterRows.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private async hasActualFabricMeters(): Promise<boolean> {
+    try {
+      const rows = await this.cuttingRepo.query(
+        "SHOW COLUMNS FROM `order_cutting` LIKE 'actual_fabric_meters'",
+      );
+      return Array.isArray(rows) && rows.length > 0;
+    } catch {
+      return false;
+    }
+  }
+
+  private async fetchActualFabricMetersMap(orderIds: number[]): Promise<Map<number, string>> {
+    const ids = Array.isArray(orderIds) ? orderIds.filter((v) => typeof v === 'number' && v > 0) : [];
+    const map = new Map<number, string>();
+    if (!ids.length) return map;
+    if (!(await this.hasActualFabricMeters())) return map;
+    try {
+      const rows = await this.cuttingRepo.query(
+        `SELECT order_id AS orderId, actual_fabric_meters AS actualFabricMeters
+         FROM \`order_cutting\`
+         WHERE order_id IN (?)`,
+        [ids],
+      );
+      if (Array.isArray(rows)) {
+        for (const r of rows) {
+          const orderId = Number((r as any).orderId);
+          const v = (r as any).actualFabricMeters;
+          if (!Number.isNaN(orderId) && v != null && String(v).trim() !== '') {
+            map.set(orderId, String(v));
+          }
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return map;
+  }
+
+  private toDateTimeLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') {
+      const s = v.slice(0, 19).replace('T', ' ');
+      return s || null;
+    }
+    if (!(v instanceof Date)) return null;
+    if (Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    const hh = String(v.getHours()).padStart(2, '0');
+    const mm = String(v.getMinutes()).padStart(2, '0');
+    const ss = String(v.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+  }
+
+  private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') {
+      const s = v.slice(0, 10);
+      return s || null;
+    }
+    if (!(v instanceof Date)) return null;
+    if (Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
 
   private sumActualCut(rows: ActualCutRow[] | null): number | null {
     if (!rows || rows.length === 0) return null;
@@ -92,9 +177,10 @@ export class ProductionCuttingService {
       return [];
     }
 
-    const cuttings = await this.cuttingRepo.find({
-      where: orderIds.map((id) => ({ orderId: id })),
-    });
+    const [cuttings, actualFabricMap] = await Promise.all([
+      this.cuttingRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
+      this.fetchActualFabricMetersMap(orderIds),
+    ]);
     const cuttingMap = new Map(cuttings.map((c) => [c.orderId, c]));
 
     const rows: CuttingListItem[] = [];
@@ -104,14 +190,12 @@ export class ProductionCuttingService {
       if (tab === 'pending' && cuttingStatus === 'completed') continue;
       if (tab === 'completed' && cuttingStatus !== 'completed') continue;
 
-      const arrivedAt = cutting?.arrivedAt
-        ? cutting.arrivedAt.toISOString().slice(0, 19).replace('T', ' ')
-        : order.status === 'pending_cutting' && order.statusTime
-          ? order.statusTime.toISOString().slice(0, 19).replace('T', ' ')
-          : null;
-      const completedAt = cutting?.completedAt
-        ? cutting.completedAt.toISOString().slice(0, 19).replace('T', ' ')
-        : null;
+      const arrivedAt =
+        this.toDateTimeLocalString(cutting?.arrivedAt) ??
+        // 兼容历史数据：若未记录 arrived_at，则回退为裁床完成时间（避免显示为空）
+        this.toDateTimeLocalString(cutting?.completedAt) ??
+        (order.status === 'pending_cutting' ? this.toDateTimeLocalString(order.statusTime) : null);
+      const completedAt = this.toDateTimeLocalString(cutting?.completedAt);
 
       rows.push({
         orderId: order.id,
@@ -120,7 +204,7 @@ export class ProductionCuttingService {
         salesperson: order.salesperson ?? '',
         merchandiser: order.merchandiser ?? '',
         customerDueDate: order.customerDueDate
-          ? order.customerDueDate.toISOString().slice(0, 10)
+          ? this.toDateOnlyLocalString(order.customerDueDate)
           : null,
         skuCode: order.skuCode ?? '',
         quantity: order.quantity ?? 0,
@@ -130,6 +214,7 @@ export class ProductionCuttingService {
         cuttingStatus: cuttingStatus === 'completed' ? 'completed' : 'pending',
         actualCutTotal: this.sumActualCut(cutting?.actualCutRows ?? null),
         cuttingCost: cutting?.cuttingCost ?? null,
+        actualFabricMeters: actualFabricMap.get(order.id) ?? null,
         timeRating: '-',
       });
     }
@@ -155,7 +240,7 @@ export class ProductionCuttingService {
     return this.buildCuttingRows(query);
   }
 
-  /** 裁床列表用：订单数量/实裁数量按尺码明细（悬停展示，与订单列表数量追踪同结构） */
+  /** 裁床列表用：订单数量/裁床数量按尺码明细（悬停展示，与订单列表数量追踪同结构） */
   async getQuantityBreakdown(orderId: number): Promise<{ headers: string[]; rows: Array<{ label: string; values: (number | null)[] }> }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -190,7 +275,7 @@ export class ProductionCuttingService {
     const cutPerSize = buildPerSize(cutting?.actualCutRows ?? null);
     const rows: Array<{ label: string; values: (number | null)[] }> = [];
     if (orderPerSize) rows.push({ label: '订单数量', values: orderPerSize });
-    if (cutPerSize) rows.push({ label: '实裁数量', values: cutPerSize });
+    if (cutPerSize) rows.push({ label: '裁床数量', values: cutPerSize });
     return { headers, rows };
   }
 
@@ -213,11 +298,14 @@ export class ProductionCuttingService {
     return { colorSizeHeaders, colorSizeRows };
   }
 
-  /** 裁床登记完成：写入实裁数量与裁剪成本，订单状态改为待车缝 */
+  /** 裁床登记完成：写入裁床数量与裁剪成本，订单状态改为待车缝 */
   async completeCutting(
     orderId: number,
     cuttingCost: string,
     actualCutRows: ActualCutRow[],
+    cuttingDepartment?: string | null,
+    cutterName?: string | null,
+    actualFabricMeters?: string | null,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -232,6 +320,13 @@ export class ProductionCuttingService {
     const costNorm = cuttingCost === null || cuttingCost === undefined || String(cuttingCost).trim() === '' ? '0' : String(cuttingCost).trim();
 
     let cutting = await this.cuttingRepo.findOne({ where: { orderId } });
+    const [hasColumns, hasFabricCol] = await Promise.all([
+      this.hasCuttingDepartmentAndCutter(),
+      this.hasActualFabricMeters(),
+    ]);
+    const depNorm = (cuttingDepartment ?? '').trim();
+    const cutterNorm = (cutterName ?? '').trim();
+    const fabricNorm = actualFabricMeters == null || String(actualFabricMeters).trim() === '' ? null : String(actualFabricMeters).trim();
     if (!cutting) {
       cutting = this.cuttingRepo.create({
         orderId,
@@ -241,12 +336,26 @@ export class ProductionCuttingService {
         cuttingCost: costNorm,
         actualCutRows: actualCutRows?.length ? actualCutRows : null,
       });
+      if (hasColumns) {
+        (cutting as any).cuttingDepartment = depNorm || null;
+        (cutting as any).cutterName = cutterNorm || null;
+      }
+      if (hasFabricCol) {
+        (cutting as any).actualFabricMeters = fabricNorm;
+      }
     } else {
       cutting.status = 'completed';
       cutting.arrivedAt = cutting.arrivedAt ?? arrivedAt;
       cutting.completedAt = now;
       cutting.cuttingCost = costNorm;
       cutting.actualCutRows = actualCutRows?.length ? actualCutRows : null;
+      if (hasColumns) {
+        (cutting as any).cuttingDepartment = depNorm || null;
+        (cutting as any).cutterName = cutterNorm || null;
+      }
+      if (hasFabricCol) {
+        (cutting as any).actualFabricMeters = fabricNorm;
+      }
     }
     await this.cuttingRepo.save(cutting);
 

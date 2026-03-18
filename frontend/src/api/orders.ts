@@ -17,7 +17,7 @@ export interface OrderListItem {
   merchandiser: string
   /** 数量 */
   quantity: number
-  /** 实裁总件数（来自裁床登记），可为空 */
+  /** 裁床总件数（来自裁床登记），可为空 */
   actualCutTotal?: number | null
   /** 车缝完成件数，可为空 */
   sewingQuantity?: number | null
@@ -78,7 +78,13 @@ export interface OrderListQuery {
   merchandiser?: string
   orderDateStart?: string
   orderDateEnd?: string
+  /** 完成时间开始（YYYY-MM-DD，仅对已完成订单生效） */
+  completedStart?: string
+  /** 完成时间结束（YYYY-MM-DD，仅对已完成订单生效） */
+  completedEnd?: string
+  /** 客户交期开始（兼容旧参数） */
   customerDueStart?: string
+  /** 客户交期结束（兼容旧参数） */
   customerDueEnd?: string
   factory?: string
   status?: string
@@ -192,6 +198,19 @@ export interface OrderSizeBreakdownRes {
 /** 订单尺码数量追踪明细（列表数量悬停用） */
 export function getOrderSizeBreakdown(id: number) {
   return request.get<OrderSizeBreakdownRes>(`/orders/${id}/size-breakdown`)
+}
+
+export interface OrderColorSizeBreakdownRes {
+  headers: string[]
+  rows: Array<{
+    colorName: string
+    values: number[]
+  }>
+}
+
+/** 订单颜色尺码数量明细（待入库数量悬停用） */
+export function getOrderColorSizeBreakdown(id: number) {
+  return request.get<OrderColorSizeBreakdownRes>(`/orders/${id}/color-size-breakdown`)
 }
 
 export interface OrderOperationLogItem {

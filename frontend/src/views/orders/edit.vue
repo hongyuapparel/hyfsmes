@@ -83,7 +83,7 @@
           </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="合作方式">
+            <el-form-item label="合作方式" prop="collaborationTypeId">
               <el-select
                 v-model="form.collaborationTypeId"
                 placeholder="选择合作方式"
@@ -101,7 +101,7 @@
           </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="订单类型">
+            <el-form-item label="订单类型" prop="orderTypeId">
               <el-tree-select
                 v-model="form.orderTypeId"
                 :data="orderTypeTreeSelectData"
@@ -140,7 +140,7 @@
           </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="客户交期">
+            <el-form-item label="客户交期" prop="customerDueDate">
               <el-date-picker
                 v-model="form.customerDueDate"
                 type="date"
@@ -643,6 +643,11 @@
             </el-select>
           </template>
         </el-table-column>
+        <el-table-column label="部位" min-width="140">
+          <template #default="{ row }">
+            <el-input v-model="row.part" placeholder="如：前幅 / 后幅 / 袖子" />
+          </template>
+        </el-table-column>
         <el-table-column label="工艺说明 / 备注" min-width="200">
           <template #default="{ row }">
             <el-input v-model="row.remark" placeholder="说明 / 备注" />
@@ -880,10 +885,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createOrderDraft,
   getOrderDetail,
@@ -899,12 +904,21 @@ import { getDictItems } from '@/api/dicts'
 import { Delete, CircleClose } from '@element-plus/icons-vue'
 import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
 import { getProducts, type ProductItem } from '@/api/products'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 
+/** 用于「再回订单编辑时打开上次编辑的订单」的 sessionStorage 键 */
+const ORDERS_LAST_EDIT_ID = 'orders_last_edit_id'
+
 const formRef = ref<FormInstance>()
 const pageLoading = ref(false)
+
+/** 是否有未保存的修改（用于离开前提示） */
+const hasUnsavedChanges = ref(false)
+/** 在 loadDetail / 初始化赋值时置 true，避免把“程序赋值”当成用户修改 */
+let skipDirtyCheck = false
 
 // 订单 ID：首次从路由参数初始化，之后在新建草稿成功后仅更新本地状态，避免再次路由跳转导致「新页面」感
 const orderId = ref<number | undefined>(undefined)
@@ -951,6 +965,9 @@ const form = reactive<OrderFormPayload>({
 const rules: FormRules = {
   skuCode: [{ required: true, message: '请选择 SKU', trigger: 'change' }],
   customerId: [{ required: true, message: '请选择客户', trigger: 'change' }],
+  collaborationTypeId: [{ required: true, message: '请选择合作方式', trigger: 'change' }],
+  orderTypeId: [{ required: true, message: '请选择订单类型', trigger: 'change' }],
+  customerDueDate: [{ required: true, message: '请选择客户交期', trigger: 'change' }],
 }
 
 // SKU 选择弹窗（从产品列表中选择）
@@ -1680,6 +1697,7 @@ async function copySizeInfoToClipboard() {
 interface ProcessRow {
   processName?: string
   supplierName?: string
+  part?: string
   remark?: string
 }
 
@@ -1845,6 +1863,39 @@ function removeAttachment(index: number) {
   attachments.value.splice(index, 1)
 }
 
+// 监听表单与各区块数据变化，用于离开前未保存提示（程序赋值时用 skipDirtyCheck 忽略）
+watch(
+  () => [
+    form,
+    colorRows.value,
+    sizeHeaders.value,
+    materials.value,
+    sizeMetaHeaders.value,
+    sizeInfoRows.value,
+    processItems.value,
+    productionRequirement.value,
+    packagingHeaders.value,
+    packagingCells.value,
+    packagingMethod.value,
+    attachments.value,
+  ],
+  () => {
+    if (!skipDirtyCheck) hasUnsavedChanges.value = true
+  },
+  { deep: true },
+)
+
+onBeforeRouteLeave((_to, _from, next) => {
+  if (!hasUnsavedChanges.value) return next()
+  ElMessageBox.confirm('当前有未保存的内容，离开后将无法恢复，确定要离开吗？', '提示', {
+    confirmButtonText: '确定离开',
+    cancelButtonText: '取消',
+    type: 'warning',
+  })
+    .then(() => next())
+    .catch(() => next(false))
+})
+
 // 订单图片点击上传
 const orderImageFileInputRef = ref<HTMLInputElement | null>(null)
 
@@ -1893,6 +1944,8 @@ function checkRequiredFields(): boolean {
   const missing: string[] = []
   if (!form.skuCode || !String(form.skuCode).trim()) missing.push('SKU')
   if (form.customerId == null || form.customerId === undefined) missing.push('客户')
+  if (form.collaborationTypeId == null || form.collaborationTypeId === undefined) missing.push('合作方式')
+  if ((form as any).orderTypeId == null || (form as any).orderTypeId === undefined) missing.push('订单类型')
   if (!form.customerDueDate) missing.push('客户交期')
 
   if (missing.length) {
@@ -1955,6 +2008,8 @@ async function onSaveDraft() {
       ElMessage.success('草稿已保存')
       orderStatus.value = (res.data as any)?.status ?? orderStatus.value
       orderNo.value = res.data?.orderNo ?? orderNo.value
+      hasUnsavedChanges.value = false
+      sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(orderId.value))
     } else {
       const res = await createOrderDraft(payload)
       ElMessage.success('草稿已创建')
@@ -1963,7 +2018,11 @@ async function onSaveDraft() {
       orderNo.value = res.data?.orderNo ?? ''
       if (id) {
         orderId.value = id
+        sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(id))
+        // 将 URL 更新为带 id 的编辑页，切到别页再切回同一标签时仍为该订单，不会变成空白新建页
+        router.replace({ name: 'OrdersEdit', params: { id: String(id) } })
       }
+      hasUnsavedChanges.value = false
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -1983,15 +2042,20 @@ async function onSaveAndSubmit() {
       ElMessage.success('提交成功')
       orderNo.value = res.data?.orderNo ?? orderNo.value
       orderStatus.value = (res.data as any)?.status ?? orderStatus.value
+      hasUnsavedChanges.value = false
+      sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(orderId.value))
     } else {
       const draftRes = await createOrderDraft(payload)
       const id = draftRes.data?.id
       if (id) {
         orderId.value = id
+        sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(id))
+        router.replace({ name: 'OrdersEdit', params: { id: String(id) } })
         const res = await submitOrder(id)
         orderNo.value = res.data?.orderNo ?? draftRes.data?.orderNo ?? ''
         ElMessage.success('提交成功')
         orderStatus.value = (res.data as any)?.status ?? orderStatus.value
+        hasUnsavedChanges.value = false
       }
     }
   } catch (e: unknown) {
@@ -2009,6 +2073,7 @@ async function loadDetail() {
     return
   }
   try {
+    skipDirtyCheck = true
     const res = await getOrderDetail(orderId.value)
     const d = res.data
     if (!d) return
@@ -2073,6 +2138,7 @@ async function loadDetail() {
     processItems.value = ((d as any).processItems ?? []).map((p: any) => ({
       processName: p.processName ?? '',
       supplierName: p.supplierName ?? '',
+      part: p.part ?? '',
       remark: p.remark ?? '',
     }))
     // F 区
@@ -2091,7 +2157,13 @@ async function loadDetail() {
     packagingMethod.value = (d as any).packagingMethod ?? ''
     // H 区
     attachments.value = ((d as any).attachments ?? []) as string[]
+    sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(orderId.value))
+    nextTick(() => {
+      hasUnsavedChanges.value = false
+      skipDirtyCheck = false
+    })
   } catch (e: unknown) {
+    skipDirtyCheck = false
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
 }
@@ -2101,6 +2173,22 @@ function goBack() {
 }
 
 onMounted(async () => {
+  // 明确「新建订单」入口：清除上次编辑 id，显示空白表单
+  if (route.query.new === '1') {
+    sessionStorage.removeItem(ORDERS_LAST_EDIT_ID)
+  }
+  // 从侧边栏/菜单点「订单编辑」且无 id 时：若有上次编辑的订单，则进入该订单编辑页，保持内容一致
+  if (!route.params.id && route.query.new !== '1') {
+    const lastId = sessionStorage.getItem(ORDERS_LAST_EDIT_ID)
+    if (lastId) {
+      const n = Number(lastId)
+      if (!Number.isNaN(n) && n > 0) {
+        router.replace({ name: 'OrdersEdit', params: { id: lastId } })
+        orderId.value = n
+      }
+    }
+  }
+
   if (orderId.value) {
     pageLoading.value = true
   }
@@ -2122,8 +2210,31 @@ onMounted(async () => {
     ])
     // 物料类型：旧订单可能只存了 materialType 字符串，这里在字典和明细都加载完后做一次自动映射
     syncMaterialTypeIdsFromLabel()
+    // 新建订单时业务员默认为当前登录账号，并保证下拉中可选项包含当前用户
+    if (!orderId.value) {
+      const authStore = useAuthStore()
+      if (authStore.user) {
+        const label = authStore.user.displayName || authStore.user.username
+        if (!form.salesperson) form.salesperson = label
+        const exists = salespersonOptions.value.some(
+          (u) => (u.displayName || u.username) === label
+        )
+        if (!exists) {
+          salespersonOptions.value.unshift({
+            id: authStore.user.id,
+            username: authStore.user.username,
+            displayName: authStore.user.displayName ?? '',
+          })
+        }
+      }
+    }
   } finally {
     pageLoading.value = false
+    // 初始化完成后不视为“未保存”，避免新建订单的默认值触发离开提示
+    nextTick(() => {
+      hasUnsavedChanges.value = false
+      skipDirtyCheck = false
+    })
   }
 })
 </script>
@@ -2311,20 +2422,42 @@ onMounted(async () => {
   align-items: center;
   justify-content: center;
   width: 100%;
-  padding-right: 24px;
+  box-sizing: border-box;
+  padding-right: 10px;
 }
 .b-header-input {
   width: 100%;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.b-header-input :deep(.el-input__wrapper) {
+  padding-left: 1px;
+  padding-right: 1px;
+}
+.b-header-input :deep(.el-input__inner) {
   text-align: center;
 }
 .b-header-remove {
   position: absolute;
   top: 50%;
+  /* 放在“输入框右侧预留空白(10px)”内，不遮挡输入框 */
   right: 2px;
   transform: translateY(-50%);
-  padding: 2px;
+  width: 6px;
+  height: 10px;
+  padding: 0;
+  min-height: 10px;
+  min-width: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0;
   transition: opacity 0.15s;
+}
+.b-header-remove :deep(.el-icon) {
+  font-size: 8px;
+  line-height: 8px;
 }
 .b-header-cell:hover .b-header-remove {
   opacity: 1;
@@ -2362,8 +2495,8 @@ onMounted(async () => {
 }
 .size-info-table :deep(.el-input__wrapper),
 .size-info-table :deep(.el-input-number .el-input__wrapper) {
-  padding-left: 6px;
-  padding-right: 6px;
+  padding-left: 4px;
+  padding-right: 4px;
 }
 .size-info-table :deep(.el-input__inner),
 .size-info-table :deep(.el-input-number .el-input__inner) {

@@ -56,6 +56,7 @@ export class ProductsController {
     @Query('companyName') companyName?: string,
     @Query('skuCode') skuCode?: string,
     @Query('productGroupId') productGroupIdStr?: string,
+    @Query('applicablePeopleId') applicablePeopleIdStr?: string,
     @Query('salesperson') salesperson?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
@@ -63,10 +64,12 @@ export class ProductsController {
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
     const productGroupId = productGroupIdStr ? parseInt(productGroupIdStr, 10) : undefined;
+    const applicablePeopleId = applicablePeopleIdStr ? parseInt(applicablePeopleIdStr, 10) : undefined;
     return this.productsService.findAll({
       companyName,
       skuCode,
       productGroupId: Number.isNaN(productGroupId as number) ? undefined : (productGroupId as number),
+      applicablePeopleId: Number.isNaN(applicablePeopleId as number) ? undefined : (applicablePeopleId as number),
       salesperson,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
@@ -112,6 +115,7 @@ export class ProductsController {
       sku_code?: string;
       image_url?: string;
       product_group_id?: number | null;
+      applicable_people_id?: number | null;
       customer_id?: number | null;
       salesperson?: string;
     },
@@ -126,6 +130,7 @@ export class ProductsController {
     body: {
       image_url?: string;
       product_group_id?: number | null;
+      applicable_people_id?: number | null;
       customer_id?: number | null;
       salesperson?: string;
     },

@@ -9,6 +9,14 @@ const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'admin';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
 
 export async function seedAdmin(dataSource: DataSource): Promise<void> {
+  if (process.env.NODE_ENV === 'production') {
+    const usernameIsDefault = !process.env.ADMIN_USERNAME || process.env.ADMIN_USERNAME === 'admin';
+    const passwordIsDefault = !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'admin123';
+    if (usernameIsDefault || passwordIsDefault) {
+      throw new Error('生产环境必须配置 ADMIN_USERNAME 与 ADMIN_PASSWORD，且不能使用默认值 admin/admin123');
+    }
+  }
+
   const roleRepo = dataSource.getRepository(Role);
   const userRepo = dataSource.getRepository(User);
   const permRepo = dataSource.getRepository(Permission);

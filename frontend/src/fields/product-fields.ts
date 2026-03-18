@@ -10,8 +10,9 @@ export const PRODUCT_FIELDS: FieldDefinition[] = [
   { code: 'skuCode', label: 'SKU编号', type: 'text', order: 2, filterable: true, placeholder: '输入SKU编号' },
   { code: 'imageUrl', label: '图片', type: 'image', order: 3, filterable: false, placeholder: '图片URL' },
   { code: 'productGroup', label: '产品分组', type: 'select', order: 4, filterable: true, optionsKey: 'productGroups', placeholder: '选择产品分组' },
-  { code: 'companyName', label: '客户', type: 'select', order: 5, filterable: true, optionsKey: 'customers', placeholder: '选择客户' },
-  { code: 'salesperson', label: '业务员', type: 'select', order: 6, filterable: true, optionsKey: 'salespeople', placeholder: '选择业务员' },
+  { code: 'applicablePeople', label: '适用人群', type: 'select', order: 5, filterable: true, optionsKey: 'applicablePeople', placeholder: '选择适用人群' },
+  { code: 'companyName', label: '客户', type: 'select', order: 6, filterable: true, optionsKey: 'customers', placeholder: '选择客户' },
+  { code: 'salesperson', label: '业务员', type: 'select', order: 7, filterable: true, optionsKey: 'salespeople', placeholder: '选择业务员' },
 ]
 
 /** 按 order 排序后的字段列表 */

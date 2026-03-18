@@ -12,6 +12,8 @@ export interface ProductListQuery {
   skuCode?: string;
   /** 产品分组 ID（system_options.id） */
   productGroupId?: number | null;
+  /** 适用人群 ID（system_options.id） */
+  applicablePeopleId?: number | null;
   salesperson?: string;
   page?: number;
   pageSize?: number;
@@ -38,6 +40,7 @@ export class ProductsService {
       companyName,
       skuCode,
       productGroupId,
+      applicablePeopleId,
       salesperson,
       page = 1,
       pageSize = 20,
@@ -57,12 +60,15 @@ export class ProductsService {
     if (typeof productGroupId === 'number') {
       qb.andWhere('p.product_group_id = :productGroupId', { productGroupId });
     }
+    if (typeof applicablePeopleId === 'number') {
+      qb.andWhere('p.applicable_people_id = :apid', { apid: applicablePeopleId });
+    }
     if (salesperson?.trim()) {
       qb.andWhere('p.salesperson = :salesperson', { salesperson: salesperson.trim() });
     }
 
     const sortColumn = this.toSnakeCase(sortBy);
-    const validSortColumns = ['id', 'sku_code', 'product_group_id', 'created_at', 'salesperson'];
+    const validSortColumns = ['id', 'sku_code', 'product_group_id', 'applicable_people', 'created_at', 'salesperson'];
     if (validSortColumns.includes(sortColumn)) {
       qb.orderBy(`p.${sortColumn}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     }
@@ -72,9 +78,12 @@ export class ProductsService {
 
     const ids = list.map((p) => p.productGroupId).filter((id): id is number => id != null);
     const pathMap = ids.length ? await this.systemOptionsService.getProductGroupPathsByIds(ids) : {};
+    const apIds = list.map((p) => p.applicablePeopleId).filter((id): id is number => id != null);
+    const apLabelMap = apIds.length ? await this.systemOptionsService.getOptionLabelsByIds('applicable_people', apIds) : {};
     const listWithPath = list.map((p) => ({
       ...p,
       productGroup: p.productGroupId != null ? (pathMap[p.productGroupId] ?? '') : '',
+      applicablePeople: p.applicablePeopleId != null ? (apLabelMap[p.applicablePeopleId] ?? '') : '',
     }));
 
     return { list: listWithPath, total, page, pageSize };
@@ -120,6 +129,7 @@ export class ProductsService {
     sku_code?: string;
     image_url?: string;
     product_group_id?: number | null;
+    applicable_people_id?: number | null;
     customer_id?: number | null;
     salesperson?: string;
   }) {
@@ -132,6 +142,7 @@ export class ProductsService {
       skuCode,
       imageUrl: dto.image_url ?? '',
       productGroupId: typeof dto.product_group_id === 'number' ? dto.product_group_id : null,
+      applicablePeopleId: typeof dto.applicable_people_id === 'number' ? dto.applicable_people_id : null,
       customerId: dto.customer_id ?? null,
       salesperson: dto.salesperson ?? '',
     });
@@ -149,6 +160,7 @@ export class ProductsService {
       product_name?: string;
       image_url?: string;
       product_group_id?: number | null;
+      applicable_people_id?: number | null;
       customer_id?: number | null;
       salesperson?: string;
     },
@@ -160,6 +172,8 @@ export class ProductsService {
     if (dto.image_url !== undefined) product.imageUrl = dto.image_url;
     if (dto.product_group_id !== undefined)
       product.productGroupId = typeof dto.product_group_id === 'number' ? dto.product_group_id : null;
+    if (dto.applicable_people_id !== undefined)
+      product.applicablePeopleId = typeof dto.applicable_people_id === 'number' ? dto.applicable_people_id : null;
     if (dto.customer_id !== undefined) product.customerId = dto.customer_id;
     if (dto.salesperson !== undefined) product.salesperson = dto.salesperson;
 

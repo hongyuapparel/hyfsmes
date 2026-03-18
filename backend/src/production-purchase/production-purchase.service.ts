@@ -4,6 +4,8 @@ import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { OrderStatus } from '../entities/order-status.entity';
+import { OrderStatusHistory } from '../entities/order-status-history.entity';
 
 /** 已审单：非草稿、非待审单，即待纸样及之后的状态 */
 const PURCHASE_ORDER_STATUSES = [
@@ -20,6 +22,8 @@ export interface PurchaseItemRow {
   materialIndex: number;
   orderNo: string;
   orderDate: string | null;
+  /** 到待采购状态的时间（订单进入待采购时记录） */
+  pendingPurchaseAt: string | null;
   imageUrl: string;
   skuCode: string;
   /** 订单类型 ID（system_options.id, option_type='order_types'） */
@@ -58,8 +62,35 @@ export class ProductionPurchaseService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    @InjectRepository(OrderStatus)
+    private readonly orderStatusRepo: Repository<OrderStatus>,
+    @InjectRepository(OrderStatusHistory)
+    private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
     private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
+
+  private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 10) || null;
+    if (!(v instanceof Date) || Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+
+  private toDateTimeLocalString(v: Date | string | null | undefined): string | null {
+    if (v == null) return null;
+    if (typeof v === 'string') return v.slice(0, 19).replace('T', ' ') || null;
+    if (!(v instanceof Date) || Number.isNaN(v.getTime())) return null;
+    const y = v.getFullYear();
+    const m = String(v.getMonth() + 1).padStart(2, '0');
+    const d = String(v.getDate()).padStart(2, '0');
+    const hh = String(v.getHours()).padStart(2, '0');
+    const mm = String(v.getMinutes()).padStart(2, '0');
+    const ss = String(v.getSeconds()).padStart(2, '0');
+    return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+  }
 
   /**
    * 采购登记金额类字段统一归一化：
@@ -124,6 +155,35 @@ export class ProductionPurchaseService {
       return { list: [], total: 0, page, pageSize };
     }
 
+    // 到采购时间：从状态历史表中取进入 pending_purchase 的时间（取最新一次进入时间）
+    let pendingPurchaseEnteredAtMap = new Map<number, string>();
+    try {
+      const pendingStatus = await this.orderStatusRepo.findOne({ where: { code: 'pending_purchase' } });
+      const statusId = pendingStatus?.id;
+      if (statusId) {
+        const historyRows = await this.orderStatusHistoryRepo
+          .createQueryBuilder('h')
+          .select('h.order_id', 'orderId')
+          .addSelect('MAX(h.entered_at)', 'enteredAt')
+          .where('h.status_id = :statusId', { statusId })
+          .andWhere('h.order_id IN (:...orderIds)', { orderIds })
+          .groupBy('h.order_id')
+          .getRawMany<{ orderId: number; enteredAt: string }>();
+        const map = new Map<number, string>();
+        for (const r of historyRows) {
+          const orderId = Number((r as any)?.orderId);
+          const enteredAt = (r as any)?.enteredAt as string | undefined;
+          if (!Number.isFinite(orderId) || !enteredAt) continue;
+          const formatted = this.toDateTimeLocalString(enteredAt);
+          if (!formatted) continue;
+          map.set(orderId, formatted);
+        }
+        pendingPurchaseEnteredAtMap = map;
+      }
+    } catch {
+      pendingPurchaseEnteredAtMap = new Map<number, string>();
+    }
+
     const extList = await this.orderExtRepo.find({
       where: orderIds.map((id) => ({ orderId: id })),
     });
@@ -133,7 +193,8 @@ export class ProductionPurchaseService {
     for (const order of orders) {
       const ext = extMap.get(order.id);
       const materials: OrderMaterialRow[] = ext?.materials ?? [];
-      const orderDate = order.orderDate ? order.orderDate.toISOString().slice(0, 10) : null;
+      const orderDate = this.toDateOnlyLocalString(order.orderDate);
+      const pendingPurchaseAt = pendingPurchaseEnteredAtMap.get(order.id) || null;
 
       for (let i = 0; i < materials.length; i++) {
         const m = materials[i];
@@ -150,6 +211,7 @@ export class ProductionPurchaseService {
           materialIndex: i,
           orderNo: order.orderNo ?? '',
           orderDate: orderDate,
+          pendingPurchaseAt,
           imageUrl: order.imageUrl ?? '',
           skuCode: order.skuCode ?? '',
           orderTypeId: order.orderTypeId ?? null,
@@ -213,7 +275,7 @@ export class ProductionPurchaseService {
       purchaseUnitPrice: this.normalizeDecimalInput(unitPrice),
       purchaseOtherCost: this.normalizeDecimalInput(otherCost),
       purchaseAmount: totalStr,
-      purchaseCompletedAt: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      purchaseCompletedAt: this.toDateTimeLocalString(new Date()),
       purchaseRemark: (remark ?? '').trim() || null,
       purchaseImageUrl: (imageUrl ?? '').trim() || null,
     };

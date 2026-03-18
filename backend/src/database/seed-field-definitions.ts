@@ -6,8 +6,9 @@ const PRODUCT_FIELDS = [
   { code: 'skuCode', label: 'SKU编号', type: 'text', order: 2, visible: 1, filterable: 1, sortable: 0, optionsKey: null },
   { code: 'imageUrl', label: '图片', type: 'image', order: 3, visible: 1, filterable: 0, sortable: 0, optionsKey: null },
   { code: 'productGroup', label: '产品分组', type: 'select', order: 4, visible: 1, filterable: 1, sortable: 0, optionsKey: 'productGroups' },
-  { code: 'companyName', label: '客户(公司名称)', type: 'text', order: 5, visible: 1, filterable: 1, sortable: 0, optionsKey: null },
-  { code: 'salesperson', label: '业务员', type: 'select', order: 6, visible: 1, filterable: 1, sortable: 0, optionsKey: 'salespeople' },
+  { code: 'applicablePeople', label: '适用人群', type: 'select', order: 5, visible: 1, filterable: 1, sortable: 0, optionsKey: 'applicablePeople' },
+  { code: 'companyName', label: '客户(公司名称)', type: 'text', order: 6, visible: 1, filterable: 1, sortable: 0, optionsKey: null },
+  { code: 'salesperson', label: '业务员', type: 'select', order: 7, visible: 1, filterable: 1, sortable: 0, optionsKey: 'salespeople' },
 ];
 
 export async function seedFieldDefinitions(dataSource: DataSource): Promise<void> {
@@ -23,6 +24,28 @@ export async function seedFieldDefinitions(dataSource: DataSource): Promise<void
       { module: 'products', code: 'companyName' },
       { label: '客户' },
     );
+    const hasApplicablePeople = await repo.count({ where: { module: 'products', code: 'applicablePeople' } });
+    if (hasApplicablePeople === 0) {
+      const maxOrderRow = await repo
+        .createQueryBuilder('f')
+        .select('MAX(f.order)', 'maxOrder')
+        .where('f.module = :m', { m: 'products' })
+        .getRawOne<{ maxOrder?: string | number }>();
+      const baseOrder = Number((maxOrderRow as any)?.maxOrder ?? 7) || 7;
+      await repo.save(
+        repo.create({
+          module: 'products',
+          code: 'applicablePeople',
+          label: '适用人群',
+          type: 'select',
+          order: baseOrder + 1,
+          visible: 1,
+          filterable: 1,
+          sortable: 0,
+          optionsKey: 'applicablePeople',
+        }),
+      );
+    }
     return;
   }
 

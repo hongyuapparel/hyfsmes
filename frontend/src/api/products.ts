@@ -8,6 +8,9 @@ export interface ProductItem {
   imageUrl: string
   productGroupId: number | null
   productGroup: string
+  applicablePeopleId: number | null
+  /** 展示用：按 applicablePeopleId 解析出的当前名称 */
+  applicablePeople: string
   customerId: number | null
   salesperson: string
   createdAt: string
@@ -26,6 +29,7 @@ export interface ProductListQuery {
   companyName?: string
   skuCode?: string
   productGroupId?: number | null
+  applicablePeopleId?: number | null
   salesperson?: string
   page?: number
   pageSize?: number

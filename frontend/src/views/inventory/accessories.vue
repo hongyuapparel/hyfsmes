@@ -160,6 +160,7 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             value-format="YYYY-MM-DD"
+            :shortcuts="rangeShortcuts"
             size="large"
             class="filter-bar-item"
             @change="onOutboundSearch(true)"
@@ -347,6 +348,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, type CustomerItem } from '@/api/customers'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import {

@@ -201,7 +201,7 @@ onMounted(async () => {
   align-items: center;
   gap: 12px;
   padding: 0 16px;
-  height: 60px;
+  height: 48px;
   flex-shrink: 0;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -212,9 +212,9 @@ onMounted(async () => {
 }
 
 .brand-logo {
-  width: 36px;
-  height: 36px;
-  min-width: 36px;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
   border-radius: 8px;
   background: var(--color-primary);
   display: flex;
@@ -305,19 +305,25 @@ onMounted(async () => {
   flex: 1;
   overflow-y: auto;
   scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
+/* 滚动条：与深色侧边栏融合，不突兀（遵守设计系统冷色调） */
 .sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar {
-  width: 5px;
-}
-
-.sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
-  border-radius: 3px;
+  width: 4px;
 }
 
 .sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar-track {
   background: transparent;
+}
+
+.sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+.sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.18);
 }
 
 .sidebar-wrapper.collapsed :deep(.el-menu) {

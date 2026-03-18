@@ -60,16 +60,20 @@ export class FinanceIncomeController {
   create(
     @Body('occurDate') occurDate: string,
     @Body('amount') amount: number | string,
+    @Body('payer') payer?: string,
     @Body('departmentId') departmentId?: number | null,
     @Body('bankAccountId') bankAccountId?: number | null,
     @Body('remark') remark?: string,
+    @Body('attachments') attachments?: string[] | null,
   ) {
     return this.service.create({
       occurDate: occurDate!,
       amount: amount!,
+      payer,
       departmentId,
       bankAccountId,
       remark,
+      attachments,
     });
   }
 
@@ -78,16 +82,20 @@ export class FinanceIncomeController {
     @Param('id', ParseIntPipe) id: number,
     @Body('occurDate') occurDate?: string,
     @Body('amount') amount?: number | string,
+    @Body('payer') payer?: string,
     @Body('departmentId') departmentId?: number | null,
     @Body('bankAccountId') bankAccountId?: number | null,
     @Body('remark') remark?: string,
+    @Body('attachments') attachments?: string[] | null,
   ) {
     return this.service.update(id, {
       occurDate,
       amount,
+      payer,
       departmentId,
       bankAccountId,
       remark,
+      attachments,
     });
   }
 
