@@ -395,7 +395,7 @@
           <span>{{ formatMoney(totalCost) }} 元</span>
         </div>
         <div class="result-row profit-row">
-          <span>利润率（小数，如 0.15 表示 15%）</span>
+          <span>利润率（小数，如 0.1 表示 10%）</span>
           <el-input-number
             v-model="profitMargin"
             :min="0"
@@ -454,7 +454,7 @@ const materialRows = ref<MaterialRow[]>([])
 const processItemRows = ref<ProcessItemRow[]>([])
 const productionProcesses = ref<ProductionProcessItem[]>([])
 const productionRows = ref<ProductionRow[]>([])
-const profitMargin = ref(0.15)
+const profitMargin = ref(0.1)
 const applying = ref(false)
 
 const materialTypeOptions = ref<{ id: number; label: string }[]>([])
@@ -532,6 +532,14 @@ const computedExFactoryPrice = computed(() => {
 
 function formatMoney(n: number): string {
   return Number.isNaN(n) ? '0.00' : n.toFixed(2)
+}
+
+function normalizeProfitMargin(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n) || n < 0) return 0.1
+  // 历史默认值兼容：旧数据中的 0.15 视为默认，统一迁移到 0.1
+  if (Math.abs(n - 0.15) < 1e-9) return 0.1
+  return n
 }
 
 const canSaveCost = computed(() => {
@@ -758,7 +766,7 @@ async function loadCostSnapshot() {
       if (Array.isArray(s.materialRows) && s.materialRows.length) materialRows.value = s.materialRows as MaterialRow[]
       if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows as ProcessItemRow[]
       if (Array.isArray(s.productionRows) && s.productionRows.length) productionRows.value = s.productionRows as ProductionRow[]
-      if (typeof s.profitMargin === 'number') profitMargin.value = s.profitMargin
+      if (s.profitMargin !== undefined) profitMargin.value = normalizeProfitMargin(s.profitMargin)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))

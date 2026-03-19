@@ -65,10 +65,24 @@ export class FinishedGoodsStockController {
   outbound(
     @Body('id') id: number,
     @Body('quantity') quantity: number,
+    @Body('pickupUserId') pickupUserId: number | null,
+    @Body('sizeBreakdown') sizeBreakdown: any,
     @Body('remark') remark: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.outbound(Number(id), Number(quantity), user?.username ?? '', remark ?? '');
+    return this.service.outbound(
+      Number(id),
+      Number(quantity),
+      user?.username ?? '',
+      remark ?? '',
+      pickupUserId != null ? Number(pickupUserId) : null,
+      sizeBreakdown ?? null,
+    );
+  }
+
+  @Get('pickup-users')
+  getPickupUsers() {
+    return this.service.getPickupUserOptions();
   }
 
   @Get('items/:id')

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
@@ -9,6 +9,8 @@ import { Product } from '../entities/product.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
 import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-adjust-log.entity';
 import { OrderExt } from '../entities/order-ext.entity';
+import { User, UserStatus } from '../entities/user.entity';
+import { Role } from '../entities/role.entity';
 
 export interface FinishedStockRow {
   id: number;
@@ -46,7 +48,16 @@ export class FinishedGoodsStockService {
     private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(Role)
+    private readonly roleRepo: Repository<Role>,
   ) {}
+
+  private isTableMissingError(e: unknown, tableName: string): boolean {
+    const msg = String((e as any)?.message || '');
+    return msg.includes('Table') && msg.includes(tableName) && msg.includes("doesn't exist");
+  }
 
   /** 手动新增成品库存（仓库直接入库）；订单号可选，不填则不关联订单 */
   async createManual(dto: {
@@ -294,7 +305,14 @@ export class FinishedGoodsStockService {
   }
 
   /** 出库：减少已入库成品数量 */
-  async outbound(id: number, quantity: number, operatorUsername: string, remark: string): Promise<void> {
+  async outbound(
+    id: number,
+    quantity: number,
+    operatorUsername: string,
+    remark: string,
+    pickupUserId?: number | null,
+    sizeBreakdown?: any,
+  ): Promise<void> {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) {
       throw new NotFoundException('库存记录不存在');
@@ -306,29 +324,67 @@ export class FinishedGoodsStockService {
     if (q > stock.quantity) {
       throw new NotFoundException('出库数量不能大于当前库存');
     }
-    const order = stock.orderId != null ? await this.orderRepo.findOne({ where: { id: stock.orderId } }) : null;
+    const [order, product] = await Promise.all([
+      stock.orderId != null ? this.orderRepo.findOne({ where: { id: stock.orderId } }) : Promise.resolve(null),
+      stock.skuCode?.trim() ? this.productRepo.findOne({ where: { skuCode: stock.skuCode.trim() } }) : Promise.resolve(null),
+    ]);
 
-    stock.quantity -= q;
-    if (stock.quantity === 0) {
-      await this.stockRepo.remove(stock);
-    } else {
-      await this.stockRepo.save(stock);
+    let pickupUserName = '';
+    let pickupId: number | null = null;
+    if (pickupUserId != null) {
+      const salespersonRole = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
+      if (!salespersonRole) throw new NotFoundException('未配置业务员角色');
+      const pickupUser = await this.userRepo.findOne({
+        where: { id: Number(pickupUserId), roleId: salespersonRole.id, status: UserStatus.ACTIVE },
+      });
+      if (!pickupUser) throw new NotFoundException('领走人不存在或不是在职业务员');
+      pickupId = pickupUser.id;
+      pickupUserName = (pickupUser.displayName?.trim() || pickupUser.username || '').trim();
     }
 
-    const out = this.outboundRepo.create({
-      finishedStockId: id,
-      orderId: stock.orderId,
-      orderNo: order?.orderNo ?? '',
-      skuCode: stock.skuCode ?? '',
-      customerName: stock.customerName ?? '',
-      quantity: q,
-      department: stock.department?.trim() ?? '',
-      warehouseId: stock.warehouseId ?? null,
-      inventoryTypeId: stock.inventoryTypeId ?? null,
-      operatorUsername: (operatorUsername ?? '').trim(),
-      remark: (remark ?? '').trim(),
-    });
-    await this.outboundRepo.save(out);
+    try {
+      await this.stockRepo.manager.transaction(async (manager) => {
+        const txStockRepo = manager.getRepository(FinishedGoodsStock);
+        const txOutboundRepo = manager.getRepository(FinishedGoodsOutbound);
+        const txStock = await txStockRepo.findOne({ where: { id } });
+        if (!txStock) throw new NotFoundException('库存记录不存在');
+        if (q > txStock.quantity) throw new NotFoundException('出库数量不能大于当前库存');
+
+        txStock.quantity -= q;
+        if (txStock.quantity === 0) {
+          await txStockRepo.remove(txStock);
+        } else {
+          await txStockRepo.save(txStock);
+        }
+
+        const out = txOutboundRepo.create({
+          finishedStockId: id,
+          orderId: stock.orderId,
+          orderNo: order?.orderNo ?? '',
+          skuCode: stock.skuCode ?? '',
+          imageUrl: stock.imageUrl?.trim() || product?.imageUrl?.trim() || '',
+          customerName: stock.customerName ?? '',
+          quantity: q,
+          department: stock.department?.trim() ?? '',
+          warehouseId: stock.warehouseId ?? null,
+          inventoryTypeId: stock.inventoryTypeId ?? null,
+          pickupUserId: pickupId,
+          pickupUserName,
+          sizeBreakdown: sizeBreakdown ?? null,
+          operatorUsername: (operatorUsername ?? '').trim(),
+          remark: (remark ?? '').trim(),
+        });
+        await txOutboundRepo.save(out);
+      });
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (msg.includes("Table") && msg.includes("finished_goods_outbound") && msg.includes("doesn't exist")) {
+        throw new InternalServerErrorException(
+          "出库记录表不存在，请先执行 backend/scripts/create-finished-goods-outbound.sql",
+        );
+      }
+      throw e;
+    }
   }
 
   async getOutboundRecords(params: {
@@ -339,23 +395,94 @@ export class FinishedGoodsStockService {
     endDate?: string;
     page?: number;
     pageSize?: number;
-  }): Promise<{ list: FinishedGoodsOutbound[]; total: number; page: number; pageSize: number }> {
+  }): Promise<{
+    list: Array<
+      Omit<FinishedGoodsOutbound, 'createdAt'> & {
+        createdAt: string;
+        imageUrl?: string;
+      }
+    >;
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     const { orderNo, skuCode, customerName, startDate, endDate, page = 1, pageSize = 20 } = params;
-    const qb = this.outboundRepo.createQueryBuilder('o');
-    if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
-    if (skuCode?.trim()) qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
-    if (customerName?.trim()) {
-      qb.andWhere('o.customer_name LIKE :customerName', { customerName: `%${customerName.trim()}%` });
+    const buildQb = (withSnapshotImage: boolean) => {
+      const qb = this.outboundRepo
+        .createQueryBuilder('o')
+        // 兼容历史表排序规则不一致，避免 Illegal mix of collations
+        .leftJoin(Product, 'p', 'p.sku_code COLLATE utf8mb4_general_ci = o.sku_code COLLATE utf8mb4_general_ci')
+        .select([
+          'o.id AS id',
+          'o.finished_stock_id AS finishedStockId',
+          'o.order_id AS orderId',
+          'o.order_no AS orderNo',
+          'o.sku_code AS skuCode',
+          ...(withSnapshotImage ? ['o.image_url AS imageUrlSnapshot'] : []),
+          'o.customer_name AS customerName',
+          'o.quantity AS quantity',
+          'o.department AS department',
+          'o.warehouse_id AS warehouseId',
+          'o.inventory_type_id AS inventoryTypeId',
+          'o.pickup_user_id AS pickupUserId',
+          'o.pickup_user_name AS pickupUserName',
+          'o.size_breakdown AS sizeBreakdown',
+          'o.operator_username AS operatorUsername',
+          'o.remark AS remark',
+          'o.created_at AS createdAt',
+          withSnapshotImage
+            ? "COALESCE(NULLIF(o.image_url, ''), p.image_url, '') AS imageUrl"
+            : "COALESCE(p.image_url, '') AS imageUrl",
+        ]);
+      if (orderNo?.trim()) qb.andWhere('o.order_no COLLATE utf8mb4_general_ci LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
+      if (skuCode?.trim()) qb.andWhere('o.sku_code COLLATE utf8mb4_general_ci LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
+      if (customerName?.trim()) {
+        qb.andWhere('o.customer_name COLLATE utf8mb4_general_ci LIKE :customerName', { customerName: `%${customerName.trim()}%` });
+      }
+      if (startDate?.trim()) qb.andWhere('o.created_at >= :start', { start: `${startDate.trim()} 00:00:00` });
+      if (endDate?.trim()) qb.andWhere('o.created_at <= :end', { end: `${endDate.trim()} 23:59:59` });
+      qb.orderBy('o.created_at', 'DESC');
+      return qb;
+    };
+    let total = 0;
+    let list: any[] = [];
+    try {
+      const qb = buildQb(true);
+      total = await qb.getCount();
+      list = await qb
+        .skip((page - 1) * pageSize)
+        .take(pageSize)
+        .getRawMany<any>();
+    } catch (e: any) {
+      const msg = String(e?.message || '');
+      if (!(msg.includes("Unknown column") && msg.includes('o.image_url'))) throw e;
+      const qb = buildQb(false);
+      total = await qb.getCount();
+      list = await qb
+        .skip((page - 1) * pageSize)
+        .take(pageSize)
+        .getRawMany<any>();
     }
-    if (startDate?.trim()) qb.andWhere('o.created_at >= :start', { start: `${startDate.trim()} 00:00:00` });
-    if (endDate?.trim()) qb.andWhere('o.created_at <= :end', { end: `${endDate.trim()} 23:59:59` });
-    qb.orderBy('o.created_at', 'DESC');
-    const total = await qb.getCount();
-    const list = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getMany();
-    return { list, total, page, pageSize };
+    const rows = list.map((r: any) => ({
+      id: Number(r.id),
+      finishedStockId: Number(r.finishedStockId),
+      orderId: r.orderId != null ? Number(r.orderId) : null,
+      orderNo: r.orderNo ?? '',
+      skuCode: r.skuCode ?? '',
+      imageUrl: r.imageUrl || r.imageUrlSnapshot || '',
+      customerName: r.customerName ?? '',
+      quantity: Number(r.quantity) || 0,
+      department: r.department ?? '',
+      warehouseId: r.warehouseId != null ? Number(r.warehouseId) : null,
+      inventoryTypeId: r.inventoryTypeId != null ? Number(r.inventoryTypeId) : null,
+      pickupUserId: r.pickupUserId != null ? Number(r.pickupUserId) : null,
+      pickupUserName: r.pickupUserName ?? '',
+      sizeBreakdown: r.sizeBreakdown ?? null,
+      operatorUsername: r.operatorUsername ?? '',
+      remark: r.remark ?? '',
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
+    }));
+    return { list: rows, total, page, pageSize };
   }
 
   async getDetail(id: number): Promise<{
@@ -369,13 +496,23 @@ export class FinishedGoodsStockService {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('库存记录不存在');
 
-    const [order, product, colorImages, logs, ext] = await Promise.all([
+    const [order, product, ext] = await Promise.all([
       stock.orderId != null ? this.orderRepo.findOne({ where: { id: stock.orderId } }) : Promise.resolve(null),
       stock.skuCode?.trim() ? this.productRepo.findOne({ where: { skuCode: stock.skuCode.trim() } }) : Promise.resolve(null),
-      this.colorImageRepo.find({ where: { finishedStockId: id }, order: { updatedAt: 'DESC' } }),
-      this.adjustLogRepo.find({ where: { finishedStockId: id }, order: { createdAt: 'DESC' }, take: 50 }),
       stock.orderId != null ? this.orderExtRepo.findOne({ where: { orderId: stock.orderId } }) : Promise.resolve(null),
     ]);
+    let colorImages: FinishedGoodsStockColorImage[] = [];
+    let logs: FinishedGoodsStockAdjustLog[] = [];
+    try {
+      colorImages = await this.colorImageRepo.find({ where: { finishedStockId: id }, order: { updatedAt: 'DESC' } });
+    } catch (e) {
+      if (!this.isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+    }
+    try {
+      logs = await this.adjustLogRepo.find({ where: { finishedStockId: id }, order: { createdAt: 'DESC' }, take: 50 });
+    } catch (e) {
+      if (!this.isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
+    }
 
     const headers = Array.isArray(ext?.colorSizeHeaders) ? ext!.colorSizeHeaders! : [];
     const rows = Array.isArray(ext?.colorSizeRows) ? ext!.colorSizeRows! : [];
@@ -444,15 +581,19 @@ export class FinishedGoodsStockService {
       before.location !== after.location;
 
     if (changed) {
-      await this.adjustLogRepo.save(
-        this.adjustLogRepo.create({
-          finishedStockId: id,
-          operatorUsername: (operatorUsername ?? '').trim(),
-          before,
-          after,
-          remark: (dto.remark ?? '').trim(),
-        }),
-      );
+      try {
+        await this.adjustLogRepo.save(
+          this.adjustLogRepo.create({
+            finishedStockId: id,
+            operatorUsername: (operatorUsername ?? '').trim(),
+            before,
+            after,
+            remark: (dto.remark ?? '').trim(),
+          }),
+        );
+      } catch (e) {
+        if (!this.isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
+      }
     }
 
     return saved;
@@ -469,12 +610,36 @@ export class FinishedGoodsStockService {
     const imageUrl = (dto.imageUrl ?? '').trim();
     if (!imageUrl) throw new NotFoundException('图片不能为空');
 
-    const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: id, colorName } });
-    if (existing) {
-      existing.imageUrl = imageUrl;
-      await this.colorImageRepo.save(existing);
-      return;
+    try {
+      const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: id, colorName } });
+      if (existing) {
+        existing.imageUrl = imageUrl;
+        await this.colorImageRepo.save(existing);
+        return;
+      }
+      await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: id, colorName, imageUrl }));
+    } catch (e) {
+      if (this.isTableMissingError(e, 'finished_goods_stock_color_images')) {
+        throw new InternalServerErrorException(
+          '库存详情图片表不存在，请先执行 backend/scripts/create-finished-goods-stock-detail-tables.sql',
+        );
+      }
+      throw e;
     }
-    await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: id, colorName, imageUrl }));
+  }
+
+  /** 领走人下拉：仅业务员角色的在职账号 */
+  async getPickupUserOptions(): Promise<Array<{ id: number; username: string; displayName: string }>> {
+    const role = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
+    if (!role) return [];
+    const users = await this.userRepo.find({
+      where: { roleId: role.id, status: UserStatus.ACTIVE },
+      order: { displayName: 'ASC' },
+    });
+    return users.map((u) => ({
+      id: u.id,
+      username: u.username,
+      displayName: u.displayName ?? '',
+    }));
   }
 }

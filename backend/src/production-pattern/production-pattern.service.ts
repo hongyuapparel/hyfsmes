@@ -290,7 +290,8 @@ export class ProductionPatternService {
 
       const arrivedAtPattern =
         arrivedAtPatternMap.get(order.id) ??
-        (order.status === 'pending_pattern' && order.statusTime ? this.toDateTimeLocalString(order.statusTime) : null);
+        this.toDateTimeLocalString(order.statusTime) ??
+        this.toDateTimeLocalString(pattern?.completedAt ?? null);
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',

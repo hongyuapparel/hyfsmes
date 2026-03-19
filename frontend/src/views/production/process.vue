@@ -116,11 +116,13 @@
 
     <!-- 有工艺项目的订单列表 -->
     <el-table
+      ref="craftTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="craft-table"
+      @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -139,6 +141,7 @@
             :src="row.imageUrl"
             fit="cover"
             class="table-thumb"
+            :preview-teleported="true"
             :preview-src-list="[row.imageUrl]"
           />
           <span v-else class="text-muted">-</span>
@@ -184,9 +187,11 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCraftItems, completeCraft, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
+import { getOrderDetail } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const CRAFT_TABS = [
   { label: '全部', value: 'all' },
@@ -265,6 +270,7 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<CraftListItem[]>([])
+const craftTableRef = ref()
 const loading = ref(false)
 const completing = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -273,6 +279,49 @@ const hasSelection = computed(() => selectedRows.value.length > 0)
 const canCompleteSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.craftStatus !== 'completed'),
 )
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-craft-main')
+
+function buildCraftSummaryFromOrderDetail(detail: any): { supplierName: string; processItem: string } {
+  const items = Array.isArray(detail?.processItems) ? detail.processItems : []
+  const suppliers = Array.from(
+    new Set(
+      items
+        .map((p: any) => (p?.supplierName ?? '').trim())
+        .filter((v: string) => !!v),
+    ),
+  )
+  const processes = Array.from(
+    new Set(
+      items
+        .map((p: any) => (p?.processName ?? '').trim())
+        .filter((v: string) => !!v),
+    ),
+  )
+  return {
+    supplierName: suppliers.join(' / '),
+    processItem: processes.join(' / '),
+  }
+}
+
+async function enrichCraftRowsFromOrderDetail(rows: CraftListItem[]) {
+  if (!rows.length) return rows
+  const enriched = await Promise.all(
+    rows.map(async (row) => {
+      try {
+        const res = await getOrderDetail(row.orderId)
+        const summary = buildCraftSummaryFromOrderDetail(res.data as any)
+        return {
+          ...row,
+          supplierName: summary.supplierName,
+          processItem: summary.processItem,
+        } as CraftListItem
+      } catch {
+        return row
+      }
+    }),
+  )
+  return enriched
+}
 
 function getTabLabel(tab: CraftTabConfig): string {
   const counts = tabCounts.value
@@ -336,8 +385,11 @@ async function load() {
     const res = await getCraftItems(buildQuery())
     const data = res.data
     if (data) {
-      list.value = data.list ?? []
+      const baseRows = data.list ?? []
+      // 强制以订单编辑 E 区 processItems 为准覆盖展示，避免供应商显示成旧来源
+      list.value = await enrichCraftRowsFromOrderDetail(baseRows)
       pagination.total = data.total ?? 0
+      restoreColumnWidths(craftTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))

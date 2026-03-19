@@ -22,6 +22,7 @@ export class ProductionCraftController {
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
@@ -38,7 +39,7 @@ export class ProductionCraftController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.craftService.getCraftList(query);
+    return this.craftService.getCraftList(query, user?.userId);
   }
 
   @Post('items/complete')

@@ -1511,8 +1511,9 @@ watchEffect(() => {
 
 .order-card-meta {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 10px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   font-size: var(--font-size-caption, 12px);
   color: var(--color-text-muted, #909399);
   line-height: 1.3;

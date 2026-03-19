@@ -45,6 +45,37 @@ export class XiaomanService {
 
   constructor(private config: ConfigService) {}
 
+  /**
+   * 小满 company/list 返回字段在不同账号下会有差异，关键词匹配不能只依赖固定 3 个字段。
+   * 这里对条目里所有可序列化文本做宽松匹配，确保“在小满能搜到”的数据尽量都能被命中。
+   */
+  private matchesKeyword(item: XiaomanCompanyItem, lowerKeyword: string): boolean {
+    const anyItem = item as unknown as Record<string, unknown>
+    for (const value of Object.values(anyItem)) {
+      if (value == null) continue
+      if (typeof value === 'string' || typeof value === 'number') {
+        if (String(value).toLowerCase().includes(lowerKeyword)) return true
+        continue
+      }
+      if (Array.isArray(value)) {
+        for (const v of value) {
+          if ((typeof v === 'string' || typeof v === 'number') && String(v).toLowerCase().includes(lowerKeyword)) {
+            return true
+          }
+        }
+        continue
+      }
+      if (typeof value === 'object') {
+        for (const nested of Object.values(value as Record<string, unknown>)) {
+          if ((typeof nested === 'string' || typeof nested === 'number') && String(nested).toLowerCase().includes(lowerKeyword)) {
+            return true
+          }
+        }
+      }
+    }
+    return false
+  }
+
   private getBaseUrl(): string {
     return this.config.get<string>('XIAOMAN_API_BASE_URL') ?? process.env.XIAOMAN_API_BASE_URL ?? DEFAULT_BASE_URL;
   }
@@ -97,22 +128,45 @@ export class XiaomanService {
     const hasKeyword = !!kw;
 
     // 只取「客户列表」中的客户（all=0 排除公海）
-    const baseParams = '&removed=0&all=0';
+    // const baseParams = '&removed=0&all=0';
+    const baseParams = '&all=0';
 
     // 有搜索关键词：由于小满接口文档未说明 keyword 的行为，实际测试发现它并不会稳定按关键字过滤，
     // 所以这里改为「拉取客户列表（all=0）+ 本地模糊匹配」。
     // 为了避免多次请求导致的超时/断线，这里加缓存 + 多页拉取重试 + 失败降级（不让前端直接报错）。
     if (hasKeyword) {
+      // 优先使用小满服务端 keyword 搜索（更贴近小满页面行为，且更快）
+      // 若该账号下 keyword 行为不稳定，再降级到本地全量过滤。
+      try {
+        const startIndex = page
+        const directUrl =
+          `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${startIndex}${baseParams}` +
+          `&keyword=${encodeURIComponent(kw)}`
+          console.log(directUrl)
+        const directRes = await fetch(directUrl, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        const directText = await directRes.text()
+        const directJson = JSON.parse(directText) as {
+          code?: number
+          data?: { list?: XiaomanCompanyItem[]; totalItem?: number }
+        }
+        if (directJson.code === 200 && directJson.data) {
+          const directList = directJson.data.list ?? []
+          const directTotal = directJson.data.totalItem ?? directList.length
+          if (directTotal > 0) {
+            return { list: directList, total: directTotal }
+          }
+        }
+      } catch {
+        // 直连 keyword 失败时静默降级到本地过滤，避免影响主流程
+      }
+
       const now = Date.now()
       if (this.companyListCache && now - this.companyListCache.fetchedAt < this.companyListCacheTtlMs) {
         const all = this.companyListCache.list
         const lower = kw.toLowerCase()
-        const filtered = all.filter(
-          (c) =>
-            (c.name || '').toLowerCase().includes(lower) ||
-            (c.short_name || '').toLowerCase().includes(lower) ||
-            (c.serial_id || '').toLowerCase().includes(lower),
-        )
+        const filtered = all.filter((c) => this.matchesKeyword(c, lower))
         const total = filtered.length
         const sliceStart = (page - 1) * pageSize
         const sliceEnd = sliceStart + pageSize
@@ -125,13 +179,14 @@ export class XiaomanService {
       const MAX_FETCH = 5000
       const PAGE_SIZE_FOR_FETCH = 500
       let fetched: XiaomanCompanyItem[] = []
+      // 小满 start_index 按偏移量语义：0, 500, 1000...
       let startIndex = 0
       let totalItem: number | null = null
       let endedByMaxFetch = false
       let lastPageListLen = 0
 
       const fetchPageWithRetry = async (): Promise<{ list: XiaomanCompanyItem[]; totalItem?: number } | null> => {
-        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${startIndex}${baseParams}`
+        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${page}${baseParams}`
         const maxAttempts = 3
         let lastError: unknown = null
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -150,6 +205,7 @@ export class XiaomanService {
             } catch {
               throw new Error(`小满 API 响应格式异常 (${res.status})`)
             }
+            console.log('[xiaoman] json', json);
             if (json.code !== 200) {
               const msg = json.message || `小满客户列表获取失败 (code: ${json.code})`
               throw new Error(msg)
@@ -200,12 +256,7 @@ export class XiaomanService {
       }
 
       const lower = kw.toLowerCase()
-      const filtered = fetched.filter(
-        (c) =>
-          (c.name || '').toLowerCase().includes(lower) ||
-          (c.short_name || '').toLowerCase().includes(lower) ||
-          (c.serial_id || '').toLowerCase().includes(lower),
-      )
+      const filtered = fetched.filter((c) => this.matchesKeyword(c, lower))
 
       const total = filtered.length
       const sliceStart = (page - 1) * pageSize
@@ -213,9 +264,9 @@ export class XiaomanService {
       return { list: filtered.slice(sliceStart, sliceEnd), total }
     }
 
-    // 无搜索关键词：直接按页码从小满取一页即可
-    const startIndex = (page - 1) * pageSize;
-    const url = `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${startIndex}${baseParams}`;
+    // 无搜索关键词：按偏移量取一页
+    const startIndex = Math.max(0, (page - 1) * pageSize);
+    const url = `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${page}${baseParams}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });

@@ -74,11 +74,13 @@
 
     <!-- 待裁床订单列表 -->
     <el-table
+      ref="cuttingTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="cutting-table"
+      @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -97,6 +99,7 @@
             :src="row.imageUrl"
             fit="cover"
             class="table-thumb"
+            :preview-teleported="true"
             :preview-src-list="[row.imageUrl]"
           />
           <span v-else class="text-muted">-</span>
@@ -353,6 +356,7 @@ import {
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSupplierList } from '@/api/suppliers'
 import { getEmployeeList } from '@/api/hr'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },
@@ -394,6 +398,7 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<CuttingListItem[]>([])
+const cuttingTableRef = ref()
 const loading = ref(false)
 const sizeBreakdownCache = ref<Record<number, CuttingQuantityBreakdownRes>>({})
 const sizePopoverLoadingId = ref<number | null>(null)
@@ -404,6 +409,7 @@ const hasSelection = computed(() => selectedRows.value.length > 0)
 const canRegisterSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.cuttingStatus !== 'completed'),
 )
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-cutting-main')
 
 function getTabLabel(tab: CuttingTabConfig): string {
   const counts = tabCounts.value
@@ -491,6 +497,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreColumnWidths(cuttingTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -816,11 +823,12 @@ onMounted(() => {
   padding: 2px 4px;
   color: var(--color-text-muted, #909399);
   white-space: nowrap;
+  text-align: center;
 }
 
 .qty-popover-table .qty-value {
   padding: 2px 4px;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -828,6 +836,7 @@ onMounted(() => {
   padding: 2px 4px;
   font-weight: 500;
   white-space: nowrap;
+  text-align: center;
 }
 
 .qty-popover-loading,

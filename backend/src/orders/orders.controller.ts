@@ -37,6 +37,7 @@ export class OrdersController {
     @Query('status') status?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
@@ -62,7 +63,7 @@ export class OrdersController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.ordersService.findAll(query);
+    return this.ordersService.findAll(query, user?.userId);
   }
 
   /**
@@ -90,6 +91,7 @@ export class OrdersController {
     @Query('customerDueStart') customerDueStart?: string,
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
@@ -112,7 +114,7 @@ export class OrdersController {
       customerDueEnd,
       factory,
     };
-    return this.ordersService.countByStatus(query);
+    return this.ordersService.countByStatus(query, user?.userId);
   }
 
   /**

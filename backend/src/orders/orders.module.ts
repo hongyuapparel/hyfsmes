@@ -12,6 +12,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
+import { OrderCraft } from '../entities/order-craft.entity';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryAccessoriesModule } from '../inventory-accessories/inventory-accessories.module';
 import { SystemOptionsModule } from '../system-options/system-options.module';
@@ -31,6 +32,7 @@ import { OrdersService } from './orders.service';
       OrderCutting,
       OrderSewing,
       OrderFinishing,
+      OrderCraft,
       User,
       RolePermission,
       OrderStatus,

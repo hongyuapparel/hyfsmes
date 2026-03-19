@@ -82,11 +82,13 @@
 
     <!-- 待车缝订单列表 -->
     <el-table
+      ref="sewingTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="sewing-table"
+      @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -105,6 +107,7 @@
             :src="row.imageUrl"
             fit="cover"
             class="table-thumb"
+            :preview-teleported="true"
             :preview-src-list="[row.imageUrl]"
           />
           <span v-else class="text-muted">-</span>
@@ -405,6 +408,7 @@ import {
 import { getSupplierList, type SupplierItem } from '@/api/suppliers'
 import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const SEWING_TABS = [
   { label: '全部', value: 'all' },
@@ -446,6 +450,7 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<SewingListItem[]>([])
+const sewingTableRef = ref()
 const loading = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
@@ -459,6 +464,7 @@ const canAssignSelection = computed(() =>
 const canRegisterSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.sewingStatus !== 'completed'),
 )
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-sewing-main')
 
 const factorySuppliers = ref<SupplierItem[]>([])
 const assignDialog = reactive<{ visible: boolean; submitting: boolean }>({ visible: false, submitting: false })
@@ -635,6 +641,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreColumnWidths(sewingTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -737,7 +744,10 @@ async function openRegisterDialog() {
     const len = headers.length
     // 车缝数量只存各尺码，合计列自动计算不参与编辑（合计 = 各码数之和）
     const sizeCount = len > 1 ? len - 1 : 1
-    registerForm.sewingQuantities = cutRow
+    const cutSizeValues = cutRow.slice(0, sizeCount)
+    const hasAnyCutValue = cutSizeValues.some((v) => v != null && !Number.isNaN(Number(v)))
+    const defaultSource = hasAnyCutValue ? cutRow : orderRow
+    registerForm.sewingQuantities = defaultSource
       .slice(0, sizeCount)
       .map((v) => (v != null ? Number(v) : 0))
     while (registerForm.sewingQuantities.length < sizeCount) {
@@ -915,11 +925,12 @@ onMounted(() => {
   padding: 2px 4px;
   color: var(--color-text-muted, #909399);
   white-space: nowrap;
+  text-align: center;
 }
 
 .qty-popover-table .qty-value {
   padding: 2px 4px;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -927,6 +938,7 @@ onMounted(() => {
   padding: 2px 4px;
   font-weight: 500;
   white-space: nowrap;
+  text-align: center;
 }
 
 .qty-popover-loading,

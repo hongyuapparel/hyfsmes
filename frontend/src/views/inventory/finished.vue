@@ -233,13 +233,15 @@
           <el-date-picker
             v-model="outboundFilter.dateRange"
             type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
+            range-separator=""
+            start-placeholder="出库时间"
+            end-placeholder=""
             value-format="YYYY-MM-DD"
             :shortcuts="rangeShortcuts"
+            unlink-panels
             size="large"
-            class="filter-bar-item"
+            :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
+            :style="getFilterRangeStyle(outboundFilter.dateRange)"
             @change="onOutboundSearch(true)"
           />
           <div class="filter-bar-actions">
@@ -253,7 +255,50 @@
             <template #default="{ row }">{{ row.createdAt }}</template>
           </el-table-column>
           <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
-          <el-table-column prop="quantity" label="出库数量" width="90" align="right" />
+          <el-table-column label="图片" width="90" align="center">
+            <template #default="{ row }">
+              <el-image
+                v-if="row.imageUrl"
+                :src="row.imageUrl"
+                fit="cover"
+                style="width: 56px; height: 56px; border-radius: 6px"
+                :preview-src-list="[row.imageUrl]"
+                preview-teleported
+              />
+              <span v-else class="text-placeholder">-</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="出库数量" width="90" align="right">
+            <template #default="{ row }">
+              <el-tooltip
+                v-if="row.sizeBreakdown?.headers?.length && row.sizeBreakdown?.rows?.length"
+                placement="top"
+                effect="light"
+                popper-class="finished-qty-popper"
+              >
+                <template #content>
+                  <div class="qty-tooltip">
+                    <div class="qty-tooltip-grid">
+                      <div class="qty-tooltip-row qty-tooltip-head">
+                        <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
+                        <div v-for="(h, idx) in row.sizeBreakdown.headers" :key="idx" class="qty-tooltip-cell">
+                          {{ h }}
+                        </div>
+                      </div>
+                      <div v-for="(r, rIdx) in row.sizeBreakdown.rows" :key="rIdx" class="qty-tooltip-row">
+                        <div class="qty-tooltip-cell qty-tooltip-color">{{ r.colorName || '-' }}</div>
+                        <div v-for="(v, vIdx) in r.quantities" :key="vIdx" class="qty-tooltip-cell qty-tooltip-num">
+                          {{ v }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+                <span class="qty-hover">{{ row.quantity }}</span>
+              </el-tooltip>
+              <span v-else>{{ row.quantity }}</span>
+            </template>
+          </el-table-column>
           <el-table-column prop="department" label="部门" min-width="90" show-overflow-tooltip />
           <el-table-column label="库存类型" min-width="100" show-overflow-tooltip>
             <template #default="{ row }">
@@ -265,6 +310,7 @@
               {{ findWarehouseLabelById(row.warehouseId) || '-' }}
             </template>
           </el-table-column>
+          <el-table-column prop="pickupUserName" label="领走人" width="120" show-overflow-tooltip />
           <el-table-column prop="operatorUsername" label="操作人" width="120" show-overflow-tooltip />
           <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
         </el-table>
@@ -362,7 +408,7 @@
     <el-dialog
       v-model="outboundDialog.visible"
       title="出库"
-      width="400"
+      width="640"
       destroy-on-close
       @close="resetOutboundForm"
     >
@@ -372,16 +418,53 @@
         :rules="outboundRules"
         label-width="80px"
       >
-        <el-form-item label="出库数量" prop="quantity">
-          <el-input-number
-            v-model="outboundForm.quantity"
-            :min="1"
-            :max="outboundMaxQty"
-            :precision="0"
-            controls-position="right"
-            style="width: 100%"
-          />
+        <el-form-item label="领走人" prop="pickupUserId">
+          <el-select
+            v-model="outboundForm.pickupUserId"
+            placeholder="请选择业务员"
+            filterable
+            clearable
+            style="width: 260px"
+          >
+            <el-option
+              v-for="opt in pickupUserOptions"
+              :key="opt.id"
+              :label="opt.displayName || opt.username"
+              :value="opt.id"
+            />
+          </el-select>
         </el-form-item>
+        <el-form-item v-if="outboundSizeBreakdown.headers.length" label="颜色尺码明细">
+          <div class="outbound-size-wrap">
+            <el-table :data="outboundSizeBreakdown.rows" border size="small">
+              <el-table-column label="颜色" min-width="100">
+                <template #default="{ row }">
+                  {{ row.colorName || '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column
+                v-for="(h, hIdx) in outboundSizeBreakdown.headers"
+                :key="hIdx"
+                :label="h"
+                min-width="80"
+                align="right"
+              >
+                <template #default="{ row }">
+                  <el-input-number
+                    v-model="row.quantities[hIdx]"
+                    :min="0"
+                    :precision="0"
+                    controls-position="right"
+                    size="small"
+                    style="width: 100%"
+                  />
+                </template>
+              </el-table-column>
+            </el-table>
+            <div class="outbound-size-footer">明细合计：{{ outboundBreakdownTotal }}</div>
+          </div>
+        </el-form-item>
+        <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法按明细出库。</div>
         <p v-if="outboundDialog.row" class="outbound-tip">
           当前库存：{{ outboundDialog.row.quantity }}
         </p>
@@ -675,6 +758,7 @@ import {
   getFinishedStockList,
   doPendingInbound,
   finishedOutbound,
+  getFinishedPickupUserOptions,
   createFinishedStock,
   getFinishedOutboundRecords,
   getFinishedStockDetail,
@@ -682,6 +766,7 @@ import {
   upsertFinishedStockColorImage,
   type FinishedStockRow,
   type FinishedOutboundRecord,
+  type FinishedPickupUserOption,
 } from '@/api/inventory'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getCustomers, type CustomerItem } from '@/api/customers'
@@ -689,9 +774,12 @@ import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/a
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
+const DATE_RANGE_WIDTH_EMPTY = '140px'
+const DATE_RANGE_WIDTH_FILLED = '220px'
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
 const FILTER_CHAR_PX = 14
+const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
 
 function getFilterInputStyle(v: unknown) {
   return v ? { color: ACTIVE_FILTER_COLOR } : undefined
@@ -709,6 +797,13 @@ function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
   const estimated = text.length * FILTER_CHAR_PX + 60
   const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
   return { width: `${width}px`, flex: `0 0 ${width}px` }
+}
+
+function getFilterRangeStyle(v: [string, string] | []) {
+  const hasValue = Array.isArray(v) && v.length === 2
+  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
+  const base = { width, flex: `0 0 ${width}` }
+  return hasValue ? { ...base, ...activeSelectStyle } : base
 }
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
@@ -915,11 +1010,27 @@ const outboundDialog = reactive<{
   row: FinishedStockRow | null
 }>({ visible: false, submitting: false, row: null })
 const outboundFormRef = ref<FormInstance>()
-const outboundForm = reactive({ quantity: 1 })
+const outboundForm = reactive({
+  pickupUserId: null as number | null,
+})
 const outboundRules: FormRules = {
-  quantity: [{ required: true, message: '请输入出库数量', trigger: 'blur' }],
+  pickupUserId: [{ required: true, message: '请选择领走人', trigger: 'change' }],
 }
 const outboundMaxQty = computed(() => outboundDialog.row?.quantity ?? 0)
+const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
+const outboundSizeBreakdown = reactive<{
+  headers: string[]
+  rows: Array<{ colorName: string; quantities: number[] }>
+}>({
+  headers: [],
+  rows: [],
+})
+const outboundBreakdownTotal = computed(() =>
+  outboundSizeBreakdown.rows.reduce(
+    (sum, row) => sum + row.quantities.reduce((s, q) => s + (Number(q) || 0), 0),
+    0,
+  ),
+)
 
 const createDialog = reactive<{ visible: boolean; submitting: boolean }>({
   visible: false,
@@ -1093,31 +1204,59 @@ async function submitInbound() {
   }
 }
 
-function openOutboundDialog() {
+async function openOutboundDialog() {
   if (storedRows.value.length === 0) return
   const row = storedRows.value[0]
   outboundDialog.row = row
-  outboundForm.quantity = row.quantity > 0 ? 1 : 0
+  outboundForm.pickupUserId = null
+  if (row.orderId) {
+    await ensureColorSizeBreakdown(row.orderId)
+  }
+  const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
+  outboundSizeBreakdown.headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+  outboundSizeBreakdown.rows = (breakdown?.rows ?? []).map((r) => ({
+    colorName: r.colorName,
+    quantities: outboundSizeBreakdown.headers.map(() => 0),
+  }))
   outboundDialog.visible = true
 }
 
 function resetOutboundForm() {
   outboundDialog.row = null
-  outboundForm.quantity = 1
+  outboundForm.pickupUserId = null
+  outboundSizeBreakdown.headers = []
+  outboundSizeBreakdown.rows = []
   outboundFormRef.value?.clearValidate()
 }
 
 async function submitOutbound() {
   if (!outboundDialog.row) return
   await outboundFormRef.value?.validate().catch(() => {})
-  const qty = outboundForm.quantity
+  if (outboundSizeBreakdown.headers.length === 0) {
+    ElMessage.warning('暂无颜色尺码明细，无法出库')
+    return
+  }
+  const qty = outboundBreakdownTotal.value
   if (qty <= 0 || qty > outboundDialog.row.quantity) {
     ElMessage.warning('出库数量无效')
     return
   }
   outboundDialog.submitting = true
   try {
-    await finishedOutbound(outboundDialog.row.id, qty)
+    await finishedOutbound(
+      outboundDialog.row.id,
+      qty,
+      outboundForm.pickupUserId,
+      outboundSizeBreakdown.headers.length > 0
+        ? {
+            headers: outboundSizeBreakdown.headers,
+            rows: outboundSizeBreakdown.rows.map((r) => ({
+              colorName: r.colorName,
+              quantities: r.quantities.map((q) => Number(q) || 0),
+            })),
+          }
+        : null,
+    )
     ElMessage.success('出库成功')
     outboundDialog.visible = false
     selectedRows.value = []
@@ -1231,12 +1370,22 @@ async function loadDepartmentOptions() {
   }
 }
 
+async function loadPickupUserOptions() {
+  try {
+    const res = await getFinishedPickupUserOptions()
+    pickupUserOptions.value = (res.data ?? []) as FinishedPickupUserOption[]
+  } catch {
+    pickupUserOptions.value = []
+  }
+}
+
 onMounted(async () => {
   await Promise.all([
     loadWarehouseOptions(),
     loadInventoryTypeOptions(),
     loadCustomerOptions(),
     loadDepartmentOptions(),
+    loadPickupUserOptions(),
   ])
   await load()
 })
@@ -1244,7 +1393,10 @@ onMounted(async () => {
 async function loadOutbounds() {
   outboundLoading2.value = true
   try {
-    const [startDate, endDate] = Array.isArray(outboundFilter.dateRange) && outboundFilter.dateRange.length === 2 ? outboundFilter.dateRange : ['', '']
+    const [startDate, endDate] =
+      Array.isArray(outboundFilter.dateRange) && outboundFilter.dateRange.length === 2
+        ? outboundFilter.dateRange
+        : ['', '']
     const res = await getFinishedOutboundRecords({
       orderNo: outboundFilter.orderNo || undefined,
       skuCode: outboundFilter.skuCode || undefined,
@@ -1301,6 +1453,19 @@ function onOutboundPageSizeChange() {
   align-items: center;
   gap: var(--space-sm);
   margin-left: auto;
+}
+
+.range-single.el-date-editor--daterange :deep(.el-range-separator) {
+  width: 0;
+}
+.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
+  display: none;
+}
+.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
+  width: 100%;
+}
+.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
+  display: none;
 }
 
 .finished-table {
@@ -1412,6 +1577,17 @@ function onOutboundPageSizeChange() {
   color: var(--color-text-muted);
   margin-top: -8px;
   margin-bottom: 0;
+}
+
+.outbound-size-wrap {
+  width: 100%;
+}
+
+.outbound-size-footer {
+  margin-top: 8px;
+  text-align: right;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
 }
 
 .create-form-grid .el-form-item {

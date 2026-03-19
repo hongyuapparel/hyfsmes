@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Res, UseGuards
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { ProductionSewingService, SewingListQuery } from './production-sewing.service';
 import type { Response } from 'express';
 
@@ -118,6 +119,7 @@ export class ProductionSewingController {
     @Body('defectQuantity') defectQuantity: number,
     @Body('defectReason') defectReason: string,
     @Body('sewingQuantities') sewingQuantities?: number[],
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.sewingService.completeSewing(
       Number(orderId),
@@ -125,6 +127,7 @@ export class ProductionSewingController {
       Number(defectQuantity ?? 0),
       defectReason ?? '',
       Array.isArray(sewingQuantities) ? sewingQuantities : undefined,
+      user?.userId,
     );
   }
 }

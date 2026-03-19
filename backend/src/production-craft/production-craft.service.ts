@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -81,7 +81,7 @@ export class ProductionCraftService {
   }
 
   private buildCraftSummaryFromProcessItems(processItems: ProcessRow[] | null): { supplierName: string; processItem: string } {
-    const items = Array.isArray(processItems) ? processItems : [];
+    const items = this.normalizeProcessItems(processItems);
     const supplierNames = items
       .map((r) => (r.supplierName ?? '').trim())
       .filter((v) => !!v);
@@ -97,9 +97,46 @@ export class ProductionCraftService {
     };
   }
 
+  private normalizeProcessItems(processItems: ProcessRow[] | null | unknown): ProcessRow[] {
+    if (!processItems) return [];
+    if (Array.isArray(processItems)) return processItems as ProcessRow[];
+    if (typeof processItems === 'string') {
+      try {
+        const parsed = JSON.parse(processItems);
+        return Array.isArray(parsed) ? (parsed as ProcessRow[]) : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  }
+
+  private async fetchProcessItemsMap(orderIds: number[]): Promise<Map<number, ProcessRow[]>> {
+    const ids = Array.isArray(orderIds) ? orderIds.filter((v) => typeof v === 'number' && v > 0) : [];
+    const map = new Map<number, ProcessRow[]>();
+    if (!ids.length) return map;
+    try {
+      const rows = await this.orderExtRepo.query(
+        'SELECT order_id AS orderId, process_items AS processItems FROM `order_ext` WHERE order_id IN (?)',
+        [ids],
+      );
+      if (!Array.isArray(rows)) return map;
+      for (const r of rows) {
+        const orderId = Number((r as any).orderId);
+        const raw = (r as any).processItems;
+        if (Number.isNaN(orderId)) continue;
+        const items = this.normalizeProcessItems(raw);
+        map.set(orderId, items);
+      }
+    } catch {
+      // ignore
+    }
+    return map;
+  }
+
   private anyCraftSupplierMatches(processItems: ProcessRow[] | null, supplier: string): boolean {
     if (!supplier?.trim()) return true;
-    const items = Array.isArray(processItems) ? processItems : [];
+    const items = this.normalizeProcessItems(processItems);
     if (!items.length) return false;
     const lower = supplier.trim().toLowerCase();
     return items.some((r) => (r.supplierName ?? '').toLowerCase().includes(lower));
@@ -107,13 +144,13 @@ export class ProductionCraftService {
 
   private anyCraftProcessMatches(processItems: ProcessRow[] | null, processItem: string): boolean {
     if (!processItem?.trim()) return true;
-    const items = Array.isArray(processItems) ? processItems : [];
+    const items = this.normalizeProcessItems(processItems);
     if (!items.length) return false;
     const lower = processItem.trim().toLowerCase();
     return items.some((r) => (r.processName ?? '').toLowerCase().includes(lower));
   }
 
-  async getCraftList(query: CraftListQuery): Promise<{
+  async getCraftList(query: CraftListQuery, actorUserId?: number): Promise<{
     list: CraftListItem[];
     total: number;
     page: number;
@@ -134,9 +171,9 @@ export class ProductionCraftService {
     // 工艺管理：仅展示审单通过后的订单（排除草稿、待审单），且订单编辑 E 区存在工艺项目
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .innerJoin(OrderExt, 'ext', 'ext.orderId = o.id')
+      .innerJoin(OrderExt, 'ext', 'ext.order_id = o.id')
       // MySQL JSON：只展示 E 区至少 1 行工艺项目的订单
-      .where('JSON_LENGTH(ext.process_items) > 0')
+      .where('IFNULL(JSON_LENGTH(ext.process_items), 0) > 0')
       .andWhere('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review'] });
 
     if (typeof orderTypeId === 'number') {
@@ -162,23 +199,60 @@ export class ProductionCraftService {
       return { list: [], total: 0, page, pageSize };
     }
 
-    const [crafts, extList] = await Promise.all([
+    const [crafts, extList, processItemsMap] = await Promise.all([
       this.craftRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
       this.orderExtRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
+      this.fetchProcessItemsMap(orderIds),
     ]);
     const craftMap = new Map(crafts.map((c) => [c.orderId, c]));
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
+
+    // 对历史“已工艺完成但订单未流转”的数据进行一次按规则补流转（无硬编码状态）。
+    // 只在可识别当前操作人时执行，以遵守 allowRoles 角色限制。
+    if (typeof actorUserId === 'number') {
+      for (const order of orders) {
+        const craft = craftMap.get(order.id);
+        const craftStatus = (craft?.status ?? 'pending').toLowerCase();
+        if (craftStatus !== 'completed') continue;
+        const nextStatus = await this.orderWorkflowService.resolveNextStatus({
+          order,
+          triggerCode: 'craft_completed',
+          actorUserId,
+        });
+        if (nextStatus && nextStatus !== order.status) {
+          order.status = nextStatus;
+          order.statusTime = new Date();
+          await this.orderRepo.save(order);
+        }
+      }
+    }
 
     const rows: CraftListItem[] = [];
     for (const order of orders) {
       const ext = extMap.get(order.id);
       const materials = ext?.materials ?? null;
-      const processItems = ext?.processItems ?? null;
+      const processItems = processItemsMap.get(order.id) ?? (ext?.processItems ?? null);
       if (supplier?.trim() && !this.anyCraftSupplierMatches(processItems, supplier)) continue;
       if (processItem?.trim() && !this.anyCraftProcessMatches(processItems, processItem)) continue;
 
       const craft = craftMap.get(order.id);
       const craftStatus = (craft?.status ?? 'pending').toLowerCase();
+
+      // 仅按流程配置展示可执行工艺完成的订单，避免“有工艺项目就都进入工艺管理”的硬编码行为。
+      if (craftStatus !== 'completed') {
+        try {
+          const nextByFlow = await this.orderWorkflowService.resolveNextStatus({
+            order,
+            triggerCode: 'craft_completed',
+            actorUserId: typeof actorUserId === 'number' ? actorUserId : 0,
+          });
+          if (!nextByFlow) continue;
+        } catch {
+          // 角色无权限或规则不匹配时，不在工艺管理列表展示该单
+          continue;
+        }
+      }
+
       if (tab === 'pending' && craftStatus === 'completed') continue;
       if (tab === 'completed' && craftStatus !== 'completed') continue;
 
@@ -225,8 +299,17 @@ export class ProductionCraftService {
       throw new NotFoundException('该订单无工艺项目');
     }
 
-    let craft = await this.craftRepo.findOne({ where: { orderId } });
     const now = new Date();
+    const nextStatus = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'craft_completed',
+      actorUserId,
+    });
+    if (!nextStatus) {
+      throw new BadRequestException('未匹配到“工艺完成(craft_completed)”流转规则，请在订单设置中检查流程链路配置');
+    }
+
+    let craft = await this.craftRepo.findOne({ where: { orderId } });
     if (!craft) {
       craft = this.craftRepo.create({
         orderId,
@@ -244,18 +327,10 @@ export class ProductionCraftService {
     }
     await this.craftRepo.save(craft);
 
-    // 若订单当前为「待工艺」，按流程链路解析下一状态并更新订单
-    if (order.status === 'pending_craft') {
-      const nextStatus = await this.orderWorkflowService.resolveNextStatus({
-        order,
-        triggerCode: 'craft_completed',
-        actorUserId,
-      });
-      if (nextStatus) {
-        order.status = nextStatus;
-        order.statusTime = now;
-        await this.orderRepo.save(order);
-      }
+    if (nextStatus !== order.status) {
+      order.status = nextStatus;
+      order.statusTime = now;
+      await this.orderRepo.save(order);
     }
   }
 }

@@ -184,6 +184,7 @@
                     <el-image
                       :src="row[f.code]"
                       fit="cover"
+                      :preview-teleported="true"
                       :preview-src-list="[row[f.code]]"
                       style="width: 40px; height: 40px; border-radius: 4px; cursor: pointer"
                     />
@@ -289,6 +290,7 @@
                   :src="form[f.code]"
                   fit="cover"
                   class="image-preview"
+                  :preview-teleported="true"
                   :preview-src-list="[form[f.code]]"
                 />
                 <el-button type="danger" link size="small" class="image-clear" @click.stop="form[f.code] = ''">移除</el-button>

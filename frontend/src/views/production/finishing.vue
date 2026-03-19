@@ -83,11 +83,13 @@
 
     <!-- 待尾部订单列表 -->
     <el-table
+      ref="finishingTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="finishing-table"
+      @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -106,6 +108,7 @@
             :src="row.imageUrl"
             fit="cover"
             class="table-thumb"
+            :preview-teleported="true"
             :preview-src-list="[row.imageUrl]"
           />
           <span v-else class="text-muted">-</span>
@@ -220,7 +223,40 @@
         </template>
       </el-table-column>
       <el-table-column label="尾部入库数" width="100" align="right">
-        <template #default="{ row }">{{ row.tailInboundQty != null ? row.tailInboundQty : '-' }}</template>
+        <template #default="{ row }">
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ row.tailInboundQty != null ? row.tailInboundQty : '-' }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
+                  <thead>
+                    <tr>
+                      <th class="qty-header">尺码</th>
+                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
+                      <td class="qty-label">{{ r.label }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
+        </template>
       </el-table-column>
       <el-table-column label="次品数" width="80" align="right">
         <template #default="{ row }">{{ row.defectQuantity != null ? row.defectQuantity : '-' }}</template>
@@ -349,11 +385,11 @@
                   </template>
                   <template v-else-if="row.key === 'defect'">
                     <template v-if="item.headers.length > 1 && hIdx === item.headers.length - 1">
-                      {{ item.defectQuantity ?? 0 }}
+                      {{ defectTotal(item) }}
                     </template>
                     <el-input-number
                       v-else
-                      v-model="item.defectQuantity"
+                      v-model="item.defectQuantities[hIdx]"
                       :min="0"
                       :max="item.row.tailReceivedQty ?? 0"
                       :precision="0"
@@ -410,6 +446,7 @@ import {
 } from '@/api/production-finishing'
 import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
@@ -452,6 +489,7 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<FinishingListItem[]>([])
+const finishingTableRef = ref()
 const loading = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
@@ -469,6 +507,7 @@ const canPackagingCompleteSelection = computed(() =>
   selectedRows.value.length > 0 &&
   selectedRows.value.every((r) => r.finishingStatus === 'pending_assign'),
 )
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-finishing-main')
 
 function getTabLabel(tab: FinishingTabConfig): string {
   const counts = tabCounts.value
@@ -527,7 +566,7 @@ interface PackagingCompleteItem {
   sewingRow: (number | null)[]
   tailReceivedRow: (number | null)[]
   inboundQuantities: number[]
-  defectQuantity: number
+  defectQuantities: number[]
   remark: string
 }
 
@@ -542,6 +581,7 @@ function packagingSizeTableRows(item: PackagingCompleteItem) {
   const received = item.row.tailReceivedQty ?? 0
   const i = item.inboundQuantities
   const sumI = i.reduce((a, b) => a + b, 0)
+  const sumD = defectTotal(item)
   const valuesReceived =
     Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
       ? item.tailReceivedRow
@@ -552,13 +592,17 @@ function packagingSizeTableRows(item: PackagingCompleteItem) {
   return [
     { key: 'tail_received', label: '尾部收货数', values: valuesReceived },
     { key: 'inbound', label: '入库数', values: valuesInbound },
-    { key: 'defect', label: '次品数', values: item.headers.length === 1 ? [item.defectQuantity ?? 0] : [...Array(item.headers.length - 1).fill(null), item.defectQuantity ?? 0] },
+    { key: 'defect', label: '次品数', values: item.headers.length === 1 ? [...item.defectQuantities] : [...item.defectQuantities, sumD] },
   ]
+}
+
+function defectTotal(item: PackagingCompleteItem): number {
+  return (item.defectQuantities ?? []).reduce((a, b) => a + (Number(b) || 0), 0)
 }
 
 function packagingSetZero(item: PackagingCompleteItem) {
   item.inboundQuantities.fill(0)
-  item.defectQuantity = 0
+  item.defectQuantities.fill(0)
 }
 
 function packagingSetInboundToReceived(item: PackagingCompleteItem) {
@@ -575,7 +619,7 @@ function packagingSetInboundToReceived(item: PackagingCompleteItem) {
     item.inboundQuantities[0] = total
     for (let i = 1; i < len; i++) item.inboundQuantities[i] = 0
   }
-  item.defectQuantity = 0
+  item.defectQuantities.fill(0)
 }
 
 function maxPackagingQtyForSize(item: PackagingCompleteItem, _hIdx: number): number {
@@ -641,6 +685,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreColumnWidths(finishingTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -805,7 +850,7 @@ async function openPackagingCompleteDialog() {
         sewingRow,
         tailReceivedRow,
         inboundQuantities: Array(sizeCount).fill(0),
-        defectQuantity: 0,
+        defectQuantities: Array(sizeCount).fill(0),
         remark: '',
       }
       // 默认全部入库：把收货总数放在第一个尺码列，其他列为 0（合计列由表格计算展示）
@@ -825,7 +870,7 @@ async function submitPackagingComplete() {
   for (const item of packagingCompleteDialog.items) {
     const received = item.row.tailReceivedQty ?? 0
     const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
-    const defect = Number(item.defectQuantity) || 0
+    const defect = defectTotal(item)
     if (sumInbound + defect !== received) {
       ElMessage.warning(`订单 ${item.row.orderNo}：入库数合计(${sumInbound})+次品数(${defect}) 须等于尾部收货数(${received})`)
       return
@@ -836,7 +881,7 @@ async function submitPackagingComplete() {
     for (const item of packagingCompleteDialog.items) {
       const received = item.row.tailReceivedQty ?? 0
       const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
-      const defect = Number(item.defectQuantity) || 0
+      const defect = defectTotal(item)
       await registerFinishingPackagingComplete({
         orderId: item.row.orderId,
         tailShippedQty: 0,
@@ -1013,11 +1058,12 @@ onMounted(() => {
   padding: 2px 4px;
   color: var(--color-text-muted, #909399);
   white-space: nowrap;
+  text-align: center;
 }
 
 .qty-popover-table .qty-value {
   padding: 2px 4px;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -1025,6 +1071,7 @@ onMounted(() => {
   padding: 2px 4px;
   font-weight: 500;
   white-space: nowrap;
+  text-align: center;
 }
 
 .qty-popover-loading,

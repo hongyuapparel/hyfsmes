@@ -190,9 +190,39 @@ export class InventoryAccessoriesService {
     outboundType?: string;
     page?: number;
     pageSize?: number;
-  }): Promise<{ list: InventoryAccessoryOutbound[]; total: number; page: number; pageSize: number }> {
+  }): Promise<{
+    list: Array<
+      Omit<InventoryAccessoryOutbound, 'createdAt'> & {
+        createdAt: string;
+        imageUrl?: string;
+        customerName?: string;
+        category?: string;
+      }
+    >;
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
     const { accessoryId, orderNo, outboundType, page = 1, pageSize = 20 } = params;
-    const qb = this.outboundRepo.createQueryBuilder('r');
+    const qb = this.outboundRepo
+      .createQueryBuilder('r')
+      .leftJoin(InventoryAccessory, 'a', 'a.id = r.accessory_id')
+      .select([
+        'r.id AS id',
+        'r.accessory_id AS accessoryId',
+        'r.order_id AS orderId',
+        'r.order_no AS orderNo',
+        'r.outbound_type AS outboundType',
+        'r.quantity AS quantity',
+        'r.before_quantity AS beforeQuantity',
+        'r.after_quantity AS afterQuantity',
+        'r.operator_username AS operatorUsername',
+        'r.remark AS remark',
+        'r.created_at AS createdAt',
+        "COALESCE(a.image_url, '') AS imageUrl",
+        "COALESCE(a.customer_name, '') AS customerName",
+        "COALESCE(a.category, '') AS category",
+      ]);
     if (accessoryId) qb.andWhere('r.accessory_id = :accessoryId', { accessoryId });
     if (orderNo?.trim()) qb.andWhere('r.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
     if (outboundType?.trim()) qb.andWhere('r.outbound_type = :outboundType', { outboundType: outboundType.trim() });
@@ -202,7 +232,23 @@ export class InventoryAccessoriesService {
     const list = await qb
       .skip((page - 1) * pageSize)
       .take(pageSize)
-      .getMany();
-    return { list, total, page, pageSize };
+      .getRawMany<any>();
+    const rows = list.map((r: any) => ({
+      id: Number(r.id),
+      accessoryId: Number(r.accessoryId),
+      orderId: r.orderId != null ? Number(r.orderId) : null,
+      orderNo: r.orderNo ?? '',
+      outboundType: r.outboundType ?? 'manual',
+      quantity: Number(r.quantity) || 0,
+      beforeQuantity: Number(r.beforeQuantity) || 0,
+      afterQuantity: Number(r.afterQuantity) || 0,
+      operatorUsername: r.operatorUsername ?? '',
+      remark: r.remark ?? '',
+      createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
+      imageUrl: r.imageUrl ?? '',
+      customerName: r.customerName ?? '',
+      category: r.category ?? '',
+    }));
+    return { list: rows, total, page, pageSize };
   }
 }

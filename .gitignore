@@ -14,9 +14,7 @@ backend/tsconfig.tsbuildinfo
 # Environment
 .env
 .env.local
-.env.*
 .env.*.local
-frontend/.env.*
 
 # IDE
 .idea/

@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Res, UseGuards
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { ProductionFinishingService, FinishingListQuery } from './production-finishing.service';
 import type { Response } from 'express';
 
@@ -120,6 +121,7 @@ export class ProductionFinishingController {
     @Body('tailInboundQty') tailInboundQty: number,
     @Body('defectQuantity') defectQuantity: number,
     @Body('remark') remark?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.finishingService.registerPackagingComplete(
       Number(orderId),
@@ -127,6 +129,7 @@ export class ProductionFinishingController {
       Number(tailInboundQty ?? 0),
       Number(defectQuantity ?? 0),
       remark ?? null,
+      user?.userId,
     );
   }
 
@@ -155,12 +158,16 @@ export class ProductionFinishingController {
   inbound(
     @Body('orderId') orderId: number,
     @Body('quantity') quantity: number,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.finishingService.inbound(Number(orderId), Number(quantity ?? 0));
+    return this.finishingService.inbound(Number(orderId), Number(quantity ?? 0), user?.userId);
   }
 
   @Post('items/:orderId/finance-approve')
-  financeApprove(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.finishingService.financeApproveFinishing(orderId);
+  financeApprove(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.finishingService.financeApproveFinishing(orderId, user?.userId);
   }
 }

@@ -2656,6 +2656,16 @@ onMounted(async () => {
   gap: var(--space-xs);
 }
 
+.packaging-method > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.packaging-method :deep(.el-input) {
+  flex: 0 1 92%;
+  max-width: 92%;
+}
+
 .accessory-dialog-filter {
   margin-bottom: var(--space-sm);
 }

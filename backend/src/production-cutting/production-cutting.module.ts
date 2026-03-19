@@ -6,11 +6,16 @@ import { OrderExt } from '../entities/order-ext.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
+import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
 import { ProductionCuttingController } from './production-cutting.controller';
 import { ProductionCuttingService } from './production-cutting.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderCutting, OrderExt, User, RolePermission]), AuthModule],
+  imports: [
+    TypeOrmModule.forFeature([Order, OrderCutting, OrderExt, User, RolePermission]),
+    AuthModule,
+    OrderWorkflowModule,
+  ],
   controllers: [ProductionCuttingController],
   providers: [ProductionCuttingService],
 })

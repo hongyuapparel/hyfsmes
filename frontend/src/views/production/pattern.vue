@@ -150,7 +150,7 @@
         </el-button>
         <el-button
           v-if="hasSelection && canCompleteSelection"
-          type="success"
+          type="primary"
           size="large"
           @click="openCompleteDialog"
         >
@@ -161,11 +161,13 @@
 
     <!-- 待纸样订单列表 -->
     <el-table
+      ref="patternTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="pattern-table"
+      @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -184,6 +186,7 @@
             :src="row.imageUrl"
             fit="cover"
             class="table-thumb"
+            :preview-teleported="true"
             :preview-src-list="[row.imageUrl]"
           />
           <span v-else class="text-muted">-</span>
@@ -287,7 +290,7 @@
             @click="triggerSampleImageUpload"
           >
             <div v-if="completeForm.sampleImageUrl" class="image-preview-wrap">
-              <el-image :src="completeForm.sampleImageUrl" fit="cover" :preview-src-list="[completeForm.sampleImageUrl]" />
+              <el-image :src="completeForm.sampleImageUrl" fit="cover" :preview-teleported="true" :preview-src-list="[completeForm.sampleImageUrl]" />
               <el-button text type="danger" size="small" class="image-remove" @click.stop="clearSampleImage">移除</el-button>
             </div>
             <div v-else class="image-placeholder">
@@ -315,7 +318,7 @@
     <el-dialog
       v-model="materialsDialog.visible"
       title="纸样物料/裁片清单"
-      width="860"
+      width="min(1100px, 92vw)"
       destroy-on-close
       @close="resetMaterialsDialog"
     >
@@ -325,20 +328,19 @@
       </div>
 
       <div class="materials-actions">
-        <el-button size="small" :disabled="materialsDialog.loading || !canEditPatternMaterials" @click="addMaterialRow">
-          新增一行
-        </el-button>
         <el-button
+          link
+          type="primary"
           size="small"
           :disabled="materialsDialog.loading || !canEditPatternMaterials"
-          @click="syncFromOrderMaterials"
+          @click="addMaterialRow"
         >
-          从订单物料同步（覆盖当前）
+          新增
         </el-button>
       </div>
 
       <el-table v-loading="materialsDialog.loading" :data="materialsForm.materials" border size="small" class="materials-table">
-        <el-table-column label="物料类型" min-width="110">
+        <el-table-column label="物料类型" min-width="110" align="center">
           <template #default="{ row }">
             <el-select
               v-model="row.materialTypeId"
@@ -358,27 +360,27 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="物料名称" min-width="180">
+        <el-table-column label="物料名称" min-width="180" align="center">
           <template #default="{ row }">
             <el-input v-model="row.materialName" size="small" :disabled="!canEditPatternMaterials" />
           </template>
         </el-table-column>
-        <el-table-column label="幅宽(cm)" width="120" align="right">
+        <el-table-column label="幅宽(cm)" width="120" align="center">
           <template #default="{ row }">
             <el-input v-model="row.fabricWidth" size="small" placeholder="如 183cm" :disabled="!canEditPatternMaterials" />
           </template>
         </el-table-column>
-        <el-table-column label="单件用量(米)" width="110" align="right">
+        <el-table-column label="单件用量(米)" width="110" align="center">
           <template #default="{ row }">
             <el-input-number v-model="row.usagePerPiece" :min="0" :controls="false" size="small" :disabled="!canEditPatternMaterials" />
           </template>
         </el-table-column>
-        <el-table-column label="裁片数量" width="110" align="right">
+        <el-table-column label="裁片数量" width="110" align="center">
           <template #default="{ row }">
             <el-input-number v-model="row.cuttingQuantity" :min="0" :controls="false" size="small" :disabled="!canEditPatternMaterials" />
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="140">
+        <el-table-column label="备注" min-width="200" align="center">
           <template #default="{ row }">
             <el-input v-model="row.remark" size="small" :disabled="!canEditPatternMaterials" />
           </template>
@@ -431,8 +433,8 @@ import { getDictTree, getDictItems } from '@/api/dicts'
 import { uploadImage } from '@/api/uploads'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { getEmployeeList, type EmployeeItem } from '@/api/hr'
-import { getOrderDetail } from '@/api/orders'
 import { useAuthStore } from '@/stores/auth'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const PATTERN_TABS = [
   { label: '全部', value: 'all' },
@@ -532,6 +534,7 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<PatternListItem[]>([])
+const patternTableRef = ref()
 const loading = ref(false)
 const exporting = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -540,6 +543,7 @@ const hasSelection = computed(() => selectedRows.value.length > 0)
 const canCompleteSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.every((r) => r.patternStatus !== 'completed'),
 )
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-pattern-main')
 
 function getTabLabel(tab: PatternTabConfig): string {
   const counts = tabCounts.value
@@ -648,6 +652,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreColumnWidths(patternTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -803,14 +808,14 @@ async function onSampleImageFileChange(e: Event) {
 }
 
 async function submitComplete() {
-  if (!completeDialog.row || !completeForm.sampleImageUrl) return
+  if (!completeDialog.row) return
   completeDialog.submitting = true
   try {
     await completePattern({
       orderId: completeDialog.row.orderId,
-      sampleImageUrl: completeForm.sampleImageUrl,
+      sampleImageUrl: (completeForm.sampleImageUrl ?? '').trim(),
     })
-    ElMessage.success('纸样已完成，订单已进入待采购')
+    ElMessage.success('纸样已完成，订单已进入样品完成')
     completeDialog.visible = false
     await load()
     void loadTabCounts()
@@ -866,29 +871,6 @@ async function openMaterialsDialog(row: PatternListItem) {
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载失败'))
     if (!materialsForm.materials.length) addMaterialRow()
-  } finally {
-    materialsDialog.loading = false
-  }
-}
-
-async function syncFromOrderMaterials() {
-  if (!materialsDialog.row) return
-  materialsDialog.loading = true
-  try {
-    const res = await getOrderDetail(materialsDialog.row.orderId)
-    const mats = (res.data?.materials ?? []).map((m: any) => ({
-      materialTypeId: m.materialTypeId ?? null,
-      materialName: m.materialName ?? '',
-      fabricWidth: m.fabricWidth ?? '',
-      usagePerPiece: m.usagePerPiece ?? null,
-      cuttingQuantity: m.cuttingQuantity ?? null,
-      remark: m.remark ?? '',
-    })) as PatternMaterialRow[]
-    materialsForm.materials = mats.map(normalizePatternMaterialRow)
-    if (!materialsForm.materials.length) addMaterialRow()
-    ElMessage.success('已从订单物料同步，可在此基础上增删改')
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '同步失败'))
   } finally {
     materialsDialog.loading = false
   }
@@ -1113,7 +1095,7 @@ onMounted(() => {
   padding: var(--space-sm);
   background: var(--el-fill-color-light);
   border-radius: var(--radius);
-  font-size: var(--font-size-caption, 12px);
+  font-size: var(--el-font-size-base);
 }
 
 .materials-brief > div + div {
@@ -1124,15 +1106,30 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+  justify-content: flex-end;
   margin-bottom: var(--space-sm);
+  font-size: var(--el-font-size-base);
 }
 
 .materials-table :deep(.el-input-number) {
   width: 100%;
 }
 
+.materials-table :deep(.el-table__cell) {
+  text-align: center;
+  font-size: var(--el-font-size-base);
+}
+
+.materials-table :deep(.el-input__inner),
+.materials-table :deep(.el-textarea__inner),
+.materials-table :deep(.el-select__selected-item),
+.materials-table :deep(.el-select__placeholder) {
+  text-align: center;
+  font-size: var(--el-font-size-base);
+}
+
 .materials-table :deep(.el-input-number .el-input__inner) {
-  text-align: right;
+  text-align: center;
 }
 
 .materials-remark {
@@ -1142,6 +1139,10 @@ onMounted(() => {
 .materials-remark-label {
   margin-bottom: 6px;
   color: var(--el-text-color-secondary);
-  font-size: var(--font-size-caption, 12px);
+  font-size: var(--el-font-size-base);
+}
+
+.materials-remark :deep(.el-textarea__inner) {
+  font-size: var(--el-font-size-base);
 }
 </style>

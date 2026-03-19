@@ -70,8 +70,26 @@ export function getFinishedStockList(params?: {
   }>('/inventory/finished/items', { params })
 }
 
-export function finishedOutbound(id: number, quantity: number) {
-  return request.post<void>('/inventory/finished/outbound', { id, quantity })
+export function finishedOutbound(
+  id: number,
+  quantity: number,
+  pickupUserId?: number | null,
+  sizeBreakdown?: {
+    headers: string[]
+    rows: Array<{ colorName: string; quantities: number[] }>
+  } | null,
+) {
+  return request.post<void>('/inventory/finished/outbound', { id, quantity, pickupUserId, sizeBreakdown })
+}
+
+export interface FinishedPickupUserOption {
+  id: number
+  username: string
+  displayName: string
+}
+
+export function getFinishedPickupUserOptions() {
+  return request.get<FinishedPickupUserOption[]>('/inventory/finished/pickup-users')
 }
 
 export interface FinishedStockDetailRes {
@@ -125,9 +143,16 @@ export interface FinishedOutboundRecord {
   department: string
   warehouseId: number | null
   inventoryTypeId: number | null
+  pickupUserId?: number | null
+  pickupUserName?: string
+  sizeBreakdown?: {
+    headers: string[]
+    rows: Array<{ colorName: string; quantities: number[] }>
+  } | null
   operatorUsername: string
   remark: string
   createdAt: string
+  imageUrl?: string
 }
 
 export function getFinishedOutboundRecords(params?: {
@@ -234,6 +259,9 @@ export interface AccessoryOutboundRecord {
   accessoryId: number
   orderId: number | null
   orderNo: string
+  imageUrl?: string
+  customerName?: string
+  category?: string
   outboundType: string
   quantity: number
   beforeQuantity: number

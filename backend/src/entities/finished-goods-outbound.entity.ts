@@ -22,6 +22,10 @@ export class FinishedGoodsOutbound {
   @Column({ name: 'sku_code', length: 64, default: '' })
   skuCode: string;
 
+  /** 出库时图片快照（优先库存图，其次产品图） */
+  @Column({ name: 'image_url', length: 512, default: '' })
+  imageUrl: string;
+
   @Index()
   @Column({ name: 'customer_name', length: 255, default: '' })
   customerName: string;
@@ -41,6 +45,18 @@ export class FinishedGoodsOutbound {
   /** 库存类型 ID（出库时从库存冗余） */
   @Column({ name: 'inventory_type_id', type: 'int', nullable: true })
   inventoryTypeId: number | null;
+
+  /** 领走人用户 ID（业务员） */
+  @Column({ name: 'pickup_user_id', type: 'int', nullable: true })
+  pickupUserId: number | null;
+
+  /** 领走人姓名（冗余，避免后续改名影响历史） */
+  @Column({ name: 'pickup_user_name', length: 128, default: '' })
+  pickupUserName: string;
+
+  /** 出库颜色尺码明细快照（可选） */
+  @Column({ name: 'size_breakdown', type: 'json', nullable: true })
+  sizeBreakdown: any;
 
   /** 操作人（中文名或用户名） */
   @Column({ name: 'operator_username', length: 128, default: '' })

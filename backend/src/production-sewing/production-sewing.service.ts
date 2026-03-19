@@ -5,6 +5,7 @@ import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
+import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 export interface SewingListItem {
   orderId: number;
@@ -56,6 +57,7 @@ export class ProductionSewingService {
     private readonly cuttingRepo: Repository<OrderCutting>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
 
   private sumActualCut(rows: ActualCutRow[] | null): number | null {
@@ -296,6 +298,7 @@ export class ProductionSewingService {
     defectQuantity: number,
     defectReason: string,
     sewingQuantities?: number[] | null,
+    actorUserId?: number,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -337,8 +340,15 @@ export class ProductionSewingService {
     }
     await this.sewingRepo.save(sewing);
 
-    order.status = 'pending_finishing';
-    order.statusTime = now;
-    await this.orderRepo.save(order);
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'sewing_completed',
+      actorUserId: actorUserId ?? 0,
+    });
+    if (next && next !== order.status) {
+      order.status = next;
+      order.statusTime = now;
+      await this.orderRepo.save(order);
+    }
   }
 }

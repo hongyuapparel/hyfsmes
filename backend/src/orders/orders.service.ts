@@ -17,6 +17,7 @@ import { User } from '../entities/user.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
+import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
@@ -141,6 +142,8 @@ export class OrdersService {
     private readonly orderSewingRepo: Repository<OrderSewing>,
     @InjectRepository(OrderFinishing)
     private readonly orderFinishingRepo: Repository<OrderFinishing>,
+    @InjectRepository(OrderCraft)
+    private readonly orderCraftRepo: Repository<OrderCraft>,
     @InjectRepository(OrderStatus)
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
@@ -149,6 +152,31 @@ export class OrdersService {
     private readonly systemOptionsService: SystemOptionsService,
     private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
+
+  /**
+   * 自愈历史数据：工艺已完成但订单状态未按链路流转时，按 craft_completed 规则补齐。
+   */
+  private async reconcileCraftCompletedOrders(actorUserId?: number): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    const crafts = await this.orderCraftRepo.find({ where: { status: 'completed' } });
+    if (!crafts.length) return;
+    const orderIds = crafts.map((c) => c.orderId);
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds) } });
+    if (!orders.length) return;
+    const craftMap = new Map(crafts.map((c) => [c.orderId, c]));
+    for (const order of orders) {
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'craft_completed',
+        actorUserId,
+      });
+      if (!next || next === order.status) continue;
+      const craft = craftMap.get(order.id);
+      order.status = next;
+      order.statusTime = craft?.completedAt ?? new Date();
+      await this.orderRepo.save(order);
+    }
+  }
 
   /** 持久化时只存 materialTypeId，不存 materialType（改名历史同步） */
   private normalizeMaterialRows(rows: OrderMaterialRow[]): OrderMaterialRow[] {
@@ -814,9 +842,14 @@ export class OrdersService {
       // 复制订单成本快照（成本页的物料/工艺/工序及利润率），新草稿可沿用原单成本信息
       const srcCost = await this.orderCostSnapshotRepo.findOne({ where: { orderId: src.id } });
       if (srcCost?.snapshot != null) {
+        const srcSnapshot =
+          srcCost.snapshot && typeof srcCost.snapshot === 'object' ? ({ ...(srcCost.snapshot as any) } as any) : null;
+        if (srcSnapshot && Object.prototype.hasOwnProperty.call(srcSnapshot, 'profitMargin')) {
+          srcSnapshot.profitMargin = this.normalizeProfitMargin(srcSnapshot.profitMargin);
+        }
         const newCost = this.orderCostSnapshotRepo.create({
           orderId: saved.id,
-          snapshot: srcCost.snapshot,
+          snapshot: srcSnapshot ?? srcCost.snapshot,
         });
         await this.orderCostSnapshotRepo.save(newCost);
       } else {
@@ -854,7 +887,8 @@ export class OrdersService {
     return `${prefix}${seqStr}`;
   }
 
-  async findAll(query: OrderListQuery) {
+  async findAll(query: OrderListQuery, actorUserId?: number) {
+    await this.reconcileCraftCompletedOrders(actorUserId);
     const { page = 1, pageSize = 20 } = query;
 
     const qb = this.orderRepo.createQueryBuilder('o');
@@ -994,6 +1028,15 @@ export class OrdersService {
             tailTotal,
           ]
         : null;
+    // 5）尾部入库数：当前仅记录总件数
+    const inboundTotal = finishing?.tailInboundQty ?? null;
+    const inboundRow =
+      inboundTotal != null
+        ? [
+            ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
+            inboundTotal,
+          ]
+        : null;
 
     const rows: Array<{ label: string; values: (number | null)[] }> = [];
     if (orderPerSize) {
@@ -1007,6 +1050,9 @@ export class OrdersService {
     }
     if (tailRow) {
       rows.push({ label: '尾部出货数', values: tailRow });
+    }
+    if (inboundRow) {
+      rows.push({ label: '尾部入库数', values: inboundRow });
     }
 
     return { headers, rows };
@@ -1036,7 +1082,8 @@ export class OrdersService {
     return { headers: [...headers, '合计'], rows };
   }
 
-  async countByStatus(query: OrderListQuery) {
+  async countByStatus(query: OrderListQuery, actorUserId?: number) {
+    await this.reconcileCraftCompletedOrders(actorUserId);
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
 
     const totalQb = this.orderRepo.createQueryBuilder('o');
@@ -1188,7 +1235,7 @@ export class OrdersService {
         ? mergedProcessItemRows
         : [{ unitPrice: 0, quantity: order.quantity ?? 0 } as any],
       productionRows: Array.isArray(existingSnapshot?.productionRows) ? existingSnapshot.productionRows : [],
-      profitMargin: typeof existingSnapshot?.profitMargin === 'number' ? existingSnapshot.profitMargin : 0.15,
+      profitMargin: this.normalizeProfitMargin(existingSnapshot?.profitMargin),
     };
 
     if (existing) {
@@ -1216,10 +1263,27 @@ export class OrdersService {
     return key(a) === key(b);
   }
 
+  private normalizeProfitMargin(v: unknown): number {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || n < 0) return 0.1;
+    // 历史默认值兼容：旧数据中的 0.15 视为默认，统一迁移到 0.1
+    if (Math.abs(n - 0.15) < 1e-9) return 0.1;
+    return n;
+  }
+
   /** 获取订单成本快照（成本页回显） */
   async getCostSnapshot(orderId: number): Promise<OrderCostSnapshot | null> {
     await this.findOne(orderId);
     const row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    if (row?.snapshot && typeof row.snapshot === 'object') {
+      const snapshot = row.snapshot as Record<string, unknown>;
+      const normalized = this.normalizeProfitMargin(snapshot.profitMargin);
+      const current = typeof snapshot.profitMargin === 'number' ? snapshot.profitMargin : Number(snapshot.profitMargin);
+      if (!Number.isFinite(current) || Math.abs(current - normalized) > 1e-9) {
+        row.snapshot = { ...snapshot, profitMargin: normalized };
+        await this.orderCostSnapshotRepo.save(row);
+      }
+    }
     return row ?? null;
   }
 

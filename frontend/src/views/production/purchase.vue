@@ -125,11 +125,13 @@
 
     <!-- 物料列表表格 -->
     <el-table
+      ref="purchaseTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="purchase-table"
+      @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -152,6 +154,7 @@
             :src="row.imageUrl"
             fit="cover"
             class="table-thumb"
+            :preview-teleported="true"
             :preview-src-list="[row.imageUrl]"
           />
           <span v-else class="text-muted">-</span>
@@ -291,6 +294,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
@@ -382,10 +386,12 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<PurchaseItemRow[]>([])
+const purchaseTableRef = ref()
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PurchaseItemRow[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-purchase-main')
 
 function getTabLabel(tab: PurchaseTabConfig): string {
   const counts = tabCounts.value
@@ -487,6 +493,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreColumnWidths(purchaseTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))

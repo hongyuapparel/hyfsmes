@@ -7,6 +7,7 @@ import { OrderExt } from '../entities/order-ext.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
+import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 export interface FinishingListItem {
   orderId: number;
@@ -61,6 +62,7 @@ export class ProductionFinishingService {
     private readonly sewingRepo: Repository<OrderSewing>,
     @InjectRepository(InboundPending)
     private readonly inboundPendingRepo: Repository<InboundPending>,
+    private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
@@ -394,6 +396,7 @@ export class ProductionFinishingService {
     tailInboundQty: number,
     defectQuantity: number,
     remark?: string | null,
+    actorUserId?: number,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -439,23 +442,45 @@ export class ProductionFinishingService {
     finishing.status = 'inbound';
     await this.finishingRepo.save(finishing);
 
-    order.status = 'completed';
-    order.statusTime = new Date();
-    await this.orderRepo.save(order);
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'tailing_inbound_completed',
+      actorUserId: actorUserId ?? 0,
+    });
+    if (next && next !== order.status) {
+      order.status = next;
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+    }
 
+    const pendingRows: InboundPending[] = [];
     if (inbound > 0) {
-      const pending = this.inboundPendingRepo.create({
-        orderId: order.id,
-        skuCode: order.skuCode ?? '',
-        quantity: inbound,
-        status: 'pending',
-      });
-      await this.inboundPendingRepo.save(pending);
+      pendingRows.push(
+        this.inboundPendingRepo.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity: inbound,
+          status: 'pending',
+        }),
+      );
+    }
+    if (defect > 0) {
+      pendingRows.push(
+        this.inboundPendingRepo.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity: defect,
+          status: 'pending',
+        }),
+      );
+    }
+    if (pendingRows.length) {
+      await this.inboundPendingRepo.save(pendingRows);
     }
   }
 
   /** 财务审批通过：等待发货且已分配完毕（出货+入库+次品=尾部收货数）时，订单完成并写入待入库 */
-  async financeApproveFinishing(orderId: number): Promise<void> {
+  async financeApproveFinishing(orderId: number, actorUserId?: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -479,17 +504,39 @@ export class ProductionFinishingService {
 
     finishing.status = 'inbound';
     await this.finishingRepo.save(finishing);
-    order.status = 'completed';
-    order.statusTime = new Date();
-    await this.orderRepo.save(order);
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'tailing_inbound_completed',
+      actorUserId: actorUserId ?? 0,
+    });
+    if (next && next !== order.status) {
+      order.status = next;
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+    }
+    const pendingRows: InboundPending[] = [];
     if (inbound > 0) {
-      const pending = this.inboundPendingRepo.create({
-        orderId: order.id,
-        skuCode: order.skuCode ?? '',
-        quantity: inbound,
-        status: 'pending',
-      });
-      await this.inboundPendingRepo.save(pending);
+      pendingRows.push(
+        this.inboundPendingRepo.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity: inbound,
+          status: 'pending',
+        }),
+      );
+    }
+    if (defect > 0) {
+      pendingRows.push(
+        this.inboundPendingRepo.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity: defect,
+          status: 'pending',
+        }),
+      );
+    }
+    if (pendingRows.length) {
+      await this.inboundPendingRepo.save(pendingRows);
     }
   }
 
@@ -568,7 +615,7 @@ export class ProductionFinishingService {
   }
 
   /** 入库：填本次入库数并累加；当 出货+入库+次品=尾部收货数 时订单完成 */
-  async inbound(orderId: number, quantity: number): Promise<void> {
+  async inbound(orderId: number, quantity: number, actorUserId?: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -602,9 +649,16 @@ export class ProductionFinishingService {
       finishing.status = 'inbound';
       await this.finishingRepo.save(finishing);
 
-      order.status = 'completed';
-      order.statusTime = new Date();
-      await this.orderRepo.save(order);
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'tailing_inbound_completed',
+        actorUserId: actorUserId ?? 0,
+      });
+      if (next && next !== order.status) {
+        order.status = next;
+        order.statusTime = new Date();
+        await this.orderRepo.save(order);
+      }
 
       const pending = this.inboundPendingRepo.create({
         orderId: order.id,

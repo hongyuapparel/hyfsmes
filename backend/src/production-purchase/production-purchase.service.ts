@@ -194,7 +194,17 @@ export class ProductionPurchaseService {
       const ext = extMap.get(order.id);
       const materials: OrderMaterialRow[] = ext?.materials ?? [];
       const orderDate = this.toDateOnlyLocalString(order.orderDate);
-      const pendingPurchaseAt = pendingPurchaseEnteredAtMap.get(order.id) || null;
+      const pendingPurchaseAt =
+        pendingPurchaseEnteredAtMap.get(order.id) ||
+        (order.status === 'pending_purchase' && order.statusTime
+          ? this.toDateTimeLocalString(order.statusTime)
+          : null);
+
+      // 采购页仅展示“当前待采购”或“历史进入过待采购”的订单：
+      // 若某条链路配置为不经过待采购（如部分成品链路），则不应出现在采购页。
+      if (!pendingPurchaseAt) {
+        continue;
+      }
 
       for (let i = 0; i < materials.length; i++) {
         const m = materials[i];
@@ -291,10 +301,6 @@ export class ProductionPurchaseService {
           triggerCode: 'purchase_all_completed',
           actorUserId: actorUserId ?? 0,
         });
-        // 若未命中任何配置规则，则按默认样品/大货逻辑继续流转
-        if (!next) {
-          next = await this.orderWorkflowService.resolveFallbackNextStatusForPurchase(order);
-        }
         if (next && next !== order.status) {
           order.status = next;
           order.statusTime = new Date();

@@ -9,6 +9,7 @@ import { InboundPending } from '../entities/inbound-pending.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
+import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
 import { ProductionFinishingController } from './production-finishing.controller';
 import { ProductionFinishingService } from './production-finishing.service';
 
@@ -16,6 +17,7 @@ import { ProductionFinishingService } from './production-finishing.service';
   imports: [
     TypeOrmModule.forFeature([Order, OrderFinishing, OrderCutting, OrderExt, OrderSewing, InboundPending, User, RolePermission]),
     AuthModule,
+    OrderWorkflowModule,
   ],
   controllers: [ProductionFinishingController],
   providers: [ProductionFinishingService],

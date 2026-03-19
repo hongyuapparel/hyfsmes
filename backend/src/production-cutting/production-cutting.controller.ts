@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Res, UseGuards
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { ProductionCuttingService, CuttingListQuery } from './production-cutting.service';
 import type { Response } from 'express';
 
@@ -107,6 +108,7 @@ export class ProductionCuttingController {
     @Body('cuttingDepartment') cuttingDepartment?: string,
     @Body('cutterName') cutterName?: string,
     @Body('actualFabricMeters') actualFabricMeters?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.cuttingService.completeCutting(
       Number(orderId),
@@ -115,6 +117,7 @@ export class ProductionCuttingController {
       cuttingDepartment ?? null,
       cutterName ?? null,
       actualFabricMeters ?? null,
+      user?.userId,
     );
   }
 }

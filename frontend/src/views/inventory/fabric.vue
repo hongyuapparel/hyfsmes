@@ -99,13 +99,15 @@
           <el-date-picker
             v-model="outboundFilter.dateRange"
             type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
+            start-placeholder="出库时间"
+            end-placeholder=""
+            range-separator=""
+            unlink-panels
             value-format="YYYY-MM-DD"
             :shortcuts="rangeShortcuts"
             size="large"
-            class="filter-bar-item"
+            :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
+            :style="getFilterRangeStyle(outboundFilter.dateRange)"
             @change="onOutboundSearch(true)"
           />
           <div class="filter-bar-actions">
@@ -282,9 +284,12 @@ import { uploadOutboundImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
+const DATE_RANGE_WIDTH_EMPTY = '140px'
+const DATE_RANGE_WIDTH_FILLED = '220px'
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
 const FILTER_CHAR_PX = 14
+const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
 
 function getFilterInputStyle(v: unknown) {
   return v ? { color: ACTIVE_FILTER_COLOR } : undefined
@@ -295,6 +300,12 @@ function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
   const estimated = text.length * FILTER_CHAR_PX + 60
   const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
   return { width: `${width}px`, flex: `0 0 ${width}px` }
+}
+function getFilterRangeStyle(v: [string, string] | []) {
+  const hasValue = Array.isArray(v) && v.length === 2
+  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
+  const base = { width, flex: `0 0 ${width}` }
+  return hasValue ? { ...base, ...activeSelectStyle } : base
 }
 
 const filter = reactive({ name: '', customerName: '' })
@@ -625,6 +636,19 @@ function onOutboundPageSizeChange() {
   align-items: center;
   gap: var(--space-sm);
   margin-left: auto;
+}
+
+.range-single.el-date-editor--daterange :deep(.el-range-separator) {
+  width: 0;
+}
+.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
+  display: none;
+}
+.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
+  width: 100%;
+}
+.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
+  display: none;
 }
 
 .hidden-file-input {

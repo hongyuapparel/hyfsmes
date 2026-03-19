@@ -2,6 +2,7 @@ import { ForbiddenException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
+import { OrderExt } from '../entities/order-ext.entity';
 import { OrderStatusTransition } from '../entities/order-status-transition.entity';
 import { SystemOption } from '../entities/system-option.entity';
 import { User } from '../entities/user.entity';
@@ -25,6 +26,8 @@ export class OrderWorkflowService {
   constructor(
     @InjectRepository(OrderStatusTransition)
     private readonly transitionRepo: Repository<OrderStatusTransition>,
+    @InjectRepository(OrderExt)
+    private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(SystemOption)
     private readonly optionRepo: Repository<SystemOption>,
     @InjectRepository(User)
@@ -90,7 +93,24 @@ export class OrderWorkflowService {
     const productForm =
       collaborationValue.includes('成品') ? 'finished' : collaborationValue.includes('裁片') ? 'cut' : undefined;
 
-    const hasProcessItem = !!(order.processItem && String(order.processItem).trim());
+    // hasProcessItem 以 E 区 order_ext.process_items 为准，兼容回退到旧字段 orders.process_item。
+    let hasProcessItem = !!(order.processItem && String(order.processItem).trim());
+    try {
+      const ext = await this.orderExtRepo.findOne({ where: { orderId: order.id } });
+      const extItems = ext?.processItems;
+      if (Array.isArray(extItems)) {
+        hasProcessItem = extItems.some((it) => {
+          if (!it || typeof it !== 'object') return false;
+          const processName = String((it as any).processName ?? '').trim();
+          const supplierName = String((it as any).supplierName ?? '').trim();
+          const part = String((it as any).part ?? '').trim();
+          const remark = String((it as any).remark ?? '').trim();
+          return !!(processName || supplierName || part || remark);
+        });
+      }
+    } catch {
+      // 查询扩展表失败时，回退旧字段判断，避免影响主流程
+    }
     return {
       orderType,
       orderTypeId: order.orderTypeId ?? null,
@@ -156,6 +176,7 @@ export class OrderWorkflowService {
     const tags = await this.resolveOrderTags(order);
     const actorRole = await this.getActorRole(actorUserId);
     const actorTokens = [actorRole.code, actorRole.name].filter((v) => !!v);
+    const isAdmin = actorRole.code === 'admin';
 
     const conditionMatched: OrderStatusTransition[] = [];
     const candidates: Array<{ rule: OrderStatusTransition; score: number }> = [];
@@ -165,7 +186,7 @@ export class OrderWorkflowService {
       conditionMatched.push(r);
 
       const allow = this.parseAllowRoles(r.allowRoles);
-      if (allow.length > 0 && (!actorTokens.length || !actorTokens.some((t) => allow.includes(t)))) {
+      if (allow.length > 0 && !isAdmin && (!actorTokens.length || !actorTokens.some((t) => allow.includes(t)))) {
         // 条件匹配但角色不在允许列表中，先跳过，后面统一判断是否仅因角色限制导致失败
         continue;
       }
@@ -181,20 +202,19 @@ export class OrderWorkflowService {
       return null;
     }
 
-    candidates.sort((a, b) => b.score - a.score || a.rule.id - b.rule.id);
+    // 冲突规则优先级：
+    // 1) 条件命中更具体（score 更高）优先
+    // 2) 链路规则（chainId 非空）优先于独立旧规则
+    // 3) 同优先级下使用最新规则（id 更大）优先，避免历史旧规则覆盖新配置
+    candidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aHasChain = a.rule.chainId != null ? 1 : 0;
+      const bHasChain = b.rule.chainId != null ? 1 : 0;
+      if (bHasChain !== aHasChain) return bHasChain - aHasChain;
+      return b.rule.id - a.rule.id;
+    });
     return candidates[0].rule.toStatus;
   }
 
-  /**
-   * 当未命中任何配置规则时，按默认样品/大货逻辑给出「采购完成」后的下一状态。
-   * - 样品类订单：待纸样（pending_pattern）
-   * - 大货类订单：待裁床（pending_cutting）
-   */
-  async resolveFallbackNextStatusForPurchase(order: Order): Promise<string | null> {
-    const tags = await this.resolveOrderTags(order);
-    if (tags.orderType === 'sample') return 'pending_pattern';
-    if (tags.orderType === 'bulk') return 'pending_cutting';
-    return null;
-  }
 }
 

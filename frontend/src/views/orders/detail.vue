@@ -114,42 +114,15 @@
           size="small"
           class="compact-table table-full materials-table"
         >
-          <el-table-column prop="materialTypeLabel" label="类型" min-width="80" />
-          <el-table-column prop="supplierName" label="供应商" min-width="100" />
-          <el-table-column prop="materialName" label="名称" min-width="120" />
-          <el-table-column prop="color" label="颜色" min-width="80" />
           <el-table-column
-            v-if="hasAnyField(materialsForView, 'usagePerPiece')"
-            prop="usagePerPiece"
-            label="单件用量"
-            min-width="70"
+            v-for="col in materialColumns"
+            :key="`material-col-${col.key}`"
+            :prop="col.key"
+            :label="col.label"
+            :min-width="col.minWidth"
+            :show-overflow-tooltip="col.showOverflowTooltip"
           />
-          <el-table-column
-            v-if="hasAnyField(materialsForView, 'lossPercent')"
-            prop="lossPercent"
-            label="损耗%"
-            min-width="60"
-          />
-          <el-table-column
-            v-if="hasAnyField(materialsForView, 'orderPieces')"
-            prop="orderPieces"
-            label="订单件数"
-            min-width="70"
-          />
-          <el-table-column
-            v-if="hasAnyField(materialsForView, 'purchaseQuantity')"
-            prop="purchaseQuantity"
-            label="采购总量"
-            min-width="80"
-          />
-          <el-table-column
-            v-if="hasAnyField(materialsForView, 'remark')"
-            prop="remark"
-            label="备注"
-            min-width="200"
-            show-overflow-tooltip
-            />
-          </el-table>
+        </el-table>
         </div>
       </section>
 
@@ -167,7 +140,7 @@
             v-for="(header, index) in sizeMetaHeadersForView"
             :key="'meta-' + index"
             :label="header"
-            min-width="80"
+            :min-width="sizeMetaColWidth"
           >
             <template #default="{ row }">
               <span>{{ row.metaValues[index] ?? '' }}</span>
@@ -177,7 +150,7 @@
             v-for="(header, index) in sizeHeadersForView"
             :key="'size-' + index"
             :label="header"
-            min-width="60"
+            :min-width="sizeValueColWidth"
           >
             <template #default="{ row }">
               <span>{{ row.sizeValues[index] ?? '' }}</span>
@@ -197,9 +170,14 @@
           size="small"
           class="compact-table table-full"
         >
-          <el-table-column prop="processName" label="工艺项目" min-width="120" />
-          <el-table-column prop="supplierName" label="供应商" min-width="100" />
-            <el-table-column prop="remark" label="说明 / 备注" min-width="160" />
+          <el-table-column
+            v-for="col in processColumns"
+            :key="`process-col-${col.key}`"
+            :prop="col.key"
+            :label="col.label"
+            :min-width="col.minWidth"
+            :show-overflow-tooltip="col.showOverflowTooltip"
+          />
         </el-table>
         </div>
       </section>
@@ -393,10 +371,12 @@ const materialsForView = computed(() => {
       supplierName: m.supplierName ?? '',
       materialName: m.materialName ?? '',
       color: m.color ?? '',
+      fabricWidth: m.fabricWidth ?? '',
       usagePerPiece: m.usagePerPiece ?? '',
       lossPercent: m.lossPercent ?? '',
       orderPieces: m.orderPieces ?? '',
       purchaseQuantity: m.purchaseQuantity ?? '',
+      cuttingQuantity: m.cuttingQuantity ?? '',
       remark: m.remark ?? '',
     }
   })
@@ -407,12 +387,72 @@ const materialsForView = computed(() => {
 
 const hasMaterials = computed(() => materialsForView.value.length > 0)
 
-function hasAnyField<T extends Record<string, unknown>>(list: T[], key: keyof T): boolean {
-  return list.some((item) => {
-    const v = item[key]
-    return v !== '' && v != null
-  })
+function toPrintLabelByKey(key: string): string {
+  const labelMap: Record<string, string> = {
+    materialTypeLabel: '类型',
+    supplierName: '供应商',
+    materialName: '名称',
+    color: '颜色',
+    fabricWidth: '门幅',
+    usagePerPiece: '单件用量',
+    lossPercent: '损耗%',
+    orderPieces: '订单件数',
+    purchaseQuantity: '采购总量',
+    cuttingQuantity: '裁床用量',
+    remark: '备注',
+    processName: '工艺项目',
+    part: '部位',
+  }
+  if (labelMap[key]) return labelMap[key]
+  return key
 }
+
+interface DynamicColumn {
+  key: string
+  label: string
+  minWidth: number
+  showOverflowTooltip?: boolean
+}
+
+function buildDynamicColumns(
+  rows: Record<string, unknown>[],
+  preferredOrder: string[],
+  defaultMinWidth = 100,
+): DynamicColumn[] {
+  const allKeys = new Set<string>()
+  rows.forEach((row) => {
+    Object.entries(row).forEach(([key, value]) => {
+      if (value !== '' && value != null) allKeys.add(key)
+    })
+  })
+  const orderedKeys = [...preferredOrder.filter((k) => allKeys.has(k)), ...[...allKeys].filter((k) => !preferredOrder.includes(k))]
+  return orderedKeys.map((key) => ({
+    key,
+    label: toPrintLabelByKey(key),
+    minWidth: key === 'remark' ? 160 : defaultMinWidth,
+    showOverflowTooltip: key === 'remark',
+  }))
+}
+
+const materialColumns = computed(() =>
+  buildDynamicColumns(
+    materialsForView.value as Record<string, unknown>[],
+    [
+      'materialTypeLabel',
+      'supplierName',
+      'materialName',
+      'color',
+      'fabricWidth',
+      'usagePerPiece',
+      'lossPercent',
+      'orderPieces',
+      'purchaseQuantity',
+      'cuttingQuantity',
+      'remark',
+    ],
+    80,
+  ),
+)
 
 // D 区
 const sizeMetaHeadersForView = computed(() => {
@@ -423,6 +463,24 @@ const sizeMetaHeadersForView = computed(() => {
 const sizeHeadersForView = computed(() => {
   const headers = (detail.value?.colorSizeHeaders ?? []).filter((h) => String(h || '').trim())
   return headers.length ? headers : []
+})
+
+/**
+ * D 区列宽自适应压缩：
+ * 打印页不可滚动，尺码列越多时越需要压缩前置信息列与尺码列宽度。
+ */
+const sizeMetaColWidth = computed(() => {
+  const sizeCount = sizeHeadersForView.value.length
+  if (sizeCount >= 8) return 56
+  if (sizeCount >= 6) return 62
+  return 72
+})
+
+const sizeValueColWidth = computed(() => {
+  const sizeCount = sizeHeadersForView.value.length
+  if (sizeCount >= 8) return 34
+  if (sizeCount >= 6) return 40
+  return 52
 })
 
 const sizeInfoRowsForView = computed(() => {
@@ -444,17 +502,34 @@ const hasSizeInfo = computed(() => sizeInfoRowsForView.value.length > 0)
 
 // E 区
 const processItemsForView = computed(() => {
-  const list = (detail.value?.processItems ?? []).map((p) => ({
-    processName: p.processName ?? '',
-    supplierName: p.supplierName ?? '',
-    remark: p.remark ?? '',
-  }))
+  const list = (detail.value?.processItems ?? []).map((p: any) => {
+    const extras = Object.entries(p ?? {}).reduce((acc, [key, value]) => {
+      if (['processName', 'supplierName', 'part', 'remark'].includes(key)) return acc
+      if (key === 'id' || key.endsWith('Id') || key === 'createdAt' || key === 'updatedAt') return acc
+      ;(acc as any)[key] = value
+      return acc
+    }, {} as Record<string, unknown>)
+    return {
+      processName: p.processName ?? '',
+      supplierName: p.supplierName ?? '',
+      part: p.part ?? '',
+      remark: p.remark ?? '',
+      ...extras,
+    }
+  })
   return list.filter((p) =>
     Object.values(p).some((v) => String(v || '').trim()),
   )
 })
 
 const hasProcessItems = computed(() => processItemsForView.value.length > 0)
+const processColumns = computed(() =>
+  buildDynamicColumns(
+    processItemsForView.value as Record<string, unknown>[],
+    ['processName', 'supplierName', 'part', 'remark'],
+    100,
+  ),
+)
 
 // G 区
 const packagingCellsForView = computed(() => {
