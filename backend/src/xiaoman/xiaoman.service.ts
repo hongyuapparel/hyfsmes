@@ -40,6 +40,8 @@ export interface XiaomanCompanyDetail {
 export class XiaomanService {
   private token: string | null = null;
   private tokenExpiry = 0;
+  private companyListCache: { list: XiaomanCompanyItem[]; fetchedAt: number } | null = null;
+  private companyListCacheTtlMs = 10 * 60 * 1000; // 10 分钟
 
   constructor(private config: ConfigService) {}
 
@@ -97,70 +99,118 @@ export class XiaomanService {
     // 只取「客户列表」中的客户（all=0 排除公海）
     const baseParams = '&removed=0&all=0';
 
-    // 有搜索关键词：由于小满接口文档未说明 keyword 的行为，实际测试发现它不会按关键字过滤，
-    // 所以这里改为「全量拉取 + 本地模糊匹配」，保证你能搜到任何客户。
+    // 有搜索关键词：由于小满接口文档未说明 keyword 的行为，实际测试发现它并不会稳定按关键字过滤，
+    // 所以这里改为「拉取客户列表（all=0）+ 本地模糊匹配」。
+    // 为了避免多次请求导致的超时/断线，这里加缓存 + 多页拉取重试 + 失败降级（不让前端直接报错）。
     if (hasKeyword) {
-      const MAX_FETCH = 5000;
-      const PAGE_SIZE_FOR_FETCH = 500;
-      let fetched: XiaomanCompanyItem[] = [];
-      let startIndex = 0;
-      let totalItem: number | null = null;
+      const now = Date.now()
+      if (this.companyListCache && now - this.companyListCache.fetchedAt < this.companyListCacheTtlMs) {
+        const all = this.companyListCache.list
+        const lower = kw.toLowerCase()
+        const filtered = all.filter(
+          (c) =>
+            (c.name || '').toLowerCase().includes(lower) ||
+            (c.short_name || '').toLowerCase().includes(lower) ||
+            (c.serial_id || '').toLowerCase().includes(lower),
+        )
+        const total = filtered.length
+        const sliceStart = (page - 1) * pageSize
+        const sliceEnd = sliceStart + pageSize
+        // 若缓存不足导致过滤结果为空，则继续走全量拉取避免“搜不到”
+        if (total > 0) {
+          return { list: filtered.slice(sliceStart, sliceEnd), total }
+        }
+      }
+
+      const MAX_FETCH = 5000
+      const PAGE_SIZE_FOR_FETCH = 500
+      let fetched: XiaomanCompanyItem[] = []
+      let startIndex = 0
+      let totalItem: number | null = null
+      let endedByMaxFetch = false
+      let lastPageListLen = 0
+
+      const fetchPageWithRetry = async (): Promise<{ list: XiaomanCompanyItem[]; totalItem?: number } | null> => {
+        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${startIndex}${baseParams}`
+        const maxAttempts = 3
+        let lastError: unknown = null
+        for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+          try {
+            const res = await fetch(url, {
+              headers: { Authorization: `Bearer ${token}` },
+            })
+            const text = await res.text()
+            let json: {
+              code?: number
+              message?: string
+              data?: { list?: XiaomanCompanyItem[]; totalItem?: number }
+            }
+            try {
+              json = JSON.parse(text) as typeof json
+            } catch {
+              throw new Error(`小满 API 响应格式异常 (${res.status})`)
+            }
+            if (json.code !== 200) {
+              const msg = json.message || `小满客户列表获取失败 (code: ${json.code})`
+              throw new Error(msg)
+            }
+            if (!json.data) {
+              throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围')
+            }
+            return { list: json.data.list ?? [], totalItem: json.data.totalItem }
+          } catch (e) {
+            lastError = e
+            const delayMs = 400 * attempt
+            await new Promise((r) => setTimeout(r, delayMs))
+          }
+        }
+        // 降级：这一页拿不到，就直接返回 null
+        return null
+      }
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${startIndex}${baseParams}`;
-        const res = await fetch(url, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const text = await res.text();
-        let json: {
-          code?: number;
-          message?: string;
-          data?: { list?: XiaomanCompanyItem[]; totalItem?: number };
-        };
-        try {
-          json = JSON.parse(text) as typeof json;
-        } catch {
-          throw new Error(`小满 API 响应格式异常 (${res.status})`);
-        }
-        if (json.code !== 200) {
-          const msg = json.message || `小满客户列表获取失败 (code: ${json.code})`;
-          throw new Error(msg);
-        }
-        if (!json.data) {
-          throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围');
-        }
-        const pageList = json.data.list ?? [];
-        if (totalItem == null) {
-          const rawTotal = json.data.totalItem;
-          const parsed = typeof rawTotal === 'number' ? rawTotal : rawTotal != null ? Number(rawTotal) : NaN;
-          if (Number.isFinite(parsed) && parsed > 0) totalItem = parsed;
-        }
-        fetched = fetched.concat(pageList);
+        const r = await fetchPageWithRetry()
+        if (!r) break
 
-        const reachedTotal = totalItem != null ? fetched.length >= totalItem : false;
-        if (reachedTotal || fetched.length >= MAX_FETCH || pageList.length < PAGE_SIZE_FOR_FETCH) {
-          break;
+        if (totalItem == null && r.totalItem != null) {
+          const parsed = Number(r.totalItem)
+          if (Number.isFinite(parsed) && parsed > 0) totalItem = parsed
         }
-        startIndex += PAGE_SIZE_FOR_FETCH;
+
+        lastPageListLen = r.list.length
+        fetched = fetched.concat(r.list)
+        if (fetched.length >= MAX_FETCH) endedByMaxFetch = true
+
+        const reachedTotal = totalItem != null ? fetched.length >= totalItem : false
+        if (reachedTotal || fetched.length >= MAX_FETCH || r.list.length < PAGE_SIZE_FOR_FETCH) {
+          break
+        }
+        startIndex += PAGE_SIZE_FOR_FETCH
+      }
+
+      // 只有在“看起来已拉完/自然结束”时才缓存，避免缓存不完整后导致后续永远搜不到
+      const shouldCache = fetched.length > 0 && !endedByMaxFetch && (lastPageListLen < PAGE_SIZE_FOR_FETCH || (totalItem != null && fetched.length >= totalItem))
+      if (shouldCache) {
+        this.companyListCache = { list: fetched, fetchedAt: Date.now() }
       }
 
       if (!fetched.length) {
-        return { list: [], total: 0 };
+        return { list: [], total: 0 }
       }
 
-      const lower = kw.toLowerCase();
+      const lower = kw.toLowerCase()
       const filtered = fetched.filter(
         (c) =>
           (c.name || '').toLowerCase().includes(lower) ||
           (c.short_name || '').toLowerCase().includes(lower) ||
           (c.serial_id || '').toLowerCase().includes(lower),
-      );
+      )
 
-      const total = filtered.length;
-      const sliceStart = (page - 1) * pageSize;
-      const sliceEnd = sliceStart + pageSize;
-      return { list: filtered.slice(sliceStart, sliceEnd), total };
+      const total = filtered.length
+      const sliceStart = (page - 1) * pageSize
+      const sliceEnd = sliceStart + pageSize
+      return { list: filtered.slice(sliceStart, sliceEnd), total }
     }
 
     // 无搜索关键词：直接按页码从小满取一页即可

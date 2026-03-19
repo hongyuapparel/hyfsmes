@@ -284,7 +284,9 @@ const editId = ref(0)
 const submitLoading = ref(false)
 const selectedIds = ref<number[]>([])
 
-const CUSTOMER_TABLE_FIELDS = computed(() => CUSTOMER_FIELDS_SORTED.filter((f) => f.code !== 'cooperationDate'))
+const CUSTOMER_TABLE_FIELDS = computed(() =>
+  CUSTOMER_FIELDS_SORTED.filter((f) => !['cooperationDate', 'contactInfo', 'productGroup'].includes(f.code)),
+)
 const CUSTOMER_FORM_FIELDS = computed(() => CUSTOMER_FIELDS_SORTED.filter((f) => f.code !== 'cooperationDate'))
 
 function toProductGroupTreeSelect(

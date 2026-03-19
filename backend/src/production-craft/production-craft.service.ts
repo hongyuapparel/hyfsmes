@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
-import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
+import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 
 export interface CraftListItem {
@@ -80,17 +80,37 @@ export class ProductionCraftService {
     return materials.every((m) => (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed');
   }
 
-  private firstSupplierName(materials: OrderMaterialRow[] | null): string {
-    if (!materials || materials.length === 0) return '';
-    const first = materials.find((m) => (m.supplierName ?? '').trim());
-    return first ? (first.supplierName ?? '').trim() : (materials[0]?.supplierName ?? '').trim();
+  private buildCraftSummaryFromProcessItems(processItems: ProcessRow[] | null): { supplierName: string; processItem: string } {
+    const items = Array.isArray(processItems) ? processItems : [];
+    const supplierNames = items
+      .map((r) => (r.supplierName ?? '').trim())
+      .filter((v) => !!v);
+    const processNames = items
+      .map((r) => (r.processName ?? '').trim())
+      .filter((v) => !!v);
+    const uniq = (arr: string[]) => Array.from(new Set(arr));
+    const suppliers = uniq(supplierNames);
+    const processes = uniq(processNames);
+    return {
+      supplierName: suppliers.length ? suppliers.join(' / ') : '',
+      processItem: processes.length ? processes.join(' / ') : '',
+    };
   }
 
-  private anySupplierMatches(materials: OrderMaterialRow[] | null, supplier: string): boolean {
+  private anyCraftSupplierMatches(processItems: ProcessRow[] | null, supplier: string): boolean {
     if (!supplier?.trim()) return true;
-    if (!materials || materials.length === 0) return false;
+    const items = Array.isArray(processItems) ? processItems : [];
+    if (!items.length) return false;
     const lower = supplier.trim().toLowerCase();
-    return materials.some((m) => (m.supplierName ?? '').toLowerCase().includes(lower));
+    return items.some((r) => (r.supplierName ?? '').toLowerCase().includes(lower));
+  }
+
+  private anyCraftProcessMatches(processItems: ProcessRow[] | null, processItem: string): boolean {
+    if (!processItem?.trim()) return true;
+    const items = Array.isArray(processItems) ? processItems : [];
+    if (!items.length) return false;
+    const lower = processItem.trim().toLowerCase();
+    return items.some((r) => (r.processName ?? '').toLowerCase().includes(lower));
   }
 
   async getCraftList(query: CraftListQuery): Promise<{
@@ -111,15 +131,14 @@ export class ProductionCraftService {
       pageSize = 20,
     } = query;
 
-    // 工艺管理：仅展示审单通过后的订单（排除草稿、待审单），且选择了工艺项目
+    // 工艺管理：仅展示审单通过后的订单（排除草稿、待审单），且订单编辑 E 区存在工艺项目
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .where("o.process_item IS NOT NULL AND o.process_item != ''")
+      .innerJoin(OrderExt, 'ext', 'ext.orderId = o.id')
+      // MySQL JSON：只展示 E 区至少 1 行工艺项目的订单
+      .where('JSON_LENGTH(ext.process_items) > 0')
       .andWhere('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review'] });
 
-    if (processItem?.trim()) {
-      qb.andWhere('o.process_item LIKE :processItem', { processItem: `%${processItem.trim()}%` });
-    }
     if (typeof orderTypeId === 'number') {
       qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId });
     }
@@ -154,7 +173,9 @@ export class ProductionCraftService {
     for (const order of orders) {
       const ext = extMap.get(order.id);
       const materials = ext?.materials ?? null;
-      if (supplier?.trim() && !this.anySupplierMatches(materials, supplier)) continue;
+      const processItems = ext?.processItems ?? null;
+      if (supplier?.trim() && !this.anyCraftSupplierMatches(processItems, supplier)) continue;
+      if (processItem?.trim() && !this.anyCraftProcessMatches(processItems, processItem)) continue;
 
       const craft = craftMap.get(order.id);
       const craftStatus = (craft?.status ?? 'pending').toLowerCase();
@@ -168,6 +189,7 @@ export class ProductionCraftService {
           : order.statusTime
             ? this.toDateTimeLocalString(order.statusTime)
             : null;
+      const summary = this.buildCraftSummaryFromProcessItems(processItems);
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
@@ -178,8 +200,8 @@ export class ProductionCraftService {
         orderDate: this.toDateOnlyLocalString(order.orderDate),
         skuCode: order.skuCode ?? '',
         imageUrl: order.imageUrl ?? '',
-        supplierName: this.firstSupplierName(materials) || '-',
-        processItem: order.processItem?.trim() ?? '-',
+        supplierName: summary.supplierName,
+        processItem: summary.processItem,
         orderTypeId: order.orderTypeId ?? null,
         collaborationTypeId: order.collaborationTypeId ?? null,
         purchaseStatus: purchaseCompleted ? 'completed' : 'pending',

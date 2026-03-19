@@ -162,7 +162,7 @@
           </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="销售价">
+            <el-form-item label="销售价" prop="salePrice" required>
               <el-input v-model="form.salePrice" placeholder="人民币" />
             </el-form-item>
           </el-col>
@@ -381,6 +381,7 @@
               placeholder="选择物料类型"
               filterable
               clearable
+              @change="onMaterialTypeChange(row)"
               :ref="(el) => setMaterialCellRef(el, $index, 0)"
               @keydown.capture.stop="onMaterialCellKeydown($event, $index, 0)"
             >
@@ -401,6 +402,10 @@
               filterable
               allow-create
               default-first-option
+              remote
+              :remote-method="(kw: string) => searchMaterialSuppliers(kw, row)"
+              :loading="supplierLoading"
+              @visible-change="(visible: boolean) => onMaterialSupplierVisibleChange(visible, row)"
               @change="onSupplierChange(row)"
               :ref="(el) => setMaterialCellRef(el, $index, 1)"
               @keydown.capture.stop="onMaterialCellKeydown($event, $index, 1)"
@@ -630,7 +635,7 @@
               placeholder="选择供应商"
               filterable
               clearable
-              :remote-method="searchSuppliers"
+              :remote-method="searchProcessSuppliers"
               remote
               :loading="supplierLoading"
             >
@@ -968,6 +973,18 @@ const rules: FormRules = {
   collaborationTypeId: [{ required: true, message: '请选择合作方式', trigger: 'change' }],
   orderTypeId: [{ required: true, message: '请选择订单类型', trigger: 'change' }],
   customerDueDate: [{ required: true, message: '请选择客户交期', trigger: 'change' }],
+  salePrice: [
+    {
+      validator: (_rule: any, value: any, callback: (err?: Error) => void) => {
+        const str = String(value ?? '').trim()
+        if (!str) return callback(new Error('请填写销售价'))
+        const num = Number(str)
+        if (!Number.isFinite(num) || num <= 0) return callback(new Error('销售价需大于 0'))
+        return callback()
+      },
+      trigger: 'blur',
+    },
+  ],
 }
 
 // SKU 选择弹窗（从产品列表中选择）
@@ -1314,6 +1331,16 @@ function normalizeColorRows() {
   })
 }
 
+function ensureAtLeastOneColorRow() {
+  if (colorRows.value.length > 0) return
+  const len = sizeHeaders.value.length
+  colorRows.value.push({
+    colorName: '',
+    quantities: Array(len).fill(0),
+    remark: '',
+  })
+}
+
 function addColorRow() {
   const len = sizeHeaders.value.length
   colorRows.value.push({
@@ -1325,6 +1352,7 @@ function addColorRow() {
 
 function removeColorRow(index: number) {
   colorRows.value.splice(index, 1)
+  ensureAtLeastOneColorRow()
 }
 
 function addSizeColumn() {
@@ -1755,8 +1783,15 @@ function normalizePackagingCells() {
 // 初始化时保证与默认表头长度一致，避免模板访问 undefined
 normalizePackagingCells()
 
+function getNextPackagingHeader(): string {
+  const existing = new Set(packagingHeaders.value.map((h) => String(h ?? '').trim()).filter(Boolean))
+  const missingDefault = defaultPackagingHeaders.find((h) => !existing.has(h))
+  if (missingDefault) return missingDefault
+  return `项${packagingHeaders.value.length + 1}`
+}
+
 function addPackagingHeader() {
-  packagingHeaders.value.push(`项${packagingHeaders.value.length + 1}`)
+  packagingHeaders.value.push(getNextPackagingHeader())
   normalizePackagingCells()
 }
 
@@ -1936,6 +1971,62 @@ async function searchSuppliers(keyword: string) {
   }
 }
 
+async function searchProcessSuppliers(keyword: string) {
+  return searchSuppliersByType('工艺供应商', keyword)
+}
+
+function getMaterialTypeLabel(row: MaterialRow): string {
+  if (row.materialTypeId != null) {
+    const opt = materialTypeOptions.value.find((x) => x.id === row.materialTypeId)
+    if (opt?.label) return String(opt.label)
+  }
+  return String(row.materialType ?? '')
+}
+
+function getSupplierTypeForMaterialType(materialTypeLabel: string): string {
+  const label = materialTypeLabel.trim()
+  if (label === '主布' || label === '里布' || label === '衬布') return '面料供应商'
+  if (label === '辅料') return '辅料供应商'
+  if (label === '成品') return '成品供应商'
+  return ''
+}
+
+async function searchSuppliersByType(typeValue: string, keyword: string) {
+  supplierLoading.value = true
+  try {
+    const res = await request.get('/suppliers/items', {
+      params: {
+        type: typeValue || undefined,
+        name: keyword || undefined,
+        page: 1,
+        pageSize: 20,
+      },
+      skipGlobalErrorHandler: true,
+    })
+    const data = res.data as { list?: { id: number; name: string }[] }
+    supplierOptions.value = data.list ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('供应商下拉加载失败', getErrorMessage(e))
+  } finally {
+    supplierLoading.value = false
+  }
+}
+
+function onMaterialTypeChange(row: MaterialRow) {
+  row.supplierName = ''
+}
+
+function onMaterialSupplierVisibleChange(visible: boolean, row: MaterialRow) {
+  if (!visible) return
+  const typeValue = getSupplierTypeForMaterialType(getMaterialTypeLabel(row))
+  void searchSuppliersByType(typeValue, '')
+}
+
+function searchMaterialSuppliers(keyword: string, row: MaterialRow) {
+  const typeValue = getSupplierTypeForMaterialType(getMaterialTypeLabel(row))
+  return searchSuppliersByType(typeValue, keyword)
+}
+
 // 保存逻辑
 const saving = ref(false)
 const submitting = ref(false)
@@ -1947,6 +2038,11 @@ function checkRequiredFields(): boolean {
   if (form.collaborationTypeId == null || form.collaborationTypeId === undefined) missing.push('合作方式')
   if ((form as any).orderTypeId == null || (form as any).orderTypeId === undefined) missing.push('订单类型')
   if (!form.customerDueDate) missing.push('客户交期')
+  {
+    const str = String(form.salePrice ?? '').trim()
+    const num = Number(str)
+    if (!str || !Number.isFinite(num) || num <= 0) missing.push('销售价')
+  }
 
   if (missing.length) {
     ElMessage.warning(`请先填写必填项：${missing.join('、')}`)
@@ -2070,6 +2166,8 @@ async function loadDetail() {
     const today = new Date()
     const iso = today.toISOString().slice(0, 10)
     form.orderDate = iso
+    // B 区默认必须有一行，避免每次都要点「新增颜色」
+    ensureAtLeastOneColorRow()
     return
   }
   try {
@@ -2110,6 +2208,7 @@ async function loadDetail() {
       remark: row.remark ?? '',
     }))
     normalizeColorRows()
+    ensureAtLeastOneColorRow()
     // C 区
     materials.value = ((d as any).materials ?? []).map((m: any) => ({
       materialTypeId: m.materialTypeId ?? null,
@@ -2202,7 +2301,7 @@ onMounted(async () => {
         // 初始化 SKU 下拉，让用户下拉时能直接看到产品列表
         await searchSkus('')
         // C 区 / E 区供应商下拉初始列表
-        await searchSuppliers('')
+        await searchProcessSuppliers('')
         // E 区工艺项目下拉：与「供应商设置」中「工艺供应商」的业务范围一致
         await loadProcessOptions()
       })(),
