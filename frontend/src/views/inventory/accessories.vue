@@ -82,11 +82,13 @@
         </div>
 
         <el-table
+          ref="accessoriesStockTableRef"
           v-loading="loading"
           :data="list"
           border
           stripe
           class="accessories-table"
+          @header-dragend="onAccessoriesStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="46" fixed />
@@ -164,7 +166,7 @@
             :shortcuts="rangeShortcuts"
             size="large"
             :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-            :style="getFilterRangeStyle(outboundFilter.dateRange)"
+            :style="getInventoryOutboundRangeStyle(outboundFilter.dateRange)"
             @change="onOutboundSearch(true)"
           />
           <div class="filter-bar-actions">
@@ -174,11 +176,13 @@
         </div>
 
         <el-table
+          ref="accessoriesOutboundTableRef"
           v-loading="outboundLoading2"
           :data="outboundList"
           border
           stripe
           class="accessories-table"
+          @header-dragend="onAccessoriesOutboundHeaderDragEnd"
         >
           <el-table-column prop="createdAt" label="时间" width="160" align="center">
             <template #default="{ row }">
@@ -321,10 +325,10 @@
         <el-form-item label="辅料" prop="accessoryName">
           <el-input v-model="outboundForm.accessoryName" disabled />
         </el-form-item>
-        <el-form-item label="领用人" prop="receiverUserId">
+        <el-form-item label="领取人" prop="receiverUserId">
           <el-select
             v-model="outboundForm.receiverUserId"
-            placeholder="请选择领用人"
+            placeholder="请选择领取人"
             filterable
             clearable
             style="width: 100%"
@@ -382,36 +386,21 @@ import {
 } from '@/api/inventory'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const DATE_RANGE_WIDTH_EMPTY = '140px'
-const DATE_RANGE_WIDTH_FILLED = '220px'
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
-
-function getFilterInputStyle(v: unknown) {
-  return v ? { color: ACTIVE_FILTER_COLOR } : undefined
-}
-function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
-  if (!val || !showLabel) return undefined
-  const text = prefix + String(val)
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
-function getFilterRangeStyle(v: [string, string] | []) {
-  const hasValue = Array.isArray(v) && v.length === 2
-  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  const base = { width, flex: `0 0 ${width}` }
-  return hasValue ? { ...base, ...activeSelectStyle } : base
-}
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getTextFilterStyle,
+  getFilterRangeStyle,
+} from '@/composables/useFilterBarHelpers'
+import { formatDateTime as formatDate } from '@/utils/date-format'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const filter = reactive({ name: '', category: '', customerName: '' })
 const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
+const accessoriesStockTableRef = ref()
+const accessoriesOutboundTableRef = ref()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const categoryOptions = ref<string[]>([])
 const loading = ref(false)
@@ -428,6 +417,20 @@ const outboundFilter = reactive<{
 const outboundList = ref<AccessoryOutboundRecord[]>([])
 const outboundLoading2 = ref(false)
 const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
+const {
+  onHeaderDragEnd: onAccessoriesStockHeaderDragEnd,
+  restoreColumnWidths: restoreAccessoriesStockColumnWidths,
+} = useTableColumnWidthPersist('inventory-accessories-stock')
+const {
+  onHeaderDragEnd: onAccessoriesOutboundHeaderDragEnd,
+  restoreColumnWidths: restoreAccessoriesOutboundColumnWidths,
+} = useTableColumnWidthPersist('inventory-accessories-outbounds')
+
+function getInventoryOutboundRangeStyle(v: [string, string] | []) {
+  const hasValue = Array.isArray(v) && v.length === 2
+  if (!hasValue) return { ...getFilterRangeStyle(v), width: '160px', flex: '0 0 160px' }
+  return { ...getFilterRangeStyle(v), width: '240px', flex: '0 0 240px' }
+}
 
 const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
   visible: false,
@@ -449,13 +452,6 @@ const formRules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
 }
 
-function formatDate(v: string | null | undefined): string {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleString('zh-CN')
-}
-
 async function load() {
   loading.value = true
   try {
@@ -470,6 +466,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreAccessoriesStockColumnWidths(accessoriesStockTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -681,7 +678,7 @@ const outboundForm = reactive<{
 })
 
 const outboundRules: FormRules = {
-  receiverUserId: [{ required: true, message: '请选择领用人', trigger: 'change' }],
+  receiverUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
   quantity: [{ required: true, message: '请输入出库数量', trigger: 'blur' }],
 }
 
@@ -736,7 +733,7 @@ async function submitOutbound() {
   }
   outboundDialog.submitting = true
   try {
-    const remark = [`领用人：${receiverLabel}`, (outboundForm.remark ?? '').trim()].filter(Boolean).join('；')
+    const remark = [`领取人：${receiverLabel}`, (outboundForm.remark ?? '').trim()].filter(Boolean).join('；')
     await manualAccessoryOutbound({
       accessoryId: outboundForm.accessoryId,
       quantity: qty,
@@ -775,6 +772,7 @@ async function loadOutbounds() {
     const data = res.data
     outboundList.value = data?.list ?? []
     outboundPagination.total = data?.total ?? 0
+    restoreAccessoriesOutboundColumnWidths(accessoriesOutboundTableRef.value)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -802,6 +800,13 @@ function onOutboundPageSizeChange() {
 </script>
 
 <style scoped>
+.inventory-accessories-page {
+  background: var(--color-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
 .category-empty-tip {
   margin-top: 6px;
   font-size: var(--font-size-caption);
@@ -830,16 +835,4 @@ function onOutboundPageSizeChange() {
   line-height: 1.2;
 }
 
-.range-single.el-date-editor--daterange :deep(.el-range-separator) {
-  width: 0;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
-  display: none;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
-  width: 100%;
-}
-.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
-  display: none;
-}
 </style>

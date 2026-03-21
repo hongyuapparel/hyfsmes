@@ -1,144 +1,60 @@
 <template>
   <div class="page-card finance-income-page">
     <div class="filter-bar">
-      <el-date-picker
-        v-model="filter.dateFrom"
-        type="date"
-        value-format="YYYY-MM-DD"
-        placeholder="开始日期"
-        clearable
-        class="filter-bar-item"
-      />
-      <el-date-picker
-        v-model="filter.dateTo"
-        type="date"
-        value-format="YYYY-MM-DD"
-        placeholder="结束日期"
-        clearable
-        class="filter-bar-item"
-      />
-      <el-select
-        v-model="filter.departmentId"
-        placeholder="部门"
-        clearable
-        filterable
-        class="filter-bar-item filter-select"
-      >
-        <el-option
-          v-for="opt in optionData.departments"
-          :key="opt.id"
-          :label="opt.value"
-          :value="opt.id"
-        />
+      <el-date-picker v-model="filter.dateFrom" type="date" value-format="YYYY-MM-DD" :placeholder="'\u5f00\u59cb\u65e5\u671f'" clearable class="filter-bar-item" @change="onSearch" />
+      <el-date-picker v-model="filter.dateTo" type="date" value-format="YYYY-MM-DD" :placeholder="'\u7ed3\u675f\u65e5\u671f'" clearable class="filter-bar-item" @change="onSearch" />
+      <el-select v-model="filter.departmentId" :placeholder="'\u90e8\u95e8'" clearable filterable class="filter-bar-item filter-select" @change="onSearch">
+        <el-option v-for="opt in optionData.departments" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
-      <el-select
-        v-model="filter.bankAccountId"
-        placeholder="银行账号"
-        clearable
-        filterable
-        class="filter-bar-item filter-select"
-      >
-        <el-option
-          v-for="opt in optionData.bankAccounts"
-          :key="opt.id"
-          :label="opt.value"
-          :value="opt.id"
-        />
+      <el-select v-model="filter.bankAccountId" :placeholder="'\u94f6\u884c\u8d26\u53f7'" clearable filterable class="filter-bar-item filter-select" @change="onSearch">
+        <el-option v-for="opt in optionData.bankAccounts" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
       <div class="filter-bar-actions">
-        <el-button type="primary" @click="onSearch">查询</el-button>
-        <el-button @click="onReset">清空</el-button>
-        <el-button type="primary" @click="openForm(null)">登记收入</el-button>
+        <el-button type="primary" @click="onSearch">{{ '\u641c\u7d22' }}</el-button>
+        <el-button @click="onReset">{{ '\u6e05\u7a7a' }}</el-button>
+        <el-button type="primary" @click="openForm(null)">{{ '\u767b\u8bb0\u6536\u5165' }}</el-button>
       </div>
     </div>
 
     <el-table v-loading="loading" :data="list" border stripe class="data-table">
-      <el-table-column prop="occurDate" label="日期" width="120" />
-      <el-table-column prop="amount" label="金额（元）" width="120" align="right">
+      <el-table-column prop="occurDate" :label="'\u65e5\u671f'" width="120" />
+      <el-table-column prop="amount" :label="'\u91d1\u989d\uff08\u5143\uff09'" width="120" align="right">
         <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
       </el-table-column>
-      <el-table-column prop="departmentName" label="部门" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="bankAccountName" label="银行账号" min-width="120" show-overflow-tooltip />
-      <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column prop="departmentName" :label="'\u90e8\u95e8'" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="bankAccountName" :label="'\u94f6\u884c\u8d26\u53f7'" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="remark" :label="'\u5907\u6ce8'" min-width="140" show-overflow-tooltip />
+      <el-table-column :label="'\u64cd\u4f5c'" width="120" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
-          <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+          <el-button link type="primary" size="small" @click="openForm(row)">{{ '\u7f16\u8f91' }}</el-button>
+          <el-button link type="danger" size="small" @click="onDelete(row)">{{ '\u5220\u9664' }}</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 40, 60]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
+      <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20,40,60]" layout="total, sizes, prev, pager, next" @current-change="load" @size-change="onPageSizeChange" />
     </div>
 
-    <el-dialog
-      v-model="formDialog.visible"
-      :title="formDialog.isEdit ? '编辑收入' : '登记收入'"
-      width="480"
-      destroy-on-close
-      @close="formRef?.resetFields()"
-    >
+    <el-dialog v-model="formDialog.visible" :title="formDialog.isEdit ? '\u7f16\u8f91\u6536\u5165' : '\u767b\u8bb0\u6536\u5165'" width="480" destroy-on-close @close="formRef?.resetFields()">
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
-        <el-form-item label="发生日期" prop="occurDate">
-          <el-date-picker
-            v-model="form.occurDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="金额（元）" prop="amount">
-          <el-input-number v-model="form.amount" :min="0" :precision="2" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="部门" prop="departmentId">
-          <el-select
-            v-model="form.departmentId"
-            placeholder="选择部门"
-            clearable
-            filterable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in optionData.departments"
-              :key="opt.id"
-              :label="opt.value"
-              :value="opt.id"
-            />
+        <el-form-item :label="'\u53d1\u751f\u65e5\u671f'" prop="occurDate"><el-date-picker v-model="form.occurDate" type="date" value-format="YYYY-MM-DD" :placeholder="'\u9009\u62e9\u65e5\u671f'" style="width:100%" /></el-form-item>
+        <el-form-item :label="'\u91d1\u989d\uff08\u5143\uff09'" prop="amount"><el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" /></el-form-item>
+        <el-form-item :label="'\u90e8\u95e8'" prop="departmentId">
+          <el-select v-model="form.departmentId" :placeholder="'\u9009\u62e9\u90e8\u95e8'" clearable filterable style="width:100%">
+            <el-option v-for="opt in optionData.departments" :key="opt.id" :label="opt.value" :value="opt.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="银行账号" prop="bankAccountId">
-          <el-select
-            v-model="form.bankAccountId"
-            placeholder="选择银行账号"
-            clearable
-            filterable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in optionData.bankAccounts"
-              :key="opt.id"
-              :label="opt.value"
-              :value="opt.id"
-            />
+        <el-form-item :label="'\u94f6\u884c\u8d26\u53f7'" prop="bankAccountId">
+          <el-select v-model="form.bankAccountId" :placeholder="'\u9009\u62e9\u94f6\u884c\u8d26\u53f7'" clearable filterable style="width:100%">
+            <el-option v-for="opt in optionData.bankAccounts" :key="opt.id" :label="opt.value" :value="opt.id" />
           </el-select>
         </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="选填" clearable />
-        </el-form-item>
+        <el-form-item :label="'\u5907\u6ce8'" prop="remark"><el-input v-model="form.remark" type="textarea" :rows="2" :placeholder="'\u9009\u586b'" clearable /></el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="formDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="formDialog.submitting" @click="submitForm">确定</el-button>
+        <el-button @click="formDialog.visible = false">{{ '\u53d6\u6d88' }}</el-button>
+        <el-button type="primary" :loading="formDialog.submitting" @click="submitForm">{{ '\u786e\u5b9a' }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -147,79 +63,33 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import {
-  getIncomeList,
-  getIncomeOptions,
-  createIncome,
-  updateIncome,
-  deleteIncome,
-  type IncomeRecordItem,
-} from '@/api/finance'
+import { getIncomeList, getIncomeOptions, createIncome, updateIncome, deleteIncome, type IncomeRecordItem } from '@/api/finance'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
-const optionData = reactive<{
-  departments: { id: number; value: string }[]
-  bankAccounts: { id: number; value: string }[]
-}>({ departments: [], bankAccounts: [] })
-
-const filter = reactive<{
-  dateFrom: string
-  dateTo: string
-  departmentId: number | null
-  bankAccountId: number | null
-}>({
-  dateFrom: '',
-  dateTo: '',
-  departmentId: null,
-  bankAccountId: null,
-})
+const optionData = reactive<{ departments: { id: number; value: string }[]; bankAccounts: { id: number; value: string }[] }>({ departments: [], bankAccounts: [] })
+const filter = reactive({ dateFrom: '', dateTo: '', departmentId: null as number | null, bankAccountId: null as number | null })
 const list = ref<IncomeRecordItem[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 
-const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
-  visible: false,
-  submitting: false,
-  isEdit: false,
-})
+const formDialog = reactive({ visible: false, submitting: false, isEdit: false })
 const editId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
-const form = reactive<{
-  occurDate: string
-  amount: number
-  departmentId: number | null
-  bankAccountId: number | null
-  remark: string
-}>({
-  occurDate: '',
-  amount: 0,
-  departmentId: null,
-  bankAccountId: null,
-  remark: '',
-})
+const form = reactive({ occurDate: '', amount: 0, departmentId: null as number | null, bankAccountId: null as number | null, remark: '' })
 const formRules: FormRules = {
-  occurDate: [{ required: true, message: '请选择发生日期', trigger: 'change' }],
-  amount: [{ required: true, message: '请输入金额', trigger: 'blur' }],
+  occurDate: [{ required: true, message: '\u8bf7\u9009\u62e9\u53d1\u751f\u65e5\u671f', trigger: 'change' }],
+  amount: [{ required: true, message: '\u8bf7\u8f93\u5165\u91d1\u989d', trigger: 'blur' }],
 }
 
 function formatAmount(v: string | number): string {
-  if (v === '' || v == null) return '-'
   const n = Number(v)
-  if (Number.isNaN(n)) return '-'
-  return n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Number.isNaN(n) ? '-' : n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 async function load() {
   loading.value = true
   try {
-    const res = await getIncomeList({
-      dateFrom: filter.dateFrom || undefined,
-      dateTo: filter.dateTo || undefined,
-      departmentId: filter.departmentId ?? undefined,
-      bankAccountId: filter.bankAccountId ?? undefined,
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-    })
+    const res = await getIncomeList({ dateFrom: filter.dateFrom || undefined, dateTo: filter.dateTo || undefined, departmentId: filter.departmentId ?? undefined, bankAccountId: filter.bankAccountId ?? undefined, page: pagination.page, pageSize: pagination.pageSize })
     const data = res.data
     if (data) {
       list.value = data.list ?? []
@@ -232,24 +102,9 @@ async function load() {
   }
 }
 
-function onSearch() {
-  pagination.page = 1
-  load()
-}
-
-function onReset() {
-  filter.dateFrom = ''
-  filter.dateTo = ''
-  filter.departmentId = null
-  filter.bankAccountId = null
-  pagination.page = 1
-  load()
-}
-
-function onPageSizeChange() {
-  pagination.page = 1
-  load()
-}
+function onSearch() { pagination.page = 1; load() }
+function onReset() { filter.dateFrom = ''; filter.dateTo = ''; filter.departmentId = null; filter.bankAccountId = null; pagination.page = 1; load() }
+function onPageSizeChange() { pagination.page = 1; load() }
 
 function openForm(row: IncomeRecordItem | null) {
   formDialog.isEdit = !!row
@@ -275,23 +130,11 @@ async function submitForm() {
   formDialog.submitting = true
   try {
     if (formDialog.isEdit && editId.value != null) {
-      await updateIncome(editId.value, {
-        occurDate: form.occurDate,
-        amount: form.amount,
-        departmentId: form.departmentId,
-        bankAccountId: form.bankAccountId,
-        remark: form.remark,
-      })
-      ElMessage.success('已保存')
+      await updateIncome(editId.value, { occurDate: form.occurDate, amount: form.amount, departmentId: form.departmentId, bankAccountId: form.bankAccountId, remark: form.remark })
+      ElMessage.success('\u5df2\u4fdd\u5b58')
     } else {
-      await createIncome({
-        occurDate: form.occurDate,
-        amount: form.amount,
-        departmentId: form.departmentId,
-        bankAccountId: form.bankAccountId,
-        remark: form.remark,
-      })
-      ElMessage.success('已登记')
+      await createIncome({ occurDate: form.occurDate, amount: form.amount, departmentId: form.departmentId, bankAccountId: form.bankAccountId, remark: form.remark })
+      ElMessage.success('\u5df2\u767b\u8bb0')
     }
     formDialog.visible = false
     load()
@@ -304,13 +147,9 @@ async function submitForm() {
 
 async function onDelete(row: IncomeRecordItem) {
   try {
-    await ElMessageBox.confirm('确定删除该条收入记录？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
+    await ElMessageBox.confirm('\u786e\u5b9a\u5220\u9664\u8be5\u6761\u6536\u5165\u8bb0\u5f55\uff1f', '\u63d0\u793a', { confirmButtonText: '\u786e\u5b9a', cancelButtonText: '\u53d6\u6d88', type: 'warning' })
     await deleteIncome(row.id)
-    ElMessage.success('已删除')
+    ElMessage.success('\u5df2\u5220\u9664')
     load()
   } catch (e: unknown) {
     if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -321,10 +160,7 @@ onMounted(async () => {
   try {
     const res = await getIncomeOptions()
     const data = res.data
-    if (data) {
-      optionData.departments = data.departments ?? []
-      optionData.bankAccounts = data.bankAccounts ?? []
-    }
+    if (data) { optionData.departments = data.departments ?? []; optionData.bankAccounts = data.bankAccounts ?? [] }
   } catch {
     optionData.departments = []
     optionData.bankAccounts = []
@@ -344,12 +180,12 @@ onMounted(async () => {
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-sm);
-  margin-bottom: var(--space-md);
   padding: var(--space-sm);
-  background-color: var(--color-bg-subtle, #f5f6f8);
+  margin-bottom: var(--space-md);
   border-radius: var(--radius-lg);
+  background-color: var(--color-bg-subtle, #f5f6f8);
 }
 
 .filter-bar-item {
@@ -361,17 +197,13 @@ onMounted(async () => {
 }
 
 .filter-bar-actions {
-  margin-left: auto;
   display: flex;
+  align-items: center;
   gap: var(--space-sm);
+  margin-left: auto;
 }
 
 .data-table {
   margin-bottom: var(--space-md);
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
 }
 </style>

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -20,6 +20,9 @@ import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
+import { Product } from '../entities/product.entity';
+import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
+import { Role } from '../entities/role.entity';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
@@ -148,6 +151,12 @@ export class OrdersService {
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
+    @InjectRepository(Product)
+    private readonly productRepo: Repository<Product>,
+    @InjectRepository(RoleOrderPolicy)
+    private readonly roleOrderPolicyRepo: Repository<RoleOrderPolicy>,
+    @InjectRepository(Role)
+    private readonly roleRepo: Repository<Role>,
     private readonly inventoryAccessoriesService: InventoryAccessoriesService,
     private readonly systemOptionsService: SystemOptionsService,
     private readonly orderWorkflowService: OrderWorkflowService,
@@ -482,6 +491,10 @@ export class OrdersService {
       packagingCells?: PackagingCell[];
       packagingMethod?: string;
       attachments?: string[];
+      productGroupId?: number | null;
+      productGroupName?: string;
+      applicablePeopleId?: number | null;
+      applicablePeopleName?: string;
     }
   > {
     const order = await this.orderRepo.findOne({ where: { id } });
@@ -501,6 +514,27 @@ export class OrdersService {
     const packagingCells = ext?.packagingCells ?? [];
     const packagingMethod = ext?.packagingMethod ?? '';
     const attachments = ext?.attachments ?? [];
+    const skuCode = String(order.skuCode ?? '').trim();
+    let productGroupId: number | null = null;
+    let productGroupName = '';
+    let applicablePeopleId: number | null = null;
+    let applicablePeopleName = '';
+    if (skuCode) {
+      const product = await this.productRepo.findOne({
+        where: { skuCode },
+      });
+      if (product) {
+        productGroupId = product.productGroupId ?? null;
+        applicablePeopleId = product.applicablePeopleId ?? null;
+        if (productGroupId != null) {
+          productGroupName = await this.systemOptionsService.getProductGroupPathById(productGroupId);
+        }
+        if (applicablePeopleId != null) {
+          const labelMap = await this.systemOptionsService.getOptionLabelsByIds('applicable_people', [applicablePeopleId]);
+          applicablePeopleName = labelMap[applicablePeopleId] ?? '';
+        }
+      }
+    }
     return {
       ...order,
       materials,
@@ -514,6 +548,10 @@ export class OrdersService {
       packagingCells,
       packagingMethod,
       attachments,
+      productGroupId,
+      productGroupName,
+      applicablePeopleId,
+      applicablePeopleName,
     };
   }
 
@@ -968,6 +1006,7 @@ export class OrdersService {
     const headers = Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
       ? [...ext.colorSizeHeaders, '合计']
       : ['合计'];
+    const sizeLen = Math.max(0, headers.length - 1);
 
     const buildPerSizeFromRows = (rows: ColorSizeRow[] | ActualCutRow[] | null | undefined): number[] | null => {
       if (!rows || rows.length === 0 || headers.length <= 1) return null;
@@ -1014,29 +1053,55 @@ export class OrdersService {
           : null;
     }
 
-    // 4）尾部出货数：当前仅记录总件数（若无出货，则回退为尾部收货数）
-    const tailTotal =
-      finishing?.tailShippedQty != null
-        ? finishing.tailShippedQty
-        : finishing?.tailReceivedQty != null
-          ? finishing.tailReceivedQty
-          : null;
-    const tailRow =
-      tailTotal != null
-        ? [
-            ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
-            tailTotal,
-          ]
-        : null;
-    // 5）尾部入库数：当前仅记录总件数
+    // 4）尾部入库数：优先按尺码明细推导；无明细时回退仅显示总件数
     const inboundTotal = finishing?.tailInboundQty ?? null;
-    const inboundRow =
-      inboundTotal != null
-        ? [
-            ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
-            inboundTotal,
-          ]
-        : null;
+    let inboundRow: (number | null)[] | null = null;
+    if (inboundTotal != null) {
+      let receivedQtyRow: number[] | null = null;
+      try {
+        // tail_received_qty_row 在实体中 select=false，这里按需读取；缺列环境下会自动回退。
+        const rows = await this.orderFinishingRepo.query(
+          'SELECT tail_received_qty_row AS tailReceivedQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+          [orderId],
+        );
+        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as any).tailReceivedQtyRow : null;
+        if (raw != null) {
+          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (Array.isArray(parsed)) {
+            receivedQtyRow = parsed.map((n: any) => Number(n) || 0);
+          }
+        }
+      } catch {
+        // 忽略明细读取失败，走总数回退展示。
+      }
+
+      if (receivedQtyRow && sizeLen > 0) {
+        const base = receivedQtyRow.slice(0, sizeLen).map((n) => Math.max(0, Number(n) || 0));
+        while (base.length < sizeLen) base.push(0);
+        const receivedTotal = Number(finishing?.tailReceivedQty) || base.reduce((a, b) => a + b, 0);
+        if (receivedTotal > 0) {
+          const exact = base.map((n) => (n * Number(inboundTotal)) / receivedTotal);
+          const floorVals = exact.map((v) => Math.floor(v));
+          let remain = Number(inboundTotal) - floorVals.reduce((a, b) => a + b, 0);
+          const idxByFrac = exact
+            .map((v, i) => ({ i, frac: v - Math.floor(v) }))
+            .sort((a, b) => b.frac - a.frac);
+          for (const item of idxByFrac) {
+            if (remain <= 0) break;
+            floorVals[item.i] += 1;
+            remain -= 1;
+          }
+          inboundRow = [...floorVals, Number(inboundTotal)];
+        }
+      }
+
+      if (!inboundRow) {
+        inboundRow = [
+          ...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []),
+          Number(inboundTotal),
+        ];
+      }
+    }
 
     const rows: Array<{ label: string; values: (number | null)[] }> = [];
     if (orderPerSize) {
@@ -1047,9 +1112,6 @@ export class OrdersService {
     }
     if (sewingRow) {
       rows.push({ label: '车缝数量', values: sewingRow });
-    }
-    if (tailRow) {
-      rows.push({ label: '尾部出货数', values: tailRow });
     }
     if (inboundRow) {
       rows.push({ label: '尾部入库数', values: inboundRow });
@@ -1297,6 +1359,48 @@ export class OrdersService {
       row = this.orderCostSnapshotRepo.create({ orderId, snapshot: payload.snapshot ?? null });
     }
     return this.orderCostSnapshotRepo.save(row);
+  }
+
+  /**
+   * 兼容旧调用：按订单 ID 校验动作可执行性。
+   * 当前至少保证订单存在，后续如需更严格校验可在此扩展。
+   */
+  async assertOrderActionById(orderId: number, _userId: number, _action: string): Promise<void> {
+    const order = await this.findOne(orderId);
+    await this.assertOrderActionByStatuses([order.status], _userId, _action);
+  }
+
+  async assertOrderActionByIds(orderIds: number[], userId: number, action: string): Promise<void> {
+    const ids = [...new Set((orderIds ?? []).filter((id) => typeof id === 'number' && id > 0))];
+    if (!ids.length) return;
+    const rows = await this.orderRepo.find({ where: { id: In(ids) }, select: ['id', 'status'] });
+    await this.assertOrderActionByStatuses(rows.map((r) => r.status), userId, action);
+  }
+
+  private async assertOrderActionByStatuses(statuses: string[], userId: number, action: string): Promise<void> {
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'roleId'] });
+    if (!user?.roleId) throw new ForbiddenException('无权限访问');
+    const role = await this.roleRepo.findOne({ where: { id: user.roleId }, select: ['code'] });
+    if (role?.code === 'admin') return;
+
+    const normalized = [...new Set((statuses ?? []).map((s) => (s ?? '').trim()).filter(Boolean))];
+    if (!normalized.length) return;
+
+    const actionKey = (action ?? '').trim();
+    if (!['edit', 'review', 'delete'].includes(actionKey)) return;
+
+    const rows = await this.roleOrderPolicyRepo.find({
+      where: { roleId: user.roleId, action: actionKey as any },
+      select: ['statusCode'],
+    });
+    if (!rows.length) {
+      throw new ForbiddenException('该操作未配置可操作状态');
+    }
+    const allowSet = new Set(rows.map((r) => (r.statusCode ?? '').trim()).filter(Boolean));
+    const denied = normalized.filter((s) => !allowSet.has(s));
+    if (denied.length) {
+      throw new ForbiddenException(`当前状态不允许该操作: ${denied.join('、')}`);
+    }
   }
 }
 

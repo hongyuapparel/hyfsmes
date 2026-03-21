@@ -192,6 +192,28 @@ export interface OrderSlaReportRow {
   salesperson: string
   customerName: string
   orderDate: string | null
+  customerDueDate: string | null
+  reviewAt: string | null
+  reviewDurationHours: number | null
+  reviewJudge: string
+  purchaseArrivedAt: string | null
+  purchaseCompletedAt: string | null
+  purchaseJudge: string
+  patternArrivedAt: string | null
+  patternCompletedAt: string | null
+  patternJudge: string
+  cuttingArrivedAt: string | null
+  cuttingCompletedAt: string | null
+  cuttingJudge: string
+  craftArrivedAt: string | null
+  craftCompletedAt: string | null
+  craftJudge: string
+  sewingArrivedAt: string | null
+  sewingCompletedAt: string | null
+  sewingJudge: string
+  finishingArrivedAt: string | null
+  finishingCompletedAt: string | null
+  finishingJudge: string
   completedAt: string | null
   statusId: number
   statusLabel: string
@@ -206,6 +228,8 @@ export function getOrderSlaReport(params?: {
   start_date?: string
   end_date?: string
   status_id?: number
+  collaboration_type_id?: number
+  order_type_id?: number
   order_date_from?: string
   order_date_to?: string
   completed_from?: string

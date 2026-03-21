@@ -14,6 +14,7 @@ export interface PendingListItem {
   skuCode: string;
   imageUrl: string;
   quantity: number;
+  sourceType: string;
   createdAt: string;
 }
 
@@ -51,6 +52,7 @@ export class InventoryPendingService {
         'p.sku_code AS skuCode',
         'pr.image_url AS imageUrl',
         'p.quantity AS quantity',
+        'p.source_type AS sourceType',
         'p.created_at AS createdAt',
       ]);
 
@@ -85,6 +87,7 @@ export class InventoryPendingService {
         skuCode: string;
         imageUrl: string;
         quantity: number;
+        sourceType: string;
         createdAt: Date;
       }>();
 
@@ -96,6 +99,7 @@ export class InventoryPendingService {
       skuCode: r.skuCode ?? '',
       imageUrl: r.imageUrl ?? '',
       quantity: r.quantity ?? 0,
+      sourceType: r.sourceType ?? 'normal',
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
     }));
 
@@ -141,6 +145,7 @@ export class InventoryPendingService {
         orderId: p.orderId,
         skuCode: p.skuCode,
         quantity: p.quantity,
+        unitPrice: order?.exFactoryPrice != null ? String(order.exFactoryPrice) : '0',
         warehouseId: warehouseId != null ? Number(warehouseId) : null,
         inventoryTypeId: inventoryTypeId != null ? Number(inventoryTypeId) : null,
         department: department?.trim() ?? '',

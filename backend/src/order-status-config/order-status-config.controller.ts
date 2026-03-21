@@ -135,6 +135,8 @@ export class OrderStatusConfigController {
     @Query('order_date_to') orderDateTo?: string,
     @Query('completed_from') completedFrom?: string,
     @Query('completed_to') completedTo?: string,
+    @Query('collaboration_type_id') collaborationTypeId?: string,
+    @Query('order_type_id') orderTypeId?: string,
   ) {
     return this.service.getSlaReport({
       startDate,
@@ -144,6 +146,8 @@ export class OrderStatusConfigController {
       orderDateTo,
       completedFrom,
       completedTo,
+      collaborationTypeId: collaborationTypeId != null ? Number(collaborationTypeId) : undefined,
+      orderTypeId: orderTypeId != null ? Number(orderTypeId) : undefined,
     });
   }
 }

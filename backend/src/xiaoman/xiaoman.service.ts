@@ -46,34 +46,13 @@ export class XiaomanService {
   constructor(private config: ConfigService) {}
 
   /**
-   * 小满 company/list 返回字段在不同账号下会有差异，关键词匹配不能只依赖固定 3 个字段。
-   * 这里对条目里所有可序列化文本做宽松匹配，确保“在小满能搜到”的数据尽量都能被命中。
+   * 搜索仅匹配：公司名称 name、联系人 contactPerson。
    */
   private matchesKeyword(item: XiaomanCompanyItem, lowerKeyword: string): boolean {
-    const anyItem = item as unknown as Record<string, unknown>
-    for (const value of Object.values(anyItem)) {
-      if (value == null) continue
-      if (typeof value === 'string' || typeof value === 'number') {
-        if (String(value).toLowerCase().includes(lowerKeyword)) return true
-        continue
-      }
-      if (Array.isArray(value)) {
-        for (const v of value) {
-          if ((typeof v === 'string' || typeof v === 'number') && String(v).toLowerCase().includes(lowerKeyword)) {
-            return true
-          }
-        }
-        continue
-      }
-      if (typeof value === 'object') {
-        for (const nested of Object.values(value as Record<string, unknown>)) {
-          if ((typeof nested === 'string' || typeof nested === 'number') && String(nested).toLowerCase().includes(lowerKeyword)) {
-            return true
-          }
-        }
-      }
-    }
-    return false
+    const anyItem = item as unknown as Record<string, unknown>;
+    const companyName = String(anyItem.name ?? '').toLowerCase();
+    const contactPerson = String(anyItem.contactPerson ?? '').toLowerCase();
+    return companyName.includes(lowerKeyword) || contactPerson.includes(lowerKeyword);
   }
 
   private getBaseUrl(): string {
@@ -131,142 +110,109 @@ export class XiaomanService {
     // const baseParams = '&removed=0&all=0';
     const baseParams = '&all=0';
 
-    // 有搜索关键词：由于小满接口文档未说明 keyword 的行为，实际测试发现它并不会稳定按关键字过滤，
-    // 所以这里改为「拉取客户列表（all=0）+ 本地模糊匹配」。
-    // 为了避免多次请求导致的超时/断线，这里加缓存 + 多页拉取重试 + 失败降级（不让前端直接报错）。
+    // 有搜索关键词：先拉列表，再在后端本地按 name/contactPerson 做模糊匹配。
     if (hasKeyword) {
-      // 优先使用小满服务端 keyword 搜索（更贴近小满页面行为，且更快）
-      // 若该账号下 keyword 行为不稳定，再降级到本地全量过滤。
-      try {
-        const startIndex = page
-        const directUrl =
-          `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${startIndex}${baseParams}` +
-          `&keyword=${encodeURIComponent(kw)}`
-          console.log(directUrl)
-        const directRes = await fetch(directUrl, {
-          headers: { Authorization: `Bearer ${token}` },
-        })
-        const directText = await directRes.text()
-        const directJson = JSON.parse(directText) as {
-          code?: number
-          data?: { list?: XiaomanCompanyItem[]; totalItem?: number }
-        }
-        if (directJson.code === 200 && directJson.data) {
-          const directList = directJson.data.list ?? []
-          const directTotal = directJson.data.totalItem ?? directList.length
-          if (directTotal > 0) {
-            return { list: directList, total: directTotal }
-          }
-        }
-      } catch {
-        // 直连 keyword 失败时静默降级到本地过滤，避免影响主流程
-      }
-
-      const now = Date.now()
+      const now = Date.now();
       if (this.companyListCache && now - this.companyListCache.fetchedAt < this.companyListCacheTtlMs) {
-        const all = this.companyListCache.list
-        const lower = kw.toLowerCase()
-        const filtered = all.filter((c) => this.matchesKeyword(c, lower))
-        const total = filtered.length
-        const sliceStart = (page - 1) * pageSize
-        const sliceEnd = sliceStart + pageSize
-        // 若缓存不足导致过滤结果为空，则继续走全量拉取避免“搜不到”
+        const all = this.companyListCache.list;
+        const lower = kw.toLowerCase();
+        const filtered = all.filter((c) => this.matchesKeyword(c, lower));
+        const total = filtered.length;
+        const sliceStart = (page - 1) * pageSize;
+        const sliceEnd = sliceStart + pageSize;
         if (total > 0) {
-          return { list: filtered.slice(sliceStart, sliceEnd), total }
+          return { list: filtered.slice(sliceStart, sliceEnd), total };
         }
       }
 
-      const MAX_FETCH = 5000
-      const PAGE_SIZE_FOR_FETCH = 500
-      let fetched: XiaomanCompanyItem[] = []
+      const MAX_FETCH = 5000;
+      const PAGE_SIZE_FOR_FETCH = 500;
+      let fetched: XiaomanCompanyItem[] = [];
       // 小满 start_index 按偏移量语义：0, 500, 1000...
-      let startIndex = 0
-      let totalItem: number | null = null
-      let endedByMaxFetch = false
-      let lastPageListLen = 0
+      let startIndex = 0;
+      let totalItem: number | null = null;
+      let endedByMaxFetch = false;
+      let lastPageListLen = 0;
 
       const fetchPageWithRetry = async (): Promise<{ list: XiaomanCompanyItem[]; totalItem?: number } | null> => {
-        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${page}${baseParams}`
-        const maxAttempts = 3
-        let lastError: unknown = null
+        const url = `${baseUrl}/v1/company/list?count=${PAGE_SIZE_FOR_FETCH}&start_index=${startIndex}${baseParams}`;
+        const maxAttempts = 3;
         for (let attempt = 1; attempt <= maxAttempts; attempt++) {
           try {
             const res = await fetch(url, {
               headers: { Authorization: `Bearer ${token}` },
-            })
-            const text = await res.text()
+            });
+            const text = await res.text();
             let json: {
-              code?: number
-              message?: string
-              data?: { list?: XiaomanCompanyItem[]; totalItem?: number }
-            }
+              code?: number;
+              message?: string;
+              data?: { list?: XiaomanCompanyItem[]; totalItem?: number };
+            };
             try {
-              json = JSON.parse(text) as typeof json
+              json = JSON.parse(text) as typeof json;
             } catch {
-              throw new Error(`小满 API 响应格式异常 (${res.status})`)
+              throw new Error(`小满 API 响应格式异常 (${res.status})`);
             }
-            console.log('[xiaoman] json', json);
             if (json.code !== 200) {
-              const msg = json.message || `小满客户列表获取失败 (code: ${json.code})`
-              throw new Error(msg)
+              const msg = json.message || `小满客户列表获取失败 (code: ${json.code})`;
+              throw new Error(msg);
             }
             if (!json.data) {
-              throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围')
+              throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围');
             }
-            return { list: json.data.list ?? [], totalItem: json.data.totalItem }
+            return { list: json.data.list ?? [], totalItem: json.data.totalItem };
           } catch (e) {
-            lastError = e
-            const delayMs = 400 * attempt
-            await new Promise((r) => setTimeout(r, delayMs))
+            const delayMs = 400 * attempt;
+            await new Promise((r) => setTimeout(r, delayMs));
           }
         }
         // 降级：这一页拿不到，就直接返回 null
-        return null
-      }
+        return null;
+      };
 
       // eslint-disable-next-line no-constant-condition
       while (true) {
-        const r = await fetchPageWithRetry()
-        if (!r) break
+        const r = await fetchPageWithRetry();
+        if (!r) break;
 
         if (totalItem == null && r.totalItem != null) {
-          const parsed = Number(r.totalItem)
-          if (Number.isFinite(parsed) && parsed > 0) totalItem = parsed
+          const parsed = Number(r.totalItem);
+          if (Number.isFinite(parsed) && parsed > 0) totalItem = parsed;
         }
 
-        lastPageListLen = r.list.length
-        fetched = fetched.concat(r.list)
-        if (fetched.length >= MAX_FETCH) endedByMaxFetch = true
+        lastPageListLen = r.list.length;
+        fetched = fetched.concat(r.list);
+        if (fetched.length >= MAX_FETCH) endedByMaxFetch = true;
 
-        const reachedTotal = totalItem != null ? fetched.length >= totalItem : false
+        const reachedTotal = totalItem != null ? fetched.length >= totalItem : false;
         if (reachedTotal || fetched.length >= MAX_FETCH || r.list.length < PAGE_SIZE_FOR_FETCH) {
-          break
+          break;
         }
-        startIndex += PAGE_SIZE_FOR_FETCH
+        startIndex += PAGE_SIZE_FOR_FETCH;
       }
 
       // 只有在“看起来已拉完/自然结束”时才缓存，避免缓存不完整后导致后续永远搜不到
-      const shouldCache = fetched.length > 0 && !endedByMaxFetch && (lastPageListLen < PAGE_SIZE_FOR_FETCH || (totalItem != null && fetched.length >= totalItem))
+      const shouldCache = fetched.length > 0 && !endedByMaxFetch && (lastPageListLen < PAGE_SIZE_FOR_FETCH || (totalItem != null && fetched.length >= totalItem));
       if (shouldCache) {
-        this.companyListCache = { list: fetched, fetchedAt: Date.now() }
+        this.companyListCache = { list: fetched, fetchedAt: Date.now() };
       }
 
       if (!fetched.length) {
-        return { list: [], total: 0 }
+        return { list: [], total: 0 };
       }
 
-      const lower = kw.toLowerCase()
-      const filtered = fetched.filter((c) => this.matchesKeyword(c, lower))
+      const lower = kw.toLowerCase();
+      const filtered = fetched.filter((c) => this.matchesKeyword(c, lower));
 
-      const total = filtered.length
-      const sliceStart = (page - 1) * pageSize
-      const sliceEnd = sliceStart + pageSize
-      return { list: filtered.slice(sliceStart, sliceEnd), total }
+      const total = filtered.length;
+      const sliceStart = (page - 1) * pageSize;
+      const sliceEnd = sliceStart + pageSize;
+      return { list: filtered.slice(sliceStart, sliceEnd), total };
     }
 
     // 无搜索关键词：按偏移量取一页
     const startIndex = Math.max(0, (page - 1) * pageSize);
-    const url = `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${page}${baseParams}`;
+    const url = `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${startIndex}${baseParams}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },
     });

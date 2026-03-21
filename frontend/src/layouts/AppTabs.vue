@@ -35,6 +35,10 @@ const tabs = ref<TabItem[]>([])
 const activeKey = ref(route.fullPath)
 
 function getTitle(r: RouteLocationNormalizedLoaded) {
+  if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit') {
+    const queryTitle = typeof r.query?.tabTitle === 'string' ? r.query.tabTitle.trim() : ''
+    if (queryTitle) return queryTitle
+  }
   const metaTitle = r.meta?.title as string | undefined
   if (metaTitle) return metaTitle
   if (typeof r.name === 'string') return r.name

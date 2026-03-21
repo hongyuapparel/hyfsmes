@@ -13,6 +13,9 @@ import { OrderCutting } from '../entities/order-cutting.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
+import { Product } from '../entities/product.entity';
+import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
+import { Role } from '../entities/role.entity';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryAccessoriesModule } from '../inventory-accessories/inventory-accessories.module';
 import { SystemOptionsModule } from '../system-options/system-options.module';
@@ -35,8 +38,11 @@ import { OrdersService } from './orders.service';
       OrderCraft,
       User,
       RolePermission,
+      RoleOrderPolicy,
       OrderStatus,
       OrderStatusHistory,
+      Product,
+      Role,
     ]),
     AuthModule,
     InventoryAccessoriesModule,

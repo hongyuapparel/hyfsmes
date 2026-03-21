@@ -190,27 +190,21 @@ import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'elem
 import { getSupplierList, createSupplier, updateSupplier, deleteSupplier, type SupplierItem } from '@/api/suppliers'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getTextFilterStyle,
+} from '@/composables/useFilterBarHelpers'
+import { formatDate } from '@/utils/date-format'
 
 const supplierTypeOptions = ref<{ id: number; label: string }[]>([])
 const businessScopeOptions = ref<{ id: number; label: string }[]>([])
 const allSupplierOptions = ref<SystemOptionItem[]>([])
 const businessScopeByTypeId = ref<Record<number, { id: number; label: string }[]>>({})
 
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
 const FILTER_CHAR_PX = 14
-
-function getFilterInputStyle(v: unknown) {
-  return v ? { color: ACTIVE_FILTER_COLOR } : undefined
-}
-function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
-  if (!val || !showLabel) return undefined
-  const text = prefix + String(val)
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
 function getFilterSelectAutoWidthStyle(labelText: string) {
   if (!labelText) return undefined
   const estimated = labelText.length * FILTER_CHAR_PX + 60
@@ -252,13 +246,6 @@ const form = reactive<{
 })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入供应商名称', trigger: 'blur' }],
-}
-
-function formatDate(v: string | null | undefined): string {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleDateString('zh-CN')
 }
 
 async function load() {
@@ -459,30 +446,7 @@ onMounted(async () => {
   border: 1px solid var(--color-border);
 }
 
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
 .suppliers-table {
   margin-bottom: var(--space-md);
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
 }
 </style>

@@ -49,6 +49,14 @@ export interface OrderListItem {
   factoryName: string
   /** 订单图片 */
   imageUrl: string
+  /** SKU 对应产品分组 ID（来自 products.product_group_id） */
+  productGroupId?: number | null
+  /** SKU 对应产品分组名称（路径） */
+  productGroupName?: string
+  /** SKU 对应适用人群 ID（来自 products.applicable_people_id） */
+  applicablePeopleId?: number | null
+  /** SKU 对应适用人群名称 */
+  applicablePeopleName?: string
   /** 创建时间 */
   createdAt: string
   /** 更新时间 */

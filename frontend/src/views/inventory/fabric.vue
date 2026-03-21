@@ -46,7 +46,15 @@
           </div>
         </div>
 
-        <el-table v-loading="loading" :data="list" border stripe class="fabric-table">
+        <el-table
+          ref="fabricStockTableRef"
+          v-loading="loading"
+          :data="list"
+          border
+          stripe
+          class="fabric-table"
+          @header-dragend="onFabricStockHeaderDragEnd"
+        >
           <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
           <el-table-column prop="quantity" label="数量" width="100" align="right" />
@@ -107,7 +115,7 @@
             :shortcuts="rangeShortcuts"
             size="large"
             :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-            :style="getFilterRangeStyle(outboundFilter.dateRange)"
+            :style="getInventoryOutboundRangeStyle(outboundFilter.dateRange)"
             @change="onOutboundSearch(true)"
           />
           <div class="filter-bar-actions">
@@ -116,7 +124,15 @@
           </div>
         </div>
 
-        <el-table v-loading="outboundLoading2" :data="outboundList" border stripe class="fabric-table">
+        <el-table
+          ref="fabricOutboundTableRef"
+          v-loading="outboundLoading2"
+          :data="outboundList"
+          border
+          stripe
+          class="fabric-table"
+          @header-dragend="onFabricOutboundHeaderDragEnd"
+        >
           <el-table-column prop="createdAt" label="时间" width="160" align="center" />
           <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
@@ -215,29 +231,7 @@
           />
         </el-form-item>
         <el-form-item label="拍照" prop="photoUrl" required>
-          <div class="outbound-photo-wrap">
-            <input
-              ref="outboundPhotoInputRef"
-              type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
-              class="hidden-file-input"
-              @change="onOutboundPhotoChange"
-            />
-            <div
-              v-if="!outboundForm.photoUrl"
-              class="outbound-photo-area"
-              @click="outboundPhotoInputRef?.click()"
-            >
-              <span v-if="outboundPhotoUploading">上传中...</span>
-              <span v-else>点击上传出库照片</span>
-            </div>
-            <div v-else class="outbound-photo-preview">
-              <el-image :src="outboundForm.photoUrl" fit="contain" style="height: 120px" />
-              <el-button type="primary" link size="small" @click="outboundPhotoInputRef?.click()">
-                重新上传
-              </el-button>
-            </div>
-          </div>
+          <ImageUploadArea v-model="outboundForm.photoUrl" :compact="false" />
         </el-form-item>
         <el-form-item label="备注" prop="remark" required>
           <el-input
@@ -280,37 +274,21 @@ import {
   type FabricItem,
   type FabricOutboundRecord,
 } from '@/api/inventory'
-import { uploadOutboundImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const DATE_RANGE_WIDTH_EMPTY = '140px'
-const DATE_RANGE_WIDTH_FILLED = '220px'
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
-
-function getFilterInputStyle(v: unknown) {
-  return v ? { color: ACTIVE_FILTER_COLOR } : undefined
-}
-function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
-  if (!val || !showLabel) return undefined
-  const text = prefix + String(val)
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
-function getFilterRangeStyle(v: [string, string] | []) {
-  const hasValue = Array.isArray(v) && v.length === 2
-  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  const base = { width, flex: `0 0 ${width}` }
-  return hasValue ? { ...base, ...activeSelectStyle } : base
-}
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getTextFilterStyle,
+  getFilterRangeStyle,
+} from '@/composables/useFilterBarHelpers'
+import { formatDateTime as formatDate } from '@/utils/date-format'
 
 const filter = reactive({ name: '', customerName: '' })
 const nameLabelVisible = ref(false)
 const list = ref<FabricItem[]>([])
+const fabricStockTableRef = ref()
+const fabricOutboundTableRef = ref()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -324,6 +302,16 @@ const outboundFilter = reactive<{
 const outboundList = ref<FabricOutboundRecord[]>([])
 const outboundLoading2 = ref(false)
 const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
+const { onHeaderDragEnd: onFabricStockHeaderDragEnd, restoreColumnWidths: restoreFabricStockColumnWidths } =
+  useTableColumnWidthPersist('inventory-fabric-stock')
+const { onHeaderDragEnd: onFabricOutboundHeaderDragEnd, restoreColumnWidths: restoreFabricOutboundColumnWidths } =
+  useTableColumnWidthPersist('inventory-fabric-outbounds')
+
+function getInventoryOutboundRangeStyle(v: [string, string] | []) {
+  const hasValue = Array.isArray(v) && v.length === 2
+  if (!hasValue) return { ...getFilterRangeStyle(v), width: '160px', flex: '0 0 160px' }
+  return { ...getFilterRangeStyle(v), width: '240px', flex: '0 0 240px' }
+}
 
 const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
   visible: false,
@@ -360,15 +348,6 @@ const outboundMaxQty = computed(() => {
   const q = parseFloat(String(row.quantity))
   return Number.isFinite(q) ? q : 0
 })
-const outboundPhotoInputRef = ref<HTMLInputElement | null>(null)
-const outboundPhotoUploading = ref(false)
-
-function formatDate(v: string | null | undefined): string {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleString('zh-CN')
-}
 
 async function load() {
   loading.value = true
@@ -383,6 +362,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreFabricStockColumnWidths(fabricStockTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -526,22 +506,6 @@ function resetOutboundForm() {
   outboundFormRef.value?.clearValidate()
 }
 
-async function onOutboundPhotoChange(ev: Event) {
-  const input = ev.target as HTMLInputElement
-  const file = input.files?.[0]
-  if (!file) return
-  outboundPhotoUploading.value = true
-  try {
-    const url = await uploadOutboundImage(file)
-    outboundForm.photoUrl = url
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '上传失败'))
-  } finally {
-    outboundPhotoUploading.value = false
-    input.value = ''
-  }
-}
-
 async function submitOutbound() {
   if (!outboundDialog.row) return
   if (!outboundForm.photoUrl || !outboundForm.remark?.trim()) {
@@ -584,6 +548,7 @@ async function loadOutbounds() {
     const data = res.data
     outboundList.value = data?.list ?? []
     outboundPagination.total = data?.total ?? 0
+    restoreFabricOutboundColumnWidths(fabricOutboundTableRef.value)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -611,77 +576,15 @@ function onOutboundPageSizeChange() {
 </script>
 
 <style scoped>
+.inventory-fabric-page {
+  background: var(--color-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
 .inventory-fabric-page .fabric-table {
   margin-bottom: var(--space-md);
 }
 
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
-.range-single.el-date-editor--daterange :deep(.el-range-separator) {
-  width: 0;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
-  display: none;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
-  width: 100%;
-}
-.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
-  display: none;
-}
-
-.hidden-file-input {
-  position: absolute;
-  width: 0;
-  height: 0;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.outbound-photo-wrap {
-  width: 100%;
-}
-
-.outbound-photo-area {
-  border: 1px dashed var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: var(--font-size-caption);
-  cursor: pointer;
-}
-
-.outbound-photo-area:hover {
-  border-color: var(--el-color-primary);
-  color: var(--el-color-primary);
-}
-
-.outbound-photo-preview {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-xs);
-}
 </style>

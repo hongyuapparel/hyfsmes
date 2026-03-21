@@ -409,6 +409,13 @@ import { getSupplierList, type SupplierItem } from '@/api/suppliers'
 import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getOrderNoFilterStyle,
+  getSkuCodeFilterStyle,
+} from '@/composables/useFilterBarHelpers'
+import { formatDateTime } from '@/utils/date-format'
 
 const SEWING_TABS = [
   { label: '全部', value: 'all' },
@@ -417,30 +424,6 @@ const SEWING_TABS = [
 ] as const
 
 type SewingTabConfig = (typeof SEWING_TABS)[number]
-
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
-
-function getFilterInputStyle(v: unknown) {
-  return v ? activeInputStyle : undefined
-}
-function getOrderNoFilterStyle(orderNo: unknown, showLabel: boolean) {
-  if (!orderNo || !showLabel) return undefined
-  const text = `订单号：${String(orderNo)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
-function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
-  if (!skuCode || !showLabel) return undefined
-  const text = `SKU：${String(skuCode)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
 
 const filter = reactive({ orderNo: '', skuCode: '' })
 const orderNoLabelVisible = ref(false)
@@ -522,13 +505,6 @@ const registerSewingTotal = computed(() =>
 const registerRules: FormRules = {
   defectQuantity: [],
   defectReason: [],
-}
-
-function formatDateTime(v: string | null | undefined): string {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleString('zh-CN')
 }
 
 function nowDatetimeStr(): string {
@@ -825,24 +801,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
 .sewing-table {
   margin-bottom: var(--space-md);
 }
@@ -856,11 +814,6 @@ onMounted(() => {
 
 .text-muted {
   color: var(--el-text-color-secondary);
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .register-brief {

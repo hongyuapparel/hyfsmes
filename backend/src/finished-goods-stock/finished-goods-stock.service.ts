@@ -59,6 +59,12 @@ export class FinishedGoodsStockService {
     return msg.includes('Table') && msg.includes(tableName) && msg.includes("doesn't exist");
   }
 
+  private normalizeOrderUnitPrice(v: unknown): string {
+    const n = Number(v);
+    if (!Number.isFinite(n)) return '0';
+    return n.toFixed(2);
+  }
+
   /** 手动新增成品库存（仓库直接入库）；订单号可选，不填则不关联订单 */
   async createManual(dto: {
     orderNo?: string;
@@ -79,6 +85,7 @@ export class FinishedGoodsStockService {
     let orderId: number | null = null;
     let customerId: number | null = null;
     let customerName = '';
+    let orderExFactoryPrice: string | number | null = null;
     if (orderNo) {
       const order = await this.orderRepo.findOne({ where: { orderNo } });
       if (!order) {
@@ -87,11 +94,12 @@ export class FinishedGoodsStockService {
       orderId = order.id;
       customerId = order.customerId ?? null;
       customerName = order.customerName?.trim() ?? '';
+      orderExFactoryPrice = order.exFactoryPrice ?? '0';
     }
     const unitPriceStr =
       dto.unitPrice != null && dto.unitPrice !== ''
-        ? String(Number(dto.unitPrice))
-        : '0';
+        ? this.normalizeOrderUnitPrice(dto.unitPrice)
+        : this.normalizeOrderUnitPrice(orderExFactoryPrice);
     const stock = this.stockRepo.create({
       orderId,
       skuCode: dto.skuCode?.trim() ?? '',
@@ -216,7 +224,11 @@ export class FinishedGoodsStockService {
           's.customer_name AS customerName',
           's.sku_code AS skuCode',
           's.quantity AS quantity',
-          's.unit_price AS unitPrice',
+          `CASE
+            WHEN s.unit_price IS NOT NULL AND s.unit_price > 0 THEN s.unit_price
+            WHEN o.ex_factory_price IS NOT NULL AND o.ex_factory_price > 0 THEN o.ex_factory_price
+            ELSE 0
+          END AS unitPrice`,
           's.warehouse_id AS warehouseId',
           's.inventory_type_id AS inventoryTypeId',
           's.department AS department',
@@ -491,7 +503,7 @@ export class FinishedGoodsStockService {
     productImageUrl: string;
     colorImages: Array<{ colorName: string; imageUrl: string; updatedAt: string }>;
     adjustLogs: Array<{ id: number; operatorUsername: string; before: any; after: any; remark: string; createdAt: string }>;
-    colorSize: { headers: string[]; colors: string[] };
+    colorSize: { headers: string[]; colors: string[]; rows: Array<{ colorName: string; quantities: number[] }> };
   }> {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('库存记录不存在');
@@ -517,6 +529,25 @@ export class FinishedGoodsStockService {
     const headers = Array.isArray(ext?.colorSizeHeaders) ? ext!.colorSizeHeaders! : [];
     const rows = Array.isArray(ext?.colorSizeRows) ? ext!.colorSizeRows! : [];
     const colors = rows.map((r: any) => String(r?.colorName ?? '')).filter((v) => v);
+    const mappedRows = rows.map((r: any) => ({
+      colorName: String(r?.colorName ?? ''),
+      quantities: Array.isArray(r?.quantities)
+        ? r.quantities.map((q: unknown) => {
+            const n = Number(q);
+            return Number.isFinite(n) ? n : 0;
+          })
+        : [],
+    }));
+
+    const stockUnitPrice = Number(stock.unitPrice);
+    const orderUnitPrice = Number(order?.exFactoryPrice);
+    const resolvedUnitPrice =
+      Number.isFinite(stockUnitPrice) && stockUnitPrice > 0
+        ? stockUnitPrice
+        : Number.isFinite(orderUnitPrice)
+          ? orderUnitPrice
+          : 0;
+    stock.unitPrice = this.normalizeOrderUnitPrice(resolvedUnitPrice);
 
     return {
       stock,
@@ -535,7 +566,7 @@ export class FinishedGoodsStockService {
         remark: l.remark ?? '',
         createdAt: l.createdAt ? new Date(l.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
       })),
-      colorSize: { headers, colors },
+      colorSize: { headers, colors, rows: mappedRows },
     };
   }
 
@@ -546,6 +577,7 @@ export class FinishedGoodsStockService {
       inventoryTypeId?: number | null;
       warehouseId?: number | null;
       location?: string;
+      imageUrl?: string;
       remark?: string;
     },
     operatorUsername: string,
@@ -564,6 +596,7 @@ export class FinishedGoodsStockService {
     if (dto.inventoryTypeId !== undefined) stock.inventoryTypeId = dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null;
     if (dto.warehouseId !== undefined) stock.warehouseId = dto.warehouseId != null ? Number(dto.warehouseId) : null;
     if (dto.location !== undefined) stock.location = (dto.location ?? '').trim();
+    if (dto.imageUrl !== undefined) stock.imageUrl = (dto.imageUrl ?? '').trim();
 
     const saved = await this.stockRepo.save(stock);
 
@@ -608,10 +641,15 @@ export class FinishedGoodsStockService {
     const colorName = (dto.colorName ?? '').trim();
     if (!colorName) throw new NotFoundException('颜色不能为空');
     const imageUrl = (dto.imageUrl ?? '').trim();
-    if (!imageUrl) throw new NotFoundException('图片不能为空');
 
     try {
       const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: id, colorName } });
+      if (!imageUrl) {
+        if (existing) {
+          await this.colorImageRepo.remove(existing);
+        }
+        return;
+      }
       if (existing) {
         existing.imageUrl = imageUrl;
         await this.colorImageRepo.save(existing);

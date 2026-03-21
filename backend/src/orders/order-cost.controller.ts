@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Put, UseGuards } from '@nes
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { OrdersService } from './orders.service';
 
 /**
@@ -20,10 +21,14 @@ export class OrderCostController {
   }
 
   @Put()
+  @RequirePermission('orders_edit')
   saveCost(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body() body: { snapshot: Record<string, unknown> },
+    @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.ordersService.saveCostSnapshot(orderId, body);
+    return this.ordersService.assertOrderActionById(orderId, user.userId, 'edit').then(() =>
+      this.ordersService.saveCostSnapshot(orderId, body),
+    );
   }
 }

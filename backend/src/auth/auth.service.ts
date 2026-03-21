@@ -5,12 +5,15 @@ import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
 import { User, UserStatus } from '../entities/user.entity';
 import { Permission } from '../entities/permission.entity';
+import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
+    @InjectRepository(RoleOrderPolicy)
+    private roleOrderPolicyRepo: Repository<RoleOrderPolicy>,
     private jwtService: JwtService,
   ) {}
 
@@ -39,6 +42,11 @@ export class AuthService {
     roleId: number;
     roleName: string;
     permissions: Permission[];
+    orderPolicies: {
+      edit: string[];
+      review: string[];
+      delete: string[];
+    };
   }> {
     const user = await this.userRepo.findOne({
       where: { id: userId },
@@ -48,6 +56,16 @@ export class AuthService {
     const permissions = (user.role?.rolePermissions ?? [])
       .map((rp) => rp.permission)
       .filter(Boolean);
+    const policyRows = await this.roleOrderPolicyRepo.find({
+      where: { roleId: user.roleId },
+      select: ['action', 'statusCode'],
+    });
+    const orderPolicies = { edit: [] as string[], review: [] as string[], delete: [] as string[] };
+    for (const row of policyRows) {
+      if (row.action === 'edit') orderPolicies.edit.push(row.statusCode);
+      if (row.action === 'review') orderPolicies.review.push(row.statusCode);
+      if (row.action === 'delete') orderPolicies.delete.push(row.statusCode);
+    }
     return {
       id: user.id,
       username: user.username,
@@ -55,6 +73,7 @@ export class AuthService {
       roleId: user.roleId,
       roleName: user.role?.name ?? '',
       permissions,
+      orderPolicies,
     };
   }
 }

@@ -38,7 +38,7 @@
         </template>
         <el-option v-for="s in salespeople" :key="s" :label="s" :value="s" />
       </el-select>
-      <el-button type="primary" size="large" @click="onFilterChange(true)">筛选</el-button>
+      <el-button type="primary" size="large" @click="onFilterChange(true)">搜索</el-button>
       <el-button size="large" @click="resetFilter">清空</el-button>
 
       <div class="filter-actions">

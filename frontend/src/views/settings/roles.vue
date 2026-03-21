@@ -84,6 +84,27 @@
         <el-checkbox-group v-model="actionDialogCheckedIds">
           <div v-for="item in actionDialogItems" :key="item.id" class="action-perm-item">
             <el-checkbox :label="item.id">{{ item.name }}</el-checkbox>
+            <div v-if="isOrderListAction(item)" class="action-status-config">
+              <template v-if="isOrderReviewAction(item)">
+                <div class="action-status-title">可操作状态：待审单（固定）</div>
+              </template>
+              <template v-else>
+              <div class="action-status-title">可操作状态：</div>
+              <el-checkbox-group
+                v-model="actionStatusDraft[getOrderActionKey(item)!]"
+                :disabled="!actionDialogCheckedIds.includes(item.id)"
+              >
+                <el-checkbox
+                  v-for="status in orderStatuses"
+                  :key="`${item.id}-${status.code}`"
+                  :label="status.code"
+                  size="small"
+                >
+                  {{ status.label }}
+                </el-checkbox>
+              </el-checkbox-group>
+              </template>
+            </div>
           </div>
         </el-checkbox-group>
       </div>
@@ -126,10 +147,13 @@ import {
   deleteRole,
   getRolePermissions,
   setRolePermissions,
+  getRoleOrderPolicies,
+  setRoleOrderPolicies,
   type RoleItem,
 } from '@/api/roles'
 import { Delete } from '@element-plus/icons-vue'
 import { getPermissions, type PermissionItem } from '@/api/permissions'
+import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const list = ref<RoleItem[]>([])
@@ -138,6 +162,13 @@ const selectedRoleId = ref<number | null>(null)
 const checkedIds = ref<number[]>([])
 const saving = ref(false)
 const menuTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
+const rolePermReqSeq = ref(0)
+const orderStatuses = ref<OrderStatusItem[]>([])
+const roleOrderPolicies = ref<{ edit: string[]; review: string[]; delete: string[] }>({
+  edit: [],
+  review: [],
+  delete: [],
+})
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -197,6 +228,8 @@ const menuCheckedKeys = computed(() =>
  */
 const ORDER_LIST_ACTION_EXCLUDE_NAMES = [
   '草稿提交',
+  '待审单可编辑',
+  '全状态可编辑',
   '采购完成',
   '纸样完成',
   '裁床完成',
@@ -230,10 +263,30 @@ const actionDialogPageName = ref('')
 const actionDialogRoutePath = ref('')
 const actionDialogItems = ref<PermissionItem[]>([])
 const actionDialogCheckedIds = ref<number[]>([])
+const actionStatusDraft = ref<Record<'edit' | 'review' | 'delete', string[]>>({
+  edit: [],
+  review: [],
+  delete: [],
+})
 
 const actionDialogTitle = computed(
   () => `${actionDialogPageName.value || '页面'} - 操作权限`,
 )
+
+function getOrderActionKey(item: PermissionItem): 'edit' | 'review' | 'delete' | null {
+  if (item.code === 'orders_edit') return 'edit'
+  if (item.code === 'orders_review') return 'review'
+  if (item.code === 'orders_delete') return 'delete'
+  return null
+}
+
+function isOrderListAction(item: PermissionItem): boolean {
+  return (item.routePath || '/') === '/orders/list' && !!getOrderActionKey(item)
+}
+
+function isOrderReviewAction(item: PermissionItem): boolean {
+  return getOrderActionKey(item) === 'review'
+}
 
 function openActionDialog(data: TreeNode) {
   const path = data.routePath || '/'
@@ -244,17 +297,36 @@ function openActionDialog(data: TreeNode) {
   actionDialogCheckedIds.value = checkedIds.value.filter((id) =>
     items.some((p) => p.id === id),
   )
+  actionStatusDraft.value = {
+    edit: [...roleOrderPolicies.value.edit],
+    review: [...roleOrderPolicies.value.review],
+    delete: [...roleOrderPolicies.value.delete],
+  }
   actionDialogVisible.value = true
 }
 
 function confirmActionDialog() {
-  const path = actionDialogRoutePath.value
   const items = actionDialogItems.value
   const idsForPage = new Set(items.map((p) => p.id))
   checkedIds.value = [
     ...checkedIds.value.filter((id) => !idsForPage.has(id)),
     ...actionDialogCheckedIds.value,
   ]
+  const checkedSet = new Set(actionDialogCheckedIds.value)
+  for (const item of items) {
+    const actionKey = getOrderActionKey(item)
+    if (!actionKey) continue
+    if (!checkedSet.has(item.id)) {
+      actionStatusDraft.value[actionKey] = []
+    } else if (actionKey === 'review') {
+      actionStatusDraft.value.review = ['pending_review']
+    }
+  }
+  roleOrderPolicies.value = {
+    edit: [...actionStatusDraft.value.edit],
+    review: [...actionStatusDraft.value.review],
+    delete: [...actionStatusDraft.value.delete],
+  }
   actionDialogVisible.value = false
 }
 
@@ -263,6 +335,7 @@ function actionDialogClosed() {
   actionDialogRoutePath.value = ''
   actionDialogItems.value = []
   actionDialogCheckedIds.value = []
+  actionStatusDraft.value = { edit: [], review: [], delete: [] }
 }
 
 const menuTreeData = computed<TreeNode[]>(() => {
@@ -295,7 +368,8 @@ const menuTreeData = computed<TreeNode[]>(() => {
   const findParentPath = (path: string): string | null => {
     if (!path || path === '/') return null
     const parts = path.split('/').filter(Boolean)
-    if (parts.length <= 1) return '/'
+    // 一级菜单与主页并列，不应挂在 "/" 下面，否则会导致勾选主页时整树联动全选
+    if (parts.length <= 1) return null
     return '/' + parts.slice(0, parts.length - 1).join('/')
   }
 
@@ -329,15 +403,41 @@ async function load() {
 async function loadPermissions() {
   const res = await getPermissions()
   permissions.value = res.data ?? []
+  const statusRes = await getOrderStatuses()
+  orderStatuses.value = (statusRes.data ?? [])
+    .filter((s) => s.enabled !== false)
+    .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0))
 }
 
 async function loadRolePermissions() {
+  const reqSeq = ++rolePermReqSeq.value
   if (!selectedRoleId.value) {
     checkedIds.value = []
+    menuTreeRef.value?.setCheckedKeys?.([])
+    roleOrderPolicies.value = { edit: [], review: [], delete: [] }
     return
   }
-  const res = await getRolePermissions(selectedRoleId.value)
-  checkedIds.value = res.data ?? []
+  const roleId = selectedRoleId.value
+  const permRes = await getRolePermissions(roleId)
+  let policyData: { edit?: string[]; review?: string[]; delete?: string[] } | null = null
+  try {
+    const policyRes = await getRoleOrderPolicies(roleId)
+    policyData = policyRes.data ?? null
+  } catch (e: unknown) {
+    const status = (e as { response?: { status?: number } })?.response?.status
+    if (status !== 404 && !isErrorHandled(e)) {
+      ElMessage.warning('订单状态策略读取失败，已按旧模式加载')
+    }
+  }
+  // 忽略过期请求结果，避免快速切换角色时旧请求覆盖新角色权限
+  if (reqSeq !== rolePermReqSeq.value) return
+  checkedIds.value = (permRes.data ?? []).filter((id) => menuPermissionIds.value.includes(id) || actionPermissionIds.value.includes(id))
+  roleOrderPolicies.value = {
+    edit: policyData?.edit ?? [],
+    review: policyData?.review ?? [],
+    delete: policyData?.delete ?? [],
+  }
+  menuTreeRef.value?.setCheckedKeys?.(menuCheckedKeys.value)
 }
 
 function openCreate() {
@@ -401,6 +501,15 @@ async function savePermissions() {
   saving.value = true
   try {
     await setRolePermissions(selectedRoleId.value, ids)
+    try {
+      await setRoleOrderPolicies(selectedRoleId.value, roleOrderPolicies.value)
+    } catch (e: unknown) {
+      const status = (e as { response?: { status?: number } })?.response?.status
+      // 404 表示当前后端未启用状态策略接口；主权限已保存，这里不再提示避免误导为“保存失败”
+      if (status !== 404) {
+        ElMessage.warning('主权限已保存；订单状态策略保存失败，请稍后重试')
+      }
+    }
     checkedIds.value = ids
     ElMessage.success('保存成功')
   } catch (e: unknown) {
@@ -461,5 +570,13 @@ onMounted(async () => {
 }
 .action-perm-item:last-child {
   margin-bottom: 0;
+}
+.action-status-config {
+  margin: 6px 0 0 24px;
+}
+.action-status-title {
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+  margin-bottom: 4px;
 }
 </style>

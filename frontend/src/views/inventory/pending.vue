@@ -57,11 +57,13 @@
     </div>
 
     <el-table
+      ref="pendingTableRef"
       v-loading="loading"
       :data="list"
       border
       stripe
       class="pending-table"
+      @header-dragend="onPendingHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -81,7 +83,7 @@
           <span v-else class="text-placeholder">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="90" align="right">
+      <el-table-column label="数量" width="140" align="right">
         <template #default="{ row }">
           <el-tooltip
             placement="top"
@@ -133,7 +135,12 @@
                 </template>
               </div>
             </template>
-            <span class="qty-hover">{{ row.quantity }}</span>
+            <span class="qty-inline">
+              <span class="qty-hover">{{ row.quantity }}</span>
+              <el-tag v-if="row.sourceType === 'defect'" type="danger" size="small" effect="light" class="defect-tag">
+                次品
+              </el-tag>
+            </span>
           </el-tooltip>
         </template>
       </el-table-column>
@@ -234,39 +241,26 @@ import { getPendingList, doPendingInbound, type PendingListItem } from '@/api/in
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-
-function getFilterInputStyle(v: unknown) {
-  return v ? { color: ACTIVE_FILTER_COLOR } : undefined
-}
-function getOrderNoFilterStyle(orderNo: unknown, showLabel: boolean) {
-  if (!orderNo || !showLabel) return undefined
-  const text = `订单号：${String(orderNo)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
-function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
-  if (!skuCode || !showLabel) return undefined
-  const text = `SKU：${String(skuCode)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getOrderNoFilterStyle,
+  getSkuCodeFilterStyle,
+} from '@/composables/useFilterBarHelpers'
 
 const filter = reactive({ orderNo: '', skuCode: '' })
 const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 const list = ref<PendingListItem[]>([])
+const pendingTableRef = ref()
 const loading = ref(false)
 const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PendingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+const { onHeaderDragEnd: onPendingHeaderDragEnd, restoreColumnWidths: restorePendingColumnWidths } =
+  useTableColumnWidthPersist('inventory-pending-main')
 
 const inboundDialog = reactive<{ visible: boolean; submitting: boolean }>({
   visible: false,
@@ -331,6 +325,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restorePendingColumnWidths(pendingTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -457,6 +452,17 @@ onMounted(async () => {
   text-underline-offset: 3px;
 }
 
+.qty-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.defect-tag {
+  transform: scale(0.92);
+  transform-origin: right center;
+}
+
 .qty-tooltip {
   max-width: 520px;
 }
@@ -535,11 +541,14 @@ onMounted(async () => {
 </style>
 
 <style scoped>
+.inventory-pending-page {
+  background: var(--color-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
 .inventory-pending-page .pending-table {
   margin-bottom: var(--space-md);
-}
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
 }
 </style>

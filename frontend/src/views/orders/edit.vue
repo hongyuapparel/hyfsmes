@@ -83,6 +83,18 @@
           </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
+            <el-form-item label="产品分组">
+              <el-input :model-value="selectedSkuMeta.productGroupName" disabled placeholder="随 SKU 自动带出" />
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12" :md="8">
+            <el-form-item label="适用人群">
+              <el-input :model-value="selectedSkuMeta.applicablePeopleName" disabled placeholder="随 SKU 自动带出" />
+            </el-form-item>
+          </el-col>
+
+          <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="合作方式" prop="collaborationTypeId">
               <el-select
                 v-model="form.collaborationTypeId"
@@ -992,6 +1004,39 @@ const skuDialogVisible = ref(false)
 const skuDialogLoading = ref(false)
 const skuKeyword = ref('')
 const skuProducts = ref<ProductItem[]>([])
+const skuProductGroupName = ref('')
+const skuApplicablePeopleName = ref('')
+
+function toLeafOptionLabel(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const parts = raw
+    .split('>')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : raw
+}
+
+const selectedSkuMeta = computed(() => {
+  const sku = String(form.skuCode ?? '').trim()
+  if (!sku) {
+    return {
+      productGroupName: toLeafOptionLabel(skuProductGroupName.value),
+      applicablePeopleName: skuApplicablePeopleName.value,
+    }
+  }
+  const matched = skuProducts.value.find((item) => String(item.skuCode ?? '').trim() === sku)
+  if (matched) {
+    return {
+      productGroupName: toLeafOptionLabel(matched.productGroup ?? ''),
+      applicablePeopleName: matched.applicablePeople ?? '',
+    }
+  }
+  return {
+    productGroupName: toLeafOptionLabel(skuProductGroupName.value),
+    applicablePeopleName: skuApplicablePeopleName.value,
+  }
+})
 
 const filteredSkuProducts = computed(() => {
   const kw = skuKeyword.value.trim().toLowerCase()
@@ -1035,6 +1080,8 @@ async function openSkuDialog() {
 
 function onSelectSku(row: ProductItem) {
   form.skuCode = row.skuCode
+  skuProductGroupName.value = row.productGroup ?? ''
+  skuApplicablePeopleName.value = row.applicablePeople ?? ''
   if (row.imageUrl && !form.imageUrl) {
     form.imageUrl = row.imageUrl
   }
@@ -2178,6 +2225,8 @@ async function loadDetail() {
     orderNo.value = d.orderNo
     orderStatus.value = (d as any).status ?? 'draft'
     form.skuCode = d.skuCode
+    skuProductGroupName.value = (d as any).productGroupName ?? ''
+    skuApplicablePeopleName.value = (d as any).applicablePeopleName ?? ''
     form.xiaomanOrderNo = (d as any).xiaomanOrderNo ?? ''
     form.customerId = d.customerId ?? null
     form.customerName = d.customerName ?? ''

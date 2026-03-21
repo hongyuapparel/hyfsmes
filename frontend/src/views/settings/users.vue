@@ -79,6 +79,7 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { getUsers, createUser, updateUser, resetUserPassword, type UserItem } from '@/api/users'
 import { getRoles, type RoleItem } from '@/api/roles'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { formatDateTime as formatDate } from '@/utils/date-format'
 
 const list = ref<UserItem[]>([])
 const roles = ref<RoleItem[]>([])
@@ -99,11 +100,6 @@ const rules: FormRules = {
 const pwdForm = ref({ password: '' })
 const pwdRules: FormRules = {
   password: [{ required: true, message: '请输入新密码', trigger: 'blur' }],
-}
-
-function formatDate(s: string) {
-  if (!s) return '-'
-  return new Date(s).toLocaleString('zh-CN')
 }
 
 async function load() {

@@ -14,7 +14,7 @@
         </el-radio-group>
       </div>
       <div class="status-tabs-right">
-        <el-button type="primary" size="small" @click="onCreateOrder">新建订单</el-button>
+        <el-button v-if="canEditOrders" type="primary" size="small" @click="onCreateOrder">新建订单</el-button>
       </div>
     </div>
 
@@ -230,7 +230,7 @@
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button
-          v-if="canDeleteOrders && hasSelection"
+          v-if="canDeleteOrders && hasSelection && canDeleteSelectedByStatus"
           type="danger"
           size="large"
           @click="onBatchDelete"
@@ -238,7 +238,7 @@
           删除
         </el-button>
         <el-button
-          v-if="hasSelection"
+          v-if="canEditOrders && hasSelection"
           type="warning"
           size="large"
           @click="onBatchCopyToDraft"
@@ -246,7 +246,7 @@
           复制为草稿
         </el-button>
         <el-button
-          v-if="canReviewOrders && isPendingReviewTab && hasSelection"
+          v-if="canReviewOrders && isPendingReviewTab && hasSelection && canReviewSelectedByStatus"
           type="success"
           size="large"
           @click="openReviewDialog"
@@ -298,9 +298,6 @@
               <div class="order-card-main">
                 <span class="sku-line">
                   SKU：{{ item.skuCode || '-' }}
-                  <template v-if="collaborationDisplay(item)">
-                    · {{ collaborationDisplay(item) }}
-                  </template>
                 </span>
                 <div class="order-card-meta">
                   <span>下单时间：{{ formatDateTime(item.orderDate) }}</span>
@@ -328,6 +325,7 @@
             <div class="field-row">
               <span class="field-label">数量：</span>
               <el-popover
+                v-if="!isSampleOrder(item)"
                 placement="top-start"
                 trigger="hover"
                 :width="Math.max(320, (sizeBreakdownCache[item.id]?.headers.length || 1) * 72)"
@@ -383,6 +381,9 @@
                   </div>
                 </div>
               </el-popover>
+              <span v-else class="field-value">
+                {{ item.quantity }} 件
+              </span>
             </div>
             <div class="field-row">
               <span class="field-label">出厂价：</span>
@@ -392,29 +393,22 @@
               <span class="field-label">销售价：</span>
               <span class="field-value price-value">￥{{ item.salePrice }}</span>
             </div>
-            <div v-if="orderTypeDisplay(item) || item.processItem" class="field-row order-tags-row">
+            <div v-if="getOrderMetaTags(item).length" class="field-row order-tags-row">
               <el-tag
-                v-if="orderTypeDisplay(item)"
+                v-for="(tag, idx) in getOrderMetaTags(item)"
+                :key="`${item.id}-${tag}-${idx}`"
                 size="small"
-                effect="light"
-                class="order-type-tag"
+                :effect="idx % 2 === 0 ? 'light' : 'plain'"
+                class="order-meta-tag"
               >
-                {{ orderTypeDisplay(item) }}
-              </el-tag>
-              <el-tag
-                v-if="item.processItem"
-                size="small"
-                effect="plain"
-                class="process-item-tag"
-              >
-                {{ item.processItem }}
+                {{ tag }}
               </el-tag>
             </div>
           </div>
           <div class="order-card-footer">
             <div v-if="item.factoryName" class="footer-factory ellipsis" :title="item.factoryName">{{ item.factoryName }}</div>
             <div class="footer-actions">
-              <span class="footer-action-item">
+              <span v-if="canEditOrderItem(item)" class="footer-action-item">
                 <el-tooltip content="编辑" placement="top">
                   <el-button link type="primary" size="small" circle class="action-btn" @click="openEdit(item)">
                     <el-icon><Edit /></el-icon>
@@ -718,7 +712,7 @@ function findCollaborationLabelById(id: number | null | undefined): string {
 }
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const DATE_RANGE_WIDTH_EMPTY = '140px'
+const DATE_RANGE_WIDTH_EMPTY = '170px'
 const DATE_RANGE_WIDTH_FILLED = '220px'
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
@@ -866,8 +860,37 @@ const selectedIds = computed(() => {
 })
 const hasSelection = computed(() => selectedIds.value.length > 0)
 const isPendingReviewTab = computed(() => currentStatus.value === 'pending_review')
+const canEditOrders = computed(() => authStore.hasPermission('orders_edit'))
 const canDeleteOrders = computed(() => authStore.hasPermission('orders_delete'))
 const canReviewOrders = computed(() => authStore.hasPermission('orders_review'))
+const deleteAllowedStatuses = computed(() => {
+  const arr = authStore.user?.orderPolicies?.delete ?? []
+  return new Set(arr.map((s) => (s ?? '').trim()).filter(Boolean))
+})
+const reviewAllowedStatuses = computed(() => {
+  const arr = authStore.user?.orderPolicies?.review ?? []
+  return new Set(arr.map((s) => (s ?? '').trim()).filter(Boolean))
+})
+const selectedStatusList = computed(() =>
+  list.value.filter((item) => cardSelected.value[item.id]).map((item) => (item.status ?? '').trim()),
+)
+const canDeleteSelectedByStatus = computed(() => {
+  const statuses = selectedStatusList.value
+  if (!statuses.length) return false
+  // 策略未返回时回退旧行为，避免阻断现有操作
+  if (!authStore.user?.orderPolicies?.delete) return true
+  const allow = deleteAllowedStatuses.value
+  if (!allow.size) return false
+  return statuses.every((s) => allow.has(s))
+})
+const canReviewSelectedByStatus = computed(() => {
+  const statuses = selectedStatusList.value
+  if (!statuses.length) return false
+  if (!authStore.user?.orderPolicies?.review) return true
+  const allow = reviewAllowedStatuses.value
+  if (!allow.size) return false
+  return statuses.every((s) => allow.has(s))
+})
 
 function resetSelection() {
   cardSelected.value = {}
@@ -875,6 +898,15 @@ function resetSelection() {
 
 function onCardSelectChange() {
   // 选中状态变化时，selectedIds 由计算属性自动更新
+}
+
+function canEditOrderItem(item: OrderListItem): boolean {
+  if (!canEditOrders.value) return false
+  const allowed = authStore.user?.orderPolicies?.edit
+  if (!allowed) return true
+  const allowedSet = new Set((allowed ?? []).map((s) => (s ?? '').trim()).filter(Boolean))
+  if (!allowedSet.size) return false
+  return allowedSet.has((item.status ?? '').trim())
 }
 
 function getStatusLabel(status: string): string {
@@ -919,6 +951,39 @@ function orderTypeDisplay(item: OrderListItem): string {
     if (label && label.trim()) return label.trim()
   }
   return ''
+}
+
+function findOrderTypePathById(id: number | null | undefined): string[] {
+  if (!id) return []
+  const dfs = (nodes: SystemOptionTreeNode[], path: string[]): string[] | null => {
+    for (const node of nodes) {
+      const currentPath = [...path, node.value]
+      if (node.id === id) return currentPath
+      if (node.children?.length) {
+        const found = dfs(node.children, currentPath)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  return dfs(orderTypeTree.value, []) ?? []
+}
+
+function isSampleOrder(item: OrderListItem): boolean {
+  if (typeof item.orderTypeId !== 'number') return false
+  const path = findOrderTypePathById(item.orderTypeId)
+  return path.some((seg) => (seg ?? '').includes('样品'))
+}
+
+function getOrderMetaTags(item: OrderListItem): string[] {
+  const tags: string[] = []
+  const orderType = orderTypeDisplay(item)
+  const processItem = item.processItem?.trim()
+  const collaboration = collaborationDisplay(item)
+  if (orderType) tags.push(orderType)
+  if (processItem) tags.push(processItem)
+  if (collaboration) tags.push(collaboration)
+  return tags
 }
 
 function collaborationDisplay(item: OrderListItem): string {
@@ -1203,7 +1268,7 @@ async function onShowSizePopover(order: OrderListItem) {
   sizePopoverLoadingId.value = id
   try {
     const res = await getOrderSizeBreakdown(id)
-    sizeBreakdownCache.value[id] = res.data ?? { headers: [], rows: [] }
+    sizeBreakdownCache.value[id] = normalizeSizeBreakdown(res.data ?? { headers: [], rows: [] })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) {
       ElMessage.error(getErrorMessage(e, '尺码明细加载失败'))
@@ -1213,12 +1278,61 @@ async function onShowSizePopover(order: OrderListItem) {
   }
 }
 
+function normalizeSizeBreakdown(data: OrderSizeBreakdownRes): OrderSizeBreakdownRes {
+  const headers = Array.isArray(data.headers) ? data.headers : []
+  const expectedLen = headers.length
+  let rows = Array.isArray(data.rows) ? data.rows.map((r) => ({ ...r, values: [...(r.values ?? [])] })) : []
+
+  // 兼容旧后端返回：前端不再展示“尾部出货数”
+  rows = rows.filter((r) => r.label !== '尾部出货数')
+
+  if (expectedLen <= 1) return { headers, rows }
+
+  const inbound = rows.find((r) => r.label === '尾部入库数')
+  if (!inbound) return { headers, rows }
+
+  while (inbound.values.length < expectedLen) inbound.values.push(null)
+  inbound.values = inbound.values.slice(0, expectedLen)
+
+  const inboundTotalRaw = inbound.values[expectedLen - 1]
+  const inboundTotal = Number(inboundTotalRaw)
+  if (!Number.isFinite(inboundTotal) || inboundTotal <= 0) return { headers, rows }
+
+  const hasInboundPerSize = inbound.values.slice(0, expectedLen - 1).some((v) => Number(v) > 0)
+  if (hasInboundPerSize) return { headers, rows }
+
+  const referenceLabels = ['尾部收货数', '车缝数量', '裁床数量', '订单数量']
+  const refRow = rows.find((r) => referenceLabels.includes(r.label))
+  if (!refRow || !Array.isArray(refRow.values) || refRow.values.length < expectedLen) return { headers, rows }
+
+  const base = refRow.values.slice(0, expectedLen - 1).map((v) => Math.max(0, Number(v) || 0))
+  const baseTotal = base.reduce((sum, n) => sum + n, 0)
+  if (baseTotal <= 0) return { headers, rows }
+
+  const exact = base.map((n) => (n * inboundTotal) / baseTotal)
+  const floors = exact.map((n) => Math.floor(n))
+  let remain = inboundTotal - floors.reduce((sum, n) => sum + n, 0)
+  const order = exact
+    .map((n, idx) => ({ idx, frac: n - Math.floor(n) }))
+    .sort((a, b) => b.frac - a.frac)
+  for (const item of order) {
+    if (remain <= 0) break
+    floors[item.idx] += 1
+    remain -= 1
+  }
+
+  inbound.values = [...floors, inboundTotal]
+  return { headers, rows }
+}
+
 function openEdit(order: OrderListItem) {
-  router.push({ name: 'OrdersEdit', params: { id: order.id } })
+  const title = `订单编辑 ${order.orderNo || order.id}`
+  router.push({ name: 'OrdersEdit', params: { id: order.id }, query: { tabTitle: title } })
 }
 
 function openView(order: OrderListItem) {
-  router.push({ name: 'OrdersDetail', params: { id: order.id } })
+  const title = `订单详情 ${order.orderNo || order.id}`
+  router.push({ name: 'OrdersDetail', params: { id: order.id }, query: { tabTitle: title } })
 }
 
 function openCost(order: OrderListItem) {
@@ -1276,7 +1390,8 @@ function downloadExcel() {
 
 function printOrder(_order: OrderListItem) {
   // 统一使用订单详情页进行打印，保证版式一致
-  router.push({ name: 'OrdersDetail', params: { id: _order.id } })
+  const title = `订单详情 ${_order.orderNo || _order.id}`
+  router.push({ name: 'OrdersDetail', params: { id: _order.id }, query: { tabTitle: title } })
 }
 
 async function openOperationLog(order: OrderListItem) {
@@ -1567,17 +1682,19 @@ watchEffect(() => {
 .qty-popover-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .qty-popover-table .qty-label {
   padding: 2px 4px;
   color: var(--color-text-muted, #909399);
   white-space: nowrap;
+  text-align: left;
 }
 
 .qty-popover-table .qty-value {
   padding: 2px 4px;
-  text-align: right;
+  text-align: center;
   white-space: nowrap;
 }
 
@@ -1591,6 +1708,7 @@ watchEffect(() => {
   padding: 2px 4px;
   font-weight: 500;
   white-space: nowrap;
+  text-align: center;
 }
 
 /* 订单类型 + 工艺 同一行：左侧标签（仅值），右侧工艺 */
@@ -1606,8 +1724,7 @@ watchEffect(() => {
   max-width: 100%;
 }
 
-.order-tags-row .order-type-tag,
-.order-tags-row .process-item-tag {
+.order-tags-row .order-meta-tag {
   overflow: hidden;
   text-overflow: ellipsis;
 }

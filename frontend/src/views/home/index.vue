@@ -120,11 +120,15 @@
       <!-- 即将到期（预警样式） -->
       <section
         v-if="canAccessOrders"
-        class="todo-section todo-section--warning"
-        :class="{ 'todo-section-loading': todoLoading }"
+        class="todo-section"
+        :class="{
+          'todo-section--warning': todoCounts.dueSoon > 0,
+          'todo-section--default': todoCounts.dueSoon <= 0,
+          'todo-section-loading': todoLoading,
+        }"
       >
         <div class="todo-section-head">
-          <el-icon class="todo-section-icon"><WarningFilled /></el-icon>
+          <el-icon v-if="todoCounts.dueSoon > 0" class="todo-section-icon"><WarningFilled /></el-icon>
           <span class="todo-section-title">{{ isAdmin ? '即将到期(7天内)(全部)' : '即将到期(7天内)' }}</span>
           <span class="todo-section-count">{{ todoCounts.dueSoon }}</span>
           <el-link
@@ -227,6 +231,7 @@
  *
  * 3. 即将到期(7天内)
  *    - 条件：订单 customer_due_date 在「今天 00:00」到「今天+7 天 23:59」之间（本地日期）
+ *            且仅统计「非草稿 + 非终态（未完成）」状态
  *    - 显示：有订单列表权限即展示
  *
  * 4. 待入库(全部) / 待入库
@@ -248,8 +253,11 @@ import {
 import { useAuthStore } from '@/stores/auth'
 import { getOrders } from '@/api/orders'
 import type { OrderListItem } from '@/api/orders'
+import { getOrderStatuses } from '@/api/order-status-config'
+import type { OrderStatusItem } from '@/api/order-status-config'
 import { getPendingInboundList } from '@/api/inventory-pending'
 import type { PendingInboundItem } from '@/api/inventory-pending'
+import { formatDate } from '@/utils/date-format'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -495,12 +503,6 @@ function addDaysYYYYMMDD(days: number): string {
 const dueSoonStart = computed(() => todayYYYYMMDD())
 const dueSoonEnd = computed(() => addDaysYYYYMMDD(7))
 
-function formatDate(val: string | null | undefined): string {
-  if (!val) return '-'
-  const s = String(val).slice(0, 10)
-  return s || '-'
-}
-
 const pendingReviewLink = '/orders/list?status=pending_review'
 const myMerchandiserLink = computed(() => {
   const name = encodeURIComponent(displayName.value)
@@ -528,6 +530,56 @@ function goOrderDetail(orderId: number) {
 
 function goPendingInbound() {
   router.push({ path: '/inventory/pending' })
+}
+
+function parseDateTs(v: string | null | undefined): number {
+  if (!v) return Number.MAX_SAFE_INTEGER
+  const t = new Date(v).getTime()
+  return Number.isNaN(t) ? Number.MAX_SAFE_INTEGER : t
+}
+
+/** 即将到期仅统计：非草稿 + 非终态（例如已完成） */
+async function loadDueSoonTodo() {
+  const statusRes = await getOrderStatuses()
+  const allStatuses: OrderStatusItem[] = statusRes.data ?? []
+  const remindableStatuses = allStatuses
+    .filter((s) => s.enabled && s.code !== 'draft' && !s.isFinal)
+    .map((s) => s.code)
+
+  if (!remindableStatuses.length) {
+    todoCounts.value.dueSoon = 0
+    todoLists.value.dueSoon = []
+    return
+  }
+
+  const responses = await Promise.all(
+    remindableStatuses.map((statusCode) =>
+      getOrders({
+        status: statusCode,
+        customerDueStart: dueSoonStart.value,
+        customerDueEnd: dueSoonEnd.value,
+        page: 1,
+        pageSize: TODO_LIST_PAGE_SIZE,
+      }),
+    ),
+  )
+
+  let total = 0
+  const merged: OrderListItem[] = []
+  for (const res of responses) {
+    const data = res.data
+    total += data?.total ?? 0
+    if (data?.list?.length) merged.push(...data.list)
+  }
+
+  merged.sort((a, b) => {
+    const dueDiff = parseDateTs(a.customerDueDate) - parseDateTs(b.customerDueDate)
+    if (dueDiff !== 0) return dueDiff
+    return b.id - a.id
+  })
+
+  todoCounts.value.dueSoon = total
+  todoLists.value.dueSoon = merged.slice(0, TODO_LIST_PAGE_SIZE)
 }
 
 async function loadTodo() {
@@ -565,18 +617,7 @@ async function loadTodo() {
     }
 
     if (canAccessOrders.value) {
-      promises.push(
-        getOrders({
-          customerDueStart: dueSoonStart.value,
-          customerDueEnd: dueSoonEnd.value,
-          page: 1,
-          pageSize: TODO_LIST_PAGE_SIZE,
-        }).then((res) => {
-          const data = res.data
-          todoCounts.value.dueSoon = data?.total ?? 0
-          todoLists.value.dueSoon = data?.list ?? []
-        }),
-      )
+      promises.push(loadDueSoonTodo())
     }
 
     if (canAccessPendingInbound.value) {

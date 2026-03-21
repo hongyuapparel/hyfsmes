@@ -127,7 +127,7 @@
             </template>
             <el-option v-for="s in salespeople" :key="s" :label="s" :value="s" />
           </el-select>
-          <el-button type="primary" size="large" @click="onFilterChange(true)">筛选</el-button>
+          <el-button type="primary" size="large" @click="onFilterChange(true)">搜索</el-button>
           <el-button size="large" @click="resetFilter">清空</el-button>
 
           <div class="filter-actions">
@@ -555,10 +555,17 @@ const formFields = computed(() => {
   const list = Array.isArray(src)
     ? (src as { code: string; label: string; type: string; optionsKey?: string }[])
     : []
-  return list
+  const ordered = list
     .filter((f) => f.code !== 'createdAt')
     .filter((f) => (f as { visible?: number }).visible !== 0)
     .sort((a, b) => ((a as { order?: number }).order ?? 0) - ((b as { order?: number }).order ?? 0))
+  const productGroupIndex = ordered.findIndex((f) => f.code === 'productGroup')
+  const applicablePeopleIndex = ordered.findIndex((f) => f.code === 'applicablePeople')
+  if (productGroupIndex >= 0 && applicablePeopleIndex >= 0 && applicablePeopleIndex !== productGroupIndex + 1) {
+    const [applicablePeopleField] = ordered.splice(applicablePeopleIndex, 1)
+    ordered.splice(productGroupIndex + 1, 0, applicablePeopleField)
+  }
+  return ordered
 })
 
 const form = reactive<Record<string, string | number | null>>({})

@@ -101,11 +101,13 @@
         </div>
 
         <el-table
+          ref="finishedStockTableRef"
           v-loading="loading"
           :data="list"
           border
           stripe
           class="finished-table"
+          @header-dragend="onFinishedStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="48" align="center" />
@@ -145,14 +147,14 @@
                       <div class="qty-tooltip-error">明细加载失败</div>
                     </template>
                     <template v-else>
-                      <div v-if="!row.orderId || (colorSizeCache[row.orderId]?.headers?.length ?? 0) === 0" class="qty-tooltip-empty">
+                      <div v-if="!row.orderId || getPreviewHeaders(row).length === 0 || getPreviewRows(row).length === 0" class="qty-tooltip-empty">
                         暂无明细
                       </div>
                       <div v-else class="qty-tooltip-grid">
                         <div class="qty-tooltip-row qty-tooltip-head">
                           <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
                           <div
-                            v-for="(h, idx) in colorSizeCache[row.orderId].headers"
+                            v-for="(h, idx) in getPreviewHeaders(row)"
                             :key="idx"
                             class="qty-tooltip-cell"
                           >
@@ -160,7 +162,7 @@
                           </div>
                         </div>
                         <div
-                          v-for="(r, rIdx) in colorSizeCache[row.orderId].rows"
+                          v-for="(r, rIdx) in getPreviewRows(row)"
                           :key="rIdx"
                           class="qty-tooltip-row"
                         >
@@ -241,7 +243,7 @@
             unlink-panels
             size="large"
             :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-            :style="getFilterRangeStyle(outboundFilter.dateRange)"
+            :style="getInventoryOutboundRangeStyle(outboundFilter.dateRange)"
             @change="onOutboundSearch(true)"
           />
           <div class="filter-bar-actions">
@@ -250,7 +252,15 @@
           </div>
         </div>
 
-        <el-table v-loading="outboundLoading2" :data="outboundList" border stripe class="finished-table">
+        <el-table
+          ref="finishedOutboundTableRef"
+          v-loading="outboundLoading2"
+          :data="outboundList"
+          border
+          stripe
+          class="finished-table"
+          @header-dragend="onFinishedOutboundHeaderDragEnd"
+        >
           <el-table-column prop="createdAt" label="出库时间" width="160" align="center">
             <template #default="{ row }">{{ row.createdAt }}</template>
           </el-table-column>
@@ -390,7 +400,7 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="位置登记" prop="location">
+        <el-form-item label="存放地址" prop="location">
           <el-input v-model="inboundForm.location" placeholder="请输入货物存放地址" clearable />
         </el-form-item>
         <el-form-item label="图片" prop="imageUrl">
@@ -418,7 +428,7 @@
         :rules="outboundRules"
         label-width="80px"
       >
-        <el-form-item label="领走人" prop="pickupUserId">
+        <el-form-item label="领取人" prop="pickupUserId">
           <el-select
             v-model="outboundForm.pickupUserId"
             placeholder="请选择业务员"
@@ -480,7 +490,7 @@
     <el-dialog
       v-model="createDialog.visible"
       title="新增库存"
-      width="640"
+      width="960"
       destroy-on-close
       @close="resetCreateForm"
     >
@@ -491,132 +501,177 @@
         label-width="90px"
         class="create-form-grid"
       >
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="订单号" prop="orderNo">
-              <el-input v-model="createForm.orderNo" placeholder="选填，不填则不关联订单" clearable />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="SKU" prop="skuCode">
-              <el-input v-model="createForm.skuCode" placeholder="请输入SKU编号" clearable />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="24">
-            <el-form-item label="尺寸数量">
-              <div class="create-size-table-wrap">
-                <el-table :data="sizeRows" border size="small" class="create-size-table">
-                  <el-table-column label="尺寸（如 S/M/L）" min-width="140">
-                    <template #default="{ row }">
-                      <el-input v-model="row.size" placeholder="尺寸" clearable size="small" />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="数量" width="120" align="right">
-                    <template #default="{ row }">
-                      <el-input-number
-                        v-model="row.quantity"
-                        :min="0"
-                        :precision="0"
-                        controls-position="right"
-                        size="small"
-                        style="width: 100%"
-                      />
-                    </template>
-                  </el-table-column>
-                  <el-table-column label="操作" width="70" align="center">
-                    <template #default="{ $index }">
-                      <el-button
-                        v-if="sizeRows.length > 1"
-                        type="danger"
-                        link
-                        size="small"
-                        @click="removeSizeRow($index)"
-                      >
-                        删除
-                      </el-button>
-                    </template>
-                  </el-table-column>
-                </el-table>
-                <div class="create-size-footer">
-                  <el-button type="primary" link size="small" @click="addSizeRow">+ 新增尺寸行</el-button>
-                  <span class="create-size-total">合计数量：{{ sizeTotalQuantity }}</span>
+        <div class="create-sections">
+          <div class="detail-section">
+            <div class="detail-section-title">基础信息与产品图</div>
+            <div class="detail-basic-main">
+              <div class="detail-basic-grid">
+                <div class="detail-basic-label">订单号</div>
+                <div class="detail-basic-value">
+                  <el-input v-model="createForm.orderNo" placeholder="选填，不填则不关联订单" clearable size="small" />
                 </div>
+                <div class="detail-basic-label">SKU</div>
+                <div class="detail-basic-value">
+                  <el-input v-model="createForm.skuCode" placeholder="请输入SKU编号" clearable size="small" />
+                </div>
+
+                <div class="detail-basic-label">库存类型</div>
+                <div class="detail-basic-value">
+                  <el-select
+                    v-model="createForm.inventoryTypeId"
+                    placeholder="请选择库存类型"
+                    filterable
+                    clearable
+                    size="small"
+                  >
+                    <el-option
+                      v-for="opt in inventoryTypeOptions"
+                      :key="opt.id"
+                      :label="opt.label"
+                      :value="opt.id"
+                    />
+                  </el-select>
+                </div>
+                <div class="detail-basic-label">仓库</div>
+                <div class="detail-basic-value">
+                  <el-select
+                    v-model="createForm.warehouseId"
+                    placeholder="请选择仓库"
+                    filterable
+                    clearable
+                    size="small"
+                  >
+                    <el-option
+                      v-for="opt in warehouseOptions"
+                      :key="opt.id"
+                      :label="opt.label"
+                      :value="opt.id"
+                    />
+                  </el-select>
+                </div>
+
+                <div class="detail-basic-label">部门</div>
+                <div class="detail-basic-value">
+                  <el-select
+                    v-model="createForm.department"
+                    placeholder="请选择部门"
+                    filterable
+                    clearable
+                    size="small"
+                  >
+                    <el-option
+                      v-for="opt in departmentOptions"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </div>
+                <div class="detail-basic-label">出厂价</div>
+                <div class="detail-basic-value">
+                  <el-input v-model="createForm.unitPrice" placeholder="请输入出厂价" clearable size="small" />
+                </div>
+
+                <div class="detail-basic-label">总价</div>
+                <div class="detail-basic-value">{{ createTotalPriceDisplay }}</div>
+
+                <div class="detail-basic-label">存放地址</div>
+                <div class="detail-basic-value detail-basic-value-span-3">
+                  <el-input v-model="createForm.location" placeholder="请输入具体存放地址" clearable size="small" />
+                </div>
+
+                <div class="detail-basic-label">备注</div>
+                <div class="detail-basic-value detail-basic-value-span-3">
+                  <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
+                </div>
+
               </div>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="仓库" prop="warehouseId">
-              <el-select
-                v-model="createForm.warehouseId"
-                placeholder="请选择仓库"
-                filterable
-                clearable
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="opt in warehouseOptions"
-                  :key="opt.id"
-                  :label="opt.label"
-                  :value="opt.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="库存类型" prop="inventoryTypeId">
-              <el-select
-                v-model="createForm.inventoryTypeId"
-                placeholder="请选择库存类型"
-                filterable
-                clearable
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="opt in inventoryTypeOptions"
-                  :key="opt.id"
-                  :label="opt.label"
-                  :value="opt.id"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row :gutter="16">
-          <el-col :span="12">
-            <el-form-item label="部门" prop="department">
-              <el-select
-                v-model="createForm.department"
-                placeholder="请选择部门"
-                filterable
-                clearable
-                style="width: 100%"
-              >
-                <el-option
-                  v-for="opt in departmentOptions"
-                  :key="opt.value"
-                  :label="opt.label"
-                  :value="opt.value"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="存放地址" prop="location">
-              <el-input v-model="createForm.location" placeholder="请输入具体存放地址" clearable />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        <el-row>
-          <el-col :span="24">
-            <el-form-item label="图片">
-              <ImageUploadArea v-model="createForm.imageUrl" />
-            </el-form-item>
-          </el-col>
-        </el-row>
+              <div class="detail-product-image-panel">
+                <div class="detail-image-label">产品图</div>
+                <ImageUploadArea v-model="createForm.imageUrl" compact />
+              </div>
+            </div>
+          </div>
+
+          <div class="detail-section">
+            <div class="detail-section-title">颜色图片与码数明细</div>
+            <div class="create-size-table-wrap">
+              <el-table :data="createSizeTableRows" border size="small" class="create-size-table detail-color-size-table">
+                <el-table-column label="颜色" min-width="96" align="center" header-align="center">
+                  <template #default="{ row }">
+                    <el-input v-model="row.colorName" placeholder="颜色" clearable size="small" />
+                  </template>
+                </el-table-column>
+                <el-table-column label="颜色图片" min-width="120" align="center" header-align="center">
+                  <template #default="{ row }">
+                    <ImageUploadArea v-model="row.imageUrl" compact />
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  v-for="(size, idx) in createSizeHeaders"
+                  :key="`create-size-${idx}`"
+                  min-width="96"
+                  align="center"
+                  header-align="center"
+                >
+                  <template #header>
+                    <div class="b-header-cell">
+                      <el-input
+                        v-model="createSizeHeaders[idx]"
+                        size="small"
+                        class="b-header-input"
+                        :input-style="{ textAlign: 'center' }"
+                      />
+                      <el-button
+                        v-if="createSizeHeaders.length > 1"
+                        link
+                        type="danger"
+                        size="small"
+                        class="b-header-remove"
+                        @click.stop="removeCreateSizeColumn(idx)"
+                      >
+                        <el-icon><Close /></el-icon>
+                      </el-button>
+                    </div>
+                  </template>
+                  <template #default>
+                    <el-input-number
+                      v-model="createSizeTableRows[0].quantities[idx]"
+                      :min="0"
+                      :precision="0"
+                      controls-position="right"
+                      size="small"
+                      style="width: 100%"
+                    />
+                  </template>
+                </el-table-column>
+                <el-table-column label="合计" min-width="88" align="center" header-align="center">
+                  <template #default="{ row }">{{ sumDetailRowQty(row.quantities) }}</template>
+                </el-table-column>
+                <el-table-column label="操作" width="70" align="center" header-align="center">
+                  <template #default="{ $index }">
+                    <el-button
+                      v-if="createSizeTableRows.length > 1"
+                      type="danger"
+                      link
+                      size="small"
+                      @click="removeCreateColorRow($index)"
+                    >
+                      删除
+                    </el-button>
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div class="create-size-footer">
+                <div>
+                  <el-button type="primary" link size="small" @click="addCreateColorRow">+ 新增颜色</el-button>
+                  <el-button type="primary" link size="small" @click="addCreateSizeColumn">+ 新增尺码列</el-button>
+                </div>
+                <span class="create-size-total">总件数：{{ sizeTotalQuantity }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="createDialog.visible = false">取消</el-button>
@@ -629,100 +684,214 @@
     <el-drawer
       v-model="detailDrawer.visible"
       title="库存详情"
-      size="620px"
+      size="960px"
       destroy-on-close
       :with-header="true"
+      class="finished-detail-drawer"
     >
       <div v-loading="detailDrawer.loading" class="detail-wrap">
         <div v-if="detailDrawer.data" class="detail-sections">
-          <div class="detail-section">
-            <div class="detail-section-title">基础信息</div>
-            <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="入库时间">{{ detailDrawer.data.stock.createdAt }}</el-descriptions-item>
-              <el-descriptions-item label="订单号">{{ detailDrawer.data.orderNo || '-' }}</el-descriptions-item>
-              <el-descriptions-item label="SKU">{{ detailDrawer.data.stock.skuCode }}</el-descriptions-item>
-              <el-descriptions-item label="数量">{{ detailDrawer.data.stock.quantity }}</el-descriptions-item>
-              <el-descriptions-item label="出厂价">{{ formatPrice(detailDrawer.data.stock.unitPrice) }}</el-descriptions-item>
-              <el-descriptions-item label="总价">{{ formatTotalPrice(detailDrawer.data.stock.quantity, detailDrawer.data.stock.unitPrice) }}</el-descriptions-item>
-            </el-descriptions>
-          </div>
-
-          <div class="detail-section">
-            <div class="detail-section-title">图片</div>
-            <div class="detail-images">
-              <div class="detail-image-card">
-                <div class="detail-image-label">产品图</div>
-                <el-image
-                  v-if="detailDrawer.data.productImageUrl"
-                  :src="detailDrawer.data.productImageUrl"
-                  fit="cover"
-                  style="width: 120px; height: 120px; border-radius: 8px"
-                  :preview-src-list="[detailDrawer.data.productImageUrl]"
-                  preview-teleported
-                />
-                <div v-else class="detail-image-empty">-</div>
+          <div class="detail-top-row">
+            <div class="detail-section">
+              <div class="detail-section-head">
+                <div class="detail-section-title">基础信息与产品图</div>
+                <div class="detail-head-actions">
+                  <el-button
+                    v-if="!detailMetaEditing"
+                    size="small"
+                    text
+                    type="primary"
+                    class="detail-head-btn"
+                    @click="toggleDetailEditMode"
+                  >
+                    <el-icon><Edit /></el-icon>
+                    <span>编辑</span>
+                  </el-button>
+                  <template v-else>
+                    <el-button
+                      size="small"
+                      type="success"
+                      class="detail-head-btn"
+                      :loading="detailDrawer.saving"
+                      @click="saveDetailMeta"
+                    >
+                      保存
+                    </el-button>
+                    <el-button
+                      size="small"
+                      class="detail-head-btn"
+                      @click="toggleDetailEditMode"
+                    >
+                      取消
+                    </el-button>
+                  </template>
+                </div>
               </div>
-              <div class="detail-image-card">
-                <div class="detail-image-label">库存图</div>
-                <el-image
-                  v-if="detailDrawer.data.stock.imageUrl"
-                  :src="detailDrawer.data.stock.imageUrl"
-                  fit="cover"
-                  style="width: 120px; height: 120px; border-radius: 8px"
-                  :preview-src-list="[detailDrawer.data.stock.imageUrl]"
-                  preview-teleported
-                />
-                <div v-else class="detail-image-empty">-</div>
+              <div class="detail-basic-main">
+                <div class="detail-basic-grid">
+                  <div class="detail-basic-label">入库时间</div>
+                  <div class="detail-basic-value">{{ formatDateTime(detailDrawer.data.stock.createdAt) }}</div>
+                  <div class="detail-basic-label">订单号</div>
+                  <div class="detail-basic-value">{{ detailDrawer.data.orderNo || '-' }}</div>
+
+                  <div class="detail-basic-label">SKU</div>
+                  <div class="detail-basic-value">{{ detailDrawer.data.stock.skuCode }}</div>
+                  <div class="detail-basic-label">数量</div>
+                  <div class="detail-basic-value">{{ detailDrawer.data.stock.quantity }}</div>
+
+                  <div class="detail-basic-label">出厂价</div>
+                  <div class="detail-basic-value">{{ formatPrice(detailDrawer.data.stock.unitPrice) }}</div>
+                  <div class="detail-basic-label">总价</div>
+                  <div class="detail-basic-value">{{ formatTotalPrice(detailDrawer.data.stock.quantity, detailDrawer.data.stock.unitPrice) }}</div>
+
+                  <div class="detail-basic-label">客户</div>
+                  <div class="detail-basic-value">{{ detailDrawer.data.stock.customerName || '-' }}</div>
+                  <div class="detail-basic-label">库存类型</div>
+                  <div class="detail-basic-value">
+                    <el-select
+                      v-if="detailMetaEditing"
+                      v-model="detailEditForm.inventoryTypeId"
+                      filterable
+                      clearable
+                      size="small"
+                    >
+                      <el-option v-for="opt in inventoryTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
+                    </el-select>
+                    <span v-else>{{ findInventoryTypeLabelById(detailDrawer.data.stock.inventoryTypeId) || '-' }}</span>
+                  </div>
+
+                  <div class="detail-basic-label">仓库</div>
+                  <div class="detail-basic-value">
+                    <el-select
+                      v-if="detailMetaEditing"
+                      v-model="detailEditForm.warehouseId"
+                      filterable
+                      clearable
+                      size="small"
+                    >
+                      <el-option v-for="opt in warehouseOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
+                    </el-select>
+                    <span v-else>{{ findWarehouseLabelById(detailDrawer.data.stock.warehouseId) || '-' }}</span>
+                  </div>
+                  <div class="detail-basic-label">部门</div>
+                  <div class="detail-basic-value">
+                    <el-select
+                      v-if="detailMetaEditing"
+                      v-model="detailEditForm.department"
+                      filterable
+                      clearable
+                      size="small"
+                    >
+                      <el-option v-for="opt in departmentOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+                    </el-select>
+                    <span v-else>{{ detailDrawer.data.stock.department || '-' }}</span>
+                  </div>
+
+                  <div class="detail-basic-label">存放地址</div>
+                  <div class="detail-basic-value detail-basic-value-span-3">
+                    <el-input
+                      v-if="detailMetaEditing"
+                      v-model="detailEditForm.location"
+                      clearable
+                      size="small"
+                    />
+                    <span v-else>{{ detailDrawer.data.stock.location || '-' }}</span>
+                  </div>
+
+                  <div class="detail-basic-label">备注</div>
+                  <div class="detail-basic-value detail-basic-value-span-3">
+                    <el-input
+                      v-if="detailMetaEditing"
+                      v-model="detailEditForm.remark"
+                      clearable
+                      size="small"
+                      placeholder="选填"
+                    />
+                    <span v-else>{{ detailEditForm.remark || '-' }}</span>
+                  </div>
+                </div>
+                <div class="detail-product-image-panel">
+                  <div class="detail-image-label">产品图（可更换）</div>
+                  <ImageUploadArea
+                    v-if="detailMetaEditing"
+                    compact
+                    :model-value="getDisplayProductImage()"
+                    @update:model-value="saveProductImage"
+                  />
+                  <el-image
+                    v-else-if="getDisplayProductImage()"
+                    :src="getDisplayProductImage()"
+                    fit="cover"
+                    style="width: 160px; height: 120px; border-radius: 8px"
+                    :preview-src-list="[getDisplayProductImage()]"
+                    preview-teleported
+                  />
+                  <div v-else class="detail-image-empty">-</div>
+                </div>
               </div>
             </div>
           </div>
 
           <div class="detail-section">
-            <div class="detail-section-title">按颜色上传图片</div>
-            <div v-if="detailDrawer.data.colorSize.colors.length" class="detail-color-grid">
-              <div
-                v-for="c in detailDrawer.data.colorSize.colors"
-                :key="c"
-                class="detail-color-item"
+            <div class="detail-section-title">颜色图片与码数明细</div>
+            <div
+              v-if="detailDrawer.data.colorSize.headers.length && detailDisplayColorSizeRows.length"
+              class="detail-color-size-table-wrap"
+            >
+              <el-table
+                :data="detailDisplayColorSizeRows"
+                border
+                size="small"
+                class="detail-color-size-table"
               >
-                <div class="detail-color-name">{{ c }}</div>
-                <ImageUploadArea
-                  :model-value="getColorImageUrl(c)"
-                  @update:model-value="(url) => saveColorImage(c, url)"
-                />
+                <el-table-column label="颜色" min-width="110" align="center" header-align="center">
+                  <template #default="{ row }">
+                    {{ row.colorName || '-' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="颜色图片" min-width="170" align="center" header-align="center">
+                  <template #default="{ row }">
+                    <ImageUploadArea
+                      v-if="detailMetaEditing"
+                      class="detail-color-image-editor"
+                      compact
+                      :model-value="getColorImageUrl(row.colorName)"
+                      @update:model-value="(url) => saveColorImage(row.colorName, url)"
+                    />
+                    <el-image
+                      v-else-if="getColorImageUrl(row.colorName)"
+                      :src="getColorImageUrl(row.colorName)"
+                      fit="cover"
+                      class="detail-color-thumb"
+                      :preview-src-list="[getColorImageUrl(row.colorName)]"
+                      preview-teleported
+                    />
+                    <span v-else class="text-placeholder">-</span>
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  v-for="(size, sizeIdx) in detailDrawer.data.colorSize.headers"
+                  :key="`size-${sizeIdx}`"
+                  :label="size"
+                  min-width="72"
+                  align="center"
+                  header-align="center"
+                >
+                  <template #default="{ row }">
+                    {{ Number(row.quantities?.[sizeIdx] ?? 0) || 0 }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="合计" min-width="80" align="center" header-align="center">
+                  <template #default="{ row }">
+                    {{ sumDetailRowQty(row.quantities) }}
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div class="detail-color-size-footer">
+                总件数：{{ detailDrawer.data.stock.quantity }}
               </div>
             </div>
-            <div v-else class="detail-muted">暂无颜色列表（未关联订单或订单未维护颜色尺码）。</div>
-          </div>
-
-          <div class="detail-section">
-            <div class="detail-section-title">可编辑信息</div>
-            <el-form :model="detailEditForm" label-width="90px" class="detail-edit-form">
-              <el-form-item label="部门">
-                <el-select v-model="detailEditForm.department" filterable clearable style="width: 100%">
-                  <el-option v-for="opt in departmentOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="库存类型">
-                <el-select v-model="detailEditForm.inventoryTypeId" filterable clearable style="width: 100%">
-                  <el-option v-for="opt in inventoryTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="仓库">
-                <el-select v-model="detailEditForm.warehouseId" filterable clearable style="width: 100%">
-                  <el-option v-for="opt in warehouseOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
-                </el-select>
-              </el-form-item>
-              <el-form-item label="存放地址">
-                <el-input v-model="detailEditForm.location" clearable />
-              </el-form-item>
-              <el-form-item label="备注">
-                <el-input v-model="detailEditForm.remark" type="textarea" :rows="2" placeholder="选填" />
-              </el-form-item>
-              <div class="detail-edit-actions">
-                <el-button type="primary" :loading="detailDrawer.saving" @click="saveDetailMeta">保存</el-button>
-              </div>
-            </el-form>
+            <div v-else class="detail-muted">暂无颜色尺码明细（未关联订单或订单未维护颜色尺码）。</div>
           </div>
 
           <div class="detail-section">
@@ -752,6 +921,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { Edit, Close } from '@element-plus/icons-vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import {
@@ -772,39 +942,15 @@ import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-option
 import { getCustomers, type CustomerItem } from '@/api/customers'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const DATE_RANGE_WIDTH_EMPTY = '140px'
-const DATE_RANGE_WIDTH_FILLED = '220px'
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
-
-function getFilterInputStyle(v: unknown) {
-  return v ? { color: ACTIVE_FILTER_COLOR } : undefined
-}
-function getOrderNoFilterStyle(orderNo: unknown, showLabel: boolean) {
-  if (!orderNo || !showLabel) return undefined
-  const text = `订单号：${String(orderNo)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
-function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
-  if (!skuCode || !showLabel) return undefined
-  const text = `SKU：${String(skuCode)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
-
-function getFilterRangeStyle(v: [string, string] | []) {
-  const hasValue = Array.isArray(v) && v.length === 2
-  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  const base = { width, flex: `0 0 ${width}` }
-  return hasValue ? { ...base, ...activeSelectStyle } : base
-}
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getOrderNoFilterStyle,
+  getSkuCodeFilterStyle,
+  getFilterRangeStyle,
+} from '@/composables/useFilterBarHelpers'
+import { formatDateTime } from '@/utils/date-format'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const currentTab = ref<string>('stored')
@@ -817,6 +963,8 @@ const filter = reactive<{
 const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 const list = ref<FinishedStockRow[]>([])
+const finishedStockTableRef = ref()
+const finishedOutboundTableRef = ref()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const warehouseOptions = ref<{ id: number; label: string }[]>([])
 const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
@@ -842,6 +990,7 @@ const detailDrawer = reactive<{
   data: null,
   colorImageMap: {},
 })
+const detailMetaEditing = ref(false)
 
 const detailEditForm = reactive<{
   department: string
@@ -870,6 +1019,135 @@ function getColorImageUrl(colorName: string): string {
   return detailDrawer.colorImageMap[colorName] || ''
 }
 
+function getDisplayProductImage(): string {
+  return detailDrawer.data?.stock?.imageUrl || detailDrawer.data?.productImageUrl || ''
+}
+
+async function saveProductImage(url: string) {
+  if (!detailDrawer.stockId) return
+  try {
+    await updateFinishedStockMeta(detailDrawer.stockId, { imageUrl: (url ?? '').trim() })
+    if (detailDrawer.data?.stock) detailDrawer.data.stock.imageUrl = (url ?? '').trim()
+    ElMessage.success('产品图已更新')
+    await load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  }
+}
+
+function sumDetailRowQty(quantities: unknown[]): number {
+  if (!Array.isArray(quantities)) return 0
+  return quantities.reduce((sum, q) => sum + (Number(q) || 0), 0)
+}
+
+const detailDisplayColorSizeRows = computed(() => {
+  const data = detailDrawer.data as any
+  const headers: string[] = Array.isArray(data?.colorSize?.headers) ? data.colorSize.headers : []
+  const rows: Array<{ colorName: string; quantities: number[] }> = Array.isArray(data?.colorSize?.rows)
+    ? data.colorSize.rows
+    : []
+  const stockQty = Math.max(0, Math.trunc(Number(data?.stock?.quantity) || 0))
+  if (!headers.length || !rows.length) return []
+
+  const orderTotal = rows.reduce(
+    (sum, r) => sum + (Array.isArray(r.quantities) ? r.quantities.reduce((s, q) => s + (Number(q) || 0), 0) : 0),
+    0,
+  )
+  if (orderTotal === stockQty) return rows
+
+  const weights: number[] = []
+  rows.forEach((r) => {
+    for (let i = 0; i < headers.length; i += 1) {
+      weights.push(Math.max(0, Number(r.quantities?.[i]) || 0))
+    }
+  })
+  const allocated = allocateByWeight(weights, stockQty)
+  let cursor = 0
+  return rows.map((r) => {
+    const quantities: number[] = []
+    for (let i = 0; i < headers.length; i += 1) {
+      quantities.push(allocated[cursor] ?? 0)
+      cursor += 1
+    }
+    return {
+      colorName: r.colorName,
+      quantities,
+    }
+  })
+})
+
+function getOrderBreakdownTotal(orderId: number | null | undefined): number {
+  if (!orderId) return 0
+  const rows = colorSizeCache[orderId]?.rows ?? []
+  return rows.reduce(
+    (sum, row) => sum + (Array.isArray(row.values) ? row.values.reduce((s, q) => s + (Number(q) || 0), 0) : 0),
+    0,
+  )
+}
+
+function allocateByWeight(weights: number[], total: number): number[] {
+  const safeTotal = Math.max(0, Math.trunc(Number(total) || 0))
+  if (!weights.length) return []
+  const sumWeight = weights.reduce((s, w) => s + Math.max(0, Number(w) || 0), 0)
+  if (safeTotal <= 0) return weights.map(() => 0)
+  if (sumWeight <= 0) {
+    const arr = weights.map(() => 0)
+    arr[0] = safeTotal
+    return arr
+  }
+  const exact = weights.map((w) => (Math.max(0, Number(w) || 0) * safeTotal) / sumWeight)
+  const base = exact.map((v) => Math.floor(v))
+  let remain = safeTotal - base.reduce((s, n) => s + n, 0)
+  const order = exact
+    .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
+    .sort((a, b) => b.frac - a.frac)
+  let i = 0
+  while (remain > 0 && order.length > 0) {
+    base[order[i % order.length].idx] += 1
+    remain -= 1
+    i += 1
+  }
+  return base
+}
+
+function getPreviewHeaders(row: { orderId?: number | null }): string[] {
+  if (!row.orderId) return []
+  return colorSizeCache[row.orderId]?.headers ?? []
+}
+
+function getPreviewRows(row: { orderId?: number | null; quantity: number }) {
+  if (!row.orderId) return []
+  const cache = colorSizeCache[row.orderId]
+  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return []
+
+  const targetQty = Math.max(0, Math.trunc(Number(row.quantity) || 0))
+  const orderTotal = getOrderBreakdownTotal(row.orderId)
+  if (orderTotal === targetQty) return cache.rows
+
+  const hasTotalCol = cache.headers[cache.headers.length - 1] === '合计'
+  const sizeColCount = hasTotalCol ? Math.max(0, cache.headers.length - 1) : cache.headers.length
+  const weights: number[] = []
+  cache.rows.forEach((r) => {
+    for (let i = 0; i < sizeColCount; i += 1) {
+      weights.push(Math.max(0, Number(r.values?.[i]) || 0))
+    }
+  })
+  const allocated = allocateByWeight(weights, targetQty)
+  let cursor = 0
+  return cache.rows.map((r) => {
+    const sizeValues: number[] = []
+    for (let i = 0; i < sizeColCount; i += 1) {
+      sizeValues.push(allocated[cursor] ?? 0)
+      cursor += 1
+    }
+    const rowTotal = sizeValues.reduce((s, n) => s + n, 0)
+    return {
+      colorName: r.colorName,
+      values: hasTotalCol ? [...sizeValues, rowTotal] : sizeValues,
+    }
+  })
+}
+
 async function loadDetail(stockId: number) {
   detailDrawer.loading = true
   detailDrawer.saving = false
@@ -885,6 +1163,7 @@ async function loadDetail(stockId: number) {
     detailEditForm.warehouseId = data?.stock?.warehouseId ?? null
     detailEditForm.location = data?.stock?.location ?? ''
     detailEditForm.remark = ''
+    detailMetaEditing.value = false
     const map: Record<string, string> = {}
     ;(data?.colorImages ?? []).forEach((r: any) => {
       if (r?.colorName) map[String(r.colorName)] = String(r.imageUrl ?? '')
@@ -895,6 +1174,17 @@ async function loadDetail(stockId: number) {
   } finally {
     detailDrawer.loading = false
   }
+}
+
+function toggleDetailEditMode() {
+  if (!detailMetaEditing.value && detailDrawer.data?.stock) {
+    detailEditForm.department = detailDrawer.data.stock.department ?? ''
+    detailEditForm.inventoryTypeId = detailDrawer.data.stock.inventoryTypeId ?? null
+    detailEditForm.warehouseId = detailDrawer.data.stock.warehouseId ?? null
+    detailEditForm.location = detailDrawer.data.stock.location ?? ''
+    detailEditForm.remark = ''
+  }
+  detailMetaEditing.value = !detailMetaEditing.value
 }
 
 async function openDetail(row: FinishedStockRow) {
@@ -916,6 +1206,7 @@ async function saveDetailMeta() {
     ElMessage.success('保存成功')
     await loadDetail(detailDrawer.stockId)
     await load()
+    detailMetaEditing.value = false
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -926,11 +1217,15 @@ async function saveDetailMeta() {
 async function saveColorImage(colorName: string, url: string) {
   if (!detailDrawer.stockId) return
   const imageUrl = (url ?? '').trim()
-  if (!imageUrl) return
   try {
     await upsertFinishedStockColorImage(detailDrawer.stockId, { colorName, imageUrl })
-    detailDrawer.colorImageMap[colorName] = imageUrl
-    ElMessage.success('已保存图片')
+    if (imageUrl) {
+      detailDrawer.colorImageMap[colorName] = imageUrl
+      ElMessage.success('已保存图片')
+    } else {
+      delete detailDrawer.colorImageMap[colorName]
+      ElMessage.success('已清除图片')
+    }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
@@ -974,6 +1269,16 @@ const outboundFilter = reactive<{
 const outboundList = ref<FinishedOutboundRecord[]>([])
 const outboundLoading2 = ref(false)
 const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
+const { onHeaderDragEnd: onFinishedStockHeaderDragEnd, restoreColumnWidths: restoreFinishedStockColumnWidths } =
+  useTableColumnWidthPersist('inventory-finished-stock')
+const { onHeaderDragEnd: onFinishedOutboundHeaderDragEnd, restoreColumnWidths: restoreFinishedOutboundColumnWidths } =
+  useTableColumnWidthPersist('inventory-finished-outbounds')
+
+function getInventoryOutboundRangeStyle(v: [string, string] | []) {
+  const hasValue = Array.isArray(v) && v.length === 2
+  if (!hasValue) return { ...getFilterRangeStyle(v), width: '160px', flex: '0 0 160px' }
+  return { ...getFilterRangeStyle(v), width: '240px', flex: '0 0 240px' }
+}
 
 const pendingRows = computed(() => selectedRows.value.filter((r) => r.type === 'pending'))
 const storedRows = computed(() => selectedRows.value.filter((r) => r.type === 'stored'))
@@ -1001,7 +1306,7 @@ const inboundForm = reactive<{
 const inboundRules: FormRules = {
   warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
   department: [{ required: true, message: '请选择部门', trigger: 'change' }],
-  location: [{ required: true, message: '请输入位置登记', trigger: 'blur' }],
+  location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
 }
 
 const outboundDialog = reactive<{
@@ -1014,7 +1319,7 @@ const outboundForm = reactive({
   pickupUserId: null as number | null,
 })
 const outboundRules: FormRules = {
-  pickupUserId: [{ required: true, message: '请选择领走人', trigger: 'change' }],
+  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
 }
 const outboundMaxQty = computed(() => outboundDialog.row?.quantity ?? 0)
 const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
@@ -1041,11 +1346,13 @@ const createForm = reactive({
   orderNo: '',
   skuCode: '',
   quantity: 1,
+  unitPrice: '',
   warehouseId: null as number | null,
   inventoryTypeId: null as number | null,
   department: '',
   location: '',
   imageUrl: '',
+  remark: '',
 })
 const createRules: FormRules = {
   skuCode: [{ required: true, message: '请输入SKU', trigger: 'blur' }],
@@ -1055,24 +1362,62 @@ const createRules: FormRules = {
   location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
 }
 
-const sizeRows = ref<{ size: string; quantity: number }[]>([
-  { size: '', quantity: 0 },
+const createSizeHeaders = ref<string[]>(['S'])
+const createSizeTableRows = ref<Array<{ colorName: string; imageUrl: string; quantities: number[] }>>([
+  { colorName: '默认', imageUrl: '', quantities: [0] },
 ])
 
 const sizeTotalQuantity = computed(() =>
-  sizeRows.value.reduce((sum, row) => {
-    const q = Number(row.quantity)
-    return Number.isFinite(q) && q > 0 ? sum + q : sum
+  createSizeTableRows.value.reduce((sum, row) => {
+    const rowSum = row.quantities.reduce((s, qty) => {
+      const q = Number(qty)
+      return Number.isFinite(q) && q > 0 ? s + q : s
+    }, 0)
+    return sum + rowSum
   }, 0),
 )
 
-function addSizeRow() {
-  sizeRows.value.push({ size: '', quantity: 0 })
+const createTotalPriceDisplay = computed(() =>
+  formatTotalPrice(sizeTotalQuantity.value, createForm.unitPrice || undefined),
+)
+
+function normalizeCreateSizeRows() {
+  const len = createSizeHeaders.value.length
+  createSizeTableRows.value.forEach((row) => {
+    if (!Array.isArray(row.quantities)) row.quantities = []
+    if (row.quantities.length < len) row.quantities.push(...Array(len - row.quantities.length).fill(0))
+    else if (row.quantities.length > len) row.quantities.splice(len)
+  })
 }
 
-function removeSizeRow(index: number) {
-  sizeRows.value.splice(index, 1)
-  if (!sizeRows.value.length) sizeRows.value.push({ size: '', quantity: 0 })
+function addCreateSizeColumn() {
+  createSizeHeaders.value.push(`尺码${createSizeHeaders.value.length + 1}`)
+  normalizeCreateSizeRows()
+}
+
+function addCreateColorRow() {
+  createSizeTableRows.value.push({
+    colorName: '',
+    imageUrl: '',
+    quantities: Array(createSizeHeaders.value.length).fill(0),
+  })
+}
+
+function removeCreateColorRow(index: number) {
+  createSizeTableRows.value.splice(index, 1)
+  if (!createSizeTableRows.value.length) {
+    createSizeTableRows.value.push({
+      colorName: '默认',
+      imageUrl: '',
+      quantities: Array(createSizeHeaders.value.length).fill(0),
+    })
+  }
+}
+
+function removeCreateSizeColumn(index: number) {
+  if (createSizeHeaders.value.length <= 1) return
+  createSizeHeaders.value.splice(index, 1)
+  normalizeCreateSizeRows()
 }
 
 async function loadCustomerOptions() {
@@ -1104,6 +1449,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      restoreFinishedStockColumnWidths(finishedStockTableRef.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -1277,12 +1623,15 @@ function resetCreateForm() {
   createForm.orderNo = ''
   createForm.skuCode = ''
   createForm.quantity = 1
+  createForm.unitPrice = ''
   createForm.warehouseId = null
   createForm.inventoryTypeId = null
   createForm.department = ''
   createForm.location = ''
   createForm.imageUrl = ''
-  sizeRows.value = [{ size: '', quantity: 0 }]
+  createForm.remark = ''
+  createSizeHeaders.value = ['S']
+  createSizeTableRows.value = [{ colorName: '默认', imageUrl: '', quantities: [0] }]
   createFormRef.value?.clearValidate()
 }
 
@@ -1300,11 +1649,13 @@ async function submitCreate() {
       orderNo: createForm.orderNo?.trim() || undefined,
       skuCode: createForm.skuCode,
       quantity: createForm.quantity,
+      unitPrice: createForm.unitPrice?.trim() || undefined,
       warehouseId: createForm.warehouseId,
       inventoryTypeId: createForm.inventoryTypeId ?? undefined,
       department: createForm.department,
       location: createForm.location,
       imageUrl: createForm.imageUrl || undefined,
+      remark: createForm.remark?.trim() || undefined,
     })
     ElMessage.success('新增库存成功')
     createDialog.visible = false
@@ -1317,15 +1668,15 @@ async function submitCreate() {
 }
 
 function formatPrice(unitPrice: string | undefined): string {
-  if (unitPrice == null || unitPrice === '') return '-'
+  if (unitPrice == null || unitPrice === '') return '￥0.00'
   const n = Number(unitPrice)
-  return Number.isFinite(n) ? n.toFixed(2) : '-'
+  return Number.isFinite(n) ? `￥${n.toFixed(2)}` : '￥0.00'
 }
 
 function formatTotalPrice(quantity: number, unitPrice: string | undefined): string {
   const n = Number(unitPrice)
-  if (!Number.isFinite(n) || !Number.isFinite(quantity)) return '-'
-  return (quantity * n).toFixed(2)
+  if (!Number.isFinite(n) || !Number.isFinite(quantity)) return '￥0.00'
+  return `￥${(quantity * n).toFixed(2)}`
 }
 
 function findWarehouseLabelById(id: number | null | undefined): string {
@@ -1409,6 +1760,7 @@ async function loadOutbounds() {
     const data = res.data
     outboundList.value = data?.list ?? []
     outboundPagination.total = data?.total ?? 0
+    restoreFinishedOutboundColumnWidths(finishedOutboundTableRef.value)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -1437,44 +1789,15 @@ function onOutboundPageSizeChange() {
 </script>
 
 <style scoped>
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
-.range-single.el-date-editor--daterange :deep(.el-range-separator) {
-  width: 0;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
-  display: none;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
-  width: 100%;
-}
-.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
-  display: none;
+.inventory-finished-page {
+  background: var(--color-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
 }
 
 .finished-table {
   margin-bottom: var(--space-md);
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
 }
 
 .qty-hover {
@@ -1485,18 +1808,117 @@ function onOutboundPageSizeChange() {
 }
 
 .detail-wrap {
-  padding: 12px;
+  padding: 0 12px 12px 12px;
 }
 
 .detail-sections {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .detail-section-title {
   font-weight: 600;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  color: var(--el-text-color-primary);
+}
+
+.detail-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.detail-section-head .detail-section-title {
+  margin-bottom: 0;
+}
+
+.detail-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.detail-head-btn {
+  padding-inline: 8px;
+}
+
+.detail-top-row {
+  display: flex;
+  gap: 0;
+  align-items: stretch;
+}
+
+.detail-section {
+  min-width: 0;
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: #fff;
+}
+.detail-top-row .detail-section {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.detail-basic-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.detail-basic-grid {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr) 96px minmax(0, 1fr);
+  border: 1px solid var(--el-border-color-lighter);
+  font-size: 12px;
+}
+
+.detail-basic-label,
+.detail-basic-value {
+  min-width: 0;
+  padding: 7px 10px;
+  border-right: 1px solid var(--el-border-color-lighter);
+  border-bottom: 1px solid var(--el-border-color-lighter);
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.detail-basic-label {
+  font-weight: 600;
+  color: var(--el-text-color-primary);
+  background: var(--el-fill-color-lighter);
+}
+
+.detail-basic-value {
+  color: var(--el-text-color-regular);
+  overflow: hidden;
+}
+
+.detail-basic-value-span-3 {
+  grid-column: 2 / 5;
+}
+
+.detail-basic-grid > :nth-child(4n) {
+  border-right: none;
+}
+
+.detail-basic-grid > :nth-last-child(-n + 2) {
+  border-bottom: none;
+}
+
+.detail-product-image-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 220px;
+  min-width: 220px;
 }
 
 .detail-images {
@@ -1528,6 +1950,17 @@ function onOutboundPageSizeChange() {
   gap: 12px;
 }
 
+.detail-color-size-table-wrap {
+  width: 100%;
+}
+
+.detail-color-size-footer {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  text-align: right;
+}
+
 .detail-color-name {
   font-size: 12px;
   color: var(--el-text-color-regular);
@@ -1537,7 +1970,65 @@ function onOutboundPageSizeChange() {
 .detail-edit-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 8px;
+  margin-top: 4px;
+}
+
+/* 详情抽屉内：压缩顶部留白、保证表格内可点击控件可用 */
+.finished-detail-drawer :deep(.el-drawer__header) {
+  margin-bottom: 6px;
+  padding-bottom: 0;
+}
+
+.finished-detail-drawer :deep(.el-drawer__body) {
+  padding-top: 0;
+}
+
+.finished-detail-drawer :deep(.detail-color-size-table .el-table__cell) {
+  overflow: visible;
+  vertical-align: top;
+}
+
+.finished-detail-drawer :deep(.detail-color-size-table .image-upload-area) {
+  min-height: 92px;
+}
+
+.finished-detail-drawer :deep(.el-form-item__label),
+.finished-detail-drawer :deep(.el-input__inner),
+.finished-detail-drawer :deep(.el-select__selected-item),
+.finished-detail-drawer :deep(.el-table),
+.finished-detail-drawer :deep(.el-table th),
+.finished-detail-drawer :deep(.el-table td) {
+  font-size: 12px;
+}
+
+.finished-detail-drawer :deep(.detail-product-image-panel .image-upload-area) {
+  width: 100%;
+}
+
+.finished-detail-drawer :deep(.detail-basic-grid .el-select),
+.finished-detail-drawer :deep(.detail-basic-grid .el-input) {
+  width: 100%;
+  max-width: 100%;
+}
+
+.finished-detail-drawer :deep(.detail-basic-grid .el-select__wrapper) {
+  min-width: 0 !important;
+}
+
+.detail-color-thumb {
+  width: 64px;
+  height: 64px;
+  border-radius: 6px;
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.finished-detail-drawer :deep(.detail-color-image-editor.image-upload-area) {
+  min-height: 72px;
+}
+
+.finished-detail-drawer :deep(.detail-color-image-editor .preview-img) {
+  width: 72px;
+  height: 72px;
 }
 
 .detail-logs {
@@ -1594,6 +2085,12 @@ function onOutboundPageSizeChange() {
   margin-bottom: var(--space-sm);
 }
 
+.create-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .create-size-table-wrap {
   width: 100%;
   border: 1px solid var(--el-border-color);
@@ -1609,6 +2106,58 @@ function onOutboundPageSizeChange() {
   display: none;
 }
 
+.b-header-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding-right: 10px;
+}
+
+.b-header-input {
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.b-header-input :deep(.el-input__wrapper) {
+  padding-left: 1px;
+  padding-right: 1px;
+}
+
+.b-header-input :deep(.el-input__inner) {
+  text-align: center;
+}
+
+.b-header-remove {
+  position: absolute;
+  top: 50%;
+  right: 2px;
+  transform: translateY(-50%);
+  width: 10px;
+  height: 10px;
+  padding: 0;
+  min-height: 10px;
+  min-width: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.b-header-remove :deep(.el-icon) {
+  font-size: 8px;
+  line-height: 8px;
+}
+
+.b-header-cell:hover .b-header-remove {
+  opacity: 1;
+}
+
 .create-size-footer {
   display: flex;
   align-items: center;
@@ -1621,6 +2170,15 @@ function onOutboundPageSizeChange() {
 .create-size-total {
   font-size: var(--font-size-caption);
   color: var(--color-text-muted);
+}
+
+@media (max-width: 1200px) {
+  .detail-top-row {
+    flex-direction: column;
+  }
+  .detail-basic-main {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
 

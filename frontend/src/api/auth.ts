@@ -11,6 +11,11 @@ export interface MeRes {
   roleId: number
   roleName: string
   permissions: { id: number; code: string; name: string; type: string; routePath: string }[]
+  orderPolicies?: {
+    edit: string[]
+    review: string[]
+    delete: string[]
+  }
 }
 
 export function login(username: string, password: string) {

@@ -18,12 +18,27 @@
     <template v-if="modelValue">
       <div class="preview-wrap">
         <el-image :src="modelValue" fit="contain" class="preview-img" />
-        <div class="preview-actions">
-          <el-button type="primary" link size="small" :loading="uploading" @click.stop="fileInputRef?.click()">
-            重新上传
-          </el-button>
-          <el-button type="danger" link size="small" :disabled="uploading" @click.stop="clear">清除</el-button>
-        </div>
+        <template v-if="props.compact">
+          <div class="preview-actions preview-actions-compact">
+            <el-button
+              circle
+              class="compact-delete-btn"
+              size="small"
+              :disabled="uploading"
+              @click.stop="clear"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </div>
+        </template>
+        <template v-else>
+          <div class="preview-actions">
+            <el-button type="primary" link size="small" :loading="uploading" @click.stop="fileInputRef?.click()">
+              重新上传
+            </el-button>
+            <el-button type="danger" link size="small" :disabled="uploading" @click.stop="clear">清除</el-button>
+          </div>
+        </template>
       </div>
     </template>
     <template v-else>
@@ -40,12 +55,19 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { Delete } from '@element-plus/icons-vue'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
-const props = defineProps<{
-  modelValue?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue?: string
+    compact?: boolean
+  }>(),
+  {
+    compact: true,
+  },
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', url: string): void
@@ -116,10 +138,11 @@ function clear() {
   position: relative;
   border: 1px dashed var(--el-border-color);
   border-radius: var(--el-border-radius-base);
-  min-height: 120px;
+  min-height: 92px;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-align: center;
   cursor: pointer;
   transition: border-color 0.2s, background-color 0.2s;
 }
@@ -148,7 +171,7 @@ function clear() {
 }
 
 .placeholder {
-  padding: var(--space-md, 12px);
+  padding: 8px;
   text-align: center;
 }
 
@@ -163,21 +186,52 @@ function clear() {
 }
 
 .preview-wrap {
-  padding: var(--space-sm, 8px);
+  position: relative;
+  width: 100%;
+  padding: 4px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-xs, 4px);
+  gap: 2px;
+  box-sizing: border-box;
 }
 
 .preview-img {
-  width: 160px;
-  height: 120px;
+  width: 100%;
+  max-width: 132px;
+  height: auto;
+  aspect-ratio: 4 / 3;
   border-radius: var(--radius-md, 4px);
 }
 
 .preview-actions {
   display: flex;
   gap: var(--space-sm, 8px);
+}
+
+.preview-actions-compact {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  z-index: 2;
+  opacity: 0;
+  transform: translateY(2px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.preview-wrap:hover .preview-actions-compact {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.compact-delete-btn {
+  border: none;
+  color: #fff;
+  background: rgba(31, 41, 55, 0.52);
+}
+
+.compact-delete-btn:hover {
+  color: #fff;
+  background: rgba(239, 68, 68, 0.9);
 }
 </style>

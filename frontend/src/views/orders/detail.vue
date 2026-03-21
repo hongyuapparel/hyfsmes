@@ -13,6 +13,9 @@
         <span class="header-order-no" v-if="detail.orderNo">{{ detail.orderNo }}</span>
         <span class="header-sep" v-if="detail.orderDate">下单日期：</span>
         <span v-if="detail.orderDate">{{ formatDate(detail.orderDate) }}</span>
+        <span class="header-meta-right" v-if="headerMetaValues.length">
+          {{ headerMetaValues.join('  ') }}
+        </span>
       </header>
 
       <!-- 缩略图在左，A 区 + B 区在右，占满右侧减少空白 -->
@@ -241,6 +244,7 @@ import { ElMessage } from 'element-plus'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems, getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
+import { formatDate } from '@/utils/date-format'
 
 const route = useRoute()
 const router = useRouter()
@@ -312,12 +316,23 @@ const collaborationDisplay = computed(() => {
   return legacy ? String(legacy).trim() : ''
 })
 
-function formatDate(v: string | null | undefined): string {
-  if (!v) return ''
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleDateString('zh-CN')
+function toLeafOptionLabel(value: string | null | undefined): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return ''
+  const parts = raw
+    .split('>')
+    .map((item) => item.trim())
+    .filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : raw
 }
+
+const headerMetaValues = computed(() => {
+  const values = [
+    toLeafOptionLabel((detail.value as any)?.productGroupName),
+    String((detail.value as any)?.applicablePeopleName ?? '').trim(),
+  ].filter(Boolean)
+  return values
+})
 
 function goBack() {
   router.push({ name: 'OrdersList' })
@@ -674,6 +689,12 @@ onMounted(async () => {
 
 .sheet-header .header-order-no {
   font-weight: 600;
+}
+
+.sheet-header .header-meta-right {
+  margin-left: auto;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .block {

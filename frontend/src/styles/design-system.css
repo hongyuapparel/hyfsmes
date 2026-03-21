@@ -445,9 +445,12 @@ a:hover {
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--space-sm);
+  padding: var(--space-sm);
   margin-bottom: var(--space-md);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-subtle, #f5f6f8);
 }
 .filter-bar > .el-input,
 .filter-bar > .el-select,
@@ -455,6 +458,30 @@ a:hover {
 .filter-bar .filter-bar-item {
   width: 120px;
   min-width: 120px;
+}
+.filter-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.range-single.el-date-editor--daterange .el-range-separator {
+  width: 0;
+}
+.range-single.el-date-editor--daterange .el-range-input:last-child {
+  display: none;
+}
+.range-single.el-date-editor--daterange .el-range-input:first-child {
+  width: 100%;
+}
+.range-single.el-date-editor--daterange .el-range__close-icon {
+  display: none;
 }
 
 /* ========== 11. 响应式断点 ========== */

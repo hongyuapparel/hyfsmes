@@ -192,6 +192,12 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getFilterRangeStyle,
+} from '@/composables/useFilterBarHelpers'
+import { formatDate, formatDateTime } from '@/utils/date-format'
 
 const CRAFT_TABS = [
   { label: '全部', value: 'all' },
@@ -232,30 +238,16 @@ function findCollaborationLabelById(id: number | null | undefined): string {
   return found?.label ?? ''
 }
 
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const DATE_RANGE_WIDTH_EMPTY = '140px'
-const DATE_RANGE_WIDTH_FILLED = '220px'
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
 const FILTER_CHAR_PX = 14
-const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
 const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR as string }
-
-function getFilterInputStyle(v: unknown) {
-  return v ? activeInputStyle : undefined
-}
 function getFilterSelectAutoWidthStyle(v: unknown) {
   if (!v) return undefined
   const text = String(v)
   const estimated = text.length * FILTER_CHAR_PX + 60
   const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
   return { ...activeSelectStyle, width: `${width}px`, flex: `0 0 ${width}px` }
-}
-function getFilterRangeStyle(v: [string, string] | null) {
-  const hasValue = v && v.length === 2
-  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  const base = { width, flex: `0 0 ${width}` }
-  return hasValue ? { ...base, ...activeSelectStyle } : base
 }
 
 const filter = reactive({
@@ -327,19 +319,6 @@ function getTabLabel(tab: CraftTabConfig): string {
   const counts = tabCounts.value
   const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
   return `${tab.label}(${count})`
-}
-
-function formatDate(v: string | null | undefined): string {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleDateString('zh-CN')
-}
-function formatDateTime(v: string | null | undefined): string {
-  if (!v) return '-'
-  const d = new Date(v)
-  if (Number.isNaN(d.getTime())) return '-'
-  return d.toLocaleString('zh-CN')
 }
 
 function buildQuery(): CraftListQuery {
@@ -517,24 +496,6 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
 .craft-table {
   margin-bottom: var(--space-md);
 }
@@ -550,8 +511,4 @@ onMounted(() => {
   color: var(--el-text-color-secondary);
 }
 
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-}
 </style>

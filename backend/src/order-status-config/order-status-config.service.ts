@@ -325,6 +325,8 @@ export class OrderStatusConfigService {
     orderDateTo?: string;
     completedFrom?: string;
     completedTo?: string;
+    collaborationTypeId?: number;
+    orderTypeId?: number;
   }): Promise<{
     list: Array<{
       orderId: number;
@@ -339,6 +341,28 @@ export class OrderStatusConfigService {
       salesperson: string;
       customerName: string;
       orderDate: string | null;
+      customerDueDate: string | null;
+      reviewAt: string | null;
+      reviewDurationHours: number | null;
+      reviewJudge: string;
+      purchaseArrivedAt: string | null;
+      purchaseCompletedAt: string | null;
+      purchaseJudge: string;
+      patternArrivedAt: string | null;
+      patternCompletedAt: string | null;
+      patternJudge: string;
+      cuttingArrivedAt: string | null;
+      cuttingCompletedAt: string | null;
+      cuttingJudge: string;
+      craftArrivedAt: string | null;
+      craftCompletedAt: string | null;
+      craftJudge: string;
+      sewingArrivedAt: string | null;
+      sewingCompletedAt: string | null;
+      sewingJudge: string;
+      finishingArrivedAt: string | null;
+      finishingCompletedAt: string | null;
+      finishingJudge: string;
       completedAt: string | null;
       statusId: number;
       statusLabel: string;
@@ -372,6 +396,16 @@ export class OrderStatusConfigService {
         completedTo: params.completedTo + ' 23:59:59',
       });
     }
+    if (params.collaborationTypeId != null) {
+      qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
+        collaborationTypeId: params.collaborationTypeId,
+      });
+    }
+    if (params.orderTypeId != null) {
+      qb.andWhere('o.order_type_id = :orderTypeId', {
+        orderTypeId: params.orderTypeId,
+      });
+    }
     const rows = await qb.getMany();
     const slaMap = new Map<number, number>();
     const slaRows = await this.slaRepo.find({ where: { enabled: true } });
@@ -397,6 +431,28 @@ export class OrderStatusConfigService {
       salesperson: string;
       customerName: string;
       orderDate: string | null;
+      customerDueDate: string | null;
+      reviewAt: string | null;
+      reviewDurationHours: number | null;
+      reviewJudge: string;
+      purchaseArrivedAt: string | null;
+      purchaseCompletedAt: string | null;
+      purchaseJudge: string;
+      patternArrivedAt: string | null;
+      patternCompletedAt: string | null;
+      patternJudge: string;
+      cuttingArrivedAt: string | null;
+      cuttingCompletedAt: string | null;
+      cuttingJudge: string;
+      craftArrivedAt: string | null;
+      craftCompletedAt: string | null;
+      craftJudge: string;
+      sewingArrivedAt: string | null;
+      sewingCompletedAt: string | null;
+      sewingJudge: string;
+      finishingArrivedAt: string | null;
+      finishingCompletedAt: string | null;
+      finishingJudge: string;
       completedAt: string | null;
       statusId: number;
       statusLabel: string;
@@ -421,30 +477,117 @@ export class OrderStatusConfigService {
       this.systemOptionsService.getOptionLabelsByIds('collaboration', collaborationIds),
       this.systemOptionsService.getOptionLabelsByIds('order_types', orderTypeIds),
     ]);
+    const allStatuses = await this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
+    const statusByCode = new Map(allStatuses.map((s) => [s.code, s]));
+    const phaseDefs = [
+      { code: 'pending_review', key: 'review' },
+      { code: 'pending_purchase', key: 'purchase' },
+      { code: 'pending_pattern', key: 'pattern' },
+      { code: 'pending_cutting', key: 'cutting' },
+      { code: 'pending_craft', key: 'craft' },
+      { code: 'pending_sewing', key: 'sewing' },
+      { code: 'pending_finishing', key: 'finishing' },
+    ] as const;
 
     for (const [, hist] of byOrder) {
       hist.sort((a, b) => a.enteredAt.getTime() - b.enteredAt.getTime());
-      const cur = hist[hist.length - 1];
-      if (!cur) continue;
+      const latest = hist[hist.length - 1];
+      if (!latest) continue;
 
       // 仅保留“一单一行”，展示该单当前停留段（最后一次进入状态）数据
+      const order = (latest as any).order as Order | undefined;
+      const orderStatusCode = (order?.status ?? '').trim();
+
+      // 优先按订单当前状态匹配对应历史段，确保与订单列表状态一致；
+      // 若历史暂缺该状态段，则回退到最后一段。
+      const matchedByOrderStatus =
+        orderStatusCode.length > 0
+          ? [...hist]
+              .reverse()
+              .find((h) => String((h as any)?.status?.code ?? '').trim() === orderStatusCode)
+          : undefined;
+      const currentSeg = matchedByOrderStatus ?? latest;
+
       const leftAt = now;
-      const durationHours = (leftAt.getTime() - cur.enteredAt.getTime()) / (1000 * 60 * 60);
-      const limitHours = slaMap.get(cur.statusId) ?? null;
+      const durationHours = (leftAt.getTime() - currentSeg.enteredAt.getTime()) / (1000 * 60 * 60);
+
+      const statusFromOrder = orderStatusCode ? statusByCode.get(orderStatusCode) : undefined;
+      const resolvedStatusId = statusFromOrder?.id ?? currentSeg.statusId;
+      const resolvedStatusLabel = statusFromOrder?.label ?? String((currentSeg as any)?.status?.label ?? '');
+
+      const limitHours = slaMap.get(resolvedStatusId) ?? null;
       const isOverdue = limitHours != null && durationHours > limitHours;
-      const order = (cur as any).order as Order | undefined;
       const collaborationTypeId = order?.collaborationTypeId ?? null;
       const orderTypeId = order?.orderTypeId ?? null;
       const completedAt =
         order?.status === 'completed' && order.statusTime ? order.statusTime.toISOString() : null;
 
+      const segByCode = new Map<string, OrderStatusHistory>();
+      for (const seg of hist) {
+        const code = String((seg as any)?.status?.code ?? '').trim();
+        if (code && !segByCode.has(code)) segByCode.set(code, seg);
+      }
+
+      const getArrivedAt = (code: string): Date | null => {
+        const seg = segByCode.get(code);
+        return seg?.enteredAt ?? null;
+      };
+      const getLaterArrivedAt = (startIndex: number): Date | null => {
+        for (let i = startIndex + 1; i < phaseDefs.length; i++) {
+          const d = getArrivedAt(phaseDefs[i].code);
+          if (d) return d;
+        }
+        return null;
+      };
+      const getPhaseCompletedAt = (index: number): Date | null => {
+        const phase = phaseDefs[index];
+        if (!phase) return null;
+        if (phase.code === 'pending_finishing') {
+          return completedAt ? new Date(completedAt) : null;
+        }
+        const nextArrived = getArrivedAt(phaseDefs[index + 1]?.code ?? '');
+        if (nextArrived) return nextArrived;
+        return getLaterArrivedAt(index);
+      };
+      const toIso = (d: Date | null): string | null => (d ? d.toISOString() : null);
+      const getJudge = (phaseCode: string, startAt: Date | null, endAt: Date | null): string => {
+        if (!startAt) return '-';
+        const phaseStatus = statusByCode.get(phaseCode);
+        const limit = phaseStatus ? slaMap.get(phaseStatus.id) ?? null : null;
+        if (endAt) {
+          if (limit == null) return '-';
+          const hours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
+          return hours > limit ? '超期' : '正常';
+        }
+        return orderStatusCode === phaseCode ? '进行中' : '-';
+      };
+
+      const reviewAtDate = getArrivedAt('pending_review');
+      const reviewCompletedAtDate = getPhaseCompletedAt(0);
+      const reviewDurationHours =
+        reviewAtDate && reviewCompletedAtDate
+          ? Math.round(((reviewCompletedAtDate.getTime() - reviewAtDate.getTime()) / (1000 * 60 * 60)) * 100) / 100
+          : null;
+      const purchaseArrivedAtDate = getArrivedAt('pending_purchase');
+      const purchaseCompletedAtDate = getPhaseCompletedAt(1);
+      const patternArrivedAtDate = getArrivedAt('pending_pattern');
+      const patternCompletedAtDate = getPhaseCompletedAt(2);
+      const cuttingArrivedAtDate = getArrivedAt('pending_cutting');
+      const cuttingCompletedAtDate = getPhaseCompletedAt(3);
+      const craftArrivedAtDate = getArrivedAt('pending_craft');
+      const craftCompletedAtDate = getPhaseCompletedAt(4);
+      const sewingArrivedAtDate = getArrivedAt('pending_sewing');
+      const sewingCompletedAtDate = getPhaseCompletedAt(5);
+      const finishingArrivedAtDate = getArrivedAt('pending_finishing');
+      const finishingCompletedAtDate = getPhaseCompletedAt(6);
+
       // 过滤：按“当前状态”与“当前进入时间”筛选（避免同一订单多段命中导致重复）
-      if (params.statusId != null && cur.statusId !== params.statusId) continue;
-      if (params.startDate && cur.enteredAt < new Date(params.startDate)) continue;
-      if (params.endDate && cur.enteredAt > new Date(params.endDate + ' 23:59:59')) continue;
+      if (params.statusId != null && resolvedStatusId !== params.statusId) continue;
+      if (params.startDate && currentSeg.enteredAt < new Date(params.startDate)) continue;
+      if (params.endDate && currentSeg.enteredAt > new Date(params.endDate + ' 23:59:59')) continue;
 
       list.push({
-        orderId: cur.orderId,
+        orderId: currentSeg.orderId,
         orderNo: order?.orderNo ?? '',
         skuCode: order?.skuCode ?? '',
         collaborationTypeId,
@@ -457,10 +600,32 @@ export class OrderStatusConfigService {
         salesperson: order?.salesperson ?? '',
         customerName: order?.customerName ?? '',
         orderDate: order?.orderDate ? order.orderDate.toISOString() : null,
+        customerDueDate: order?.customerDueDate ? order.customerDueDate.toISOString() : null,
+        reviewAt: toIso(reviewAtDate),
+        reviewDurationHours,
+        reviewJudge: getJudge('pending_review', reviewAtDate, reviewCompletedAtDate),
+        purchaseArrivedAt: toIso(purchaseArrivedAtDate),
+        purchaseCompletedAt: toIso(purchaseCompletedAtDate),
+        purchaseJudge: getJudge('pending_purchase', purchaseArrivedAtDate, purchaseCompletedAtDate),
+        patternArrivedAt: toIso(patternArrivedAtDate),
+        patternCompletedAt: toIso(patternCompletedAtDate),
+        patternJudge: getJudge('pending_pattern', patternArrivedAtDate, patternCompletedAtDate),
+        cuttingArrivedAt: toIso(cuttingArrivedAtDate),
+        cuttingCompletedAt: toIso(cuttingCompletedAtDate),
+        cuttingJudge: getJudge('pending_cutting', cuttingArrivedAtDate, cuttingCompletedAtDate),
+        craftArrivedAt: toIso(craftArrivedAtDate),
+        craftCompletedAt: toIso(craftCompletedAtDate),
+        craftJudge: getJudge('pending_craft', craftArrivedAtDate, craftCompletedAtDate),
+        sewingArrivedAt: toIso(sewingArrivedAtDate),
+        sewingCompletedAt: toIso(sewingCompletedAtDate),
+        sewingJudge: getJudge('pending_sewing', sewingArrivedAtDate, sewingCompletedAtDate),
+        finishingArrivedAt: toIso(finishingArrivedAtDate),
+        finishingCompletedAt: toIso(finishingCompletedAtDate),
+        finishingJudge: getJudge('pending_finishing', finishingArrivedAtDate, finishingCompletedAtDate),
         completedAt,
-        statusId: cur.statusId,
-        statusLabel: (cur as any).status?.label ?? '',
-        enteredAt: cur.enteredAt.toISOString(),
+        statusId: resolvedStatusId,
+        statusLabel: resolvedStatusLabel,
+        enteredAt: currentSeg.enteredAt.toISOString(),
         leftAt: null,
         durationHours: Math.round(durationHours * 100) / 100,
         limitHours,

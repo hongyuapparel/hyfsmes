@@ -15,6 +15,10 @@ export class InboundPending {
   @Column({ name: 'quantity', type: 'int', default: 0 })
   quantity: number;
 
+  /** normal | defect */
+  @Column({ name: 'source_type', length: 32, default: 'normal' })
+  sourceType: string;
+
   /** pending | completed */
   @Column({ name: 'status', length: 32, default: 'pending' })
   status: string;

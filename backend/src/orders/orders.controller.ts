@@ -122,7 +122,12 @@ export class OrdersController {
    * GET /orders/:id
    */
   @Get(':id')
-  findOne(@Param('id', ParseIntPipe) id: number) {
+  @RequirePermission('orders_edit')
+  async findOne(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    await this.ordersService.assertOrderActionById(id, user.userId, 'edit');
     return this.ordersService.findOne(id);
   }
 
@@ -149,6 +154,7 @@ export class OrdersController {
    * POST /orders
    */
   @Post()
+  @RequirePermission('orders_edit')
   createDraft(@Body() body: OrderEditPayload, @CurrentUser() user: { userId: number; username: string }) {
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.createDraft(body, actor);
@@ -159,11 +165,13 @@ export class OrdersController {
    * PUT /orders/:id
    */
   @Put(':id')
-  updateDraft(
+  @RequirePermission('orders_edit')
+  async updateDraft(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: OrderEditPayload,
     @CurrentUser() user: { userId: number; username: string },
   ) {
+    await this.ordersService.assertOrderActionById(id, user.userId, 'edit');
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.updateDraft(id, body, actor);
   }
@@ -173,7 +181,9 @@ export class OrdersController {
    * POST /orders/:id/submit
    */
   @Post(':id/submit')
-  submit(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+  @RequirePermission('orders_edit')
+  async submit(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+    await this.ordersService.assertOrderActionById(id, user.userId, 'edit');
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.submit(id, actor);
   }
@@ -185,10 +195,11 @@ export class OrdersController {
    */
   @Post('batch-delete')
   @RequirePermission('orders_delete')
-  batchDelete(
+  async batchDelete(
     @Body('ids') ids: number[],
     @CurrentUser() user: { userId: number; username: string },
   ) {
+    await this.ordersService.assertOrderActionByIds(ids ?? [], user.userId, 'delete');
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.deleteMany(ids ?? [], actor);
   }
@@ -200,10 +211,11 @@ export class OrdersController {
    */
   @Post('review')
   @RequirePermission('orders_review')
-  review(
+  async review(
     @Body('ids') ids: number[],
     @CurrentUser() user: { userId: number; username: string },
   ) {
+    await this.ordersService.assertOrderActionByIds(ids ?? [], user.userId, 'review');
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.reviewMany(ids ?? [], actor);
   }
@@ -215,11 +227,12 @@ export class OrdersController {
    */
   @Post('review/reject')
   @RequirePermission('orders_review')
-  reviewReject(
+  async reviewReject(
     @Body('ids') ids: number[],
     @Body('reason') reason: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
+    await this.ordersService.assertOrderActionByIds(ids ?? [], user.userId, 'review');
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.ordersService.reviewRejectMany(ids ?? [], reason, actor);
   }
@@ -230,6 +243,7 @@ export class OrdersController {
    * body: { ids: number[] }
    */
   @Post('copy-to-draft')
+  @RequirePermission('orders_edit')
   copyToDraft(
     @Body('ids') ids: number[],
     @CurrentUser() user: { userId: number; username: string },

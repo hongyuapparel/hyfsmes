@@ -9,6 +9,7 @@ export interface PendingListItem {
   skuCode: string
   imageUrl?: string
   quantity: number
+  sourceType?: 'normal' | 'defect'
   createdAt: string
 }
 
@@ -105,7 +106,11 @@ export interface FinishedStockDetailRes {
     remark: string
     createdAt: string
   }>
-  colorSize: { headers: string[]; colors: string[] }
+  colorSize: {
+    headers: string[]
+    colors: string[]
+    rows: Array<{ colorName: string; quantities: number[] }>
+  }
 }
 
 export function getFinishedStockDetail(id: number) {
@@ -119,6 +124,7 @@ export function updateFinishedStockMeta(
     inventoryTypeId?: number | null
     warehouseId?: number | null
     location?: string
+    imageUrl?: string
     remark?: string
   }
 ) {
@@ -180,6 +186,7 @@ export function createFinishedStock(body: {
   department: string
   location: string
   imageUrl?: string
+  remark?: string
 }) {
   return request.post<FinishedStockRow>('/inventory/finished/items', body)
 }

@@ -460,6 +460,7 @@ export class ProductionFinishingService {
           orderId: order.id,
           skuCode: order.skuCode ?? '',
           quantity: inbound,
+          sourceType: 'normal',
           status: 'pending',
         }),
       );
@@ -470,6 +471,7 @@ export class ProductionFinishingService {
           orderId: order.id,
           skuCode: order.skuCode ?? '',
           quantity: defect,
+          sourceType: 'defect',
           status: 'pending',
         }),
       );
@@ -521,6 +523,7 @@ export class ProductionFinishingService {
           orderId: order.id,
           skuCode: order.skuCode ?? '',
           quantity: inbound,
+          sourceType: 'normal',
           status: 'pending',
         }),
       );
@@ -531,6 +534,7 @@ export class ProductionFinishingService {
           orderId: order.id,
           skuCode: order.skuCode ?? '',
           quantity: defect,
+          sourceType: 'defect',
           status: 'pending',
         }),
       );
@@ -664,6 +668,7 @@ export class ProductionFinishingService {
         orderId: order.id,
         skuCode: order.skuCode ?? '',
         quantity: finishing.tailInboundQty ?? 0,
+        sourceType: 'normal',
         status: 'pending',
       });
       await this.inboundPendingRepo.save(pending);
