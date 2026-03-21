@@ -2,6 +2,7 @@
 node_modules/
 backend/node_modules/
 frontend/node_modules/
+**/node_modules1/
 
 # Build
 dist/
@@ -29,6 +30,11 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+**/package-lock.json1
 
 # Uploads (user-uploaded files)
-uploads/
+backend/uploads/
+
+# Keep backend source module tracked
+!backend/src/uploads/
+!backend/src/uploads/**
