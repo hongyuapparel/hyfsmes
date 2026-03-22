@@ -1,14 +1,5 @@
 import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  ParseIntPipe,
-  Patch,
-  Post,
-  Query,
-  UseGuards,
+  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
@@ -26,35 +17,24 @@ export class FinanceExpenseController {
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('expenseTypeId') expenseTypeIdStr?: string,
-    @Query('departmentId') departmentIdStr?: string,
-    @Query('orderId') orderIdStr?: string,
-    @Query('supplierId') supplierIdStr?: string,
+    @Query('fundAccountId') fundAccountIdStr?: string,
+    @Query('payeeKeyword') payeeKeyword?: string,
+    @Query('orderNo') orderNo?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    const expenseTypeId =
-      expenseTypeIdStr != null && expenseTypeIdStr !== '' ? parseInt(expenseTypeIdStr, 10) : undefined;
-    const departmentId =
-      departmentIdStr != null && departmentIdStr !== '' ? parseInt(departmentIdStr, 10) : undefined;
-    const orderId =
-      orderIdStr != null && orderIdStr !== '' ? parseInt(orderIdStr, 10) : undefined;
-    const supplierId =
-      supplierIdStr != null && supplierIdStr !== '' ? parseInt(supplierIdStr, 10) : undefined;
+    const expenseTypeId = expenseTypeIdStr ? parseInt(expenseTypeIdStr, 10) : undefined;
+    const fundAccountId = fundAccountIdStr ? parseInt(fundAccountIdStr, 10) : undefined;
     return this.service.getList({
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       expenseTypeId: Number.isNaN(expenseTypeId!) ? undefined : expenseTypeId,
-      departmentId: Number.isNaN(departmentId!) ? undefined : departmentId,
-      orderId: Number.isNaN(orderId!) ? undefined : orderId,
-      supplierId: Number.isNaN(supplierId!) ? undefined : supplierId,
+      fundAccountId: Number.isNaN(fundAccountId!) ? undefined : fundAccountId,
+      payeeKeyword: payeeKeyword || undefined,
+      orderNo: orderNo || undefined,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
-  }
-
-  @Get('options')
-  getOptions() {
-    return this.service.getOptions();
   }
 
   @Get(':id')
@@ -63,61 +43,36 @@ export class FinanceExpenseController {
   }
 
   @Post()
-  create(
-    @Body('occurDate') occurDate: string,
-    @Body('amount') amount: number | string,
-    @Body('expenseTypeId') expenseTypeId?: number | null,
-    @Body('departmentId') departmentId?: number | null,
-    @Body('bankAccountId') bankAccountId?: number | null,
-    @Body('payee') payee?: string,
-    @Body('styleNo') styleNo?: string,
-    @Body('orderId') orderId?: number | null,
-    @Body('supplierId') supplierId?: number | null,
-    @Body('detail') detail?: string,
-    @Body('attachments') attachments?: string[] | null,
-  ) {
+  create(@Body() body: any) {
     return this.service.create({
-      occurDate: occurDate!,
-      amount: amount!,
-      expenseTypeId,
-      departmentId,
-      bankAccountId,
-      payee,
-      styleNo,
-      orderId,
-      supplierId,
-      detail,
-      attachments,
+      occurDate: body.occurDate,
+      amount: body.amount,
+      expenseTypeId: body.expenseTypeId != null ? Number(body.expenseTypeId) : null,
+      fundAccountId: body.fundAccountId != null ? Number(body.fundAccountId) : null,
+      objectType: body.objectType,
+      payeeName: body.payeeName,
+      orderNo: body.orderNo,
+      departmentId: body.departmentId != null ? Number(body.departmentId) : null,
+      operator: body.operator,
+      remark: body.remark,
+      attachments: body.attachments,
     });
   }
 
   @Patch(':id')
-  update(
-    @Param('id', ParseIntPipe) id: number,
-    @Body('occurDate') occurDate?: string,
-    @Body('amount') amount?: number | string,
-    @Body('expenseTypeId') expenseTypeId?: number | null,
-    @Body('departmentId') departmentId?: number | null,
-    @Body('bankAccountId') bankAccountId?: number | null,
-    @Body('payee') payee?: string,
-    @Body('styleNo') styleNo?: string,
-    @Body('orderId') orderId?: number | null,
-    @Body('supplierId') supplierId?: number | null,
-    @Body('detail') detail?: string,
-    @Body('attachments') attachments?: string[] | null,
-  ) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.service.update(id, {
-      occurDate,
-      amount,
-      expenseTypeId,
-      departmentId,
-      bankAccountId,
-      payee,
-      styleNo,
-      orderId,
-      supplierId,
-      detail,
-      attachments,
+      occurDate: body.occurDate,
+      amount: body.amount,
+      expenseTypeId: body.expenseTypeId !== undefined ? (body.expenseTypeId != null ? Number(body.expenseTypeId) : null) : undefined,
+      fundAccountId: body.fundAccountId !== undefined ? (body.fundAccountId != null ? Number(body.fundAccountId) : null) : undefined,
+      objectType: body.objectType,
+      payeeName: body.payeeName,
+      orderNo: body.orderNo,
+      departmentId: body.departmentId !== undefined ? (body.departmentId != null ? Number(body.departmentId) : null) : undefined,
+      operator: body.operator,
+      remark: body.remark,
+      attachments: body.attachments,
     });
   }
 

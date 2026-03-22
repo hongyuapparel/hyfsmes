@@ -58,4 +58,13 @@ export class UploadsController {
     if (!file) throw new BadRequestException('请选择图片文件');
     return { url: `/uploads/${file.filename}` };
   }
+
+  /** 财务附件/凭证上传（收入/支出流水登记时使用） */
+  @Post('finance-image')
+  @RequirePermission('/finance/income')
+  @UseInterceptors(imageInterceptor)
+  uploadFinanceImage(@UploadedFile() file: any) {
+    if (!file) throw new BadRequestException('请选择图片文件');
+    return { url: `/uploads/${file.filename}` };
+  }
 }

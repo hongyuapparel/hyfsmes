@@ -129,6 +129,10 @@ export interface OrderFormPayload {
   orderTypeId?: number | null
   /** 工艺项目（原二次工艺） */
   processItem?: string
+  /**
+   * 与列表/详情 `processItem` 对应的展示字段（历史命名，与 E 区 processItems 摘要并存）
+   */
+  secondaryProcess?: string
   quantity?: number
   exFactoryPrice?: string
   salePrice?: string

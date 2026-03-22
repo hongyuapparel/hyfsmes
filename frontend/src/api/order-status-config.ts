@@ -41,7 +41,14 @@ export function getOrderStatuses() {
   return request.get<OrderStatusItem[]>('/order-status-config/statuses')
 }
 
-export function createOrderStatus(data: { code: string; label: string; sortOrder?: number; groupKey?: string; isFinal?: boolean; enabled?: boolean }) {
+export function createOrderStatus(data: {
+  code?: string
+  label: string
+  sortOrder?: number
+  groupKey?: string
+  isFinal?: boolean
+  enabled?: boolean
+}) {
   return request.post<OrderStatusItem>('/order-status-config/statuses', data)
 }
 

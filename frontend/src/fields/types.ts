@@ -3,7 +3,7 @@
  * 同一字段在不同页面使用相同 code，保证显示一致
  * 后续可迁移至系统配置（DB），支持增减、排序
  */
-export type FieldType = 'text' | 'date' | 'select' | 'number' | 'phone'
+export type FieldType = 'text' | 'date' | 'select' | 'number' | 'phone' | 'image'
 
 export interface FieldDefinition {
   /** 唯一标识，全系统统一，用于数据绑定与跨页面复用 */

@@ -14,6 +14,18 @@ export async function uploadImage(file: File): Promise<string> {
   return url.startsWith('http') ? url : `${baseURL.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`
 }
 
+/** 财务凭证/附件上传（收入/支出流水登记时使用） */
+export async function uploadFinanceImage(file: File): Promise<string> {
+  const formData = new FormData()
+  formData.append('file', file)
+  const res = await request.post<{ url: string }>('/uploads/finance-image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 30000,
+  })
+  const url = res.data?.url ?? ''
+  return url.startsWith('http') ? url : `${baseURL.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`
+}
+
 /** 面料出库拍照上传（使用 /inventory/fabric 权限） */
 export async function uploadOutboundImage(file: File): Promise<string> {
   const formData = new FormData()

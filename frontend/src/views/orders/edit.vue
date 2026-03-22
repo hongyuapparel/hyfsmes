@@ -2240,7 +2240,7 @@ async function loadDetail() {
     if (form.customerId && form.customerName && !customerOptions.value.some((c) => c.id === form.customerId)) {
       customerOptions.value.unshift({ id: form.customerId, companyName: form.customerName })
     }
-  form.secondaryProcess = d.secondaryProcess ?? ''
+    form.secondaryProcess = d.processItem ?? ''
     form.quantity = d.quantity ?? 0
     form.exFactoryPrice = d.exFactoryPrice ?? ''
     form.salePrice = d.salePrice ?? ''

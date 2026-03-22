@@ -536,24 +536,28 @@ function toggleGroupCollapse(path: string) {
 const tableFields = computed(() => {
   const src = fieldDefinitions.value.length ? fieldDefinitions.value : PRODUCT_FIELDS_SORTED
   const list = Array.isArray(src)
-    ? (src as { code: string; label: string; type: string; sortable?: boolean; visible?: number }[])
+    ? (src as { code: string; label: string; type: string; sortable?: boolean | number; visible?: number }[])
     : []
   return list
     .filter((f) => (f as { visible?: number }).visible !== 0)
     .sort((a, b) => ((a as { order?: number }).order ?? 0) - ((b as { order?: number }).order ?? 0))
-    .map((f) => ({
-      code: f.code,
-      label: f.label,
-      type: f.type,
-      sortable: (f as { sortable?: number }).sortable ? true : false,
-    }))
+    .map((f) => {
+      const s = f.sortable
+      const sortable = s === true || s === 1
+      return {
+        code: f.code,
+        label: f.label,
+        type: f.type,
+        sortable,
+      }
+    })
 })
 
 /** 表单字段：排除仅展示字段 */
 const formFields = computed(() => {
   const src = fieldDefinitions.value.length ? fieldDefinitions.value : PRODUCT_FIELDS_SORTED
   const list = Array.isArray(src)
-    ? (src as { code: string; label: string; type: string; optionsKey?: string }[])
+    ? (src as { code: string; label: string; type: string; optionsKey?: string; placeholder?: string }[])
     : []
   const ordered = list
     .filter((f) => f.code !== 'createdAt')
@@ -679,7 +683,7 @@ async function onColumnVisibleChange(f: { id: number; visible: boolean }) {
   }
 }
 
-async function moveColumn(f: { id: number; order: number }, delta: number) {
+async function moveColumn(f: { id: number; order: number; code: string }, delta: number) {
   const list = [...columnConfigList.value]
   const idx = list.findIndex((x) => x.id === f.id && x.code === f.code)
   if (idx < 0 || (delta < 0 && idx === 0) || (delta > 0 && idx === list.length - 1)) return
@@ -782,7 +786,7 @@ async function loadOptions() {
     ])
     productGroupOptions.value = ct.data ?? []
     productGroupsTree.value = treeRes.data ?? []
-    const countList = countsRes.data ?? []
+    const countList: Array<{ productGroupId: number; count: number }> = countsRes.data ?? []
     groupCountsMap.value = countList.reduce<Record<number, number>>((acc, { productGroupId, count }) => {
       acc[productGroupId] = count
       return acc

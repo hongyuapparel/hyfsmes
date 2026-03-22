@@ -46,6 +46,7 @@ export const menuConfig: MenuItem[] = [
     title: '财务管理',
     icon: 'Coin',
     children: [
+      { path: '/finance/dashboard', title: '财务看板' },
       { path: '/finance/income', title: '收入流水' },
       { path: '/finance/expense', title: '支出流水' },
       { path: '/finance/order-sla-report', title: '订单时效' },

@@ -1,109 +1,223 @@
 <template>
-  <div class="page-card finance-expense-page">
+  <div class="page-card finance-page">
+    <!-- 筛选栏 -->
     <div class="filter-bar">
-      <el-date-picker v-model="filter.dateFrom" type="date" value-format="YYYY-MM-DD" :placeholder="'\u5f00\u59cb\u65e5\u671f'" clearable class="filter-bar-item" @change="onSearch" />
-      <el-date-picker v-model="filter.dateTo" type="date" value-format="YYYY-MM-DD" :placeholder="'\u7ed3\u675f\u65e5\u671f'" clearable class="filter-bar-item" @change="onSearch" />
-      <el-select v-model="filter.expenseTypeId" :placeholder="'\u652f\u51fa\u7c7b\u578b'" clearable filterable class="filter-bar-item filter-select" @change="onSearch">
-        <el-option v-for="opt in optionData.expenseTypes" :key="opt.id" :label="opt.value" :value="opt.id" />
+      <el-date-picker v-model="filter.dateFrom" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" clearable class="filter-item" />
+      <el-date-picker v-model="filter.dateTo" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" clearable class="filter-item" />
+      <el-select v-model="filter.expenseTypeId" placeholder="支出类型" clearable filterable class="filter-item filter-select">
+        <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
       </el-select>
-      <el-select v-model="filter.departmentId" :placeholder="'\u90e8\u95e8'" clearable filterable class="filter-bar-item filter-select" @change="onSearch">
-        <el-option v-for="opt in optionData.departments" :key="opt.id" :label="opt.value" :value="opt.id" />
+      <el-select v-model="filter.fundAccountId" placeholder="支出账户" clearable filterable class="filter-item filter-select">
+        <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
       </el-select>
-      <div class="filter-bar-actions">
-        <el-button type="primary" @click="onSearch">{{ '\u641c\u7d22' }}</el-button>
-        <el-button @click="onReset">{{ '\u6e05\u7a7a' }}</el-button>
-        <el-button type="primary" @click="openForm(null)">{{ '\u767b\u8bb0\u652f\u51fa' }}</el-button>
+      <el-input v-model="filter.payeeKeyword" placeholder="收款方关键词" clearable class="filter-item" style="width:150px" />
+      <el-input v-model="filter.orderNo" placeholder="订单号" clearable class="filter-item" style="width:140px" />
+      <div class="filter-actions">
+        <el-button type="primary" @click="onSearch">查询</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button type="primary" @click="openForm(null)">登记支出</el-button>
       </div>
     </div>
 
+    <!-- 汇总行 -->
+    <div v-if="summary.totalAmount" class="summary-bar">
+      当前筛选共 <b>{{ pagination.total }}</b> 条，合计支出：<b class="expense-highlight">¥{{ summary.totalAmount }}</b>
+    </div>
+
     <el-table v-loading="loading" :data="list" border stripe class="data-table">
-      <el-table-column prop="occurDate" :label="'\u65e5\u671f'" width="120" />
-      <el-table-column prop="amount" :label="'\u91d1\u989d\uff08\u5143\uff09'" width="120" align="right">
-        <template #default="{ row }">{{ formatAmount(row.amount) }}</template>
-      </el-table-column>
-      <el-table-column prop="expenseTypeName" :label="'\u652f\u51fa\u7c7b\u578b'" width="100" show-overflow-tooltip />
-      <el-table-column prop="departmentName" :label="'\u90e8\u95e8'" width="100" show-overflow-tooltip />
-      <el-table-column prop="orderNo" :label="'\u5173\u8054\u8ba2\u5355'" width="110" show-overflow-tooltip />
-      <el-table-column prop="supplierName" :label="'\u5173\u8054\u4f9b\u5e94\u5546'" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="detail" :label="'\u660e\u7ec6'" min-width="160" show-overflow-tooltip />
-      <el-table-column :label="'\u64cd\u4f5c'" width="120" align="center" fixed="right">
+      <el-table-column prop="occurDate" label="支出日期" width="110" />
+      <el-table-column label="支出金额（元）" width="130" align="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openForm(row)">{{ '\u7f16\u8f91' }}</el-button>
-          <el-button link type="danger" size="small" @click="onDelete(row)">{{ '\u5220\u9664' }}</el-button>
+          <span class="expense-amount">{{ fmtAmt(row.amount) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="expenseTypeName" label="支出类型" width="110" show-overflow-tooltip />
+      <el-table-column prop="fundAccountName" label="支出账户" width="110" show-overflow-tooltip />
+      <el-table-column label="对象类型" width="90">
+        <template #default="{ row }">{{ objectTypeLabel(row.objectType) }}</template>
+      </el-table-column>
+      <el-table-column prop="payeeName" label="收款方名称" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="orderNo" label="关联订单" width="120" show-overflow-tooltip>
+        <template #default="{ row }">{{ row.orderNo || '—' }}</template>
+      </el-table-column>
+      <el-table-column prop="departmentName" label="部门" width="90" show-overflow-tooltip />
+      <el-table-column prop="operator" label="经办人" width="80" show-overflow-tooltip />
+      <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
+      <el-table-column label="附件" width="70" align="center">
+        <template #default="{ row }">
+          <el-button v-if="row.attachments?.length" link type="primary" size="small" @click="previewAttachments(row.attachments)">
+            查看({{ row.attachments.length }})
+          </el-button>
+          <span v-else class="text-muted">—</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="120" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
+          <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
 
     <div class="pagination-wrap">
-      <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20,40,60]" layout="total, sizes, prev, pager, next" @current-change="load" @size-change="onPageSizeChange" />
+      <el-pagination v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize"
+        :total="pagination.total" :page-sizes="[20, 50, 100]" layout="total, sizes, prev, pager, next"
+        @current-change="load" @size-change="onPageSizeChange" />
     </div>
 
-    <el-dialog v-model="formDialog.visible" :title="formDialog.isEdit ? '\u7f16\u8f91\u652f\u51fa' : '\u767b\u8bb0\u652f\u51fa'" width="560" destroy-on-close @close="formRef?.resetFields()">
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="100px">
-        <el-form-item :label="'\u53d1\u751f\u65e5\u671f'" prop="occurDate"><el-date-picker v-model="form.occurDate" type="date" value-format="YYYY-MM-DD" :placeholder="'\u9009\u62e9\u65e5\u671f'" style="width:100%" /></el-form-item>
-        <el-form-item :label="'\u91d1\u989d\uff08\u5143\uff09'" prop="amount"><el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" /></el-form-item>
-        <el-form-item :label="'\u652f\u51fa\u7c7b\u578b'" prop="expenseTypeId">
-          <el-select v-model="form.expenseTypeId" :placeholder="'\u9009\u62e9\u652f\u51fa\u7c7b\u578b'" clearable filterable style="width:100%">
-            <el-option v-for="opt in optionData.expenseTypes" :key="opt.id" :label="opt.value" :value="opt.id" />
+    <!-- 登记/编辑弹窗 -->
+    <el-dialog v-model="dialog.visible" :title="dialog.isEdit ? '编辑支出' : '登记支出'"
+      width="580" destroy-on-close @close="formRef?.resetFields()">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+        <el-form-item label="支出日期" prop="occurDate">
+          <el-date-picker v-model="form.occurDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="支出金额" prop="amount">
+          <el-input-number v-model="form.amount" :min="0" :precision="2" style="width:100%" />
+        </el-form-item>
+        <el-form-item label="支出类型" prop="expenseTypeId">
+          <el-select v-model="form.expenseTypeId" placeholder="选择支出类型" clearable filterable style="width:100%">
+            <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="'\u90e8\u95e8'" prop="departmentId">
-          <el-select v-model="form.departmentId" :placeholder="'\u9009\u62e9\u90e8\u95e8'" clearable filterable style="width:100%">
-            <el-option v-for="opt in optionData.departments" :key="opt.id" :label="opt.value" :value="opt.id" />
+        <el-form-item label="支出账户">
+          <el-select v-model="form.fundAccountId" placeholder="选择支出账户" clearable filterable style="width:100%">
+            <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="'\u5173\u8054\u8ba2\u5355'" prop="orderId"><el-input-number v-model="form.orderId" :min="1" :placeholder="'\u53ef\u9009\uff0c\u586b\u5199\u8ba2\u5355 ID'" controls-position="right" style="width:100%" /></el-form-item>
-        <el-form-item :label="'\u5173\u8054\u4f9b\u5e94\u5546'" prop="supplierId">
-          <el-select v-model="form.supplierId" :placeholder="'\u53ef\u9009\uff0c\u82e5\u652f\u51fa\u5339\u914d\u4f9b\u5e94\u5546\u8bf7\u586b\u5199'" clearable filterable style="width:100%">
-            <el-option v-for="s in supplierOptions" :key="s.id" :label="s.name" :value="s.id" />
+        <el-form-item label="对象类型">
+          <el-select v-model="form.objectType" placeholder="选择对象类型" clearable style="width:100%">
+            <el-option v-for="o in OBJECT_TYPE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
           </el-select>
         </el-form-item>
-        <el-form-item :label="'\u660e\u7ec6'" prop="detail"><el-input v-model="form.detail" type="textarea" :rows="3" :placeholder="'\u8bf7\u5c3d\u91cf\u5199\u6e05\u695a\u7528\u9014\uff0c\u4fbf\u4e8e\u540e\u7eed\u7edf\u8ba1\u5206\u6790'" clearable /></el-form-item>
+        <el-form-item label="收款方名称">
+          <el-input v-model="form.payeeName" placeholder="如：供应商名称、员工姓名、平台名称" clearable />
+        </el-form-item>
+        <el-form-item label="关联订单号">
+          <el-input v-model="form.orderNo" placeholder="选填，可输入系统外订单号" clearable />
+        </el-form-item>
+        <el-form-item label="部门">
+          <el-select v-model="form.departmentId" placeholder="选填" clearable filterable style="width:100%">
+            <el-option v-for="d in departments" :key="d.id" :label="d.value" :value="d.id" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="经办人">
+          <el-input v-model="form.operator" placeholder="选填" clearable />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="选填" clearable />
+        </el-form-item>
+        <el-form-item label="附件凭证">
+          <div class="attachment-area">
+            <div v-if="form.attachments.length" class="attachment-list">
+              <div v-for="(url, idx) in form.attachments" :key="idx" class="attachment-item">
+                <el-image :src="url" fit="cover" class="attachment-thumb" :preview-src-list="form.attachments" :initial-index="idx" />
+                <el-button link type="danger" size="small" class="attachment-del" @click="removeAttachment(idx)">删除</el-button>
+              </div>
+            </div>
+            <el-upload :show-file-list="false" :before-upload="(f: File) => handleUpload(f)" accept="image/*" :disabled="uploading">
+              <el-button size="small" :loading="uploading">{{ uploading ? '上传中…' : '上传图片' }}</el-button>
+            </el-upload>
+          </div>
+        </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="formDialog.visible = false">{{ '\u53d6\u6d88' }}</el-button>
-        <el-button type="primary" :loading="formDialog.submitting" @click="submitForm">{{ '\u786e\u5b9a' }}</el-button>
+        <el-button @click="dialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="dialog.submitting" @click="submitForm">确定</el-button>
       </template>
+    </el-dialog>
+
+    <!-- 附件预览弹窗 -->
+    <el-dialog v-model="previewDialog.visible" title="附件预览" width="700">
+      <div class="preview-grid">
+        <el-image v-for="(url, i) in previewDialog.urls" :key="i" :src="url" fit="contain"
+          class="preview-img" :preview-src-list="previewDialog.urls" :initial-index="i" />
+      </div>
     </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import { getExpenseList, getExpenseOptions, createExpense, updateExpense, deleteExpense, type ExpenseRecordItem } from '@/api/finance'
-import { getSupplierList } from '@/api/suppliers'
+import {
+  getExpenseList, createExpense, updateExpense, deleteExpense,
+  getFinanceDropdownOptions, OBJECT_TYPE_OPTIONS,
+  type ExpenseRecordItem, type FinanceFundAccount, type FinanceExpenseType,
+} from '@/api/finance'
+import { uploadFinanceImage } from '@/api/uploads'
+import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
-const optionData = reactive<{ expenseTypes: { id: number; value: string }[]; departments: { id: number; value: string }[] }>({ expenseTypes: [], departments: [] })
-const supplierOptions = ref<{ id: number; name: string }[]>([])
-const filter = reactive({ dateFrom: '', dateTo: '', expenseTypeId: null as number | null, departmentId: null as number | null })
+const options = reactive<{ expenseTypes: FinanceExpenseType[]; fundAccounts: FinanceFundAccount[] }>({
+  expenseTypes: [],
+  fundAccounts: [],
+})
+const departments = ref<SystemOptionItem[]>([])
+
+const filter = reactive({
+  dateFrom: '', dateTo: '',
+  expenseTypeId: null as number | null,
+  fundAccountId: null as number | null,
+  payeeKeyword: '', orderNo: '',
+})
 const list = ref<ExpenseRecordItem[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+const rawTotalAmount = ref(0)
+const summary = computed(() => ({
+  totalAmount: rawTotalAmount.value > 0 ? rawTotalAmount.value.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '',
+}))
 
-const formDialog = reactive({ visible: false, submitting: false, isEdit: false })
+const dialog = reactive({ visible: false, isEdit: false, submitting: false })
 const editId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
-const form = reactive({ occurDate: '', amount: 0, expenseTypeId: null as number | null, departmentId: null as number | null, orderId: null as number | null, supplierId: null as number | null, detail: '' })
-const formRules: FormRules = {
-  occurDate: [{ required: true, message: '\u8bf7\u9009\u62e9\u53d1\u751f\u65e5\u671f', trigger: 'change' }],
-  amount: [{ required: true, message: '\u8bf7\u8f93\u5165\u91d1\u989d', trigger: 'blur' }],
+const uploading = ref(false)
+const form = reactive({
+  occurDate: '', amount: 0,
+  expenseTypeId: null as number | null,
+  fundAccountId: null as number | null,
+  objectType: '',
+  payeeName: '', orderNo: '',
+  departmentId: null as number | null,
+  operator: '', remark: '',
+  attachments: [] as string[],
+})
+const rules: FormRules = {
+  occurDate: [{ required: true, message: '请选择支出日期', trigger: 'change' }],
+  amount: [{ required: true, message: '请输入金额', trigger: 'blur' }],
+  expenseTypeId: [{ required: true, message: '请选择支出类型', trigger: 'change' }],
 }
 
-function formatAmount(v: string | number): string {
+const previewDialog = reactive({ visible: false, urls: [] as string[] })
+
+function fmtAmt(v: string | number) {
   const n = Number(v)
   return Number.isNaN(n) ? '-' : n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+function objectTypeLabel(v: string) {
+  return OBJECT_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? (v || '—')
 }
 
 async function load() {
   loading.value = true
   try {
-    const res = await getExpenseList({ dateFrom: filter.dateFrom || undefined, dateTo: filter.dateTo || undefined, expenseTypeId: filter.expenseTypeId ?? undefined, departmentId: filter.departmentId ?? undefined, page: pagination.page, pageSize: pagination.pageSize })
+    const res = await getExpenseList({
+      dateFrom: filter.dateFrom || undefined,
+      dateTo: filter.dateTo || undefined,
+      expenseTypeId: filter.expenseTypeId ?? undefined,
+      fundAccountId: filter.fundAccountId ?? undefined,
+      payeeKeyword: filter.payeeKeyword || undefined,
+      orderNo: filter.orderNo || undefined,
+      page: pagination.page,
+      pageSize: pagination.pageSize,
+    })
     const data = res.data
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      rawTotalAmount.value = list.value.reduce((s, r) => s + parseFloat(r.amount || '0'), 0)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -113,57 +227,83 @@ async function load() {
 }
 
 function onSearch() { pagination.page = 1; load() }
-function onReset() { filter.dateFrom = ''; filter.dateTo = ''; filter.expenseTypeId = null; filter.departmentId = null; pagination.page = 1; load() }
+function onReset() {
+  filter.dateFrom = ''; filter.dateTo = ''
+  filter.expenseTypeId = null; filter.fundAccountId = null
+  filter.payeeKeyword = ''; filter.orderNo = ''
+  pagination.page = 1; load()
+}
 function onPageSizeChange() { pagination.page = 1; load() }
 
 function openForm(row: ExpenseRecordItem | null) {
-  formDialog.isEdit = !!row
-  editId.value = row ? row.id : null
+  dialog.isEdit = !!row
+  editId.value = row?.id ?? null
   if (row) {
-    form.occurDate = row.occurDate
-    form.amount = Number(row.amount)
-    form.expenseTypeId = row.expenseTypeId
-    form.departmentId = row.departmentId
-    form.orderId = row.orderId
-    form.supplierId = row.supplierId
-    form.detail = row.detail ?? ''
+    form.occurDate = row.occurDate; form.amount = Number(row.amount)
+    form.expenseTypeId = row.expenseTypeId; form.fundAccountId = row.fundAccountId
+    form.objectType = row.objectType ?? ''; form.payeeName = row.payeeName ?? ''
+    form.orderNo = row.orderNo ?? ''; form.departmentId = row.departmentId
+    form.operator = row.operator ?? ''; form.remark = row.remark ?? ''
+    form.attachments = [...(row.attachments ?? [])]
   } else {
-    form.occurDate = ''
-    form.amount = 0
-    form.expenseTypeId = null
-    form.departmentId = null
-    form.orderId = null
-    form.supplierId = null
-    form.detail = ''
+    form.occurDate = ''; form.amount = 0
+    form.expenseTypeId = null; form.fundAccountId = null
+    form.objectType = ''; form.payeeName = ''; form.orderNo = ''
+    form.departmentId = null; form.operator = ''; form.remark = ''
+    form.attachments = []
   }
-  formDialog.visible = true
+  dialog.visible = true
 }
 
-async function submitForm() {
-  await formRef.value?.validate().catch(() => {})
-  formDialog.submitting = true
+async function handleUpload(file: File) {
+  uploading.value = true
   try {
-    if (formDialog.isEdit && editId.value != null) {
-      await updateExpense(editId.value, { occurDate: form.occurDate, amount: form.amount, expenseTypeId: form.expenseTypeId, departmentId: form.departmentId, orderId: form.orderId != null && form.orderId > 0 ? form.orderId : undefined, supplierId: form.supplierId ?? undefined, detail: form.detail })
-      ElMessage.success('\u5df2\u4fdd\u5b58')
-    } else {
-      await createExpense({ occurDate: form.occurDate, amount: form.amount, expenseTypeId: form.expenseTypeId, departmentId: form.departmentId, orderId: form.orderId != null && form.orderId > 0 ? form.orderId : undefined, supplierId: form.supplierId ?? undefined, detail: form.detail })
-      ElMessage.success('\u5df2\u767b\u8bb0')
+    const url = await uploadFinanceImage(file)
+    form.attachments.push(url)
+  } catch (e: unknown) {
+    ElMessage.error(getErrorMessage(e))
+  } finally {
+    uploading.value = false
+  }
+  return false
+}
+
+function removeAttachment(idx: number) { form.attachments.splice(idx, 1) }
+function previewAttachments(urls: string[]) { previewDialog.urls = urls; previewDialog.visible = true }
+
+async function submitForm() {
+  const valid = await formRef.value?.validate().catch(() => false)
+  if (!valid) return
+  dialog.submitting = true
+  try {
+    const payload = {
+      occurDate: form.occurDate, amount: form.amount,
+      expenseTypeId: form.expenseTypeId, fundAccountId: form.fundAccountId,
+      objectType: form.objectType, payeeName: form.payeeName, orderNo: form.orderNo,
+      departmentId: form.departmentId, operator: form.operator, remark: form.remark,
+      attachments: form.attachments.length ? form.attachments : null,
     }
-    formDialog.visible = false
+    if (dialog.isEdit && editId.value != null) {
+      await updateExpense(editId.value, payload)
+      ElMessage.success('已保存')
+    } else {
+      await createExpense(payload)
+      ElMessage.success('已登记')
+    }
+    dialog.visible = false
     load()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    formDialog.submitting = false
+    dialog.submitting = false
   }
 }
 
 async function onDelete(row: ExpenseRecordItem) {
   try {
-    await ElMessageBox.confirm('\u786e\u5b9a\u5220\u9664\u8be5\u6761\u652f\u51fa\u8bb0\u5f55\uff1f', '\u63d0\u793a', { confirmButtonText: '\u786e\u5b9a', cancelButtonText: '\u53d6\u6d88', type: 'warning' })
+    await ElMessageBox.confirm('确定删除该条支出记录？', '提示', { type: 'warning' })
     await deleteExpense(row.id)
-    ElMessage.success('\u5df2\u5220\u9664')
+    ElMessage.success('已删除')
     load()
   } catch (e: unknown) {
     if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -172,55 +312,37 @@ async function onDelete(row: ExpenseRecordItem) {
 
 onMounted(async () => {
   try {
-    const [optRes, supRes] = await Promise.all([getExpenseOptions(), getSupplierList({ page: 1, pageSize: 500 })])
-    const optData = optRes.data
-    if (optData) { optionData.expenseTypes = optData.expenseTypes ?? []; optionData.departments = optData.departments ?? [] }
-    const supData = supRes.data
-    if (supData?.list) supplierOptions.value = supData.list.map((s) => ({ id: s.id, name: s.name }))
-  } catch {
-    optionData.expenseTypes = []
-    optionData.departments = []
-    supplierOptions.value = []
-  }
+    const [optRes, deptRes] = await Promise.all([
+      getFinanceDropdownOptions(),
+      getSystemOptionsList('org_departments'),
+    ])
+    if (optRes.data) {
+      options.expenseTypes = optRes.data.expenseTypes ?? []
+      options.fundAccounts = optRes.data.fundAccounts ?? []
+    }
+    departments.value = (deptRes.data ?? []).filter((d) => d.parentId == null)
+  } catch { /* 选项加载失败不阻塞页面 */ }
   await load()
 })
 </script>
 
 <style scoped>
-.finance-expense-page {
-  background: var(--color-card);
-  padding: var(--space-md);
-  border-radius: var(--radius-xl);
-  border: 1px solid var(--color-border);
-}
-
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-bar-item {
-  width: 160px;
-}
-
-.filter-select {
-  min-width: 120px;
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
-.data-table {
-  margin-bottom: var(--space-md);
-}
+.finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
+.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); padding: var(--space-sm); background: var(--color-bg-subtle, #f5f6f8); border-radius: var(--radius-lg); }
+.filter-item { width: 150px; }
+.filter-select { min-width: 120px; }
+.filter-actions { margin-left: auto; display: flex; gap: var(--space-sm); }
+.summary-bar { padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: 13px; color: #c2410c; margin-bottom: var(--space-sm); }
+.expense-highlight { color: #dc2626; font-size: 15px; }
+.expense-amount { color: #dc2626; font-weight: 600; }
+.text-muted { color: var(--color-text-muted); }
+.data-table { margin-bottom: var(--space-md); }
+.pagination-wrap { display: flex; justify-content: flex-end; }
+.attachment-area { display: flex; flex-direction: column; gap: 8px; }
+.attachment-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.attachment-item { position: relative; }
+.attachment-thumb { width: 72px; height: 72px; border-radius: 4px; border: 1px solid var(--color-border); cursor: zoom-in; }
+.attachment-del { position: absolute; top: 2px; right: 2px; padding: 0 4px; background: rgba(0,0,0,.45); color: #fff; border-radius: 2px; }
+.preview-grid { display: flex; flex-wrap: wrap; gap: 12px; }
+.preview-img { width: 180px; height: 180px; border-radius: 6px; border: 1px solid var(--color-border); cursor: zoom-in; }
 </style>

@@ -1,50 +1,40 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-/**
- * 收入流水：按部门、银行账号手动录入，提款一笔录一笔，不关联订单
- */
+/** 收入流水 v2 */
 @Entity('finance_income_records')
 export class IncomeRecord {
   @PrimaryGeneratedColumn()
   id: number;
 
-  /** 发生日期 */
   @Column({ name: 'occur_date', type: 'date' })
   occurDate: Date;
 
-  /** 金额（元） */
   @Column({ name: 'amount', type: 'decimal', precision: 12, scale: 2 })
   amount: string;
 
-  /** 付款方/来源（选填） */
-  @Column({ name: 'payer', length: 100, default: '' })
-  payer: string;
+  /** 收入类型 ID（finance_income_types.id） */
+  @Column({ name: 'income_type_id', type: 'int', nullable: true })
+  incomeTypeId: number | null;
 
-  /**
-   * 部门 ID（system_options.id，option_type='org_departments'）
-   * 改名后历史展示自动同步
-   */
-  @Column({ name: 'department_id', type: 'int', nullable: true })
-  departmentId: number | null;
+  /** 收款账户 ID（finance_fund_accounts.id） */
+  @Column({ name: 'fund_account_id', type: 'int', nullable: true })
+  fundAccountId: number | null;
 
-  /**
-   * 银行账号 ID（system_options.id，option_type='bank_accounts'）
-   * 对应「目前在哪家银行/哪个账号」
-   */
-  @Column({ name: 'bank_account_id', type: 'int', nullable: true })
-  bankAccountId: number | null;
+  /** 来源方/客户名称（自由文本） */
+  @Column({ name: 'source_name', length: 200, default: '' })
+  sourceName: string;
 
-  /** 备注 */
+  /** 关联订单号（自由文本，兼容非系统订单） */
+  @Column({ name: 'order_no', length: 100, default: '' })
+  orderNo: string;
+
+  /** 经办人 */
+  @Column({ name: 'operator', length: 100, default: '' })
+  operator: string;
+
   @Column({ name: 'remark', length: 500, default: '' })
   remark: string;
 
-  /** 图片/附件 URL 数组（选填） */
   @Column({ name: 'attachments', type: 'json', nullable: true })
   attachments: string[] | null;
 

@@ -201,6 +201,7 @@
               clearable
               class="xiaoman-search-input"
               @keyup.enter="onXiaomanSearch"
+              @clear="onXiaomanClear"
             />
             <el-button type="primary" @click="onXiaomanSearch">搜索</el-button>
           </div>
@@ -486,7 +487,9 @@ async function submit() {
     const payload: Record<string, string | number | null> = {}
     for (const f of CUSTOMER_FIELDS_SORTED) {
       if (f.code === 'contactInfo') {
-        const parts = [form.contactCountryCode, form.contactPhone].map((s) => (s ?? '').trim()).filter(Boolean)
+        const parts = [form.contactCountryCode, form.contactPhone]
+          .map((s) => String(s ?? '').trim())
+          .filter(Boolean)
         payload.contactInfo = parts.length ? parts.join(' ') : ''
       } else if (f.code === 'productGroup') {
         const v = form.productGroup
@@ -554,6 +557,9 @@ async function loadXiaomanList() {
     if (data) {
       xiaomanList.value = data.list ?? []
       xiaomanPagination.total = data.total ?? 0
+    } else {
+      xiaomanList.value = []
+      xiaomanPagination.total = 0
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -563,6 +569,11 @@ async function loadXiaomanList() {
 }
 
 function onXiaomanSearch() {
+  xiaomanPagination.page = 1
+  loadXiaomanList()
+}
+
+function onXiaomanClear() {
   xiaomanPagination.page = 1
   loadXiaomanList()
 }
@@ -604,6 +615,16 @@ watch(
   () => filter.companyName,
   (v) => {
     if (!v || !String(v).trim()) companyNameLabelVisible.value = false
+  },
+)
+
+watch(
+  () => xiaomanKeyword.value,
+  (v, oldV) => {
+    if (oldV && !v) {
+      xiaomanPagination.page = 1
+      loadXiaomanList()
+    }
   },
 )
 

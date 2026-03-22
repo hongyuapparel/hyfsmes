@@ -128,8 +128,8 @@ export class XiaomanService {
       const MAX_FETCH = 5000;
       const PAGE_SIZE_FOR_FETCH = 500;
       let fetched: XiaomanCompanyItem[] = [];
-      // 小满 start_index 按偏移量语义：0, 500, 1000...
-      let startIndex = 0;
+      // 小满 start_index 按页码语义：1, 2, 3...（每页 count 条）
+      let startIndex = 1;
       let totalItem: number | null = null;
       let endedByMaxFetch = false;
       let lastPageListLen = 0;
@@ -188,7 +188,7 @@ export class XiaomanService {
         if (reachedTotal || fetched.length >= MAX_FETCH || r.list.length < PAGE_SIZE_FOR_FETCH) {
           break;
         }
-        startIndex += PAGE_SIZE_FOR_FETCH;
+        startIndex += 1;
       }
 
       // 只有在“看起来已拉完/自然结束”时才缓存，避免缓存不完整后导致后续永远搜不到
@@ -210,8 +210,8 @@ export class XiaomanService {
       return { list: filtered.slice(sliceStart, sliceEnd), total };
     }
 
-    // 无搜索关键词：按偏移量取一页
-    const startIndex = Math.max(0, (page - 1) * pageSize);
+    // 无搜索关键词：start_index 为小满页码（与 count 配套），非偏移量
+    const startIndex = page;
     const url = `${baseUrl}/v1/company/list?count=${pageSize}&start_index=${startIndex}${baseParams}`;
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${token}` },

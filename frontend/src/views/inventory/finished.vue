@@ -1037,7 +1037,7 @@ async function saveProductImage(url: string) {
 
 function sumDetailRowQty(quantities: unknown[]): number {
   if (!Array.isArray(quantities)) return 0
-  return quantities.reduce((sum, q) => sum + (Number(q) || 0), 0)
+  return quantities.reduce<number>((sum, q) => sum + (Number(q) || 0), 0)
 }
 
 const detailDisplayColorSizeRows = computed(() => {

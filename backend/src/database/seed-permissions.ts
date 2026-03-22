@@ -20,6 +20,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_inventory_accessories', name: '辅料库存', routePath: '/inventory/accessories', type: 'menu' },
   { code: 'menu_inventory_fabric', name: '面料库存', routePath: '/inventory/fabric', type: 'menu' },
   { code: 'menu_finance', name: '财务管理', routePath: '/finance', type: 'menu' },
+  { code: 'menu_finance_dashboard', name: '财务看板', routePath: '/finance/dashboard', type: 'menu' },
   { code: 'menu_finance_income', name: '收入流水', routePath: '/finance/income', type: 'menu' },
   { code: 'menu_finance_expense', name: '支出流水', routePath: '/finance/expense', type: 'menu' },
   { code: 'menu_finance_order_sla_report', name: '订单时效', routePath: '/finance/order-sla-report', type: 'menu' },

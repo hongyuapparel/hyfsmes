@@ -354,8 +354,8 @@ import {
   type CuttingQuantityBreakdownRes,
 } from '@/api/production-cutting'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getSupplierList } from '@/api/suppliers'
-import { getEmployeeList } from '@/api/hr'
+import { getSupplierList, type SupplierItem } from '@/api/suppliers'
+import { getEmployeeList, type EmployeeItem } from '@/api/hr'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import {
   ACTIVE_FILTER_COLOR,
@@ -658,7 +658,7 @@ async function submitRegister() {
 async function loadCuttingDepartments() {
   try {
     const res = await getSupplierList({ type: '生产加工厂', page: 1, pageSize: 200 })
-    const list = res.data?.list ?? []
+    const list: SupplierItem[] = res.data?.list ?? []
     const names = list.map((s) => (s.name ?? '').trim()).filter((v) => !!v)
     // 去重 + 排序，且避免和“本厂”重复展示
     const uniq = Array.from(new Set(names)).filter((n) => n !== SELF_DEPARTMENT_LABEL)
@@ -671,7 +671,7 @@ async function loadCuttingDepartments() {
 async function loadCutterOptions() {
   try {
     const res = await getEmployeeList({ status: 'active', page: 1, pageSize: 500 })
-    const list = res.data?.list ?? []
+    const list: EmployeeItem[] = res.data?.list ?? []
     const names = list
       .filter((e) => {
         const dept = (e.departmentName ?? '').trim()

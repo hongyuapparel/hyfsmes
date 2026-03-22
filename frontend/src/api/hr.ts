@@ -39,8 +39,8 @@ export function getEmployeeOne(id: number) {
 export function createEmployee(body: {
   employeeNo?: string
   name: string
-  department?: string
-  jobTitle?: string
+  departmentId?: number | null
+  jobTitleId?: number | null
   entryDate?: string
   contactPhone?: string
   status?: string
@@ -55,8 +55,8 @@ export function updateEmployee(
   body: {
     employeeNo?: string
     name?: string
-    department?: string
-    jobTitle?: string
+    departmentId?: number | null
+    jobTitleId?: number | null
     entryDate?: string
     contactPhone?: string
     status?: string

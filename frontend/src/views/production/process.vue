@@ -377,7 +377,7 @@ async function load() {
   }
 }
 
-function onSearch() {
+function onSearch(_immediate?: boolean) {
   pagination.page = 1
   load()
   void loadTabCounts()

@@ -54,5 +54,4 @@
 ```
 frontend/   # Vue 3 + Vite + Element Plus
 backend/    # NestJS + TypeORM + MySQL
-V0design/   # 设计系统文档
 ```

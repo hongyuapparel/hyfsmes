@@ -1,64 +1,58 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-} from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
-/**
- * 支出流水：能匹配系统环节的关联订单/供应商，匹配不上的直接录入明细
- */
+export type ObjectType = 'supplier' | 'employee' | 'platform' | 'customer' | 'other';
+
+export const OBJECT_TYPE_LABELS: Record<ObjectType, string> = {
+  supplier: '供应商',
+  employee: '员工',
+  platform: '平台',
+  customer: '客户',
+  other: '其他',
+};
+
+/** 支出流水 v2 */
 @Entity('finance_expense_records')
 export class ExpenseRecord {
   @PrimaryGeneratedColumn()
   id: number;
 
-  /** 发生日期 */
   @Column({ name: 'occur_date', type: 'date' })
   occurDate: Date;
 
-  /** 金额（元） */
   @Column({ name: 'amount', type: 'decimal', precision: 12, scale: 2 })
   amount: string;
 
-  /**
-   * 支出类型 ID（system_options.id，option_type='expense_types'）
-   */
+  /** 支出类型 ID（finance_expense_types.id） */
   @Column({ name: 'expense_type_id', type: 'int', nullable: true })
   expenseTypeId: number | null;
 
-  /**
-   * 部门 ID（system_options.id，option_type='org_departments'），可选
-   */
+  /** 支出账户 ID（finance_fund_accounts.id） */
+  @Column({ name: 'fund_account_id', type: 'int', nullable: true })
+  fundAccountId: number | null;
+
+  /** 对象类型：supplier/employee/platform/customer/other */
+  @Column({ name: 'object_type', length: 20, default: '' })
+  objectType: string;
+
+  /** 收款方名称（自由文本） */
+  @Column({ name: 'payee_name', length: 200, default: '' })
+  payeeName: string;
+
+  /** 关联订单号（自由文本，兼容非系统订单） */
+  @Column({ name: 'order_no', length: 100, default: '' })
+  orderNo: string;
+
+  /** 部门 ID（system_options.id，option_type='org_departments'） */
   @Column({ name: 'department_id', type: 'int', nullable: true })
   departmentId: number | null;
 
-  /** 付款账号 ID（system_options.id，option_type='bank_accounts'） */
-  @Column({ name: 'bank_account_id', type: 'int', nullable: true })
-  bankAccountId: number | null;
+  /** 经办人 */
+  @Column({ name: 'operator', length: 100, default: '' })
+  operator: string;
 
-  /** 收款方/对方（选填） */
-  @Column({ name: 'payee', length: 100, default: '' })
-  payee: string;
+  @Column({ name: 'remark', length: 500, default: '' })
+  remark: string;
 
-  /** 款号/外部单号（选填，用于对账/防重复） */
-  @Column({ name: 'style_no', length: 50, default: '' })
-  styleNo: string;
-
-  /** 关联订单 ID（能匹配上系统订单时填写） */
-  @Column({ name: 'order_id', type: 'int', nullable: true })
-  orderId: number | null;
-
-  /** 关联供应商 ID（能匹配上系统供应商时填写） */
-  @Column({ name: 'supplier_id', type: 'int', nullable: true })
-  supplierId: number | null;
-
-  /** 明细/备注（匹配不上的支出在此写清楚） */
-  @Column({ name: 'detail', length: 500, default: '' })
-  detail: string;
-
-  /** 图片/附件 URL 数组（选填） */
   @Column({ name: 'attachments', type: 'json', nullable: true })
   attachments: string[] | null;
 

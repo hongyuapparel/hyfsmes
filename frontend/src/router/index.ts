@@ -157,9 +157,15 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'finance',
         component: RouterViewWrapper,
-        redirect: '/finance/income',
+        redirect: '/finance/dashboard',
         meta: { title: '财务管理', permissionPath: '/finance' },
         children: [
+          {
+            path: 'dashboard',
+            name: 'FinanceDashboard',
+            component: () => import('@/views/finance/dashboard.vue'),
+            meta: { title: '财务看板', permissionPath: '/finance/dashboard' },
+          },
           {
             path: 'income',
             name: 'FinanceIncome',

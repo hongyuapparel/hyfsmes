@@ -226,6 +226,7 @@ export function createAccessory(body: {
   category?: string
   quantity?: number
   unit?: string
+  customerName?: string
   remark?: string
   imageUrl?: string
 }) {
@@ -234,7 +235,15 @@ export function createAccessory(body: {
 
 export function updateAccessory(
   id: number,
-  body: { name?: string; category?: string; quantity?: number; unit?: string; remark?: string; imageUrl?: string }
+  body: {
+    name?: string
+    category?: string
+    quantity?: number
+    unit?: string
+    customerName?: string
+    remark?: string
+    imageUrl?: string
+  }
 ) {
   return request.put<AccessoryItem>(`/inventory/accessories/items/${id}`, body)
 }

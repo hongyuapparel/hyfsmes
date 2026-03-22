@@ -320,7 +320,7 @@ async function openForm(row: SupplierItem | null) {
     form.settlementTime = ''
   }
   formDialog.visible = true
-  if (form.type) await onFormTypeChange()
+  if (form.supplierTypeId != null) await onFormTypeChange()
   else businessScopeOptions.value = []
 }
 
