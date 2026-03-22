@@ -4,9 +4,7 @@ import router from '@/router'
 import { TOKEN_KEY } from '@/constants'
 
 // 开发环境未配置时走 Vite 代理 /api -> 后端，避免 404
-const baseURL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.DEV ? '/api' : '')
+const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
 
 const request = axios.create({
   baseURL,
