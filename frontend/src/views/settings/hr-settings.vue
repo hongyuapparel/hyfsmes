@@ -6,7 +6,10 @@
 
     <div class="settings-body">
       <div class="org-tree-wrap">
-        <h3 class="section-title">部门</h3>
+        <h3 class="section-title">
+          部门
+          <span class="section-subtitle">（{{ deptCount }}）</span>
+        </h3>
         <div class="org-toolbar">
           <el-button type="primary" size="small" @click="openDeptDialog(null)">新增顶级部门</el-button>
           <el-button
@@ -17,34 +20,37 @@
             新增子部门
           </el-button>
         </div>
-        <el-tree
-          v-loading="deptLoading"
-          :data="deptTree"
-          node-key="id"
-          highlight-current
-          default-expand-all
-          :props="{ label: 'label', children: 'children' }"
-          @current-change="onDeptChange"
-        >
-          <template #default="{ data }">
-            <span class="tree-node">
-              <span>{{ data.label }}</span>
-              <span class="tree-node-actions">
-                <el-button link type="primary" size="small" @click.stop="openDeptDialog(data)">
-                  编辑
-                </el-button>
-                <el-button
-                  link
-                  type="danger"
-                  size="small"
-                  @click.stop="removeDept(data)"
-                >
-                  删除
-                </el-button>
+        <div class="dept-panel">
+          <el-tree
+            v-loading="deptLoading"
+            :data="deptTree"
+            node-key="id"
+            highlight-current
+            default-expand-all
+            :props="{ label: 'label', children: 'children' }"
+            class="dept-tree"
+            @current-change="onDeptChange"
+          >
+            <template #default="{ data }">
+              <span class="tree-node">
+                <span class="tree-node-label">{{ data.label }}</span>
+                <span class="tree-node-actions">
+                  <el-button link type="primary" size="small" @click.stop="openDeptDialog(data)">
+                    编辑
+                  </el-button>
+                  <el-button
+                    link
+                    type="danger"
+                    size="small"
+                    @click.stop="removeDept(data)"
+                  >
+                    删除
+                  </el-button>
+                </span>
               </span>
-            </span>
-          </template>
-        </el-tree>
+            </template>
+          </el-tree>
+        </div>
       </div>
 
       <div class="org-jobs-wrap">
@@ -161,6 +167,12 @@ const jobList = ref<JobItem[]>([])
 const deptDialog = reactive({ visible: false, submitting: false, editingId: 0, parentId: null as number | null })
 const deptForm = reactive({ label: '' })
 const deptDialogTitle = computed(() => (deptDialog.editingId ? '编辑部门' : deptDialog.parentId ? '新增子部门' : '新增顶级部门'))
+const deptCount = computed(() => {
+  function count(nodes: DeptTreeNode[]): number {
+    return nodes.reduce((sum, n) => sum + 1 + count(n.children ?? []), 0)
+  }
+  return count(deptTree.value)
+})
 
 const jobDialog = reactive({ visible: false, submitting: false, editingId: 0 })
 const jobForm = reactive({ label: '', description: '' })
@@ -398,7 +410,9 @@ onMounted(() => {
 }
 
 .org-tree-wrap {
-  width: 260px;
+  width: 360px;
+  min-width: 360px;
+  flex: 0 0 360px;
 }
 
 .org-jobs-wrap {
@@ -426,7 +440,31 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  margin-bottom: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+
+.dept-panel {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-base);
+  padding: var(--space-xs);
+  min-height: 420px;
+  max-height: 560px;
+  overflow: auto;
+}
+
+.dept-tree :deep(.el-tree-node__content) {
+  height: 38px;
+  border-radius: 8px;
+  padding-right: 8px;
+}
+
+.dept-tree :deep(.el-tree-node__content:hover) {
+  background: var(--color-bg-subtle, #f5f6f8);
+}
+
+.dept-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background: color-mix(in srgb, var(--el-color-primary) 10%, #fff);
 }
 
 .tree-node {
@@ -434,12 +472,27 @@ onMounted(() => {
   align-items: center;
   justify-content: space-between;
   width: 100%;
+  gap: 8px;
+}
+
+.tree-node-label {
+  font-size: var(--font-size-body);
+  color: var(--color-text-primary);
 }
 
 .tree-node-actions {
   display: flex;
   align-items: center;
   gap: 4px;
+  opacity: 1;
+}
+
+.tree-node-actions :deep(.el-button--primary) {
+  color: var(--el-color-primary);
+}
+
+.tree-node-actions :deep(.el-button--danger) {
+  color: var(--el-color-danger);
 }
 
 .jobs-table {

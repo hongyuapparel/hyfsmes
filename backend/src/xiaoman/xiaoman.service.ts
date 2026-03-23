@@ -41,7 +41,7 @@ export class XiaomanService {
   private token: string | null = null;
   private tokenExpiry = 0;
   private companyListCache: { list: XiaomanCompanyItem[]; fetchedAt: number } | null = null;
-  private companyListCacheTtlMs = 10 * 60 * 1000; // 10 分钟
+  private companyListCacheTtlMs = 5 * 60 * 1000; // 5 分钟
 
   constructor(private config: ConfigService) {}
 
@@ -114,16 +114,18 @@ export class XiaomanService {
     if (hasKeyword) {
       const now = Date.now();
       if (this.companyListCache && now - this.companyListCache.fetchedAt < this.companyListCacheTtlMs) {
+        // eslint-disable-next-line no-console
+        console.log('[xiaoman] using search cache');
         const all = this.companyListCache.list;
         const lower = kw.toLowerCase();
         const filtered = all.filter((c) => this.matchesKeyword(c, lower));
         const total = filtered.length;
         const sliceStart = (page - 1) * pageSize;
         const sliceEnd = sliceStart + pageSize;
-        if (total > 0) {
-          return { list: filtered.slice(sliceStart, sliceEnd), total };
-        }
+        return { list: filtered.slice(sliceStart, sliceEnd), total };
       }
+      // eslint-disable-next-line no-console
+      console.log('[xiaoman] refreshing search cache');
 
       const MAX_FETCH = 5000;
       const PAGE_SIZE_FOR_FETCH = 500;

@@ -8,7 +8,7 @@
       >
         <div class="sidebar-brand">
           <div class="brand-logo">
-            <el-icon :size="24"><Lightning /></el-icon>
+            <img class="brand-logo-image" :src="brandLogoUrl" alt="鸿宇ERP" />
           </div>
           <span v-show="!appStore.sidebarCollapsed" class="brand-name">鸿宇服饰</span>
         </div>
@@ -88,7 +88,6 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   Expand,
   Fold,
-  Lightning,
   HomeFilled,
   UserFilled,
   ShoppingCart,
@@ -107,6 +106,7 @@ import AppTabs from './AppTabs.vue'
 import { menuConfig } from '@/router/menu'
 import { getHealth } from '@/api/health'
 import type { MenuItem } from '@/router/menu'
+import brandLogoUrl from '@/assets/brand-logo.svg'
 
 const route = useRoute()
 const router = useRouter()
@@ -216,12 +216,18 @@ onMounted(async () => {
   height: 32px;
   min-width: 32px;
   border-radius: 8px;
-  background: var(--color-primary);
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--color-white);
   flex-shrink: 0;
+}
+
+.brand-logo-image {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: inherit;
 }
 
 .brand-name {

@@ -5,7 +5,6 @@ export interface OrderStatusItem {
   code: string
   label: string
   sortOrder: number
-  groupKey: string | null
   isFinal: boolean
   enabled: boolean
 }
@@ -45,7 +44,6 @@ export function createOrderStatus(data: {
   code?: string
   label: string
   sortOrder?: number
-  groupKey?: string
   isFinal?: boolean
   enabled?: boolean
 }) {
@@ -54,7 +52,7 @@ export function createOrderStatus(data: {
 
 export function updateOrderStatus(
   id: number,
-  data: Partial<{ code: string; label: string; sortOrder: number; groupKey: string | null; isFinal: boolean; enabled: boolean }>,
+  data: Partial<{ code: string; label: string; sortOrder: number; isFinal: boolean; enabled: boolean }>,
 ) {
   return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}`, data)
 }

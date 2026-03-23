@@ -322,7 +322,6 @@
               >
                 <el-table-column prop="label" label="名称" width="160" />
                 <el-table-column prop="sortOrder" label="排序" width="80" />
-                <el-table-column prop="groupKey" label="分组标记" width="120" />
                 <el-table-column prop="isFinal" label="终态" width="80">
                   <template #default="{ row }">
                     <el-tag v-if="row.isFinal" type="success" size="small">是</el-tag>
@@ -425,9 +424,6 @@
               <el-form-item label="排序">
                 <el-input-number v-model="statusForm.sortOrder" :min="0" :controls="false" style="width: 100%" />
               </el-form-item>
-              <el-form-item label="分组标记">
-                <el-input v-model="statusForm.groupKey" placeholder="可不填，如 before_production / in_production / completed" />
-              </el-form-item>
               <el-form-item label="是否终态">
                 <el-switch v-model="statusForm.isFinal" />
               </el-form-item>
@@ -486,7 +482,7 @@
             width="900px"
             destroy-on-close
           >
-            <p class="section-desc">按顺序配置每一步：从哪个状态、通过什么动作、到哪个状态。若某步「到状态」是待工艺，可填「无工艺时到」：有工艺订单走待工艺，无工艺订单直接到该状态，一条链路即可。</p>
+            <p class="section-desc">按顺序配置每一步：从哪个状态、通过什么动作、到哪个状态。</p>
             <el-form label-width="120px" size="default">
               <el-form-item label="链路名称">
                 <el-input v-model="chainForm.name" placeholder="如：默认主流程" />
@@ -610,22 +606,6 @@
                       style="width: 240px"
                     >
                       <el-option v-for="r in roleOptions" :key="r.code" :label="r.name" :value="r.code" />
-                    </el-select>
-                    <el-select
-                      v-if="normalizeStatusCode(step.toStatusCode) === 'pending_craft'"
-                      v-model="step.elseToStatusCode"
-                      clearable
-                      placeholder="无工艺时到…"
-                      size="small"
-                      style="width: 110px"
-                      title="选填。有工艺走待工艺，无工艺订单直接到此处"
-                    >
-                      <el-option
-                        v-for="s in statusList"
-                        :key="s.id"
-                        :label="s.label"
-                        :value="s.code"
-                      />
                     </el-select>
                     <el-button
                       type="danger"
@@ -798,7 +778,6 @@ const statusDialog = ref<{ visible: boolean; isEdit: boolean; id?: number }>({ v
 const statusForm = ref({
   label: '',
   sortOrder: 0,
-  groupKey: '',
   isFinal: false,
 })
 
@@ -914,8 +893,6 @@ interface ChainStepRow {
   triggerType: string
   triggerCode: string
   allowRoles: string[]
-  /** 选填。有工艺→本步 to 状态，无工艺→直接到此处；不填则本步不区分工艺 */
-  elseToStatusCode: string
 }
 const chainForm = ref<{
   name: string
@@ -929,7 +906,7 @@ const chainForm = ref<{
   orderTypeIds: [],
   collaborationTypeIds: [],
   hasProcessItem: '',
-  steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '', allowRoles: [], elseToStatusCode: '' }],
+  steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '', allowRoles: [] }],
 })
 
 function openChainDialog() {
@@ -938,7 +915,7 @@ function openChainDialog() {
     orderTypeIds: [],
     collaborationTypeIds: [],
     hasProcessItem: '',
-    steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '', allowRoles: [], elseToStatusCode: '' }],
+    steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '', allowRoles: [] }],
   }
   chainEdit.value.id = null
   chainDialog.value.visible = true
@@ -952,7 +929,6 @@ function addChainStep() {
     triggerType: 'button',
     triggerCode: '',
     allowRoles: [],
-    elseToStatusCode: '',
   })
 }
 
@@ -985,35 +961,18 @@ async function submitChain() {
     return Object.keys(base).length ? base : undefined
   }
 
-  const payloadSteps: Array<{
-    fromStatus: string
-    toStatus: string
-    triggerType: string
-    triggerCode: string
-    allowRoles?: string
-    enabled: boolean
-    conditionsJson?: Record<string, unknown>
-  }> = []
-  for (const s of steps) {
-    const base = {
+  const payload = {
+    name: chainForm.value.name?.trim() || undefined,
+    conditionsJson: Object.keys(chainConditions).length ? chainConditions : undefined,
+    steps: steps.map((s) => ({
       fromStatus: s.fromStatusCode,
+      toStatus: s.toStatusCode,
       triggerType: s.triggerType,
       triggerCode: s.triggerCode,
       allowRoles: (s.allowRoles ?? []).filter(Boolean).join(',') || undefined,
       enabled: true,
-    }
-    if (normalizeStatusCode(s.toStatusCode) === 'pending_craft' && s.elseToStatusCode?.trim()) {
-      payloadSteps.push({ ...base, toStatus: s.toStatusCode, conditionsJson: stepConditions(true) })
-      payloadSteps.push({ ...base, toStatus: s.elseToStatusCode.trim(), conditionsJson: stepConditions(false) })
-    } else {
-      payloadSteps.push({ ...base, toStatus: s.toStatusCode, conditionsJson: stepConditions() })
-    }
-  }
-
-  const payload = {
-    name: chainForm.value.name?.trim() || undefined,
-    conditionsJson: Object.keys(chainConditions).length ? chainConditions : undefined,
-    steps: payloadSteps,
+      conditionsJson: stepConditions(),
+    })),
   }
   try {
     if (chainEdit.value.id) {
@@ -1193,48 +1152,16 @@ function openEditChain(row: OrderWorkflowChainWithSteps) {
     orderTypeIds: Array.isArray(conditions.orderTypeIds) ? conditions.orderTypeIds : [],
     collaborationTypeIds: Array.isArray(conditions.collaborationTypeIds) ? conditions.collaborationTypeIds : [],
     hasProcessItem: conditions.hasProcessItem === true ? 'has' : conditions.hasProcessItem === false ? 'none' : '',
-    steps: (() => {
-      const sorted = (row.steps ?? [])
-        .slice()
-        .sort((a, b) => (Number(a.stepOrder ?? 0) - Number(b.stepOrder ?? 0)) || (a.id - b.id))
-      const rows: ChainStepRow[] = []
-      for (let i = 0; i < sorted.length; i++) {
-        const s = sorted[i]
-        const cond = (s.conditionsJson ?? {}) as { hasProcessItem?: boolean }
-        const next = sorted[i + 1]
-        const nextCond = (next?.conditionsJson ?? {}) as { hasProcessItem?: boolean }
-        const sameFromTrigger =
-          next &&
-          s.fromStatus === next.fromStatus &&
-          s.triggerCode === next.triggerCode
-        const isCraftPair =
-          sameFromTrigger &&
-          cond.hasProcessItem === true &&
-          nextCond.hasProcessItem === false &&
-          normalizeStatusCode(s.toStatus) === 'pending_craft'
-        if (isCraftPair) {
-          rows.push({
-            fromStatusCode: normalizeStatusCode(s.fromStatus),
-            toStatusCode: normalizeStatusCode(s.toStatus),
-            triggerType: s.triggerType,
-            triggerCode: normalizeTriggerCode(s.triggerCode),
-            allowRoles: (s.allowRoles ?? '').split(',').map((x) => x.trim()).filter(Boolean),
-            elseToStatusCode: normalizeStatusCode(next.toStatus),
-          })
-          i++
-        } else {
-          rows.push({
-            fromStatusCode: normalizeStatusCode(s.fromStatus),
-            toStatusCode: normalizeStatusCode(s.toStatus),
-            triggerType: s.triggerType,
-            triggerCode: normalizeTriggerCode(s.triggerCode),
-            allowRoles: (s.allowRoles ?? '').split(',').map((x) => x.trim()).filter(Boolean),
-            elseToStatusCode: '',
-          })
-        }
-      }
-      return rows
-    })(),
+    steps: (row.steps ?? [])
+      .slice()
+      .sort((a, b) => (Number(a.stepOrder ?? 0) - Number(b.stepOrder ?? 0)) || (a.id - b.id))
+      .map((s) => ({
+        fromStatusCode: normalizeStatusCode(s.fromStatus),
+        toStatusCode: normalizeStatusCode(s.toStatus),
+        triggerType: s.triggerType,
+        triggerCode: normalizeTriggerCode(s.triggerCode),
+        allowRoles: (s.allowRoles ?? '').split(',').map((x) => x.trim()).filter(Boolean),
+      })),
   }
   chainEdit.value.id = row.chain.id
   chainDialog.value.visible = true
@@ -1301,7 +1228,6 @@ function openCreateStatus() {
   statusForm.value = {
     label: '',
     sortOrder: statusList.value.length,
-    groupKey: '',
     isFinal: false,
   }
 }
@@ -1311,7 +1237,6 @@ function openEditStatus(row: OrderStatusItem) {
   statusForm.value = {
     label: row.label,
     sortOrder: row.sortOrder,
-    groupKey: row.groupKey ?? '',
     isFinal: row.isFinal,
   }
 }
@@ -1320,7 +1245,6 @@ async function submitStatus() {
   const payload = {
     label: statusForm.value.label.trim(),
     sortOrder: statusForm.value.sortOrder,
-    groupKey: statusForm.value.groupKey.trim() || undefined,
     isFinal: statusForm.value.isFinal,
   }
   if (!payload.label) {
@@ -1332,7 +1256,6 @@ async function submitStatus() {
       await updateOrderStatus(statusDialog.value.id, {
         label: payload.label,
         sortOrder: payload.sortOrder,
-        groupKey: payload.groupKey ?? null,
         isFinal: payload.isFinal,
       })
       ElMessage.success('状态已更新')
