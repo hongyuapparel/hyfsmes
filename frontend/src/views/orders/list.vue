@@ -877,8 +877,8 @@ const selectedStatusList = computed(() =>
 const canDeleteSelectedByStatus = computed(() => {
   const statuses = selectedStatusList.value
   if (!statuses.length) return false
-  // 策略未返回时回退旧行为，避免阻断现有操作
-  if (!authStore.user?.orderPolicies?.delete) return true
+  // 未返回策略时默认不放行，避免“配置不一致”导致误显示按钮
+  if (!authStore.user?.orderPolicies?.delete) return false
   const allow = deleteAllowedStatuses.value
   if (!allow.size) return false
   return statuses.every((s) => allow.has(s))
@@ -886,7 +886,7 @@ const canDeleteSelectedByStatus = computed(() => {
 const canReviewSelectedByStatus = computed(() => {
   const statuses = selectedStatusList.value
   if (!statuses.length) return false
-  if (!authStore.user?.orderPolicies?.review) return true
+  if (!authStore.user?.orderPolicies?.review) return false
   const allow = reviewAllowedStatuses.value
   if (!allow.size) return false
   return statuses.every((s) => allow.has(s))
@@ -1429,7 +1429,13 @@ function applyQueryFromRoute() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
+  try {
+    // 强制刷新当前用户权限与订单状态策略，避免旧缓存导致按钮显示不一致
+    await authStore.fetchUser()
+  } catch {
+    // 失败时保持现有行为，由全局鉴权处理登录态
+  }
   applyQueryFromRoute()
   load()
   loadOptions()

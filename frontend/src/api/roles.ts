@@ -26,6 +26,22 @@ export function updateRole(id: number, data: { code?: string; name?: string; sta
   return request.patch(`/roles/${id}`, data)
 }
 
+export function moveRole(id: number, direction: 'up' | 'down') {
+  return request.patch(
+    `/roles/${id}/move`,
+    { direction },
+    {
+      skipGlobalErrorHandler: true,
+    } as any,
+  )
+}
+
+export function reorderRoles(data: { orderedIds: number[] }) {
+  return request.put('/roles/reorder', data, {
+    skipGlobalErrorHandler: true,
+  } as any)
+}
+
 export function deleteRole(id: number) {
   return request.delete(`/roles/${id}`)
 }

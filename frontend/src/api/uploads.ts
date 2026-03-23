@@ -1,6 +1,11 @@
 import request from './request'
 
-const baseURL = import.meta.env.VITE_API_BASE_URL || ''
+/** 后端返回的图片 URL 是静态资源路径（如 /uploads/xxx.jpg），不属于 API 路由，直接使用即可 */
+function normalizeUploadUrl(url: string): string {
+  if (!url) return ''
+  if (url.startsWith('http')) return url
+  return url.startsWith('/') ? url : `/${url}`
+}
 
 /** 上传图片，返回可访问的完整 URL */
 export async function uploadImage(file: File): Promise<string> {
@@ -10,8 +15,7 @@ export async function uploadImage(file: File): Promise<string> {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 30000,
   })
-  const url = res.data?.url ?? ''
-  return url.startsWith('http') ? url : `${baseURL.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`
+  return normalizeUploadUrl(res.data?.url ?? '')
 }
 
 /** 财务凭证/附件上传（收入/支出流水登记时使用） */
@@ -22,8 +26,7 @@ export async function uploadFinanceImage(file: File): Promise<string> {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 30000,
   })
-  const url = res.data?.url ?? ''
-  return url.startsWith('http') ? url : `${baseURL.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`
+  return normalizeUploadUrl(res.data?.url ?? '')
 }
 
 /** 面料出库拍照上传（使用 /inventory/fabric 权限） */
@@ -34,6 +37,5 @@ export async function uploadOutboundImage(file: File): Promise<string> {
     headers: { 'Content-Type': 'multipart/form-data' },
     timeout: 30000,
   })
-  const url = res.data?.url ?? ''
-  return url.startsWith('http') ? url : `${baseURL.replace(/\/$/, '')}${url.startsWith('/') ? '' : '/'}${url}`
+  return normalizeUploadUrl(res.data?.url ?? '')
 }

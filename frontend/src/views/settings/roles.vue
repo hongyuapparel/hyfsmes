@@ -4,17 +4,15 @@
     <div class="toolbar">
       <el-button type="primary" @click="openCreate">新增角色</el-button>
     </div>
-    <el-table :data="list" border stripe>
+    <el-table ref="roleTableRef" :data="list" border stripe row-key="id">
+      <el-table-column label="" width="52">
+        <template #default>
+          <span class="role-drag-handle" title="拖拽排序">::</span>
+        </template>
+      </el-table-column>
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="code" label="编码" width="140" />
       <el-table-column prop="name" label="名称" width="140" />
-      <el-table-column prop="status" label="状态" width="90">
-        <template #default="{ row }">
-          <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
-            {{ row.status === 'active' ? '启用' : '禁用' }}
-          </el-tag>
-        </template>
-      </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
@@ -137,13 +135,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import Sortable from 'sortablejs'
 import {
   getRoles,
   suggestRoleCode,
   createRole,
   updateRole,
+  moveRole,
   deleteRole,
   getRolePermissions,
   setRolePermissions,
@@ -157,6 +157,9 @@ import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-confi
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const list = ref<RoleItem[]>([])
+const roleTableRef = ref()
+let roleSortable: Sortable | null = null
+const roleSortSupported = ref(true)
 const permissions = ref<PermissionItem[]>([])
 const selectedRoleId = ref<number | null>(null)
 const checkedIds = ref<number[]>([])
@@ -397,7 +400,61 @@ async function load() {
   const res = await getRoles()
   list.value = res.data ?? []
   if (list.value.length && !selectedRoleId.value) selectedRoleId.value = list.value[0].id
+  await nextTick()
+  initRoleDragSort()
   await loadRolePermissions()
+}
+
+function initRoleDragSort() {
+  const tableEl = (roleTableRef.value as { $el?: HTMLElement } | undefined)?.$el as HTMLElement | undefined
+  if (!tableEl) return
+  const tbody = tableEl.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
+  if (!tbody) return
+  if (roleSortable) {
+    roleSortable.destroy()
+    roleSortable = null
+  }
+  roleSortable = Sortable.create(tbody, {
+    handle: '.role-drag-handle',
+    animation: 150,
+    ghostClass: 'role-drag-ghost',
+    onEnd(evt) {
+      if (!roleSortSupported.value) {
+        void load()
+        return
+      }
+      if (evt.oldIndex == null || evt.newIndex == null) return
+      if (evt.oldIndex === evt.newIndex) return
+      const next = list.value.slice()
+      const [moved] = next.splice(evt.oldIndex, 1)
+      if (!moved) return
+      next.splice(evt.newIndex, 0, moved)
+      list.value = next
+      void persistRoleOrder(moved.id, evt.oldIndex, evt.newIndex)
+    },
+  })
+}
+
+async function persistRoleOrder(roleId: number, oldIndex: number, newIndex: number) {
+  try {
+    // 兼容后端未提供批量重排接口的情况：按拖拽位移次数调用 move
+    const direction = newIndex > oldIndex ? 'down' : 'up'
+    const steps = Math.abs(newIndex - oldIndex)
+    for (let i = 0; i < steps; i++) {
+      await moveRole(roleId, direction)
+    }
+    await load()
+    ElMessage.success('排序已更新')
+  } catch (e: unknown) {
+    const status = (e as { response?: { status?: number } })?.response?.status
+    if (status === 404) {
+      roleSortSupported.value = false
+      await load()
+      return
+    }
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '排序失败'))
+    await load()
+  }
 }
 
 async function loadPermissions() {
@@ -523,6 +580,13 @@ onMounted(async () => {
   await loadPermissions()
   await load()
 })
+
+onBeforeUnmount(() => {
+  if (roleSortable) {
+    roleSortable.destroy()
+    roleSortable = null
+  }
+})
 </script>
 
 <style scoped>
@@ -543,6 +607,16 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+.role-drag-handle {
+  cursor: move;
+  user-select: none;
+  color: var(--el-text-color-secondary);
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+:deep(.role-drag-ghost > td) {
+  background: var(--el-color-primary-light-9);
 }
 .perm-section {
   margin-top: 12px;

@@ -15,7 +15,7 @@
           <el-button
             size="small"
             :disabled="!currentDept"
-            @click="openDeptDialog(currentDept!)"
+            @click="openAddChildDept()"
           >
             新增子部门
           </el-button>
@@ -256,6 +256,14 @@ function openDeptDialog(node: DeptTreeNode | null) {
     deptDialog.parentId = currentDept.value ? currentDept.value.id : null
     deptForm.label = ''
   }
+  deptDialog.visible = true
+}
+
+function openAddChildDept() {
+  if (!currentDept.value) return
+  deptDialog.editingId = 0
+  deptDialog.parentId = currentDept.value.id
+  deptForm.label = ''
   deptDialog.visible = true
 }
 

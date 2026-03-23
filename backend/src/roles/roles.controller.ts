@@ -67,6 +67,23 @@ export class RolesController {
     });
   }
 
+  @Patch(':id/move')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('/settings/roles')
+  move(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { direction: 'up' | 'down' },
+  ) {
+    return this.rolesService.move(id, body.direction);
+  }
+
+  @Put('reorder')
+  @UseGuards(PermissionGuard)
+  @RequirePermission('/settings/roles')
+  reorder(@Body() body: { orderedIds: number[] }) {
+    return this.rolesService.reorder(body.orderedIds ?? []);
+  }
+
   @Delete(':id')
   @UseGuards(PermissionGuard)
   @RequirePermission('/settings/roles')
