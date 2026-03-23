@@ -479,15 +479,33 @@ export class OrderStatusConfigService {
     ]);
     const allStatuses = await this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
     const statusByCode = new Map(allStatuses.map((s) => [s.code, s]));
-    const phaseDefs = [
-      { code: 'pending_review', key: 'review' },
-      { code: 'pending_purchase', key: 'purchase' },
-      { code: 'pending_pattern', key: 'pattern' },
-      { code: 'pending_cutting', key: 'cutting' },
-      { code: 'pending_craft', key: 'craft' },
-      { code: 'pending_sewing', key: 'sewing' },
-      { code: 'pending_finishing', key: 'finishing' },
-    ] as const;
+    /**
+     * 按状态历史时间轴计算环节窗口：到达时间=首次进入该状态的 entered_at；
+     * 离开时间=时间轴上「下一条记录」的 entered_at（与真实流转顺序一致，不依赖固定环节顺序）。
+     * 若该环节是历史中的最后一段且订单已完成，且无下一条，则用订单完成时间作为离开时间。
+     */
+    const getPhaseWindow = (
+      histSorted: OrderStatusHistory[],
+      phaseCode: string,
+      orderCompletedAt: Date | null,
+    ): { start: Date | null; end: Date | null } => {
+      const timeline = histSorted
+        .map((h) => ({
+          code: String((h as any)?.status?.code ?? '').trim(),
+          enteredAt: h.enteredAt,
+        }))
+        .filter((x) => x.code.length > 0);
+      const idx = timeline.findIndex((t) => t.code === phaseCode);
+      if (idx < 0) return { start: null, end: null };
+      const start = timeline[idx].enteredAt;
+      if (idx + 1 < timeline.length) {
+        return { start, end: timeline[idx + 1].enteredAt };
+      }
+      if (phaseCode === 'pending_finishing' && orderCompletedAt) {
+        return { start, end: orderCompletedAt };
+      }
+      return { start, end: null };
+    };
 
     for (const [, hist] of byOrder) {
       hist.sort((a, b) => a.enteredAt.getTime() - b.enteredAt.getTime());
@@ -521,65 +539,47 @@ export class OrderStatusConfigService {
       const orderTypeId = order?.orderTypeId ?? null;
       const completedAt =
         order?.status === 'completed' && order.statusTime ? order.statusTime.toISOString() : null;
+      const orderCompletedAtDate =
+        order?.status === 'completed' && order.statusTime ? order.statusTime : null;
 
-      const segByCode = new Map<string, OrderStatusHistory>();
-      for (const seg of hist) {
-        const code = String((seg as any)?.status?.code ?? '').trim();
-        if (code && !segByCode.has(code)) segByCode.set(code, seg);
-      }
-
-      const getArrivedAt = (code: string): Date | null => {
-        const seg = segByCode.get(code);
-        return seg?.enteredAt ?? null;
-      };
-      const getLaterArrivedAt = (startIndex: number): Date | null => {
-        for (let i = startIndex + 1; i < phaseDefs.length; i++) {
-          const d = getArrivedAt(phaseDefs[i].code);
-          if (d) return d;
-        }
-        return null;
-      };
-      const getPhaseCompletedAt = (index: number): Date | null => {
-        const phase = phaseDefs[index];
-        if (!phase) return null;
-        if (phase.code === 'pending_finishing') {
-          return completedAt ? new Date(completedAt) : null;
-        }
-        const nextArrived = getArrivedAt(phaseDefs[index + 1]?.code ?? '');
-        if (nextArrived) return nextArrived;
-        return getLaterArrivedAt(index);
-      };
       const toIso = (d: Date | null): string | null => (d ? d.toISOString() : null);
       const getJudge = (phaseCode: string, startAt: Date | null, endAt: Date | null): string => {
         if (!startAt) return '-';
         const phaseStatus = statusByCode.get(phaseCode);
         const limit = phaseStatus ? slaMap.get(phaseStatus.id) ?? null : null;
         if (endAt) {
-          if (limit == null) return '-';
+          if (limit == null) return '未配置时限';
           const hours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
           return hours > limit ? '超期' : '正常';
         }
         return orderStatusCode === phaseCode ? '进行中' : '-';
       };
 
-      const reviewAtDate = getArrivedAt('pending_review');
-      const reviewCompletedAtDate = getPhaseCompletedAt(0);
+      const reviewW = getPhaseWindow(hist, 'pending_review', orderCompletedAtDate);
+      const reviewAtDate = reviewW.start;
+      const reviewCompletedAtDate = reviewW.end;
       const reviewDurationHours =
         reviewAtDate && reviewCompletedAtDate
           ? Math.round(((reviewCompletedAtDate.getTime() - reviewAtDate.getTime()) / (1000 * 60 * 60)) * 100) / 100
           : null;
-      const purchaseArrivedAtDate = getArrivedAt('pending_purchase');
-      const purchaseCompletedAtDate = getPhaseCompletedAt(1);
-      const patternArrivedAtDate = getArrivedAt('pending_pattern');
-      const patternCompletedAtDate = getPhaseCompletedAt(2);
-      const cuttingArrivedAtDate = getArrivedAt('pending_cutting');
-      const cuttingCompletedAtDate = getPhaseCompletedAt(3);
-      const craftArrivedAtDate = getArrivedAt('pending_craft');
-      const craftCompletedAtDate = getPhaseCompletedAt(4);
-      const sewingArrivedAtDate = getArrivedAt('pending_sewing');
-      const sewingCompletedAtDate = getPhaseCompletedAt(5);
-      const finishingArrivedAtDate = getArrivedAt('pending_finishing');
-      const finishingCompletedAtDate = getPhaseCompletedAt(6);
+      const purchaseW = getPhaseWindow(hist, 'pending_purchase', orderCompletedAtDate);
+      const purchaseArrivedAtDate = purchaseW.start;
+      const purchaseCompletedAtDate = purchaseW.end;
+      const patternW = getPhaseWindow(hist, 'pending_pattern', orderCompletedAtDate);
+      const patternArrivedAtDate = patternW.start;
+      const patternCompletedAtDate = patternW.end;
+      const cuttingW = getPhaseWindow(hist, 'pending_cutting', orderCompletedAtDate);
+      const cuttingArrivedAtDate = cuttingW.start;
+      const cuttingCompletedAtDate = cuttingW.end;
+      const craftW = getPhaseWindow(hist, 'pending_craft', orderCompletedAtDate);
+      const craftArrivedAtDate = craftW.start;
+      const craftCompletedAtDate = craftW.end;
+      const sewingW = getPhaseWindow(hist, 'pending_sewing', orderCompletedAtDate);
+      const sewingArrivedAtDate = sewingW.start;
+      const sewingCompletedAtDate = sewingW.end;
+      const finishingW = getPhaseWindow(hist, 'pending_finishing', orderCompletedAtDate);
+      const finishingArrivedAtDate = finishingW.start;
+      const finishingCompletedAtDate = finishingW.end;
 
       // 过滤：按“当前状态”与“当前进入时间”筛选（避免同一订单多段命中导致重复）
       if (params.statusId != null && resolvedStatusId !== params.statusId) continue;

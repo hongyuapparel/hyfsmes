@@ -1,10 +1,9 @@
-import { Column, Entity, Index, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
+import { Column, Entity, PrimaryGeneratedColumn, UpdateDateColumn } from 'typeorm';
 
 /**
  * 订单成本快照（订单成本页填写的物料/工艺/工序明细及利润率，按订单保存一份）
  */
 @Entity('order_cost_snapshots')
-@Index(['orderId'], { unique: true })
 export class OrderCostSnapshot {
   @PrimaryGeneratedColumn()
   id: number;
