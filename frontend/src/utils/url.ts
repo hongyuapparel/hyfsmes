@@ -29,6 +29,9 @@ export function resolveAssetUrl(value: string): string {
   const normalized = url.startsWith('/') ? url : `/${url}`
   const baseUrl = getUploadBaseUrl()
   if (!baseUrl) return normalized
+  if (baseUrl.startsWith('/') && (normalized === baseUrl || normalized.startsWith(`${baseUrl}/`))) {
+    return normalized
+  }
 
   return `${baseUrl}${normalized}`
 }
