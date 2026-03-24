@@ -3,8 +3,15 @@
     <div class="toolbar">
       <el-button type="primary" @click="openCreate">新增用户</el-button>
     </div>
-    <el-table :data="list" border stripe>
-      <el-table-column prop="id" label="ID" width="70" />
+    <el-table ref="tableRef" :data="list" border stripe row-key="id">
+      <el-table-column prop="id" label="ID" width="88">
+        <template #default="{ row }">
+          <span class="id-cell">
+            <span class="option-drag-handle" title="拖拽调整顺序">≡</span>
+            <span>{{ row.id }}</span>
+          </span>
+        </template>
+      </el-table-column>
       <el-table-column prop="username" label="登录账号" width="140" />
       <el-table-column prop="displayName" label="显示名" width="120" />
       <el-table-column label="角色" width="120">
@@ -20,18 +27,20 @@
       <el-table-column prop="lastLoginAt" label="最后登录" width="160">
         <template #default="{ row }">{{ row.lastLoginAt ? formatDate(row.lastLoginAt) : '-' }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column label="操作" min-width="170">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-          <el-button link type="primary" size="small" @click="openResetPwd(row)">重置密码</el-button>
-          <el-button
-            link
-            :type="row.status === 'active' ? 'warning' : 'success'"
-            size="small"
-            @click="toggleStatus(row)"
-          >
-            {{ row.status === 'active' ? '禁用' : '启用' }}
-          </el-button>
+          <div class="op-cell">
+            <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
+            <el-button link type="primary" size="small" @click="openResetPwd(row)">重置密码</el-button>
+            <el-button
+              link
+              :type="row.status === 'active' ? 'warning' : 'success'"
+              size="small"
+              @click="toggleStatus(row)"
+            >
+              {{ row.status === 'active' ? '禁用' : '启用' }}
+            </el-button>
+          </div>
         </template>
       </el-table-column>
     </el-table>
@@ -74,8 +83,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import Sortable from 'sortablejs'
 import { getUsers, createUser, updateUser, resetUserPassword, type UserItem } from '@/api/users'
 import { getRoles, type RoleItem } from '@/api/roles'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -90,6 +100,8 @@ const editId = ref(0)
 const formRef = ref<FormInstance>()
 const submitLoading = ref(false)
 const pwdLoading = ref(false)
+const tableRef = ref<{ $el?: HTMLElement }>()
+let rowSortable: Sortable | null = null
 
 const form = ref({ username: '', password: '', displayName: '', roleId: 0 })
 const rules: FormRules = {
@@ -107,6 +119,33 @@ async function load() {
   list.value = u.data ?? []
   roles.value = r.data ?? []
   if (roles.value.length && !form.value.roleId) form.value.roleId = roles.value[0].id
+  await nextTick()
+  initRowDrag()
+}
+
+function initRowDrag() {
+  const tableEl = tableRef.value?.$el
+  if (!tableEl) return
+  const tbody = tableEl.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
+  if (!tbody) return
+  if (rowSortable) {
+    rowSortable.destroy()
+    rowSortable = null
+  }
+  rowSortable = Sortable.create(tbody, {
+    handle: '.option-drag-handle',
+    animation: 150,
+    ghostClass: 'option-drag-ghost',
+    onEnd(evt) {
+      if (evt.oldIndex == null || evt.newIndex == null) return
+      if (evt.oldIndex === evt.newIndex) return
+      const rows = list.value.slice()
+      const [moved] = rows.splice(evt.oldIndex, 1)
+      if (!moved) return
+      rows.splice(evt.newIndex, 0, moved)
+      list.value = rows
+    },
+  })
 }
 
 function openCreate() {
@@ -196,6 +235,12 @@ async function toggleStatus(row: UserItem) {
 }
 
 onMounted(load)
+onBeforeUnmount(() => {
+  if (rowSortable) {
+    rowSortable.destroy()
+    rowSortable = null
+  }
+})
 </script>
 
 <style scoped>
@@ -206,5 +251,33 @@ onMounted(load)
 }
 .toolbar {
   margin-bottom: 16px;
+}
+.id-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.option-drag-handle {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  line-height: 18px;
+  text-align: center;
+  cursor: grab;
+  user-select: none;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+.option-drag-handle:active {
+  cursor: grabbing;
+}
+.option-drag-ghost {
+  opacity: 0.6;
+}
+.op-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  white-space: nowrap;
 }
 </style>

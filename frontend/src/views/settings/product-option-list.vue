@@ -7,21 +7,26 @@
       {{ hideTopLevelButton ? '暂无配置' : '暂无配置，点击「添加顶级分组」新增' }}
     </div>
     <el-table
+      ref="optionTableRef"
       v-else
       :data="treeData"
       row-key="id"
       border
-      default-expand-all
       :tree-props="{ children: 'children' }"
       class="option-table"
     >
-      <el-table-column prop="value" label="分组名称" min-width="200" />
-      <el-table-column label="操作" width="320" fixed="right">
+      <el-table-column label="分组名称" min-width="240">
+        <template #default="{ row }">
+          <span class="option-name-cell">
+            <span class="option-drag-handle" title="拖拽调整顺序">≡</span>
+            <span>{{ row.value }}</span>
+          </span>
+        </template>
+      </el-table-column>
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
           <el-button link type="primary" size="small" @click="openAdd(row.id)">新建下级分组</el-button>
-          <el-button link size="small" :disabled="!canMoveUp(row)" @click="moveRow(row, -1)">上移</el-button>
-          <el-button link size="small" :disabled="!canMoveDown(row)" @click="moveRow(row, 1)">下移</el-button>
           <el-tooltip content="删除" placement="top">
           <el-button link type="danger" size="small" circle @click="remove(row)">
             <el-icon><Delete /></el-icon>
@@ -46,8 +51,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue'
+import { ref, watch, computed, nextTick, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import Sortable from 'sortablejs'
 import {
   getSystemOptionsTree,
   createSystemOption,
@@ -76,13 +82,21 @@ const editId = ref(0)
 const parentId = ref<number | null>(null)
 const form = ref({ value: '' })
 const submitLoading = ref(false)
+const optionTableRef = ref<{ $el?: HTMLElement }>()
+let optionSortable: Sortable | null = null
 
 async function load() {
   try {
     const res = await getSystemOptionsTree(props.type)
     treeData.value = res.data ?? []
+    await nextTick()
+    initDragSort()
   } catch {
     treeData.value = []
+    if (optionSortable) {
+      optionSortable.destroy()
+      optionSortable = null
+    }
   }
 }
 
@@ -107,16 +121,76 @@ function getSiblings(node: SystemOptionTreeNode, tree: SystemOptionTreeNode[]): 
   return collect(tree).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
 }
 
-function canMoveUp(node: SystemOptionTreeNode): boolean {
-  const siblings = getSiblings(node, treeData.value)
-  const idx = siblings.findIndex((s) => s.id === node.id)
-  return idx > 0
+/** 将树按表格展示顺序平铺（default-expand-all） */
+function flattenVisibleRows(nodes: SystemOptionTreeNode[]): SystemOptionTreeNode[] {
+  const out: SystemOptionTreeNode[] = []
+  const walk = (list: SystemOptionTreeNode[]) => {
+    for (const n of list) {
+      out.push(n)
+      if (n.children?.length) walk(n.children)
+    }
+  }
+  walk(nodes)
+  return out
 }
 
-function canMoveDown(node: SystemOptionTreeNode): boolean {
-  const siblings = getSiblings(node, treeData.value)
-  const idx = siblings.findIndex((s) => s.id === node.id)
-  return idx >= 0 && idx < siblings.length - 1
+function initDragSort() {
+  const tableEl = optionTableRef.value?.$el
+  if (!tableEl) return
+  const tbody = tableEl.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
+  if (!tbody) return
+
+  if (optionSortable) {
+    optionSortable.destroy()
+    optionSortable = null
+  }
+
+  optionSortable = Sortable.create(tbody, {
+    handle: '.option-drag-handle',
+    animation: 150,
+    ghostClass: 'option-drag-ghost',
+    onEnd(evt) {
+      if (evt.oldIndex == null || evt.newIndex == null) return
+      if (evt.oldIndex === evt.newIndex) return
+      void handleDragEnd(evt.oldIndex, evt.newIndex)
+    },
+  })
+}
+
+async function handleDragEnd(oldIndex: number, newIndex: number) {
+  const visibleRows = flattenVisibleRows(treeData.value)
+  const moved = visibleRows[oldIndex]
+  const target = visibleRows[newIndex]
+  if (!moved || !target) return
+
+  const movedParentId = moved.parentId ?? null
+  const targetParentId = target.parentId ?? null
+  if (movedParentId !== targetParentId) {
+    ElMessage.warning('仅支持同级分组内拖拽排序')
+    await load()
+    return
+  }
+
+  const siblings = getSiblings(moved, treeData.value)
+  const oldSiblingIdx = siblings.findIndex((s) => s.id === moved.id)
+  const newSiblingIdx = siblings.findIndex((s) => s.id === target.id)
+  if (oldSiblingIdx < 0 || newSiblingIdx < 0 || oldSiblingIdx === newSiblingIdx) {
+    await load()
+    return
+  }
+
+  const reordered = [...siblings]
+  const [node] = reordered.splice(oldSiblingIdx, 1)
+  reordered.splice(newSiblingIdx, 0, node)
+  const items = reordered.map((n, i) => ({ id: n.id, sort_order: i }))
+  try {
+    await batchUpdateSystemOptionOrder(props.type, movedParentId, items)
+    ElMessage.success('已保存排序')
+    await load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    await load()
+  }
 }
 
 function openAdd(pid: number | null) {
@@ -189,26 +263,12 @@ async function remove(node: SystemOptionTreeNode) {
   }
 }
 
-async function moveRow(node: SystemOptionTreeNode, delta: number) {
-  const siblings = getSiblings(node, treeData.value)
-  const idx = siblings.findIndex((s) => s.id === node.id)
-  if (idx < 0) return
-  const newIdx = idx + delta
-  if (newIdx < 0 || newIdx >= siblings.length) return
-  const arr = [...siblings]
-  ;[arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]]
-  const items = arr.map((n, i) => ({ id: n.id, sort_order: i }))
-  try {
-    await batchUpdateSystemOptionOrder(
-      props.type,
-      node.parentId ?? null,
-      items,
-    )
-    load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+onBeforeUnmount(() => {
+  if (optionSortable) {
+    optionSortable.destroy()
+    optionSortable = null
   }
-}
+})
 </script>
 
 <style scoped>
@@ -225,5 +285,26 @@ async function moveRow(node: SystemOptionTreeNode, delta: number) {
 }
 .option-table {
   margin-top: var(--space-xs);
+}
+.option-drag-handle {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  cursor: grab;
+  user-select: none;
+  color: var(--el-text-color-secondary);
+}
+.option-name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.option-drag-handle:active {
+  cursor: grabbing;
+}
+.option-drag-ghost {
+  opacity: 0.6;
 }
 </style>

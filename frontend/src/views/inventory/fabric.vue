@@ -55,12 +55,12 @@
           class="fabric-table"
           @header-dragend="onFabricStockHeaderDragEnd"
         >
-          <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="quantity" label="数量" width="100" align="right" />
-          <el-table-column prop="unit" label="单位" width="70" align="center" />
-          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
-          <el-table-column label="图片" width="90" align="center">
+          <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="quantity" label="数量" width="100" align="center" header-align="center" />
+          <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
               <el-image
                 v-if="row.imageUrl"
@@ -73,10 +73,10 @@
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
-          <el-table-column prop="createdAt" label="创建时间" width="160" align="center">
+          <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="160" align="center" fixed="right">
+          <el-table-column label="操作" width="160" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
               <el-button link type="warning" size="small" @click="openOutboundDialog(row)">出库</el-button>
@@ -133,14 +133,14 @@
           class="fabric-table"
           @header-dragend="onFabricOutboundHeaderDragEnd"
         >
-          <el-table-column prop="createdAt" label="时间" width="160" align="center" />
-          <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip />
-          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
-          <el-table-column label="出库数量" width="110" align="right">
+          <el-table-column prop="createdAt" label="时间" width="160" align="center" header-align="center" />
+          <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="出库数量" width="110" align="center" header-align="center">
             <template #default="{ row }">{{ row.quantity }} {{ row.unit }}</template>
           </el-table-column>
-          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip />
-          <el-table-column label="照片" width="90" align="center">
+          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="照片" width="90" align="center" header-align="center">
             <template #default="{ row }">
               <el-image
                 v-if="row.photoUrl"

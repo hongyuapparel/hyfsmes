@@ -1,7 +1,6 @@
 <template>
   <div class="main-layout">
     <div class="layout-body">
-      <!-- 左侧整体：顶条品牌区 + 侧边栏菜单，同步收起/展开 -->
       <div
         class="sidebar-wrapper"
         :class="{ collapsed: appStore.sidebarCollapsed }"
@@ -52,7 +51,7 @@
           </template>
         </el-menu>
       </div>
-      <!-- 右侧：顶条 + 主内容 -->
+
       <div class="content-wrapper">
         <header class="layout-header">
           <div class="header-left-section">
@@ -143,11 +142,6 @@ const allowedMenus = computed(() => {
     .filter(Boolean) as MenuItem[]
 })
 
-const pageTitle = computed(() => {
-  const t = route.meta?.title as string
-  return t || 'ERP 后台'
-})
-
 const activeMenu = computed(() => route.path)
 
 function handleLogout() {
@@ -177,7 +171,6 @@ onMounted(async () => {
   overflow: hidden;
 }
 
-/* 左侧整体：品牌区 + 菜单，同步收起/展开，无卡顿 */
 .sidebar-wrapper {
   width: 220px;
   flex-shrink: 0;
@@ -185,7 +178,6 @@ onMounted(async () => {
   flex-direction: column;
   background: #071327;
   color: var(--color-white);
-  flex-shrink: 0;
   transition: width 0.2s ease;
   border-right: 1px solid rgba(0, 0, 0, 0.08);
   box-shadow: 1px 0 4px rgba(0, 0, 0, 0.04);
@@ -239,7 +231,6 @@ onMounted(async () => {
   text-overflow: ellipsis;
 }
 
-/* 右侧：顶条 + 主内容 */
 .content-wrapper {
   flex: 1;
   display: flex;
@@ -280,12 +271,6 @@ onMounted(async () => {
   background-color: transparent;
 }
 
-.page-title {
-  font-size: var(--font-size-title);
-  font-weight: 600;
-  color: var(--color-text);
-}
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -303,7 +288,6 @@ onMounted(async () => {
   overflow: auto;
 }
 
-/* 侧边菜单：紧凑布局、小圆角 */
 .sidebar-wrapper :deep(.el-menu) {
   background-color: transparent;
   border-right: none;
@@ -314,7 +298,6 @@ onMounted(async () => {
   scrollbar-color: rgba(255, 255, 255, 0.12) transparent;
 }
 
-/* 滚动条：与深色侧边栏融合，不突兀（遵守设计系统冷色调） */
 .sidebar-wrapper :deep(.el-menu)::-webkit-scrollbar {
   width: 4px;
 }
@@ -399,16 +382,17 @@ onMounted(async () => {
 }
 </style>
 
-<!-- 打印时只保留主内容区，不打印侧栏与顶栏 -->
 <style>
 @media print {
   .main-layout .sidebar-wrapper,
   .main-layout .layout-header {
     display: none;
   }
+
   .main-layout .content-wrapper {
     width: 100%;
   }
+
   .main-layout .layout-main {
     padding: 0;
     overflow: visible;

@@ -21,7 +21,6 @@
         <template v-if="props.compact">
           <div class="preview-actions preview-actions-compact">
             <el-button
-              circle
               class="compact-delete-btn"
               size="small"
               :disabled="uploading"
@@ -225,7 +224,13 @@ function clear() {
 }
 
 .compact-delete-btn {
-  border: none;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0;
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  border-radius: 999px;
   color: #fff;
   background: rgba(31, 41, 55, 0.52);
 }

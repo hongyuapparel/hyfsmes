@@ -2,16 +2,30 @@
   <div class="page-card finance-page">
     <!-- 筛选栏 -->
     <div class="filter-bar">
-      <el-date-picker v-model="filter.dateFrom" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" clearable class="filter-item" />
-      <el-date-picker v-model="filter.dateTo" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" clearable class="filter-item" />
-      <el-select v-model="filter.expenseTypeId" placeholder="支出类型" clearable filterable class="filter-item filter-select">
+      <el-date-picker
+        v-model="filter.occurDateRange"
+        type="daterange"
+        range-separator=""
+        start-placeholder="支出日期"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        class="filter-item filter-range"
+        :class="{ 'range-single': !hasDateRangeValue(filter.occurDateRange) }"
+        :style="getFinanceRangeStyle(filter.occurDateRange)"
+        @change="onSearch"
+        @clear="onDateRangeClear"
+      />
+      <el-select v-model="filter.expenseTypeId" placeholder="支出类型" clearable filterable class="filter-item filter-select" @change="onSearch">
         <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
       </el-select>
-      <el-select v-model="filter.fundAccountId" placeholder="支出账户" clearable filterable class="filter-item filter-select">
+      <el-select v-model="filter.fundAccountId" placeholder="支出账户" clearable filterable class="filter-item filter-select" @change="onSearch">
         <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
       </el-select>
-      <el-input v-model="filter.payeeKeyword" placeholder="收款方关键词" clearable class="filter-item" style="width:150px" />
-      <el-input v-model="filter.orderNo" placeholder="订单号" clearable class="filter-item" style="width:140px" />
+      <el-input v-model="filter.payeeKeyword" placeholder="收款方关键词" clearable class="filter-item" style="width:150px" @clear="onSearch" @keyup.enter="onSearch" />
+      <el-input v-model="filter.orderNo" placeholder="订单号" clearable class="filter-item" style="width:140px" @clear="onSearch" @keyup.enter="onSearch" />
       <div class="filter-actions">
         <el-button type="primary" @click="onSearch">查询</el-button>
         <el-button @click="onReset">清空</el-button>
@@ -146,6 +160,8 @@ import {
   type ExpenseRecordItem, type FinanceFundAccount, type FinanceExpenseType,
 } from '@/api/finance'
 import { uploadFinanceImage } from '@/api/uploads'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
+import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
@@ -155,8 +171,10 @@ const options = reactive<{ expenseTypes: FinanceExpenseType[]; fundAccounts: Fin
 })
 const departments = ref<SystemOptionItem[]>([])
 
+type DateRangeValue = [string, string] | null
+
 const filter = reactive({
-  dateFrom: '', dateTo: '',
+  occurDateRange: null as DateRangeValue,
   expenseTypeId: null as number | null,
   fundAccountId: null as number | null,
   payeeKeyword: '', orderNo: '',
@@ -200,12 +218,26 @@ function objectTypeLabel(v: string) {
   return OBJECT_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? (v || '—')
 }
 
+function hasDateRangeValue(v: DateRangeValue | undefined) {
+  return Array.isArray(v) && v.length === 2
+}
+
+function getFinanceRangeStyle(v: DateRangeValue | undefined) {
+  const hasValue = hasDateRangeValue(v)
+  if (hasValue) return getFilterRangeStyle(v)
+  return {
+    width: '170px',
+    flex: '0 0 170px',
+  }
+}
+
 async function load() {
   loading.value = true
   try {
+    const [dateFrom, dateTo] = hasDateRangeValue(filter.occurDateRange) ? filter.occurDateRange : []
     const res = await getExpenseList({
-      dateFrom: filter.dateFrom || undefined,
-      dateTo: filter.dateTo || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
       expenseTypeId: filter.expenseTypeId ?? undefined,
       fundAccountId: filter.fundAccountId ?? undefined,
       payeeKeyword: filter.payeeKeyword || undefined,
@@ -227,8 +259,12 @@ async function load() {
 }
 
 function onSearch() { pagination.page = 1; load() }
+function onDateRangeClear() {
+  filter.occurDateRange = null
+  onSearch()
+}
 function onReset() {
-  filter.dateFrom = ''; filter.dateTo = ''
+  filter.occurDateRange = null
   filter.expenseTypeId = null; filter.fundAccountId = null
   filter.payeeKeyword = ''; filter.orderNo = ''
   pagination.page = 1; load()
@@ -330,6 +366,7 @@ onMounted(async () => {
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); padding: var(--space-sm); background: var(--color-bg-subtle, #f5f6f8); border-radius: var(--radius-lg); }
 .filter-item { width: 150px; }
+.filter-range { min-width: 140px; }
 .filter-select { min-width: 120px; }
 .filter-actions { margin-left: auto; display: flex; gap: var(--space-sm); }
 .summary-bar { padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: 13px; color: #c2410c; margin-bottom: var(--space-sm); }
@@ -345,4 +382,8 @@ onMounted(async () => {
 .attachment-del { position: absolute; top: 2px; right: 2px; padding: 0 4px; background: rgba(0,0,0,.45); color: #fff; border-radius: 2px; }
 .preview-grid { display: flex; flex-wrap: wrap; gap: 12px; }
 .preview-img { width: 180px; height: 180px; border-radius: 6px; border: 1px solid var(--color-border); cursor: zoom-in; }
+.range-single.el-date-editor--daterange :deep(.el-range-separator) { display: none; }
+.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) { display: none; }
+.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) { width: 100%; }
+.range-single.el-date-editor--daterange :deep(.el-range__close-icon) { margin-left: 0; }
 </style>

@@ -111,10 +111,10 @@
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="48" align="center" />
-          <el-table-column prop="createdAt" label="入库时间" width="160" align="center" />
-          <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip />
-          <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
-          <el-table-column label="图片" width="90" align="center">
+          <el-table-column prop="createdAt" label="入库时间" width="160" align="center" header-align="center" />
+          <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
               <el-image
                 v-if="row.imageUrl"
@@ -127,7 +127,7 @@
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
-          <el-table-column label="数量" width="90" align="right">
+          <el-table-column label="数量" width="90" align="center" header-align="center">
             <template #default="{ row }">
               <el-tooltip
                 placement="top"
@@ -183,29 +183,29 @@
               </el-tooltip>
             </template>
           </el-table-column>
-          <el-table-column label="出厂价" width="100" align="right">
+          <el-table-column label="出厂价" width="100" align="center" header-align="center">
             <template #default="{ row }">
               {{ formatPrice(row.unitPrice) }}
             </template>
           </el-table-column>
-          <el-table-column label="总价" width="100" align="right">
+          <el-table-column label="总价" width="100" align="center" header-align="center">
             <template #default="{ row }">
               {{ formatTotalPrice(row.quantity, row.unitPrice) }}
             </template>
           </el-table-column>
-          <el-table-column prop="department" label="部门" min-width="90" show-overflow-tooltip />
-          <el-table-column label="库存类型" min-width="100" show-overflow-tooltip>
+          <el-table-column prop="department" label="部门" min-width="90" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="库存类型" min-width="100" show-overflow-tooltip align="center" header-align="center">
             <template #default="{ row }">
               {{ findInventoryTypeLabelById(row.inventoryTypeId) || '-' }}
             </template>
           </el-table-column>
-          <el-table-column label="仓库" min-width="90" show-overflow-tooltip>
+          <el-table-column label="仓库" min-width="90" show-overflow-tooltip align="center" header-align="center">
             <template #default="{ row }">
               {{ findWarehouseLabelById(row.warehouseId) || '-' }}
             </template>
           </el-table-column>
-          <el-table-column prop="location" label="存放地址" min-width="120" show-overflow-tooltip />
-          <el-table-column label="操作" width="88" align="center" fixed="right">
+          <el-table-column prop="location" label="存放地址" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="操作" width="88" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
             </template>
@@ -512,9 +512,37 @@
                 </div>
                 <div class="detail-basic-label">SKU</div>
                 <div class="detail-basic-value">
-                  <el-input v-model="createForm.skuCode" placeholder="请输入SKU编号" clearable size="small" />
+                  <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small">
+                    <template #suffix>
+                      <el-button
+                        link
+                        type="primary"
+                        size="small"
+                        @click.stop="openCreateSkuDialog"
+                      >
+                        选择
+                      </el-button>
+                    </template>
+                  </el-input>
                 </div>
 
+                <div class="detail-basic-label">部门</div>
+                <div class="detail-basic-value">
+                  <el-select
+                    v-model="createForm.department"
+                    placeholder="请选择部门"
+                    filterable
+                    clearable
+                    size="small"
+                  >
+                    <el-option
+                      v-for="opt in departmentOptions"
+                      :key="opt.value"
+                      :label="opt.label"
+                      :value="opt.value"
+                    />
+                  </el-select>
+                </div>
                 <div class="detail-basic-label">库存类型</div>
                 <div class="detail-basic-value">
                   <el-select
@@ -550,33 +578,8 @@
                   </el-select>
                 </div>
 
-                <div class="detail-basic-label">部门</div>
-                <div class="detail-basic-value">
-                  <el-select
-                    v-model="createForm.department"
-                    placeholder="请选择部门"
-                    filterable
-                    clearable
-                    size="small"
-                  >
-                    <el-option
-                      v-for="opt in departmentOptions"
-                      :key="opt.value"
-                      :label="opt.label"
-                      :value="opt.value"
-                    />
-                  </el-select>
-                </div>
-                <div class="detail-basic-label">出厂价</div>
-                <div class="detail-basic-value">
-                  <el-input v-model="createForm.unitPrice" placeholder="请输入出厂价" clearable size="small" />
-                </div>
-
-                <div class="detail-basic-label">总价</div>
-                <div class="detail-basic-value">{{ createTotalPriceDisplay }}</div>
-
                 <div class="detail-basic-label">存放地址</div>
-                <div class="detail-basic-value detail-basic-value-span-3">
+                <div class="detail-basic-value">
                   <el-input v-model="createForm.location" placeholder="请输入具体存放地址" clearable size="small" />
                 </div>
 
@@ -594,15 +597,28 @@
           </div>
 
           <div class="detail-section">
-            <div class="detail-section-title">颜色图片与码数明细</div>
+            <div class="detail-section-head">
+              <div class="detail-section-title">颜色图片与码数明细</div>
+              <div class="detail-head-actions">
+                <el-button type="primary" link size="small" @click="addCreateColorRow">+ 新增颜色</el-button>
+                <el-button type="primary" link size="small" @click="addCreateSizeColumn">+ 新增尺码列</el-button>
+              </div>
+            </div>
             <div class="create-size-table-wrap">
-              <el-table :data="createSizeTableRows" border size="small" class="create-size-table detail-color-size-table">
-                <el-table-column label="颜色" min-width="96" align="center" header-align="center">
+              <el-table
+                :data="createSizeTableRows"
+                border
+                size="small"
+                class="create-size-table detail-color-size-table"
+                show-summary
+                :summary-method="getCreateColorSizeSummary"
+              >
+                <el-table-column label="颜色" width="88" align="center" header-align="center">
                   <template #default="{ row }">
                     <el-input v-model="row.colorName" placeholder="颜色" clearable size="small" />
                   </template>
                 </el-table-column>
-                <el-table-column label="颜色图片" min-width="120" align="center" header-align="center">
+                <el-table-column label="颜色图片" width="122" align="center" header-align="center">
                   <template #default="{ row }">
                     <ImageUploadArea v-model="row.imageUrl" compact />
                   </template>
@@ -610,7 +626,7 @@
                 <el-table-column
                   v-for="(size, idx) in createSizeHeaders"
                   :key="`create-size-${idx}`"
-                  min-width="96"
+                  min-width="64"
                   align="center"
                   header-align="center"
                 >
@@ -634,41 +650,48 @@
                       </el-button>
                     </div>
                   </template>
-                  <template #default>
+                  <template #default="{ row }">
                     <el-input-number
-                      v-model="createSizeTableRows[0].quantities[idx]"
+                      v-model="row.quantities[idx]"
                       :min="0"
                       :precision="0"
-                      controls-position="right"
+                      :controls="false"
                       size="small"
                       style="width: 100%"
                     />
                   </template>
                 </el-table-column>
-                <el-table-column label="合计" min-width="88" align="center" header-align="center">
+                <el-table-column label="合计" width="72" align="center" header-align="center">
                   <template #default="{ row }">{{ sumDetailRowQty(row.quantities) }}</template>
                 </el-table-column>
-                <el-table-column label="操作" width="70" align="center" header-align="center">
+                <el-table-column label="出厂价" width="88" align="center" header-align="center">
+                  <template #default>
+                    <el-input
+                      v-model="createForm.unitPrice"
+                      placeholder="请输入"
+                      clearable
+                      size="small"
+                    />
+                  </template>
+                </el-table-column>
+                <el-table-column label="总价" width="120" align="center" header-align="center">
+                  <template #default="{ row }">{{ createRowTotalPrice(row.quantities) }}</template>
+                </el-table-column>
+                <el-table-column label="操作" width="48" align="center" header-align="center">
                   <template #default="{ $index }">
                     <el-button
                       v-if="createSizeTableRows.length > 1"
                       type="danger"
                       link
                       size="small"
+                      class="create-row-remove-btn"
                       @click="removeCreateColorRow($index)"
                     >
-                      删除
+                      <el-icon><Delete /></el-icon>
                     </el-button>
                   </template>
                 </el-table-column>
               </el-table>
-              <div class="create-size-footer">
-                <div>
-                  <el-button type="primary" link size="small" @click="addCreateColorRow">+ 新增颜色</el-button>
-                  <el-button type="primary" link size="small" @click="addCreateSizeColumn">+ 新增尺码列</el-button>
-                </div>
-                <span class="create-size-total">总件数：{{ sizeTotalQuantity }}</span>
-              </div>
             </div>
           </div>
         </div>
@@ -681,14 +704,65 @@
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="createSkuDialogVisible"
+      title="选择 SKU"
+      width="760px"
+      destroy-on-close
+    >
+      <el-input
+        v-model="createSkuKeyword"
+        placeholder="输入 SKU 或客户搜索"
+        clearable
+        style="max-width: 320px; margin-bottom: 10px"
+      />
+      <el-table
+        v-loading="createSkuDialogLoading"
+        :data="filteredCreateSkuProducts"
+        border
+        stripe
+        height="420"
+      >
+        <el-table-column label="图片" width="90" align="center">
+          <template #default="{ row }">
+            <el-image
+              v-if="row.imageUrl"
+              :src="row.imageUrl"
+              fit="cover"
+              style="width: 56px; height: 56px; border-radius: 6px"
+              :preview-src-list="[row.imageUrl]"
+              preview-teleported
+            />
+            <span v-else class="text-placeholder">-</span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="skuCode" label="SKU 编号" min-width="160" />
+        <el-table-column label="客户" min-width="180">
+          <template #default="{ row }">
+            {{ row.customer?.companyName || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="productGroup" label="产品分组" min-width="180" show-overflow-tooltip />
+        <el-table-column label="操作" width="90" align="center" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="onSelectCreateSku(row)">选择</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <template #footer>
+        <el-button @click="createSkuDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <el-drawer
       v-model="detailDrawer.visible"
       title="库存详情"
-      size="960px"
+      :size="`${detailDrawerWidth}px`"
       destroy-on-close
       :with-header="true"
       class="finished-detail-drawer"
     >
+      <div class="detail-drawer-resizer" title="拖拽调整宽度" @mousedown="startResizeDetailDrawer" />
       <div v-loading="detailDrawer.loading" class="detail-wrap">
         <div v-if="detailDrawer.data" class="detail-sections">
           <div class="detail-top-row">
@@ -736,16 +810,9 @@
 
                   <div class="detail-basic-label">SKU</div>
                   <div class="detail-basic-value">{{ detailDrawer.data.stock.skuCode }}</div>
-                  <div class="detail-basic-label">数量</div>
-                  <div class="detail-basic-value">{{ detailDrawer.data.stock.quantity }}</div>
-
-                  <div class="detail-basic-label">出厂价</div>
-                  <div class="detail-basic-value">{{ formatPrice(detailDrawer.data.stock.unitPrice) }}</div>
-                  <div class="detail-basic-label">总价</div>
-                  <div class="detail-basic-value">{{ formatTotalPrice(detailDrawer.data.stock.quantity, detailDrawer.data.stock.unitPrice) }}</div>
-
                   <div class="detail-basic-label">客户</div>
                   <div class="detail-basic-value">{{ detailDrawer.data.stock.customerName || '-' }}</div>
+
                   <div class="detail-basic-label">库存类型</div>
                   <div class="detail-basic-value">
                     <el-select
@@ -788,7 +855,7 @@
                   </div>
 
                   <div class="detail-basic-label">存放地址</div>
-                  <div class="detail-basic-value detail-basic-value-span-3">
+                  <div class="detail-basic-value">
                     <el-input
                       v-if="detailMetaEditing"
                       v-model="detailEditForm.location"
@@ -843,13 +910,15 @@
                 border
                 size="small"
                 class="detail-color-size-table"
+                show-summary
+                :summary-method="getDetailColorSizeSummary"
               >
-                <el-table-column label="颜色" min-width="110" align="center" header-align="center">
+                <el-table-column label="颜色" width="88" align="center" header-align="center">
                   <template #default="{ row }">
                     {{ row.colorName || '-' }}
                   </template>
                 </el-table-column>
-                <el-table-column label="颜色图片" min-width="170" align="center" header-align="center">
+                <el-table-column label="颜色图片" width="122" align="center" header-align="center">
                   <template #default="{ row }">
                     <ImageUploadArea
                       v-if="detailMetaEditing"
@@ -873,7 +942,7 @@
                   v-for="(size, sizeIdx) in detailDrawer.data.colorSize.headers"
                   :key="`size-${sizeIdx}`"
                   :label="size"
-                  min-width="72"
+                  min-width="64"
                   align="center"
                   header-align="center"
                 >
@@ -881,15 +950,22 @@
                     {{ Number(row.quantities?.[sizeIdx] ?? 0) || 0 }}
                   </template>
                 </el-table-column>
-                <el-table-column label="合计" min-width="80" align="center" header-align="center">
+                <el-table-column label="合计" width="72" align="center" header-align="center">
                   <template #default="{ row }">
                     {{ sumDetailRowQty(row.quantities) }}
                   </template>
                 </el-table-column>
+                <el-table-column label="出厂价" width="88" align="center" header-align="center">
+                  <template #default>
+                    {{ detailTableUnitPrice }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="总价" width="120" align="center" header-align="center">
+                  <template #default="{ row }">
+                    {{ detailRowTotalPrice(row.quantities) }}
+                  </template>
+                </el-table-column>
               </el-table>
-              <div class="detail-color-size-footer">
-                总件数：{{ detailDrawer.data.stock.quantity }}
-              </div>
             </div>
             <div v-else class="detail-muted">暂无颜色尺码明细（未关联订单或订单未维护颜色尺码）。</div>
           </div>
@@ -919,9 +995,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { Edit, Close } from '@element-plus/icons-vue'
+import { Edit, Close, Delete } from '@element-plus/icons-vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import {
@@ -938,6 +1014,7 @@ import {
   type FinishedOutboundRecord,
   type FinishedPickupUserOption,
 } from '@/api/inventory'
+import { getProducts, type ProductItem } from '@/api/products'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getCustomers, type CustomerItem } from '@/api/customers'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
@@ -966,6 +1043,10 @@ const list = ref<FinishedStockRow[]>([])
 const finishedStockTableRef = ref()
 const finishedOutboundTableRef = ref()
 const customerOptions = ref<{ label: string; value: string }[]>([])
+const createSkuDialogVisible = ref(false)
+const createSkuDialogLoading = ref(false)
+const createSkuKeyword = ref('')
+const createSkuProducts = ref<ProductItem[]>([])
 const warehouseOptions = ref<{ id: number; label: string }[]>([])
 const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
 const departmentOptions = ref<{ value: string; label: string }[]>([])
@@ -990,6 +1071,14 @@ const detailDrawer = reactive<{
   data: null,
   colorImageMap: {},
 })
+const DETAIL_DRAWER_MIN_WIDTH = 760
+const DETAIL_DRAWER_DEFAULT_WIDTH = 900
+const DETAIL_DRAWER_MAX_MARGIN = 48
+const DETAIL_DRAWER_WIDTH_STORAGE_KEY = 'inventory_finished_detail_drawer_width'
+const detailDrawerWidth = ref(DETAIL_DRAWER_DEFAULT_WIDTH)
+const resizeRafId = ref<number | null>(null)
+const resizeMoveHandler = ref<((evt: MouseEvent) => void) | null>(null)
+const resizeUpHandler = ref<(() => void) | null>(null)
 const detailMetaEditing = ref(false)
 
 const detailEditForm = reactive<{
@@ -1021,6 +1110,80 @@ function getColorImageUrl(colorName: string): string {
 
 function getDisplayProductImage(): string {
   return detailDrawer.data?.stock?.imageUrl || detailDrawer.data?.productImageUrl || ''
+}
+
+function getDetailDrawerMaxWidth() {
+  return Math.max(DETAIL_DRAWER_MIN_WIDTH, window.innerWidth - DETAIL_DRAWER_MAX_MARGIN)
+}
+
+function clampDetailDrawerWidth(width: number) {
+  return Math.min(Math.max(width, DETAIL_DRAWER_MIN_WIDTH), getDetailDrawerMaxWidth())
+}
+
+function loadSavedDetailDrawerWidth() {
+  try {
+    const raw = window.localStorage.getItem(DETAIL_DRAWER_WIDTH_STORAGE_KEY)
+    const parsed = Number(raw)
+    if (!Number.isFinite(parsed) || parsed <= 0) return DETAIL_DRAWER_DEFAULT_WIDTH
+    return clampDetailDrawerWidth(parsed)
+  } catch {
+    return DETAIL_DRAWER_DEFAULT_WIDTH
+  }
+}
+
+function persistDetailDrawerWidth(width: number) {
+  try {
+    window.localStorage.setItem(DETAIL_DRAWER_WIDTH_STORAGE_KEY, String(clampDetailDrawerWidth(width)))
+  } catch {
+    // 忽略本地存储异常，不影响主流程
+  }
+}
+
+function setDetailDrawerResizing(active: boolean) {
+  document.body.classList.toggle('detail-drawer-resizing', active)
+}
+
+function stopResizeDetailDrawer() {
+  if (resizeMoveHandler.value) {
+    window.removeEventListener('mousemove', resizeMoveHandler.value)
+    resizeMoveHandler.value = null
+  }
+  if (resizeUpHandler.value) {
+    window.removeEventListener('mouseup', resizeUpHandler.value)
+    resizeUpHandler.value = null
+  }
+  if (resizeRafId.value != null) {
+    window.cancelAnimationFrame(resizeRafId.value)
+    resizeRafId.value = null
+  }
+  setDetailDrawerResizing(false)
+}
+
+function startResizeDetailDrawer(e: MouseEvent) {
+  e.preventDefault()
+  const startX = e.clientX
+  const startWidth = detailDrawerWidth.value
+  let latestX = startX
+  const onMouseMove = (evt: MouseEvent) => {
+    latestX = evt.clientX
+    if (resizeRafId.value != null) return
+    resizeRafId.value = window.requestAnimationFrame(() => {
+      resizeRafId.value = null
+      // 右侧抽屉：向左拖动变宽，向右拖动变窄
+      const delta = startX - latestX
+      detailDrawerWidth.value = clampDetailDrawerWidth(startWidth + delta)
+    })
+  }
+  const onMouseUp = () => {
+    stopResizeDetailDrawer()
+    persistDetailDrawerWidth(detailDrawerWidth.value)
+  }
+  stopResizeDetailDrawer()
+  resizeMoveHandler.value = onMouseMove
+  resizeUpHandler.value = onMouseUp
+  setDetailDrawerResizing(true)
+  window.addEventListener('mousemove', onMouseMove)
+  window.addEventListener('mouseup', onMouseUp)
 }
 
 async function saveProductImage(url: string) {
@@ -1075,6 +1238,34 @@ const detailDisplayColorSizeRows = computed(() => {
     }
   })
 })
+
+const detailTableTotalQty = computed(() =>
+  detailDisplayColorSizeRows.value.reduce((sum, row) => sum + sumDetailRowQty(row.quantities), 0),
+)
+
+const detailTableUnitPrice = computed(() => formatPrice(detailDrawer.data?.stock?.unitPrice))
+
+const detailTableTotalPrice = computed(() =>
+  formatTotalPrice(detailTableTotalQty.value, detailDrawer.data?.stock?.unitPrice),
+)
+
+function detailRowTotalPrice(quantities: unknown[]): string {
+  return formatTotalPrice(sumDetailRowQty(quantities), detailDrawer.data?.stock?.unitPrice)
+}
+
+function getDetailColorSizeSummary({ columns }: { columns: Array<{ label?: string }> }) {
+  const headersLen = Array.isArray(detailDrawer.data?.colorSize?.headers) ? detailDrawer.data.colorSize.headers.length : 0
+  const sumQtyColIndex = 2 + headersLen
+  const unitPriceColIndex = 3 + headersLen
+  const totalPriceColIndex = 4 + headersLen
+  return columns.map((_, index) => {
+    if (index === 0) return '汇总'
+    if (index === sumQtyColIndex) return String(detailTableTotalQty.value)
+    if (index === unitPriceColIndex) return detailTableUnitPrice.value
+    if (index === totalPriceColIndex) return detailTableTotalPrice.value
+    return ''
+  })
+}
 
 function getOrderBreakdownTotal(orderId: number | null | undefined): number {
   if (!orderId) return 0
@@ -1188,6 +1379,7 @@ function toggleDetailEditMode() {
 }
 
 async function openDetail(row: FinishedStockRow) {
+  detailDrawerWidth.value = loadSavedDetailDrawerWidth()
   detailDrawer.visible = true
   await loadDetail(row.id)
 }
@@ -1355,7 +1547,7 @@ const createForm = reactive({
   remark: '',
 })
 const createRules: FormRules = {
-  skuCode: [{ required: true, message: '请输入SKU', trigger: 'blur' }],
+  skuCode: [{ required: true, message: '请选择SKU', trigger: 'change' }],
   quantity: [{ required: true, message: '请输入数量', trigger: 'blur' }],
   warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
   department: [{ required: true, message: '请选择部门', trigger: 'change' }],
@@ -1377,9 +1569,27 @@ const sizeTotalQuantity = computed(() =>
   }, 0),
 )
 
-const createTotalPriceDisplay = computed(() =>
+const createTableTotalPrice = computed(() =>
   formatTotalPrice(sizeTotalQuantity.value, createForm.unitPrice || undefined),
 )
+
+function createRowTotalPrice(quantities: unknown[]): string {
+  return formatTotalPrice(sumDetailRowQty(quantities), createForm.unitPrice || undefined)
+}
+
+function getCreateColorSizeSummary({ columns }: { columns: Array<{ label?: string }> }) {
+  const headersLen = createSizeHeaders.value.length
+  const sumQtyColIndex = 2 + headersLen
+  const unitPriceColIndex = 3 + headersLen
+  const totalPriceColIndex = 4 + headersLen
+  return columns.map((_, index) => {
+    if (index === 0) return '汇总'
+    if (index === sumQtyColIndex) return String(sizeTotalQuantity.value)
+    if (index === unitPriceColIndex) return formatPrice(createForm.unitPrice || undefined)
+    if (index === totalPriceColIndex) return createTableTotalPrice.value
+    return ''
+  })
+}
 
 function normalizeCreateSizeRows() {
   const len = createSizeHeaders.value.length
@@ -1431,6 +1641,43 @@ async function loadCustomerOptions() {
   } catch (e: unknown) {
     console.warn('客户选项加载失败')
   }
+}
+
+const filteredCreateSkuProducts = computed(() => {
+  const kw = createSkuKeyword.value.trim().toLowerCase()
+  if (!kw) return createSkuProducts.value
+  return createSkuProducts.value.filter((item) => {
+    const sku = String(item.skuCode ?? '').toLowerCase()
+    const customer = String(item.customer?.companyName ?? '').toLowerCase()
+    return sku.includes(kw) || customer.includes(kw)
+  })
+})
+
+async function loadCreateSkuProducts() {
+  createSkuDialogLoading.value = true
+  try {
+    const res = await getProducts({ page: 1, pageSize: 300 })
+    createSkuProducts.value = res.data?.list ?? []
+  } catch {
+    createSkuProducts.value = []
+  } finally {
+    createSkuDialogLoading.value = false
+  }
+}
+
+async function openCreateSkuDialog() {
+  createSkuDialogVisible.value = true
+  if (!createSkuProducts.value.length) {
+    await loadCreateSkuProducts()
+  }
+}
+
+function onSelectCreateSku(row: ProductItem) {
+  createForm.skuCode = row.skuCode || ''
+  if (row.imageUrl && !createForm.imageUrl) {
+    createForm.imageUrl = row.imageUrl
+  }
+  createSkuDialogVisible.value = false
 }
 
 async function load() {
@@ -1732,6 +1979,7 @@ async function loadPickupUserOptions() {
 
 onMounted(async () => {
   await Promise.all([
+    loadCreateSkuProducts(),
     loadWarehouseOptions(),
     loadInventoryTypeOptions(),
     loadCustomerOptions(),
@@ -1739,6 +1987,12 @@ onMounted(async () => {
     loadPickupUserOptions(),
   ])
   await load()
+  detailDrawerWidth.value = loadSavedDetailDrawerWidth()
+})
+
+onBeforeUnmount(() => {
+  stopResizeDetailDrawer()
+  detailDrawerWidth.value = DETAIL_DRAWER_DEFAULT_WIDTH
 })
 
 async function loadOutbounds() {
@@ -1867,7 +2121,7 @@ function onOutboundPageSizeChange() {
 
 .detail-basic-main {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 220px;
+  grid-template-columns: minmax(0, 1fr) 170px;
   gap: 12px;
   align-items: stretch;
 }
@@ -1917,8 +2171,8 @@ function onOutboundPageSizeChange() {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  width: 220px;
-  min-width: 220px;
+  width: 170px;
+  min-width: 170px;
 }
 
 .detail-images {
@@ -1959,6 +2213,10 @@ function onOutboundPageSizeChange() {
   font-size: 12px;
   color: var(--el-text-color-secondary);
   text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
 }
 
 .detail-color-name {
@@ -1979,6 +2237,10 @@ function onOutboundPageSizeChange() {
   padding-bottom: 0;
 }
 
+.finished-detail-drawer :deep(.el-drawer) {
+  position: relative;
+}
+
 .finished-detail-drawer :deep(.el-drawer__body) {
   padding-top: 0;
 }
@@ -1986,6 +2248,29 @@ function onOutboundPageSizeChange() {
 .finished-detail-drawer :deep(.detail-color-size-table .el-table__cell) {
   overflow: visible;
   vertical-align: top;
+}
+
+.detail-drawer-resizer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 10px;
+  height: 100%;
+  z-index: 10;
+  cursor: ew-resize;
+}
+
+.detail-drawer-resizer:hover {
+  background: rgba(64, 158, 255, 0.12);
+}
+
+:global(body.detail-drawer-resizing) {
+  cursor: ew-resize !important;
+  user-select: none !important;
+}
+
+:global(body.detail-drawer-resizing *) {
+  user-select: none !important;
 }
 
 .finished-detail-drawer :deep(.detail-color-size-table .image-upload-area) {
@@ -2016,19 +2301,19 @@ function onOutboundPageSizeChange() {
 }
 
 .detail-color-thumb {
-  width: 64px;
-  height: 64px;
+  width: 56px;
+  height: 56px;
   border-radius: 6px;
   border: 1px solid var(--el-border-color-lighter);
 }
 
 .finished-detail-drawer :deep(.detail-color-image-editor.image-upload-area) {
-  min-height: 72px;
+  min-height: 64px;
 }
 
 .finished-detail-drawer :deep(.detail-color-image-editor .preview-img) {
-  width: 72px;
-  height: 72px;
+  width: 60px;
+  height: 60px;
 }
 
 .detail-logs {
@@ -2158,6 +2443,10 @@ function onOutboundPageSizeChange() {
   opacity: 1;
 }
 
+.create-row-remove-btn {
+  padding: 0;
+}
+
 .create-size-footer {
   display: flex;
   align-items: center;
@@ -2172,7 +2461,7 @@ function onOutboundPageSizeChange() {
   color: var(--color-text-muted);
 }
 
-@media (max-width: 1200px) {
+@media (max-width: 860px) {
   .detail-top-row {
     flex-direction: column;
   }

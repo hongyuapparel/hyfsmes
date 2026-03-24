@@ -1,4 +1,4 @@
-import { Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
@@ -86,11 +86,24 @@ export class FinishedGoodsStockService {
     let customerId: number | null = null;
     let customerName = '';
     let orderExFactoryPrice: string | number | null = null;
+    let linkedOrder: Order | null = null;
     if (orderNo) {
-      const order = await this.orderRepo.findOne({ where: { orderNo } });
-      if (!order) {
+      linkedOrder = await this.orderRepo.findOne({ where: { orderNo } });
+      if (!linkedOrder) {
         throw new NotFoundException('订单不存在');
       }
+    } else {
+      const skuCode = dto.skuCode?.trim() ?? '';
+      if (skuCode) {
+        linkedOrder = await this.orderRepo.findOne({
+          where: { skuCode },
+          order: { id: 'DESC' },
+        });
+      }
+    }
+
+    if (linkedOrder) {
+      const order = linkedOrder;
       orderId = order.id;
       customerId = order.customerId ?? null;
       customerName = order.customerName?.trim() ?? '';
@@ -113,7 +126,15 @@ export class FinishedGoodsStockService {
       customerName,
       imageUrl: dto.imageUrl?.trim() ?? '',
     });
-    return this.stockRepo.save(stock);
+    try {
+      return await this.stockRepo.save(stock);
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (msg.includes("Column 'order_id' cannot be null")) {
+        throw new BadRequestException('当前环境要求关联订单，请选择订单号后再保存');
+      }
+      throw e;
+    }
   }
 
   async getList(params: {

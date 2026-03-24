@@ -550,9 +550,9 @@ async function remove(row: RoleItem) {
 
 async function savePermissions() {
   if (!selectedRoleId.value) return
-  const halfMenu = (menuTreeRef.value?.getHalfCheckedKeys?.() ?? []) as Array<number | string>
   const fullMenu = (menuTreeRef.value?.getCheckedKeys?.() ?? []) as Array<number | string>
-  const menuIds = [...new Set([...halfMenu, ...fullMenu])].filter((id): id is number => typeof id === 'number')
+  // 只保存明确勾选的菜单节点；半选父节点是树联动状态，不应持久化，否则刷新会放大为“全选子节点”
+  const menuIds = [...new Set(fullMenu)].filter((id): id is number => typeof id === 'number')
   const actionIds = checkedIds.value.filter((id) => actionPermissionIds.value.includes(id))
   const ids = [...new Set([...menuIds, ...actionIds])]
   saving.value = true

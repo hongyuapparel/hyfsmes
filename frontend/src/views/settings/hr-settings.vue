@@ -27,12 +27,20 @@
             node-key="id"
             highlight-current
             default-expand-all
+            draggable
             :props="{ label: 'label', children: 'children' }"
             class="dept-tree"
+            :allow-drag="allowDeptDrag"
+            :allow-drop="allowDeptDrop"
             @current-change="onDeptChange"
+            @node-drop="onDeptDrop"
+            @node-drag-end="onDeptDragEnd"
           >
             <template #default="{ data }">
               <span class="tree-node">
+                <span class="option-drag-handle" title="拖拽调整顺序" @mousedown.stop="enableDeptDrag(data.id)">
+                  ≡
+                </span>
                 <span class="tree-node-label">{{ data.label }}</span>
                 <span class="tree-node-actions">
                   <el-button link type="primary" size="small" @click.stop="openDeptDialog(data)">
@@ -134,6 +142,7 @@ import {
   createSystemOption,
   updateSystemOption,
   deleteSystemOption,
+  batchUpdateSystemOptionOrder,
   type SystemOptionTreeNode,
   type SystemOptionItem,
 } from '@/api/system-options'
@@ -167,6 +176,7 @@ const jobList = ref<JobItem[]>([])
 const deptDialog = reactive({ visible: false, submitting: false, editingId: 0, parentId: null as number | null })
 const deptForm = reactive({ label: '' })
 const deptDialogTitle = computed(() => (deptDialog.editingId ? '编辑部门' : deptDialog.parentId ? '新增子部门' : '新增顶级部门'))
+const dragEnabledDeptId = ref<number | null>(null)
 const deptCount = computed(() => {
   function count(nodes: DeptTreeNode[]): number {
     return nodes.reduce((sum, n) => sum + 1 + count(n.children ?? []), 0)
@@ -213,6 +223,70 @@ function findDeptById(id: number, tree: DeptTreeNode[]): DeptTreeNode | null {
     }
   }
   return null
+}
+
+function isDescendantOf(node: DeptTreeNode, maybeAncestorId: number): boolean {
+  if (node.id === maybeAncestorId) return true
+  if (!node.children?.length) return false
+  return node.children.some((c) => isDescendantOf(c, maybeAncestorId))
+}
+
+function allowDeptDrop(
+  draggingNode: { data: DeptTreeNode },
+  dropNode: { data: DeptTreeNode },
+  type: 'prev' | 'next' | 'inner',
+) {
+  if (type !== 'inner') return true
+  // 禁止把节点拖到自己的后代里，避免形成循环树
+  return !isDescendantOf(draggingNode.data, dropNode.data.id)
+}
+
+function allowDeptDrag(node: { data?: DeptTreeNode }) {
+  return dragEnabledDeptId.value != null && dragEnabledDeptId.value === (node.data?.id ?? null)
+}
+
+function enableDeptDrag(id: number) {
+  dragEnabledDeptId.value = id
+}
+
+function onDeptDragEnd() {
+  dragEnabledDeptId.value = null
+}
+
+function getSiblingNodes(parentId: number | null): DeptTreeNode[] {
+  if (parentId == null) return deptTree.value
+  const parent = findDeptById(parentId, deptTree.value)
+  return parent?.children ?? []
+}
+
+async function syncSiblingOrder(parentId: number | null) {
+  const siblings = getSiblingNodes(parentId)
+  const items = siblings.map((n, idx) => ({ id: n.id, sort_order: idx }))
+  await batchUpdateSystemOptionOrder(ORG_DEPT_TYPE, parentId, items)
+}
+
+async function onDeptDrop(
+  draggingNode: { data: DeptTreeNode },
+  dropNode: { data: DeptTreeNode; parent?: { data?: DeptTreeNode } },
+  dropType: 'before' | 'after' | 'inner',
+) {
+  const dragged = draggingNode.data
+  const oldParentId = dragged.parentId ?? null
+  const newParentId = dropType === 'inner' ? dropNode.data.id : (dropNode.parent?.data?.id ?? null)
+
+  try {
+    if (oldParentId !== newParentId) {
+      await updateSystemOption(dragged.id, { parent_id: newParentId })
+      dragged.parentId = newParentId
+    }
+    await syncSiblingOrder(newParentId)
+    if (oldParentId !== newParentId) await syncSiblingOrder(oldParentId)
+    ElMessage.success('部门顺序已更新')
+    await loadDepartments()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    await loadDepartments()
+  }
 }
 
 function onDeptChange(node: DeptTreeNode | null) {
@@ -478,14 +552,32 @@ onMounted(() => {
 .tree-node {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   gap: 8px;
+}
+
+.option-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  color: var(--el-text-color-secondary);
+  cursor: grab;
+  flex: 0 0 auto;
+  user-select: none;
+}
+
+.option-drag-handle:active {
+  cursor: grabbing;
 }
 
 .tree-node-label {
   font-size: var(--font-size-body);
   color: var(--color-text-primary);
+  flex: 1;
+  min-width: 0;
 }
 
 .tree-node-actions {

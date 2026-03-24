@@ -134,45 +134,51 @@
             :load="loadProcessTreeNode"
             :tree-props="{ hasChildren: 'hasChildren', children: 'children' }"
           >
-            <el-table-column label="部门" min-width="100">
+            <el-table-column label="部门" min-width="100" align="center">
               <template #default="{ row }">
                 <template v-if="row.rowType === 'department'">{{ row.department || '-' }}</template>
                 <template v-else></template>
               </template>
             </el-table-column>
-            <el-table-column label="工种" min-width="120">
+            <el-table-column label="工种" min-width="120" align="center">
               <template #default="{ row }">
                 <template v-if="row.rowType === 'job_type'">{{ row.displayName || '-' }}</template>
                 <template v-else></template>
               </template>
             </el-table-column>
-            <el-table-column label="工序" min-width="120">
+            <el-table-column label="工序" min-width="120" align="center">
               <template #default="{ row }">
                 <template v-if="row.rowType === 'process'">{{ row.processName || '-' }}</template>
                 <template v-else></template>
               </template>
             </el-table-column>
-            <el-table-column label="价格(元)" width="100" align="right">
+            <el-table-column label="价格(元)" width="100" align="center">
               <template #default="{ row }">
                 <template v-if="row.rowType === 'process'">{{ row.price }}</template>
                 <template v-else>-</template>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="320" fixed="right">
+            <el-table-column label="操作" min-width="180">
               <template #default="{ row }">
                 <template v-if="row.rowType === 'department'">
-                  <el-button link type="primary" size="small" @click="openAddChildJobType(row)">新建工种</el-button>
+                  <div class="process-row-actions">
+                    <el-button link type="primary" size="small" @click="openAddChildJobType(row)">新建工种</el-button>
+                  </div>
                 </template>
                 <template v-else-if="row.rowType === 'job_type'">
-                  <el-button link type="primary" size="small" @click="openEditJobType(row)">编辑</el-button>
-                  <el-button link size="small" :disabled="!canMoveUpJobType(row)" @click="moveJobTypeRow(row, -1)">上移</el-button>
-                  <el-button link size="small" :disabled="!canMoveDownJobType(row)" @click="moveJobTypeRow(row, 1)">下移</el-button>
-                  <el-button link type="danger" size="small" @click="removeJobType(row)">删除</el-button>
-                  <el-button link type="primary" size="small" @click="openProcessDialog(undefined, row)">新增工序</el-button>
+                  <div class="process-row-actions">
+                    <el-button link type="primary" size="small" @click="openEditJobType(row)">编辑</el-button>
+                    <el-button link size="small" :disabled="!canMoveUpJobType(row)" @click="moveJobTypeRow(row, -1)">上移</el-button>
+                    <el-button link size="small" :disabled="!canMoveDownJobType(row)" @click="moveJobTypeRow(row, 1)">下移</el-button>
+                    <el-button link type="danger" size="small" @click="removeJobType(row)">删除</el-button>
+                    <el-button link type="primary" size="small" @click="openProcessDialog(undefined, row)">新增工序</el-button>
+                  </div>
                 </template>
                 <template v-else-if="row.rowType === 'process'">
-                  <el-button link type="primary" size="small" @click="openProcessDialog(row.processRow)">编辑</el-button>
-                  <el-button link type="danger" size="small" @click="removeProcess(row.processRow!)">删除</el-button>
+                  <div class="process-row-actions">
+                    <el-button link type="primary" size="small" @click="openProcessDialog(row.processRow)">编辑</el-button>
+                    <el-button link type="danger" size="small" @click="removeProcess(row.processRow!)">删除</el-button>
+                  </div>
                 </template>
               </template>
             </el-table-column>
@@ -228,16 +234,46 @@
           <div class="process-actions">
             <el-button type="primary" size="small" @click="openQuoteTemplateDialog()">新增模板</el-button>
           </div>
-          <el-table :data="quoteTemplateList" size="small" border row-key="id" class="process-table">
-            <el-table-column prop="name" label="模板名称" min-width="140" />
-            <el-table-column label="操作" width="220" fixed="right">
-              <template #default="{ row }">
-                <el-button link type="primary" size="small" @click="openQuoteTemplateDialog(row)">编辑</el-button>
-                <el-button link type="primary" size="small" @click="openQuoteTemplateItemsDialog(row)">编辑工序</el-button>
-                <el-button link type="danger" size="small" @click="removeQuoteTemplate(row)">删除</el-button>
+          <el-collapse v-model="activeQuoteTemplateIds" class="quote-template-collapse" @change="onQuoteTemplateCollapseChange">
+            <el-collapse-item v-for="row in quoteTemplateList" :key="row.id" :name="String(row.id)">
+              <template #title>
+                <div class="quote-template-title">
+                  <span class="quote-template-name-wrap">
+                    <el-icon
+                      class="quote-template-fold-icon"
+                      :class="{ expanded: isQuoteTemplateExpanded(row.id) }"
+                    >
+                      <ArrowRight />
+                    </el-icon>
+                    <span class="quote-template-name">{{ row.name }}</span>
+                  </span>
+                  <div class="quote-template-actions" @click.stop>
+                    <el-button link type="primary" size="small" @click.stop="openQuoteTemplateDialog(row)">编辑</el-button>
+                    <el-button link type="primary" size="small" @click.stop="openQuoteTemplateItemsDialog(row)">编辑工序</el-button>
+                    <el-button link type="danger" size="small" @click.stop="removeQuoteTemplate(row)">删除</el-button>
+                  </div>
+                </div>
               </template>
-            </el-table-column>
-          </el-table>
+              <div class="template-expand-wrap">
+                <el-skeleton v-if="quoteTemplateItemsLoadingMap[row.id]" :rows="2" animated />
+                <el-table
+                  v-else
+                  :data="quoteTemplateItemsMap[row.id] ?? []"
+                  size="small"
+                  border
+                  class="process-table template-items-table"
+                >
+                  <el-table-column prop="department" label="部门" min-width="100" align="center" />
+                  <el-table-column prop="jobType" label="工种" min-width="120" align="center" />
+                  <el-table-column prop="processName" label="工序" min-width="120" align="center" />
+                  <el-table-column prop="unitPrice" label="价格(元)" width="100" align="center" />
+                </el-table>
+                <p v-if="!quoteTemplateItemsLoadingMap[row.id] && !(quoteTemplateItemsMap[row.id]?.length)" class="empty-hint">
+                  该模板暂无工序，可点击右上“编辑工序”维护。
+                </p>
+              </div>
+            </el-collapse-item>
+          </el-collapse>
           <el-dialog
             v-model="quoteTemplateDialog.visible"
             :title="quoteTemplateDialog.id ? '编辑模板' : '新增模板'"
@@ -686,6 +722,7 @@ import {
   type OrderWorkflowChainWithSteps,
   type OrderStatusSlaItem,
 } from '@/api/order-status-config'
+import { ArrowRight } from '@element-plus/icons-vue'
 
 /** 树表行：部门 / 工种 / 工序（懒加载用）；displayName 为单列树展示用，不重复父级 */
 interface ProcessTreeRow {
@@ -745,6 +782,9 @@ const quoteTemplateItemsDialog = ref<{ visible: boolean; templateId?: number; na
 const quoteTemplateItemsEdit = ref<{ processId: number; department: string; jobType: string; processName: string; unitPrice: string }[]>([])
 const quoteTemplateProcessOptions = ref<ProductionProcessItem[]>([])
 const quoteTemplateItemToAdd = ref<number[]>([])
+const activeQuoteTemplateIds = ref<string[]>([])
+const quoteTemplateItemsMap = ref<Record<number, QuoteTemplateItemType[]>>({})
+const quoteTemplateItemsLoadingMap = ref<Record<number, boolean>>({})
 
 function buildNodeMap(nodes: SystemOptionTreeNode[], map: Map<number, SystemOptionTreeNode>) {
   for (const n of nodes) {
@@ -1771,9 +1811,42 @@ async function loadQuoteTemplates() {
   try {
     const res = await getProcessQuoteTemplates()
     quoteTemplateList.value = res.data ?? []
+    activeQuoteTemplateIds.value = []
+    quoteTemplateItemsMap.value = {}
+    quoteTemplateItemsLoadingMap.value = {}
   } catch {
     quoteTemplateList.value = []
+    activeQuoteTemplateIds.value = []
+    quoteTemplateItemsMap.value = {}
+    quoteTemplateItemsLoadingMap.value = {}
   }
+}
+
+async function ensureQuoteTemplateItemsLoaded(templateId: number) {
+  if (quoteTemplateItemsMap.value[templateId]) return
+  quoteTemplateItemsLoadingMap.value[templateId] = true
+  try {
+    const res = await getProcessQuoteTemplateItems(templateId)
+    quoteTemplateItemsMap.value[templateId] = (res.data ?? []) as QuoteTemplateItemType[]
+  } catch {
+    quoteTemplateItemsMap.value[templateId] = []
+  } finally {
+    quoteTemplateItemsLoadingMap.value[templateId] = false
+  }
+}
+
+function onQuoteTemplateCollapseChange(names: string[] | string) {
+  const values = Array.isArray(names) ? names : [names]
+  values.forEach((name) => {
+    const id = Number(name)
+    if (!Number.isNaN(id) && id > 0) {
+      void ensureQuoteTemplateItemsLoaded(id)
+    }
+  })
+}
+
+function isQuoteTemplateExpanded(templateId: number): boolean {
+  return activeQuoteTemplateIds.value.includes(String(templateId))
 }
 
 function openQuoteTemplateDialog(row?: QuoteTemplateType) {
@@ -1942,12 +2015,85 @@ async function submitQuoteTemplateItems() {
   min-width: 280px;
 }
 
+.template-expand-wrap {
+  padding: 8px 0;
+}
+
+.template-items-table {
+  margin-bottom: 6px;
+}
+
+.quote-template-collapse {
+  border-top: 1px solid var(--el-border-color);
+  border-bottom: 1px solid var(--el-border-color);
+}
+
+.quote-template-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: 0 var(--space-sm);
+}
+
+.quote-template-name {
+  font-weight: 500;
+}
+
+.quote-template-name-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.quote-template-fold-icon {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  transition: transform 0.2s ease;
+}
+
+.quote-template-fold-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.quote-template-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+}
+
+.quote-template-collapse :deep(.el-collapse-item__arrow) {
+  display: none;
+}
+
+.quote-template-collapse :deep(.el-collapse-item__header) {
+  height: 32px;
+  line-height: 32px;
+  min-height: 32px;
+  padding: 0 4px;
+}
+
+.quote-template-collapse :deep(.el-collapse-item__content) {
+  padding-bottom: 8px;
+}
+
 .process-table {
   font-size: var(--font-size-body);
 }
 
 .process-tree-single .el-table__row .el-table__cell:first-child {
   font-weight: inherit;
+}
+
+.process-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .status-layout {
