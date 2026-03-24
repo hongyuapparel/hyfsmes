@@ -1,8 +1,8 @@
 <template>
   <div
     class="image-upload-area"
-    :class="{ 'is-dragover': isDragover, 'has-image': modelValue }"
-    @click="!modelValue && fileInputRef?.click()"
+    :class="{ 'is-dragover': isDragover, 'has-image': displayUrl }"
+    @click="!displayUrl && fileInputRef?.click()"
     @dragover.prevent="isDragover = true"
     @dragleave.prevent="isDragover = false"
     @drop.prevent="onDrop"
@@ -15,9 +15,10 @@
       class="hidden-input"
       @change="onFileChange"
     />
-    <template v-if="modelValue">
+    <template v-if="displayUrl">
       <div class="preview-wrap">
-        <el-image :src="modelValue" fit="contain" class="preview-img" />
+        <el-image :src="displayUrl" fit="contain" class="preview-img" />
+        <span v-if="uploading" class="preview-uploading">上传中...</span>
         <template v-if="props.compact">
           <div class="preview-actions preview-actions-compact">
             <el-button
@@ -52,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { uploadImage } from '@/api/uploads'
@@ -75,8 +76,21 @@ const emit = defineEmits<{
 const fileInputRef = ref<HTMLInputElement | null>(null)
 const isDragover = ref(false)
 const uploading = ref(false)
+const localPreviewUrl = ref('')
+
+const displayUrl = computed(() => localPreviewUrl.value || props.modelValue || '')
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+function revokeLocalPreview() {
+  if (localPreviewUrl.value.startsWith('blob:')) URL.revokeObjectURL(localPreviewUrl.value)
+  localPreviewUrl.value = ''
+}
+
+function setLocalPreview(file: File) {
+  revokeLocalPreview()
+  localPreviewUrl.value = URL.createObjectURL(file)
+}
 
 function isImageFile(file: File): boolean {
   return IMAGE_TYPES.includes(file.type)
@@ -95,11 +109,13 @@ function getFileFromPaste(e: ClipboardEvent): File | null {
 }
 
 async function uploadFile(file: File) {
+  setLocalPreview(file)
   uploading.value = true
   try {
     const url = await uploadImage(file)
     emit('update:modelValue', url)
   } catch (e: unknown) {
+    revokeLocalPreview()
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '图片上传失败'))
   } finally {
     uploading.value = false
@@ -128,8 +144,20 @@ function onPaste(e: ClipboardEvent) {
 }
 
 function clear() {
+  revokeLocalPreview()
   emit('update:modelValue', '')
 }
+
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (value) revokeLocalPreview()
+  },
+)
+
+onBeforeUnmount(() => {
+  revokeLocalPreview()
+})
 </script>
 
 <style scoped>
@@ -201,6 +229,18 @@ function clear() {
   height: auto;
   aspect-ratio: 4 / 3;
   border-radius: var(--radius-md, 4px);
+}
+
+.preview-uploading {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(31, 41, 55, 0.72);
 }
 
 .preview-actions {
