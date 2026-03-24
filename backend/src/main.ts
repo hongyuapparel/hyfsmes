@@ -13,6 +13,54 @@ import { seedOrderCostSnapshotsTable } from './database/seed-order-cost-snapshot
 import { seedOrderSewingFactoryDueDate } from './database/seed-order-sewing-factory-due-date';
 import { seedOrderSewingQuantityRow } from './database/seed-order-sewing-quantity-row';
 
+async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
+  const rows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'suppliers'
+       AND COLUMN_NAME = 'business_scope_ids'`,
+  );
+  const cnt = Number(rows?.[0]?.cnt ?? 0);
+  if (cnt > 0) return;
+  await dataSource.query(
+    `ALTER TABLE suppliers
+     ADD COLUMN business_scope_ids LONGTEXT NULL AFTER business_scope_id`,
+  );
+  console.log('[Schema] Added suppliers.business_scope_ids');
+}
+
+async function ensureSupplierLastActiveColumn(dataSource: DataSource) {
+  const rows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'suppliers'
+       AND COLUMN_NAME = 'last_active_at'`,
+  );
+  const cnt = Number(rows?.[0]?.cnt ?? 0);
+  if (cnt > 0) return;
+  await dataSource.query(
+    `ALTER TABLE suppliers
+     ADD COLUMN last_active_at DATETIME NULL AFTER business_scope_ids`,
+  );
+  console.log('[Schema] Added suppliers.last_active_at');
+}
+
+async function dropSupplierCooperationDateColumn(dataSource: DataSource) {
+  const rows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'suppliers'
+       AND COLUMN_NAME = 'cooperation_date'`,
+  );
+  const cnt = Number(rows?.[0]?.cnt ?? 0);
+  if (cnt <= 0) return;
+  await dataSource.query(`ALTER TABLE suppliers DROP COLUMN cooperation_date`);
+  console.log('[Schema] Dropped suppliers.cooperation_date');
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -38,6 +86,9 @@ async function bootstrap() {
 
   const dataSource = app.get(DataSource);
   try {
+    await ensureSupplierMultiScopeColumn(dataSource);
+    await ensureSupplierLastActiveColumn(dataSource);
+    await dropSupplierCooperationDateColumn(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);

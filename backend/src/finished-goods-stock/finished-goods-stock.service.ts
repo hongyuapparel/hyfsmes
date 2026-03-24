@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
@@ -28,6 +28,12 @@ export interface FinishedStockRow {
   createdAt: string;
   type: 'pending' | 'stored';
 }
+
+type FinishedOutboundItemInput = {
+  id: number;
+  quantity: number;
+  sizeBreakdown?: any;
+};
 
 @Injectable()
 export class FinishedGoodsStockService {
@@ -63,6 +69,22 @@ export class FinishedGoodsStockService {
     const n = Number(v);
     if (!Number.isFinite(n)) return '0';
     return n.toFixed(2);
+  }
+
+  private async resolvePickupUser(pickupUserId?: number | null): Promise<{ pickupId: number | null; pickupUserName: string }> {
+    if (pickupUserId == null) {
+      return { pickupId: null, pickupUserName: '' };
+    }
+    const salespersonRole = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
+    if (!salespersonRole) throw new NotFoundException('未配置业务员角色');
+    const pickupUser = await this.userRepo.findOne({
+      where: { id: Number(pickupUserId), roleId: salespersonRole.id, status: UserStatus.ACTIVE },
+    });
+    if (!pickupUser) throw new NotFoundException('领走人不存在或不是在职业务员');
+    return {
+      pickupId: pickupUser.id,
+      pickupUserName: (pickupUser.displayName?.trim() || pickupUser.username || '').trim(),
+    };
   }
 
   /** 手动新增成品库存（仓库直接入库）；订单号可选，不填则不关联订单 */
@@ -337,77 +359,106 @@ export class FinishedGoodsStockService {
     return { list: [], total: 0, page, pageSize };
   }
 
-  /** 出库：减少已入库成品数量 */
+  /** 出库：支持单条或同一客户多条库存批量出库 */
   async outbound(
-    id: number,
-    quantity: number,
+    items: FinishedOutboundItemInput[],
     operatorUsername: string,
     remark: string,
     pickupUserId?: number | null,
-    sizeBreakdown?: any,
   ): Promise<void> {
-    const stock = await this.stockRepo.findOne({ where: { id } });
-    if (!stock) {
-      throw new NotFoundException('库存记录不存在');
+    const normalizedItems = Array.isArray(items)
+      ? items
+          .map((item) => ({
+            id: Number(item?.id),
+            quantity: Number(item?.quantity),
+            sizeBreakdown: item?.sizeBreakdown ?? null,
+          }))
+          .filter((item) => Number.isInteger(item.id) && item.id > 0)
+      : [];
+    if (!normalizedItems.length) {
+      throw new BadRequestException('请选择需要出库的库存记录');
     }
-    const q = Number(quantity);
-    if (!Number.isInteger(q) || q <= 0) {
-      throw new NotFoundException('出库数量必须为正整数');
+    const uniqueIds = Array.from(new Set(normalizedItems.map((item) => item.id)));
+    if (uniqueIds.length !== normalizedItems.length) {
+      throw new BadRequestException('同一条库存记录不能重复出库');
     }
-    if (q > stock.quantity) {
-      throw new NotFoundException('出库数量不能大于当前库存');
-    }
-    const [order, product] = await Promise.all([
-      stock.orderId != null ? this.orderRepo.findOne({ where: { id: stock.orderId } }) : Promise.resolve(null),
-      stock.skuCode?.trim() ? this.productRepo.findOne({ where: { skuCode: stock.skuCode.trim() } }) : Promise.resolve(null),
-    ]);
 
-    let pickupUserName = '';
-    let pickupId: number | null = null;
-    if (pickupUserId != null) {
-      const salespersonRole = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
-      if (!salespersonRole) throw new NotFoundException('未配置业务员角色');
-      const pickupUser = await this.userRepo.findOne({
-        where: { id: Number(pickupUserId), roleId: salespersonRole.id, status: UserStatus.ACTIVE },
-      });
-      if (!pickupUser) throw new NotFoundException('领走人不存在或不是在职业务员');
-      pickupId = pickupUser.id;
-      pickupUserName = (pickupUser.displayName?.trim() || pickupUser.username || '').trim();
+    const stocks = await this.stockRepo.find({ where: { id: In(uniqueIds) } });
+    if (stocks.length !== uniqueIds.length) {
+      throw new NotFoundException('存在库存记录不存在或已失效');
     }
+    const stockMap = new Map(stocks.map((stock) => [stock.id, stock]));
+    for (const item of normalizedItems) {
+      const stock = stockMap.get(item.id);
+      if (!stock) throw new NotFoundException('库存记录不存在');
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0) {
+        throw new BadRequestException('出库数量必须为正整数');
+      }
+      if (item.quantity > stock.quantity) {
+        throw new BadRequestException(`库存 ${stock.skuCode || stock.id} 的出库数量不能大于当前库存`);
+      }
+    }
+
+    const customerNames = Array.from(
+      new Set(
+        stocks.map((stock) => (stock.customerName?.trim() || '__EMPTY__')),
+      ),
+    );
+    if (customerNames.length > 1) {
+      throw new BadRequestException('批量出库仅支持选择同一客户的记录');
+    }
+
+    const orderIds = Array.from(new Set(stocks.map((stock) => stock.orderId).filter((id): id is number => id != null)));
+    const skuCodes = Array.from(new Set(stocks.map((stock) => stock.skuCode?.trim()).filter((code): code is string => !!code)));
+    const [orders, products, pickupInfo] = await Promise.all([
+      orderIds.length ? this.orderRepo.find({ where: { id: In(orderIds) } }) : Promise.resolve([]),
+      skuCodes.length ? this.productRepo.find({ where: skuCodes.map((skuCode) => ({ skuCode })) }) : Promise.resolve([]),
+      this.resolvePickupUser(pickupUserId),
+    ]);
+    const orderMap = new Map(orders.map((order) => [order.id, order]));
+    const productMap = new Map(products.map((product) => [product.skuCode?.trim() ?? '', product]));
 
     try {
       await this.stockRepo.manager.transaction(async (manager) => {
         const txStockRepo = manager.getRepository(FinishedGoodsStock);
         const txOutboundRepo = manager.getRepository(FinishedGoodsOutbound);
-        const txStock = await txStockRepo.findOne({ where: { id } });
-        if (!txStock) throw new NotFoundException('库存记录不存在');
-        if (q > txStock.quantity) throw new NotFoundException('出库数量不能大于当前库存');
 
-        txStock.quantity -= q;
-        if (txStock.quantity === 0) {
-          await txStockRepo.remove(txStock);
-        } else {
-          await txStockRepo.save(txStock);
+        for (const item of normalizedItems) {
+          const txStock = await txStockRepo.findOne({ where: { id: item.id } });
+          if (!txStock) throw new NotFoundException('库存记录不存在');
+          if (item.quantity > txStock.quantity) {
+            throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 的出库数量不能大于当前库存`);
+          }
+
+          txStock.quantity -= item.quantity;
+          if (txStock.quantity === 0) {
+            await txStockRepo.remove(txStock);
+          } else {
+            await txStockRepo.save(txStock);
+          }
+
+          const stock = stockMap.get(item.id) ?? txStock;
+          const order = stock.orderId != null ? orderMap.get(stock.orderId) ?? null : null;
+          const product = productMap.get(stock.skuCode?.trim() ?? '') ?? null;
+          const out = txOutboundRepo.create({
+            finishedStockId: item.id,
+            orderId: stock.orderId,
+            orderNo: order?.orderNo ?? '',
+            skuCode: stock.skuCode ?? '',
+            imageUrl: stock.imageUrl?.trim() || product?.imageUrl?.trim() || '',
+            customerName: stock.customerName ?? '',
+            quantity: item.quantity,
+            department: stock.department?.trim() ?? '',
+            warehouseId: stock.warehouseId ?? null,
+            inventoryTypeId: stock.inventoryTypeId ?? null,
+            pickupUserId: pickupInfo.pickupId,
+            pickupUserName: pickupInfo.pickupUserName,
+            sizeBreakdown: item.sizeBreakdown ?? null,
+            operatorUsername: (operatorUsername ?? '').trim(),
+            remark: (remark ?? '').trim(),
+          });
+          await txOutboundRepo.save(out);
         }
-
-        const out = txOutboundRepo.create({
-          finishedStockId: id,
-          orderId: stock.orderId,
-          orderNo: order?.orderNo ?? '',
-          skuCode: stock.skuCode ?? '',
-          imageUrl: stock.imageUrl?.trim() || product?.imageUrl?.trim() || '',
-          customerName: stock.customerName ?? '',
-          quantity: q,
-          department: stock.department?.trim() ?? '',
-          warehouseId: stock.warehouseId ?? null,
-          inventoryTypeId: stock.inventoryTypeId ?? null,
-          pickupUserId: pickupId,
-          pickupUserName,
-          sizeBreakdown: sizeBreakdown ?? null,
-          operatorUsername: (operatorUsername ?? '').trim(),
-          remark: (remark ?? '').trim(),
-        });
-        await txOutboundRepo.save(out);
       });
     } catch (e: any) {
       const msg = String(e?.message ?? '');

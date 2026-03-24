@@ -36,6 +36,20 @@ export function doPendingInbound(body: {
   return request.post<void>('/inventory/pending/inbound', body)
 }
 
+export function doPendingOutbound(body: {
+  items: Array<{
+    id: number
+    quantity: number
+    sizeBreakdown?: {
+      headers: string[]
+      rows: Array<{ colorName: string; quantities: number[] }>
+    } | null
+  }>
+  pickupUserId?: number | null
+}) {
+  return request.post<void>('/inventory/pending/outbound', body)
+}
+
 /** 成品库存（含待入库/已入库） */
 export interface FinishedStockRow {
   id: number
@@ -71,16 +85,18 @@ export function getFinishedStockList(params?: {
   }>('/inventory/finished/items', { params })
 }
 
-export function finishedOutbound(
-  id: number,
-  quantity: number,
-  pickupUserId?: number | null,
-  sizeBreakdown?: {
-    headers: string[]
-    rows: Array<{ colorName: string; quantities: number[] }>
-  } | null,
-) {
-  return request.post<void>('/inventory/finished/outbound', { id, quantity, pickupUserId, sizeBreakdown })
+export function finishedOutbound(body: {
+  items: Array<{
+    id: number
+    quantity: number
+    sizeBreakdown?: {
+      headers: string[]
+      rows: Array<{ colorName: string; quantities: number[] }>
+    } | null
+  }>
+  pickupUserId?: number | null
+}) {
+  return request.post<void>('/inventory/finished/outbound', body)
 }
 
 export interface FinishedPickupUserOption {
@@ -91,6 +107,10 @@ export interface FinishedPickupUserOption {
 
 export function getFinishedPickupUserOptions() {
   return request.get<FinishedPickupUserOption[]>('/inventory/finished/pickup-users')
+}
+
+export function getPendingPickupUserOptions() {
+  return request.get<FinishedPickupUserOption[]>('/inventory/pending/pickup-users')
 }
 
 export interface FinishedStockDetailRes {

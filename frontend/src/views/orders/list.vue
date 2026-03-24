@@ -109,31 +109,32 @@
           </span>
         </template>
       </el-tree-select>
-      <el-select
+      <el-tree-select
         v-model="filter.processItem"
+        :data="processOptions"
         placeholder="工艺项目"
         filterable
         clearable
+        check-strictly
+        :props="{ label: 'label', value: 'value', children: 'children' }"
         size="large"
         class="filter-bar-item"
         :style="
           getFilterSelectAutoWidthStyle(
-            filter.processItem && `工艺项目：${filter.processItem}`,
+            filter.processItem && `工艺项目：${getProcessItemDisplayLabel(filter.processItem)}`,
           )
         "
         @change="onSearch"
       >
-        <template #label="{ label }">
-          <span v-if="filter.processItem">工艺项目：{{ label }}</span>
-          <span v-else>{{ label }}</span>
+        <template #prefix>
+          <span
+            v-if="filter.processItem"
+            :style="{ color: 'var(--el-color-primary)' }"
+          >
+            工艺项目：
+          </span>
         </template>
-        <el-option
-          v-for="opt in secondaryProcessOptions"
-          :key="opt.value"
-          :label="opt.label"
-          :value="opt.value"
-        />
-      </el-select>
+      </el-tree-select>
       <el-select
         v-model="filter.salesperson"
         placeholder="业务员"
@@ -612,7 +613,7 @@ import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, reviewReje
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getCustomers, type CustomerItem, getSalespeople, getMerchandisers } from '@/api/customers'
 import { getDictItems, getDictOptions, getDictTree } from '@/api/dicts'
-import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
+import { getSupplierBusinessScopeTreeOptions, type SupplierBusinessScopeTreeNode } from '@/api/suppliers'
 import { type SystemOptionTreeNode } from '@/api/system-options'
 import { useAuthStore } from '@/stores/auth'
 import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
@@ -670,7 +671,12 @@ function getActionLabel(action: string): string {
 
 const orderTypeTree = ref<SystemOptionTreeNode[]>([])
 const collaborationItems = ref<Array<{ id: number; value: string }>>([])
-const secondaryProcessOptions = ref<{ label: string; value: string }[]>([])
+interface ProcessOptionNode {
+  label: string
+  value: string
+  children?: ProcessOptionNode[]
+}
+const processOptions = ref<ProcessOptionNode[]>([])
 const factoryOptions = ref<{ label: string; value: string }[]>([])
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const salespersonOptions = ref<string[]>([])
@@ -709,6 +715,15 @@ function findCollaborationLabelById(id: number | null | undefined): string {
   if (!id) return ''
   const found = collaborationItems.value.find((item) => item.id === id)
   return found?.value ?? ''
+}
+
+function getProcessItemDisplayLabel(v: string | undefined): string {
+  if (!v) return ''
+  const parts = v
+    .split('/')
+    .map((s) => s.trim())
+    .filter(Boolean)
+  return parts.length ? parts[parts.length - 1] : v
 }
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
@@ -995,14 +1010,14 @@ function collaborationDisplay(item: OrderListItem): string {
 }
 
 async function loadOptions() {
-  // 1）基础选项：客户 / 业务员 / 订单类型 / 合作方式 / 二次工艺 / 加工厂
+  // 1）基础选项：客户 / 业务员 / 订单类型 / 合作方式 / 工艺项目 / 加工厂
   try {
-    const [custRes, salesRes, orderTypeRes, collabRes, secondaryRes, factoryRes] = await Promise.all([
+    const [custRes, salesRes, orderTypeRes, collabRes, processRes, factoryRes] = await Promise.all([
       getCustomers({ page: 1, pageSize: 200 }),
       getSalespeople(),
       getDictTree('order_types'),
       getDictItems('collaboration'),
-      getSupplierBusinessScopeOptions('工艺供应商'),
+      getSupplierBusinessScopeTreeOptions('工艺供应商'),
       getDictOptions('factories'),
     ])
 
@@ -1022,8 +1037,19 @@ async function loadOptions() {
       ? collabVals.map((item: any) => ({ id: item.id, value: item.value }))
       : []
 
-    const secondaryVals = secondaryRes.data ?? []
-    secondaryProcessOptions.value = secondaryVals.map((v: string) => ({ label: v, value: v }))
+    const toProcessTreeSelect = (
+      nodes: SupplierBusinessScopeTreeNode[],
+      parentPath = '',
+    ): ProcessOptionNode[] =>
+      nodes.map((n) => {
+        const path = parentPath ? `${parentPath} / ${n.value}` : n.value
+        return {
+          label: n.value,
+          value: path,
+          children: n.children?.length ? toProcessTreeSelect(n.children, path) : undefined,
+        }
+      })
+    processOptions.value = toProcessTreeSelect(processRes.data ?? [])
 
     const factoryVals = factoryRes.data ?? []
     factoryOptions.value = factoryVals.map((v: string) => ({ label: v, value: v }))

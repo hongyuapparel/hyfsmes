@@ -340,7 +340,7 @@
       destroy-on-close
       @close="packagingCompleteDialog.items = []"
     >
-      <p class="dialog-tip">登记包装完成后将默认“全部入库”，自动生成一条仓库「待入库」记录，同时订单状态变为「订单完成」。后续发货/入库等由仓库模块处理。</p>
+      <p class="dialog-tip">登记包装完成后将默认“全部入库”，自动生成一条仓库「待仓处理」记录，同时订单状态变为「订单完成」。后续发货/入库等由仓库模块处理。</p>
       <div v-if="packagingCompleteDialog.formLoading" class="register-loading">加载尺寸细数...</div>
       <template v-else>
         <div
@@ -866,7 +866,7 @@ async function submitPackagingComplete() {
         remark: item.remark?.trim() || undefined,
       })
     }
-    ElMessage.success('登记包装完成：已生成待入库，订单已完成')
+    ElMessage.success('登记包装完成：已生成待仓处理记录，订单已完成')
     packagingCompleteDialog.visible = false
     await load()
     void loadTabCounts()

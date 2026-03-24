@@ -8,6 +8,7 @@ import { Role } from '../entities/role.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
 export interface ProductListQuery {
+  productName?: string;
   companyName?: string;
   skuCode?: string;
   /** 产品分组 ID（system_options.id） */
@@ -37,6 +38,7 @@ export class ProductsService {
 
   async findAll(query: ProductListQuery) {
     const {
+      productName,
       companyName,
       skuCode,
       productGroupId,
@@ -51,6 +53,9 @@ export class ProductsService {
       .createQueryBuilder('p')
       .leftJoinAndSelect('p.customer', 'c');
 
+    if (productName?.trim()) {
+      qb.andWhere('p.product_name LIKE :productName', { productName: `%${productName.trim()}%` });
+    }
     if (companyName?.trim()) {
       qb.andWhere('c.company_name LIKE :companyName', { companyName: `%${companyName.trim()}%` });
     }
@@ -58,7 +63,10 @@ export class ProductsService {
       qb.andWhere('p.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
     }
     if (typeof productGroupId === 'number') {
-      qb.andWhere('p.product_group_id = :productGroupId', { productGroupId });
+      const groupIds = await this.systemOptionsService.getSelfAndDescendantIds('product_groups', productGroupId);
+      qb.andWhere('p.product_group_id IN (:...groupIds)', {
+        groupIds,
+      });
     }
     if (typeof applicablePeopleId === 'number') {
       qb.andWhere('p.applicable_people_id = :apid', { apid: applicablePeopleId });
@@ -68,7 +76,7 @@ export class ProductsService {
     }
 
     const sortColumn = this.toSnakeCase(sortBy);
-    const validSortColumns = ['id', 'sku_code', 'product_group_id', 'applicable_people', 'created_at', 'salesperson'];
+    const validSortColumns = ['id', 'product_name', 'sku_code', 'product_group_id', 'applicable_people_id', 'created_at', 'salesperson'];
     if (validSortColumns.includes(sortColumn)) {
       qb.orderBy(`p.${sortColumn}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     }

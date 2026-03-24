@@ -53,6 +53,7 @@ export class ProductsController {
 
   @Get()
   findAll(
+    @Query('productName') productName?: string,
     @Query('companyName') companyName?: string,
     @Query('skuCode') skuCode?: string,
     @Query('productGroupId') productGroupIdStr?: string,
@@ -66,6 +67,7 @@ export class ProductsController {
     const productGroupId = productGroupIdStr ? parseInt(productGroupIdStr, 10) : undefined;
     const applicablePeopleId = applicablePeopleIdStr ? parseInt(applicablePeopleIdStr, 10) : undefined;
     return this.productsService.findAll({
+      productName,
       companyName,
       skuCode,
       productGroupId: Number.isNaN(productGroupId as number) ? undefined : (productGroupId as number),

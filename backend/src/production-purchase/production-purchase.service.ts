@@ -6,6 +6,7 @@ import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
+import { SuppliersService } from '../suppliers/suppliers.service';
 
 /** 已审单：非草稿、非待审单，即待纸样及之后的状态 */
 const PURCHASE_ORDER_STATUSES = [
@@ -67,6 +68,7 @@ export class ProductionPurchaseService {
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
     private readonly orderWorkflowService: OrderWorkflowService,
+    private readonly suppliersService: SuppliersService,
   ) {}
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
@@ -291,6 +293,7 @@ export class ProductionPurchaseService {
     };
     ext.materials = materials;
     await this.orderExtRepo.save(ext);
+    await this.suppliersService.touchLastActiveByNames([row?.supplierName ?? '']);
 
     // 若该订单全部物料采购完成，则按配置规则流转
     if (order.status === 'pending_purchase') {

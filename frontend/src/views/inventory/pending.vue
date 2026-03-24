@@ -53,6 +53,15 @@
         >
           入库
         </el-button>
+        <el-button
+          v-if="canOutboundSelection"
+          type="warning"
+          size="large"
+          :loading="outboundDialog.submitting"
+          @click="openOutboundDialog"
+        >
+          发货
+        </el-button>
       </div>
     </div>
 
@@ -231,13 +240,106 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="outboundDialog.visible"
+      title="发货"
+      width="860"
+      destroy-on-close
+      @close="resetOutboundForm"
+    >
+      <el-form
+        ref="outboundFormRef"
+        :model="outboundForm"
+        :rules="outboundRules"
+        label-width="80px"
+      >
+        <el-form-item label="领取人" prop="pickupUserId">
+          <el-select
+            v-model="outboundForm.pickupUserId"
+            placeholder="请选择业务员"
+            filterable
+            clearable
+            style="width: 260px"
+          >
+            <el-option
+              v-for="opt in pickupUserOptions"
+              :key="opt.id"
+              :label="opt.displayName || opt.username"
+              :value="opt.id"
+            />
+          </el-select>
+        </el-form-item>
+        <div class="outbound-batch-head">
+          <span>客户：{{ outboundSelectedCustomer }}</span>
+          <span>选中记录：{{ outboundDialog.items.length }}</span>
+          <span>发货总数：{{ outboundGrandTotal }}</span>
+        </div>
+        <div class="outbound-batch-list">
+          <div
+            v-for="item in outboundDialog.items"
+            :key="item.row.id"
+            class="outbound-batch-card"
+          >
+            <div class="outbound-card-meta">
+              <div>订单号：{{ item.row.orderNo }}</div>
+              <div>SKU：{{ item.row.skuCode }}</div>
+              <div>客户：{{ item.row.customerName || '-' }}</div>
+              <div>当前待处理：{{ item.row.quantity }}</div>
+            </div>
+            <div v-if="item.headers.length" class="outbound-size-wrap">
+              <el-table :data="item.rows" border size="small">
+                <el-table-column label="颜色" min-width="100">
+                  <template #default="{ row }">
+                    {{ row.colorName || '-' }}
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  v-for="(h, hIdx) in item.headers"
+                  :key="hIdx"
+                  :label="h"
+                  min-width="80"
+                  align="right"
+                >
+                  <template #default="{ row }">
+                    <el-input-number
+                      v-model="row.quantities[hIdx]"
+                      :min="0"
+                      :precision="0"
+                      controls-position="right"
+                      size="small"
+                      style="width: 100%"
+                    />
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div class="outbound-size-footer">该记录合计：{{ getOutboundItemTotal(item) }}</div>
+            </div>
+            <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法发货。</div>
+          </div>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="outboundDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="outboundDialog.submitting" @click="submitOutbound">
+          确定发货
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { getPendingList, doPendingInbound, type PendingListItem } from '@/api/inventory'
+import {
+  getPendingList,
+  doPendingInbound,
+  doPendingOutbound,
+  getPendingPickupUserOptions,
+  type PendingListItem,
+  type FinishedPickupUserOption,
+} from '@/api/inventory'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -259,6 +361,9 @@ const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PendingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+const canOutboundSelection = computed(
+  () => selectedRows.value.length > 0 && selectedRows.value.every((r) => r.sourceType !== 'defect'),
+)
 const { onHeaderDragEnd: onPendingHeaderDragEnd, restoreColumnWidths: restorePendingColumnWidths } =
   useTableColumnWidthPersist('inventory-pending-main')
 
@@ -278,6 +383,33 @@ const inboundRules: FormRules = {
   department: [{ required: true, message: '请选择部门', trigger: 'change' }],
   location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
 }
+
+type PendingOutboundDialogItem = {
+  row: PendingListItem
+  headers: string[]
+  rows: Array<{ colorName: string; quantities: number[] }>
+}
+
+const outboundDialog = reactive<{
+  visible: boolean
+  submitting: boolean
+  items: PendingOutboundDialogItem[]
+}>({ visible: false, submitting: false, items: [] })
+const outboundFormRef = ref<FormInstance>()
+const outboundForm = reactive({
+  pickupUserId: null as number | null,
+})
+const outboundRules: FormRules = {
+  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
+}
+const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
+const outboundSelectedCustomer = computed(() => {
+  const first = outboundDialog.items[0]?.row?.customerName?.trim()
+  return first || '-'
+})
+const outboundGrandTotal = computed(() =>
+  outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
+)
 
 const warehouseOptions = ref<{ id: number; label: string }[]>([])
 const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
@@ -438,8 +570,115 @@ async function loadInventoryTypeOptions() {
   }
 }
 
+async function loadPickupUserOptions() {
+  try {
+    const res = await getPendingPickupUserOptions()
+    pickupUserOptions.value = res.data ?? []
+  } catch {
+    pickupUserOptions.value = []
+  }
+}
+
+async function openOutboundDialog() {
+  if (!selectedRows.value.length) return
+  const rows = selectedRows.value
+  if (rows.some((row) => row.sourceType === 'defect')) {
+    ElMessage.warning('次品记录不支持直接发货')
+    return
+  }
+  const customerNames = Array.from(new Set(rows.map((row) => row.customerName?.trim() || '__EMPTY__')))
+  if (customerNames.length > 1) {
+    ElMessage.warning('批量发货请只选择同一客户的记录')
+    return
+  }
+  outboundForm.pickupUserId = null
+  await Promise.all(
+    rows
+      .map((row) => row.orderId)
+      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
+      .map((orderId) => ensureColorSizeBreakdown(orderId)),
+  )
+  outboundDialog.items = rows.map((row) => {
+    const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
+    const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+    return {
+      row,
+      headers,
+      rows: (breakdown?.rows ?? []).map((r) => ({
+        colorName: r.colorName,
+        quantities: headers.map(() => 0),
+      })),
+    }
+  })
+  outboundDialog.visible = true
+}
+
+function resetOutboundForm() {
+  outboundDialog.items = []
+  outboundForm.pickupUserId = null
+  outboundFormRef.value?.clearValidate()
+}
+
+function getOutboundItemTotal(item: PendingOutboundDialogItem) {
+  return item.rows.reduce(
+    (sum, row) => sum + row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0),
+    0,
+  )
+}
+
+async function submitOutbound() {
+  if (!outboundDialog.items.length) return
+  const valid = await outboundFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  const invalidItem = outboundDialog.items.find((item) => {
+    const qty = getOutboundItemTotal(item)
+    return item.headers.length === 0 || qty <= 0 || qty > item.row.quantity
+  })
+  if (invalidItem) {
+    const qty = getOutboundItemTotal(invalidItem)
+    if (invalidItem.headers.length === 0) {
+      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 暂无颜色尺码明细，无法发货`)
+    } else if (qty <= 0) {
+      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 请填写发货数量`)
+    } else {
+      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 的发货数量不能大于当前待处理数量`)
+    }
+    return
+  }
+  outboundDialog.submitting = true
+  try {
+    await doPendingOutbound({
+      items: outboundDialog.items.map((item) => ({
+        id: item.row.id,
+        quantity: getOutboundItemTotal(item),
+        sizeBreakdown: {
+          headers: item.headers,
+          rows: item.rows.map((row) => ({
+            colorName: row.colorName,
+            quantities: row.quantities.map((q) => Number(q) || 0),
+          })),
+        },
+      })),
+      pickupUserId: outboundForm.pickupUserId,
+    })
+    ElMessage.success('发货成功')
+    outboundDialog.visible = false
+    selectedRows.value = []
+    load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    outboundDialog.submitting = false
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([loadWarehouseOptions(), loadInventoryTypeOptions(), loadDepartmentOptions()])
+  await Promise.all([
+    loadWarehouseOptions(),
+    loadInventoryTypeOptions(),
+    loadDepartmentOptions(),
+    loadPickupUserOptions(),
+  ])
   await load()
 })
 </script>
@@ -511,6 +750,48 @@ onMounted(async () => {
 .qty-tooltip-num {
   text-align: center;
 }
+
+.outbound-size-wrap {
+  width: 100%;
+}
+
+.outbound-size-footer {
+  margin-top: 8px;
+  text-align: right;
+  color: var(--el-text-color-secondary);
+}
+
+.outbound-batch-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.outbound-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 55vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.outbound-batch-card {
+  padding: 12px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 10px;
+  background: var(--el-fill-color-blank);
+}
+
+.outbound-card-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  color: var(--el-text-color-regular);
+}
 </style>
 
 <style>
@@ -550,5 +831,9 @@ onMounted(async () => {
 
 .inventory-pending-page .pending-table {
   margin-bottom: var(--space-md);
+}
+
+.detail-muted {
+  color: var(--el-text-color-secondary);
 }
 </style>

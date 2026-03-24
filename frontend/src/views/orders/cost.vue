@@ -145,21 +145,17 @@
       <el-table :data="processItemRows" border size="small" class="cost-table">
         <el-table-column label="工艺项目" min-width="120">
           <template #default="{ row }">
-            <el-select
+            <el-tree-select
               v-model="row.processName"
               placeholder="选择工艺项目"
               filterable
-              allow-create
-              default-first-option
+              clearable
+              check-strictly
+              :data="processOptions"
+              :props="{ label: 'label', value: 'value', children: 'children' }"
               size="small"
-            >
-              <el-option
-                v-for="p in processOptions"
-                :key="p"
-                :label="p"
-                :value="p"
-              />
-            </el-select>
+              style="width: 100%"
+            />
           </template>
         </el-table-column>
         <el-table-column label="供应商" min-width="100">
@@ -436,7 +432,10 @@ import { getProductionProcesses, type ProductionProcessItem } from '@/api/produc
 import { getProcessQuoteTemplates, getProcessQuoteTemplateItems } from '@/api/process-quote-templates'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems } from '@/api/dicts'
-import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
+import {
+  getSupplierBusinessScopeTreeOptions,
+  type SupplierBusinessScopeTreeNode,
+} from '@/api/suppliers'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -460,7 +459,13 @@ const applying = ref(false)
 const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 const supplierOptions = ref<{ id: number; name: string }[]>([])
 const supplierLoading = ref(false)
-const processOptions = ref<string[]>([])
+interface ProcessOptionNode {
+  label: string
+  value: string
+  children?: ProcessOptionNode[]
+}
+
+const processOptions = ref<ProcessOptionNode[]>([])
 
 const importTemplateDialog = ref<{ visible: boolean; templateId: number | null }>({ visible: false, templateId: null })
 const importTemplateOptions = ref<{ id: number; name: string }[]>([])
@@ -678,8 +683,20 @@ async function searchSuppliers(keyword: string) {
 
 async function loadProcessOptions() {
   try {
-    const res = await getSupplierBusinessScopeOptions('工艺供应商')
-    processOptions.value = res.data ?? []
+    const res = await getSupplierBusinessScopeTreeOptions('工艺供应商')
+    const toTreeSelect = (
+      nodes: SupplierBusinessScopeTreeNode[],
+      parentPath = '',
+    ): ProcessOptionNode[] =>
+      nodes.map((n) => {
+        const path = parentPath ? `${parentPath} / ${n.value}` : n.value
+        return {
+          label: n.value,
+          value: path,
+          children: n.children?.length ? toTreeSelect(n.children, path) : undefined,
+        }
+      })
+    processOptions.value = toTreeSelect(res.data ?? [])
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('工艺项目选项加载失败', getErrorMessage(e))
   }

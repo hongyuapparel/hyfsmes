@@ -26,6 +26,7 @@ export interface ProductListRes {
 }
 
 export interface ProductListQuery {
+  productName?: string
   companyName?: string
   skuCode?: string
   productGroupId?: number | null

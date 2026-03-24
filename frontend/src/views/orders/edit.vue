@@ -625,19 +625,16 @@
       <el-table :data="processItems" border>
         <el-table-column label="工艺项目" min-width="160">
           <template #default="{ row }">
-            <el-select
+            <el-tree-select
               v-model="row.processName"
               placeholder="选择工艺项目"
               filterable
               clearable
-            >
-              <el-option
-                v-for="p in processOptions"
-                :key="p"
-                :label="p"
-                :value="p"
-              />
-            </el-select>
+              check-strictly
+              :data="processOptions"
+              :props="{ label: 'label', value: 'value', children: 'children' }"
+              style="width: 100%"
+            />
           </template>
         </el-table-column>
         <el-table-column label="供应商" min-width="140">
@@ -914,7 +911,10 @@ import {
   type OrderFormPayload,
 } from '@/api/orders'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getSupplierBusinessScopeOptions } from '@/api/suppliers'
+import {
+  getSupplierBusinessScopeTreeOptions,
+  type SupplierBusinessScopeTreeNode,
+} from '@/api/suppliers'
 import { uploadImage } from '@/api/uploads'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getDictItems } from '@/api/dicts'
@@ -1778,7 +1778,13 @@ interface ProcessRow {
 
 const processItems = ref<ProcessRow[]>([])
 /** 工艺项目下拉选项：与「供应商设置」中「工艺供应商」的业务范围一致 */
-const processOptions = ref<string[]>([])
+interface ProcessOptionNode {
+  label: string
+  value: string
+  children?: ProcessOptionNode[]
+}
+
+const processOptions = ref<ProcessOptionNode[]>([])
 
 function addProcessRow() {
   processItems.value.push({})
@@ -1791,8 +1797,20 @@ function removeProcessRow(index: number) {
 /** 从供应商设置加载「工艺供应商」下的业务范围作为工艺项目选项 */
 async function loadProcessOptions() {
   try {
-    const res = await getSupplierBusinessScopeOptions('工艺供应商')
-    processOptions.value = res.data ?? []
+    const res = await getSupplierBusinessScopeTreeOptions('工艺供应商')
+    const toTreeSelect = (
+      nodes: SupplierBusinessScopeTreeNode[],
+      parentPath = '',
+    ): ProcessOptionNode[] =>
+      nodes.map((n) => {
+        const path = parentPath ? `${parentPath} / ${n.value}` : n.value
+        return {
+          label: n.value,
+          value: path,
+          children: n.children?.length ? toTreeSelect(n.children, path) : undefined,
+        }
+      })
+    processOptions.value = toTreeSelect(res.data ?? [])
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('工艺项目选项加载失败', getErrorMessage(e))
   }

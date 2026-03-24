@@ -35,7 +35,7 @@ export const menuConfig: MenuItem[] = [
     title: '库存管理',
     icon: 'Box',
     children: [
-      { path: '/inventory/pending', title: '待入库' },
+      { path: '/inventory/pending', title: '待仓处理' },
       { path: '/inventory/finished', title: '成品库存' },
       { path: '/inventory/accessories', title: '辅料库存' },
       { path: '/inventory/fabric', title: '面料库存' },

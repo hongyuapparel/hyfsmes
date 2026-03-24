@@ -15,7 +15,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_production_sewing', name: '车缝管理', routePath: '/production/sewing', type: 'menu' },
   { code: 'menu_production_finishing', name: '尾部管理', routePath: '/production/finishing', type: 'menu' },
   { code: 'menu_inventory', name: '库存管理', routePath: '/inventory', type: 'menu' },
-  { code: 'menu_inventory_pending', name: '待入库', routePath: '/inventory/pending', type: 'menu' },
+  { code: 'menu_inventory_pending', name: '待仓处理', routePath: '/inventory/pending', type: 'menu' },
   { code: 'menu_inventory_finished', name: '成品库存', routePath: '/inventory/finished', type: 'menu' },
   { code: 'menu_inventory_accessories', name: '辅料库存', routePath: '/inventory/accessories', type: 'menu' },
   { code: 'menu_inventory_fabric', name: '面料库存', routePath: '/inventory/fabric', type: 'menu' },

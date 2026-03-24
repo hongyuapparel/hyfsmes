@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
+import { DataSource, Repository, IsNull } from 'typeorm';
 import { SystemOption } from '../entities/system-option.entity';
 
 export interface SystemOptionTree extends SystemOption {
@@ -12,6 +12,7 @@ export class SystemOptionsService {
   constructor(
     @InjectRepository(SystemOption)
     private repo: Repository<SystemOption>,
+    private readonly dataSource: DataSource,
   ) {}
 
   /** 供下拉用：扁平时子项显示为 "父级 > 子级 */
@@ -57,7 +58,7 @@ export class SystemOptionsService {
     return option?.id ?? null;
   }
 
-  /** 按父节点值返回直接子节点值列表（如某供应商类型下的业务范围） */
+  /** 按父节点值返回后代路径列表（父分组与子分组都可作为下拉选项） */
   async findChildrenValuesByParentValue(
     optionType: string,
     parentValue: string,
@@ -66,11 +67,36 @@ export class SystemOptionsService {
       where: { optionType, value: parentValue, parentId: IsNull() },
     });
     if (!parent) return [];
-    const list = await this.repo.find({
-      where: { optionType, parentId: parent.id },
+    const all = await this.repo.find({
+      where: { optionType },
       order: { sortOrder: 'ASC', id: 'ASC' },
     });
-    return list.map((o) => o.value);
+    const byParent = new Map<number, SystemOption[]>();
+    for (const o of all) {
+      if (o.parentId == null) continue;
+      if (!byParent.has(o.parentId)) byParent.set(o.parentId, []);
+      byParent.get(o.parentId)!.push(o);
+    }
+
+    const values: string[] = [];
+    const stack: Array<{ node: SystemOption; path: string }> = (byParent.get(parent.id) ?? []).map((n) => ({
+      node: n,
+      path: n.value,
+    }));
+    while (stack.length) {
+      const { node, path } = stack.shift()!;
+      const children = byParent.get(node.id) ?? [];
+      values.push(path);
+      if (children.length > 0) {
+        stack.unshift(
+          ...children.map((c) => ({
+            node: c,
+            path: `${path} / ${c.value}`,
+          })),
+        );
+      }
+    }
+    return values;
   }
 
   /** 按类型获取扁平列表（含 parentId），供管理页建树 */
@@ -198,6 +224,40 @@ export class SystemOptionsService {
     return result;
   }
 
+  /**
+   * 通用：按类型 + 根节点 ID，返回「根节点 + 全部子孙节点」ID。
+   * 适用于父分组筛选时包含所有子分组数据。
+   */
+  async getSelfAndDescendantIds(optionType: string, rootId: number): Promise<number[]> {
+    if (!Number.isFinite(rootId)) return [];
+    const list = await this.repo.find({
+      where: { optionType },
+      order: { parentId: 'ASC', sortOrder: 'ASC', id: 'ASC' },
+      select: ['id', 'parentId'],
+    });
+    const nodeIds = new Set(list.map((x) => x.id));
+    if (!nodeIds.has(rootId)) return [rootId];
+    const byParent = new Map<number, number[]>();
+    for (const row of list) {
+      if (row.parentId == null) continue;
+      const children = byParent.get(row.parentId) ?? [];
+      children.push(row.id);
+      byParent.set(row.parentId, children);
+    }
+    const result: number[] = [];
+    const visited = new Set<number>();
+    const queue: number[] = [rootId];
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      if (visited.has(current)) continue;
+      visited.add(current);
+      result.push(current);
+      const children = byParent.get(current) ?? [];
+      if (children.length > 0) queue.push(...children);
+    }
+    return result;
+  }
+
   /** 按类型获取树形结构 */
   async findTreeByType(optionType: string): Promise<SystemOptionTree[]> {
     const list = await this.repo.find({
@@ -233,14 +293,82 @@ export class SystemOptionsService {
   ): Promise<SystemOption> {
     const opt = await this.repo.findOne({ where: { id } });
     if (!opt) throw new NotFoundException('选项不存在');
+    const oldValue = opt.value;
 
     if (dto.value !== undefined) opt.value = dto.value;
     if (dto.sortOrder !== undefined) opt.sortOrder = dto.sortOrder;
     if (dto.parentId !== undefined) opt.parentId = dto.parentId;
     const saved = await this.repo.save(opt);
 
-    // 仓库：业务表只存 warehouse_id，列表/详情展示时按 ID 查当前名称，故此处无需按名称同步更新业务表，改名即自动同步。
+    await this.syncHistoricalTextByOptionRename(saved, oldValue, saved.value);
     return saved;
+  }
+
+  /** 配置项改名后，回写历史文本快照字段（仅覆盖当前确有文本快照的场景） */
+  private async syncHistoricalTextByOptionRename(
+    option: SystemOption,
+    oldValue: string,
+    newValue: string,
+  ): Promise<void> {
+    const from = (oldValue ?? '').trim();
+    const to = (newValue ?? '').trim();
+    if (!from || !to || from === to) return;
+
+    // 加工厂：历史订单仍有 factory_name 文本快照，改名后统一回写。
+    if (option.optionType === 'factories') {
+      await this.dataSource.query(
+        'UPDATE orders SET factory_name = ? WHERE factory_name = ?',
+        [to, from],
+      );
+      return;
+    }
+
+    // 组织部门：历史表中存在 department 文本快照，改名后统一回写。
+    if (option.optionType === 'org_departments') {
+      await Promise.all([
+        this.dataSource.query(
+          'UPDATE employees SET department = ? WHERE department = ?',
+          [to, from],
+        ),
+        this.dataSource.query(
+          'UPDATE production_processes SET department = ? WHERE department = ?',
+          [to, from],
+        ),
+        this.dataSource.query(
+          'UPDATE warehouse_inbound SET department = ? WHERE department = ?',
+          [to, from],
+        ),
+        this.dataSource.query(
+          'UPDATE finished_goods_stock SET department = ? WHERE department = ?',
+          [to, from],
+        ),
+        this.dataSource.query(
+          'UPDATE finished_goods_outbound SET department = ? WHERE department = ?',
+          [to, from],
+        ),
+      ]);
+      return;
+    }
+
+    // 供应商设置-业务范围：历史订单工艺项目是文本快照，改名后统一回写。
+    if (option.optionType === 'supplier_types' && option.parentId != null) {
+      await this.dataSource.query(
+        'UPDATE orders SET process_item = ? WHERE process_item = ?',
+        [to, from],
+      );
+      return;
+    }
+
+    // 订单设置-工种树：改名后同步生产工序中的 job_type 文本快照。
+    if (option.optionType === 'process_job_types') {
+      await this.dataSource.query(
+        'UPDATE production_processes SET job_type = ? WHERE job_type = ?',
+        [to, from],
+      );
+      return;
+    }
+
+    // 其余配置项当前以 ID 关联为主，展示会自动解析，无需文本回写。
   }
 
   async remove(id: number): Promise<void> {

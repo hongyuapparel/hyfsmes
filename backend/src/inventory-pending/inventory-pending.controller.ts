@@ -2,6 +2,7 @@ import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { InventoryPendingService } from './inventory-pending.service';
 
 @Controller('inventory/pending')
@@ -41,6 +42,39 @@ export class InventoryPendingController {
       department ?? '',
       location ?? '',
       imageUrl,
+    );
+  }
+
+  @Get('pickup-users')
+  getPickupUsers() {
+    return this.service.getPickupUserOptions();
+  }
+
+  @Post('outbound')
+  doOutbound(
+    @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: any }> | undefined,
+    @Body('id') id: number,
+    @Body('quantity') quantity: number,
+    @Body('pickupUserId') pickupUserId: number | null,
+    @Body('sizeBreakdown') sizeBreakdown: any,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.service.doOutbound(
+      Array.isArray(items) && items.length
+        ? items.map((item) => ({
+            id: Number(item?.id),
+            quantity: Number(item?.quantity),
+            sizeBreakdown: item?.sizeBreakdown ?? null,
+          }))
+        : [
+            {
+              id: Number(id),
+              quantity: Number(quantity),
+              sizeBreakdown: sizeBreakdown ?? null,
+            },
+          ],
+      user?.username ?? '',
+      pickupUserId != null ? Number(pickupUserId) : null,
     );
   }
 }

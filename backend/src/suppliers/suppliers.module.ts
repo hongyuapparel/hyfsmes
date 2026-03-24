@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Supplier } from '../entities/supplier.entity';
+import { Order } from '../entities/order.entity';
+import { OrderExt } from '../entities/order-ext.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
@@ -10,7 +12,7 @@ import { SuppliersController } from './suppliers.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Supplier, User, RolePermission]),
+    TypeOrmModule.forFeature([Supplier, Order, OrderExt, User, RolePermission]),
     AuthModule,
     SystemOptionsModule,
   ],

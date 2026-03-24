@@ -51,6 +51,26 @@
         <!-- 顶部筛选 -->
         <div ref="filterBarRef" class="filter-bar">
           <el-input
+            v-model="filter.productName"
+            placeholder="产品名称"
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getTextFilterStyle('产品名称：', filter.productName, productNameLabelVisible)"
+            :input-style="getFilterInputStyle(filter.productName)"
+            @input="debouncedSearch"
+            @keyup.enter="onFilterChange(true)"
+          >
+            <template #prefix>
+              <span
+                v-if="filter.productName && productNameLabelVisible"
+                :style="{ color: ACTIVE_FILTER_COLOR }"
+              >
+                产品名称：
+              </span>
+            </template>
+          </el-input>
+          <el-input
             v-model="filter.companyName"
             placeholder="客户"
             clearable
@@ -270,7 +290,7 @@
           <el-input
             v-else-if="f.type === 'text'"
             v-model="form[f.code]"
-            :placeholder="f.placeholder"
+            :placeholder="f.code === 'productName' ? '建议补充场景/版型/面料（如：紧身运动速干T恤）' : f.placeholder"
             :disabled="f.code === 'skuCode' && isEdit"
             type="text"
             size="default"
@@ -395,12 +415,14 @@ const tableHeight = ref<number | undefined>(undefined)
 let tableResizeObserver: ResizeObserver | null = null
 
 const filter = reactive<{
+  productName: string
   companyName: string
   skuCode: string
   productGroupId: number | null
   applicablePeopleId: number | null
   salesperson: string
 }>({
+  productName: '',
   companyName: '',
   skuCode: '',
   productGroupId: null,
@@ -447,6 +469,7 @@ function getTextFilterStyle(labelPrefix: string, value: unknown, showLabel: bool
 
 const companyNameLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
+const productNameLabelVisible = ref(false)
 
 /** 左侧分组树数据（含每节点产品数量）；根节点为「全部分组」 */
 interface GroupTreeNode {
@@ -533,11 +556,38 @@ function toggleGroupCollapse(path: string) {
 }
 
 /** 表格字段：优先使用 API 配置，否则用静态配置；仅显示 visible 的列 */
+function getEffectiveProductFields() {
+  const local = PRODUCT_FIELDS_SORTED as unknown as Array<{
+    code: string
+    label: string
+    type: string
+    order?: number
+    visible?: number
+    sortable?: boolean | number
+    optionsKey?: string
+    placeholder?: string
+  }>
+  if (!fieldDefinitions.value.length) return local
+  const api = fieldDefinitions.value as unknown as Array<{
+    code: string
+    label: string
+    type: string
+    order?: number
+    visible?: number
+    sortable?: boolean | number
+    optionsKey?: string
+    placeholder?: string
+  }>
+  const byCode = new Map(api.map((f) => [f.code, f]))
+  const merged = [...api]
+  for (const f of local) {
+    if (!byCode.has(f.code)) merged.push(f)
+  }
+  return merged
+}
+
 const tableFields = computed(() => {
-  const src = fieldDefinitions.value.length ? fieldDefinitions.value : PRODUCT_FIELDS_SORTED
-  const list = Array.isArray(src)
-    ? (src as { code: string; label: string; type: string; sortable?: boolean | number; visible?: number }[])
-    : []
+  const list = getEffectiveProductFields()
   return list
     .filter((f) => (f as { visible?: number }).visible !== 0)
     .sort((a, b) => ((a as { order?: number }).order ?? 0) - ((b as { order?: number }).order ?? 0))
@@ -555,10 +605,7 @@ const tableFields = computed(() => {
 
 /** 表单字段：排除仅展示字段 */
 const formFields = computed(() => {
-  const src = fieldDefinitions.value.length ? fieldDefinitions.value : PRODUCT_FIELDS_SORTED
-  const list = Array.isArray(src)
-    ? (src as { code: string; label: string; type: string; optionsKey?: string; placeholder?: string }[])
-    : []
+  const list = getEffectiveProductFields() as { code: string; label: string; type: string; optionsKey?: string; placeholder?: string }[]
   const ordered = list
     .filter((f) => f.code !== 'createdAt')
     .filter((f) => (f as { visible?: number }).visible !== 0)
@@ -716,6 +763,7 @@ function getOptions(f: { optionsKey?: string }) {
 async function load() {
   try {
     const res = await getProducts({
+      productName: filter.productName || undefined,
       companyName: filter.companyName || undefined,
       skuCode: filter.skuCode || undefined,
       productGroupId: filter.productGroupId ?? undefined,
@@ -747,6 +795,7 @@ function debouncedSearch() {
 
 function onFilterChange(byUser = false) {
   if (byUser) {
+    if (filter.productName && String(filter.productName).trim()) productNameLabelVisible.value = true
     if (filter.companyName && String(filter.companyName).trim()) companyNameLabelVisible.value = true
     if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
   }
@@ -806,8 +855,10 @@ async function loadOptions() {
 }
 
 function resetFilter() {
+  productNameLabelVisible.value = false
   companyNameLabelVisible.value = false
   skuCodeLabelVisible.value = false
+  filter.productName = ''
   filter.companyName = ''
   filter.skuCode = ''
   filter.productGroupId = null
@@ -969,6 +1020,12 @@ async function batchDelete() {
   }
 }
 
+watch(
+  () => filter.productName,
+  (v) => {
+    if (!v || !String(v).trim()) productNameLabelVisible.value = false
+  },
+)
 watch(
   () => filter.companyName,
   (v) => {

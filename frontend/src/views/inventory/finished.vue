@@ -92,7 +92,7 @@
               v-if="hasStoredSelection"
               type="warning"
               size="large"
-              :loading="outboundLoading"
+              :loading="outboundDialog.submitting"
               @click="openOutboundDialog"
             >
               出库
@@ -418,7 +418,7 @@
     <el-dialog
       v-model="outboundDialog.visible"
       title="出库"
-      width="640"
+      width="860"
       destroy-on-close
       @close="resetOutboundForm"
     >
@@ -444,40 +444,54 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item v-if="outboundSizeBreakdown.headers.length" label="颜色尺码明细">
-          <div class="outbound-size-wrap">
-            <el-table :data="outboundSizeBreakdown.rows" border size="small">
-              <el-table-column label="颜色" min-width="100">
-                <template #default="{ row }">
-                  {{ row.colorName || '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column
-                v-for="(h, hIdx) in outboundSizeBreakdown.headers"
-                :key="hIdx"
-                :label="h"
-                min-width="80"
-                align="right"
-              >
-                <template #default="{ row }">
-                  <el-input-number
-                    v-model="row.quantities[hIdx]"
-                    :min="0"
-                    :precision="0"
-                    controls-position="right"
-                    size="small"
-                    style="width: 100%"
-                  />
-                </template>
-              </el-table-column>
-            </el-table>
-            <div class="outbound-size-footer">明细合计：{{ outboundBreakdownTotal }}</div>
+        <div class="outbound-batch-head">
+          <span>客户：{{ outboundSelectedCustomer }}</span>
+          <span>选中记录：{{ outboundDialog.items.length }}</span>
+          <span>出库总数：{{ outboundGrandTotal }}</span>
+        </div>
+        <div class="outbound-batch-list">
+          <div
+            v-for="item in outboundDialog.items"
+            :key="item.row.id"
+            class="outbound-batch-card"
+          >
+            <div class="outbound-card-meta">
+              <div>订单号：{{ item.row.orderNo }}</div>
+              <div>SKU：{{ item.row.skuCode }}</div>
+              <div>客户：{{ item.row.customerName || '-' }}</div>
+              <div>当前库存：{{ item.row.quantity }}</div>
+            </div>
+            <div v-if="item.headers.length" class="outbound-size-wrap">
+              <el-table :data="item.rows" border size="small">
+                <el-table-column label="颜色" min-width="100">
+                  <template #default="{ row }">
+                    {{ row.colorName || '-' }}
+                  </template>
+                </el-table-column>
+                <el-table-column
+                  v-for="(h, hIdx) in item.headers"
+                  :key="hIdx"
+                  :label="h"
+                  min-width="80"
+                  align="right"
+                >
+                  <template #default="{ row }">
+                    <el-input-number
+                      v-model="row.quantities[hIdx]"
+                      :min="0"
+                      :precision="0"
+                      controls-position="right"
+                      size="small"
+                      style="width: 100%"
+                    />
+                  </template>
+                </el-table-column>
+              </el-table>
+              <div class="outbound-size-footer">该记录合计：{{ getOutboundItemTotal(item) }}</div>
+            </div>
+            <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法按明细出库。</div>
           </div>
-        </el-form-item>
-        <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法按明细出库。</div>
-        <p v-if="outboundDialog.row" class="outbound-tip">
-          当前库存：{{ outboundDialog.row.quantity }}
-        </p>
+        </div>
       </el-form>
       <template #footer>
         <el-button @click="outboundDialog.visible = false">取消</el-button>
@@ -1052,7 +1066,6 @@ const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
 const departmentOptions = ref<{ value: string; label: string }[]>([])
 const loading = ref(false)
 const inboundLoading = ref(false)
-const outboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<FinishedStockRow[]>([])
 
@@ -1501,11 +1514,17 @@ const inboundRules: FormRules = {
   location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
 }
 
+type FinishedOutboundDialogItem = {
+  row: FinishedStockRow
+  headers: string[]
+  rows: Array<{ colorName: string; quantities: number[] }>
+}
+
 const outboundDialog = reactive<{
   visible: boolean
   submitting: boolean
-  row: FinishedStockRow | null
-}>({ visible: false, submitting: false, row: null })
+  items: FinishedOutboundDialogItem[]
+}>({ visible: false, submitting: false, items: [] })
 const outboundFormRef = ref<FormInstance>()
 const outboundForm = reactive({
   pickupUserId: null as number | null,
@@ -1513,20 +1532,13 @@ const outboundForm = reactive({
 const outboundRules: FormRules = {
   pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
 }
-const outboundMaxQty = computed(() => outboundDialog.row?.quantity ?? 0)
 const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
-const outboundSizeBreakdown = reactive<{
-  headers: string[]
-  rows: Array<{ colorName: string; quantities: number[] }>
-}>({
-  headers: [],
-  rows: [],
+const outboundSelectedCustomer = computed(() => {
+  const first = outboundDialog.items[0]?.row?.customerName?.trim()
+  return first || '-'
 })
-const outboundBreakdownTotal = computed(() =>
-  outboundSizeBreakdown.rows.reduce(
-    (sum, row) => sum + row.quantities.reduce((s, q) => s + (Number(q) || 0), 0),
-    0,
-  ),
+const outboundGrandTotal = computed(() =>
+  outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
 )
 
 const createDialog = reactive<{ visible: boolean; submitting: boolean }>({
@@ -1799,57 +1811,82 @@ async function submitInbound() {
 
 async function openOutboundDialog() {
   if (storedRows.value.length === 0) return
-  const row = storedRows.value[0]
-  outboundDialog.row = row
-  outboundForm.pickupUserId = null
-  if (row.orderId) {
-    await ensureColorSizeBreakdown(row.orderId)
+  const rows = storedRows.value
+  const customerNames = Array.from(new Set(rows.map((row) => row.customerName?.trim() || '__EMPTY__')))
+  if (customerNames.length > 1) {
+    ElMessage.warning('批量出库请只选择同一客户的记录')
+    return
   }
-  const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-  outboundSizeBreakdown.headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-  outboundSizeBreakdown.rows = (breakdown?.rows ?? []).map((r) => ({
-    colorName: r.colorName,
-    quantities: outboundSizeBreakdown.headers.map(() => 0),
-  }))
+  outboundForm.pickupUserId = null
+  await Promise.all(
+    rows
+      .map((row) => row.orderId)
+      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
+      .map((orderId) => ensureColorSizeBreakdown(orderId)),
+  )
+  outboundDialog.items = rows.map((row) => {
+    const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
+    const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+    return {
+      row,
+      headers,
+      rows: (breakdown?.rows ?? []).map((r) => ({
+        colorName: r.colorName,
+        quantities: headers.map(() => 0),
+      })),
+    }
+  })
   outboundDialog.visible = true
 }
 
 function resetOutboundForm() {
-  outboundDialog.row = null
+  outboundDialog.items = []
   outboundForm.pickupUserId = null
-  outboundSizeBreakdown.headers = []
-  outboundSizeBreakdown.rows = []
   outboundFormRef.value?.clearValidate()
 }
 
+function getOutboundItemTotal(item: FinishedOutboundDialogItem) {
+  return item.rows.reduce(
+    (sum, row) => sum + row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0),
+    0,
+  )
+}
+
 async function submitOutbound() {
-  if (!outboundDialog.row) return
-  await outboundFormRef.value?.validate().catch(() => {})
-  if (outboundSizeBreakdown.headers.length === 0) {
-    ElMessage.warning('暂无颜色尺码明细，无法出库')
-    return
-  }
-  const qty = outboundBreakdownTotal.value
-  if (qty <= 0 || qty > outboundDialog.row.quantity) {
-    ElMessage.warning('出库数量无效')
+  if (!outboundDialog.items.length) return
+  const valid = await outboundFormRef.value?.validate().catch(() => false)
+  if (!valid) return
+  const invalidItem = outboundDialog.items.find((item) => {
+    const qty = getOutboundItemTotal(item)
+    return item.headers.length === 0 || qty <= 0 || qty > item.row.quantity
+  })
+  if (invalidItem) {
+    const qty = getOutboundItemTotal(invalidItem)
+    if (invalidItem.headers.length === 0) {
+      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 暂无颜色尺码明细，无法出库`)
+    } else if (qty <= 0) {
+      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 请填写出库数量`)
+    } else {
+      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 的出库数量不能大于当前库存`)
+    }
     return
   }
   outboundDialog.submitting = true
   try {
-    await finishedOutbound(
-      outboundDialog.row.id,
-      qty,
-      outboundForm.pickupUserId,
-      outboundSizeBreakdown.headers.length > 0
-        ? {
-            headers: outboundSizeBreakdown.headers,
-            rows: outboundSizeBreakdown.rows.map((r) => ({
-              colorName: r.colorName,
-              quantities: r.quantities.map((q) => Number(q) || 0),
-            })),
-          }
-        : null,
-    )
+    await finishedOutbound({
+      items: outboundDialog.items.map((item) => ({
+        id: item.row.id,
+        quantity: getOutboundItemTotal(item),
+        sizeBreakdown: {
+          headers: item.headers,
+          rows: item.rows.map((row) => ({
+            colorName: row.colorName,
+            quantities: row.quantities.map((q) => Number(q) || 0),
+          })),
+        },
+      })),
+      pickupUserId: outboundForm.pickupUserId,
+    })
     ElMessage.success('出库成功')
     outboundDialog.visible = false
     selectedRows.value = []
@@ -2348,13 +2385,6 @@ function onOutboundPageSizeChange() {
   color: var(--el-text-color-secondary);
 }
 
-.outbound-tip {
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
-  margin-top: -8px;
-  margin-bottom: 0;
-}
-
 .outbound-size-wrap {
   width: 100%;
 }
@@ -2364,6 +2394,38 @@ function onOutboundPageSizeChange() {
   text-align: right;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+
+.outbound-batch-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 12px;
+  color: var(--el-text-color-secondary);
+}
+
+.outbound-batch-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 55vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.outbound-batch-card {
+  padding: 12px;
+  border: 1px solid var(--el-border-color-light);
+  border-radius: 10px;
+  background: var(--el-fill-color-blank);
+}
+
+.outbound-card-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px 12px;
+  margin-bottom: 10px;
+  color: var(--el-text-color-regular);
 }
 
 .create-form-grid .el-form-item {

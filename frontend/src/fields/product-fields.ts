@@ -7,12 +7,13 @@ import type { FieldDefinition } from './types'
 
 export const PRODUCT_FIELDS: FieldDefinition[] = [
   { code: 'createdAt', label: '创建时间', type: 'date', order: 1, sortable: true, filterable: false },
-  { code: 'skuCode', label: 'SKU编号', type: 'text', order: 2, filterable: true, placeholder: '输入SKU编号' },
-  { code: 'imageUrl', label: '图片', type: 'image', order: 3, filterable: false, placeholder: '图片URL' },
-  { code: 'productGroup', label: '产品分组', type: 'select', order: 4, filterable: true, optionsKey: 'productGroups', placeholder: '选择产品分组' },
-  { code: 'applicablePeople', label: '适用人群', type: 'select', order: 5, filterable: true, optionsKey: 'applicablePeople', placeholder: '选择适用人群' },
-  { code: 'companyName', label: '客户', type: 'select', order: 6, filterable: true, optionsKey: 'customers', placeholder: '选择客户' },
-  { code: 'salesperson', label: '业务员', type: 'select', order: 7, filterable: true, optionsKey: 'salespeople', placeholder: '选择业务员' },
+  { code: 'productName', label: '产品名称', type: 'text', order: 2, filterable: true, placeholder: '建议补充场景/版型/面料（如：紧身运动速干T恤）' },
+  { code: 'skuCode', label: 'SKU编号', type: 'text', order: 3, filterable: true, placeholder: '输入SKU编号' },
+  { code: 'imageUrl', label: '图片', type: 'image', order: 4, filterable: false, placeholder: '图片URL' },
+  { code: 'productGroup', label: '产品分组', type: 'select', order: 5, filterable: true, optionsKey: 'productGroups', placeholder: '选择产品分组' },
+  { code: 'applicablePeople', label: '适用人群', type: 'select', order: 6, filterable: true, optionsKey: 'applicablePeople', placeholder: '选择适用人群' },
+  { code: 'companyName', label: '客户', type: 'select', order: 7, filterable: true, optionsKey: 'customers', placeholder: '选择客户' },
+  { code: 'salesperson', label: '业务员', type: 'select', order: 8, filterable: true, optionsKey: 'salespeople', placeholder: '选择业务员' },
 ]
 
 /** 按 order 排序后的字段列表 */

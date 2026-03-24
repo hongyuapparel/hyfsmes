@@ -26,6 +26,7 @@ import { Role } from '../entities/role.entity';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { SuppliersService } from '../suppliers/suppliers.service';
 
 const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   draft: '草稿',
@@ -160,7 +161,30 @@ export class OrdersService {
     private readonly inventoryAccessoriesService: InventoryAccessoriesService,
     private readonly systemOptionsService: SystemOptionsService,
     private readonly orderWorkflowService: OrderWorkflowService,
+    private readonly suppliersService: SuppliersService,
   ) {}
+
+  private collectSupplierNamesFromOrderExt(ext: OrderExt | null | undefined): string[] {
+    if (!ext) return [];
+    const names: string[] = [];
+    const materials = Array.isArray(ext.materials) ? ext.materials : [];
+    for (const m of materials) {
+      const name = (m?.supplierName ?? '').trim();
+      if (name) names.push(name);
+    }
+    const processItems = Array.isArray(ext.processItems) ? ext.processItems : [];
+    for (const p of processItems) {
+      const name = (p?.supplierName ?? '').trim();
+      if (name) names.push(name);
+    }
+    return names;
+  }
+
+  private async touchSuppliersActiveByOrderId(orderId: number): Promise<void> {
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const names = this.collectSupplierNamesFromOrderExt(ext);
+    await this.suppliersService.touchLastActiveByNames(names);
+  }
 
   /**
    * 自愈历史数据：工艺已完成但订单状态未按链路流转时，按 craft_completed 规则补齐。
@@ -742,6 +766,9 @@ export class OrdersService {
       await this.addLog(saved, actor, 'submit', `状态: ${beforeStatus || '-'} -> ${saved.status}`);
       await this.appendStatusHistory(saved.id, saved.status);
     }
+
+    // 提交订单时，按订单引用的供应商刷新活跃时间（系统自动维护）
+    await this.touchSuppliersActiveByOrderId(saved.id);
 
     // 订单从草稿首次提交时，按包装辅料自动出库，避免重复提交导致重复扣减
     if (beforeStatus === 'draft') {

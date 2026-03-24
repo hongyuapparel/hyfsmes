@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 /**
  * 供应商实体
- * 供应商类型-业务范围-合作日期-联系人-联系电话-工厂地址-结款时间
+ * 供应商类型-业务范围-联系人-联系电话-工厂地址-结款时间
  */
 @Entity('suppliers')
 export class Supplier {
@@ -21,9 +21,13 @@ export class Supplier {
   @Column({ name: 'business_scope_id', type: 'int', nullable: true })
   businessScopeId: number | null;
 
-  /** 合作日期 */
-  @Column({ name: 'cooperation_date', type: 'date', nullable: true })
-  cooperationDate: Date | null;
+  /** 业务范围 ID 列表（多选，兼容逐步从单选迁移到多选） */
+  @Column({ name: 'business_scope_ids', type: 'simple-json', nullable: true })
+  businessScopeIds: number[] | null;
+
+  /** 最近活跃时间（系统自动更新，禁止人工编辑） */
+  @Column({ name: 'last_active_at', type: 'datetime', nullable: true })
+  lastActiveAt: Date | null;
 
   /** 联系人 */
   @Column({ name: 'contact_person', length: 128, default: '' })

@@ -19,8 +19,8 @@
           <p><strong>待审核：</strong>订单状态为「待审单」(pending_review)，即已提交未审核的订单。</p>
           <p><strong>待我跟单：</strong>订单的跟单员等于当前登录用户的显示名（完全一致），仅非管理员显示。</p>
           <p><strong>即将到期：</strong>客户交期在今日起 7 天内（含今天）。</p>
-          <p><strong>待入库：</strong>待入库表中状态为「待处理」的记录（尾部入库后、仓管未完成入库）。</p>
-          <p class="todo-rules-hint">全部为 0 时请检查：是否有待审单、交期是否在 7 天内、跟单员是否与当前用户显示名一致、是否有待入库记录。</p>
+          <p><strong>待仓处理：</strong>待仓处理表中状态为「待处理」的记录（尾部交接后、仓管未完成入库或直接发货）。</p>
+          <p class="todo-rules-hint">全部为 0 时请检查：是否有待审单、交期是否在 7 天内、跟单员是否与当前用户显示名一致、是否有待仓处理记录。</p>
         </div>
       </el-popover>
     </div>
@@ -168,14 +168,14 @@
         </div>
       </section>
 
-      <!-- 待入库 -->
+      <!-- 待仓处理 -->
       <section
         v-if="canAccessPendingInbound"
         class="todo-section todo-section--default"
         :class="{ 'todo-section-loading': todoLoading }"
       >
         <div class="todo-section-head">
-          <span class="todo-section-title">{{ isAdmin ? '待入库(全部)' : '待入库' }}</span>
+          <span class="todo-section-title">{{ isAdmin ? '待仓处理(全部)' : '待仓处理' }}</span>
           <span class="todo-section-count">{{ todoCounts.pendingInbound }}</span>
           <el-link
             v-if="todoCounts.pendingInbound > 0"
@@ -192,7 +192,7 @@
               <tr>
                 <th>订单号</th>
                 <th>SKU</th>
-                <th>待入数量</th>
+                <th>待处理数量</th>
               </tr>
             </thead>
             <tbody>
@@ -219,7 +219,7 @@
 
 <script setup lang="ts">
 /**
- * 待办事项统计规则（与后端订单列表、待入库接口一致）：
+ * 待办事项统计规则（与后端订单列表、待仓处理接口一致）：
  *
  * 1. 待审核(全部) / 待我审核
  *    - 条件：订单 status = 'pending_review'（订单提交后、审核前的状态）
@@ -234,7 +234,7 @@
  *            且仅统计「非草稿 + 非终态（未完成）」状态
  *    - 显示：有订单列表权限即展示
  *
- * 4. 待入库(全部) / 待入库
+ * 4. 待仓处理(全部) / 待仓处理
  *    - 条件：表 inbound_pending 中 status = 'pending' 的记录（尾部入库后、仓管未完成入库）
  *    - 显示：有 /inventory/pending 路由权限才请求并展示
  */
@@ -283,8 +283,8 @@ const greetingText = computed(() => {
 type EncourageItem = { text: string; icon: typeof Sunny; forRoutePath?: string; forPermissionCode?: string }
 const ENCOURAGE_ITEMS: EncourageItem[] = [
   // ---------- 岗位相关（仅对应权限用户可见） ----------
-  { text: '审单仔细一点，后续会轻松很多。✨', icon: CircleCheckFilled, forPermissionCode: 'orders_review' },
-  { text: '待入库及时处理，数据更准。', icon: Present, forRoutePath: '/inventory/pending' },
+  { text: '审单仔细一点，后续会轻松很多哦！✨', icon: CircleCheckFilled, forPermissionCode: 'orders_review' },
+  { text: '待仓处理及时处理，数据更准。', icon: Present, forRoutePath: '/inventory/pending' },
   { text: '跟单有疑问先记一笔，集中沟通更高效。', icon: TrendCharts },
 
   // ---------- 天气 ----------
@@ -295,32 +295,30 @@ const ENCOURAGE_ITEMS: EncourageItem[] = [
   { text: '阴天也适合专心干活。', icon: TrendCharts },
 
   // ---------- 季节 ----------
-  { text: '入秋了，注意加件衣服。', icon: Sunny },
-  { text: '春天了，可以多出去走走。', icon: StarFilled },
-  { text: '夏天天热，多喝水。', icon: Moon },
-  { text: '冬天注意保暖。', icon: Present },
+  { text: '入秋了，注意加件衣服呀~', icon: Sunny },
+  { text: '夏天天热，多喝水哦~', icon: Moon },
+  { text: '冬天注意保暖哟！', icon: Present },
 
   // ---------- 节日 / 特殊时段 ----------
-  { text: '今天过节，尽量早点收工。', icon: Present },
-  { text: '假期快到了，撑住。', icon: TrendCharts },
-  { text: '节后第一天，慢慢来。', icon: Sunny },
-  { text: '周末愉快。', icon: StarFilled },
-  { text: '小长假前，事多也别忘了喘口气。', icon: Moon },
+  { text: '今天过节，尽量早点收工哟', icon: Present },
+  { text: '假期快到了，撑住~', icon: TrendCharts },
+  { text: '节后第一天，慢慢来！', icon: Sunny },
+  { text: '周末愉快鸭！', icon: StarFilled },
+  { text: '小长假前事多，别忘了喘口气~', icon: Moon },
 
   // ---------- 通用·小确幸 ----------
-  { text: '今天事多，辛苦了。', icon: StarFilled },
-  { text: '忙完这阵，记得喘口气。', icon: Sunny },
-  { text: '午休记得动一动，换换脑子。', icon: Moon },
-  { text: '下班路上注意安全。', icon: Present },
-  { text: '歇一下喝口水，效率更高。', icon: Moon },
-  { text: '累了就歇 5 分钟，不丢人。', icon: Sunny },
-  { text: '先喝口水，再继续。✨', icon: MagicStick },
-  { text: '累了就喘口气，没人会怪你。', icon: Present },
-  { text: '午饭好好吃。', icon: CircleCheckFilled },
-  { text: '困了就眯几分钟，不丢人。', icon: Moon },
+  { text: '今天事多，辛苦了哟！', icon: StarFilled },
+  { text: '午休记得动一动，换换脑子(*^_^*)', icon: Moon },
+  { text: '下班路上一定要注意安全哟', icon: Present },
+  { text: '歇一下喝口水，效率更高！', icon: Moon },
+  { text: '桌面收一收，脑子会更清爽。', icon: CircleCheckFilled },
+  { text: '喝口水，肩膀放松一下，再继续。', icon: Moon },
+  { text: '完成一件就给自己一个小勾，成就感会回来。', icon: MagicStick },
+  { text: '先把最不想做的那件做掉，后面会轻松很多。', icon: TrendCharts },
+  { text: '今天也要好好吃饭哦~😜', icon: CircleCheckFilled },
   { text: '对自己好一点，也是今天的 KPI。', icon: Present },
-  { text: '再忙也留一点时间给自己。', icon: Moon },
-  { text: '忙完这一段，奖励自己一下。✨', icon: Sunny },
+  { text: '再忙也要留出一点时间给自己。', icon: Moon },
+  { text: '忙完这一段，奖励一下认真工作的自己吧。✨', icon: Sunny },
 
   // ---------- 通用·陪伴鼓励 ----------
   { text: '你今天的状态，比昨天又好了那么一点。', icon: Sunny },
@@ -331,36 +329,30 @@ const ENCOURAGE_ITEMS: EncourageItem[] = [
   { text: '节奏稳、执行到位，本身就是一种厉害。', icon: Present },
   { text: '忙归忙，你比 KPI 重要。', icon: Moon },
   { text: '在意细节的人，说的就是你。✨', icon: StarFilled },
-  { text: '认真上线了，本身就值得一个赞。', icon: CircleCheckFilled },
   { text: '待办一条条划掉，是不是有点爽？', icon: TrendCharts },
-  { text: '你在这儿，事情就在好好推进。', icon: Sunny },
-  { text: '重要的事先做，剩下的按节奏来。', icon: MagicStick },
   { text: '和客户、工厂沟通留个痕，省心。', icon: Present },
   { text: '今日事今日毕，交期在心不慌张。', icon: Sunny },
-  { text: '别急，一步一步来，你已经在路上了。', icon: Moon },
-  { text: '能搞定这些的人，本身就很靠谱。✨', icon: StarFilled },
-  { text: '你的时间很贵，先顾好手头的事，系统可以等。', icon: MagicStick },
+  { text: '能搞定这些工作的你，真的很靠谱。✨', icon: StarFilled },
+  { text: '你的时间很贵，别拿来跟不值得的事情生气~', icon: MagicStick },
   { text: '小事做稳了，大事才不慌。', icon: CircleCheckFilled },
   { text: '小目标：比昨天从容一点就好。', icon: TrendCharts },
-  { text: '把乱序理成条理，你有一手。', icon: StarFilled },
   { text: '你的认真，客户和同事都看得到。', icon: CircleCheckFilled },
   { text: '问题一个一个解决，你就比昨天更强。', icon: MagicStick },
   { text: '别扛太多，该协作就协作。', icon: Moon },
-  { text: '该跟进的事都跟上了，心里有数。', icon: Present },
   { text: '把事情捋顺的人，值得一句夸。✨', icon: TrendCharts },
   { text: '偶尔放空一下，脑子会更清楚。', icon: Sunny },
   { text: '进度在往前，就是好事。', icon: StarFilled },
   { text: '难搞的先记下来，别压在心里。', icon: Moon },
   { text: '你的节奏，就是最好的节奏。', icon: MagicStick },
   { text: '今天又推进了几件小事，已经很有成效了。', icon: Present },
-  { text: '让流程跑起来的人，有你。✨', icon: TrendCharts },
   { text: '能把琐事理清的人，做事都有章法。', icon: StarFilled },
   { text: '交期在心、执行在手，你就稳了。', icon: CircleCheckFilled },
   { text: '问题会解决，你也会越做越顺。', icon: MagicStick },
-  { text: '小成就也值得记一笔。✨', icon: Present },
+  { text: '小成就也值得记一笔，呀呼~✨', icon: Present },
   { text: '一步一步来，比焦虑有用。', icon: Moon },
   { text: '你的靠谱，就是团队的底气。', icon: TrendCharts },
-  { text: '把事情做完的人，本身就了不起。', icon: Sunny },
+  { text: '愿意沟通、愿意改进的人，走得都不会慢。', icon: CircleCheckFilled },
+  { text: '你在认真对待工作，工作也会回报你。', icon: Present },
   { text: '偶尔慢下来，是为了走更远。', icon: StarFilled },
   { text: '好好干活了，值得一句夸。', icon: CircleCheckFilled },
   { text: '你的存在，让很多事有了着落。✨', icon: Present },
@@ -375,8 +367,7 @@ const ENCOURAGE_ITEMS: EncourageItem[] = [
   { text: '休息好了，再冲也不迟。', icon: Sunny },
   { text: '你的付出，会有人看见的。', icon: CircleCheckFilled },
   { text: '能推进一点是一点，已经很好了。', icon: Present },
-  { text: '别憋着，该问就问。', icon: Moon },
-  { text: '好好对待自己了。', icon: TrendCharts },
+  { text: '工作上有问题，别憋着，该问就问！', icon: Moon },
   { text: '按自己的节奏来，就对了。', icon: Sunny },
   { text: '把事情一件件做完，超酷的。✨', icon: StarFilled },
   { text: '棘手的事先记下来，找时间集中处理。', icon: CircleCheckFilled },
@@ -385,15 +376,11 @@ const ENCOURAGE_ITEMS: EncourageItem[] = [
   { text: '路会越走越顺，前提是你一直在走。', icon: TrendCharts },
   { text: '把事捋顺，你行的。', icon: Sunny },
   { text: '分担出去一些，团队一起扛更轻松。', icon: StarFilled },
-  { text: '该处理的都处理了，值得肯定。', icon: MagicStick },
   { text: '把事情做完，本身就是一种能力。', icon: Present },
-  { text: '偶尔慢一点，是为了走更稳。', icon: Moon },
   { text: '你的认真，大家都看得到。✨', icon: TrendCharts },
-  { text: '先搞定手头这一件。', icon: Sunny },
   { text: '能理清待办的人，做事有条理。', icon: StarFilled },
   { text: '问题会一个一个解决的。', icon: MagicStick },
   { text: '有些事可以交给别人，不必全揽在自己身上。', icon: Moon },
-  { text: '把事情捋顺，你就赢了。✨', icon: TrendCharts },
   { text: '有你在跟进，事情就不会悬着。', icon: Sunny },
   { text: '把一件件事做到位的人，会越来越被看见。', icon: StarFilled },
   { text: '小事做稳，大事才不慌。', icon: CircleCheckFilled },
@@ -679,7 +666,12 @@ onMounted(() => {
 
 .home-encourage-icon {
   font-size: 1.25rem;
-  color: var(--el-color-primary);
+  color: #d97706;
+  background: #fff4db;
+  border: 1px solid #f6d79a;
+  border-radius: 999px;
+  padding: 4px;
+  box-shadow: 0 1px 4px rgba(217, 119, 6, 0.18);
   flex-shrink: 0;
 }
 

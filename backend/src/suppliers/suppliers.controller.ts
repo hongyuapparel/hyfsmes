@@ -48,6 +48,17 @@ export class SuppliersController {
   }
 
   /**
+   * 某供应商类型下的业务范围树（父分组可展开到子分组，父子都可选）
+   * GET /suppliers/options/business-scope/tree?type=工艺供应商
+   */
+  @Get('options/business-scope/tree')
+  async getBusinessScopeTree(@Query('type') type: string) {
+    const tree = await this.systemOptionsService.findTreeByType(SUPPLIER_TYPE_OPTION_TYPE);
+    const root = tree.find((n) => n.parentId == null && n.value === (type || '').trim());
+    return root?.children ?? [];
+  }
+
+  /**
    * 下拉搜索供应商（订单编辑等调用，需具备 /suppliers 权限）
    * GET /suppliers?keyword=&page=&pageSize=
    */
@@ -99,12 +110,24 @@ export class SuppliersController {
     return this.suppliersService.getOne(Number(id));
   }
 
+  /** 供应商最近合作记录（按订单引用） */
+  @Get('items/:id/recent-records')
+  getRecentRecords(
+    @Param('id') id: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.suppliersService.getRecentOrderRecords(
+      Number(id),
+      limit ? Number(limit) : 10,
+    );
+  }
+
   @Post('items')
   create(
     @Body('name') name: string,
     @Body('supplierTypeId') supplierTypeId?: number | null,
     @Body('businessScopeId') businessScopeId?: number | null,
-    @Body('cooperationDate') cooperationDate?: string,
+    @Body('businessScopeIds') businessScopeIds?: number[] | null,
     @Body('contactPerson') contactPerson?: string,
     @Body('contactInfo') contactInfo?: string,
     @Body('factoryAddress') factoryAddress?: string,
@@ -114,7 +137,7 @@ export class SuppliersController {
       name,
       supplierTypeId,
       businessScopeId,
-      cooperationDate,
+      businessScopeIds,
       contactPerson,
       contactInfo,
       factoryAddress,
@@ -128,7 +151,7 @@ export class SuppliersController {
     @Body('name') name?: string,
     @Body('supplierTypeId') supplierTypeId?: number | null,
     @Body('businessScopeId') businessScopeId?: number | null,
-    @Body('cooperationDate') cooperationDate?: string,
+    @Body('businessScopeIds') businessScopeIds?: number[] | null,
     @Body('contactPerson') contactPerson?: string,
     @Body('contactInfo') contactInfo?: string,
     @Body('factoryAddress') factoryAddress?: string,
@@ -138,7 +161,7 @@ export class SuppliersController {
       name,
       supplierTypeId,
       businessScopeId,
-      cooperationDate,
+      businessScopeIds,
       contactPerson,
       contactInfo,
       factoryAddress,

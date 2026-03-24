@@ -5,13 +5,30 @@ export interface SupplierItem {
   name: string
   supplierTypeId: number | null
   businessScopeId: number | null
-  cooperationDate: string | null
+  businessScopeIds: number[] | null
+  lastActiveAt: string | null
   contactPerson: string
   contactInfo: string
   factoryAddress: string
   settlementTime: string
   createdAt: string
   updatedAt: string
+}
+
+export interface SupplierRecentRecordItem {
+  orderId: number
+  orderNo: string
+  skuCode: string
+  status: string
+  orderDate: string | null
+  refType: 'material' | 'process'
+  refName: string
+}
+
+export interface SupplierBusinessScopeTreeNode {
+  id: number
+  value: string
+  children: SupplierBusinessScopeTreeNode[]
 }
 
 /** 管理页列表（支持名称、类型筛选）。type 为类型名称，如「生产加工厂」 */
@@ -33,11 +50,17 @@ export function getSupplierOne(id: number) {
   return request.get<SupplierItem>(`/suppliers/items/${id}`)
 }
 
+export function getSupplierRecentRecords(id: number, limit = 10) {
+  return request.get<SupplierRecentRecordItem[]>(`/suppliers/items/${id}/recent-records`, {
+    params: { limit },
+  })
+}
+
 export function createSupplier(body: {
   name: string
   supplierTypeId?: number | null
   businessScopeId?: number | null
-  cooperationDate?: string
+  businessScopeIds?: number[] | null
   contactPerson?: string
   contactInfo?: string
   factoryAddress?: string
@@ -52,7 +75,7 @@ export function updateSupplier(
     name?: string
     supplierTypeId?: number | null
     businessScopeId?: number | null
-    cooperationDate?: string
+    businessScopeIds?: number[] | null
     contactPerson?: string
     contactInfo?: string
     factoryAddress?: string
@@ -78,9 +101,16 @@ export function getSupplierTypeOptions() {
   return request.get<string[]>('/suppliers/options')
 }
 
-/** 某供应商类型下的业务范围下拉选项（该类型下的二级配置） */
+/** 某供应商类型下的业务范围下拉选项（返回可选层级路径，父/子分组都可选） */
 export function getSupplierBusinessScopeOptions(type: string) {
   return request.get<string[]>('/suppliers/options/business-scope', {
+    params: { type },
+  })
+}
+
+/** 某供应商类型下的业务范围树（父/子分组树形，可展开） */
+export function getSupplierBusinessScopeTreeOptions(type: string) {
+  return request.get<SupplierBusinessScopeTreeNode[]>('/suppliers/options/business-scope/tree', {
     params: { type },
   })
 }

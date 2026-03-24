@@ -132,7 +132,7 @@ const routes: RouteRecordRaw[] = [
             path: 'pending',
             name: 'InventoryPending',
             component: () => import('@/views/inventory/pending.vue'),
-            meta: { title: '待入库', permissionPath: '/inventory/pending' },
+            meta: { title: '待仓处理', permissionPath: '/inventory/pending' },
           },
           {
             path: 'finished',

@@ -63,6 +63,7 @@ export class FinishedGoodsStockController {
 
   @Post('outbound')
   outbound(
+    @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: any }> | undefined,
     @Body('id') id: number,
     @Body('quantity') quantity: number,
     @Body('pickupUserId') pickupUserId: number | null,
@@ -71,12 +72,22 @@ export class FinishedGoodsStockController {
     @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.service.outbound(
-      Number(id),
-      Number(quantity),
+      Array.isArray(items) && items.length
+        ? items.map((item) => ({
+            id: Number(item?.id),
+            quantity: Number(item?.quantity),
+            sizeBreakdown: item?.sizeBreakdown ?? null,
+          }))
+        : [
+            {
+              id: Number(id),
+              quantity: Number(quantity),
+              sizeBreakdown: sizeBreakdown ?? null,
+            },
+          ],
       user?.username ?? '',
       remark ?? '',
       pickupUserId != null ? Number(pickupUserId) : null,
-      sizeBreakdown ?? null,
     );
   }
 

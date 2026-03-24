@@ -20,6 +20,7 @@ import { AuthModule } from '../auth/auth.module';
 import { InventoryAccessoriesModule } from '../inventory-accessories/inventory-accessories.module';
 import { SystemOptionsModule } from '../system-options/system-options.module';
 import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
+import { SuppliersModule } from '../suppliers/suppliers.module';
 import { OrdersController } from './orders.controller';
 import { OrderCostController } from './order-cost.controller';
 import { OrdersService } from './orders.service';
@@ -48,6 +49,7 @@ import { OrdersService } from './orders.service';
     InventoryAccessoriesModule,
     SystemOptionsModule,
     OrderWorkflowModule,
+    SuppliersModule,
   ],
   controllers: [OrdersController, OrderCostController],
   providers: [OrdersService],
