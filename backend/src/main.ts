@@ -17,9 +17,14 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
   app.enableCors();
+
   const uploadsDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+
+  // Support both direct `/uploads/*` access and proxied `/api/uploads/*` access.
   app.use('/uploads', express.static(uploadsDir));
+  app.use('/api/uploads', express.static(uploadsDir));
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -27,8 +32,10 @@ async function bootstrap() {
       transform: true,
     }),
   );
+
   const port = process.env.PORT || 3000;
   await app.listen(port, '0.0.0.0');
+
   const dataSource = app.get(DataSource);
   try {
     await seedPermissions(dataSource);
@@ -40,6 +47,8 @@ async function bootstrap() {
   } catch (err) {
     console.error('[Seed] Failed:', err);
   }
+
   console.log(`Backend running at http://localhost:${port}`);
 }
+
 bootstrap();

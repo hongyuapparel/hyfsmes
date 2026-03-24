@@ -39,6 +39,10 @@ const imageInterceptor = FileInterceptor('file', {
   },
 });
 
+function buildUploadUrl(filename: string) {
+  return `/api/uploads/${filename}`;
+}
+
 @Controller('uploads')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 export class UploadsController {
@@ -47,7 +51,7 @@ export class UploadsController {
   @UseInterceptors(imageInterceptor)
   uploadImage(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('请选择图片文件');
-    return { url: `/uploads/${file.filename}` };
+    return { url: buildUploadUrl(file.filename) };
   }
 
   /** 面料出库拍照上传，需库存/面料权限 */
@@ -56,7 +60,7 @@ export class UploadsController {
   @UseInterceptors(imageInterceptor)
   uploadOutboundImage(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('请选择图片文件');
-    return { url: `/uploads/${file.filename}` };
+    return { url: buildUploadUrl(file.filename) };
   }
 
   /** 财务附件/凭证上传（收入/支出流水登记时使用） */
@@ -65,6 +69,6 @@ export class UploadsController {
   @UseInterceptors(imageInterceptor)
   uploadFinanceImage(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('请选择图片文件');
-    return { url: `/uploads/${file.filename}` };
+    return { url: buildUploadUrl(file.filename) };
   }
 }
