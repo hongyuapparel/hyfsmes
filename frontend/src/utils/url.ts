@@ -1,20 +1,17 @@
 const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i
 const SPECIAL_URL_RE = /^(?:data|blob):/i
 
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
 function getUploadBaseUrl(): string {
-  const explicitBase = (import.meta.env.VITE_UPLOAD_BASE_URL ?? '').trim()
+  const explicitBase = trimTrailingSlash((import.meta.env.VITE_UPLOAD_BASE_URL ?? '').trim())
   if (explicitBase) return explicitBase
 
-  const apiBase = (import.meta.env.VITE_API_BASE_URL ?? '').trim()
-  if (/^https?:\/\//i.test(apiBase)) {
-    try {
-      return new URL(apiBase).origin
-    } catch {
-      return ''
-    }
-  }
-
-  return ''
+  // Keep uploads on the same proxy prefix as API so production can route
+  // static files through `/api -> backend` even when `/uploads` is not exposed.
+  return trimTrailingSlash((import.meta.env.VITE_API_BASE_URL || '/api').trim())
 }
 
 function looksLikeUploadPath(value: string): boolean {
@@ -33,11 +30,7 @@ export function resolveAssetUrl(value: string): string {
   const baseUrl = getUploadBaseUrl()
   if (!baseUrl) return normalized
 
-  try {
-    return new URL(normalized, baseUrl).toString()
-  } catch {
-    return normalized
-  }
+  return `${baseUrl}${normalized}`
 }
 
 export function normalizeUploadUrlsDeep<T>(input: T): T {
