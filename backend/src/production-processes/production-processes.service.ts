@@ -22,6 +22,30 @@ export class ProductionProcessesService {
     return qb.getMany();
   }
 
+  async findPage(
+    filters?: { department?: string; jobType?: string; page?: number; pageSize?: number },
+  ): Promise<{ items: ProductionProcess[]; total: number; page: number; pageSize: number }> {
+    const page = Math.max(1, Number(filters?.page ?? 1) || 1);
+    const pageSize = Math.min(500, Math.max(1, Number(filters?.pageSize ?? 50) || 50));
+    const qb = this.repo
+      .createQueryBuilder('p')
+      .orderBy('p.sort_order', 'ASC')
+      .addOrderBy('p.id', 'ASC');
+    if (filters?.department?.trim()) {
+      qb.andWhere('p.department = :department', { department: filters.department.trim() });
+    }
+    if (filters?.jobType?.trim()) {
+      qb.andWhere('p.job_type = :jobType', { jobType: filters.jobType.trim() });
+    }
+    const total = await qb.getCount();
+    const items = await qb
+      .clone()
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+    return { items, total, page, pageSize };
+  }
+
   async findOne(id: number): Promise<ProductionProcess> {
     const row = await this.repo.findOne({ where: { id } });
     if (!row) throw new NotFoundException('生产工序不存在');

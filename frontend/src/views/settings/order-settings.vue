@@ -128,12 +128,14 @@
             ref="processTreeTableRef"
             :data="processTreeData"
             row-key="id"
+            :expand-row-keys="processExpandedRowKeys"
             border
             size="small"
             class="process-table process-tree-single"
             lazy
             :load="loadProcessTreeNode"
             :tree-props="{ hasChildren: 'hasChildren', children: 'children' }"
+            @expand-change="onProcessTreeExpandChange"
           >
             <el-table-column label="部门" min-width="100" align="center">
               <template #default="{ row }">
@@ -179,6 +181,13 @@
                   <div class="process-row-actions">
                     <el-button link type="primary" size="small" @click="openProcessDialog(row.processRow)">编辑</el-button>
                     <el-button link type="danger" size="small" @click="removeProcess(row.processRow!)">删除</el-button>
+                  </div>
+                </template>
+                <template v-else-if="row.rowType === 'load_more'">
+                  <div class="process-row-actions">
+                    <el-button link type="primary" size="small" @click="loadMoreProcesses(row)">
+                      加载更多（{{ row.loadedCount ?? 0 }}/{{ row.totalCount ?? 0 }}）
+                    </el-button>
                   </div>
                 </template>
               </template>
@@ -676,6 +685,7 @@ import Sortable from 'sortablejs'
 import OptionList from './product-option-list.vue'
 import {
   getProductionProcesses,
+  getProductionProcessesPage,
   createProductionProcess,
   updateProductionProcess,
   deleteProductionProcess,
@@ -693,11 +703,16 @@ import {
 } from '@/api/process-quote-templates'
 import {
   getSystemOptionsTree,
+  getSystemOptionsList,
+  getSystemOptionsRoots,
+  getSystemOptionsChildren,
   createSystemOption,
   updateSystemOption,
   deleteSystemOption,
   batchUpdateSystemOptionOrder,
   type SystemOptionTreeNode,
+  type SystemOptionItem,
+  type SystemOptionLazyNode,
 } from '@/api/system-options'
 import { getRoles, type RoleItem } from '@/api/roles'
 import {
@@ -728,7 +743,7 @@ import { ArrowRight } from '@element-plus/icons-vue'
 /** 树表行：部门 / 工种 / 工序（懒加载用）；displayName 为单列树展示用，不重复父级 */
 interface ProcessTreeRow {
   id: string | number
-  rowType: 'department' | 'job_type' | 'process'
+  rowType: 'department' | 'job_type' | 'process' | 'load_more'
   displayName: string
   department: string
   jobType: string
@@ -736,8 +751,11 @@ interface ProcessTreeRow {
   price: string
   hasChildren: boolean
   nodeId?: number
+  parentId?: number | null
   jobTypePath?: string
   processRow?: ProductionProcessItem
+  loadedCount?: number
+  totalCount?: number
 }
 
 const processDepartments = ['裁床', '车缝', '尾部'] as const
@@ -748,8 +766,11 @@ const activeTab = ref<
 const processTreeTableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const processTreeVersion = ref(0)
 const processTreeData = ref<ProcessTreeRow[]>([])
-const processJobTypeTreeRef = ref<SystemOptionTreeNode[]>([])
-const processJobTypeNodeMap = ref<Map<number, SystemOptionTreeNode>>(new Map())
+const processJobTypeListRef = ref<SystemOptionItem[]>([])
+const processJobTypeChildrenMapRef = ref<Map<number, SystemOptionItem[]>>(new Map())
+const processRowsCacheRef = ref<Map<string, ProductionProcessItem[]>>(new Map())
+const processExpandedRowKeys = ref<Array<string | number>>([])
+const processPageSizeByJobTypeRef = ref<Map<string, number>>(new Map())
 
 const processDialog = ref<{ visible: boolean; id?: number }>({ visible: false })
 const processForm = ref({
@@ -788,11 +809,116 @@ const activeQuoteTemplateIds = ref<string[]>([])
 const quoteTemplateItemsMap = ref<Record<number, QuoteTemplateItemType[]>>({})
 const quoteTemplateItemsLoadingMap = ref<Record<number, boolean>>({})
 
-function buildNodeMap(nodes: SystemOptionTreeNode[], map: Map<number, SystemOptionTreeNode>) {
-  for (const n of nodes) {
-    map.set(n.id, n)
-    if (n.children?.length) buildNodeMap(n.children, map)
+async function refreshProcessJobTypeList() {
+  try {
+    const res = await getSystemOptionsList('process_job_types')
+    const list = (res.data ?? []).slice().sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+    processJobTypeListRef.value = list
+    const childrenMap = new Map<number, SystemOptionItem[]>()
+    for (const item of list) {
+      if (item.parentId == null) continue
+      const bucket = childrenMap.get(item.parentId) ?? []
+      bucket.push(item)
+      childrenMap.set(item.parentId, bucket)
+    }
+    processJobTypeChildrenMapRef.value = childrenMap
+  } catch {
+    processJobTypeListRef.value = []
+    processJobTypeChildrenMapRef.value = new Map()
   }
+}
+
+function getChildrenFromLocalCache(parentId: number): SystemOptionLazyNode[] | null {
+  const children = processJobTypeChildrenMapRef.value.get(parentId)
+  if (!children) return null
+  return children.map((child) => ({
+    id: child.id,
+    value: child.value,
+    sortOrder: child.sortOrder,
+    hasChildren: processJobTypeChildrenMapRef.value.has(child.id),
+  }))
+}
+
+function mapJobTypeRowsFromChildren(
+  children: SystemOptionLazyNode[],
+  parentRow: ProcessTreeRow,
+): ProcessTreeRow[] {
+  const parentPath = parentRow.rowType === 'department'
+    ? parentRow.department
+    : (parentRow.jobTypePath ?? parentRow.jobType)
+  return children.map((c) => ({
+    id: `job-${c.id}`,
+    rowType: 'job_type' as const,
+    displayName: c.value,
+    department: parentRow.department,
+    jobType: `${parentPath} > ${c.value}`,
+    processName: '',
+    price: '',
+    // 工种行需要可展开，展开后再决定展示“子工种”还是“工序”
+    hasChildren: true,
+    nodeId: c.id,
+    parentId: parentRow.nodeId ?? null,
+    jobTypePath: `${parentPath} > ${c.value}`,
+  }))
+}
+
+function saveExpandedRowKey(row: ProcessTreeRow) {
+  if (row.rowType !== 'department' && row.rowType !== 'job_type') return
+  if (processExpandedRowKeys.value.includes(row.id)) return
+  processExpandedRowKeys.value = [...processExpandedRowKeys.value, row.id]
+}
+
+function getProcessPageSize(jobTypePath: string): number {
+  return processPageSizeByJobTypeRef.value.get(jobTypePath) ?? 50
+}
+
+function increaseProcessPageSize(jobTypePath: string) {
+  const current = getProcessPageSize(jobTypePath)
+  processPageSizeByJobTypeRef.value.set(jobTypePath, current + 50)
+}
+
+async function reloadProcessTreeKeepExpanded() {
+  await loadProcessTreeRoots()
+}
+
+function onProcessTreeExpandChange(row: ProcessTreeRow, expanded: boolean | ProcessTreeRow[]) {
+  if (row.rowType !== 'department' && row.rowType !== 'job_type') return
+  const isExpanded = Array.isArray(expanded)
+    ? expanded.some((r) => r.id === row.id)
+    : !!expanded
+  if (isExpanded) {
+    saveExpandedRowKey(row)
+    return
+  }
+  processExpandedRowKeys.value = processExpandedRowKeys.value.filter((k) => k !== row.id)
+}
+
+function buildJobTypePathsFromList(list: SystemOptionItem[], rootId: number, rootValue: string): string[] {
+  const childrenByParent = new Map<number, SystemOptionItem[]>()
+  for (const item of list) {
+    if (item.parentId == null) continue
+    const bucket = childrenByParent.get(item.parentId) ?? []
+    bucket.push(item)
+    childrenByParent.set(item.parentId, bucket)
+  }
+  for (const bucket of childrenByParent.values()) {
+    bucket.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+  }
+
+  const result: string[] = []
+  const stack = (childrenByParent.get(rootId) ?? []).map((child) => ({
+    id: child.id,
+    path: `${rootValue} > ${child.value}`,
+  }))
+  while (stack.length) {
+    const current = stack.shift()!
+    result.push(current.path)
+    const next = childrenByParent.get(current.id) ?? []
+    for (const n of next) {
+      stack.push({ id: n.id, path: `${current.path} > ${n.value}` })
+    }
+  }
+  return result
 }
 
 // ---------------- 订单状态 & 流转规则配置 ----------------
@@ -1461,13 +1587,9 @@ watch(
 /** 树表根节点：部门（来自 process_job_types 根） */
 async function loadProcessTreeRoots() {
   try {
-    const res = await getSystemOptionsTree('process_job_types')
-    const tree = res.data ?? []
-    processJobTypeTreeRef.value = tree
-    const map = new Map<number, SystemOptionTreeNode>()
-    buildNodeMap(tree, map)
-    processJobTypeNodeMap.value = map
-    processTreeData.value = tree.map((n) => ({
+    const res = await getSystemOptionsRoots('process_job_types')
+    const roots = res.data ?? []
+    processTreeData.value = roots.map((n) => ({
       id: `dept-${n.id}`,
       rowType: 'department' as const,
       displayName: n.value,
@@ -1475,8 +1597,10 @@ async function loadProcessTreeRoots() {
       jobType: '',
       processName: '',
       price: '',
+      // 懒加载树需要可展开才能触发 load；部门行统一允许展开
       hasChildren: true,
       nodeId: n.id,
+      parentId: null,
     }))
     processTreeVersion.value += 1
   } catch {
@@ -1492,86 +1616,120 @@ async function loadProcessTreeNode(
   resolve: (rows: ProcessTreeRow[]) => void,
 ) {
   if (row.rowType === 'department' && row.nodeId != null) {
-    const node = processJobTypeNodeMap.value.get(row.nodeId)
-    const children = node?.children ?? []
-    const rows: ProcessTreeRow[] = children.map((c) => ({
-      id: `job-${c.id}`,
-      rowType: 'job_type' as const,
-      displayName: c.value,
-      department: row.department,
-      jobType: `${row.department} > ${c.value}`,
-      processName: '',
-      price: '',
-      hasChildren: true,
-      nodeId: c.id,
-      jobTypePath: `${row.department} > ${c.value}`,
-    }))
-    resolve(rows)
+    saveExpandedRowKey(row)
+    const localChildren = getChildrenFromLocalCache(row.nodeId)
+    if (localChildren) {
+      resolve(mapJobTypeRowsFromChildren(localChildren, row))
+      return
+    }
+    try {
+      const res = await getSystemOptionsChildren('process_job_types', row.nodeId)
+      const children = res.data ?? []
+      resolve(mapJobTypeRowsFromChildren(children, row))
+    } catch {
+      resolve([])
+    }
     return
   }
   if (row.rowType === 'job_type' && row.nodeId != null && row.jobTypePath != null) {
-    const node = processJobTypeNodeMap.value.get(row.nodeId)
-    if (node?.children?.length) {
-      const rows: ProcessTreeRow[] = node.children.map((c) => ({
-        id: `job-${c.id}`,
-        rowType: 'job_type' as const,
-        displayName: c.value,
-        department: row.department,
-        jobType: `${row.jobTypePath} > ${c.value}`,
-        processName: '',
-        price: '',
-        hasChildren: true,
-        nodeId: c.id,
-        jobTypePath: `${row.jobTypePath} > ${c.value}`,
-      }))
-      resolve(rows)
+    saveExpandedRowKey(row)
+    const localChildren = getChildrenFromLocalCache(row.nodeId)
+    if (localChildren && localChildren.length > 0) {
+      resolve(mapJobTypeRowsFromChildren(localChildren, row))
       return
     }
-    const res = await getProductionProcesses({ department: row.department, jobType: row.jobTypePath })
-    const list = res.data ?? []
-    const rows: ProcessTreeRow[] = list.map((p) => ({
-      id: p.id,
-      rowType: 'process' as const,
-      displayName: p.name,
-      department: p.department,
-      jobType: p.jobType,
-      processName: p.name,
-      price: p.unitPrice,
-      hasChildren: false,
-      processRow: p,
-    }))
-    resolve(rows)
+    try {
+      const childrenRes = await getSystemOptionsChildren('process_job_types', row.nodeId)
+      const children = childrenRes.data ?? []
+      if (children.length > 0) {
+        resolve(mapJobTypeRowsFromChildren(children, row))
+        return
+      }
+
+      const pageSize = getProcessPageSize(row.jobTypePath)
+      const cacheKey = `${row.department}__${row.jobTypePath}__${pageSize}`
+      const cached = processRowsCacheRef.value.get(cacheKey)
+      const pageRes = cached
+        ? { items: cached, total: cached.length }
+        : (await getProductionProcessesPage({
+            department: row.department,
+            jobType: row.jobTypePath,
+            page: 1,
+            pageSize,
+          })).data
+      const list = pageRes?.items ?? []
+      if (!cached) processRowsCacheRef.value.set(cacheKey, list)
+      const rows: ProcessTreeRow[] = list.map((p) => ({
+        id: p.id,
+        rowType: 'process' as const,
+        displayName: p.name,
+        department: p.department,
+        jobType: p.jobType,
+        processName: p.name,
+        price: p.unitPrice,
+        hasChildren: false,
+        processRow: p,
+      }))
+      if ((pageRes?.total ?? 0) > list.length) {
+        rows.push({
+          id: `more-${row.department}-${row.jobTypePath}`,
+          rowType: 'load_more',
+          displayName: '',
+          department: row.department,
+          jobType: row.jobTypePath,
+          processName: '',
+          price: '',
+          hasChildren: false,
+          parentId: row.nodeId ?? null,
+          jobTypePath: row.jobTypePath,
+          loadedCount: list.length,
+          totalCount: pageRes?.total ?? 0,
+        })
+      }
+      resolve(rows)
+    } catch {
+      resolve([])
+    }
   }
 }
 
-/** 同一父级下的兄弟节点（process_job_types 树），用于工种上移/下移 */
-function getSiblingsForProcessJobType(nodeId: number): SystemOptionTreeNode[] {
-  const tree = processJobTypeTreeRef.value
-  const node = processJobTypeNodeMap.value.get(nodeId)
-  if (!node) return []
-  const pid = node.parentId ?? null
-  if (pid === null) return [...tree].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
-  function collect(list: SystemOptionTreeNode[]): SystemOptionTreeNode[] {
-    let out: SystemOptionTreeNode[] = []
-    for (const n of list) {
-      if ((n.parentId ?? null) === pid) out.push(n)
-      if (n.children?.length) out = out.concat(collect(n.children))
-    }
-    return out
+async function loadMoreProcesses(row: ProcessTreeRow) {
+  if (row.rowType !== 'load_more' || !row.jobTypePath) return
+  increaseProcessPageSize(row.jobTypePath)
+  // 清理该工种的分页缓存，触发按更大页重新加载
+  for (const key of processRowsCacheRef.value.keys()) {
+    if (key.includes(`__${row.jobTypePath}__`)) processRowsCacheRef.value.delete(key)
   }
-  return collect(tree).sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+  await reloadProcessTreeKeepExpanded()
+}
+
+/** 同一父级下的兄弟节点（懒加载接口），用于工种上移/下移 */
+async function getSiblingsForProcessJobType(
+  row: ProcessTreeRow,
+): Promise<Array<SystemOptionLazyNode & { parentId: number | null }>> {
+  const parentId = row.parentId ?? null
+  if (parentId == null) {
+    const res = await getSystemOptionsRoots('process_job_types')
+    return (res.data ?? []).map((x) => ({ ...x, parentId: null }))
+  }
+  const res = await getSystemOptionsChildren('process_job_types', parentId)
+  return (res.data ?? []).map((x) => ({ ...x, parentId }))
 }
 
 function canMoveUpJobType(row: ProcessTreeRow): boolean {
   if (row.rowType !== 'job_type' || row.nodeId == null) return false
-  const siblings = getSiblingsForProcessJobType(row.nodeId)
+  const siblings = processJobTypeListRef.value
+    .filter((x) => (x.parentId ?? null) === (row.parentId ?? null))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
   const idx = siblings.findIndex((s) => s.id === row.nodeId)
   return idx > 0
 }
 
 function canMoveDownJobType(row: ProcessTreeRow): boolean {
   if (row.rowType !== 'job_type' || row.nodeId == null) return false
-  const siblings = getSiblingsForProcessJobType(row.nodeId)
+  const siblings = processJobTypeListRef.value
+    .filter((x) => (x.parentId ?? null) === (row.parentId ?? null))
+    .sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
   const idx = siblings.findIndex((s) => s.id === row.nodeId)
   return idx >= 0 && idx < siblings.length - 1
 }
@@ -1605,21 +1763,23 @@ async function submitJobType() {
     if (jobTypeDialog.value.mode === 'edit' && jobTypeDialog.value.nodeId != null) {
       await updateSystemOption(jobTypeDialog.value.nodeId, { value: val })
       ElMessage.success('已更新')
-    } else if (jobTypeDialog.value.mode === 'add' && jobTypeDialog.value.parentId != null) {
-      const tree = processJobTypeTreeRef.value
-      const pid = jobTypeDialog.value.parentId
-      const siblings = pid === null ? tree : (processJobTypeNodeMap.value.get(pid)?.children ?? [])
+    } else if (jobTypeDialog.value.mode === 'add') {
+      const pid = jobTypeDialog.value.parentId ?? null
+      const siblings = pid == null
+        ? (await getSystemOptionsRoots('process_job_types')).data ?? []
+        : (await getSystemOptionsChildren('process_job_types', pid)).data ?? []
       const sortOrder = siblings.length
       await createSystemOption({
         type: 'process_job_types',
         value: val,
         sort_order: sortOrder,
-        parent_id: pid ?? undefined,
+        parent_id: pid,
       })
       ElMessage.success('已添加')
     }
     jobTypeDialog.value.visible = false
-    await loadProcessTreeRoots()
+    await refreshProcessJobTypeList()
+    await reloadProcessTreeKeepExpanded()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '操作失败')
   } finally {
@@ -1629,11 +1789,16 @@ async function submitJobType() {
 
 async function removeJobType(row: ProcessTreeRow) {
   if (row.rowType !== 'job_type' || row.nodeId == null) return
-  const node = processJobTypeNodeMap.value.get(row.nodeId)
-  if (!node) return
+  let hasChildGroups = false
+  try {
+    const res = await getSystemOptionsChildren('process_job_types', row.nodeId)
+    hasChildGroups = (res.data ?? []).length > 0
+  } catch {
+    hasChildGroups = false
+  }
   try {
     await ElMessageBox.confirm(
-      node.children?.length ? `确定删除「${row.displayName}」及其下级分组？` : `确定删除「${row.displayName}」？`,
+      hasChildGroups ? `确定删除「${row.displayName}」及其下级分组？` : `确定删除「${row.displayName}」？`,
       '提示',
       { type: 'warning' },
     )
@@ -1643,7 +1808,8 @@ async function removeJobType(row: ProcessTreeRow) {
   try {
     await deleteSystemOption(row.nodeId)
     ElMessage.success('已删除')
-    await loadProcessTreeRoots()
+    await refreshProcessJobTypeList()
+    await reloadProcessTreeKeepExpanded()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '删除失败')
   }
@@ -1651,7 +1817,7 @@ async function removeJobType(row: ProcessTreeRow) {
 
 async function moveJobTypeRow(row: ProcessTreeRow, delta: number) {
   if (row.rowType !== 'job_type' || row.nodeId == null) return
-  const siblings = getSiblingsForProcessJobType(row.nodeId)
+  const siblings = await getSiblingsForProcessJobType(row)
   const idx = siblings.findIndex((s) => s.id === row.nodeId)
   if (idx < 0) return
   const newIdx = idx + delta
@@ -1660,24 +1826,13 @@ async function moveJobTypeRow(row: ProcessTreeRow, delta: number) {
   ;[arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]]
   const items = arr.map((n, i) => ({ id: n.id, sort_order: i }))
   try {
-    const parentId = processJobTypeNodeMap.value.get(row.nodeId)?.parentId ?? null
-    await batchUpdateSystemOptionOrder('process_job_types', parentId, items)
+    await batchUpdateSystemOptionOrder('process_job_types', row.parentId ?? null, items)
     ElMessage.success('已移动')
-    await loadProcessTreeRoots()
+    await refreshProcessJobTypeList()
+    await reloadProcessTreeKeepExpanded()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '移动失败')
   }
-}
-
-/** 从部门根节点递归收集所有后代路径，如 裁床 > 裁工、裁床 > 裁工 > 细分 */
-function collectJobTypePaths(nodes: SystemOptionTreeNode[], parentPath = ''): string[] {
-  const list: string[] = []
-  for (const n of nodes) {
-    const path = parentPath ? `${parentPath} > ${n.value}` : n.value
-    list.push(path)
-    if (n.children?.length) list.push(...collectJobTypePaths(n.children, path))
-  }
-  return list
 }
 
 async function loadProcessJobTypeOptions(department: string) {
@@ -1686,18 +1841,14 @@ async function loadProcessJobTypeOptions(department: string) {
     return
   }
   try {
-    const res = await getSystemOptionsTree('process_job_types')
-    const tree = res.data ?? []
-    const root = tree.find((n) => n.value === department)
+    if (!processJobTypeListRef.value.length) await refreshProcessJobTypeList()
+    const all = processJobTypeListRef.value
+    const root = all.find((n) => n.parentId == null && n.value === department)
     if (!root) {
       processJobTypeOptions.value = []
       return
     }
-    // 只取该部门下的后代路径（不含部门名本身），用于下拉选项
-    const paths = root.children?.length
-      ? collectJobTypePaths(root.children, department)
-      : []
-    processJobTypeOptions.value = paths
+    processJobTypeOptions.value = buildJobTypePathsFromList(all, root.id, department)
   } catch {
     processJobTypeOptions.value = []
   }
@@ -1711,18 +1862,19 @@ function onProcessDepartmentChange() {
 /** 确保 process_job_types 下存在三个根节点：裁床、车缝、尾部 */
 async function ensureProcessJobTypeRoots() {
   try {
-    const res = await getSystemOptionsTree('process_job_types')
-    const tree = res.data ?? []
-    const values = new Set(tree.map((n) => n.value))
+    const res = await getSystemOptionsRoots('process_job_types')
+    const roots = res.data ?? []
+    const values = new Set(roots.map((n) => n.value))
     const toAdd = processDepartments.filter((d) => !values.has(d))
     for (let i = 0; i < toAdd.length; i++) {
       await createSystemOption({
         type: 'process_job_types',
         value: toAdd[i],
-        sort_order: tree.length + i,
+        sort_order: roots.length + i,
         parent_id: null,
       })
     }
+    await refreshProcessJobTypeList()
   } catch {
     // ignore
   }
@@ -1792,7 +1944,8 @@ async function submitProcess() {
       ElMessage.success('已新增')
     }
     processDialog.value.visible = false
-    loadProcessTreeRoots()
+    processRowsCacheRef.value.clear()
+    await reloadProcessTreeKeepExpanded()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '操作失败')
   }
@@ -1805,7 +1958,8 @@ async function removeProcess(row: ProductionProcessItem) {
     })
     await deleteProductionProcess(row.id)
     ElMessage.success('已删除')
-    loadProcessTreeRoots()
+    processRowsCacheRef.value.clear()
+    await reloadProcessTreeKeepExpanded()
   } catch (e) {
     if ((e as string) !== 'cancel') ElMessage.error('删除失败')
   }

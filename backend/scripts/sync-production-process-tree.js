@@ -82,6 +82,8 @@ async function main() {
         currentJobType: row.job_type,
       });
       const department = detectDepartment({
+        // 保留已有部门信息优先级，避免仅凭工序名把尾部/裁床误判为车缝
+        workClass: String(row.department || '').trim(),
         groupName: leaf,
         processesName: row.name,
         currentJobType: row.job_type,

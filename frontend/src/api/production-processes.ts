@@ -15,6 +15,22 @@ export function getProductionProcesses(params?: { department?: string; jobType?:
   return request.get<ProductionProcessItem[]>('/production-processes', { params })
 }
 
+export interface ProductionProcessPageRes {
+  items: ProductionProcessItem[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export function getProductionProcessesPage(params: {
+  department?: string
+  jobType?: string
+  page?: number
+  pageSize?: number
+}) {
+  return request.get<ProductionProcessPageRes>('/production-processes/page', { params })
+}
+
 export function createProductionProcess(body: {
   department?: string
   jobType?: string

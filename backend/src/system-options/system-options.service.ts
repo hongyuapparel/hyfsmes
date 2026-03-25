@@ -115,19 +115,30 @@ export class SystemOptionsService {
       where: { optionType, parentId: IsNull() },
       order: { sortOrder: 'ASC', id: 'ASC' },
     });
-    const result: { id: number; value: string; sortOrder: number; hasChildren: boolean }[] = [];
-    for (const r of roots) {
-      const childCount = await this.repo.count({
-        where: { optionType, parentId: r.id },
-      });
-      result.push({
-        id: r.id,
-        value: r.value,
-        sortOrder: r.sortOrder,
-        hasChildren: childCount > 0,
-      });
-    }
-    return result;
+    if (!roots.length) return [];
+
+    const childCounts: Array<{ parentId: number; cnt: string | number }> =
+      await this.repo
+        .createQueryBuilder('o')
+        .select('o.parent_id', 'parentId')
+        .addSelect('COUNT(1)', 'cnt')
+        .where('o.option_type = :optionType', { optionType })
+        .andWhere('o.parent_id IN (:...rootIds)', { rootIds: roots.map((r) => r.id) })
+        .groupBy('o.parent_id')
+        .getRawMany();
+    const hasChildrenSet = new Set(
+      childCounts
+        .filter((x) => Number(x.cnt) > 0)
+        .map((x) => Number(x.parentId))
+        .filter((n) => Number.isFinite(n)),
+    );
+
+    return roots.map((r) => ({
+      id: r.id,
+      value: r.value,
+      sortOrder: r.sortOrder,
+      hasChildren: hasChildrenSet.has(r.id),
+    }));
   }
 
   /** 懒加载树：按父节点 id 返回子节点，带 hasChildren 标记 */
@@ -139,19 +150,30 @@ export class SystemOptionsService {
       where: { optionType, parentId },
       order: { sortOrder: 'ASC', id: 'ASC' },
     });
-    const result: { id: number; value: string; sortOrder: number; hasChildren: boolean }[] = [];
-    for (const o of list) {
-      const childCount = await this.repo.count({
-        where: { optionType, parentId: o.id },
-      });
-      result.push({
-        id: o.id,
-        value: o.value,
-        sortOrder: o.sortOrder,
-        hasChildren: childCount > 0,
-      });
-    }
-    return result;
+    if (!list.length) return [];
+
+    const childCounts: Array<{ parentId: number; cnt: string | number }> =
+      await this.repo
+        .createQueryBuilder('o')
+        .select('o.parent_id', 'parentId')
+        .addSelect('COUNT(1)', 'cnt')
+        .where('o.option_type = :optionType', { optionType })
+        .andWhere('o.parent_id IN (:...ids)', { ids: list.map((x) => x.id) })
+        .groupBy('o.parent_id')
+        .getRawMany();
+    const hasChildrenSet = new Set(
+      childCounts
+        .filter((x) => Number(x.cnt) > 0)
+        .map((x) => Number(x.parentId))
+        .filter((n) => Number.isFinite(n)),
+    );
+
+    return list.map((o) => ({
+      id: o.id,
+      value: o.value,
+      sortOrder: o.sortOrder,
+      hasChildren: hasChildrenSet.has(o.id),
+    }));
   }
 
   /**

@@ -19,6 +19,25 @@ export class ProductionProcessesController {
     return this.service.findAll({ department, jobType });
   }
 
+  /** 分页列表：生产工序树叶子节点按需加载，降低一次性渲染压力 */
+  @Get('page')
+  @RequirePermission('/orders/list')
+  findPage(
+    @Query('department') department?: string,
+    @Query('jobType') jobType?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const p = page ? parseInt(page, 10) : 1;
+    const ps = pageSize ? parseInt(pageSize, 10) : 50;
+    return this.service.findPage({
+      department,
+      jobType,
+      page: Number.isNaN(p) ? 1 : p,
+      pageSize: Number.isNaN(ps) ? 50 : ps,
+    });
+  }
+
   /** 新增工序（使用 /create 避免与 @Get(':id') 冲突导致 404） */
   @Post('create')
   @RequirePermission('/orders/list')
