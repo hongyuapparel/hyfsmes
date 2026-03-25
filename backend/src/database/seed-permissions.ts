@@ -11,6 +11,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_production', name: '生产管理', routePath: '/production', type: 'menu' },
   { code: 'menu_production_purchase', name: '采购管理', routePath: '/production/purchase', type: 'menu' },
   { code: 'menu_production_pattern', name: '纸样管理', routePath: '/production/pattern', type: 'menu' },
+  { code: 'menu_production_process', name: '工艺管理', routePath: '/production/process', type: 'menu' },
   { code: 'menu_production_cutting', name: '裁床管理', routePath: '/production/cutting', type: 'menu' },
   { code: 'menu_production_sewing', name: '车缝管理', routePath: '/production/sewing', type: 'menu' },
   { code: 'menu_production_finishing', name: '尾部管理', routePath: '/production/finishing', type: 'menu' },

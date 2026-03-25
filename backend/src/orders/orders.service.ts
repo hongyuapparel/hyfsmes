@@ -1279,13 +1279,15 @@ export class OrdersService {
       unitPrice: 0,
     }));
 
+    // 工艺项目成本「数量」与订单件数脱钩，默认 1，由成本页按工艺填写；合并快照时保留已保存数量
+    const defaultProcessItemQty = 1;
     const nextProcessItemRows = sourceProcessItems.map((p) => ({
       processName: p?.processName ?? '',
       supplierName: p?.supplierName ?? '',
       part: p?.part ?? '',
       remark: p?.remark ?? '',
       unitPrice: 0,
-      quantity: order.quantity ?? 0,
+      quantity: defaultProcessItemQty,
     }));
 
     const existing = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
@@ -1310,7 +1312,7 @@ export class OrdersService {
             ? {
                 ...row,
                 unitPrice: Number(found.unitPrice) || 0,
-                // 若成本页手工调整过数量，则沿用；否则使用订单数量
+                // 若成本页已保存数量则沿用；否则用行默认数量
                 quantity:
                   typeof found.quantity === 'number' && Number.isFinite(found.quantity) ? found.quantity : row.quantity,
               }
@@ -1322,7 +1324,7 @@ export class OrdersService {
       materialRows: mergedMaterialRows.length ? mergedMaterialRows : [{ unitPrice: 0 } as any],
       processItemRows: mergedProcessItemRows.length
         ? mergedProcessItemRows
-        : [{ unitPrice: 0, quantity: order.quantity ?? 0 } as any],
+        : [{ unitPrice: 0, quantity: defaultProcessItemQty } as any],
       productionRows: Array.isArray(existingSnapshot?.productionRows) ? existingSnapshot.productionRows : [],
       profitMargin: this.normalizeProfitMargin(existingSnapshot?.profitMargin),
     };

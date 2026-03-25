@@ -124,6 +124,7 @@
             <el-button type="primary" size="small" @click="openAddDepartment()">新增部门</el-button>
           </div>
           <el-table
+            :key="processTreeVersion"
             ref="processTreeTableRef"
             :data="processTreeData"
             row-key="id"
@@ -745,6 +746,7 @@ const activeTab = ref<
   'orderTypes' | 'collaboration' | 'productGroups' | 'applicablePeople' | 'materialTypes' | 'productionProcesses' | 'orderSla' | 'orderStatusConfig'
 >('orderStatusConfig')
 const processTreeTableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
+const processTreeVersion = ref(0)
 const processTreeData = ref<ProcessTreeRow[]>([])
 const processJobTypeTreeRef = ref<SystemOptionTreeNode[]>([])
 const processJobTypeNodeMap = ref<Map<number, SystemOptionTreeNode>>(new Map())
@@ -1476,8 +1478,10 @@ async function loadProcessTreeRoots() {
       hasChildren: true,
       nodeId: n.id,
     }))
+    processTreeVersion.value += 1
   } catch {
     processTreeData.value = []
+    processTreeVersion.value += 1
   }
 }
 
@@ -1949,6 +1953,17 @@ async function submitQuoteTemplateItems() {
       templateId,
       quoteTemplateItemsEdit.value.map((x) => x.processId),
     )
+    // 立即同步折叠区缓存，避免“保存成功但列表不刷新”
+    quoteTemplateItemsMap.value[templateId] = quoteTemplateItemsEdit.value.map((x) => ({
+      id: x.processId,
+      templateId,
+      processId: x.processId,
+      sortOrder: 0,
+      department: x.department,
+      jobType: x.jobType,
+      processName: x.processName,
+      unitPrice: x.unitPrice,
+    }))
     ElMessage.success('已保存')
     quoteTemplateItemsDialog.value.visible = false
   } catch (e: unknown) {

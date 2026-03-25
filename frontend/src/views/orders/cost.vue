@@ -721,6 +721,9 @@ function removeMaterialRow(index: number) {
   materialRows.value.splice(index, 1)
 }
 
+/** 工艺项目成本数量：与订单件数无关，默认 1，由跟单按工艺自行填写 */
+const DEFAULT_PROCESS_ITEM_QTY = 1
+
 function addProcessItemRow() {
   processItemRows.value.push({
     processName: '',
@@ -728,7 +731,7 @@ function addProcessItemRow() {
     part: '',
     remark: '',
     unitPrice: 0,
-    quantity: order.value?.quantity ?? 0,
+    quantity: DEFAULT_PROCESS_ITEM_QTY,
   })
 }
 
@@ -757,9 +760,9 @@ function syncFromOrder(d: OrderDetail) {
   const procs = (d.processItems ?? []).map((p) => ({
     ...p,
     unitPrice: 0,
-    quantity: d.quantity ?? 0,
+    quantity: DEFAULT_PROCESS_ITEM_QTY,
   })) as ProcessItemRow[]
-  processItemRows.value = procs.length ? procs : [{ unitPrice: 0 } as ProcessItemRow]
+  processItemRows.value = procs.length ? procs : [{ unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY } as ProcessItemRow]
 }
 
 async function loadOrder() {
