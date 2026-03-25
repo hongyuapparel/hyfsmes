@@ -1,0 +1,2 @@
+docs/migration-samples/旧系统导出内容/*.sql filter=lfs diff=lfs merge=lfs -text
+docs/migration-samples/**/*.xlsx filter=lfs diff=lfs merge=lfs -text
