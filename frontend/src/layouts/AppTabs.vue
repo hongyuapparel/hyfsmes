@@ -9,9 +9,9 @@
     >
       <el-tab-pane
         v-for="tab in tabs"
-        :key="tab.fullPath"
+        :key="tab.key"
         :label="tab.title"
-        :name="tab.fullPath"
+        :name="tab.key"
         closable
       />
     </el-tabs>

@@ -491,6 +491,7 @@ interface FlatGroupNode {
 }
 
 const collapsedGroupPaths = ref<string[]>([])
+const groupCollapseInitialized = ref(false)
 const groupTreeWithCounts = computed(() => {
   const map = groupCountsMap.value
   function build(nodes: SystemOptionTreeNode[], parentPath = ''): GroupTreeNode[] {
@@ -823,6 +824,19 @@ function toProductGroupTreeSelect(
 
 const productGroupTreeSelectData = computed(() => toProductGroupTreeSelect(productGroupsTree.value))
 
+function collectDefaultCollapsedPaths(nodes: SystemOptionTreeNode[], parentPath = ''): string[] {
+  const result: string[] = []
+  for (const n of nodes) {
+    const path = parentPath ? `${parentPath} > ${n.value}` : n.value
+    if (n.children?.length) {
+      // 默认将所有可展开分组折叠，避免初始列表过长
+      result.push(path)
+      result.push(...collectDefaultCollapsedPaths(n.children, path))
+    }
+  }
+  return result
+}
+
 async function loadOptions() {
   try {
     const [ct, sp, custRes, treeRes, countsRes, apRes] = await Promise.all([
@@ -844,6 +858,10 @@ async function loadOptions() {
     const custList = (custRes.data?.list ?? []) as CustomerItem[]
     customers.value = custList.map((c) => ({ id: c.id, companyName: c.companyName }))
     applicablePeopleOptions.value = apRes.data ?? []
+    if (!groupCollapseInitialized.value) {
+      collapsedGroupPaths.value = collectDefaultCollapsedPaths(productGroupsTree.value)
+      groupCollapseInitialized.value = true
+    }
   } catch {
     productGroupOptions.value = []
     productGroupsTree.value = []
