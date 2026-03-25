@@ -1353,12 +1353,20 @@ function normalizeSizeBreakdown(data: OrderSizeBreakdownRes): OrderSizeBreakdown
 
 function openEdit(order: OrderListItem) {
   const title = `订单编辑 ${order.orderNo || order.id}`
-  router.push({ name: 'OrdersEdit', params: { id: order.id }, query: { tabTitle: title } })
+  router.push({
+    name: 'OrdersEdit',
+    params: { id: order.id },
+    query: { tabTitle: title, tabKey: `orders-edit-${order.id}` },
+  })
 }
 
 function openView(order: OrderListItem) {
   const title = `订单详情 ${order.orderNo || order.id}`
-  router.push({ name: 'OrdersDetail', params: { id: order.id }, query: { tabTitle: title } })
+  router.push({
+    name: 'OrdersDetail',
+    params: { id: order.id },
+    query: { tabTitle: title, tabKey: `orders-detail-${order.id}` },
+  })
 }
 
 function openCost(order: OrderListItem) {
@@ -1417,7 +1425,11 @@ function downloadExcel() {
 function printOrder(_order: OrderListItem) {
   // 统一使用订单详情页进行打印，保证版式一致
   const title = `订单详情 ${_order.orderNo || _order.id}`
-  router.push({ name: 'OrdersDetail', params: { id: _order.id }, query: { tabTitle: title } })
+  router.push({
+    name: 'OrdersDetail',
+    params: { id: _order.id },
+    query: { tabTitle: title, tabKey: `orders-detail-${_order.id}` },
+  })
 }
 
 async function openOperationLog(order: OrderListItem) {
@@ -1438,7 +1450,8 @@ async function openOperationLog(order: OrderListItem) {
 }
 
 function onCreateOrder() {
-  router.push({ name: 'OrdersEdit', query: { new: '1' } })
+  const key = `orders-edit-new-${Date.now()}`
+  router.push({ name: 'OrdersEdit', query: { new: '1', tabKey: key, tabTitle: '订单编辑 新建' } })
 }
 
 /** 从 URL query 恢复筛选（如从主页待办跳转进入） */

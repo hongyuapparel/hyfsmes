@@ -23,6 +23,7 @@ import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 
 interface TabItem {
+  key: string
   fullPath: string
   path: string
   title: string
@@ -32,7 +33,12 @@ const route = useRoute()
 const router = useRouter()
 
 const tabs = ref<TabItem[]>([])
-const activeKey = ref(route.fullPath)
+const activeKey = ref('')
+
+function getTabKey(r: RouteLocationNormalizedLoaded): string {
+  const k = typeof r.query?.tabKey === 'string' ? r.query.tabKey.trim() : ''
+  return k || r.fullPath
+}
 
 function getTitle(r: RouteLocationNormalizedLoaded) {
   if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit') {
@@ -47,23 +53,25 @@ function getTitle(r: RouteLocationNormalizedLoaded) {
 
 function addTab(r: RouteLocationNormalizedLoaded) {
   if (r.meta?.hideInTabs) return
+  const key = getTabKey(r)
 
-  const exists = tabs.value.find((t) => t.fullPath === r.fullPath)
+  const title = getTitle(r)
+  const exists = tabs.value.find((t) => t.key === key)
   if (!exists) {
-    tabs.value.push({
-      fullPath: r.fullPath,
-      path: r.path,
-      title: getTitle(r),
-    })
+    tabs.value.push({ key, fullPath: r.fullPath, path: r.path, title })
+  } else {
+    exists.fullPath = r.fullPath
+    exists.path = r.path
+    exists.title = title
   }
-  activeKey.value = r.fullPath
+  activeKey.value = key
 }
 
-function closeByFullPath(fullPath: string) {
-  const index = tabs.value.findIndex((t) => t.fullPath === fullPath)
+function closeByKey(key: string) {
+  const index = tabs.value.findIndex((t) => t.key === key)
   if (index === -1) return
 
-  const isActive = fullPath === route.fullPath
+  const isActive = key === activeKey.value
   tabs.value.splice(index, 1)
 
   if (!isActive) return
@@ -77,14 +85,14 @@ function closeByFullPath(fullPath: string) {
 }
 
 function onTabClick(pane: any) {
-  const name = pane.paneName as string
-  if (name && name !== route.fullPath) {
-    router.push(name)
-  }
+  const key = pane.paneName as string
+  if (!key || key === activeKey.value) return
+  const tab = tabs.value.find((t) => t.key === key)
+  if (tab) router.push(tab.fullPath)
 }
 
 function onTabRemove(name: string | number) {
-  closeByFullPath(String(name))
+  closeByKey(String(name))
 }
 
 onMounted(() => {
@@ -92,7 +100,7 @@ onMounted(() => {
 })
 
 watch(
-  () => route.fullPath,
+  () => [route.fullPath, route.query?.tabKey, route.query?.tabTitle],
   () => {
     addTab(route)
   }

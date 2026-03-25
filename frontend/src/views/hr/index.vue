@@ -21,25 +21,23 @@
           </span>
         </template>
       </el-input>
-      <el-select
+      <el-tree-select
         v-model="filter.departmentId"
         placeholder="部门"
         clearable
         filterable
         size="large"
         class="filter-bar-item"
+        :data="departmentTreeOptions"
+        node-key="id"
+        check-strictly
+        :props="{ label: 'label', value: 'id', children: 'children' }"
         @change="onSearch(true)"
       >
         <template #label>
           {{ filter.departmentId ? `部门：${getDepartmentLabel(filter.departmentId)}` : '部门' }}
         </template>
-        <el-option
-          v-for="d in flatDepartments"
-          :key="d.id"
-          :label="d.label"
-          :value="d.id"
-        />
-      </el-select>
+      </el-tree-select>
       <el-select
         v-model="filter.status"
         placeholder="状态"
@@ -119,20 +117,18 @@
           <el-input v-model="form.name" placeholder="请输入姓名" clearable />
         </el-form-item>
         <el-form-item label="部门" prop="departmentId">
-          <el-select
+          <el-tree-select
             v-model="form.departmentId"
             placeholder="选择部门"
             clearable
             filterable
             style="width: 100%"
+            :data="departmentTreeOptions"
+            node-key="id"
+            check-strictly
+            :props="{ label: 'label', value: 'id', children: 'children' }"
           >
-            <el-option
-              v-for="d in flatDepartments"
-              :key="d.id"
-              :label="d.label"
-              :value="d.id"
-            />
-          </el-select>
+          </el-tree-select>
         </el-form-item>
         <el-form-item label="岗位" prop="jobTitleId">
           <el-select
@@ -245,6 +241,10 @@ interface DeptOption {
   label: string
 }
 const flatDepartments = ref<DeptOption[]>([])
+interface DeptTreeOption extends DeptOption {
+  children?: DeptTreeOption[]
+}
+const departmentTreeOptions = ref<DeptTreeOption[]>([])
 
 interface JobOption {
   id: number
@@ -288,6 +288,13 @@ async function loadDepartments() {
   try {
     const res = await getSystemOptionsTree('org_departments')
     const tree = (res.data ?? []) as SystemOptionTreeNode[]
+    const toTreeOptions = (nodes: SystemOptionTreeNode[]): DeptTreeOption[] =>
+      nodes.map((n) => ({
+        id: n.id,
+        label: n.value,
+        children: n.children?.length ? toTreeOptions(n.children) : undefined,
+      }))
+    departmentTreeOptions.value = toTreeOptions(tree)
     const out: DeptOption[] = []
     const visit = (nodes: SystemOptionTreeNode[]) => {
       for (const n of nodes) {
@@ -298,6 +305,7 @@ async function loadDepartments() {
     visit(tree)
     flatDepartments.value = out
   } catch {
+    departmentTreeOptions.value = []
     flatDepartments.value = []
   }
 }

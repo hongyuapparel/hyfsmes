@@ -140,6 +140,7 @@
                 clearable
                 :remote-method="searchCustomers"
                 :loading="customerLoading"
+                @change="onCustomerChange"
               >
                 <el-option
                   v-for="item in customerOptions"
@@ -199,11 +200,6 @@
             </el-form-item>
           </el-col>
 
-          <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="跟单电话">
-              <el-input v-model="form.merchandiserPhone" placeholder="自动带出后可修改" />
-            </el-form-item>
-          </el-col>
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="业务员">
               <el-select
@@ -1113,6 +1109,34 @@ async function searchCustomers(keyword: string) {
   } finally {
     customerLoading.value = false
   }
+}
+
+async function ensureCustomerOptionById(customerId: number | null | undefined) {
+  if (customerId == null || Number.isNaN(Number(customerId))) return
+  if (customerOptions.value.some((item) => item.id === customerId)) return
+  try {
+    const res = await request.get(`/customers/${customerId}`, { skipGlobalErrorHandler: true })
+    const data = res.data as { id?: number; companyName?: string }
+    const id = Number(data?.id ?? customerId)
+    const companyName = String(data?.companyName ?? '').trim()
+    if (!Number.isNaN(id) && companyName) {
+      customerOptions.value.unshift({ id, companyName })
+      if (!String(form.customerName ?? '').trim()) {
+        form.customerName = companyName
+      }
+    }
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('客户信息补全失败', getErrorMessage(e))
+  }
+}
+
+function onCustomerChange(val: number | null | undefined) {
+  if (val == null) {
+    form.customerName = ''
+    return
+  }
+  const found = customerOptions.value.find((item) => item.id === val)
+  form.customerName = found?.companyName ?? form.customerName ?? ''
 }
 
 // 业务员 / 跟单员
@@ -2123,12 +2147,17 @@ async function collectPayload(): Promise<OrderFormPayload> {
     throw new Error('invalid form')
   }
   await formRef.value?.validate()
+  const selectedCustomerName =
+    customerOptions.value.find((item) => item.id === form.customerId)?.companyName ??
+    form.customerName ??
+    ''
   const processItemSummary = processItems.value
     .map((p) => (p.processName ?? '').trim())
     .filter((name, idx, arr) => name && arr.indexOf(name) === idx)
     .join('、')
   return {
     ...form,
+    customerName: selectedCustomerName,
     orderTypeId: (form as any).orderTypeId ?? null,
     collaborationTypeId: (form as any).collaborationTypeId ?? null,
     // 数量：以 B 区颜色/尺码合计为准，确保订单列表卡片数量一致
@@ -2181,7 +2210,9 @@ async function onSaveDraft() {
         orderId.value = id
         sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(id))
         // 将 URL 更新为带 id 的编辑页，切到别页再切回同一标签时仍为该订单，不会变成空白新建页
-        router.replace({ name: 'OrdersEdit', params: { id: String(id) } })
+        const tabKey = typeof route.query?.tabKey === 'string' ? route.query.tabKey : undefined
+        const title = `订单编辑 ${orderNo.value || id}`
+        router.replace({ name: 'OrdersEdit', params: { id: String(id) }, query: { tabKey, tabTitle: title } })
       }
       hasUnsavedChanges.value = false
     }
@@ -2211,7 +2242,9 @@ async function onSaveAndSubmit() {
       if (id) {
         orderId.value = id
         sessionStorage.setItem(ORDERS_LAST_EDIT_ID, String(id))
-        router.replace({ name: 'OrdersEdit', params: { id: String(id) } })
+        const tabKey = typeof route.query?.tabKey === 'string' ? route.query.tabKey : undefined
+        const title = `订单编辑 ${draftRes.data?.orderNo || id}`
+        router.replace({ name: 'OrdersEdit', params: { id: String(id) }, query: { tabKey, tabTitle: title } })
         const res = await submitOrder(id)
         orderNo.value = res.data?.orderNo ?? draftRes.data?.orderNo ?? ''
         ElMessage.success('提交成功')
@@ -2258,6 +2291,8 @@ async function loadDetail() {
     if (form.customerId && form.customerName && !customerOptions.value.some((c) => c.id === form.customerId)) {
       customerOptions.value.unshift({ id: form.customerId, companyName: form.customerName })
     }
+    // 历史数据可能只有 customerId 没有 customerName，这里按 id 拉取客户名称，避免显示成数字 id
+    await ensureCustomerOptionById(form.customerId)
     form.secondaryProcess = d.processItem ?? ''
     form.quantity = d.quantity ?? 0
     form.exFactoryPrice = d.exFactoryPrice ?? ''
@@ -2349,7 +2384,9 @@ onMounted(async () => {
     if (lastId) {
       const n = Number(lastId)
       if (!Number.isNaN(n) && n > 0) {
-        router.replace({ name: 'OrdersEdit', params: { id: lastId } })
+        const tabKey = typeof route.query?.tabKey === 'string' ? route.query.tabKey : undefined
+        const title = typeof route.query?.tabTitle === 'string' ? route.query.tabTitle : undefined
+        router.replace({ name: 'OrdersEdit', params: { id: lastId }, query: { tabKey, tabTitle: title } })
         orderId.value = n
       }
     }

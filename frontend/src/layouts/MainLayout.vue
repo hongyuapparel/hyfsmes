@@ -61,7 +61,7 @@
               text
               @click="appStore.toggleSidebar"
             />
-            <AppTabs />
+            <AppTabs v-if="showHeaderTabs" />
           </div>
           <div class="header-actions">
             <el-tag v-if="healthStatus" type="success" size="small">{{ healthStatus }}</el-tag>
@@ -112,6 +112,8 @@ const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const healthStatus = ref('')
+
+const showHeaderTabs = computed(() => route.path !== '/')
 
 const iconMap = {
   HomeFilled,

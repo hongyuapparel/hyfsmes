@@ -430,7 +430,7 @@ const filter = reactive<{
   salesperson: '',
 })
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
-const sort = reactive({ sortBy: 'id', sortOrder: 'asc' as 'asc' | 'desc' })
+const sort = reactive({ sortBy: 'createdAt', sortOrder: 'desc' as 'asc' | 'desc' })
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
 const FILTER_AUTO_MIN_WIDTH = 140
@@ -877,8 +877,8 @@ function onSortChange({ prop, order }: { prop?: string; order?: string }) {
     sort.sortBy = prop
     sort.sortOrder = order === 'ascending' ? 'asc' : 'desc'
   } else {
-    sort.sortBy = 'id'
-    sort.sortOrder = 'asc'
+    sort.sortBy = 'createdAt'
+    sort.sortOrder = 'desc'
   }
   load()
 }

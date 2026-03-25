@@ -49,6 +49,35 @@ export class UsersService {
     });
   }
 
+  /**
+   * 用户管理页筛选：允许查询全部状态（active/disabled），可按关键字与角色过滤。
+   */
+  async searchForManagement(keyword?: string, roleCode?: string, status?: UserStatus) {
+    const qb = this.userRepo
+      .createQueryBuilder('u')
+      .leftJoinAndSelect('u.role', 'r');
+
+    if (status) {
+      qb.where('u.status = :status', { status });
+    } else {
+      qb.where('1=1');
+    }
+
+    if (keyword?.trim()) {
+      qb.andWhere('(u.username LIKE :kw OR u.display_name LIKE :kw)', { kw: `%${keyword.trim()}%` });
+    }
+    if (roleCode?.trim()) {
+      qb.andWhere('r.code = :code', { code: roleCode.trim() });
+    }
+
+    qb.orderBy('u.id', 'ASC');
+    const list = await qb.getMany();
+    return list.map((u) => {
+      const { passwordHash: _, ...rest } = u;
+      return rest;
+    });
+  }
+
   async create(dto: { username: string; password: string; displayName?: string; roleId: number }) {
     const exists = await this.userRepo.findOne({ where: { username: dto.username } });
     if (exists) throw new ConflictException('用户名已存在');

@@ -46,8 +46,8 @@ export class ProductsService {
       salesperson,
       page = 1,
       pageSize = 20,
-      sortBy = 'id',
-      sortOrder = 'asc',
+      sortBy = 'createdAt',
+      sortOrder = 'desc',
     } = query;
     const qb = this.productRepo
       .createQueryBuilder('p')
@@ -75,11 +75,18 @@ export class ProductsService {
       qb.andWhere('p.salesperson = :salesperson', { salesperson: salesperson.trim() });
     }
 
-    const sortColumn = this.toSnakeCase(sortBy);
-    const validSortColumns = ['id', 'product_name', 'sku_code', 'product_group_id', 'applicable_people_id', 'created_at', 'salesperson'];
-    if (validSortColumns.includes(sortColumn)) {
-      qb.orderBy(`p.${sortColumn}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
-    }
+    const validSortColumns: Record<string, string> = {
+      id: 'id',
+      productName: 'productName',
+      skuCode: 'skuCode',
+      productGroupId: 'productGroupId',
+      applicablePeopleId: 'applicablePeopleId',
+      createdAt: 'createdAt',
+      salesperson: 'salesperson',
+    };
+    const sortKey = typeof sortBy === 'string' ? sortBy : '';
+    const resolvedSortColumn = validSortColumns[sortKey] ?? validSortColumns.id;
+    qb.orderBy(`p.${resolvedSortColumn}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
 
     const total = await qb.getCount();
     const list = await qb.skip((page - 1) * pageSize).take(pageSize).getMany();
@@ -241,7 +248,4 @@ export class ProductsService {
     return users.map((u) => (u.displayName?.trim() || u.username) || '').filter(Boolean);
   }
 
-  private toSnakeCase(str: string): string {
-    return str.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
-  }
 }

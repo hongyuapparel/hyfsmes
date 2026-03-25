@@ -487,7 +487,7 @@ onMounted(() => {
 
 .settings-body {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
   gap: var(--space-lg);
 }
 
@@ -495,6 +495,9 @@ onMounted(() => {
   width: 360px;
   min-width: 360px;
   flex: 0 0 360px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .org-jobs-wrap {
@@ -530,8 +533,8 @@ onMounted(() => {
   border-radius: var(--radius-lg);
   background: var(--color-bg-base);
   padding: var(--space-xs);
-  min-height: 420px;
-  max-height: 560px;
+  flex: 1;
+  min-height: 0;
   overflow: auto;
 }
 

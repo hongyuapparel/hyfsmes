@@ -1,7 +1,41 @@
 <template>
   <div class="page-card">
-    <div class="toolbar">
-      <el-button type="primary" @click="openCreate">新增用户</el-button>
+    <div class="filter-bar">
+      <div class="filter-left">
+        <el-input
+          v-model="filter.keyword"
+          placeholder="按显示名/登录账号搜索"
+          clearable
+          size="large"
+          class="filter-bar-item"
+          :style="getKeywordFilterStyle(filter.keyword, keywordLabelVisible)"
+          :input-style="getFilterInputStyle(filter.keyword)"
+          @keyup.enter="onSearch"
+          @clear="onSearch"
+        />
+        <el-select
+          v-model="filter.role"
+          placeholder="角色"
+          clearable
+          filterable
+          size="large"
+          class="filter-bar-item"
+          :style="getFilterSelectAutoWidthStyle(filter.role)"
+          @change="onSearch"
+          @clear="onSearch"
+        >
+          <template #label="{ label }">
+            <span v-if="filter.role">角色：{{ label }}</span>
+            <span v-else>{{ label }}</span>
+          </template>
+          <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.code" />
+        </el-select>
+      </div>
+      <div class="filter-actions">
+        <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
+        <el-button size="large" @click="onReset">清空</el-button>
+        <el-button type="primary" size="large" @click="openCreate">新增用户</el-button>
+      </div>
     </div>
     <el-table ref="tableRef" :data="list" border stripe row-key="id">
       <el-table-column prop="id" label="ID" width="88">
@@ -86,7 +120,7 @@
 import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import Sortable from 'sortablejs'
-import { getUsers, createUser, updateUser, resetUserPassword, type UserItem } from '@/api/users'
+import { getUsers, searchUsers, createUser, updateUser, resetUserPassword, type UserItem } from '@/api/users'
 import { getRoles, type RoleItem } from '@/api/roles'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { formatDateTime as formatDate } from '@/utils/date-format'
@@ -103,6 +137,40 @@ const pwdLoading = ref(false)
 const tableRef = ref<{ $el?: HTMLElement }>()
 let rowSortable: Sortable | null = null
 
+const filter = ref<{ keyword: string; role: string }>({ keyword: '', role: '' })
+const keywordLabelVisible = ref(false)
+
+const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
+const FILTER_AUTO_MIN_WIDTH = 200
+const FILTER_AUTO_MAX_WIDTH = 320
+const FILTER_CHAR_PX = 14
+const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
+const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
+
+function getFilterInputStyle(v: unknown) {
+  return v ? activeInputStyle : undefined
+}
+
+function getFilterSelectAutoWidthStyle(v: unknown) {
+  if (!v) return undefined
+  const text = String(v)
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return {
+    ...activeSelectStyle,
+    width: `${width}px`,
+    flex: `0 0 ${width}px`,
+  }
+}
+
+function getKeywordFilterStyle(value: unknown, showLabel: boolean) {
+  if (!value || !showLabel) return undefined
+  const text = `关键字：${String(value)}`
+  const estimated = text.length * FILTER_CHAR_PX + 60
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return { width: `${width}px`, flex: `0 0 ${width}px` }
+}
+
 const form = ref({ username: '', password: '', displayName: '', roleId: 0 })
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
@@ -115,12 +183,36 @@ const pwdRules: FormRules = {
 }
 
 async function load() {
-  const [u, r] = await Promise.all([getUsers(), getRoles()])
-  list.value = u.data ?? []
+  const [r] = await Promise.all([getRoles()])
   roles.value = r.data ?? []
   if (roles.value.length && !form.value.roleId) form.value.roleId = roles.value[0].id
+  await onSearch()
   await nextTick()
   initRowDrag()
+}
+
+async function onSearch() {
+  try {
+    if (filter.value.keyword && String(filter.value.keyword).trim()) {
+      keywordLabelVisible.value = true
+    }
+    const kw = filter.value.keyword?.trim()
+    const role = filter.value.role?.trim()
+    const res = await searchUsers({
+      keyword: kw || undefined,
+      role: role || undefined,
+    })
+    list.value = res.data ?? []
+  } catch (e: unknown) {
+    list.value = []
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  }
+}
+
+async function onReset() {
+  filter.value = { keyword: '', role: '' }
+  keywordLabelVisible.value = false
+  await onSearch()
 }
 
 function initRowDrag() {
@@ -249,8 +341,28 @@ onBeforeUnmount(() => {
   padding: 24px;
   border-radius: 8px;
 }
-.toolbar {
+.filter-bar {
   margin-bottom: 16px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.filter-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.filter-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filter-bar-item {
+  width: 200px;
 }
 .id-cell {
   display: inline-flex;

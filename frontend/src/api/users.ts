@@ -15,6 +15,10 @@ export function getUsers() {
   return request.get<UserItem[]>('/users')
 }
 
+export function searchUsers(params?: { keyword?: string; role?: string; status?: string }) {
+  return request.get<UserItem[]>('/users/manage', { params })
+}
+
 export function createUser(data: { username: string; password: string; display_name?: string; role_id: number }) {
   return request.post('/users', data)
 }

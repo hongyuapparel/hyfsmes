@@ -22,6 +22,17 @@ export class UsersController {
     return this.usersService.findAll();
   }
 
+  /** 用户管理页筛选（不限制启用状态） */
+  @Get('manage')
+  findForManagement(
+    @Query('keyword') keyword?: string,
+    @Query('role') role?: string,
+    @Query('status') status?: string,
+  ) {
+    const st = (status as UserStatus | undefined) || undefined;
+    return this.usersService.searchForManagement(keyword, role, st);
+  }
+
   @Post()
   create(
     @Body()
