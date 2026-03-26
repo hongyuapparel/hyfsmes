@@ -56,11 +56,25 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button v-if="selectedIds.length" type="danger" size="large" circle @click="onBatchDelete">
+          <el-icon><Delete /></el-icon>
+        </el-button>
         <el-button type="primary" size="large" @click="openForm(null)">新建人员</el-button>
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="list" border stripe class="hr-table">
+    <div v-if="selectedIds.length" class="table-selection-count">已选 {{ selectedIds.length }} 项</div>
+
+    <el-table
+      v-loading="loading"
+      :data="list"
+      border
+      stripe
+      row-key="id"
+      class="hr-table"
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="employeeNo" label="工号" width="100" show-overflow-tooltip />
       <el-table-column prop="name" label="姓名" width="100" show-overflow-tooltip />
       <el-table-column prop="departmentName" label="部门" width="120" show-overflow-tooltip />
@@ -82,10 +96,9 @@
         </template>
       </el-table-column>
       <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column label="操作" width="80" align="center" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
-          <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -95,7 +108,7 @@
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
         :total="pagination.total"
-        :page-sizes="[20, 40, 60]"
+        :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next"
         @current-change="load"
         @size-change="onPageSizeChange"
@@ -199,6 +212,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { Delete } from '@element-plus/icons-vue'
 import { getEmployeeList, createEmployee, updateEmployee, deleteEmployee, type EmployeeItem } from '@/api/hr'
 import { getHrUserOptions, type HrUserOption } from '@/api/hr'
 import {
@@ -232,6 +246,7 @@ function statusLabel(s: string) {
 const filter = reactive({ name: '', departmentId: null as number | null, status: '' })
 const nameLabelVisible = ref(false)
 const list = ref<EmployeeItem[]>([])
+const selectedIds = ref<number[]>([])
 const userOptions = ref<HrUserOption[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -355,6 +370,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      selectedIds.value = []
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -465,15 +481,22 @@ async function submitForm() {
   }
 }
 
-async function onDelete(row: EmployeeItem) {
+function onSelectionChange(rows: EmployeeItem[]) {
+  selectedIds.value = rows.map((r) => r.id)
+}
+
+async function onBatchDelete() {
+  if (!selectedIds.value.length) return
   try {
-    await ElMessageBox.confirm('确定删除该人员档案？', '提示', {
+    await ElMessageBox.confirm(`确定删除已选 ${selectedIds.value.length} 条人员档案？`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
     })
-    await deleteEmployee(row.id)
-    ElMessage.success('已删除')
+    for (const id of selectedIds.value) {
+      await deleteEmployee(id)
+    }
+    ElMessage.success('批量删除成功')
     load()
   } catch (e: unknown) {
     if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -504,6 +527,12 @@ onActivated(() => {
 
 .hr-table {
   margin-bottom: var(--space-md);
+}
+
+.table-selection-count {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  margin: 8px 0;
 }
 
 .form-tip {

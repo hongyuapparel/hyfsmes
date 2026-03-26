@@ -127,6 +127,10 @@ export interface OrderActor {
 
 @Injectable()
 export class OrdersService {
+  private craftReconcileRunning = false;
+  private craftReconcileLastRunAt = 0;
+  private readonly craftReconcileIntervalMs = 5 * 60 * 1000;
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
@@ -209,6 +213,28 @@ export class OrdersService {
       order.statusTime = craft?.completedAt ?? new Date();
       await this.orderRepo.save(order);
     }
+  }
+
+  /**
+   * 列表接口不应被“自愈任务”阻塞：
+   * - 改为后台异步执行
+   * - 增加并发锁 + 最小间隔，避免列表与状态统计并发时重复全量扫描
+   */
+  private scheduleCraftReconcile(actorUserId?: number): void {
+    if (typeof actorUserId !== 'number') return;
+    if (this.craftReconcileRunning) return;
+    const now = Date.now();
+    if (now - this.craftReconcileLastRunAt < this.craftReconcileIntervalMs) return;
+
+    this.craftReconcileRunning = true;
+    this.craftReconcileLastRunAt = now;
+    void this.reconcileCraftCompletedOrders(actorUserId)
+      .catch(() => {
+        // 自愈失败不影响列表主链路；下个间隔继续尝试。
+      })
+      .finally(() => {
+        this.craftReconcileRunning = false;
+      });
   }
 
   /** 持久化时只存 materialTypeId，不存 materialType（改名历史同步） */
@@ -953,7 +979,7 @@ export class OrdersService {
   }
 
   async findAll(query: OrderListQuery, actorUserId?: number) {
-    await this.reconcileCraftCompletedOrders(actorUserId);
+    this.scheduleCraftReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
 
     const qb = this.orderRepo.createQueryBuilder('o');
@@ -1172,12 +1198,8 @@ export class OrdersService {
   }
 
   async countByStatus(query: OrderListQuery, actorUserId?: number) {
-    await this.reconcileCraftCompletedOrders(actorUserId);
+    this.scheduleCraftReconcile(actorUserId);
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
-
-    const totalQb = this.orderRepo.createQueryBuilder('o');
-    this.applyListFilters(totalQb, baseQuery, { includeStatus: false });
-    const total = await totalQb.getCount();
 
     const groupQb = this.orderRepo.createQueryBuilder('o');
     this.applyListFilters(groupQb, baseQuery, { includeStatus: false });
@@ -1188,11 +1210,14 @@ export class OrdersService {
       .getRawMany<{ status: string; count: string }>();
 
     const byStatus: Record<string, number> = {};
+    let total = 0;
     rows.forEach((r) => {
       const key = r?.status ?? '';
       if (!key) return;
       const n = Number(r.count);
-      byStatus[key] = Number.isNaN(n) ? 0 : n;
+      const count = Number.isNaN(n) ? 0 : n;
+      byStatus[key] = count;
+      total += count;
     });
 
     return { total, byStatus };
@@ -1362,6 +1387,58 @@ export class OrdersService {
     return n;
   }
 
+  private calculateExFactoryPriceFromSnapshot(snapshot: Record<string, unknown> | null | undefined): number {
+    if (!snapshot || typeof snapshot !== 'object') return 0;
+    const materialRows = Array.isArray(snapshot.materialRows) ? (snapshot.materialRows as any[]) : [];
+    const processItemRows = Array.isArray(snapshot.processItemRows) ? (snapshot.processItemRows as any[]) : [];
+    const productionRows = Array.isArray(snapshot.productionRows) ? (snapshot.productionRows as any[]) : [];
+
+    const materialTotal = materialRows.reduce((sum, row) => {
+      const usage = Number(row?.usagePerPiece) || 0;
+      const lossPercent = Number(row?.lossPercent) || 0;
+      const unitPrice = Number(row?.unitPrice) || 0;
+      return sum + usage * (1 + lossPercent / 100) * unitPrice;
+    }, 0);
+    const processItemTotal = processItemRows.reduce((sum, row) => {
+      const qty = Number(row?.quantity) || 0;
+      const unitPrice = Number(row?.unitPrice) || 0;
+      return sum + qty * unitPrice;
+    }, 0);
+    const productionTotal = productionRows.reduce((sum, row) => sum + (Number(row?.unitPrice) || 0), 0);
+
+    const totalCost = materialTotal + processItemTotal + productionTotal;
+    const margin = this.normalizeProfitMargin(snapshot.profitMargin);
+    const exFactory = margin >= 1 ? totalCost : totalCost / (1 - margin);
+    return Number.isFinite(exFactory) ? Number(exFactory.toFixed(2)) : 0;
+  }
+
+  private withDraftMetadata(snapshot: Record<string, unknown>, actor: OrderActor): Record<string, unknown> {
+    const prev = snapshot ?? {};
+    return {
+      ...prev,
+      quoteNeedsReconfirm: true,
+      quoteDraftUpdatedAt: new Date().toISOString(),
+      quoteDraftUpdatedBy: actor.username,
+    };
+  }
+
+  private withConfirmedMetadata(
+    snapshot: Record<string, unknown>,
+    actor: OrderActor,
+    exFactoryPrice: string,
+  ): Record<string, unknown> {
+    const prev = snapshot ?? {};
+    return {
+      ...prev,
+      quoteNeedsReconfirm: false,
+      quoteConfirmedAt: new Date().toISOString(),
+      quoteConfirmedBy: actor.username,
+      quoteConfirmedExFactoryPrice: exFactoryPrice,
+      quoteDraftUpdatedAt: new Date().toISOString(),
+      quoteDraftUpdatedBy: actor.username,
+    };
+  }
+
   /** 获取订单成本快照（成本页回显） */
   async getCostSnapshot(orderId: number): Promise<OrderCostSnapshot | null> {
     await this.findOne(orderId);
@@ -1378,16 +1455,52 @@ export class OrdersService {
     return row ?? null;
   }
 
-  /** 保存订单成本快照（成本页保存时写入） */
-  async saveCostSnapshot(orderId: number, payload: { snapshot: Record<string, unknown> }): Promise<OrderCostSnapshot> {
-    await this.findOne(orderId);
+  /** 保存订单成本草稿：仅写快照，不同步订单卡片出厂价 */
+  async saveCostSnapshot(
+    orderId: number,
+    payload: { snapshot: Record<string, unknown> },
+    actor?: OrderActor,
+  ): Promise<OrderCostSnapshot> {
+    const order = await this.findOne(orderId);
+    const snapshot = this.withDraftMetadata(payload.snapshot ?? {}, actor ?? { userId: 0, username: '系统' });
     let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
     if (row) {
-      row.snapshot = payload.snapshot ?? null;
+      row.snapshot = snapshot;
     } else {
-      row = this.orderCostSnapshotRepo.create({ orderId, snapshot: payload.snapshot ?? null });
+      row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
     }
-    return this.orderCostSnapshotRepo.save(row);
+    const saved = await this.orderCostSnapshotRepo.save(row);
+    if (actor) {
+      await this.addLog(order, actor, 'cost_draft', '保存成本草稿（未同步订单卡片出厂价）');
+    }
+    return saved;
+  }
+
+  /** 确认报价：保存快照并同步订单卡片出厂价 */
+  async confirmCostQuote(
+    orderId: number,
+    payload: { snapshot: Record<string, unknown> },
+    actor: OrderActor,
+  ): Promise<OrderCostSnapshot> {
+    const order = await this.findOne(orderId);
+    const oldExFactory = this.normalizeDecimalInput(order.exFactoryPrice);
+    const computed = this.calculateExFactoryPriceFromSnapshot(payload.snapshot ?? {});
+    const nextExFactory = this.normalizeDecimalInput(computed.toFixed(2));
+    const snapshot = this.withConfirmedMetadata(payload.snapshot ?? {}, actor, nextExFactory);
+
+    let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    if (row) {
+      row.snapshot = snapshot;
+    } else {
+      row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
+    }
+    const saved = await this.orderCostSnapshotRepo.save(row);
+
+    order.exFactoryPrice = nextExFactory;
+    await this.orderRepo.save(order);
+
+    await this.addLog(order, actor, 'cost_confirm', `确认报价并同步出厂价: ${oldExFactory} -> ${nextExFactory}`);
+    return saved;
   }
 
   /**

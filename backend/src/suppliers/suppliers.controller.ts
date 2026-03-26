@@ -132,6 +132,7 @@ export class SuppliersController {
     @Body('contactInfo') contactInfo?: string,
     @Body('factoryAddress') factoryAddress?: string,
     @Body('settlementTime') settlementTime?: string,
+    @Body('remark') remark?: string,
   ) {
     return this.suppliersService.create({
       name,
@@ -142,6 +143,7 @@ export class SuppliersController {
       contactInfo,
       factoryAddress,
       settlementTime,
+      remark,
     });
   }
 
@@ -156,6 +158,7 @@ export class SuppliersController {
     @Body('contactInfo') contactInfo?: string,
     @Body('factoryAddress') factoryAddress?: string,
     @Body('settlementTime') settlementTime?: string,
+    @Body('remark') remark?: string,
   ) {
     return this.suppliersService.update(Number(id), {
       name,
@@ -166,6 +169,7 @@ export class SuppliersController {
       contactInfo,
       factoryAddress,
       settlementTime,
+      remark,
     });
   }
 

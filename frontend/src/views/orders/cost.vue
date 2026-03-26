@@ -6,6 +6,19 @@
         <span class="title">订单成本</span>
         <span v-if="order" class="sub-title">{{ order.orderNo }} · {{ order.skuCode }}</span>
       </div>
+      <div class="header-actions">
+        <el-button :loading="savingDraft" :disabled="!canSubmitCost || confirmingQuote" @click="saveDraft">
+          保存草稿
+        </el-button>
+        <el-button
+          type="primary"
+          :loading="confirmingQuote"
+          :disabled="!canSubmitCost || savingDraft"
+          @click="confirmQuote"
+        >
+          确认报价
+        </el-button>
+      </div>
     </div>
 
     <!-- 订单摘要 -->
@@ -14,6 +27,7 @@
         <span><strong>客户：</strong>{{ order?.customerName ?? '-' }}</span>
         <span><strong>数量：</strong>{{ order?.quantity ?? 0 }}</span>
         <span><strong>当前销售价：</strong>{{ order?.salePrice ?? '-' }} 元</span>
+        <span class="cost-notice">{{ costNotice }}</span>
       </div>
     </el-card>
 
@@ -409,13 +423,16 @@
       </div>
       <div class="result-actions">
         <el-button @click="goBack">取消</el-button>
+        <el-button :loading="savingDraft" :disabled="!canSubmitCost || confirmingQuote" @click="saveDraft">
+          保存草稿
+        </el-button>
         <el-button
           type="primary"
-          :loading="applying"
-          :disabled="!canSaveCost"
-          @click="applyToOrder"
+          :loading="confirmingQuote"
+          :disabled="!canSubmitCost || savingDraft"
+          @click="confirmQuote"
         >
-          保存
+          确认报价
         </el-button>
       </div>
     </el-card>
@@ -423,11 +440,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
-import { getOrderDetail, getOrderCost, saveOrderCost, updateOrderDraft, type OrderDetail } from '@/api/orders'
+import { confirmOrderCost, getOrderDetail, getOrderCost, saveOrderCost, type OrderDetail } from '@/api/orders'
 import { getProductionProcesses, type ProductionProcessItem } from '@/api/production-processes'
 import { getProcessQuoteTemplates, getProcessQuoteTemplateItems } from '@/api/process-quote-templates'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -454,7 +471,12 @@ const processItemRows = ref<ProcessItemRow[]>([])
 const productionProcesses = ref<ProductionProcessItem[]>([])
 const productionRows = ref<ProductionRow[]>([])
 const profitMargin = ref(0.1)
-const applying = ref(false)
+const savingDraft = ref(false)
+const confirmingQuote = ref(false)
+const quoteConfirmedAt = ref('')
+const quoteConfirmedBy = ref('')
+const quoteNeedsReconfirm = ref(false)
+const loadedSnapshotHash = ref('')
 
 const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 const supplierOptions = ref<{ id: number; name: string }[]>([])
@@ -547,10 +569,72 @@ function normalizeProfitMargin(v: unknown): number {
   return n
 }
 
-const canSaveCost = computed(() => {
-  const roleName = authStore.user?.roleName
-  if (!roleName) return false
-  return roleName === '管理员' || roleName === '跟单员'
+const canSubmitCost = computed(() => authStore.hasPermission('orders_cost_submit'))
+
+function formatTimeLabel(iso: string): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString()
+}
+
+function buildSnapshotPayload() {
+  return {
+    materialRows: materialRows.value.map((row) => ({
+      materialTypeId: row.materialTypeId ?? null,
+      supplierName: row.supplierName ?? '',
+      materialName: row.materialName ?? '',
+      color: row.color ?? '',
+      fabricWidth: row.fabricWidth ?? '',
+      usagePerPiece: row.usagePerPiece ?? null,
+      lossPercent: row.lossPercent ?? null,
+      orderPieces: row.orderPieces ?? null,
+      purchaseQuantity: row.purchaseQuantity ?? null,
+      cuttingQuantity: row.cuttingQuantity ?? null,
+      remark: row.remark ?? '',
+      unitPrice: row.unitPrice,
+    })),
+    processItemRows: processItemRows.value.map((row) => ({
+      processName: row.processName ?? '',
+      supplierName: row.supplierName ?? '',
+      part: row.part ?? '',
+      remark: row.remark ?? '',
+      unitPrice: row.unitPrice,
+      quantity: row.quantity ?? 0,
+    })),
+    productionRows: productionRows.value.map((row) => ({
+      processId: row.processId ?? null,
+      department: row.department ?? '',
+      jobType: row.jobType ?? '',
+      processName: row.processName ?? '',
+      unitPrice: row.unitPrice,
+      remark: row.remark ?? '',
+    })),
+    profitMargin: profitMargin.value,
+  }
+}
+
+const currentSnapshotHash = computed(() => JSON.stringify(buildSnapshotPayload()))
+const hasLocalDraftChanges = computed(
+  () => !!loadedSnapshotHash.value && currentSnapshotHash.value !== loadedSnapshotHash.value,
+)
+
+const costNotice = computed(() => {
+  if (!canSubmitCost.value) {
+    return '你没有“订单成本可提交”权限：可在页面试算，但不能保存草稿或确认报价。'
+  }
+  if (quoteConfirmedAt.value && hasLocalDraftChanges.value) {
+    return '当前成本已被修改但尚未确认报价，订单卡片仍显示上次已确认出厂价。'
+  }
+  if (quoteNeedsReconfirm.value) {
+    return '当前为草稿版本，尚未确认报价，不会同步到订单卡片。'
+  }
+  if (quoteConfirmedAt.value) {
+    const by = quoteConfirmedBy.value || '未知用户'
+    const at = formatTimeLabel(quoteConfirmedAt.value)
+    return `最近一次确认报价：${by}${at ? `（${at}）` : ''}`
+  }
+  return '当前尚未确认报价，订单卡片将继续显示上次已确认价格。'
 })
 
 /** 部门固定显示顺序（生产工序成本表格合并与排序用） */
@@ -787,7 +871,11 @@ async function loadCostSnapshot() {
       if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows as ProcessItemRow[]
       if (Array.isArray(s.productionRows) && s.productionRows.length) productionRows.value = s.productionRows as ProductionRow[]
       if (s.profitMargin !== undefined) profitMargin.value = normalizeProfitMargin(s.profitMargin)
+      quoteConfirmedAt.value = typeof s.quoteConfirmedAt === 'string' ? s.quoteConfirmedAt : ''
+      quoteConfirmedBy.value = typeof s.quoteConfirmedBy === 'string' ? s.quoteConfirmedBy : ''
+      quoteNeedsReconfirm.value = Boolean(s.quoteNeedsReconfirm)
     }
+    loadedSnapshotHash.value = currentSnapshotHash.value
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
   }
@@ -862,49 +950,53 @@ function onProductionProcessChange(row: ProductionRow) {
   row.processName = found.name
 }
 
-async function applyToOrder() {
+async function saveDraft() {
   if (!orderId.value || !order.value) return
+  if (!canSubmitCost.value) {
+    ElMessage.warning('你没有“订单成本可提交”权限，当前仅可试算')
+    return
+  }
+  savingDraft.value = true
+  try {
+    await saveOrderCost(orderId.value, {
+      snapshot: buildSnapshotPayload(),
+    })
+    quoteNeedsReconfirm.value = true
+    loadedSnapshotHash.value = currentSnapshotHash.value
+    ElMessage.success('草稿已保存（未同步订单卡片出厂价）')
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
+  } finally {
+    savingDraft.value = false
+  }
+}
+
+async function confirmQuote() {
+  if (!orderId.value || !order.value) return
+  if (!canSubmitCost.value) {
+    ElMessage.warning('你没有“订单成本可提交”权限，当前仅可试算')
+    return
+  }
   const price = computedExFactoryPrice.value
   if (price <= 0) {
     ElMessage.warning('请先填写成本并计算得出有效出厂价')
     return
   }
-  applying.value = true
+  confirmingQuote.value = true
   try {
-    await updateOrderDraft(orderId.value, { exFactoryPrice: price.toFixed(2) })
-    if (order.value) order.value.exFactoryPrice = price.toFixed(2)
-    await saveOrderCost(orderId.value, {
-      snapshot: {
-        materialRows: materialRows.value.map((row) => ({
-          materialTypeId: row.materialTypeId ?? null,
-          supplierName: row.supplierName ?? '',
-          materialName: row.materialName ?? '',
-          color: row.color ?? '',
-          fabricWidth: row.fabricWidth ?? '',
-          usagePerPiece: row.usagePerPiece ?? null,
-          lossPercent: row.lossPercent ?? null,
-          orderPieces: row.orderPieces ?? null,
-          purchaseQuantity: row.purchaseQuantity ?? null,
-          cuttingQuantity: row.cuttingQuantity ?? null,
-          remark: row.remark ?? '',
-          unitPrice: row.unitPrice,
-        })),
-        processItemRows: processItemRows.value,
-        productionRows: productionRows.value.map((row) => ({
-          processId: row.processId ?? null,
-          department: row.department ?? '',
-          jobType: row.jobType ?? '',
-          unitPrice: row.unitPrice,
-          remark: row.remark ?? '',
-        })),
-        profitMargin: profitMargin.value,
-      },
+    await confirmOrderCost(orderId.value, {
+      snapshot: buildSnapshotPayload(),
     })
-    ElMessage.success('已保存成本并同步出厂价到订单')
+    if (order.value) order.value.exFactoryPrice = price.toFixed(2)
+    quoteNeedsReconfirm.value = false
+    quoteConfirmedBy.value = authStore.user?.displayName || authStore.user?.username || ''
+    quoteConfirmedAt.value = new Date().toISOString()
+    loadedSnapshotHash.value = currentSnapshotHash.value
+    ElMessage.success('已确认报价并同步订单卡片出厂价')
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '确认报价失败'))
   } finally {
-    applying.value = false
+    confirmingQuote.value = false
   }
 }
 
@@ -966,6 +1058,7 @@ onMounted(async () => {
 .page-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
   margin-bottom: var(--space-md);
 }
@@ -978,6 +1071,12 @@ onMounted(async () => {
 .page-header .sub-title {
   font-size: var(--font-size-body);
   color: var(--el-text-color-secondary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
 }
 
 .block-card {
@@ -1021,6 +1120,12 @@ onMounted(async () => {
   flex-wrap: wrap;
   gap: var(--space-lg);
   font-size: var(--font-size-body);
+}
+
+.summary-card .cost-notice {
+  font-size: var(--font-size-small);
+  color: var(--el-color-warning);
+  margin-left: auto;
 }
 
 .cost-table {

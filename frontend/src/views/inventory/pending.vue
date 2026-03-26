@@ -65,6 +65,8 @@
       </div>
     </div>
 
+    <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+
     <el-table
       ref="pendingTableRef"
       v-loading="loading"
@@ -161,7 +163,7 @@
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
         :total="pagination.total"
-        :page-sizes="[20, 40, 60]"
+        :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next"
         @current-change="load"
         @size-change="onPageSizeChange"
@@ -831,6 +833,12 @@ onMounted(async () => {
 
 .inventory-pending-page .pending-table {
   margin-bottom: var(--space-md);
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .detail-muted {

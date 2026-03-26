@@ -78,6 +78,8 @@
       <span class="summary-overdue">{{ '\u8d85\u671f ' }}<strong>{{ summary.overdue }}</strong>{{ ' \u6761' }}</span>
     </div>
 
+    <div v-if="selection.length" class="table-selection-count">已选 {{ selection.length }} 项</div>
+
     <el-table
       v-loading="loading"
       :data="list"
@@ -430,6 +432,12 @@ onMounted(async () => {
 .summary-overdue {
   margin-left: 16px;
   color: var(--el-color-danger);
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .report-table {

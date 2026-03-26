@@ -781,6 +781,7 @@
               v-if="row.imageUrl"
               :src="row.imageUrl"
               fit="cover"
+              lazy
               style="width: 64px; height: 64px"
             />
             <span v-else>无</span>
@@ -833,12 +834,12 @@
         <el-table-column prop="skuCode" label="SKU 编号" min-width="140" />
         <el-table-column prop="productName" label="产品名称" min-width="160" />
         <el-table-column
-          prop="customer.companyName"
+          prop="customerName"
           label="客户"
           min-width="160"
         >
           <template #default="{ row }">
-            {{ row.customer?.companyName || '-' }}
+            {{ row.customerName || '-' }}
           </template>
         </el-table-column>
         <el-table-column label="操作" width="90" align="center">
@@ -916,7 +917,7 @@ import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-op
 import { getDictItems } from '@/api/dicts'
 import { Delete, CircleClose } from '@element-plus/icons-vue'
 import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
-import { getProducts, type ProductItem } from '@/api/products'
+import { getProductSkus, type ProductSkuOption } from '@/api/products'
 import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
@@ -999,7 +1000,7 @@ const rules: FormRules = {
 const skuDialogVisible = ref(false)
 const skuDialogLoading = ref(false)
 const skuKeyword = ref('')
-const skuProducts = ref<ProductItem[]>([])
+const skuProducts = ref<ProductSkuOption[]>([])
 const skuProductGroupName = ref('')
 const skuApplicablePeopleName = ref('')
 
@@ -1034,20 +1035,18 @@ const selectedSkuMeta = computed(() => {
   }
 })
 
-const filteredSkuProducts = computed(() => {
-  const kw = skuKeyword.value.trim().toLowerCase()
-  if (!kw) return skuProducts.value
-  return skuProducts.value.filter((item) => {
-    const sku = item.skuCode?.toLowerCase?.() ?? ''
-    const customer = item.customer?.companyName?.toLowerCase?.() ?? ''
-    return sku.includes(kw) || customer.includes(kw)
-  })
-})
+const filteredSkuProducts = computed(() => skuProducts.value)
 
-async function loadSkuProducts() {
+let skuSearchTimer: ReturnType<typeof setTimeout> | null = null
+async function searchSkus(keyword: string) {
   skuDialogLoading.value = true
   try {
-    const res = await getProducts({ page: 1, pageSize: 200 })
+    const kw = keyword.trim()
+    const res = await getProductSkus({
+      keyword: kw || undefined,
+      page: 1,
+      pageSize: 50,
+    })
     const data = res.data
     skuProducts.value = data?.list ?? []
   } catch (e: unknown) {
@@ -1057,35 +1056,31 @@ async function loadSkuProducts() {
   }
 }
 
-/**
- * 统一的 SKU 初始化入口。
- * 当前仅在页面挂载时用于预加载产品列表，后续若需要按关键字远程搜索，可在此扩展查询参数。
- */
-async function searchSkus(_keyword: string) {
-  if (!skuProducts.value.length) {
-    await loadSkuProducts()
-  }
+function searchSkusDebounced(keyword: string) {
+  if (skuSearchTimer) clearTimeout(skuSearchTimer)
+  skuSearchTimer = setTimeout(() => {
+    skuSearchTimer = null
+    void searchSkus(keyword)
+  }, 300)
 }
 
 async function openSkuDialog() {
   skuDialogVisible.value = true
-  if (!skuProducts.value.length) {
-    await loadSkuProducts()
-  }
+  await searchSkus(skuKeyword.value)
 }
 
-function onSelectSku(row: ProductItem) {
+function onSelectSku(row: ProductSkuOption) {
   form.skuCode = row.skuCode
   skuProductGroupName.value = row.productGroup ?? ''
   skuApplicablePeopleName.value = row.applicablePeople ?? ''
   if (row.imageUrl && !form.imageUrl) {
     form.imageUrl = row.imageUrl
   }
-  if (row.customerId && row.customer?.companyName) {
+  if (row.customerId && row.customerName) {
     form.customerId = row.customerId
-    form.customerName = row.customer.companyName
+    form.customerName = row.customerName
     if (!customerOptions.value.some((c) => c.id === row.customerId)) {
-      customerOptions.value.unshift({ id: row.customerId, companyName: row.customer.companyName })
+      customerOptions.value.unshift({ id: row.customerId, companyName: row.customerName })
     }
   }
   skuDialogVisible.value = false
@@ -2402,8 +2397,6 @@ onMounted(async () => {
         await loadDicts()
         await loadUserOptions()
         await loadMaterialTypes()
-        // 初始化 SKU 下拉，让用户下拉时能直接看到产品列表
-        await searchSkus('')
         // C 区 / E 区供应商下拉初始列表
         await searchProcessSuppliers('')
         // E 区工艺项目下拉：与「供应商设置」中「工艺供应商」的业务范围一致
@@ -2439,6 +2432,11 @@ onMounted(async () => {
       skipDirtyCheck = false
     })
   }
+})
+
+watch(skuKeyword, (val) => {
+  if (!skuDialogVisible.value) return
+  searchSkusDebounced(String(val ?? ''))
 })
 </script>
 

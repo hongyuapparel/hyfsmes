@@ -9,9 +9,8 @@ function getUploadBaseUrl(): string {
   const explicitBase = trimTrailingSlash((import.meta.env.VITE_UPLOAD_BASE_URL ?? '').trim())
   if (explicitBase) return explicitBase
 
-  // Keep uploads on the same proxy prefix as API so production can route
-  // static files through `/api -> backend` even when `/uploads` is not exposed.
-  return trimTrailingSlash((import.meta.env.VITE_API_BASE_URL || '/api').trim())
+  // 默认不加前缀，保持后端返回的 /uploads 路径，避免错误拼成 /api/uploads
+  return ''
 }
 
 function looksLikeUploadPath(value: string): boolean {
@@ -37,22 +36,8 @@ export function resolveAssetUrl(value: string): string {
 }
 
 export function normalizeUploadUrlsDeep<T>(input: T): T {
-  if (typeof input === 'string') {
-    return (looksLikeUploadPath(input) ? resolveAssetUrl(input) : input) as T
-  }
-
-  if (Array.isArray(input)) {
-    for (let i = 0; i < input.length; i += 1) {
-      input[i] = normalizeUploadUrlsDeep(input[i])
-    }
-    return input
-  }
-
-  if (!input || typeof input !== 'object') return input
-
-  const record = input as Record<string, unknown>
-  for (const key of Object.keys(record)) {
-    record[key] = normalizeUploadUrlsDeep(record[key])
+  if (typeof input === 'string' && looksLikeUploadPath(input)) {
+    return resolveAssetUrl(input) as T
   }
   return input
 }

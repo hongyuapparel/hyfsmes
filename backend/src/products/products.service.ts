@@ -104,6 +104,56 @@ export class ProductsService {
     return { list: listWithPath, total, page, pageSize };
   }
 
+  async findSkus(
+    params?: { keyword?: string; page?: number; pageSize?: number },
+  ): Promise<{ list: Array<{ id: number; skuCode: string; productName: string; customerId: number | null; customerName: string; imageUrl: string; productGroup: string; applicablePeople: string }>; total: number; page: number; pageSize: number }> {
+    const page = Math.max(1, Number(params?.page ?? 1) || 1);
+    const pageSize = Math.min(200, Math.max(1, Number(params?.pageSize ?? 20) || 20));
+    const keyword = (params?.keyword ?? '').trim();
+
+    const qb = this.productRepo
+      .createQueryBuilder('p')
+      .leftJoinAndSelect('p.customer', 'c')
+      .orderBy('p.createdAt', 'DESC')
+      .addOrderBy('p.id', 'DESC');
+
+    if (keyword) {
+      qb.andWhere(
+        '(p.sku_code LIKE :kw OR p.product_name LIKE :kw OR c.company_name LIKE :kw)',
+        { kw: `%${keyword}%` },
+      );
+    }
+
+    const total = await qb.getCount();
+    const list = await qb
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getMany();
+
+    const groupIds = list.map((p) => p.productGroupId).filter((id): id is number => id != null);
+    const pathMap = groupIds.length ? await this.systemOptionsService.getProductGroupPathsByIds(groupIds) : {};
+    const apIds = list.map((p) => p.applicablePeopleId).filter((id): id is number => id != null);
+    const apLabelMap = apIds.length
+      ? await this.systemOptionsService.getOptionLabelsByIds('applicable_people', apIds)
+      : {};
+
+    return {
+      list: list.map((p) => ({
+        id: p.id,
+        skuCode: p.skuCode,
+        productName: p.productName ?? '',
+        customerId: p.customerId ?? null,
+        customerName: p.customer?.companyName ?? '',
+        imageUrl: p.imageUrl ?? '',
+        productGroup: p.productGroupId != null ? (pathMap[p.productGroupId] ?? '') : '',
+        applicablePeople: p.applicablePeopleId != null ? (apLabelMap[p.applicablePeopleId] ?? '') : '',
+      })),
+      total,
+      page,
+      pageSize,
+    };
+  }
+
   async findOne(id: number) {
     const product = await this.productRepo.findOne({
       where: { id },

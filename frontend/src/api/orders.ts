@@ -267,6 +267,12 @@ export interface OrderCostSnapshotRes {
     processItemRows?: unknown[]
     productionRows?: unknown[]
     profitMargin?: number
+    quoteNeedsReconfirm?: boolean
+    quoteConfirmedAt?: string
+    quoteConfirmedBy?: string
+    quoteConfirmedExFactoryPrice?: string
+    quoteDraftUpdatedAt?: string
+    quoteDraftUpdatedBy?: string
   } | null
   updatedAt: string
 }
@@ -276,9 +282,14 @@ export function getOrderCost(id: number) {
   return request.get<OrderCostSnapshotRes | null>(`/orders/${id}/cost`)
 }
 
-/** 保存订单成本快照（成本页保存时写入） */
+/** 保存订单成本草稿（不同步订单卡片出厂价） */
 export function saveOrderCost(id: number, payload: { snapshot: Record<string, unknown> }) {
   return request.put<OrderCostSnapshotRes>(`/orders/${id}/cost`, payload)
+}
+
+/** 确认订单报价（同步订单卡片出厂价） */
+export function confirmOrderCost(id: number, payload: { snapshot: Record<string, unknown> }) {
+  return request.post<OrderCostSnapshotRes>(`/orders/${id}/cost/confirm`, payload)
 }
 
 /** 新建草稿 */

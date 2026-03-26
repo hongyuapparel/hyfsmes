@@ -40,6 +40,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'orders_edit', name: '订单列表-编辑订单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_delete', name: '订单列表-删除订单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_review', name: '订单列表-审核待审单', routePath: '/orders/list', type: 'action' },
+  { code: 'orders_cost_submit', name: '订单列表-订单成本可提交', routePath: '/orders/list', type: 'action' },
 ];
 
 export async function seedPermissions(dataSource: DataSource): Promise<void> {

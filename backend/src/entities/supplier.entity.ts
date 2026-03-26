@@ -2,7 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 /**
  * 供应商实体
- * 供应商类型-业务范围-联系人-联系电话-工厂地址-结款时间
+ * 供应商类型-业务范围-联系人-联系电话-工厂地址-结款时间-备注
  */
 @Entity('suppliers')
 export class Supplier {
@@ -44,6 +44,10 @@ export class Supplier {
   /** 结款时间（如月结30天、季结、货到付款等） */
   @Column({ name: 'settlement_time', length: 128, default: '' })
   settlementTime: string;
+
+  /** 备注 */
+  @Column({ name: 'remark', length: 500, default: '' })
+  remark: string;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

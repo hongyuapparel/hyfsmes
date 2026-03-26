@@ -85,6 +85,7 @@ export class SuppliersService {
     contactInfo?: string;
     factoryAddress?: string;
     settlementTime?: string;
+    remark?: string;
   }): Promise<Supplier> {
     const normalizedScopeIds = Array.isArray(dto.businessScopeIds)
       ? dto.businessScopeIds
@@ -104,6 +105,7 @@ export class SuppliersService {
       contactInfo: dto.contactInfo?.trim() ?? '',
       factoryAddress: dto.factoryAddress?.trim() ?? '',
       settlementTime: dto.settlementTime?.trim() ?? '',
+      remark: dto.remark?.trim() ?? '',
     });
     return this.supplierRepo.save(entity);
   }
@@ -119,6 +121,7 @@ export class SuppliersService {
       contactInfo?: string;
       factoryAddress?: string;
       settlementTime?: string;
+      remark?: string;
     },
   ): Promise<Supplier> {
     const item = await this.supplierRepo.findOne({ where: { id } });
@@ -146,6 +149,7 @@ export class SuppliersService {
     if (dto.contactInfo !== undefined) item.contactInfo = dto.contactInfo?.trim() ?? '';
     if (dto.factoryAddress !== undefined) item.factoryAddress = dto.factoryAddress?.trim() ?? '';
     if (dto.settlementTime !== undefined) item.settlementTime = dto.settlementTime?.trim() ?? '';
+    if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
     const saved = await this.supplierRepo.save(item);
     const newName = (saved.name ?? '').trim();
     if (oldName && newName && oldName !== newName) {

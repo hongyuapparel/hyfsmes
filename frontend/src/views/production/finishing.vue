@@ -81,6 +81,8 @@
       </div>
     </div>
 
+    <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+
     <!-- 待尾部订单列表 -->
     <el-table
       ref="finishingTableRef"
@@ -268,7 +270,7 @@
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
         :total="pagination.total"
-        :page-sizes="[20, 40, 60]"
+        :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next"
         @current-change="load"
         @size-change="onPageSizeChange"
@@ -909,6 +911,12 @@ onMounted(() => {
 
 .finishing-table {
   margin-bottom: var(--space-md);
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .table-thumb {

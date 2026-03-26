@@ -11,6 +11,7 @@ export interface SupplierItem {
   contactInfo: string
   factoryAddress: string
   settlementTime: string
+  remark: string
   createdAt: string
   updatedAt: string
 }
@@ -65,6 +66,7 @@ export function createSupplier(body: {
   contactInfo?: string
   factoryAddress?: string
   settlementTime?: string
+  remark?: string
 }) {
   return request.post<SupplierItem>('/suppliers/items', body)
 }
@@ -80,6 +82,7 @@ export function updateSupplier(
     contactInfo?: string
     factoryAddress?: string
     settlementTime?: string
+    remark?: string
   }
 ) {
   return request.put<SupplierItem>(`/suppliers/items/${id}`, body)

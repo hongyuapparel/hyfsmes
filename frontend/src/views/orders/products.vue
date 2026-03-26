@@ -166,6 +166,8 @@
           </div>
         </div>
 
+        <div v-if="selectedIds.length" class="table-selection-count">已选 {{ selectedIds.length }} 项</div>
+
         <!-- 表格：字段驱动 -->
         <el-table
           ref="tableRef"
@@ -204,6 +206,7 @@
                     <el-image
                       :src="row[f.code]"
                       fit="cover"
+                      lazy
                       :preview-teleported="true"
                       :preview-src-list="[row[f.code]]"
                       style="width: 40px; height: 40px; border-radius: 4px; cursor: pointer"
@@ -212,6 +215,7 @@
                   <el-image
                     :src="row[f.code]"
                     fit="contain"
+                    lazy
                     style="max-width: 300px; max-height: 300px; border-radius: 6px"
                   />
                 </el-popover>
@@ -236,7 +240,7 @@
             v-model:current-page="pagination.page"
             v-model:page-size="pagination.pageSize"
             :total="pagination.total"
-            :page-sizes="[10, 20, 50]"
+            :page-sizes="[20, 50, 100]"
             layout="total, sizes, prev, pager, next"
             @current-change="load"
             @size-change="load"
@@ -1214,6 +1218,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 .pagination-wrap {
   margin-top: var(--space-sm);

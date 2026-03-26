@@ -61,6 +61,23 @@ async function dropSupplierCooperationDateColumn(dataSource: DataSource) {
   console.log('[Schema] Dropped suppliers.cooperation_date');
 }
 
+async function ensureSupplierRemarkColumn(dataSource: DataSource) {
+  const rows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'suppliers'
+       AND COLUMN_NAME = 'remark'`,
+  );
+  const cnt = Number(rows?.[0]?.cnt ?? 0);
+  if (cnt > 0) return;
+  await dataSource.query(
+    `ALTER TABLE suppliers
+     ADD COLUMN remark VARCHAR(500) NOT NULL DEFAULT '' AFTER settlement_time`,
+  );
+  console.log('[Schema] Added suppliers.remark');
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -89,6 +106,7 @@ async function bootstrap() {
     await ensureSupplierMultiScopeColumn(dataSource);
     await ensureSupplierLastActiveColumn(dataSource);
     await dropSupplierCooperationDateColumn(dataSource);
+    await ensureSupplierRemarkColumn(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);

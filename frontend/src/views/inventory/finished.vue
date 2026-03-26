@@ -100,6 +100,8 @@
           </div>
         </div>
 
+        <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+
         <el-table
           ref="finishedStockTableRef"
           v-loading="loading"
@@ -217,7 +219,7 @@
             v-model:current-page="pagination.page"
             v-model:page-size="pagination.pageSize"
             :total="pagination.total"
-            :page-sizes="[20, 40, 60]"
+            :page-sizes="[20, 50, 100]"
             layout="total, sizes, prev, pager, next"
             @current-change="load"
             @size-change="onPageSizeChange"
@@ -330,7 +332,7 @@
             v-model:current-page="outboundPagination.page"
             v-model:page-size="outboundPagination.pageSize"
             :total="outboundPagination.total"
-            :page-sizes="[20, 40, 60]"
+            :page-sizes="[20, 50, 100]"
             layout="total, sizes, prev, pager, next"
             @current-change="loadOutbounds"
             @size-change="onOutboundPageSizeChange"
@@ -2089,6 +2091,12 @@ function onOutboundPageSizeChange() {
 
 .finished-table {
   margin-bottom: var(--space-md);
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .qty-hover {

@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, ParseIntPipe, Put, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Post, Put, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -11,24 +11,38 @@ import { OrdersService } from './orders.service';
  */
 @Controller('orders/:orderId/cost')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-@RequirePermission('/orders/list')
 export class OrderCostController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
+  @RequirePermission('/orders/list')
   getCost(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.ordersService.getCostSnapshot(orderId);
   }
 
+  /** 保存草稿：仅保存成本快照，不同步订单卡片出厂价 */
   @Put()
-  @RequirePermission('orders_edit')
+  @RequirePermission('orders_cost_submit')
   saveCost(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body() body: { snapshot: Record<string, unknown> },
     @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.ordersService.assertOrderActionById(orderId, user.userId, 'edit').then(() =>
-      this.ordersService.saveCostSnapshot(orderId, body),
+      this.ordersService.saveCostSnapshot(orderId, body, user),
+    );
+  }
+
+  /** 确认报价：保存快照并同步订单卡片出厂价 */
+  @Post('confirm')
+  @RequirePermission('orders_cost_submit')
+  confirmCost(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body() body: { snapshot: Record<string, unknown> },
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.ordersService.assertOrderActionById(orderId, user.userId, 'edit').then(() =>
+      this.ordersService.confirmCostQuote(orderId, body, user),
     );
   }
 }

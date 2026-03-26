@@ -31,24 +31,16 @@ export class ProductsController {
   @RequirePermission('/orders/list')
   async findSkus(
     @Query('keyword') keyword?: string,
+    @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     const size = pageSize ? parseInt(pageSize, 10) : 20;
-    const res = await this.productsService.findAll({
-      skuCode: keyword?.trim() || undefined,
-      page: 1,
+    const p = page ? parseInt(page, 10) : 1;
+    return this.productsService.findSkus({
+      keyword: keyword?.trim() || '',
+      page: Number.isFinite(p) && p > 0 ? p : 1,
       pageSize: Number.isFinite(size) && size > 0 ? size : 20,
-      sortBy: 'id',
-      sortOrder: 'desc',
     });
-    const list = (res.list ?? []).map((p) => ({
-      id: p.id,
-      skuCode: p.skuCode,
-      customerId: p.customerId ?? null,
-      customerName: p.customer?.companyName ?? '',
-      imageUrl: p.imageUrl ?? '',
-    }));
-    return { list };
   }
 
   @Get()

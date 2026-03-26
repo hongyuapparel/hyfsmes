@@ -91,3 +91,25 @@ export function getNextSkuCode() {
 export function checkSkuExists(sku: string) {
   return request.get<{ exists: boolean }>('/products/check-sku', { params: { sku } })
 }
+
+export interface ProductSkuOption {
+  id: number
+  skuCode: string
+  productName: string
+  customerId: number | null
+  customerName: string
+  imageUrl: string
+  productGroup: string
+  applicablePeople: string
+}
+
+export interface ProductSkuSearchRes {
+  list: ProductSkuOption[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export function getProductSkus(params?: { keyword?: string; page?: number; pageSize?: number }) {
+  return request.get<ProductSkuSearchRes>('/products/skus', { params })
+}

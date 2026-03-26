@@ -52,11 +52,25 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button v-if="selectedIds.length" type="danger" size="large" circle @click="onBatchDelete">
+          <el-icon><Delete /></el-icon>
+        </el-button>
         <el-button type="primary" size="large" @click="openForm(null)">新建供应商</el-button>
       </div>
     </div>
 
-    <el-table v-loading="loading" :data="list" border stripe class="suppliers-table">
+    <div v-if="selectedIds.length" class="table-selection-count">已选 {{ selectedIds.length }} 项</div>
+
+    <el-table
+      v-loading="loading"
+      :data="list"
+      border
+      stripe
+      row-key="id"
+      class="suppliers-table"
+      @selection-change="onSelectionChange"
+    >
+      <el-table-column type="selection" width="48" align="center" />
       <el-table-column label="供应商名称" min-width="120" show-overflow-tooltip>
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetailDrawer(row)">
@@ -83,10 +97,10 @@
       <el-table-column prop="contactInfo" label="联系电话" width="120" show-overflow-tooltip />
       <el-table-column prop="factoryAddress" label="工厂地址" min-width="140" show-overflow-tooltip />
       <el-table-column prop="settlementTime" label="结款时间" width="100" show-overflow-tooltip />
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
+      <el-table-column label="操作" width="80" align="center" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
-          <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -96,7 +110,7 @@
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
         :total="pagination.total"
-        :page-sizes="[20, 40, 60]"
+        :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next"
         @current-change="load"
         @size-change="onPageSizeChange"
@@ -141,11 +155,12 @@
             show-checkbox
             collapse-tags
             collapse-tags-tooltip
-            check-strictly
+            :check-strictly="false"
             style="width: 100%"
             :disabled="!form.supplierTypeId"
             :data="businessScopeOptions"
-            :props="{ label: 'label', value: 'id', children: 'children' }"
+            value-key="value"
+            :props="{ label: 'label', value: 'value', children: 'children' }"
           />
         </el-form-item>
         <el-form-item label="联系人" prop="contactPerson">
@@ -167,6 +182,17 @@
           <el-input
             v-model="form.settlementTime"
             placeholder="如月结30天、季结、货到付款"
+            clearable
+          />
+        </el-form-item>
+        <el-form-item label="备注" prop="remark">
+          <el-input
+            v-model="form.remark"
+            type="textarea"
+            :rows="2"
+            maxlength="500"
+            show-word-limit
+            placeholder="备注"
             clearable
           />
         </el-form-item>
@@ -219,6 +245,8 @@
             <div class="detail-value">{{ detailDrawer.data.factoryAddress || '-' }}</div>
             <div class="detail-label">结款时间</div>
             <div class="detail-value">{{ detailDrawer.data.settlementTime || '-' }}</div>
+            <div class="detail-label">备注</div>
+            <div class="detail-value">{{ detailDrawer.data.remark || '-' }}</div>
           </div>
 
           <div class="recent-records">
@@ -244,6 +272,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { Delete } from '@element-plus/icons-vue'
 import {
   getSupplierList,
   getSupplierOne,
@@ -265,6 +294,7 @@ import { formatDateTime } from '@/utils/date-format'
 
 interface BusinessScopeTreeNode {
   id: number
+  value: number
   label: string
   children?: BusinessScopeTreeNode[]
 }
@@ -291,6 +321,7 @@ function getFilterSelectAutoWidthStyle(labelText: string, active = false) {
 const filter = reactive<{ name: string; supplierTypeId: number | null }>({ name: '', supplierTypeId: null })
 const nameLabelVisible = ref(false)
 const list = ref<SupplierItem[]>([])
+const selectedIds = ref<number[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 
@@ -310,6 +341,7 @@ const form = reactive<{
   contactInfo: string
   factoryAddress: string
   settlementTime: string
+  remark: string
 }>({
   name: '',
   supplierTypeId: null,
@@ -319,6 +351,7 @@ const form = reactive<{
   contactInfo: '',
   factoryAddress: '',
   settlementTime: '',
+  remark: '',
 })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入供应商名称', trigger: 'blur' }],
@@ -352,6 +385,10 @@ function getScopeLabels(ids: number[] | null | undefined, fallbackId?: number | 
     return one ? [one] : []
   }
   return []
+}
+
+function onSelectionChange(rows: SupplierItem[]) {
+  selectedIds.value = rows.map((r) => r.id)
 }
 
 function getDetailDrawerMaxWidth() {
@@ -422,6 +459,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      selectedIds.value = []
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -472,6 +510,7 @@ async function openForm(row: SupplierItem | null) {
     form.contactInfo = row.contactInfo ?? ''
     form.factoryAddress = row.factoryAddress ?? ''
     form.settlementTime = row.settlementTime ?? ''
+    form.remark = row.remark ?? ''
   } else {
     form.name = ''
     form.supplierTypeId = null
@@ -481,6 +520,7 @@ async function openForm(row: SupplierItem | null) {
     form.contactInfo = ''
     form.factoryAddress = ''
     form.settlementTime = ''
+    form.remark = ''
   }
   formDialog.visible = true
   if (form.supplierTypeId != null) await onFormTypeChange()
@@ -495,28 +535,35 @@ async function submitForm() {
   await formRef.value?.validate().catch(() => {})
   formDialog.submitting = true
   try {
+    const typeTree =
+      form.supplierTypeId != null
+        ? (businessScopeTreeByTypeId.value[form.supplierTypeId] ?? [])
+        : []
+    const normalizedScopeIds = expandSelectedScopeIds(form.businessScopeIds, typeTree)
     if (formDialog.isEdit && editId.value != null) {
       await updateSupplier(editId.value, {
         name: form.name,
         supplierTypeId: form.supplierTypeId,
-        businessScopeIds: form.businessScopeIds,
-        businessScopeId: form.businessScopeIds[0] ?? null,
+        businessScopeIds: normalizedScopeIds,
+        businessScopeId: normalizedScopeIds[0] ?? null,
         contactPerson: form.contactPerson,
         contactInfo: form.contactInfo,
         factoryAddress: form.factoryAddress,
         settlementTime: form.settlementTime,
+        remark: form.remark,
       })
       ElMessage.success('保存成功')
     } else {
       await createSupplier({
         name: form.name,
         supplierTypeId: form.supplierTypeId,
-        businessScopeIds: form.businessScopeIds,
-        businessScopeId: form.businessScopeIds[0] ?? null,
+        businessScopeIds: normalizedScopeIds,
+        businessScopeId: normalizedScopeIds[0] ?? null,
         contactPerson: form.contactPerson,
         contactInfo: form.contactInfo,
         factoryAddress: form.factoryAddress,
         settlementTime: form.settlementTime,
+        remark: form.remark,
       })
       ElMessage.success('新建成功')
     }
@@ -529,15 +576,18 @@ async function submitForm() {
   }
 }
 
-async function onDelete(row: SupplierItem) {
+async function onBatchDelete() {
+  if (!selectedIds.value.length) return
   try {
-    await ElMessageBox.confirm('确定删除该供应商？', '提示', {
+    await ElMessageBox.confirm(`确定删除已选 ${selectedIds.value.length} 条供应商记录？`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning',
     })
-    await deleteSupplier(row.id)
-    ElMessage.success('已删除')
+    for (const id of selectedIds.value) {
+      await deleteSupplier(id)
+    }
+    ElMessage.success('批量删除成功')
     load()
   } catch (e: unknown) {
     if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -591,6 +641,7 @@ async function loadSupplierOptions() {
         nextLabelById[n.id] = path
         return {
           id: n.id,
+          value: n.id,
           label: n.value,
           children: buildTree(n.id, path),
         }
@@ -630,6 +681,21 @@ function onFormTypeChange() {
   form.businessScopeId = form.businessScopeIds[0] ?? null
 }
 
+function expandSelectedScopeIds(selectedIds: number[], tree: BusinessScopeTreeNode[]): number[] {
+  if (!Array.isArray(selectedIds) || !selectedIds.length) return []
+  const selected = new Set(selectedIds)
+  const expanded = new Set<number>()
+  const walk = (node: BusinessScopeTreeNode, inheritedSelected: boolean) => {
+    const currentSelected = inheritedSelected || selected.has(node.id)
+    if (currentSelected) expanded.add(node.id)
+    if (node.children?.length) {
+      for (const child of node.children) walk(child, currentSelected)
+    }
+  }
+  for (const root of tree) walk(root, false)
+  return [...expanded]
+}
+
 onMounted(async () => {
   await loadSupplierOptions()
   await load()
@@ -650,6 +716,12 @@ onBeforeUnmount(() => {
 
 .suppliers-table {
   margin-bottom: var(--space-md);
+}
+
+.table-selection-count {
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  margin: 8px 0;
 }
 
 .supplier-detail-wrap {

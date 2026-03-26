@@ -258,7 +258,7 @@
     </div>
 
     <!-- 订单卡片宫格 -->
-    <div class="orders-card-list">
+    <div class="orders-card-list" v-loading="loading">
       <el-empty v-if="!loading && !list.length" description="暂无订单" />
       <div v-else class="order-card-grid">
         <div
@@ -292,6 +292,7 @@
                   v-if="item.imageUrl"
                   :src="item.imageUrl"
                   fit="cover"
+                  lazy
                   :preview-src-list="[item.imageUrl]"
                 />
                 <div v-else class="image-placeholder">图片</div>
@@ -465,7 +466,7 @@
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
         :total="pagination.total"
-        :page-sizes="[12, 24, 48]"
+        :page-sizes="[20, 50, 100]"
         layout="total, sizes, prev, pager, next"
         @current-change="load"
         @size-change="onPageSizeChange"
@@ -622,11 +623,34 @@ const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 
-// 订单状态标签：从「订单状态配置」中动态加载
-const STATUS_TABS = ref<Array<{ label: string; value: string }>>([{ label: '全部', value: 'all' }])
+const DEFAULT_STATUS_TABS: Array<{ label: string; value: string }> = [
+  { label: '全部', value: 'all' },
+  { label: '草稿', value: 'draft' },
+  { label: '待审单', value: 'pending_review' },
+  { label: '待纸样', value: 'pending_pattern' },
+  { label: '待采购', value: 'pending_purchase' },
+  { label: '待裁床', value: 'pending_cutting' },
+  { label: '待车缝', value: 'pending_sewing' },
+  { label: '待尾部', value: 'pending_finishing' },
+  { label: '订单完成', value: 'completed' },
+]
 
-// 状态编码 -> 中文名 映射，同样从配置表生成
-const STATUS_LABEL_MAP = ref<Record<string, string>>({})
+const DEFAULT_STATUS_LABEL_MAP: Record<string, string> = {
+  draft: '草稿',
+  pending_review: '待审单',
+  pending_pattern: '待纸样',
+  pending_purchase: '待采购',
+  pending_cutting: '待裁床',
+  pending_sewing: '待车缝',
+  pending_finishing: '待尾部',
+  completed: '订单完成',
+}
+
+// 订单状态标签：先渲染默认值，接口返回后再覆盖
+const STATUS_TABS = ref<Array<{ label: string; value: string }>>([...DEFAULT_STATUS_TABS])
+
+// 状态编码 -> 中文名 映射：先用默认值，接口返回后再覆盖
+const STATUS_LABEL_MAP = ref<Record<string, string>>({ ...DEFAULT_STATUS_LABEL_MAP })
 
 async function loadStatusTabs() {
   try {
@@ -649,7 +673,7 @@ async function loadStatusTabs() {
     }
     STATUS_LABEL_MAP.value = map
   } catch (e: unknown) {
-    // 状态配置加载失败时，保留默认「全部」标签，不影响列表基础功能
+    // 状态配置加载失败时，保留本地默认状态标签，避免页面出现“像没有 tab”的空窗感
     if (!isErrorHandled(e)) {
       console.warn('订单状态配置加载失败：', getErrorMessage(e, '状态加载失败'))
     }
@@ -1139,22 +1163,43 @@ function getStatusTabLabel(tab: { label: string; value: string }) {
   return `${tab.label}(${count})`
 }
 
-async function load() {
+async function loadList() {
   loading.value = true
   try {
-    const [listRes, countsRes] = await Promise.all([getOrders(buildQuery()), getOrderStatusCounts(buildCountQuery())])
+    const listRes = await getOrders(buildQuery())
     const data = listRes.data
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
     }
-    const countsData = countsRes.data
-    statusTotal.value = countsData?.total ?? 0
-    statusCounts.value = countsData?.byStatus ?? {}
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
     loading.value = false
+  }
+}
+
+async function loadStatusCounts() {
+  try {
+    const countsRes = await getOrderStatusCounts(buildCountQuery())
+    const countsData = countsRes.data
+    statusTotal.value = countsData?.total ?? 0
+    statusCounts.value = countsData?.byStatus ?? {}
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) {
+      console.warn('订单状态统计加载失败：', getErrorMessage(e, '状态统计加载失败'))
+    }
+  }
+}
+
+/**
+ * refreshCounts=true 时刷新状态 tab 数量；
+ * 切换状态 / 分页仅刷新列表，不重复请求统计，降低 tab 卡顿感。
+ */
+async function load(options?: { refreshCounts?: boolean }) {
+  await loadList()
+  if (options?.refreshCounts) {
+    void loadStatusCounts()
   }
 }
 
@@ -1165,7 +1210,7 @@ function onSearch(byUser = false) {
     if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
   }
   pagination.page = 1
-  load()
+  load({ refreshCounts: true })
 }
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -1193,7 +1238,7 @@ function onReset() {
   currentStatus.value = 'all'
   pagination.page = 1
   resetSelection()
-  load()
+  load({ refreshCounts: true })
 }
 
 function onStatusChange() {
@@ -1220,7 +1265,7 @@ async function onBatchDelete() {
     await deleteOrders(selectedIds.value)
     ElMessage.success('已删除选中订单')
     pagination.page = 1
-    await load()
+    await load({ refreshCounts: true })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '删除失败'))
   }
@@ -1240,7 +1285,7 @@ async function onReviewApprove() {
     ElMessage.success('审核成功')
     reviewDialog.visible = false
     pagination.page = 1
-    await load()
+    await load({ refreshCounts: true })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '审核失败'))
   } finally {
@@ -1261,7 +1306,7 @@ async function onReviewReject() {
     ElMessage.success('已退回为草稿')
     reviewDialog.visible = false
     pagination.page = 1
-    await load()
+    await load({ refreshCounts: true })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '退回失败'))
   } finally {
@@ -1282,7 +1327,7 @@ async function onBatchCopyToDraft() {
     await copyOrdersToDraft(selectedIds.value)
     ElMessage.success('已复制为草稿')
     pagination.page = 1
-    await load()
+    await load({ refreshCounts: true })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '复制失败'))
   }
@@ -1476,7 +1521,7 @@ onMounted(async () => {
     // 失败时保持现有行为，由全局鉴权处理登录态
   }
   applyQueryFromRoute()
-  load()
+  load({ refreshCounts: true })
   loadOptions()
   loadStatusTabs()
 })
