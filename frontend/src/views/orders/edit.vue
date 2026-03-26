@@ -824,8 +824,9 @@
           <template #default="{ row }">
             <el-image
               v-if="row.imageUrl"
-              :src="row.imageUrl"
+              :src="toSkuThumbUrl(row.imageUrl)"
               fit="cover"
+              lazy
               style="width: 64px; height: 64px"
             />
             <span v-else>无</span>
@@ -1037,6 +1038,22 @@ const selectedSkuMeta = computed(() => {
 
 const filteredSkuProducts = computed(() => skuProducts.value)
 
+function toSkuThumbUrl(rawUrl: string | undefined): string {
+  const source = String(rawUrl ?? '').trim()
+  if (!source) return ''
+  if (/\/migration-old\/small_/i.test(source)) return source
+  // 旧系统迁移图片目录同时存在 small_ 缩略图，优先走小图减少 SKU 弹窗首屏加载压力。
+  if (/\/migration-old\//i.test(source)) {
+    const idx = source.lastIndexOf('/')
+    if (idx >= 0) {
+      const prefix = source.slice(0, idx + 1)
+      const name = source.slice(idx + 1)
+      if (name) return `${prefix}small_${name}`
+    }
+  }
+  return source
+}
+
 let skuSearchTimer: ReturnType<typeof setTimeout> | null = null
 async function searchSkus(keyword: string) {
   skuDialogLoading.value = true
@@ -1045,7 +1062,8 @@ async function searchSkus(keyword: string) {
     const res = await getProductSkus({
       keyword: kw || undefined,
       page: 1,
-      pageSize: 50,
+      // 首屏先取较小批次，配合缩略图与懒加载降低 SKU 弹窗打开时延迟
+      pageSize: 20,
     })
     const data = res.data
     skuProducts.value = data?.list ?? []

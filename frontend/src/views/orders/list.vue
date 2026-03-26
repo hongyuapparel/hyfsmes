@@ -833,7 +833,7 @@ const skuCodeLabelVisible = ref(false)
 
 const pagination = reactive({
   page: 1,
-  pageSize: 12,
+  pageSize: 20,
   total: 0,
 })
 

@@ -68,9 +68,41 @@
         v-model="dialogVisible"
         :title="isEdit ? '编辑' : getAddTitle()"
         width="400"
-        @close="form.value = ''"
+        @close="onDialogClose"
       >
         <el-form label-width="110px">
+          <template v-if="isEdit && addLevel > 0">
+            <el-form-item label="供应商类型">
+              <el-select
+                v-model="editSupplierTypeId"
+                placeholder="请选择供应商类型"
+                style="width: 100%"
+                @change="onEditSupplierTypeChange"
+              >
+                <el-option
+                  v-for="opt in editSupplierTypeOptions"
+                  :key="opt.id"
+                  :label="opt.label"
+                  :value="opt.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="父分组">
+              <el-select
+                v-model="editParentGroupId"
+                clearable
+                placeholder="不选则直属当前供应商类型"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="opt in editParentGroupOptions"
+                  :key="opt.id"
+                  :label="opt.label"
+                  :value="opt.id"
+                />
+              </el-select>
+            </el-form-item>
+          </template>
           <el-form-item :label="getAddLabel()">
             <el-input
               v-model="form.value"
@@ -88,7 +120,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { nextTick, ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowRight, Delete } from '@element-plus/icons-vue'
 import {
@@ -123,6 +155,11 @@ const parentId = ref<number | null>(null)
 const addLevel = ref<0 | 1 | 2>(0)
 const form = ref({ value: '' })
 const submitLoading = ref(false)
+const editTree = ref<SystemOptionTreeNode[]>([])
+const editSupplierTypeId = ref<number | null>(null)
+const editParentGroupId = ref<number | null>(null)
+const editSupplierTypeOptions = ref<{ id: number; label: string }[]>([])
+const editParentGroupOptions = ref<{ id: number; label: string }[]>([])
 
 async function loadRoots() {
   try {
@@ -254,6 +291,61 @@ function findRootIdByTargetId(nodes: SystemOptionTreeNode[], targetId: number): 
   return null
 }
 
+function findNodeByIdInTree(nodes: SystemOptionTreeNode[], targetId: number): SystemOptionTreeNode | null {
+  const stack = [...nodes]
+  while (stack.length) {
+    const cur = stack.shift()!
+    if (cur.id === targetId) return cur
+    if (cur.children?.length) stack.unshift(...cur.children)
+  }
+  return null
+}
+
+function collectNodeAndDescendantIds(node: SystemOptionTreeNode): Set<number> {
+  const set = new Set<number>()
+  const stack = [node]
+  while (stack.length) {
+    const cur = stack.shift()!
+    set.add(cur.id)
+    if (cur.children?.length) stack.unshift(...cur.children)
+  }
+  return set
+}
+
+function buildEditParentGroupOptions() {
+  const rootId = editSupplierTypeId.value
+  if (rootId == null) {
+    editParentGroupOptions.value = []
+    editParentGroupId.value = null
+    return
+  }
+  const root = editTree.value.find((n) => n.id === rootId)
+  const level1 = root?.children ?? []
+  const editingNode = findNodeByIdInTree(editTree.value, editId.value)
+  const blockedIds = editingNode ? collectNodeAndDescendantIds(editingNode) : new Set<number>()
+  const options = level1
+    .filter((n) => !blockedIds.has(n.id))
+    .map((n) => ({ id: n.id, label: n.value }))
+  editParentGroupOptions.value = options
+  if (editParentGroupId.value != null && !options.some((o) => o.id === editParentGroupId.value)) {
+    editParentGroupId.value = null
+  }
+}
+
+function onEditSupplierTypeChange() {
+  editParentGroupId.value = null
+  buildEditParentGroupOptions()
+}
+
+function onDialogClose() {
+  form.value = { value: '' }
+  editSupplierTypeId.value = null
+  editParentGroupId.value = null
+  editSupplierTypeOptions.value = []
+  editParentGroupOptions.value = []
+  editTree.value = []
+}
+
 function collectDescendants(nodes: SystemOptionTreeNode[]): SystemOptionTreeNode[] {
   const out: SystemOptionTreeNode[] = []
   const stack = [...nodes]
@@ -266,7 +358,7 @@ function collectDescendants(nodes: SystemOptionTreeNode[]): SystemOptionTreeNode
 }
 
 /** 规则：同一供应商类型（根）下，业务范围（父/子分组）不允许重名；供应商类型本身也不允许重名 */
-async function validateNoDuplicate(val: string): Promise<boolean> {
+async function validateNoDuplicate(val: string, targetRootId?: number): Promise<boolean> {
   const value = normalizeValue(val)
   const res = await getSystemOptionsTree(OPTION_TYPE)
   const tree = res.data ?? []
@@ -284,7 +376,9 @@ async function validateNoDuplicate(val: string): Promise<boolean> {
 
   // 新增/编辑业务范围：同一根类型下名称唯一（包含父分组和子分组）
   let rootId: number | null = null
-  if (isEdit.value && editingId != null) {
+  if (targetRootId != null) {
+    rootId = targetRootId
+  } else if (isEdit.value && editingId != null) {
     rootId = findRootIdByTargetId(tree, editingId)
   } else if (parentId.value != null) {
     rootId = findRootIdByTargetId(tree, parentId.value)
@@ -308,15 +402,41 @@ function openAdd(pid: number | null, parentLevel?: number) {
   parentId.value = pid
   addLevel.value = pid == null ? 0 : ((parentLevel ?? 0) + 1 as 1 | 2)
   form.value = { value: '' }
+  editSupplierTypeId.value = null
+  editParentGroupId.value = null
+  editSupplierTypeOptions.value = []
+  editParentGroupOptions.value = []
   dialogVisible.value = true
 }
 
-function openEdit(row: TreeRow) {
+async function openEdit(row: TreeRow) {
   isEdit.value = true
   editId.value = row.id
   addLevel.value = (row.level as 0 | 1 | 2)
   parentId.value = null
   form.value = { value: row.value }
+  if (row.level > 0) {
+    try {
+      const res = await getSystemOptionsTree(OPTION_TYPE)
+      editTree.value = res.data ?? []
+      editSupplierTypeOptions.value = editTree.value.map((r) => ({ id: r.id, label: r.value }))
+      const rootId = findRootIdByTargetId(editTree.value, row.id)
+      editSupplierTypeId.value = rootId
+      const currentNode = findNodeByIdInTree(editTree.value, row.id)
+      if (rootId != null && currentNode?.parentId != null && currentNode.parentId !== rootId) {
+        editParentGroupId.value = currentNode.parentId
+      } else {
+        editParentGroupId.value = null
+      }
+      buildEditParentGroupOptions()
+    } catch {
+      editTree.value = []
+      editSupplierTypeOptions.value = []
+      editParentGroupOptions.value = []
+      editSupplierTypeId.value = null
+      editParentGroupId.value = null
+    }
+  }
   dialogVisible.value = true
 }
 
@@ -327,31 +447,33 @@ async function submit() {
     ElMessage.warning(`请输入${label}`)
     return
   }
-  const ok = await validateNoDuplicate(val)
+  if (isEdit.value && addLevel.value > 0 && editSupplierTypeId.value == null) {
+    ElMessage.warning('请选择供应商类型')
+    return
+  }
+  if (isEdit.value && addLevel.value === 1 && editParentGroupId.value != null) {
+    const target = findNodeById(editId.value)
+    if (target?.children?.length) {
+      ElMessage.warning('该父分组下已有子分组，暂不支持直接挂到其他父分组下')
+      return
+    }
+  }
+  const ok = await validateNoDuplicate(
+    val,
+    isEdit.value && addLevel.value > 0 ? (editSupplierTypeId.value ?? undefined) : undefined,
+  )
   if (!ok) return
   submitLoading.value = true
   try {
-    let handledByLocalSync = false
+    let editedNextParentId: number | null | undefined
     if (isEdit.value) {
-      await updateSystemOption(editId.value, { value: val })
-      const target = findNodeById(editId.value)
-      if (target) {
-        target.value = val
-        // 二/三级节点编辑后，同步父节点 children 到懒加载缓存，确保立即可见
-        if (target.level > 0 && target.parentId != null) {
-          const parent = findNodeById(target.parentId)
-          if (parent) {
-            const list: SystemOptionLazyNode[] = (parent.children ?? []).map((n) => ({
-              id: n.id,
-              value: n.value,
-              sortOrder: n.sortOrder,
-              hasChildren: !!n.hasChildren,
-            }))
-            syncParentChildren(parent, list)
-          }
-        }
-        handledByLocalSync = true
-      }
+      const nextParentId =
+        addLevel.value > 0 ? (editParentGroupId.value ?? editSupplierTypeId.value ?? null) : undefined
+      editedNextParentId = nextParentId
+      await updateSystemOption(editId.value, {
+        value: val,
+        parent_id: nextParentId,
+      })
       ElMessage.success('保存成功')
     } else {
       let sortOrder: number
@@ -371,7 +493,33 @@ async function submit() {
     }
     dialogVisible.value = false
     if (isEdit.value) {
-      if (!handledByLocalSync) await loadRoots()
+      // 编辑后统一重载并自动定位，避免“保存成功但界面未即时反映”
+      await loadRoots()
+      await nextTick()
+      if (addLevel.value > 0 && editSupplierTypeId.value != null) {
+        const rootRow = findNodeById(editSupplierTypeId.value)
+        if (rootRow) {
+          tableRef.value?.toggleRowExpansion?.(rootRow, true)
+          expandedIds.value.add(Number(rootRow.id))
+          const rootChildrenRes = await getSystemOptionsChildren(OPTION_TYPE, rootRow.id)
+          syncParentChildren(rootRow, rootChildrenRes.data ?? [])
+        }
+        if (
+          editedNextParentId != null &&
+          editSupplierTypeId.value != null &&
+          editedNextParentId !== editSupplierTypeId.value
+        ) {
+          const parentRow = findNodeById(editedNextParentId)
+          if (parentRow) {
+            tableRef.value?.toggleRowExpansion?.(parentRow, true)
+            expandedIds.value.add(Number(parentRow.id))
+            if (parentRow.level < 2) {
+              const parentChildrenRes = await getSystemOptionsChildren(OPTION_TYPE, parentRow.id)
+              syncParentChildren(parentRow, parentChildrenRes.data ?? [])
+            }
+          }
+        }
+      }
     } else if (parentId.value != null) {
       const parent = findNodeById(parentId.value)
       if (parent) {
