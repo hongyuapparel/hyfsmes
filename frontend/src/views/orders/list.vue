@@ -7,7 +7,7 @@
           <el-radio-button
             v-for="tab in STATUS_TABS"
             :key="tab.value"
-            :label="tab.value"
+            :value="tab.value"
           >
             {{ getStatusTabLabel(tab) }}
           </el-radio-button>
@@ -606,7 +606,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, watchEffect, onMounted, onBeforeUnmount, computed } from 'vue'
+import { ref, reactive, watch, watchEffect, onMounted, onBeforeUnmount, onDeactivated, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -1542,6 +1542,13 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   listAbortController?.abort()
   countsAbortController?.abort()
+})
+
+onDeactivated(() => {
+  listAbortController?.abort()
+  countsAbortController?.abort()
+  // keep-alive 场景下离开页面不会触发 unmount，需主动关闭加载态，避免遮罩残留
+  loading.value = false
 })
 
 watch(

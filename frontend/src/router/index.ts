@@ -182,7 +182,7 @@ const routes: RouteRecordRaw[] = [
             path: 'order-sla-report',
             name: 'FinanceOrderSlaReport',
             component: () => import('@/views/finance/order-sla-report.vue'),
-            meta: { title: '订单时效', permissionPath: '/finance/order-sla-report' },
+            meta: { title: '订单报表', permissionPath: '/finance/order-sla-report' },
           },
         ],
       },

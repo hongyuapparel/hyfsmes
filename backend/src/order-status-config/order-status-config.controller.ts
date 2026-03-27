@@ -137,6 +137,8 @@ export class OrderStatusConfigController {
     @Query('completed_to') completedTo?: string,
     @Query('collaboration_type_id') collaborationTypeId?: string,
     @Query('order_type_id') orderTypeId?: string,
+    @Query('page') page?: string,
+    @Query('page_size') pageSize?: string,
   ) {
     return this.service.getSlaReport({
       startDate,
@@ -148,6 +150,33 @@ export class OrderStatusConfigController {
       completedTo,
       collaborationTypeId: collaborationTypeId != null ? Number(collaborationTypeId) : undefined,
       orderTypeId: orderTypeId != null ? Number(orderTypeId) : undefined,
+      page: page != null ? Number(page) : undefined,
+      pageSize: pageSize != null ? Number(pageSize) : undefined,
+    });
+  }
+
+  @Get('profit-report')
+  async getProfitReport(
+    @Query('status_id') statusId?: string,
+    @Query('order_date_from') orderDateFrom?: string,
+    @Query('order_date_to') orderDateTo?: string,
+    @Query('completed_from') completedFrom?: string,
+    @Query('completed_to') completedTo?: string,
+    @Query('collaboration_type_id') collaborationTypeId?: string,
+    @Query('order_type_id') orderTypeId?: string,
+    @Query('page') page?: string,
+    @Query('page_size') pageSize?: string,
+  ) {
+    return this.service.getProfitReport({
+      statusId: statusId != null ? Number(statusId) : undefined,
+      orderDateFrom,
+      orderDateTo,
+      completedFrom,
+      completedTo,
+      collaborationTypeId: collaborationTypeId != null ? Number(collaborationTypeId) : undefined,
+      orderTypeId: orderTypeId != null ? Number(orderTypeId) : undefined,
+      page: page != null ? Number(page) : undefined,
+      pageSize: pageSize != null ? Number(pageSize) : undefined,
     });
   }
 }

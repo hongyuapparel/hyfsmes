@@ -7,6 +7,7 @@ import { OrderWorkflowChain } from '../entities/order-workflow-chain.entity';
 import { OrderStatusSla } from '../entities/order-status-sla.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { Order } from '../entities/order.entity';
+import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Injectable()
@@ -24,6 +25,8 @@ export class OrderStatusConfigService {
     private readonly historyRepo: Repository<OrderStatusHistory>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
+    @InjectRepository(OrderCostSnapshot)
+    private readonly orderCostSnapshotRepo: Repository<OrderCostSnapshot>,
     private readonly systemOptionsService: SystemOptionsService,
   ) {}
 
@@ -327,6 +330,8 @@ export class OrderStatusConfigService {
     completedTo?: string;
     collaborationTypeId?: number;
     orderTypeId?: number;
+    page?: number;
+    pageSize?: number;
   }): Promise<{
     list: Array<{
       orderId: number;
@@ -374,39 +379,46 @@ export class OrderStatusConfigService {
     }>;
     summary: { total: number; overdue: number };
   }> {
-    const qb = this.historyRepo
-      .createQueryBuilder('h')
-      .innerJoinAndSelect('h.order', 'o')
-      .innerJoinAndSelect('h.status', 's')
-      .orderBy('h.order_id', 'ASC')
-      .addOrderBy('h.entered_at', 'ASC');
+    const orderQb = this.orderRepo.createQueryBuilder('o');
     if (params.orderDateFrom) {
-      qb.andWhere('o.order_date >= :orderDateFrom', { orderDateFrom: params.orderDateFrom });
+      orderQb.andWhere('o.order_date >= :orderDateFrom', { orderDateFrom: params.orderDateFrom });
     }
     if (params.orderDateTo) {
-      qb.andWhere('o.order_date <= :orderDateTo', { orderDateTo: params.orderDateTo + ' 23:59:59' });
+      orderQb.andWhere('o.order_date <= :orderDateTo', { orderDateTo: params.orderDateTo + ' 23:59:59' });
     }
     if (params.completedFrom) {
-      qb.andWhere("o.status = 'completed' AND o.status_time >= :completedFrom", {
+      orderQb.andWhere("o.status = 'completed' AND o.status_time >= :completedFrom", {
         completedFrom: params.completedFrom,
       });
     }
     if (params.completedTo) {
-      qb.andWhere("o.status = 'completed' AND o.status_time <= :completedTo", {
+      orderQb.andWhere("o.status = 'completed' AND o.status_time <= :completedTo", {
         completedTo: params.completedTo + ' 23:59:59',
       });
     }
     if (params.collaborationTypeId != null) {
-      qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
+      orderQb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
         collaborationTypeId: params.collaborationTypeId,
       });
     }
     if (params.orderTypeId != null) {
-      qb.andWhere('o.order_type_id = :orderTypeId', {
+      orderQb.andWhere('o.order_type_id = :orderTypeId', {
         orderTypeId: params.orderTypeId,
       });
     }
-    const rows = await qb.getMany();
+    const filteredOrders = await orderQb.getMany();
+    const orderIds = filteredOrders.map((o) => o.id);
+    const rows =
+      orderIds.length > 0
+        ? await this.historyRepo
+            .createQueryBuilder('h')
+            .innerJoinAndSelect('h.order', 'o')
+            .innerJoinAndSelect('h.status', 's')
+            .where('h.order_id IN (:...orderIds)', { orderIds })
+            .orderBy('h.order_id', 'ASC')
+            .addOrderBy('h.entered_at', 'ASC')
+            .getMany()
+        : [];
     const slaMap = new Map<number, number>();
     const slaRows = await this.slaRepo.find({ where: { enabled: true } });
     for (const r of slaRows) {
@@ -464,9 +476,7 @@ export class OrderStatusConfigService {
     }> = [];
     const now = new Date();
 
-    const orders = Array.from(byOrder.values())
-      .map((hist) => (hist?.[0] as any)?.order as Order | undefined)
-      .filter((o) => o != null) as Order[];
+    const orders = filteredOrders;
     const collaborationIds = Array.from(
       new Set(orders.map((o) => o.collaborationTypeId).filter((v) => v != null) as number[]),
     );
@@ -479,6 +489,20 @@ export class OrderStatusConfigService {
     ]);
     const allStatuses = await this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
     const statusByCode = new Map(allStatuses.map((s) => [s.code, s]));
+    for (const order of filteredOrders) {
+      if (byOrder.has(order.id)) continue;
+      const code = String(order.status ?? '').trim();
+      const status = code ? statusByCode.get(code) : undefined;
+      const enteredAt = order.statusTime ?? order.orderDate ?? order.createdAt;
+      const synthetic = {
+        orderId: order.id,
+        statusId: status?.id ?? 0,
+        enteredAt,
+        order,
+        status: status ?? null,
+      } as unknown as OrderStatusHistory;
+      byOrder.set(order.id, [synthetic]);
+    }
     /**
      * 按状态历史时间轴计算环节窗口：到达时间=首次进入该状态的 entered_at；
      * 离开时间=时间轴上「下一条记录」的 entered_at（与真实流转顺序一致，不依赖固定环节顺序）。
@@ -634,7 +658,158 @@ export class OrderStatusConfigService {
     }
     list.sort((a, b) => (a.enteredAt < b.enteredAt ? 1 : -1));
     const summary = { total: list.length, overdue: list.filter((x) => x.isOverdue).length };
-    return { list, summary };
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+    const page = Math.max(1, params.page ?? 1);
+    const start = (page - 1) * pageSize;
+    const pagedList = list.slice(start, start + pageSize);
+    return { list: pagedList, summary };
+  }
+
+  async getProfitReport(params: {
+    statusId?: number;
+    orderDateFrom?: string;
+    orderDateTo?: string;
+    completedFrom?: string;
+    completedTo?: string;
+    collaborationTypeId?: number;
+    orderTypeId?: number;
+    page?: number;
+    pageSize?: number;
+  }): Promise<{
+    list: Array<{
+      orderId: number;
+      orderNo: string;
+      skuCode: string;
+      collaborationTypeId: number | null;
+      collaborationTypeLabel: string;
+      orderTypeId: number | null;
+      orderTypeLabel: string;
+      shipmentQty: number;
+      merchandiser: string;
+      salesperson: string;
+      customerName: string;
+      salePrice: number;
+      factoryPrice: number;
+      materialCost: number;
+      processCost: number;
+      productionCost: number;
+      unitProfit: number;
+      factoryTotalProfit: number;
+    }>;
+    summary: { total: number };
+  }> {
+    const qb = this.orderRepo.createQueryBuilder('o');
+    if (params.statusId != null) {
+      const status = await this.statusRepo.findOne({ where: { id: params.statusId } });
+      if (status?.code) {
+        qb.andWhere('o.status = :statusCode', { statusCode: status.code });
+      }
+    }
+    if (params.orderDateFrom) {
+      qb.andWhere('o.order_date >= :orderDateFrom', { orderDateFrom: params.orderDateFrom });
+    }
+    if (params.orderDateTo) {
+      qb.andWhere('o.order_date <= :orderDateTo', { orderDateTo: params.orderDateTo + ' 23:59:59' });
+    }
+    if (params.completedFrom) {
+      qb.andWhere("o.status = 'completed' AND o.status_time >= :completedFrom", {
+        completedFrom: params.completedFrom,
+      });
+    }
+    if (params.completedTo) {
+      qb.andWhere("o.status = 'completed' AND o.status_time <= :completedTo", {
+        completedTo: params.completedTo + ' 23:59:59',
+      });
+    }
+    if (params.collaborationTypeId != null) {
+      qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
+        collaborationTypeId: params.collaborationTypeId,
+      });
+    }
+    if (params.orderTypeId != null) {
+      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: params.orderTypeId });
+    }
+    const orders = await qb.orderBy('o.order_date', 'DESC').addOrderBy('o.id', 'DESC').getMany();
+    const orderIds = orders.map((o) => o.id);
+    const snapshots =
+      orderIds.length > 0
+        ? await this.orderCostSnapshotRepo.find({
+            where: orderIds.map((id) => ({ orderId: id })),
+          })
+        : [];
+    const snapshotMap = new Map<number, Record<string, unknown> | null>();
+    for (const row of snapshots) {
+      snapshotMap.set(row.orderId, (row.snapshot as Record<string, unknown> | null) ?? null);
+    }
+
+    const collaborationIds = Array.from(
+      new Set(orders.map((o) => o.collaborationTypeId).filter((v) => v != null) as number[]),
+    );
+    const orderTypeIds = Array.from(
+      new Set(orders.map((o) => o.orderTypeId).filter((v) => v != null) as number[]),
+    );
+    const [collaborationLabels, orderTypeLabels] = await Promise.all([
+      this.systemOptionsService.getOptionLabelsByIds('collaboration', collaborationIds),
+      this.systemOptionsService.getOptionLabelsByIds('order_types', orderTypeIds),
+    ]);
+
+    const toNum = (v: unknown): number => {
+      const n = typeof v === 'number' ? v : Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    const round2 = (n: number): number => Math.round(n * 100) / 100;
+    const calcCosts = (snapshot: Record<string, unknown> | null): { material: number; process: number; production: number } => {
+      if (!snapshot || typeof snapshot !== 'object') return { material: 0, process: 0, production: 0 };
+      const materialRows = Array.isArray(snapshot.materialRows) ? (snapshot.materialRows as Array<Record<string, unknown>>) : [];
+      const processRows = Array.isArray(snapshot.processItemRows) ? (snapshot.processItemRows as Array<Record<string, unknown>>) : [];
+      const productionRows = Array.isArray(snapshot.productionRows) ? (snapshot.productionRows as Array<Record<string, unknown>>) : [];
+      const material = materialRows.reduce((sum, row) => {
+        const usage = toNum(row?.usagePerPiece);
+        const loss = toNum(row?.lossPercent);
+        const unitPrice = toNum(row?.unitPrice);
+        return sum + usage * (1 + loss / 100) * unitPrice;
+      }, 0);
+      const process = processRows.reduce((sum, row) => sum + toNum(row?.quantity) * toNum(row?.unitPrice), 0);
+      const production = productionRows.reduce((sum, row) => sum + toNum(row?.unitPrice), 0);
+      return { material: round2(material), process: round2(process), production: round2(production) };
+    };
+
+    const list = orders.map((o) => {
+      const shipmentQty = o.quantity ?? 0;
+      const salePrice = toNum(o.salePrice);
+      const factoryPrice = toNum(o.exFactoryPrice);
+      const costs = calcCosts(snapshotMap.get(o.id) ?? null);
+      const totalCost = costs.material + costs.process + costs.production;
+      const unitProfit = round2(factoryPrice - totalCost);
+      const factoryTotalProfit = round2(unitProfit * shipmentQty);
+      const collaborationTypeId = o.collaborationTypeId ?? null;
+      const orderTypeId = o.orderTypeId ?? null;
+      return {
+        orderId: o.id,
+        orderNo: o.orderNo ?? '',
+        skuCode: o.skuCode ?? '',
+        collaborationTypeId,
+        collaborationTypeLabel: collaborationTypeId != null ? collaborationLabels[collaborationTypeId] ?? '' : '',
+        orderTypeId,
+        orderTypeLabel: orderTypeId != null ? orderTypeLabels[orderTypeId] ?? '' : '',
+        shipmentQty,
+        merchandiser: o.merchandiser ?? '',
+        salesperson: o.salesperson ?? '',
+        customerName: o.customerName ?? '',
+        salePrice: round2(salePrice),
+        factoryPrice: round2(factoryPrice),
+        materialCost: costs.material,
+        processCost: costs.process,
+        productionCost: costs.production,
+        unitProfit,
+        factoryTotalProfit,
+      };
+    });
+
+    const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
+    const page = Math.max(1, params.page ?? 1);
+    const start = (page - 1) * pageSize;
+    return { list: list.slice(start, start + pageSize), summary: { total: list.length } };
   }
 }
 

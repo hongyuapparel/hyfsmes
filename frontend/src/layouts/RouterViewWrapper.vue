@@ -1,16 +1,4 @@
 <template>
-  <router-view v-slot="{ Component, route }">
-    <keep-alive>
-      <component :is="Component" :key="getNestedRouteCacheKey(route)" />
-    </keep-alive>
-  </router-view>
+  <!-- 与 MainLayout 内层 keep-alive 嵌套时易触发异常 patch 栈；缓存仅保留外层即可 -->
+  <router-view />
 </template>
-
-<script setup lang="ts">
-import type { RouteLocationNormalizedLoaded } from 'vue-router'
-
-function getNestedRouteCacheKey(r: RouteLocationNormalizedLoaded): string {
-  const tabKey = typeof r.query?.tabKey === 'string' ? r.query.tabKey.trim() : ''
-  return tabKey || r.path
-}
-</script>

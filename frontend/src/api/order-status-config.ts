@@ -239,9 +239,49 @@ export function getOrderSlaReport(params?: {
   order_date_to?: string
   completed_from?: string
   completed_to?: string
+  page?: number
+  page_size?: number
 }) {
   return request.get<{ list: OrderSlaReportRow[]; summary: { total: number; overdue: number } }>(
     '/order-status-config/sla-report',
+    { params },
+  )
+}
+
+export interface OrderProfitReportRow {
+  orderId: number
+  orderNo: string
+  skuCode: string
+  collaborationTypeId: number | null
+  collaborationTypeLabel: string
+  orderTypeId: number | null
+  orderTypeLabel: string
+  shipmentQty: number
+  merchandiser: string
+  salesperson: string
+  customerName: string
+  salePrice: number
+  factoryPrice: number
+  materialCost: number
+  processCost: number
+  productionCost: number
+  unitProfit: number
+  factoryTotalProfit: number
+}
+
+export function getOrderProfitReport(params?: {
+  status_id?: number
+  collaboration_type_id?: number
+  order_type_id?: number
+  order_date_from?: string
+  order_date_to?: string
+  completed_from?: string
+  completed_to?: string
+  page?: number
+  page_size?: number
+}) {
+  return request.get<{ list: OrderProfitReportRow[]; summary: { total: number } }>(
+    '/order-status-config/profit-report',
     { params },
   )
 }

@@ -1,7 +1,12 @@
 <template>
   <div class="page-card order-sla-report-page">
+    <el-tabs v-model="activeTab" class="report-tabs" @tab-change="onTabChange">
+      <el-tab-pane :label="'时效报表'" name="sla" />
+      <el-tab-pane :label="'利润报表'" name="profit" />
+    </el-tabs>
+
     <p class="report-desc">
-      {{ '\u7528\u4e8e\u67e5\u770b\u8ba2\u5355\u6574\u4f53\u4ea4\u671f\u4e0e\u8d85\u671f\u60c5\u51b5\uff0c\u652f\u6301\u6309\u4e0b\u5355\u65f6\u95f4\u3001\u5b8c\u6210\u65f6\u95f4\u3001\u5f53\u524d\u72b6\u6001\u7b5b\u9009\uff0c\u5e76\u652f\u6301\u52fe\u9009\u5bfc\u51fa\u3002' }}
+      {{ activeTab === 'sla' ? '\u7528\u4e8e\u67e5\u770b\u8ba2\u5355\u6574\u4f53\u4ea4\u671f\u4e0e\u8d85\u671f\u60c5\u51b5\uff0c\u652f\u6301\u6309\u4e0b\u5355\u65f6\u95f4\u3001\u5b8c\u6210\u65f6\u95f4\u3001\u5f53\u524d\u72b6\u6001\u7b5b\u9009\uff0c\u5e76\u652f\u6301\u52fe\u9009\u5bfc\u51fa\u3002' : '\u7528\u4e8e\u67e5\u770b\u8ba2\u5355\u5229\u6da6\u76f8\u5173\u6307\u6807\uff0c\u652f\u6301\u540c\u6b65\u7b5b\u9009\u4e0e\u5bfc\u51fa\u3002' }}
     </p>
 
     <div class="filter-bar">
@@ -67,18 +72,20 @@
       </el-select>
 
       <div class="filter-bar-actions">
-        <el-button type="primary" size="default" @click="loadReport">{{ '\u641c\u7d22' }}</el-button>
-        <el-button size="default" :disabled="!list.length" @click="onExport(false)">{{ '\u5bfc\u51fa\u5f53\u524d' }}</el-button>
-        <el-button size="default" :disabled="!selection.length" @click="onExport(true)">{{ '\u5bfc\u51fa\u9009\u4e2d' }}</el-button>
+        <el-button type="primary" size="default" @click="onSearch">{{ '\u641c\u7d22' }}</el-button>
+        <el-button size="default" :disabled="activeTab === 'sla' ? !list.length : !profitList.length" @click="onExport(false)">{{ '\u5bfc\u51fa\u5f53\u524d' }}</el-button>
+        <el-button size="default" :disabled="currentSelectionCount === 0" @click="onExport(true)">{{ '\u5bfc\u51fa\u9009\u4e2d' }}</el-button>
       </div>
     </div>
 
-    <div v-if="summary" class="summary-bar">
-      <span>{{ '\u5171 ' }}<strong>{{ summary.total }}</strong>{{ ' \u6761\u8ba2\u5355' }}</span>
-      <span class="summary-overdue">{{ '\u8d85\u671f ' }}<strong>{{ summary.overdue }}</strong>{{ ' \u6761' }}</span>
+    <div v-if="currentTotal > 0" class="summary-bar">
+      <span>{{ '\u5171 ' }}<strong>{{ currentTotal }}</strong>{{ ' \u6761\u8ba2\u5355' }}</span>
+      <span v-if="activeTab === 'sla' && summary" class="summary-overdue">{{ '\u8d85\u671f ' }}<strong>{{ summary.overdue }}</strong>{{ ' \u6761' }}</span>
     </div>
 
-    <div v-if="selection.length" class="table-selection-count">已选 {{ selection.length }} 项</div>
+    <div v-if="currentSelectionCount > 0" class="table-selection-count">已选 {{ currentSelectionCount }} 项</div>
+
+    <template v-if="activeTab === 'sla'">
 
     <el-table
       v-loading="loading"
@@ -182,12 +189,101 @@
         <template #default="{ row }">{{ row.isOverdue ? '\u8d85\u671f' : '\u6b63\u5e38' }}</template>
       </el-table-column>
     </el-table>
+
+    <div class="pagination-wrap">
+      <el-pagination
+        v-model:current-page="pagination.page"
+        v-model:page-size="pagination.pageSize"
+        :total="summary?.total ?? 0"
+        :page-sizes="[20, 50, 100]"
+        layout="total, sizes, prev, pager, next"
+        @current-change="onPageChange"
+        @size-change="onPageSizeChange"
+      />
+    </div>
+    </template>
+
+    <div v-else class="profit-placeholder">
+      <el-table
+        v-loading="loading"
+        :data="profitList"
+        border
+        stripe
+        size="small"
+        class="profit-table report-table"
+        :header-cell-style="centerStyle"
+        :cell-style="centerStyle"
+        table-layout="fixed"
+        @selection-change="onProfitSelectionChange"
+      >
+        <el-table-column type="selection" width="46" />
+        <el-table-column prop="orderNo" label="订单号" width="110" />
+        <el-table-column prop="skuCode" label="SKU" width="100" />
+        <el-table-column prop="collaborationTypeLabel" label="合作方式" width="100" />
+        <el-table-column prop="orderTypeLabel" label="订单类型" width="100" />
+        <el-table-column prop="shipmentQty" label="出货数量" width="90" />
+        <el-table-column prop="merchandiser" label="跟单" width="90" />
+        <el-table-column prop="salesperson" label="业务员" width="90" />
+        <el-table-column prop="customerName" label="客户" width="120" />
+        <el-table-column prop="salePrice" label="销售价" width="90" />
+        <el-table-column prop="factoryPrice" label="出厂价" width="90" />
+        <el-table-column prop="materialCost" width="150">
+          <template #header>
+            <div class="profit-header-main">材料成本</div>
+            <div class="profit-header-sub">订单成本的物料成本小记</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="processCost" width="150">
+          <template #header>
+            <div class="profit-header-main">工艺项目</div>
+            <div class="profit-header-sub">订单成本的工艺项目小记</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="productionCost" width="150">
+          <template #header>
+            <div class="profit-header-main">生产工序</div>
+            <div class="profit-header-sub">生产工序小记</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="unitProfit" width="130">
+          <template #header>
+            <div class="profit-header-main">单件利润</div>
+            <div class="profit-header-sub">等于出厂价减去总成本</div>
+          </template>
+        </el-table-column>
+        <el-table-column prop="factoryTotalProfit" width="130">
+          <template #header>
+            <div class="profit-header-main">工厂总利润</div>
+            <div class="profit-header-sub">等于工厂利润乘以数量</div>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <div class="pagination-wrap">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="profitSummary?.total ?? 0"
+          :page-sizes="[20, 50, 100]"
+          layout="total, sizes, prev, pager, next"
+          @current-change="onPageChange"
+          @size-change="onPageSizeChange"
+        />
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { getOrderSlaReport, getOrderStatuses, type OrderSlaReportRow } from '@/api/order-status-config'
+import { computed, ref, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  getOrderSlaReport,
+  getOrderProfitReport,
+  getOrderStatuses,
+  type OrderProfitReportRow,
+  type OrderSlaReportRow,
+} from '@/api/order-status-config'
 import type { OrderStatusItem } from '@/api/order-status-config'
 import { getDictItems } from '@/api/dicts'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -196,10 +292,18 @@ import { formatDateTime } from '@/utils/date-format'
 const loading = ref(false)
 const list = ref<OrderSlaReportRow[]>([])
 const summary = ref<{ total: number; overdue: number } | null>(null)
+const profitList = ref<OrderProfitReportRow[]>([])
+const profitSummary = ref<{ total: number } | null>(null)
 const statusOptions = ref<OrderStatusItem[]>([])
 const collaborationOptions = ref<Array<{ id: number; value: string }>>([])
 const orderTypeOptions = ref<Array<{ id: number; value: string }>>([])
 const selection = ref<OrderSlaReportRow[]>([])
+const profitSelection = ref<OrderProfitReportRow[]>([])
+const pagination = ref({ page: 1, pageSize: 20 })
+type ReportTab = 'sla' | 'profit'
+const route = useRoute()
+const router = useRouter()
+const activeTab = ref<ReportTab>('sla')
 
 const filter = ref<{
   statusId?: number
@@ -225,6 +329,13 @@ function centerStyle() {
 function onSelectionChange(rows: OrderSlaReportRow[]) {
   selection.value = rows ?? []
 }
+
+function onProfitSelectionChange(rows: OrderProfitReportRow[]) {
+  profitSelection.value = rows ?? []
+}
+
+const currentTotal = computed(() => (activeTab.value === 'sla' ? summary.value?.total ?? 0 : profitSummary.value?.total ?? 0))
+const currentSelectionCount = computed(() => (activeTab.value === 'sla' ? selection.value.length : profitSelection.value.length))
 
 function toCsvCell(v: unknown): string {
   const s = v == null ? '' : String(v)
@@ -300,13 +411,59 @@ function downloadCsv(content: string, filename: string) {
 }
 
 function onExport(onlySelected: boolean) {
+  if (activeTab.value === 'profit') {
+    const rows = onlySelected ? profitSelection.value : profitList.value
+    const suffix = onlySelected ? '\u9009\u4e2d' : '\u5f53\u524d'
+    const headers = ['订单号', 'SKU', '合作方式', '订单类型', '出货数量', '跟单', '业务员', '客户', '销售价', '出厂价', '材料成本', '工艺项目', '生产工序', '单件利润', '工厂总利润']
+    const lines = [headers.map(toCsvCell).join(',')]
+    for (const r of rows) {
+      lines.push([
+        r.orderNo,
+        r.skuCode,
+        r.collaborationTypeLabel,
+        r.orderTypeLabel,
+        r.shipmentQty,
+        r.merchandiser,
+        r.salesperson,
+        r.customerName,
+        r.salePrice,
+        r.factoryPrice,
+        r.materialCost,
+        r.processCost,
+        r.productionCost,
+        r.unitProfit,
+        r.factoryTotalProfit,
+      ].map(toCsvCell).join(','))
+    }
+    downloadCsv(`\uFEFF${lines.join('\n')}`, `订单利润_${suffix}_${new Date().toISOString().slice(0, 10)}.csv`)
+    return
+  }
   const rows = onlySelected ? selection.value : list.value
   const suffix = onlySelected ? '\u9009\u4e2d' : '\u5f53\u524d'
   downloadCsv(buildCsv(rows), `\u8ba2\u5355\u65f6\u6548_${suffix}_${new Date().toISOString().slice(0, 10)}.csv`)
 }
 
 function onSearch() {
-  loadReport()
+  pagination.value.page = 1
+  loadCurrentTab()
+}
+
+function parseTab(v: unknown): ReportTab {
+  return v === 'profit' ? 'profit' : 'sla'
+}
+
+async function onTabChange() {
+  await router.replace({ query: { ...route.query, tab: activeTab.value } })
+  await loadCurrentTab()
+}
+
+function onPageChange() {
+  loadCurrentTab()
+}
+
+function onPageSizeChange() {
+  pagination.value.page = 1
+  loadCurrentTab()
 }
 
 async function loadStatusOptions() {
@@ -349,9 +506,12 @@ async function loadReport() {
       order_date_to: orderDateTo,
       completed_from: completedFrom,
       completed_to: completedTo,
+      page: pagination.value.page,
+      page_size: pagination.value.pageSize,
     })
     list.value = res.data?.list ?? []
     summary.value = res.data?.summary ?? null
+    selection.value = []
   } catch {
     list.value = []
     summary.value = null
@@ -360,15 +520,63 @@ async function loadReport() {
   }
 }
 
+async function loadProfitReport() {
+  loading.value = true
+  try {
+    const [orderDateFrom, orderDateTo] = filter.value.orderDateRange ?? []
+    const [completedFrom, completedTo] = filter.value.completedRange ?? []
+    const res = await getOrderProfitReport({
+      status_id: filter.value.statusId,
+      collaboration_type_id: filter.value.collaborationTypeId,
+      order_type_id: filter.value.orderTypeId,
+      order_date_from: orderDateFrom,
+      order_date_to: orderDateTo,
+      completed_from: completedFrom,
+      completed_to: completedTo,
+      page: pagination.value.page,
+      page_size: pagination.value.pageSize,
+    })
+    profitList.value = res.data?.list ?? []
+    profitSummary.value = res.data?.summary ?? null
+    profitSelection.value = []
+  } catch {
+    profitList.value = []
+    profitSummary.value = null
+  } finally {
+    loading.value = false
+  }
+}
+
+async function loadCurrentTab() {
+  if (activeTab.value === 'profit') {
+    await loadProfitReport()
+    return
+  }
+  await loadReport()
+}
+
 onMounted(async () => {
+  activeTab.value = parseTab(route.query.tab)
   await loadStatusOptions()
   await loadCollaborationOptions()
   await loadOrderTypeOptions()
-  await loadReport()
+  await loadCurrentTab()
 })
+
+watch(
+  () => route.query.tab,
+  (v) => {
+    const next = parseTab(v)
+    if (next !== activeTab.value) activeTab.value = next
+  },
+)
 </script>
 
 <style scoped>
+.report-tabs {
+  margin-bottom: var(--space-sm);
+}
+
 .report-desc {
   font-size: var(--el-font-size-small);
   color: var(--el-text-color-secondary);
@@ -442,5 +650,31 @@ onMounted(async () => {
 
 .report-table {
   margin-top: 8px;
+}
+
+.pagination-wrap {
+  margin-top: var(--space-md);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.profit-placeholder {
+  padding: 8px 0;
+}
+
+.profit-table :deep(.el-table__header-wrapper th) {
+  vertical-align: top;
+}
+
+.profit-header-main {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.profit-header-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--el-text-color-secondary);
 }
 </style>

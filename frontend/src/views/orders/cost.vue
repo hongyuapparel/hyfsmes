@@ -299,21 +299,16 @@
         </el-table-column>
         <el-table-column label="工序" min-width="140">
           <template #default="{ row }">
-            <el-select
+            <el-select-v2
               v-model="row.processId"
+              :options="productionProcessSelectOptions"
               placeholder="选择工序"
               filterable
               clearable
               size="small"
-              @change="onProductionProcessChange(row)"
-            >
-              <el-option
-                v-for="p in productionProcesses"
-                :key="p.id"
-                :label="formatProductionProcessLabel(p)"
-                :value="p.id"
-              />
-            </el-select>
+              class="production-process-select"
+              @change="() => onProductionProcessChange(row)"
+            />
           </template>
         </el-table-column>
         <el-table-column label="单价(元)" width="90" align="right">
@@ -440,7 +435,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
@@ -476,7 +471,8 @@ const confirmingQuote = ref(false)
 const quoteConfirmedAt = ref('')
 const quoteConfirmedBy = ref('')
 const quoteNeedsReconfirm = ref(false)
-const loadedSnapshotHash = ref('')
+const hasLocalDraftChanges = ref(false)
+const suppressDirtyTracking = ref(true)
 
 const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 const supplierOptions = ref<{ id: number; name: string }[]>([])
@@ -491,6 +487,14 @@ const processOptions = ref<ProcessOptionNode[]>([])
 
 const importTemplateDialog = ref<{ visible: boolean; templateId: number | null }>({ visible: false, templateId: null })
 const importTemplateOptions = ref<{ id: number; name: string }[]>([])
+
+/** 虚拟列表下拉，避免数万 el-option 拖死主线程（工序接口可达百万级 JSON） */
+const productionProcessSelectOptions = computed(() =>
+  productionProcesses.value.map((p) => ({
+    value: p.id,
+    label: formatProductionProcessSelectLabel(p),
+  })),
+)
 
 interface MaterialRow {
   materialTypeId?: number | null
@@ -614,11 +618,6 @@ function buildSnapshotPayload() {
   }
 }
 
-const currentSnapshotHash = computed(() => JSON.stringify(buildSnapshotPayload()))
-const hasLocalDraftChanges = computed(
-  () => !!loadedSnapshotHash.value && currentSnapshotHash.value !== loadedSnapshotHash.value,
-)
-
 const costNotice = computed(() => {
   if (!canSubmitCost.value) {
     return '你没有“订单成本可提交”权限：可在页面试算，但不能保存草稿或确认报价。'
@@ -666,9 +665,49 @@ const productionRowsSorted = computed(() => {
   })
 })
 
-/** 生产工序表格合并：部门列、工种列连续相同则合并 */
+const productionSpanMeta = computed(() => {
+  const rows = productionRowsSorted.value
+  const deptRowspanByIndex = new Map<number, number>()
+  const jobRowspanByIndex = new Map<number, number>()
+  const hiddenDeptIndexes = new Set<number>()
+  const hiddenJobIndexes = new Set<number>()
+
+  let i = 0
+  while (i < rows.length) {
+    const dept = (rows[i].department ?? '').toString()
+    let j = i + 1
+    while (j < rows.length && (rows[j].department ?? '').toString() === dept) j += 1
+    const deptSpan = j - i
+    deptRowspanByIndex.set(i, deptSpan)
+    for (let k = i + 1; k < j; k += 1) hiddenDeptIndexes.add(k)
+
+    let p = i
+    while (p < j) {
+      const job = (rows[p].jobType ?? '').toString()
+      let q = p + 1
+      while (
+        q < j
+        && (rows[q].department ?? '').toString() === dept
+        && (rows[q].jobType ?? '').toString() === job
+      ) q += 1
+      const jobSpan = q - p
+      jobRowspanByIndex.set(p, jobSpan)
+      for (let k = p + 1; k < q; k += 1) hiddenJobIndexes.add(k)
+      p = q
+    }
+    i = j
+  }
+
+  return {
+    deptRowspanByIndex,
+    jobRowspanByIndex,
+    hiddenDeptIndexes,
+    hiddenJobIndexes,
+  }
+})
+
+/** 生产工序表格合并：部门列、工种列连续相同则合并（使用预计算元数据，避免渲染期重复扫描） */
 function productionSpanMethod({
-  row,
   columnIndex,
   rowIndex,
 }: {
@@ -676,35 +715,18 @@ function productionSpanMethod({
   columnIndex: number
   rowIndex: number
 }): { rowspan: number; colspan: number } {
-  const sorted = productionRowsSorted.value
+  const meta = productionSpanMeta.value
   if (columnIndex === 0) {
-    const dept = (row.department ?? '').toString()
-    if (rowIndex > 0 && (sorted[rowIndex - 1]?.department ?? '').toString() === dept) {
+    if (meta.hiddenDeptIndexes.has(rowIndex)) {
       return { rowspan: 0, colspan: 0 }
     }
-    let count = 0
-    for (let i = rowIndex; i < sorted.length; i++) {
-      if ((sorted[i].department ?? '').toString() === dept) count++
-      else break
-    }
-    return { rowspan: count, colspan: 1 }
+    return { rowspan: meta.deptRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
   if (columnIndex === 1) {
-    const dept = (row.department ?? '').toString()
-    const job = (row.jobType ?? '').toString()
-    if (rowIndex > 0) {
-      const prev = sorted[rowIndex - 1]
-      if ((prev?.department ?? '').toString() === dept && (prev?.jobType ?? '').toString() === job) {
-        return { rowspan: 0, colspan: 0 }
-      }
+    if (meta.hiddenJobIndexes.has(rowIndex)) {
+      return { rowspan: 0, colspan: 0 }
     }
-    let count = 0
-    for (let i = rowIndex; i < sorted.length; i++) {
-      const r = sorted[i]
-      if ((r.department ?? '').toString() === dept && (r.jobType ?? '').toString() === job) count++
-      else break
-    }
-    return { rowspan: count, colspan: 1 }
+    return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
   return { rowspan: 1, colspan: 1 }
 }
@@ -875,7 +897,7 @@ async function loadCostSnapshot() {
       quoteConfirmedBy.value = typeof s.quoteConfirmedBy === 'string' ? s.quoteConfirmedBy : ''
       quoteNeedsReconfirm.value = Boolean(s.quoteNeedsReconfirm)
     }
-    loadedSnapshotHash.value = currentSnapshotHash.value
+    hasLocalDraftChanges.value = false
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
   }
@@ -935,9 +957,12 @@ function syncProductionIdsFromName() {
   })
 }
 
-function formatProductionProcessLabel(p: ProductionProcessItem): string {
-  // 下拉里只展示当前工序名称，部门/工种在表格前两列单独展示即可
-  return p.name
+function formatProductionProcessSelectLabel(p: ProductionProcessItem): string {
+  const dept = (p.department || '').trim()
+  const job = getJobTypeLabel(p.jobType || '')
+  const name = (p.name || '').trim()
+  const parts = [dept, job, name].filter(Boolean)
+  return parts.length ? parts.join(' / ') : String(p.id ?? '')
 }
 
 function onProductionProcessChange(row: ProductionRow) {
@@ -962,7 +987,7 @@ async function saveDraft() {
       snapshot: buildSnapshotPayload(),
     })
     quoteNeedsReconfirm.value = true
-    loadedSnapshotHash.value = currentSnapshotHash.value
+    hasLocalDraftChanges.value = false
     ElMessage.success('草稿已保存（未同步订单卡片出厂价）')
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
@@ -991,7 +1016,7 @@ async function confirmQuote() {
     quoteNeedsReconfirm.value = false
     quoteConfirmedBy.value = authStore.user?.displayName || authStore.user?.username || ''
     quoteConfirmedAt.value = new Date().toISOString()
-    loadedSnapshotHash.value = currentSnapshotHash.value
+    hasLocalDraftChanges.value = false
     ElMessage.success('已确认报价并同步订单卡片出厂价')
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '确认报价失败'))
@@ -1037,6 +1062,7 @@ async function applyImportTemplate() {
 }
 
 onMounted(async () => {
+  suppressDirtyTracking.value = true
   await loadOrder()
   await loadCostSnapshot()
   await loadProcesses()
@@ -1046,7 +1072,17 @@ onMounted(async () => {
   syncMaterialTypeIdsFromLabel()
   loadProcessOptions()
   searchSuppliers('')
+  suppressDirtyTracking.value = false
 })
+
+watch(
+  [materialRows, processItemRows, productionRows, profitMargin],
+  () => {
+    if (suppressDirtyTracking.value) return
+    hasLocalDraftChanges.value = true
+  },
+  { deep: true },
+)
 </script>
 
 <style scoped>
@@ -1144,8 +1180,14 @@ onMounted(async () => {
 .cost-table :deep(.el-select__wrapper),
 .cost-table :deep(.el-select__selected-item),
 .cost-table :deep(.el-select__placeholder),
+.cost-table :deep(.el-select-v2__wrapper),
+.cost-table :deep(.el-select-v2__placeholder),
 .cost-table :deep(.el-input-number .el-input__inner) {
   font-size: inherit;
+}
+
+.production-process-select {
+  width: 100%;
 }
 
 .cost-table :deep(.el-input-number) {

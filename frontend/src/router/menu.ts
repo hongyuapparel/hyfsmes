@@ -49,7 +49,7 @@ export const menuConfig: MenuItem[] = [
       { path: '/finance/dashboard', title: '财务看板' },
       { path: '/finance/income', title: '收入流水' },
       { path: '/finance/expense', title: '支出流水' },
-      { path: '/finance/order-sla-report', title: '订单时效' },
+      { path: '/finance/order-sla-report', title: '订单报表' },
     ],
   },
   { path: '/suppliers', title: '供应商管理', icon: 'Shop' },
