@@ -290,10 +290,11 @@
               <div class="order-card-image">
                 <el-image
                   v-if="item.imageUrl"
-                  :src="toMigrationThumbUrl(item.imageUrl)"
+                  :src="getOrderListImageUrl(item.imageUrl)"
                   fit="cover"
                   lazy
                   :preview-src-list="[item.imageUrl]"
+                  @error="onOrderListImageError(item.imageUrl)"
                 />
                 <div v-else class="image-placeholder">图片</div>
               </div>
@@ -1565,6 +1566,23 @@ let listReqId = 0
 let countsReqId = 0
 let listAbortController: AbortController | null = null
 let countsAbortController: AbortController | null = null
+const failedThumbByOriginal = ref<Record<string, boolean>>({})
+
+function getOrderListImageUrl(rawUrl: string | undefined): string {
+  const source = String(rawUrl ?? '').trim()
+  if (!source) return ''
+  if (failedThumbByOriginal.value[source]) return source
+  return toMigrationThumbUrl(source)
+}
+
+function onOrderListImageError(rawUrl: string | undefined) {
+  const source = String(rawUrl ?? '').trim()
+  if (!source) return
+  const thumb = toMigrationThumbUrl(source)
+  if (thumb !== source) {
+    failedThumbByOriginal.value[source] = true
+  }
+}
 </script>
 
 <style scoped>

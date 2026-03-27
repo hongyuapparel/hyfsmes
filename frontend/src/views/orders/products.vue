@@ -204,11 +204,12 @@
                 >
                   <template #reference>
                     <el-image
-                      :src="toMigrationThumbUrl(row[f.code])"
+                      :src="getProductListImageUrl(row[f.code])"
                       fit="cover"
                       lazy
                       :preview-teleported="true"
                       :preview-src-list="[row[f.code]]"
+                      @error="onProductListImageError(row[f.code])"
                       style="width: 40px; height: 40px; border-radius: 4px; cursor: pointer"
                     />
                   </template>
@@ -421,6 +422,23 @@ let tableResizeObserver: ResizeObserver | null = null
 let tableResizeBound = false
 let loadReqId = 0
 let listAbortController: AbortController | null = null
+const failedThumbByOriginal = ref<Record<string, boolean>>({})
+
+function getProductListImageUrl(rawUrl: string | undefined): string {
+  const source = String(rawUrl ?? '').trim()
+  if (!source) return ''
+  if (failedThumbByOriginal.value[source]) return source
+  return toMigrationThumbUrl(source)
+}
+
+function onProductListImageError(rawUrl: string | undefined) {
+  const source = String(rawUrl ?? '').trim()
+  if (!source) return
+  const thumb = toMigrationThumbUrl(source)
+  if (thumb !== source) {
+    failedThumbByOriginal.value[source] = true
+  }
+}
 
 const filter = reactive<{
   productName: string
