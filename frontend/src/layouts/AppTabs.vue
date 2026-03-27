@@ -37,7 +37,7 @@ const activeKey = ref('')
 
 function getTabKey(r: RouteLocationNormalizedLoaded): string {
   const k = typeof r.query?.tabKey === 'string' ? r.query.tabKey.trim() : ''
-  return k || r.fullPath
+  return k || r.path
 }
 
 function getTitle(r: RouteLocationNormalizedLoaded) {

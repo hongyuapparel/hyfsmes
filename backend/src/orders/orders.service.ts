@@ -1009,9 +1009,18 @@ export class OrdersService {
           .where('r.order_id IN (:...ids)', { ids })
           .groupBy('r.order_id')
           .getRawMany<{ orderId: number; count: string }>(),
-        this.orderCuttingRepo.find({ where: { orderId: In(ids) } }),
-        this.orderSewingRepo.find({ where: { orderId: In(ids) } }),
-        this.orderFinishingRepo.find({ where: { orderId: In(ids) } }),
+        this.orderCuttingRepo.find({
+          where: { orderId: In(ids) },
+          select: ['orderId', 'actualCutRows'],
+        }),
+        this.orderSewingRepo.find({
+          where: { orderId: In(ids) },
+          select: ['orderId', 'sewingQuantity'],
+        }),
+        this.orderFinishingRepo.find({
+          where: { orderId: In(ids) },
+          select: ['orderId', 'tailReceivedQty', 'tailShippedQty'],
+        }),
       ]);
 
       remarkRows.forEach((r) => {
@@ -1545,4 +1554,3 @@ export class OrdersService {
     }
   }
 }
-

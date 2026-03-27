@@ -204,7 +204,7 @@
                 >
                   <template #reference>
                     <el-image
-                      :src="row[f.code]"
+                      :src="toMigrationThumbUrl(row[f.code])"
                       fit="cover"
                       lazy
                       :preview-teleported="true"
@@ -365,7 +365,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, onMounted, computed, nextTick, onBeforeUnmount } from 'vue'
+import { ref, reactive, watch, onMounted, onActivated, onDeactivated, computed, nextTick, onBeforeUnmount } from 'vue'
 import { ArrowLeft, ArrowRight, ArrowDown, Delete } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import { PRODUCT_FIELDS_SORTED } from '@/fields'
@@ -391,6 +391,7 @@ import { getSystemOptionsList, getSystemOptionsTree, type SystemOptionItem, type
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { checkSkuExists } from '@/api/products'
+import { toMigrationThumbUrl } from '@/utils/image'
 
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const formRef = ref<FormInstance>()
@@ -417,6 +418,9 @@ const filterBarRef = ref<HTMLElement | null>(null)
 const paginationWrapRef = ref<HTMLElement | null>(null)
 const tableHeight = ref<number | undefined>(undefined)
 let tableResizeObserver: ResizeObserver | null = null
+let tableResizeBound = false
+let loadReqId = 0
+let listAbortController: AbortController | null = null
 
 const filter = reactive<{
   productName: string
@@ -766,25 +770,33 @@ function getOptions(f: { optionsKey?: string }) {
 }
 
 async function load() {
+  listAbortController?.abort()
+  const controller = new AbortController()
+  listAbortController = controller
+  const currentReqId = ++loadReqId
   try {
-    const res = await getProducts({
-      productName: filter.productName || undefined,
-      companyName: filter.companyName || undefined,
-      skuCode: filter.skuCode || undefined,
-      productGroupId: filter.productGroupId ?? undefined,
-      applicablePeopleId: filter.applicablePeopleId ?? undefined,
-      salesperson: filter.salesperson || undefined,
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-      sortBy: sort.sortBy,
-      sortOrder: sort.sortOrder,
-    })
+    const res = await getProducts(
+      {
+        productName: filter.productName || undefined,
+        companyName: filter.companyName || undefined,
+        skuCode: filter.skuCode || undefined,
+        productGroupId: filter.productGroupId ?? undefined,
+        applicablePeopleId: filter.applicablePeopleId ?? undefined,
+        salesperson: filter.salesperson || undefined,
+        page: pagination.page,
+        pageSize: pagination.pageSize,
+        sortBy: sort.sortBy,
+        sortOrder: sort.sortOrder,
+      },
+      { signal: controller.signal },
+    )
     const data = res.data
-    if (data) {
+    if (data && currentReqId === loadReqId) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
     }
   } catch (e: unknown) {
+    if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
 }
@@ -945,6 +957,24 @@ function updateTableHeight() {
   tableHeight.value = Math.max(240, Math.floor(available))
 }
 
+function bindTableResize() {
+  if (tableResizeBound) return
+  tableResizeBound = true
+  tableResizeObserver = new ResizeObserver(() => updateTableHeight())
+  if (productsMainRef.value) tableResizeObserver.observe(productsMainRef.value)
+  if (filterBarRef.value) tableResizeObserver.observe(filterBarRef.value)
+  if (paginationWrapRef.value) tableResizeObserver.observe(paginationWrapRef.value)
+  window.addEventListener('resize', updateTableHeight)
+}
+
+function unbindTableResize() {
+  if (!tableResizeBound) return
+  tableResizeBound = false
+  tableResizeObserver?.disconnect()
+  tableResizeObserver = null
+  window.removeEventListener('resize', updateTableHeight)
+}
+
 async function openCreate() {
   isEdit.value = false
   editId.value = 0
@@ -1068,19 +1098,31 @@ onMounted(async () => {
 
   await nextTick()
   updateTableHeight()
+  bindTableResize()
+})
 
-  tableResizeObserver = new ResizeObserver(() => updateTableHeight())
-  if (productsMainRef.value) tableResizeObserver.observe(productsMainRef.value)
-  if (filterBarRef.value) tableResizeObserver.observe(filterBarRef.value)
-  if (paginationWrapRef.value) tableResizeObserver.observe(paginationWrapRef.value)
+onActivated(async () => {
+  await nextTick()
+  updateTableHeight()
+  bindTableResize()
+})
 
-  window.addEventListener('resize', updateTableHeight)
+onDeactivated(() => {
+  listAbortController?.abort()
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  unbindTableResize()
 })
 
 onBeforeUnmount(() => {
-  tableResizeObserver?.disconnect()
-  tableResizeObserver = null
-  window.removeEventListener('resize', updateTableHeight)
+  listAbortController?.abort()
+  if (searchTimer) {
+    clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  unbindTableResize()
 })
 </script>
 

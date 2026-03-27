@@ -85,10 +85,14 @@ async function bootstrap() {
 
   const uploadsDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });
+  const uploadStaticOptions = {
+    maxAge: '30d',
+    immutable: true,
+  };
 
   // Support both direct `/uploads/*` access and proxied `/api/uploads/*` access.
-  app.use('/uploads', express.static(uploadsDir));
-  app.use('/api/uploads', express.static(uploadsDir));
+  app.use('/uploads', express.static(uploadsDir, uploadStaticOptions));
+  app.use('/api/uploads', express.static(uploadsDir, uploadStaticOptions));
 
   app.useGlobalPipes(
     new ValidationPipe({

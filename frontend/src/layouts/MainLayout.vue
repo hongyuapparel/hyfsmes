@@ -72,7 +72,7 @@
         <main class="layout-main">
           <router-view v-slot="{ Component, route }">
             <keep-alive>
-              <component :is="Component" :key="route.fullPath" />
+              <component :is="Component" :key="getRouteCacheKey(route)" />
             </keep-alive>
           </router-view>
         </main>
@@ -83,7 +83,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import {
   Expand,
   Fold,
@@ -145,6 +145,12 @@ const allowedMenus = computed(() => {
 })
 
 const activeMenu = computed(() => route.path)
+
+function getRouteCacheKey(r: RouteLocationNormalizedLoaded): string {
+  // MainLayout 只按一级业务分组缓存（如 /orders、/inventory），
+  // 避免在二级页面切换时重建 RouterViewWrapper 导致子页面闪刷。
+  return r.matched[1]?.path || r.path
+}
 
 function handleLogout() {
   authStore.logout()

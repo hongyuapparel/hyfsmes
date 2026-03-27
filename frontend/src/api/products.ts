@@ -1,3 +1,4 @@
+import type { AxiosRequestConfig } from 'axios'
 import request from './request'
 
 /** 产品项，字段与 product-fields code 对应；productGroupId 为存库值，productGroup 为展示用路径 */
@@ -38,8 +39,8 @@ export interface ProductListQuery {
   sortOrder?: 'asc' | 'desc'
 }
 
-export function getProducts(params?: ProductListQuery) {
-  return request.get<ProductListRes>('/products', { params })
+export function getProducts(params?: ProductListQuery, config?: AxiosRequestConfig) {
+  return request.get<ProductListRes>('/products', { params, ...(config ?? {}) })
 }
 
 export function getProduct(id: number) {

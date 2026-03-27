@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 /** 订单列表项，列表/表格共用同一数据结构 */
 export interface OrderListItem {
@@ -100,8 +101,8 @@ export interface OrderListQuery {
   pageSize?: number
 }
 
-export function getOrders(params?: OrderListQuery) {
-  return request.get<OrderListRes>('/orders', { params })
+export function getOrders(params?: OrderListQuery, config?: AxiosRequestConfig) {
+  return request.get<OrderListRes>('/orders', { params, ...(config ?? {}) })
 }
 
 export interface OrderStatusCountsRes {
@@ -110,8 +111,11 @@ export interface OrderStatusCountsRes {
 }
 
 /** 状态 Tab 数量统计（与列表筛选同源，但忽略 status） */
-export function getOrderStatusCounts(params?: Omit<OrderListQuery, 'status' | 'page' | 'pageSize'>) {
-  return request.get<OrderStatusCountsRes>('/orders/status-counts', { params })
+export function getOrderStatusCounts(
+  params?: Omit<OrderListQuery, 'status' | 'page' | 'pageSize'>,
+  config?: AxiosRequestConfig,
+) {
+  return request.get<OrderStatusCountsRes>('/orders/status-counts', { params, ...(config ?? {}) })
 }
 
 /** 订单编辑页表单字段（仅 A 区，后续可扩展） */

@@ -290,7 +290,7 @@
               <div class="order-card-image">
                 <el-image
                   v-if="item.imageUrl"
-                  :src="item.imageUrl"
+                  :src="toMigrationThumbUrl(item.imageUrl)"
                   fit="cover"
                   lazy
                   :preview-src-list="[item.imageUrl]"
@@ -605,7 +605,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watch, watchEffect, onMounted, computed } from 'vue'
+import { ref, reactive, watch, watchEffect, onMounted, onBeforeUnmount, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -618,6 +618,7 @@ import { getSupplierBusinessScopeTreeOptions, type SupplierBusinessScopeTreeNode
 import { type SystemOptionTreeNode } from '@/api/system-options'
 import { useAuthStore } from '@/stores/auth'
 import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
+import { toMigrationThumbUrl } from '@/utils/image'
 
 const router = useRouter()
 const route = useRoute()
@@ -1164,28 +1165,39 @@ function getStatusTabLabel(tab: { label: string; value: string }) {
 }
 
 async function loadList() {
+  listAbortController?.abort()
+  const controller = new AbortController()
+  listAbortController = controller
+  const currentReqId = ++listReqId
   loading.value = true
   try {
-    const listRes = await getOrders(buildQuery())
+    const listRes = await getOrders(buildQuery(), { signal: controller.signal })
     const data = listRes.data
-    if (data) {
+    if (data && currentReqId === listReqId) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
     }
   } catch (e: unknown) {
+    if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (currentReqId === listReqId) loading.value = false
   }
 }
 
 async function loadStatusCounts() {
+  countsAbortController?.abort()
+  const controller = new AbortController()
+  countsAbortController = controller
+  const currentReqId = ++countsReqId
   try {
-    const countsRes = await getOrderStatusCounts(buildCountQuery())
+    const countsRes = await getOrderStatusCounts(buildCountQuery(), { signal: controller.signal })
     const countsData = countsRes.data
+    if (currentReqId !== countsReqId) return
     statusTotal.value = countsData?.total ?? 0
     statusCounts.value = countsData?.byStatus ?? {}
   } catch (e: unknown) {
+    if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
     if (!isErrorHandled(e)) {
       console.warn('订单状态统计加载失败：', getErrorMessage(e, '状态统计加载失败'))
     }
@@ -1526,6 +1538,11 @@ onMounted(async () => {
   loadStatusTabs()
 })
 
+onBeforeUnmount(() => {
+  listAbortController?.abort()
+  countsAbortController?.abort()
+})
+
 watch(
   () => filter.orderNo,
   (v) => {
@@ -1543,6 +1560,11 @@ watchEffect(() => {
   // 预留：当筛选条件发生明显变化时，可在此埋点或做其它处理
   void filter.orderNo
 })
+
+let listReqId = 0
+let countsReqId = 0
+let listAbortController: AbortController | null = null
+let countsAbortController: AbortController | null = null
 </script>
 
 <style scoped>
