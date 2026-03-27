@@ -71,9 +71,10 @@
         </header>
         <main class="layout-main">
           <router-view v-slot="{ Component, route }">
-            <keep-alive>
+            <keep-alive v-if="shouldUseOuterKeepAlive(route)">
               <component :is="Component" :key="getRouteCacheKey(route)" />
             </keep-alive>
+            <component v-else :is="Component" :key="getRouteCacheKey(route)" />
           </router-view>
         </main>
       </div>
@@ -150,6 +151,11 @@ function getRouteCacheKey(r: RouteLocationNormalizedLoaded): string {
   // MainLayout 只按一级业务分组缓存（如 /orders、/inventory），
   // 避免在二级页面切换时重建 RouterViewWrapper 导致子页面闪刷。
   return r.matched[1]?.path || r.path
+}
+
+function shouldUseOuterKeepAlive(r: RouteLocationNormalizedLoaded): boolean {
+  // 对声明了 useInnerKeepAlive 的分组，外层不再缓存，避免双层 keep-alive。
+  return !Boolean(r.matched[1]?.meta?.useInnerKeepAlive)
 }
 
 function handleLogout() {
@@ -395,6 +401,15 @@ onMounted(async () => {
   .main-layout .sidebar-wrapper,
   .main-layout .layout-header {
     display: none;
+  }
+
+  .main-layout,
+  .main-layout .layout-body,
+  .main-layout .content-wrapper,
+  .main-layout .layout-main {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
   }
 
   .main-layout .content-wrapper {

@@ -58,8 +58,9 @@ export class InventoryAccessoriesController {
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
     @Body('customerName') customerName?: string,
+    @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.create({ name, category, quantity, unit, remark, imageUrl, customerName });
+    return this.service.create({ name, category, quantity, unit, remark, imageUrl, customerName, operatorUsername: user?.username ?? '' });
   }
 
   @Put('items/:id')
@@ -72,6 +73,7 @@ export class InventoryAccessoriesController {
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
     @Body('customerName') customerName?: string,
+    @CurrentUser() user?: { username?: string },
   ) {
     return this.service.update(Number(id), {
       name,
@@ -81,12 +83,18 @@ export class InventoryAccessoriesController {
       remark,
       imageUrl,
       customerName,
+      operatorUsername: user?.username ?? '',
     });
   }
 
   @Delete('items/:id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(Number(id));
+  remove(@Param('id') id: string, @CurrentUser() user?: { username?: string }) {
+    return this.service.remove(Number(id), user?.username ?? '');
+  }
+
+  @Get('items/:id/logs')
+  getLogs(@Param('id') id: string) {
+    return this.service.getOperationLogs(Number(id));
   }
 
   /**

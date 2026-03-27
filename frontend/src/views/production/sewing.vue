@@ -7,7 +7,7 @@
           <el-radio-button
             v-for="tab in SEWING_TABS"
             :key="tab.value"
-            :label="tab.value"
+            :value="tab.value"
           >
             {{ getTabLabel(tab) }}
           </el-radio-button>
@@ -100,8 +100,8 @@
       <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
           <el-image
@@ -115,7 +115,7 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="factoryName" label="加工厂" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="factoryName" label="加工厂" min-width="100" />
       <el-table-column label="订单数量" width="96" align="right">
         <template #default="{ row }">
           <el-popover

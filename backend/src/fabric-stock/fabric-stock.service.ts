@@ -1,17 +1,67 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FabricStock } from '../entities/fabric-stock.entity';
 import { FabricOutbound } from '../entities/fabric-outbound.entity';
+import { FabricStockOperationLog } from '../entities/fabric-stock-operation-log.entity';
 
 @Injectable()
 export class FabricStockService {
+  private readonly logger = new Logger(FabricStockService.name);
+
   constructor(
     @InjectRepository(FabricStock)
     private readonly stockRepo: Repository<FabricStock>,
     @InjectRepository(FabricOutbound)
     private readonly outboundRepo: Repository<FabricOutbound>,
+    @InjectRepository(FabricStockOperationLog)
+    private readonly operationLogRepo: Repository<FabricStockOperationLog>,
   ) {}
+
+  private toSnapshot(item: FabricStock): Record<string, unknown> {
+    return {
+      id: item.id,
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      customerName: item.customerName,
+      imageUrl: item.imageUrl,
+      remark: item.remark,
+    };
+  }
+
+  private async addOperationLog(params: {
+    fabricStockId: number;
+    action: string;
+    operatorUsername: string;
+    beforeSnapshot?: Record<string, unknown> | null;
+    afterSnapshot?: Record<string, unknown> | null;
+    remark?: string;
+  }) {
+    try {
+      const row = this.operationLogRepo.create({
+        fabricStockId: params.fabricStockId,
+        action: params.action,
+        operatorUsername: (params.operatorUsername ?? '').trim(),
+        beforeSnapshot: params.beforeSnapshot ?? null,
+        afterSnapshot: params.afterSnapshot ?? null,
+        remark: (params.remark ?? '').trim(),
+      });
+      await this.operationLogRepo.save(row);
+    } catch (e: unknown) {
+      if (this.isTableMissingError(e, 'fabric_stock_operation_log')) {
+        // 领料/出入库主流程不依赖该日志表，缺表时降级为仅记录告警日志。
+        this.logger.warn('fabric_stock_operation_log 表不存在，已跳过操作日志写入');
+        return;
+      }
+      throw e;
+    }
+  }
+
+  private isTableMissingError(error: unknown, tableName: string): boolean {
+    const msg = String((error as { message?: unknown })?.message ?? error ?? '').toLowerCase();
+    return msg.includes("doesn't exist") && msg.includes(tableName.toLowerCase());
+  }
 
   async getList(params: {
     name?: string;
@@ -44,32 +94,59 @@ export class FabricStockService {
     return item;
   }
 
-  async create(dto: { name: string; quantity?: number; unit?: string; remark?: string; imageUrl?: string }): Promise<FabricStock> {
+  async create(dto: { name: string; quantity?: number; unit?: string; customerName?: string; remark?: string; imageUrl?: string; operatorUsername?: string }): Promise<FabricStock> {
     const entity = this.stockRepo.create({
       name: dto.name?.trim() ?? '',
       quantity: String(dto.quantity ?? 0),
       unit: dto.unit?.trim() ?? '米',
+      customerName: dto.customerName?.trim() ?? '',
       remark: dto.remark?.trim() ?? '',
       imageUrl: dto.imageUrl?.trim() ?? '',
     });
-    return this.stockRepo.save(entity);
+    const saved = await this.stockRepo.save(entity);
+    await this.addOperationLog({
+      fabricStockId: saved.id,
+      action: 'create',
+      operatorUsername: dto.operatorUsername ?? '',
+      beforeSnapshot: null,
+      afterSnapshot: this.toSnapshot(saved),
+    });
+    return saved;
   }
 
-  async update(id: number, dto: { name?: string; quantity?: number; unit?: string; remark?: string; imageUrl?: string }): Promise<FabricStock> {
+  async update(id: number, dto: { name?: string; quantity?: number; unit?: string; customerName?: string; remark?: string; imageUrl?: string; operatorUsername?: string }): Promise<FabricStock> {
     const item = await this.stockRepo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('面料记录不存在');
+    const before = this.toSnapshot(item);
     if (dto.name !== undefined) item.name = dto.name.trim();
     if (dto.quantity !== undefined) item.quantity = String(dto.quantity);
     if (dto.unit !== undefined) item.unit = dto.unit?.trim() ?? '米';
+    if (dto.customerName !== undefined) item.customerName = dto.customerName?.trim() ?? '';
     if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
     if (dto.imageUrl !== undefined) item.imageUrl = dto.imageUrl?.trim() ?? '';
-    return this.stockRepo.save(item);
+    const saved = await this.stockRepo.save(item);
+    await this.addOperationLog({
+      fabricStockId: saved.id,
+      action: 'update',
+      operatorUsername: dto.operatorUsername ?? '',
+      beforeSnapshot: before,
+      afterSnapshot: this.toSnapshot(saved),
+    });
+    return saved;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, operatorUsername = ''): Promise<void> {
     const item = await this.stockRepo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('面料记录不存在');
+    const before = this.toSnapshot(item);
     await this.stockRepo.remove(item);
+    await this.addOperationLog({
+      fabricStockId: id,
+      action: 'delete',
+      operatorUsername,
+      beforeSnapshot: before,
+      afterSnapshot: null,
+    });
   }
 
   /** 出库：减少数量，并记录照片与备注（谁领走、用途） */
@@ -78,6 +155,7 @@ export class FabricStockService {
     quantity: number,
     photoUrl: string,
     remark: string,
+    operatorUsername = '',
   ): Promise<void> {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('面料记录不存在');
@@ -89,8 +167,9 @@ export class FabricStockService {
     if (qty > current) {
       throw new NotFoundException('出库数量不能大于当前库存');
     }
+    const before = this.toSnapshot(stock);
     stock.quantity = String(current - qty);
-    await this.stockRepo.save(stock);
+    const saved = await this.stockRepo.save(stock);
     const out = this.outboundRepo.create({
       fabricStockId: id,
       quantity: String(qty),
@@ -98,6 +177,14 @@ export class FabricStockService {
       remark: remark?.trim() ?? '',
     });
     await this.outboundRepo.save(out);
+    await this.addOperationLog({
+      fabricStockId: id,
+      action: 'outbound',
+      operatorUsername,
+      beforeSnapshot: before,
+      afterSnapshot: this.toSnapshot(saved),
+      remark: remark?.trim() ?? '',
+    });
   }
 
   async getOutboundRecords(params: {
@@ -158,5 +245,13 @@ export class FabricStockService {
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
     }));
     return { list, total, page, pageSize };
+  }
+
+  async getOperationLogs(fabricStockId: number): Promise<FabricStockOperationLog[]> {
+    await this.getOne(fabricStockId);
+    return this.operationLogRepo.find({
+      where: { fabricStockId },
+      order: { createdAt: 'DESC' },
+    });
   }
 }

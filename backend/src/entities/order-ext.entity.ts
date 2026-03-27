@@ -74,6 +74,10 @@ export interface SizeInfoRow {
 }
 
 export interface OrderMaterialRow {
+  /** 物料来源 ID（system_options.id，option_type='material_sources'） */
+  materialSourceId?: number | null;
+  /** 物料来源名称：仅展示用，不持久化；接口返回时由 materialSourceId 解析填充 */
+  materialSource?: string;
   /** 物料类型 ID（system_options.id，option_type='material_types'），仅存 ID 实现改名历史同步 */
   materialTypeId?: number | null;
   /** 物料类型名称：仅展示用，不持久化；接口返回时由 materialTypeId 解析填充 */
@@ -103,6 +107,26 @@ export interface OrderMaterialRow {
   purchaseRemark?: string | null;
   /** 采购图片 URL（登记后写入） */
   purchaseImageUrl?: string | null;
+  /** 领料状态：pending | completed */
+  pickStatus?: string;
+  /** 领料完成时间（领料登记后写入） */
+  pickCompletedAt?: string | null;
+  /** 领料备注（领料登记后写入） */
+  pickRemark?: string | null;
+  /** 领料处理记录（含库存扣减或备注处理） */
+  pickLogs?: Array<{
+    handledAt: string;
+    handledBy: string;
+    mode: 'with_stock' | 'remark_only';
+    inventorySourceType?: 'fabric' | 'accessory' | 'finished' | null;
+    inventoryId?: number | null;
+    inventoryName?: string | null;
+    stockBatch?: string | null;
+    stockColorCode?: string | null;
+    stockSpec?: string | null;
+    quantity?: number | null;
+    remark?: string | null;
+  }>;
 }
 
 export interface ProcessRow {

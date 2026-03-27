@@ -7,6 +7,11 @@ import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { SuppliersService } from '../suppliers/suppliers.service';
+import { SystemOptionsService } from '../system-options/system-options.service';
+import { FabricStockService } from '../fabric-stock/fabric-stock.service';
+import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
+import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
+import { User } from '../entities/user.entity';
 
 /** 已审单：非草稿、非待审单，即待纸样及之后的状态 */
 const PURCHASE_ORDER_STATUSES = [
@@ -30,20 +35,28 @@ export interface PurchaseItemRow {
   /** 订单类型 ID（system_options.id, option_type='order_types'） */
   orderTypeId: number | null;
   supplierName: string;
+  materialTypeId: number | null;
+  materialType: string;
   materialName: string;
+  color: string;
   planQuantity: number | null;
   actualPurchaseQuantity: number | null;
   purchaseAmount: string | null;
   purchaseStatus: string;
+  pickStatus: string;
   purchaseCompletedAt: string | null;
+  pickCompletedAt: string | null;
   purchaseUnitPrice: string | null;
   purchaseOtherCost: string | null;
   purchaseRemark: string | null;
   purchaseImageUrl: string | null;
+  materialSourceId: number | null;
+  materialSource: string;
+  processRoute: 'purchase' | 'picking';
 }
 
 export interface PurchaseListQuery {
-  /** tab: all | pending | completed */
+  /** tab: all | pending | picking | completed */
   tab?: string;
   orderNo?: string;
   skuCode?: string;
@@ -67,9 +80,20 @@ export class ProductionPurchaseService {
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly suppliersService: SuppliersService,
+    private readonly systemOptionsService: SystemOptionsService,
+    private readonly fabricStockService: FabricStockService,
+    private readonly inventoryAccessoriesService: InventoryAccessoriesService,
+    private readonly finishedGoodsStockService: FinishedGoodsStockService,
   ) {}
+
+  private materialSourceOptionsLoadedAt = 0;
+  private materialSourceLabelById = new Map<number, string>();
+  private materialTypeOptionsLoadedAt = 0;
+  private materialTypeLabelById = new Map<number, string>();
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
     if (v == null) return null;
@@ -111,6 +135,55 @@ export class ProductionPurchaseService {
     return '0';
   }
 
+  private async ensureMaterialSourceOptionCache(): Promise<void> {
+    const now = Date.now();
+    if (now - this.materialSourceOptionsLoadedAt < 60_000 && this.materialSourceLabelById.size > 0) return;
+    const list = await this.systemOptionsService.findAllByType('material_sources');
+    this.materialSourceLabelById = new Map(list.map((item) => [item.id, item.value]));
+    this.materialSourceOptionsLoadedAt = now;
+  }
+
+  private async ensureMaterialTypeOptionCache(): Promise<void> {
+    const now = Date.now();
+    if (now - this.materialTypeOptionsLoadedAt < 60_000 && this.materialTypeLabelById.size > 0) return;
+    const list = await this.systemOptionsService.findAllByType('material_types');
+    this.materialTypeLabelById = new Map(list.map((item) => [item.id, item.value]));
+    this.materialTypeOptionsLoadedAt = now;
+  }
+
+  private getMaterialTypeLabelById(id: number | null | undefined): string {
+    if (id == null) return '';
+    return this.materialTypeLabelById.get(Number(id)) ?? '';
+  }
+
+  private getMaterialSourceLabelById(id: number | null | undefined): string {
+    if (id == null) return '';
+    return this.materialSourceLabelById.get(Number(id)) ?? '';
+  }
+
+  private resolveMaterialRouteBySourceLabel(sourceLabel: string): 'purchase' | 'picking' {
+    const label = sourceLabel.trim();
+    if (label === '公司库存' || label === '客供面料') return 'picking';
+    // 兼容历史数据：未配置来源时仍走原等待采购流程，避免破坏既有逻辑。
+    return 'purchase';
+  }
+
+  private isMaterialFlowCompleted(material: OrderMaterialRow): boolean {
+    const sourceLabel = this.getMaterialSourceLabelById(material.materialSourceId ?? null);
+    const route = this.resolveMaterialRouteBySourceLabel(sourceLabel);
+    if (route === 'purchase') {
+      return (material.purchaseStatus ?? 'pending').toLowerCase() === 'completed';
+    }
+    return (material.pickStatus ?? 'pending').toLowerCase() === 'completed';
+  }
+
+  private async resolveOperatorName(userId: number | undefined, fallback = ''): Promise<string> {
+    const fb = (fallback ?? '').trim();
+    if (!userId) return fb;
+    const user = await this.userRepo.findOne({ where: { id: userId } });
+    return (user?.displayName ?? '').trim() || (user?.username ?? '').trim() || fb;
+  }
+
   async getPurchaseItems(query: PurchaseListQuery): Promise<{
     list: PurchaseItemRow[];
     total: number;
@@ -128,6 +201,8 @@ export class ProductionPurchaseService {
       page = 1,
       pageSize = 20,
     } = query;
+    await this.ensureMaterialSourceOptionCache();
+    await this.ensureMaterialTypeOptionCache();
 
     const qb = this.orderRepo
       .createQueryBuilder('o')
@@ -214,9 +289,17 @@ export class ProductionPurchaseService {
         if (supplier?.trim() && !supplierName.toLowerCase().includes((supplier.trim()).toLowerCase())) {
           continue;
         }
+        const materialSourceId = m.materialSourceId ?? null;
+        const materialSource = this.getMaterialSourceLabelById(materialSourceId);
+        const processRoute = this.resolveMaterialRouteBySourceLabel(materialSource);
         const purchaseStatus = (m.purchaseStatus ?? 'pending').toLowerCase();
-        if (tab === 'pending' && purchaseStatus === 'completed') continue;
-        if (tab === 'completed' && purchaseStatus !== 'completed') continue;
+        const pickStatus = (m.pickStatus ?? 'pending').toLowerCase();
+        const routeStatus = processRoute === 'purchase'
+          ? (purchaseStatus === 'completed' ? 'completed' : 'pending')
+          : (pickStatus === 'completed' ? 'completed' : 'pending');
+        if (tab === 'pending' && !(processRoute === 'purchase' && routeStatus === 'pending')) continue;
+        if (tab === 'picking' && !(processRoute === 'picking' && routeStatus === 'pending')) continue;
+        if (tab === 'completed' && routeStatus !== 'completed') continue;
 
         rows.push({
           orderId: order.id,
@@ -228,16 +311,24 @@ export class ProductionPurchaseService {
           skuCode: order.skuCode ?? '',
           orderTypeId: order.orderTypeId ?? null,
           supplierName: supplierName || '-',
+          materialTypeId: m.materialTypeId ?? null,
+          materialType: (m.materialType ?? '').trim() || this.getMaterialTypeLabelById(m.materialTypeId ?? null) || '',
           materialName: (m.materialName ?? '').trim() || '-',
+          color: (m.color ?? '').trim() || '',
           planQuantity: m.purchaseQuantity ?? m.orderPieces ?? null,
           actualPurchaseQuantity: m.actualPurchaseQuantity ?? null,
           purchaseAmount: m.purchaseAmount ?? null,
           purchaseStatus: purchaseStatus === 'completed' ? 'completed' : 'pending',
+          pickStatus: pickStatus === 'completed' ? 'completed' : 'pending',
           purchaseCompletedAt: m.purchaseCompletedAt ?? null,
+          pickCompletedAt: m.pickCompletedAt ?? null,
           purchaseUnitPrice: m.purchaseUnitPrice ?? null,
           purchaseOtherCost: m.purchaseOtherCost ?? null,
           purchaseRemark: m.purchaseRemark ?? null,
           purchaseImageUrl: m.purchaseImageUrl ?? null,
+          materialSourceId,
+          materialSource,
+          processRoute,
         });
       }
     }
@@ -273,6 +364,11 @@ export class ProductionPurchaseService {
 
     const materials = [...ext.materials];
     const row = materials[materialIndex] as OrderMaterialRow;
+    await this.ensureMaterialSourceOptionCache();
+    const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
+    if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'purchase') {
+      throw new NotFoundException('该物料来源不在等待采购流程，请使用领料处理');
+    }
 
     const normalizedQty = Number.isFinite(actualPurchaseQuantity) ? actualPurchaseQuantity : 0;
     const normalizedUnit = Number(this.normalizeDecimalInput(unitPrice)) || 0;
@@ -297,12 +393,130 @@ export class ProductionPurchaseService {
 
     // 若该订单全部物料采购完成，则按配置规则流转
     if (order.status === 'pending_purchase') {
-      const allCompleted = materials.length > 0 && materials.every((m) => (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed');
+      const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
       if (allCompleted) {
         let next: string | null = await this.orderWorkflowService.resolveNextStatus({
           order,
           triggerCode: 'purchase_all_completed',
           actorUserId: actorUserId ?? 0,
+        });
+        if (next && next !== order.status) {
+          order.status = next;
+          order.statusTime = new Date();
+          await this.orderRepo.save(order);
+        }
+      }
+    }
+  }
+
+  async registerPicking(params: {
+    orderId: number;
+    materialIndex: number;
+    inventorySourceType?: 'fabric' | 'accessory' | 'finished' | null;
+    inventoryId?: number | null;
+    quantity?: number | null;
+    stockBatch?: string | null;
+    stockColorCode?: string | null;
+    stockSpec?: string | null;
+    remark?: string | null;
+    actorUserId?: number;
+    actorUsername?: string;
+  }): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: params.orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const ext = await this.orderExtRepo.findOne({ where: { orderId: params.orderId } });
+    if (!ext || !Array.isArray(ext.materials)) throw new NotFoundException('该订单无物料数据');
+    if (params.materialIndex < 0 || params.materialIndex >= ext.materials.length) throw new NotFoundException('物料索引无效');
+    await this.ensureMaterialSourceOptionCache();
+
+    const materials = [...ext.materials];
+    const row = { ...(materials[params.materialIndex] as OrderMaterialRow) };
+    const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
+    if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'picking') {
+      throw new NotFoundException('该物料来源不在待领料流程，请使用采购登记');
+    }
+
+    const operatorName = await this.resolveOperatorName(params.actorUserId, params.actorUsername ?? '');
+    const remark = (params.remark ?? '').trim();
+    const inventorySourceType = params.inventorySourceType ?? null;
+    const inventoryId = params.inventoryId != null ? Number(params.inventoryId) : null;
+    const quantity = params.quantity != null ? Number(params.quantity) : null;
+    const shouldUseStock = !!(inventorySourceType && inventoryId && quantity && quantity > 0);
+    let inventoryName: string | null = null;
+
+    if (!shouldUseStock && !remark) {
+      throw new NotFoundException('请选择库存并填写调取数量，或至少填写备注说明');
+    }
+
+    if (shouldUseStock) {
+      if (inventorySourceType === 'fabric') {
+        const stock = await this.fabricStockService.getOne(inventoryId!);
+        inventoryName = stock.name ?? '';
+        await this.fabricStockService.outbound(
+          inventoryId!,
+          quantity!,
+          '',
+          `领料出库 订单:${order.orderNo} SKU:${order.skuCode ?? ''} 物料:${row.materialName ?? ''} 来源:${sourceLabel} 批次:${params.stockBatch ?? ''} 色号:${params.stockColorCode ?? ''} 规格:${params.stockSpec ?? ''} 备注:${remark}`,
+        );
+      } else if (inventorySourceType === 'accessory') {
+        const stock = await this.inventoryAccessoriesService.getOne(inventoryId!);
+        inventoryName = stock.name ?? '';
+        await this.inventoryAccessoriesService.outbound({
+          accessoryId: inventoryId!,
+          quantity: quantity!,
+          outboundType: 'manual',
+          operatorUsername: operatorName,
+          remark: `领料出库 订单:${order.orderNo} SKU:${order.skuCode ?? ''} 物料:${row.materialName ?? ''} 来源:${sourceLabel} 批次:${params.stockBatch ?? ''} 色号:${params.stockColorCode ?? ''} 规格:${params.stockSpec ?? ''} ${remark}`,
+          orderId: order.id,
+          orderNo: order.orderNo,
+        });
+      } else if (inventorySourceType === 'finished') {
+        const detail = await this.finishedGoodsStockService.getDetail(inventoryId!);
+        inventoryName = detail.stock.skuCode ?? '';
+        await this.finishedGoodsStockService.outbound(
+          [{ id: inventoryId!, quantity: quantity!, sizeBreakdown: null }],
+          operatorName,
+          `领料出库 订单:${order.orderNo} SKU:${order.skuCode ?? ''} 物料:${row.materialName ?? ''} 来源:${sourceLabel} 批次:${params.stockBatch ?? ''} 色号:${params.stockColorCode ?? ''} 规格:${params.stockSpec ?? ''} ${remark}`,
+          null,
+        );
+      } else {
+        throw new NotFoundException('不支持的库存来源类型');
+      }
+    }
+
+    const now = this.toDateTimeLocalString(new Date()) ?? '';
+    const nextLogs = Array.isArray(row.pickLogs) ? [...row.pickLogs] : [];
+    nextLogs.push({
+      handledAt: now,
+      handledBy: operatorName,
+      mode: shouldUseStock ? 'with_stock' : 'remark_only',
+      inventorySourceType,
+      inventoryId,
+      inventoryName,
+      stockBatch: (params.stockBatch ?? '').trim() || null,
+      stockColorCode: (params.stockColorCode ?? '').trim() || null,
+      stockSpec: (params.stockSpec ?? '').trim() || null,
+      quantity: shouldUseStock ? quantity : null,
+      remark: remark || null,
+    });
+
+    materials[params.materialIndex] = {
+      ...row,
+      pickStatus: 'completed',
+      pickCompletedAt: now,
+      pickRemark: remark || null,
+      pickLogs: nextLogs,
+    };
+    ext.materials = materials;
+    await this.orderExtRepo.save(ext);
+
+    if (order.status === 'pending_purchase') {
+      const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
+      if (allCompleted) {
+        const next = await this.orderWorkflowService.resolveNextStatus({
+          order,
+          triggerCode: 'purchase_all_completed',
+          actorUserId: params.actorUserId ?? 0,
         });
         if (next && next !== order.status) {
           order.status = next;

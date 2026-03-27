@@ -3,6 +3,7 @@ import request from './request'
 /** 待入库 */
 export interface PendingListItem {
   id: number
+  tabType?: 'pending' | 'shipped'
   orderId: number
   orderNo: string
   customerName: string
@@ -10,10 +11,14 @@ export interface PendingListItem {
   imageUrl?: string
   quantity: number
   sourceType?: 'normal' | 'defect'
+  pickupUserName?: string
+  operatorUsername?: string
+  remark?: string
   createdAt: string
 }
 
 export function getPendingList(params?: {
+  tab?: 'pending' | 'shipped'
   orderNo?: string
   skuCode?: string
   page?: number
@@ -307,6 +312,17 @@ export interface AccessoryOutboundRecord {
   createdAt: string
 }
 
+export interface AccessoryOperationLog {
+  id: number
+  accessoryId: number
+  operatorUsername: string
+  action: string
+  beforeSnapshot: Record<string, any> | null
+  afterSnapshot: Record<string, any> | null
+  remark: string
+  createdAt: string
+}
+
 export function getAccessoryOutboundRecords(params?: {
   accessoryId?: number
   orderNo?: string
@@ -318,6 +334,10 @@ export function getAccessoryOutboundRecords(params?: {
     '/inventory/accessories/outbounds',
     { params }
   )
+}
+
+export function getAccessoryOperationLogs(id: number) {
+  return request.get<AccessoryOperationLog[]>(`/inventory/accessories/items/${id}/logs`)
 }
 
 /** 面料 */
@@ -352,6 +372,7 @@ export function createFabric(body: {
   name: string
   quantity?: number
   unit?: string
+  customerName?: string
   remark?: string
   imageUrl?: string
 }) {
@@ -360,7 +381,7 @@ export function createFabric(body: {
 
 export function updateFabric(
   id: number,
-  body: { name?: string; quantity?: number; unit?: string; remark?: string; imageUrl?: string }
+  body: { name?: string; quantity?: number; unit?: string; customerName?: string; remark?: string; imageUrl?: string }
 ) {
   return request.put<FabricItem>(`/inventory/fabric/items/${id}`, body)
 }
@@ -390,6 +411,17 @@ export interface FabricOutboundRecord {
   createdAt: string
 }
 
+export interface FabricOperationLog {
+  id: number
+  fabricStockId: number
+  operatorUsername: string
+  action: string
+  beforeSnapshot: Record<string, any> | null
+  afterSnapshot: Record<string, any> | null
+  remark: string
+  createdAt: string
+}
+
 export function getFabricOutboundRecords(params?: {
   name?: string
   customerName?: string
@@ -402,4 +434,8 @@ export function getFabricOutboundRecords(params?: {
     '/inventory/fabric/outbounds',
     { params }
   )
+}
+
+export function getFabricOperationLogs(id: number) {
+  return request.get<FabricOperationLog[]>(`/inventory/fabric/items/${id}/logs`)
 }

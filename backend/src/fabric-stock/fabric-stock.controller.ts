@@ -12,6 +12,7 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
 import { FabricStockService } from './fabric-stock.service';
 
 @Controller('inventory/fabric')
@@ -45,10 +46,12 @@ export class FabricStockController {
     @Body('name') name: string,
     @Body('quantity') quantity?: number,
     @Body('unit') unit?: string,
+    @Body('customerName') customerName?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.create({ name, quantity, unit, remark, imageUrl });
+    return this.service.create({ name, quantity, unit, customerName, remark, imageUrl, operatorUsername: user?.username ?? '' });
   }
 
   @Put('items/:id')
@@ -57,15 +60,17 @@ export class FabricStockController {
     @Body('name') name?: string,
     @Body('quantity') quantity?: number,
     @Body('unit') unit?: string,
+    @Body('customerName') customerName?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.update(Number(id), { name, quantity, unit, remark, imageUrl });
+    return this.service.update(Number(id), { name, quantity, unit, customerName, remark, imageUrl, operatorUsername: user?.username ?? '' });
   }
 
   @Delete('items/:id')
-  remove(@Param('id') id: string) {
-    return this.service.remove(Number(id));
+  remove(@Param('id') id: string, @CurrentUser() user?: { username?: string }) {
+    return this.service.remove(Number(id), user?.username ?? '');
   }
 
   @Post('outbound')
@@ -74,8 +79,14 @@ export class FabricStockController {
     @Body('quantity') quantity: number,
     @Body('photoUrl') photoUrl: string,
     @Body('remark') remark: string,
+    @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.outbound(Number(id), Number(quantity), photoUrl ?? '', remark ?? '');
+    return this.service.outbound(Number(id), Number(quantity), photoUrl ?? '', remark ?? '', user?.username ?? '');
+  }
+
+  @Get('items/:id/logs')
+  getLogs(@Param('id') id: string) {
+    return this.service.getOperationLogs(Number(id));
   }
 
   @Get('outbounds')

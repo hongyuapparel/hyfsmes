@@ -624,6 +624,7 @@ import { toMigrationThumbUrl } from '@/utils/image'
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
+const ORDERS_LIST_FILTER_STATE_KEY = 'orders-list-filter-state-v1'
 
 const DEFAULT_STATUS_TABS: Array<{ label: string; value: string }> = [
   { label: '全部', value: 'all' },
@@ -1526,6 +1527,86 @@ function applyQueryFromRoute() {
   }
 }
 
+interface OrdersListFilterState {
+  filter: {
+    orderNo: string
+    skuCode: string
+    customer: string
+    orderTypeId: number | null
+    processItem: string
+    salesperson: string
+    merchandiser: string
+    factory: string
+  }
+  orderDateRange: [string, string] | null
+  completedRange: [string, string] | null
+  currentStatus: string
+  page: number
+  pageSize: number
+  orderNoLabelVisible: boolean
+  skuCodeLabelVisible: boolean
+}
+
+function buildFilterStateSnapshot(): OrdersListFilterState {
+  return {
+    filter: {
+      orderNo: filter.orderNo,
+      skuCode: filter.skuCode,
+      customer: filter.customer,
+      orderTypeId: filter.orderTypeId,
+      processItem: filter.processItem,
+      salesperson: filter.salesperson,
+      merchandiser: filter.merchandiser,
+      factory: filter.factory,
+    },
+    orderDateRange: orderDateRange.value ? [...orderDateRange.value] as [string, string] : null,
+    completedRange: completedRange.value ? [...completedRange.value] as [string, string] : null,
+    currentStatus: currentStatus.value,
+    page: pagination.page,
+    pageSize: pagination.pageSize,
+    orderNoLabelVisible: orderNoLabelVisible.value,
+    skuCodeLabelVisible: skuCodeLabelVisible.value,
+  }
+}
+
+function persistFilterState() {
+  try {
+    sessionStorage.setItem(ORDERS_LIST_FILTER_STATE_KEY, JSON.stringify(buildFilterStateSnapshot()))
+  } catch {
+    // 浏览器存储不可用时保持静默，不影响列表功能
+  }
+}
+
+function restoreFilterState() {
+  try {
+    const raw = sessionStorage.getItem(ORDERS_LIST_FILTER_STATE_KEY)
+    if (!raw) return
+    const parsed = JSON.parse(raw) as Partial<OrdersListFilterState>
+    const f: Partial<OrdersListFilterState['filter']> = parsed.filter ?? {}
+    filter.orderNo = typeof f.orderNo === 'string' ? f.orderNo : ''
+    filter.skuCode = typeof f.skuCode === 'string' ? f.skuCode : ''
+    filter.customer = typeof f.customer === 'string' ? f.customer : ''
+    filter.orderTypeId = typeof f.orderTypeId === 'number' ? f.orderTypeId : null
+    filter.processItem = typeof f.processItem === 'string' ? f.processItem : ''
+    filter.salesperson = typeof f.salesperson === 'string' ? f.salesperson : ''
+    filter.merchandiser = typeof f.merchandiser === 'string' ? f.merchandiser : ''
+    filter.factory = typeof f.factory === 'string' ? f.factory : ''
+    orderDateRange.value = Array.isArray(parsed.orderDateRange) && parsed.orderDateRange.length === 2
+      ? [parsed.orderDateRange[0], parsed.orderDateRange[1]]
+      : null
+    completedRange.value = Array.isArray(parsed.completedRange) && parsed.completedRange.length === 2
+      ? [parsed.completedRange[0], parsed.completedRange[1]]
+      : null
+    currentStatus.value = typeof parsed.currentStatus === 'string' && parsed.currentStatus ? parsed.currentStatus : 'all'
+    pagination.page = typeof parsed.page === 'number' && parsed.page > 0 ? parsed.page : 1
+    pagination.pageSize = typeof parsed.pageSize === 'number' && parsed.pageSize > 0 ? parsed.pageSize : 20
+    orderNoLabelVisible.value = Boolean(parsed.orderNoLabelVisible)
+    skuCodeLabelVisible.value = Boolean(parsed.skuCodeLabelVisible)
+  } catch {
+    // 旧格式或损坏数据直接忽略，按默认筛选进入
+  }
+}
+
 onMounted(async () => {
   try {
     // 强制刷新当前用户权限与订单状态策略，避免旧缓存导致按钮显示不一致
@@ -1533,6 +1614,7 @@ onMounted(async () => {
   } catch {
     // 失败时保持现有行为，由全局鉴权处理登录态
   }
+  restoreFilterState()
   applyQueryFromRoute()
   load({ refreshCounts: true })
   loadOptions()
@@ -1540,16 +1622,42 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  persistFilterState()
   listAbortController?.abort()
   countsAbortController?.abort()
 })
 
 onDeactivated(() => {
+  persistFilterState()
   listAbortController?.abort()
   countsAbortController?.abort()
   // keep-alive 场景下离开页面不会触发 unmount，需主动关闭加载态，避免遮罩残留
   loading.value = false
 })
+
+watch(
+  [
+    () => filter.orderNo,
+    () => filter.skuCode,
+    () => filter.customer,
+    () => filter.orderTypeId,
+    () => filter.processItem,
+    () => filter.salesperson,
+    () => filter.merchandiser,
+    () => filter.factory,
+    () => orderDateRange.value,
+    () => completedRange.value,
+    () => currentStatus.value,
+    () => pagination.page,
+    () => pagination.pageSize,
+    () => orderNoLabelVisible.value,
+    () => skuCodeLabelVisible.value,
+  ],
+  () => {
+    persistFilterState()
+  },
+  { deep: true },
+)
 
 watch(
   () => filter.orderNo,

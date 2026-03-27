@@ -382,6 +382,25 @@
         </div>
       </template>
       <el-table :data="materials" border size="small" class="materials-table">
+        <el-table-column label="物料来源" min-width="120" header-align="center" align="center">
+          <template #default="{ row, $index }">
+            <el-select
+              v-model="row.materialSourceId"
+              placeholder="选择物料来源"
+              filterable
+              clearable
+              :ref="(el) => setMaterialCellRef(el, $index, 0)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 0)"
+            >
+              <el-option
+                v-for="opt in materialSourceOptions"
+                :key="opt.id"
+                :label="opt.label"
+                :value="opt.id"
+              />
+            </el-select>
+          </template>
+        </el-table-column>
         <el-table-column label="物料类型" min-width="120" header-align="center" align="center">
           <template #default="{ row, $index }">
             <el-select
@@ -390,8 +409,8 @@
               filterable
               clearable
               @change="onMaterialTypeChange(row)"
-              :ref="(el) => setMaterialCellRef(el, $index, 0)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 0)"
+              :ref="(el) => setMaterialCellRef(el, $index, 1)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 1)"
             >
               <el-option
                 v-for="opt in materialTypeOptions"
@@ -415,8 +434,8 @@
               :loading="supplierLoading"
               @visible-change="(visible: boolean) => onMaterialSupplierVisibleChange(visible, row)"
               @change="onSupplierChange(row)"
-              :ref="(el) => setMaterialCellRef(el, $index, 1)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 1)"
+              :ref="(el) => setMaterialCellRef(el, $index, 2)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 2)"
             >
               <el-option
                 v-for="s in supplierOptions"
@@ -433,8 +452,8 @@
               v-model="row.materialName"
               placeholder="物料名称"
               :input-style="{ textAlign: 'center' }"
-              :ref="(el) => setMaterialCellRef(el, $index, 2)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 2)"
+              :ref="(el) => setMaterialCellRef(el, $index, 3)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 3)"
             />
           </template>
         </el-table-column>
@@ -444,8 +463,8 @@
               v-model="row.color"
               placeholder="颜色"
               :input-style="{ textAlign: 'center' }"
-              :ref="(el) => setMaterialCellRef(el, $index, 3)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 3)"
+              :ref="(el) => setMaterialCellRef(el, $index, 4)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 4)"
             />
           </template>
         </el-table-column>
@@ -457,8 +476,8 @@
               :controls="false"
               :input-style="{ textAlign: 'center' }"
               @update:modelValue="recalcPurchaseQuantity(row)"
-              :ref="(el) => setMaterialCellRef(el, $index, 4)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 4)"
+              :ref="(el) => setMaterialCellRef(el, $index, 5)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
             />
           </template>
         </el-table-column>
@@ -470,8 +489,8 @@
               :controls="false"
               :input-style="{ textAlign: 'center' }"
               @update:modelValue="recalcPurchaseQuantity(row)"
-              :ref="(el) => setMaterialCellRef(el, $index, 5)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
+              :ref="(el) => setMaterialCellRef(el, $index, 6)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
             />
           </template>
         </el-table-column>
@@ -483,8 +502,8 @@
               :controls="false"
               :input-style="{ textAlign: 'center' }"
               @update:modelValue="recalcPurchaseQuantity(row)"
-              :ref="(el) => setMaterialCellRef(el, $index, 6)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
+              :ref="(el) => setMaterialCellRef(el, $index, 7)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
             />
           </template>
         </el-table-column>
@@ -496,8 +515,8 @@
               :controls="false"
               :input-style="{ textAlign: 'center' }"
               :readonly="true"
-              :ref="(el) => setMaterialCellRef(el, $index, 7)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
+              :ref="(el) => setMaterialCellRef(el, $index, 8)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
             />
           </template>
         </el-table-column>
@@ -507,8 +526,8 @@
               v-model="row.remark"
               placeholder="面料成分 / 克重等"
               :input-style="{ textAlign: 'center' }"
-              :ref="(el) => setMaterialCellRef(el, $index, 8)"
-              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
+              :ref="(el) => setMaterialCellRef(el, $index, 9)"
+              @keydown.capture.stop="onMaterialCellKeydown($event, $index, 9)"
             />
           </template>
         </el-table-column>
@@ -1487,6 +1506,8 @@ function bSummaryMethod() {
 
 // C 区：物料信息
 interface MaterialRow {
+  materialSourceId?: number | null
+  materialSource?: string
   materialTypeId?: number | null
   materialType?: string
   supplierName?: string
@@ -1502,6 +1523,7 @@ interface MaterialRow {
 }
 
 const materials = ref<MaterialRow[]>([])
+const materialSourceOptions = ref<{ id: number; label: string }[]>([])
 const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 
 const materialCellRefs = ref<InputComponentInstance[][]>([])
@@ -1533,7 +1555,7 @@ function focusMaterialCell(rowIndex: number, colIndex: number) {
 
 function onMaterialCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
   const rowsCount = materials.value.length
-  const colsCount = 9
+  const colsCount = 10
   let targetRow = rowIndex
   let targetCol = colIndex
 
@@ -1587,6 +1609,19 @@ async function loadMaterialTypes() {
   }
 }
 
+async function loadMaterialSources() {
+  try {
+    const res = await getDictItems('material_sources')
+    const list = res.data ?? []
+    materialSourceOptions.value = list.map((item: any) => ({
+      id: item.id,
+      label: item.value,
+    }))
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) console.warn('物料来源加载失败', getErrorMessage(e))
+  }
+}
+
 function syncMaterialTypeIdsFromLabel() {
   if (!materialTypeOptions.value.length || !materials.value.length) return
   const map = new Map<string, number>()
@@ -1599,6 +1634,20 @@ function syncMaterialTypeIdsFromLabel() {
       if (id) {
         row.materialTypeId = id
       }
+    }
+  })
+}
+
+function syncMaterialSourceIdsFromLabel() {
+  if (!materialSourceOptions.value.length || !materials.value.length) return
+  const map = new Map<string, number>()
+  materialSourceOptions.value.forEach((opt) => {
+    if (opt.label) map.set(String(opt.label), opt.id)
+  })
+  materials.value.forEach((row) => {
+    if ((row.materialSourceId == null || Number.isNaN(row.materialSourceId as any)) && row.materialSource) {
+      const id = map.get(String(row.materialSource))
+      if (id) row.materialSourceId = id
     }
   })
 }
@@ -2183,7 +2232,7 @@ async function collectPayload(): Promise<OrderFormPayload> {
       remark: row.remark,
     })),
     colorSizeHeaders: [...sizeHeaders.value],
-    materials: materials.value.map(({ materialType: _t, ...m }) => ({ ...m })),
+    materials: materials.value.map(({ materialType: _t, materialSource: _s, ...m }) => ({ ...m })),
     sizeInfoMetaHeaders: [...sizeMetaHeaders.value],
     sizeInfoRows: sizeInfoRows.value.map((r) => ({
       metaValues: [...r.metaValues],
@@ -2326,6 +2375,8 @@ async function loadDetail() {
     ensureAtLeastOneColorRow()
     // C 区
     materials.value = ((d as any).materials ?? []).map((m: any) => ({
+      materialSourceId: m.materialSourceId ?? null,
+      materialSource: m.materialSource ?? '',
       materialTypeId: m.materialTypeId ?? null,
       materialType: m.materialType ?? '',
       supplierName: m.supplierName ?? '',
@@ -2415,6 +2466,7 @@ onMounted(async () => {
         await loadDicts()
         await loadUserOptions()
         await loadMaterialTypes()
+        await loadMaterialSources()
         // C 区 / E 区供应商下拉初始列表
         await searchProcessSuppliers('')
         // E 区工艺项目下拉：与「供应商设置」中「工艺供应商」的业务范围一致
@@ -2424,6 +2476,8 @@ onMounted(async () => {
     ])
     // 物料类型：旧订单可能只存了 materialType 字符串，这里在字典和明细都加载完后做一次自动映射
     syncMaterialTypeIdsFromLabel()
+    // 物料来源：兼容历史/迁移数据中仅存名称的情况
+    syncMaterialSourceIdsFromLabel()
     // 新建订单时业务员默认为当前登录账号，并保证下拉中可选项包含当前用户
     if (!orderId.value) {
       const authStore = useAuthStore()

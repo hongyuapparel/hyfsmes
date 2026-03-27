@@ -43,7 +43,7 @@ const routes: RouteRecordRaw[] = [
         path: 'orders',
         component: RouterViewWrapper,
         redirect: '/orders/list',
-        meta: { title: '订单管理', permissionPath: '/orders' },
+        meta: { title: '订单管理', permissionPath: '/orders', useInnerKeepAlive: true },
         children: [
           {
             path: 'products',

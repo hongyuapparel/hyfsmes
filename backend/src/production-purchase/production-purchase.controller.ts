@@ -53,7 +53,7 @@ export class ProductionPurchaseController {
     @Body('otherCost') otherCost: string,
     @Body('remark') remark: string | null,
     @Body('imageUrl') imageUrl: string | null,
-    @CurrentUser() user: { userId: number; username: string },
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.purchaseService.registerPurchase(
       Number(orderId),
@@ -65,5 +65,36 @@ export class ProductionPurchaseController {
       imageUrl,
       user?.userId,
     );
+  }
+
+  /**
+   * 登记领料（可选择库存扣减或仅备注处理）
+   */
+  @Post('items/pick')
+  registerPick(
+    @Body('orderId') orderId: number,
+    @Body('materialIndex') materialIndex: number,
+    @Body('inventorySourceType') inventorySourceType?: 'fabric' | 'accessory' | 'finished' | null,
+    @Body('inventoryId') inventoryId?: number | null,
+    @Body('quantity') quantity?: number | null,
+    @Body('stockBatch') stockBatch?: string | null,
+    @Body('stockColorCode') stockColorCode?: string | null,
+    @Body('stockSpec') stockSpec?: string | null,
+    @Body('remark') remark?: string | null,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.purchaseService.registerPicking({
+      orderId: Number(orderId),
+      materialIndex: Number(materialIndex),
+      inventorySourceType: inventorySourceType ?? null,
+      inventoryId: inventoryId != null ? Number(inventoryId) : null,
+      quantity: quantity != null ? Number(quantity) : null,
+      stockBatch: stockBatch ?? null,
+      stockColorCode: stockColorCode ?? null,
+      stockSpec: stockSpec ?? null,
+      remark: remark ?? null,
+      actorUserId: user?.userId,
+      actorUsername: user?.username,
+    });
   }
 }

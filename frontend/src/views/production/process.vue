@@ -7,7 +7,7 @@
           <el-radio-button
             v-for="tab in CRAFT_TABS"
             :key="tab.value"
-            :label="tab.value"
+            :value="tab.value"
           >
             {{ getTabLabel(tab) }}
           </el-radio-button>
@@ -134,8 +134,8 @@
       <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
           <el-image
@@ -149,14 +149,14 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="supplierName" label="供应商" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="processItem" label="工艺项目" min-width="120" show-overflow-tooltip />
-      <el-table-column label="订单类型" width="100" show-overflow-tooltip>
+      <el-table-column prop="supplierName" label="供应商" min-width="100" />
+      <el-table-column prop="processItem" label="工艺项目" min-width="120" />
+      <el-table-column label="订单类型" width="100">
         <template #default="{ row }">
           {{ orderTypeDisplay(row) }}
         </template>
       </el-table-column>
-      <el-table-column label="合作方式" width="100" show-overflow-tooltip>
+      <el-table-column label="合作方式" width="100">
         <template #default="{ row }">
           {{ collaborationDisplay(row) }}
         </template>

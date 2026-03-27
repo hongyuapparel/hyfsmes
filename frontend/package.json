@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "check:el-radio-value": "node scripts/check-el-radio-value.mjs",
     "dev": "vite",
-    "build": "vue-tsc && vite build",
+    "build": "npm run check:el-radio-value && vue-tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {

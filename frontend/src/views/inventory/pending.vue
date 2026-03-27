@@ -1,5 +1,10 @@
 <template>
   <div class="page-card inventory-pending-page">
+    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
+      <el-tab-pane label="待处理" name="pending" />
+      <el-tab-pane label="已发货" name="shipped" />
+    </el-tabs>
+
     <div class="filter-bar">
       <el-input
         v-model="filter.orderNo"
@@ -45,7 +50,7 @@
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button
-          v-if="hasSelection"
+          v-if="pageTab === 'pending' && hasSelection"
           type="primary"
           size="large"
           :loading="inboundLoading"
@@ -54,7 +59,7 @@
           入库
         </el-button>
         <el-button
-          v-if="canOutboundSelection"
+          v-if="pageTab === 'pending' && canOutboundSelection"
           type="warning"
           size="large"
           :loading="outboundDialog.submitting"
@@ -65,7 +70,7 @@
       </div>
     </div>
 
-    <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+    <div v-if="pageTab === 'pending' && hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
     <el-table
       ref="pendingTableRef"
@@ -77,7 +82,7 @@
       @header-dragend="onPendingHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
-      <el-table-column type="selection" width="48" align="center" />
+      <el-table-column v-if="pageTab === 'pending'" type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
       <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
@@ -94,9 +99,10 @@
           <span v-else class="text-placeholder">-</span>
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="140" align="right">
+      <el-table-column :label="pageTab === 'pending' ? '待处理数量' : '已发货数量'" width="140" align="right">
         <template #default="{ row }">
           <el-tooltip
+            v-if="pageTab === 'pending'"
             placement="top"
             effect="light"
             :show-after="250"
@@ -153,9 +159,13 @@
               </el-tag>
             </span>
           </el-tooltip>
+          <span v-else>{{ row.quantity }}</span>
         </template>
       </el-table-column>
-      <el-table-column prop="createdAt" label="登记时间" width="160" align="center" />
+      <el-table-column :label="pageTab === 'pending' ? '完成时间' : '发货时间'" prop="createdAt" width="160" align="center" />
+      <el-table-column v-if="pageTab === 'shipped'" prop="pickupUserName" label="领取人/收货人" width="140" show-overflow-tooltip />
+      <el-table-column v-if="pageTab === 'shipped'" prop="operatorUsername" label="操作人" width="120" show-overflow-tooltip />
+      <el-table-column v-if="pageTab === 'shipped'" prop="remark" label="备注" min-width="140" show-overflow-tooltip />
     </el-table>
 
     <div class="pagination-wrap">
@@ -354,6 +364,7 @@ import {
 } from '@/composables/useFilterBarHelpers'
 
 const filter = reactive({ orderNo: '', skuCode: '' })
+const pageTab = ref<'pending' | 'shipped'>('pending')
 const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 const list = ref<PendingListItem[]>([])
@@ -364,7 +375,7 @@ const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PendingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
 const canOutboundSelection = computed(
-  () => selectedRows.value.length > 0 && selectedRows.value.every((r) => r.sourceType !== 'defect'),
+  () => pageTab.value === 'pending' && selectedRows.value.length > 0 && selectedRows.value.every((r) => r.sourceType !== 'defect'),
 )
 const { onHeaderDragEnd: onPendingHeaderDragEnd, restoreColumnWidths: restorePendingColumnWidths } =
   useTableColumnWidthPersist('inventory-pending-main')
@@ -450,6 +461,7 @@ async function load() {
   loading.value = true
   try {
     const res = await getPendingList({
+      tab: pageTab.value,
       orderNo: filter.orderNo || undefined,
       skuCode: filter.skuCode || undefined,
       page: pagination.page,
@@ -502,7 +514,14 @@ function onPageSizeChange() {
 }
 
 function onSelectionChange(rows: PendingListItem[]) {
+  if (pageTab.value !== 'pending') return
   selectedRows.value = rows
+}
+
+function onPageTabChange() {
+  selectedRows.value = []
+  pagination.page = 1
+  load()
 }
 
 function openInboundDialog() {
@@ -582,6 +601,7 @@ async function loadPickupUserOptions() {
 }
 
 async function openOutboundDialog() {
+  if (pageTab.value !== 'pending') return
   if (!selectedRows.value.length) return
   const rows = selectedRows.value
   if (rows.some((row) => row.sourceType === 'defect')) {

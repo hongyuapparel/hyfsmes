@@ -36,5 +36,6 @@ import { FinishedGoodsStockService } from './finished-goods-stock.service';
   ],
   controllers: [FinishedGoodsStockController],
   providers: [FinishedGoodsStockService],
+  exports: [FinishedGoodsStockService],
 })
 export class FinishedGoodsStockModule {}

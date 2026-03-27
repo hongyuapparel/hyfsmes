@@ -237,22 +237,27 @@ export class OrdersService {
       });
   }
 
-  /** 持久化时只存 materialTypeId，不存 materialType（改名历史同步） */
+  /** 持久化时只存 *_id，不存名称字段（改名历史同步） */
   private normalizeMaterialRows(rows: OrderMaterialRow[]): OrderMaterialRow[] {
     return rows.map((row) => {
-      const { materialType: _drop, ...rest } = row;
+      const { materialType: _dropType, materialSource: _dropSource, ...rest } = row;
       return rest as OrderMaterialRow;
     });
   }
 
-  /** 按 materialTypeId 解析物料类型名称，供前端展示 */
-  private async enrichMaterialsWithMaterialTypeLabel(materials: OrderMaterialRow[]): Promise<OrderMaterialRow[]> {
+  /** 按 materialTypeId / materialSourceId 解析名称，供前端展示 */
+  private async enrichMaterialsWithOptionLabels(materials: OrderMaterialRow[]): Promise<OrderMaterialRow[]> {
     if (!materials.length) return materials;
-    const options = await this.systemOptionsService.findAllByType('material_types');
-    const idToValue = new Map(options.map((o) => [o.id, o.value]));
+    const [materialTypes, materialSources] = await Promise.all([
+      this.systemOptionsService.findAllByType('material_types'),
+      this.systemOptionsService.findAllByType('material_sources'),
+    ]);
+    const materialTypeMap = new Map(materialTypes.map((o) => [o.id, o.value]));
+    const materialSourceMap = new Map(materialSources.map((o) => [o.id, o.value]));
     return materials.map((row) => ({
       ...row,
-      materialType: row.materialTypeId != null ? (idToValue.get(row.materialTypeId) ?? '') : '',
+      materialType: row.materialTypeId != null ? (materialTypeMap.get(row.materialTypeId) ?? '') : '',
+      materialSource: row.materialSourceId != null ? (materialSourceMap.get(row.materialSourceId) ?? '') : '',
     }));
   }
 
@@ -553,7 +558,7 @@ export class OrdersService {
     }
     const ext = await this.orderExtRepo.findOne({ where: { orderId: id } });
     const rawMaterials = ext?.materials ?? [];
-    const materials = await this.enrichMaterialsWithMaterialTypeLabel(rawMaterials);
+    const materials = await this.enrichMaterialsWithOptionLabels(rawMaterials);
     const colorSizeHeaders = ext?.colorSizeHeaders ?? [];
     const colorSizeRows = ext?.colorSizeRows ?? [];
     const sizeInfoMetaHeaders = ext?.sizeInfoMetaHeaders ?? [];

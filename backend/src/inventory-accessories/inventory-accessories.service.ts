@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
+import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
 import { User, UserStatus } from '../entities/user.entity';
 
 @Injectable()
@@ -12,9 +13,43 @@ export class InventoryAccessoriesService {
     private readonly repo: Repository<InventoryAccessory>,
     @InjectRepository(InventoryAccessoryOutbound)
     private readonly outboundRepo: Repository<InventoryAccessoryOutbound>,
+    @InjectRepository(InventoryAccessoryOperationLog)
+    private readonly operationLogRepo: Repository<InventoryAccessoryOperationLog>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
   ) {}
+
+  private toSnapshot(item: InventoryAccessory): Record<string, unknown> {
+    return {
+      id: item.id,
+      name: item.name,
+      category: item.category,
+      quantity: item.quantity,
+      unit: item.unit,
+      customerName: item.customerName,
+      imageUrl: item.imageUrl,
+      remark: item.remark,
+    };
+  }
+
+  private async addOperationLog(params: {
+    accessoryId: number;
+    action: string;
+    operatorUsername: string;
+    beforeSnapshot?: Record<string, unknown> | null;
+    afterSnapshot?: Record<string, unknown> | null;
+    remark?: string;
+  }) {
+    const row = this.operationLogRepo.create({
+      accessoryId: params.accessoryId,
+      action: params.action,
+      operatorUsername: (params.operatorUsername ?? '').trim(),
+      beforeSnapshot: params.beforeSnapshot ?? null,
+      afterSnapshot: params.afterSnapshot ?? null,
+      remark: (params.remark ?? '').trim(),
+    });
+    await this.operationLogRepo.save(row);
+  }
 
   async getList(params: {
     name?: string;
@@ -62,6 +97,7 @@ export class InventoryAccessoriesService {
     remark?: string;
     imageUrl?: string;
     customerName?: string;
+    operatorUsername?: string;
   }): Promise<InventoryAccessory> {
     const entity = this.repo.create({
       name: dto.name?.trim() ?? '',
@@ -72,7 +108,15 @@ export class InventoryAccessoriesService {
       imageUrl: dto.imageUrl?.trim() ?? '',
       customerName: dto.customerName?.trim() ?? '',
     });
-    return this.repo.save(entity);
+    const saved = await this.repo.save(entity);
+    await this.addOperationLog({
+      accessoryId: saved.id,
+      action: 'create',
+      operatorUsername: dto.operatorUsername ?? '',
+      beforeSnapshot: null,
+      afterSnapshot: this.toSnapshot(saved),
+    });
+    return saved;
   }
 
   async update(
@@ -85,10 +129,12 @@ export class InventoryAccessoriesService {
       remark?: string;
       imageUrl?: string;
       customerName?: string;
+      operatorUsername?: string;
     },
   ): Promise<InventoryAccessory> {
     const item = await this.repo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('辅料记录不存在');
+    const before = this.toSnapshot(item);
     if (dto.name !== undefined) item.name = dto.name.trim();
     if (dto.category !== undefined) item.category = dto.category?.trim() ?? '';
     if (dto.quantity !== undefined) item.quantity = dto.quantity;
@@ -96,13 +142,29 @@ export class InventoryAccessoriesService {
     if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
     if (dto.imageUrl !== undefined) item.imageUrl = dto.imageUrl?.trim() ?? '';
     if (dto.customerName !== undefined) item.customerName = dto.customerName?.trim() ?? '';
-    return this.repo.save(item);
+    const saved = await this.repo.save(item);
+    await this.addOperationLog({
+      accessoryId: saved.id,
+      action: 'update',
+      operatorUsername: dto.operatorUsername ?? '',
+      beforeSnapshot: before,
+      afterSnapshot: this.toSnapshot(saved),
+    });
+    return saved;
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, operatorUsername = ''): Promise<void> {
     const item = await this.repo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('辅料记录不存在');
+    const before = this.toSnapshot(item);
     await this.repo.remove(item);
+    await this.addOperationLog({
+      accessoryId: id,
+      action: 'delete',
+      operatorUsername,
+      beforeSnapshot: before,
+      afterSnapshot: null,
+    });
   }
 
   /** 出库弹窗「领用人」下拉：返回全公司可用用户 */
@@ -150,6 +212,7 @@ export class InventoryAccessoriesService {
     return this.repo.manager.transaction(async (manager) => {
       const accessoryRepo = manager.getRepository(InventoryAccessory);
       const recordRepo = manager.getRepository(InventoryAccessoryOutbound);
+      const operationLogRepo = manager.getRepository(InventoryAccessoryOperationLog);
 
       const accessory = await accessoryRepo
         .createQueryBuilder('a')
@@ -160,6 +223,7 @@ export class InventoryAccessoriesService {
       if (!accessory) throw new NotFoundException('辅料记录不存在');
 
       const before = Number(accessory.quantity) || 0;
+      const beforeSnapshot = this.toSnapshot(accessory);
       if (before < qty) {
         throw new BadRequestException(`库存不足：当前 ${before}，需要出库 ${qty}`);
       }
@@ -179,6 +243,16 @@ export class InventoryAccessoriesService {
         remark: (params.remark ?? '').trim(),
       });
       const savedRecord = await recordRepo.save(record);
+      await operationLogRepo.save(
+        operationLogRepo.create({
+          accessoryId: params.accessoryId,
+          action: 'outbound',
+          operatorUsername: (params.operatorUsername ?? '').trim(),
+          beforeSnapshot,
+          afterSnapshot: this.toSnapshot(savedAccessory),
+          remark: (params.remark ?? '').trim(),
+        }),
+      );
 
       return { accessory: savedAccessory, record: savedRecord };
     });
@@ -250,5 +324,13 @@ export class InventoryAccessoriesService {
       category: r.category ?? '',
     }));
     return { list: rows, total, page, pageSize };
+  }
+
+  async getOperationLogs(accessoryId: number): Promise<InventoryAccessoryOperationLog[]> {
+    await this.getOne(accessoryId);
+    return this.operationLogRepo.find({
+      where: { accessoryId },
+      order: { createdAt: 'DESC' },
+    });
   }
 }

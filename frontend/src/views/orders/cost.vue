@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card order-cost-page">
+  <div class="page-card order-cost-page" @input="onAnyFieldInput" @change="onAnyFieldChange">
     <div class="page-header">
       <div class="left">
         <el-button link type="primary" @click="goBack">返回列表</el-button>
@@ -69,6 +69,7 @@
               :remote-method="searchSuppliers"
               remote
               :loading="supplierLoading"
+              @visible-change="onSupplierSelectVisibleChange"
               size="small"
             >
               <el-option
@@ -167,6 +168,7 @@
               check-strictly
               :data="processOptions"
               :props="{ label: 'label', value: 'value', children: 'children' }"
+              @visible-change="onProcessOptionsVisibleChange"
               size="small"
               style="width: 100%"
             />
@@ -182,6 +184,7 @@
               :remote-method="searchSuppliers"
               remote
               :loading="supplierLoading"
+              @visible-change="onSupplierSelectVisibleChange"
               size="small"
             >
               <el-option
@@ -268,6 +271,7 @@
               allow-create
               default-first-option
               size="small"
+              @change="() => onProductionDepartmentChange(row)"
             >
               <el-option
                 v-for="d in departmentOptions"
@@ -287,9 +291,10 @@
               allow-create
               default-first-option
               size="small"
+              @change="() => onProductionJobTypeChange(row)"
             >
               <el-option
-                v-for="j in jobTypeOptions"
+                v-for="j in getJobTypeOptions(row)"
                 :key="j"
                 :label="getJobTypeLabel(j)"
                 :value="j"
@@ -301,7 +306,7 @@
           <template #default="{ row }">
             <el-select-v2
               v-model="row.processId"
-              :options="productionProcessSelectOptions"
+              :options="getProductionProcessSelectOptions(row)"
               placeholder="选择工序"
               filterable
               clearable
@@ -435,7 +440,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
@@ -473,6 +478,19 @@ const quoteConfirmedBy = ref('')
 const quoteNeedsReconfirm = ref(false)
 const hasLocalDraftChanges = ref(false)
 const suppressDirtyTracking = ref(true)
+const PERF_TAG = '[orders-cost-perf]'
+const mountStartAt = performance.now()
+const hasPreloadedSuppliers = ref(false)
+const hasLoadedProcessOptions = ref(false)
+let dirtyDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let dirtyTriggerCount = 0
+let recomputeCountInCurrentEdit = 0
+let recomputeLogTimer: ReturnType<typeof setTimeout> | null = null
+
+function logPerf(message: string, extra?: Record<string, unknown>) {
+  if (extra) console.info(PERF_TAG, message, extra)
+  else console.info(PERF_TAG, message)
+}
 
 const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 const supplierOptions = ref<{ id: number; name: string }[]>([])
@@ -487,14 +505,6 @@ const processOptions = ref<ProcessOptionNode[]>([])
 
 const importTemplateDialog = ref<{ visible: boolean; templateId: number | null }>({ visible: false, templateId: null })
 const importTemplateOptions = ref<{ id: number; name: string }[]>([])
-
-/** 虚拟列表下拉，避免数万 el-option 拖死主线程（工序接口可达百万级 JSON） */
-const productionProcessSelectOptions = computed(() =>
-  productionProcesses.value.map((p) => ({
-    value: p.id,
-    label: formatProductionProcessSelectLabel(p),
-  })),
-)
 
 interface MaterialRow {
   materialTypeId?: number | null
@@ -647,6 +657,30 @@ const jobTypeOptions = computed(() =>
   Array.from(new Set(productionProcesses.value.map((p) => p.jobType).filter((v) => !!v)))
 )
 
+function getJobTypeOptions(row: ProductionRow): string[] {
+  const dept = (row.department ?? '').trim()
+  const list = productionProcesses.value
+    .filter((p) => !dept || (p.department ?? '').trim() === dept)
+    .map((p) => p.jobType)
+    .filter((v): v is string => !!v)
+  return Array.from(new Set(list))
+}
+
+function getProductionProcessSelectOptions(row: ProductionRow): Array<{ value: number; label: string }> {
+  const dept = (row.department ?? '').trim()
+  const job = (row.jobType ?? '').trim()
+  return productionProcesses.value
+    .filter((p) => {
+      const hitDept = !dept || (p.department ?? '').trim() === dept
+      const hitJob = !job || (p.jobType ?? '').trim() === job
+      return hitDept && hitJob
+    })
+    .map((p) => ({
+      value: p.id,
+      label: formatProductionProcessSelectLabel(p),
+    }))
+}
+
 /** 生产工序行按部门(裁床→车缝→尾部)、工种、工序排序，用于表格展示与合并 */
 const productionRowsSorted = computed(() => {
   const rows = [...productionRows.value]
@@ -787,7 +821,14 @@ async function searchSuppliers(keyword: string) {
   }
 }
 
+function onSupplierSelectVisibleChange(visible: boolean) {
+  if (!visible || hasPreloadedSuppliers.value) return
+  hasPreloadedSuppliers.value = true
+  void searchSuppliers('')
+}
+
 async function loadProcessOptions() {
+  if (hasLoadedProcessOptions.value) return
   try {
     const res = await getSupplierBusinessScopeTreeOptions('工艺供应商')
     const toTreeSelect = (
@@ -803,9 +844,15 @@ async function loadProcessOptions() {
         }
       })
     processOptions.value = toTreeSelect(res.data ?? [])
+    hasLoadedProcessOptions.value = true
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('工艺项目选项加载失败', getErrorMessage(e))
   }
+}
+
+function onProcessOptionsVisibleChange(visible: boolean) {
+  if (!visible) return
+  void loadProcessOptions()
 }
 
 function addMaterialRow() {
@@ -958,11 +1005,8 @@ function syncProductionIdsFromName() {
 }
 
 function formatProductionProcessSelectLabel(p: ProductionProcessItem): string {
-  const dept = (p.department || '').trim()
-  const job = getJobTypeLabel(p.jobType || '')
   const name = (p.name || '').trim()
-  const parts = [dept, job, name].filter(Boolean)
-  return parts.length ? parts.join(' / ') : String(p.id ?? '')
+  return name || '未命名工序'
 }
 
 function onProductionProcessChange(row: ProductionRow) {
@@ -973,6 +1017,54 @@ function onProductionProcessChange(row: ProductionRow) {
   row.jobType = found.jobType || row.jobType
   row.unitPrice = Number(found.unitPrice) || 0
   row.processName = found.name
+}
+
+function onProductionDepartmentChange(row: ProductionRow) {
+  const dept = (row.department ?? '').trim()
+  if (!dept) return
+  const jobOptions = getJobTypeOptions(row)
+  if (row.jobType && !jobOptions.includes(row.jobType)) {
+    row.jobType = ''
+    row.processId = null
+    row.processName = ''
+    row.unitPrice = 0
+    return
+  }
+  const options = getProductionProcessSelectOptions(row)
+  if (!options.some((opt) => opt.value === row.processId)) {
+    row.processId = null
+    row.processName = ''
+    row.unitPrice = 0
+  }
+}
+
+function onProductionJobTypeChange(row: ProductionRow) {
+  const options = getProductionProcessSelectOptions(row)
+  if (!options.some((opt) => opt.value === row.processId)) {
+    row.processId = null
+    row.processName = ''
+    row.unitPrice = 0
+  }
+}
+
+function scheduleMarkLocalDirty() {
+  if (suppressDirtyTracking.value) return
+  dirtyTriggerCount += 1
+  if (dirtyDebounceTimer) clearTimeout(dirtyDebounceTimer)
+  dirtyDebounceTimer = setTimeout(() => {
+    dirtyDebounceTimer = null
+    hasLocalDraftChanges.value = true
+    logPerf('watcher触发次数（防抖聚合）', { dirtyTriggerCount })
+    dirtyTriggerCount = 0
+  }, 400)
+}
+
+function onAnyFieldInput() {
+  scheduleMarkLocalDirty()
+}
+
+function onAnyFieldChange() {
+  scheduleMarkLocalDirty()
 }
 
 async function saveDraft() {
@@ -1062,6 +1154,10 @@ async function applyImportTemplate() {
 }
 
 onMounted(async () => {
+  const w = window as Window & { __ordersCostMountCount?: number }
+  w.__ordersCostMountCount = (w.__ordersCostMountCount ?? 0) + 1
+  logPerf('页面 mount 次数', { mountCount: w.__ordersCostMountCount })
+
   suppressDirtyTracking.value = true
   await loadOrder()
   await loadCostSnapshot()
@@ -1070,18 +1166,24 @@ onMounted(async () => {
   await loadMaterialTypes()
   // 物料类型：旧订单/快照里可能只有 materialType 字符串，这里在字典和明细都加载完后做一次自动映射
   syncMaterialTypeIdsFromLabel()
-  loadProcessOptions()
-  searchSuppliers('')
+  // 工艺项目与供应商选项改为下拉打开时按需加载，降低首屏负担
   suppressDirtyTracking.value = false
+  await nextTick()
+  logPerf('首屏渲染时间(ms)', { elapsedMs: Math.round(performance.now() - mountStartAt) })
 })
 
 watch(
-  [materialRows, processItemRows, productionRows, profitMargin],
+  [materialTotal, processItemTotal, productionProcessTotal, totalCost, computedExFactoryPrice],
   () => {
     if (suppressDirtyTracking.value) return
-    hasLocalDraftChanges.value = true
+    recomputeCountInCurrentEdit += 1
+    if (recomputeLogTimer) clearTimeout(recomputeLogTimer)
+    recomputeLogTimer = setTimeout(() => {
+      logPerf('单次编辑触发重算次数', { recomputeCount: recomputeCountInCurrentEdit })
+      recomputeCountInCurrentEdit = 0
+      recomputeLogTimer = null
+    }, 450)
   },
-  { deep: true },
 )
 </script>
 

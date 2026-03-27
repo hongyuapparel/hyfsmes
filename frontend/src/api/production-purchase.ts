@@ -12,12 +12,20 @@ export interface PurchaseItemRow {
   /** 订单类型 ID（system_options.id, option_type='order_types'） */
   orderTypeId: number | null
   supplierName: string
+  materialTypeId?: number | null
+  materialType?: string | null
   materialName: string
+  color?: string | null
   planQuantity: number | null
   actualPurchaseQuantity: number | null
   purchaseAmount: string | null
+  materialSourceId: number | null
+  materialSource: string
+  processRoute: 'purchase' | 'picking'
   purchaseStatus: string
+  pickStatus: string
   purchaseCompletedAt: string | null
+  pickCompletedAt: string | null
   purchaseUnitPrice: string | null
   purchaseOtherCost: string | null
   purchaseRemark: string | null
@@ -58,4 +66,18 @@ export function registerPurchase(payload: {
   imageUrl: string
 }) {
   return request.post<void>('/production/purchase/items/register', payload)
+}
+
+export function registerPick(payload: {
+  orderId: number
+  materialIndex: number
+  inventorySourceType?: 'fabric' | 'accessory' | 'finished' | null
+  inventoryId?: number | null
+  quantity?: number | null
+  stockBatch?: string | null
+  stockColorCode?: string | null
+  stockSpec?: string | null
+  remark?: string | null
+}) {
+  return request.post<void>('/production/purchase/items/pick', payload)
 }

@@ -32,8 +32,10 @@ import { FinishedGoodsStock } from './entities/finished-goods-stock.entity';
 import { FinishedGoodsOutbound } from './entities/finished-goods-outbound.entity';
 import { InventoryAccessory } from './entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from './entities/inventory-accessory-outbound.entity';
+import { InventoryAccessoryOperationLog } from './entities/inventory-accessory-operation-log.entity';
 import { FabricStock } from './entities/fabric-stock.entity';
 import { FabricOutbound } from './entities/fabric-outbound.entity';
+import { FabricStockOperationLog } from './entities/fabric-stock-operation-log.entity';
 import { Employee } from './entities/employee.entity';
 import { Supplier } from './entities/supplier.entity';
 import { OrderStatus } from './entities/order-status.entity';
@@ -86,7 +88,7 @@ import { FinanceDashboardModule } from './finance-dashboard/finance-dashboard.mo
       username: process.env.MYSQL_USER || 'root',
       password: process.env.MYSQL_PASSWORD || '',
       database: process.env.MYSQL_DATABASE || 'erp',
-      entities: [User, Role, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCostSnapshot, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, ProcessQuoteTemplate, ProcessQuoteTemplateItem, InboundPending, FinishedGoodsStock, FinishedGoodsOutbound, FinishedGoodsStockColorImage, FinishedGoodsStockAdjustLog, InventoryAccessory, InventoryAccessoryOutbound, FabricStock, FabricOutbound, Employee, Supplier, OrderStatus, OrderStatusTransition, OrderWorkflowChain, OrderStatusSla, OrderStatusHistory, IncomeRecord, ExpenseRecord, FinanceFundAccount, FinanceIncomeType, FinanceExpenseType, RoleOrderPolicy, RoleDisplayOrder],
+      entities: [User, Role, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCostSnapshot, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, ProcessQuoteTemplate, ProcessQuoteTemplateItem, InboundPending, FinishedGoodsStock, FinishedGoodsOutbound, FinishedGoodsStockColorImage, FinishedGoodsStockAdjustLog, InventoryAccessory, InventoryAccessoryOutbound, InventoryAccessoryOperationLog, FabricStock, FabricOutbound, FabricStockOperationLog, Employee, Supplier, OrderStatus, OrderStatusTransition, OrderWorkflowChain, OrderStatusSla, OrderStatusHistory, IncomeRecord, ExpenseRecord, FinanceFundAccount, FinanceIncomeType, FinanceExpenseType, RoleOrderPolicy, RoleDisplayOrder],
       // 默认关闭，避免已有库在启动时重复建表/建索引导致启动失败。
       // 如需同步结构：设置 TYPEORM_SYNCHRONIZE=true（仅建议本地开发库使用）。
       synchronize: (process.env.TYPEORM_SYNCHRONIZE ?? '').toLowerCase() === 'true',

@@ -61,17 +61,7 @@
             <el-button type="primary" size="large" @click="openForm(null)">新增辅料</el-button>
             <el-button
               v-if="selectedRows.length"
-              type="danger"
-              size="large"
-              :disabled="deletingSelected"
-              :loading="deletingSelected"
-              @click="onDeleteSelected"
-            >
-              删除
-            </el-button>
-            <el-button
-              v-if="selectedRows.length"
-              type="primary"
+              type="warning"
               size="large"
               :disabled="selectedRows.length !== 1"
               @click="openOutboundDialog"
@@ -116,8 +106,9 @@
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="80" align="center" fixed="right">
+          <el-table-column label="操作" width="120" align="center" fixed="right">
             <template #default="{ row }">
+              <el-button link type="info" size="small" @click="openDetail(row)">详情</el-button>
               <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
             </template>
           </el-table-column>
@@ -365,12 +356,38 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-drawer
+      v-model="detailDrawer.visible"
+      title="辅料详情"
+      size="560px"
+      destroy-on-close
+    >
+      <div v-if="detailDrawer.row" class="detail-base">
+        <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
+        <div><span class="detail-label">类别：</span>{{ detailDrawer.row.category || '-' }}</div>
+        <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
+        <div><span class="detail-label">当前库存：</span>{{ detailDrawer.row.quantity }} {{ detailDrawer.row.unit || '' }}</div>
+        <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
+      </div>
+      <div class="detail-log-title">操作记录</div>
+      <el-timeline v-loading="detailDrawer.loading">
+        <el-timeline-item
+          v-for="log in detailDrawer.logs"
+          :key="log.id"
+          :timestamp="formatDate(log.createdAt)"
+          placement="top"
+        >
+          {{ formatLogAction(log.action) }}｜操作人：{{ log.operatorUsername || '-' }}{{ log.remark ? `｜备注：${log.remark}` : '' }}
+        </el-timeline-item>
+      </el-timeline>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, type CustomerItem } from '@/api/customers'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
@@ -378,12 +395,13 @@ import {
   getAccessoriesList,
   createAccessory,
   updateAccessory,
-  deleteAccessory,
   getAccessoryOutboundUserOptions,
   manualAccessoryOutbound,
   getAccessoryOutboundRecords,
+  getAccessoryOperationLogs,
   type AccessoryOutboundUserOption,
   type AccessoryOutboundRecord,
+  type AccessoryOperationLog,
   type AccessoryItem,
 } from '@/api/inventory'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
@@ -409,7 +427,12 @@ const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 
 const selectedRows = ref<AccessoryItem[]>([])
-const deletingSelected = ref(false)
+const detailDrawer = reactive<{
+  visible: boolean
+  row: AccessoryItem | null
+  loading: boolean
+  logs: AccessoryOperationLog[]
+}>({ visible: false, row: null, loading: false, logs: [] })
 
 const outboundFilter = reactive<{
   orderNo: string
@@ -614,46 +637,30 @@ async function submitForm() {
   }
 }
 
-async function onDelete(row: AccessoryItem) {
-  try {
-    await ElMessageBox.confirm('确定删除该辅料记录？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    await deleteAccessory(row.id)
-    ElMessage.success('已删除')
-    load()
-  } catch (e: unknown) {
-    if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  }
-}
-
 function onSelectionChange(rows: AccessoryItem[]) {
   selectedRows.value = rows ?? []
 }
 
-async function onDeleteSelected() {
-  if (!selectedRows.value.length) return
+function formatLogAction(action: string) {
+  if (action === 'create') return '新建'
+  if (action === 'update') return '编辑'
+  if (action === 'outbound') return '出库'
+  if (action === 'delete') return '删除'
+  return action || '操作'
+}
+
+async function openDetail(row: AccessoryItem) {
+  detailDrawer.row = row
+  detailDrawer.visible = true
+  detailDrawer.loading = true
   try {
-    await ElMessageBox.confirm(`确定删除选中的 ${selectedRows.value.length} 条辅料记录？`, '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    deletingSelected.value = true
-    const ids = selectedRows.value.map((r) => r.id)
-    const results = await Promise.allSettled(ids.map((id) => deleteAccessory(id)))
-    const ok = results.filter((r) => r.status === 'fulfilled').length
-    const fail = results.length - ok
-    if (ok) ElMessage.success(`已删除 ${ok} 条`)
-    if (fail) ElMessage.warning(`删除失败 ${fail} 条，请刷新后重试`)
-    selectedRows.value = []
-    load()
+    const res = await getAccessoryOperationLogs(row.id)
+    detailDrawer.logs = res.data ?? []
   } catch (e: unknown) {
-    if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    detailDrawer.logs = []
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    deletingSelected.value = false
+    detailDrawer.loading = false
   }
 }
 
@@ -761,10 +768,6 @@ onMounted(() => {
 async function loadOutbounds() {
   outboundLoading2.value = true
   try {
-    const [startDate, endDate] =
-      Array.isArray(outboundFilter.dateRange) && outboundFilter.dateRange.length === 2
-        ? outboundFilter.dateRange
-        : ['', '']
     const res = await getAccessoryOutboundRecords({
       orderNo: outboundFilter.orderNo || undefined,
       outboundType: outboundFilter.outboundType || undefined,
@@ -841,6 +844,21 @@ function onOutboundPageSizeChange() {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
+}
+
+.detail-base {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-label {
+  color: var(--color-text-muted);
+}
+
+.detail-log-title {
+  margin: 8px 0 12px;
+  font-weight: 600;
 }
 
 </style>

@@ -159,7 +159,11 @@ export class ProductionPatternService {
 
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
     if (!materials || materials.length === 0) return false;
-    return materials.every((m) => (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed');
+    return materials.every((m) => {
+      const purchaseDone = (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed';
+      const pickDone = (m.pickStatus ?? 'pending').toLowerCase() === 'completed';
+      return purchaseDone || pickDone;
+    });
   }
 
   private mapOrderMaterialsToPatternMaterials(materials: OrderMaterialRow[] | null | undefined): PatternMaterialRow[] {

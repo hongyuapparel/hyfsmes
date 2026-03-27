@@ -1,5 +1,7 @@
+import { resolveAssetUrl } from './url'
+
 export function toMigrationThumbUrl(rawUrl: string | undefined): string {
-  const source = String(rawUrl ?? '').trim()
+  const source = resolveAssetUrl(String(rawUrl ?? '').trim())
   if (!source) return ''
   if (/\/migration-old\/small_/i.test(source)) return source
   if (/\/migration-old\//i.test(source)) {

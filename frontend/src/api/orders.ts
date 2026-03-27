@@ -153,6 +153,10 @@ export interface OrderFormPayload {
   colorSizeHeaders?: string[]
   /** C 区：物料信息 */
   materials?: Array<{
+    /** 物料来源 ID（system_options.id, option_type='material_sources'） */
+    materialSourceId?: number | null
+    /** 物料来源名称（冗余显示字段） */
+    materialSource?: string
     /** 物料类型 ID（system_options.id, option_type='material_types'） */
     materialTypeId?: number | null
     /** 物料类型名称（冗余显示字段） */

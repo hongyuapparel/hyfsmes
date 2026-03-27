@@ -43,6 +43,15 @@
             <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
             <el-button size="large" @click="onReset">清空</el-button>
             <el-button type="primary" size="large" @click="openForm(null)">新增面料</el-button>
+            <el-button
+              v-if="selectedRows.length"
+              type="warning"
+              size="large"
+              :disabled="selectedRows.length !== 1"
+              @click="openOutboundDialog()"
+            >
+              出库
+            </el-button>
           </div>
         </div>
 
@@ -54,12 +63,9 @@
           stripe
           class="fabric-table"
           @header-dragend="onFabricStockHeaderDragEnd"
+          @selection-change="onSelectionChange"
         >
-          <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="quantity" label="数量" width="100" align="center" header-align="center" />
-          <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
-          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column type="selection" width="48" align="center" header-align="center" />
           <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
               <el-image
@@ -73,14 +79,18 @@
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
+          <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="quantity" label="数量" width="100" align="center" header-align="center" />
+          <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
+          <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="160" align="center" header-align="center" fixed="right">
+          <el-table-column label="操作" width="120" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
+              <el-button link type="info" size="small" @click="openDetail(row)">详情</el-button>
               <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
-              <el-button link type="warning" size="small" @click="openOutboundDialog(row)">出库</el-button>
-              <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -192,6 +202,21 @@
         <el-form-item label="单位" prop="unit">
           <el-input v-model="form.unit" placeholder="如米、公斤" clearable />
         </el-form-item>
+        <el-form-item label="客户">
+          <el-select
+            v-model="form.customerName"
+            placeholder="请选择客户（可选）"
+            filterable
+            clearable
+          >
+            <el-option
+              v-for="opt in customerOptions"
+              :key="opt.value"
+              :label="opt.label"
+              :value="opt.value"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="图片" prop="imageUrl">
           <ImageUploadArea v-model="form.imageUrl" />
         </el-form-item>
@@ -255,12 +280,37 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-drawer
+      v-model="detailDrawer.visible"
+      title="面料详情"
+      size="560px"
+      destroy-on-close
+    >
+      <div v-if="detailDrawer.row" class="detail-base">
+        <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
+        <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
+        <div><span class="detail-label">当前库存：</span>{{ detailDrawer.row.quantity }} {{ detailDrawer.row.unit || '' }}</div>
+        <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
+      </div>
+      <div class="detail-log-title">操作记录</div>
+      <el-timeline v-loading="detailDrawer.loading">
+        <el-timeline-item
+          v-for="log in detailDrawer.logs"
+          :key="log.id"
+          :timestamp="formatDate(log.createdAt)"
+          placement="top"
+        >
+          {{ formatLogAction(log.action) }}｜操作人：{{ log.operatorUsername || '-' }}{{ log.remark ? `｜备注：${log.remark}` : '' }}
+        </el-timeline-item>
+      </el-timeline>
+    </el-drawer>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, type CustomerItem } from '@/api/customers'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
@@ -268,11 +318,12 @@ import {
   getFabricList,
   createFabric,
   updateFabric,
-  deleteFabric,
   fabricOutbound,
   getFabricOutboundRecords,
+  getFabricOperationLogs,
   type FabricItem,
   type FabricOutboundRecord,
+  type FabricOperationLog,
 } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
@@ -292,6 +343,13 @@ const fabricOutboundTableRef = ref()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+const selectedRows = ref<FabricItem[]>([])
+const detailDrawer = reactive<{
+  visible: boolean
+  row: FabricItem | null
+  loading: boolean
+  logs: FabricOperationLog[]
+}>({ visible: false, row: null, loading: false, logs: [] })
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const outboundFilter = reactive<{
@@ -324,6 +382,7 @@ const form = reactive({
   name: '',
   quantity: 0,
   unit: '米',
+  customerName: '',
   imageUrl: '',
   remark: '',
 })
@@ -419,6 +478,10 @@ function onPageSizeChange() {
   load()
 }
 
+function onSelectionChange(rows: FabricItem[]) {
+  selectedRows.value = rows ?? []
+}
+
 function openForm(row: FabricItem | null) {
   formDialog.isEdit = !!row
   editId.value = row ? row.id : null
@@ -426,12 +489,14 @@ function openForm(row: FabricItem | null) {
     form.name = row.name
     form.quantity = parseFloat(String(row.quantity)) || 0
     form.unit = row.unit ?? '米'
+    form.customerName = row.customerName ?? ''
     form.imageUrl = row.imageUrl ?? ''
     form.remark = row.remark ?? ''
   } else {
     form.name = ''
     form.quantity = 0
     form.unit = '米'
+    form.customerName = ''
     form.imageUrl = ''
     form.remark = ''
   }
@@ -451,6 +516,7 @@ async function submitForm() {
         name: form.name,
         quantity: form.quantity,
         unit: form.unit,
+        customerName: form.customerName || undefined,
         imageUrl: form.imageUrl || undefined,
         remark: form.remark,
       })
@@ -460,6 +526,7 @@ async function submitForm() {
         name: form.name,
         quantity: form.quantity,
         unit: form.unit,
+        customerName: form.customerName || undefined,
         imageUrl: form.imageUrl || undefined,
         remark: form.remark,
       })
@@ -474,24 +541,37 @@ async function submitForm() {
   }
 }
 
-async function onDelete(row: FabricItem) {
+function formatLogAction(action: string) {
+  if (action === 'create') return '新建'
+  if (action === 'update') return '编辑'
+  if (action === 'outbound') return '出库'
+  if (action === 'delete') return '删除'
+  return action || '操作'
+}
+
+async function openDetail(row: FabricItem) {
+  detailDrawer.row = row
+  detailDrawer.visible = true
+  detailDrawer.loading = true
   try {
-    await ElMessageBox.confirm('确定删除该面料记录？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning',
-    })
-    await deleteFabric(row.id)
-    ElMessage.success('已删除')
-    load()
+    const res = await getFabricOperationLogs(row.id)
+    detailDrawer.logs = res.data ?? []
   } catch (e: unknown) {
-    if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    detailDrawer.logs = []
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    detailDrawer.loading = false
   }
 }
 
-function openOutboundDialog(row: FabricItem) {
-  outboundDialog.row = row
-  const q = parseFloat(String(row.quantity))
+function openOutboundDialog(row?: FabricItem) {
+  const target = row ?? selectedRows.value[0]
+  if (!target) {
+    ElMessage.warning('请先选中 1 条面料记录')
+    return
+  }
+  outboundDialog.row = target
+  const q = parseFloat(String(target.quantity))
   outboundForm.quantity = Number.isFinite(q) && q > 0 ? Math.min(1, q) : 0
   outboundForm.photoUrl = ''
   outboundForm.remark = ''
@@ -523,6 +603,7 @@ async function submitOutbound() {
     })
     ElMessage.success('出库成功')
     outboundDialog.visible = false
+    selectedRows.value = []
     load()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -531,7 +612,10 @@ async function submitOutbound() {
   }
 }
 
-onMounted(() => load())
+onMounted(() => {
+  loadCustomerOptions()
+  load()
+})
 
 async function loadOutbounds() {
   outboundLoading2.value = true
@@ -585,6 +669,21 @@ function onOutboundPageSizeChange() {
 
 .inventory-fabric-page .fabric-table {
   margin-bottom: var(--space-md);
+}
+
+.detail-base {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.detail-label {
+  color: var(--color-text-muted);
+}
+
+.detail-log-title {
+  margin: 8px 0 12px;
+  font-weight: 600;
 }
 
 </style>

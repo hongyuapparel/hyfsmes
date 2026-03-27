@@ -7,7 +7,7 @@
           <el-radio-button
             v-for="tab in FINISHING_TABS"
             :key="tab.value"
-            :label="tab.value"
+            :value="tab.value"
           >
             {{ getTabLabel(tab) }}
           </el-radio-button>
@@ -101,8 +101,8 @@
       <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
           <el-image

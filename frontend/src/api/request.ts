@@ -2,6 +2,7 @@ import axios, { type AxiosError } from 'axios'
 import { ElMessage } from 'element-plus'
 import router from '@/router'
 import { TOKEN_KEY } from '@/constants'
+import { normalizeUploadUrlsDeep } from '@/utils/url'
 
 // 开发环境未配置时走 Vite 代理 /api -> 后端，避免 404
 const baseURL = import.meta.env.VITE_API_BASE_URL || '/api'
@@ -46,7 +47,12 @@ function extractErrorMessage(err: AxiosError): string {
 }
 
 request.interceptors.response.use(
-  (res) => res,
+  (res) => {
+    if (res?.data != null) {
+      res.data = normalizeUploadUrlsDeep(res.data)
+    }
+    return res
+  },
   (err: AxiosError) => {
     const msg = extractErrorMessage(err)
     ;(err as AxiosError & { userMessage?: string }).userMessage = msg

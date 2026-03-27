@@ -9,6 +9,10 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
 import { SuppliersModule } from '../suppliers/suppliers.module';
+import { SystemOptionsModule } from '../system-options/system-options.module';
+import { FabricStockModule } from '../fabric-stock/fabric-stock.module';
+import { InventoryAccessoriesModule } from '../inventory-accessories/inventory-accessories.module';
+import { FinishedGoodsStockModule } from '../finished-goods-stock/finished-goods-stock.module';
 import { ProductionPurchaseController } from './production-purchase.controller';
 import { ProductionPurchaseService } from './production-purchase.service';
 
@@ -18,6 +22,10 @@ import { ProductionPurchaseService } from './production-purchase.service';
     AuthModule,
     OrderWorkflowModule,
     SuppliersModule,
+    SystemOptionsModule,
+    FabricStockModule,
+    InventoryAccessoriesModule,
+    FinishedGoodsStockModule,
   ],
   controllers: [ProductionPurchaseController],
   providers: [ProductionPurchaseService],

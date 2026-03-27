@@ -12,6 +12,7 @@ export type DictType =
   | 'order_types'
   | 'product_groups'
   | 'material_types'
+  | 'material_sources'
   | 'secondary_processes'
   | 'factories'
 

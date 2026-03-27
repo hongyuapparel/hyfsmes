@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Logger, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -9,16 +9,20 @@ import { InventoryPendingService } from './inventory-pending.service';
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/inventory/pending')
 export class InventoryPendingController {
+  private readonly logger = new Logger(InventoryPendingController.name);
+
   constructor(private readonly service: InventoryPendingService) {}
 
   @Get('items')
   getList(
+    @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.service.getList({
+      tab,
       orderNo,
       skuCode,
       page: page ? parseInt(page, 10) : 1,
@@ -51,7 +55,7 @@ export class InventoryPendingController {
   }
 
   @Post('outbound')
-  doOutbound(
+  async doOutbound(
     @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: any }> | undefined,
     @Body('id') id: number,
     @Body('quantity') quantity: number,
@@ -59,7 +63,7 @@ export class InventoryPendingController {
     @Body('sizeBreakdown') sizeBreakdown: any,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.doOutbound(
+    const normalizedItems =
       Array.isArray(items) && items.length
         ? items.map((item) => ({
             id: Number(item?.id),
@@ -72,9 +76,18 @@ export class InventoryPendingController {
               quantity: Number(quantity),
               sizeBreakdown: sizeBreakdown ?? null,
             },
-          ],
-      user?.username ?? '',
-      pickupUserId != null ? Number(pickupUserId) : null,
-    );
+          ];
+    try {
+      return await this.service.doOutbound(
+        normalizedItems,
+        user?.username ?? '',
+        pickupUserId != null ? Number(pickupUserId) : null,
+      );
+    } catch (e: any) {
+      this.logger.error('[doOutbound] route=POST /inventory/pending/outbound failed');
+      this.logger.error(`[doOutbound] message=${String(e?.message || '')}`);
+      this.logger.error(`[doOutbound] stack=${String(e?.stack || '')}`);
+      throw e;
+    }
   }
 }

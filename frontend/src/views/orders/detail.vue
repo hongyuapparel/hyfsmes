@@ -575,7 +575,7 @@ const hasPackaging = computed(
 // H 区
 const attachmentsForView = computed(() => {
   const list = (detail.value?.attachments ?? []) as string[]
-  return list.slice(0, 6)
+  return list
 })
 
 const hasAttachments = computed(() => attachmentsForView.value.length > 0)
@@ -919,6 +919,9 @@ onMounted(async () => {
     border: none;
     border-radius: 0;
     background: #ffffff;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
   }
 
   .no-print {
@@ -928,8 +931,57 @@ onMounted(async () => {
   .a4-sheet {
     margin: 0;
     width: 100%;
-    min-height: auto;
+    height: auto;
+    min-height: 297mm;
     box-shadow: none;
+    overflow: visible;
+  }
+
+  .block,
+  .block-body,
+  .block-text,
+  .block-ab-layout,
+  .ab-right {
+    break-inside: auto;
+    page-break-inside: auto;
+    overflow: visible;
+  }
+
+  .packaging-list,
+  .attachments-grid {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .packaging-item,
+  .attachment-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .compact-table :deep(.el-table),
+  .compact-table :deep(.el-table__inner-wrapper),
+  .compact-table :deep(.el-table__header-wrapper),
+  .compact-table :deep(.el-table__body-wrapper) {
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  .compact-table :deep(.el-table__header-wrapper table thead) {
+    display: table-header-group;
+  }
+
+  .compact-table :deep(.el-table__body-wrapper table tr) {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .compact-table :deep(.cell) {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    word-break: break-word;
   }
 }
 

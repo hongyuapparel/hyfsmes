@@ -227,35 +227,12 @@
         <el-table-column prop="customerName" label="客户" width="120" />
         <el-table-column prop="salePrice" label="销售价" width="90" />
         <el-table-column prop="factoryPrice" label="出厂价" width="90" />
-        <el-table-column prop="materialCost" width="150">
-          <template #header>
-            <div class="profit-header-main">材料成本</div>
-            <div class="profit-header-sub">订单成本的物料成本小记</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="processCost" width="150">
-          <template #header>
-            <div class="profit-header-main">工艺项目</div>
-            <div class="profit-header-sub">订单成本的工艺项目小记</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="productionCost" width="150">
-          <template #header>
-            <div class="profit-header-main">生产工序</div>
-            <div class="profit-header-sub">生产工序小记</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="unitProfit" width="130">
-          <template #header>
-            <div class="profit-header-main">单件利润</div>
-            <div class="profit-header-sub">等于出厂价减去总成本</div>
-          </template>
-        </el-table-column>
-        <el-table-column prop="factoryTotalProfit" width="130">
-          <template #header>
-            <div class="profit-header-main">工厂总利润</div>
-            <div class="profit-header-sub">等于工厂利润乘以数量</div>
-          </template>
+        <el-table-column prop="materialCost" label="材料成本" width="150" />
+        <el-table-column prop="processCost" label="工艺项目" width="150" />
+        <el-table-column prop="productionCost" label="生产工序" width="150" />
+        <el-table-column prop="unitProfit" label="单件利润" width="130" />
+        <el-table-column label="工厂总利润" width="130">
+          <template #default="{ row }">{{ formatMaybeNumber(calcFactoryTotalProfit(row)) }}</template>
         </el-table-column>
       </el-table>
 
@@ -350,6 +327,13 @@ function formatMaybeDateTime(v: string | null | undefined): string {
 function formatMaybeNumber(v: number | null | undefined): string {
   if (v == null) return '-'
   return String(v)
+}
+
+function calcFactoryTotalProfit(row: { unitProfit?: number | null; shipmentQty?: number | null }): number {
+  const unit = Number(row?.unitProfit ?? 0)
+  const qty = Number(row?.shipmentQty ?? 0)
+  if (!Number.isFinite(unit) || !Number.isFinite(qty)) return 0
+  return Math.round(unit * qty * 100) / 100
 }
 
 function buildCsv(rows: OrderSlaReportRow[]): string {
@@ -662,19 +646,4 @@ watch(
   padding: 8px 0;
 }
 
-.profit-table :deep(.el-table__header-wrapper th) {
-  vertical-align: top;
-}
-
-.profit-header-main {
-  font-weight: 600;
-  line-height: 1.2;
-}
-
-.profit-header-sub {
-  margin-top: 4px;
-  font-size: 12px;
-  line-height: 1.2;
-  color: var(--el-text-color-secondary);
-}
 </style>

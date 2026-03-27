@@ -11,6 +11,7 @@
         <el-tab-pane label="产品分组" name="productGroups" />
         <el-tab-pane label="适用人群" name="applicablePeople" />
         <el-tab-pane label="物料类型" name="materialTypes" />
+        <el-tab-pane label="物料来源" name="materialSources" />
         <el-tab-pane label="生产工序" name="productionProcesses" />
         <el-tab-pane label="订单时效配置" name="orderSla" />
         <el-tab-pane label="订单流转规则" name="orderStatusConfig" />
@@ -40,6 +41,10 @@
         <template v-else-if="activeTab === 'materialTypes'">
           <h3 class="section-title">物料类型</h3>
           <OptionList type="material_types" label="物料类型" />
+        </template>
+        <template v-else-if="activeTab === 'materialSources'">
+          <h3 class="section-title">物料来源</h3>
+          <OptionList type="material_sources" label="物料来源" />
         </template>
         <template v-else-if="activeTab === 'orderSla'">
           <h3 class="section-title">订单时效配置</h3>
@@ -124,11 +129,10 @@
             <el-button type="primary" size="small" @click="openAddDepartment()">新增部门</el-button>
           </div>
           <el-table
-            :key="processTreeVersion"
             ref="processTreeTableRef"
             :data="processTreeData"
             row-key="id"
-            :expand-row-keys="processExpandedRowKeys"
+            :expand-row-keys="expandedKeys"
             border
             size="small"
             class="process-table process-tree-single"
@@ -761,16 +765,17 @@ interface ProcessTreeRow {
 const processDepartments = ['裁床', '车缝', '尾部'] as const
 
 const activeTab = ref<
-  'orderTypes' | 'collaboration' | 'productGroups' | 'applicablePeople' | 'materialTypes' | 'productionProcesses' | 'orderSla' | 'orderStatusConfig'
+  'orderTypes' | 'collaboration' | 'productGroups' | 'applicablePeople' | 'materialTypes' | 'materialSources' | 'productionProcesses' | 'orderSla' | 'orderStatusConfig'
 >('orderStatusConfig')
 const processTreeTableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
-const processTreeVersion = ref(0)
 const processTreeData = ref<ProcessTreeRow[]>([])
 const processJobTypeListRef = ref<SystemOptionItem[]>([])
 const processJobTypeChildrenMapRef = ref<Map<number, SystemOptionItem[]>>(new Map())
 const processRowsCacheRef = ref<Map<string, ProductionProcessItem[]>>(new Map())
-const processExpandedRowKeys = ref<Array<string | number>>([])
-const processPageSizeByJobTypeRef = ref<Map<string, number>>(new Map())
+const expandedKeys = ref<Array<string | number>>([])
+const visibleCountMap = ref<Record<string, number>>({})
+const scrollTop = ref(0)
+const processJobMetaByNodeIdRef = ref<Map<number, { department: string; jobTypePath: string }>>(new Map())
 
 const processDialog = ref<{ visible: boolean; id?: number }>({ visible: false })
 const processForm = ref({
@@ -846,39 +851,43 @@ function mapJobTypeRowsFromChildren(
   const parentPath = parentRow.rowType === 'department'
     ? parentRow.department
     : (parentRow.jobTypePath ?? parentRow.jobType)
-  return children.map((c) => ({
+  return children.map((c) => {
+    const jobTypePath = `${parentPath} > ${c.value}`
+    processJobMetaByNodeIdRef.value.set(c.id, {
+      department: parentRow.department,
+      jobTypePath,
+    })
+    return {
     id: `job-${c.id}`,
     rowType: 'job_type' as const,
     displayName: c.value,
     department: parentRow.department,
-    jobType: `${parentPath} > ${c.value}`,
+    jobType: jobTypePath,
     processName: '',
     price: '',
     // 工种行需要可展开，展开后再决定展示“子工种”还是“工序”
     hasChildren: true,
     nodeId: c.id,
     parentId: parentRow.nodeId ?? null,
-    jobTypePath: `${parentPath} > ${c.value}`,
-  }))
+    jobTypePath,
+  }})
 }
 
 function saveExpandedRowKey(row: ProcessTreeRow) {
   if (row.rowType !== 'department' && row.rowType !== 'job_type') return
-  if (processExpandedRowKeys.value.includes(row.id)) return
-  processExpandedRowKeys.value = [...processExpandedRowKeys.value, row.id]
-}
-
-function getProcessPageSize(jobTypePath: string): number {
-  return processPageSizeByJobTypeRef.value.get(jobTypePath) ?? 50
-}
-
-function increaseProcessPageSize(jobTypePath: string) {
-  const current = getProcessPageSize(jobTypePath)
-  processPageSizeByJobTypeRef.value.set(jobTypePath, current + 50)
+  if (expandedKeys.value.includes(row.id)) return
+  expandedKeys.value = [...expandedKeys.value, row.id]
 }
 
 async function reloadProcessTreeKeepExpanded() {
+  const snapshotExpanded = [...expandedKeys.value]
+  const snapshotVisibleCount = { ...visibleCountMap.value }
+  captureScrollTop()
   await loadProcessTreeRoots()
+  expandedKeys.value = snapshotExpanded
+  visibleCountMap.value = snapshotVisibleCount
+  await nextTick()
+  restoreScrollTop()
 }
 
 function onProcessTreeExpandChange(row: ProcessTreeRow, expanded: boolean | ProcessTreeRow[]) {
@@ -890,7 +899,80 @@ function onProcessTreeExpandChange(row: ProcessTreeRow, expanded: boolean | Proc
     saveExpandedRowKey(row)
     return
   }
-  processExpandedRowKeys.value = processExpandedRowKeys.value.filter((k) => k !== row.id)
+  expandedKeys.value = expandedKeys.value.filter((k) => k !== row.id)
+}
+
+function captureScrollTop() {
+  scrollTop.value = window.scrollY || document.documentElement.scrollTop || 0
+}
+
+function restoreScrollTop() {
+  window.scrollTo({ top: scrollTop.value })
+}
+
+function setVisibleCount(parentId: number, next: number) {
+  visibleCountMap.value[String(parentId)] = next
+}
+
+function getVisibleCount(parentId: number): number {
+  return visibleCountMap.value[String(parentId)] ?? 50
+}
+
+function buildProcessRowsWithLoadMore(
+  parentId: number,
+  department: string,
+  jobTypePath: string,
+  list: ProductionProcessItem[],
+  total: number,
+): ProcessTreeRow[] {
+  const visibleCount = getVisibleCount(parentId)
+  const visibleList = list.slice(0, visibleCount)
+  const rows: ProcessTreeRow[] = visibleList.map((p) => ({
+    id: p.id,
+    rowType: 'process' as const,
+    displayName: p.name,
+    department: p.department,
+    jobType: p.jobType,
+    processName: p.name,
+    price: p.unitPrice,
+    hasChildren: false,
+    processRow: p,
+  }))
+  if (total > visibleList.length) {
+    rows.push({
+      id: `more-${parentId}`,
+      rowType: 'load_more',
+      displayName: '',
+      department,
+      jobType: jobTypePath,
+      processName: '',
+      price: '',
+      hasChildren: false,
+      parentId,
+      jobTypePath,
+      loadedCount: visibleList.length,
+      totalCount: total,
+    })
+  }
+  return rows
+}
+
+async function refreshJobTypeChildrenByMeta(parentId: number, department: string, jobTypePath: string) {
+  const pageSize = Math.max(getVisibleCount(parentId), 50)
+  const cacheKey = `${department}__${jobTypePath}__${pageSize}`
+  const cached = processRowsCacheRef.value.get(cacheKey)
+  const pageRes = cached
+    ? { items: cached, total: cached.length }
+    : (await getProductionProcessesPage({
+        department,
+        jobType: jobTypePath,
+        page: 1,
+        pageSize,
+      })).data
+  const list = pageRes?.items ?? []
+  if (!cached) processRowsCacheRef.value.set(cacheKey, list)
+  const rows = buildProcessRowsWithLoadMore(parentId, department, jobTypePath, list, pageRes?.total ?? list.length)
+  ;(processTreeTableRef.value as unknown as { updateKeyChildren?: (key: string | number, rows: ProcessTreeRow[]) => void })?.updateKeyChildren?.(`job-${parentId}`, rows)
 }
 
 function buildJobTypePathsFromList(list: SystemOptionItem[], rootId: number, rootValue: string): string[] {
@@ -1602,10 +1684,8 @@ async function loadProcessTreeRoots() {
       nodeId: n.id,
       parentId: null,
     }))
-    processTreeVersion.value += 1
   } catch {
     processTreeData.value = []
-    processTreeVersion.value += 1
   }
 }
 
@@ -1646,7 +1726,7 @@ async function loadProcessTreeNode(
         return
       }
 
-      const pageSize = getProcessPageSize(row.jobTypePath)
+      const pageSize = Math.max(getVisibleCount(row.nodeId), 50)
       const cacheKey = `${row.department}__${row.jobTypePath}__${pageSize}`
       const cached = processRowsCacheRef.value.get(cacheKey)
       const pageRes = cached
@@ -1659,33 +1739,13 @@ async function loadProcessTreeNode(
           })).data
       const list = pageRes?.items ?? []
       if (!cached) processRowsCacheRef.value.set(cacheKey, list)
-      const rows: ProcessTreeRow[] = list.map((p) => ({
-        id: p.id,
-        rowType: 'process' as const,
-        displayName: p.name,
-        department: p.department,
-        jobType: p.jobType,
-        processName: p.name,
-        price: p.unitPrice,
-        hasChildren: false,
-        processRow: p,
-      }))
-      if ((pageRes?.total ?? 0) > list.length) {
-        rows.push({
-          id: `more-${row.department}-${row.jobTypePath}`,
-          rowType: 'load_more',
-          displayName: '',
-          department: row.department,
-          jobType: row.jobTypePath,
-          processName: '',
-          price: '',
-          hasChildren: false,
-          parentId: row.nodeId ?? null,
-          jobTypePath: row.jobTypePath,
-          loadedCount: list.length,
-          totalCount: pageRes?.total ?? 0,
-        })
-      }
+      const rows = buildProcessRowsWithLoadMore(
+        row.nodeId,
+        row.department,
+        row.jobTypePath,
+        list,
+        pageRes?.total ?? list.length,
+      )
       resolve(rows)
     } catch {
       resolve([])
@@ -1695,12 +1755,34 @@ async function loadProcessTreeNode(
 
 async function loadMoreProcesses(row: ProcessTreeRow) {
   if (row.rowType !== 'load_more' || !row.jobTypePath) return
-  increaseProcessPageSize(row.jobTypePath)
-  // 清理该工种的分页缓存，触发按更大页重新加载
+  captureScrollTop()
+  if (row.parentId == null) return
+  setVisibleCount(row.parentId, getVisibleCount(row.parentId) + 50)
+  // 仅更新当前父节点，不重建整棵树
   for (const key of processRowsCacheRef.value.keys()) {
-    if (key.includes(`__${row.jobTypePath}__`)) processRowsCacheRef.value.delete(key)
+    if (key.includes(`__${row.jobTypePath}__`)) {
+      processRowsCacheRef.value.delete(key)
+    }
   }
-  await reloadProcessTreeKeepExpanded()
+  await refreshJobTypeChildrenByMeta(row.parentId, row.department, row.jobTypePath)
+  await nextTick()
+  restoreScrollTop()
+}
+
+function findProcessTreeRowByNodeId(nodeId: number): ProcessTreeRow | null {
+  const stack: ProcessTreeRow[] = [...processTreeData.value]
+  while (stack.length) {
+    const cur = stack.shift()!
+    if (cur.nodeId === nodeId) return cur
+    const children = ((cur as unknown as { children?: ProcessTreeRow[] }).children ?? [])
+    if (children.length) stack.unshift(...children)
+  }
+  return null
+}
+
+async function refreshProcessChildrenForJobType(jobRow: ProcessTreeRow) {
+  if (jobRow.rowType !== 'job_type' || !jobRow.jobTypePath || !jobRow.nodeId) return
+  await refreshJobTypeChildrenByMeta(jobRow.nodeId, jobRow.department, jobRow.jobTypePath)
 }
 
 /** 同一父级下的兄弟节点（懒加载接口），用于工种上移/下移 */
@@ -1926,26 +2008,33 @@ async function submitProcess() {
     return
   }
   try {
+    captureScrollTop()
+    let savedItem: ProductionProcessItem | null = null
     if (processDialog.value.id) {
-      await updateProductionProcess(processDialog.value.id, {
+      const res = await updateProductionProcess(processDialog.value.id, {
         department: processForm.value.department,
         jobType: processForm.value.jobType,
         name: processForm.value.name,
         unitPrice: String(processForm.value.unitPrice),
       })
+      savedItem = res.data ?? null
       ElMessage.success('已更新')
     } else {
-      await createProductionProcess({
+      const res = await createProductionProcess({
         department: processForm.value.department,
         jobType: processForm.value.jobType,
         name: processForm.value.name,
         unitPrice: String(processForm.value.unitPrice),
       })
+      savedItem = res.data ?? null
       ElMessage.success('已新增')
     }
     processDialog.value.visible = false
     processRowsCacheRef.value.clear()
-    await reloadProcessTreeKeepExpanded()
+    if (savedItem) patchProcessRowLocal(savedItem)
+    await refreshExpandedJobTypeRows()
+    await nextTick()
+    restoreScrollTop()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '操作失败')
   }
@@ -1958,10 +2047,94 @@ async function removeProcess(row: ProductionProcessItem) {
     })
     await deleteProductionProcess(row.id)
     ElMessage.success('已删除')
+    captureScrollTop()
     processRowsCacheRef.value.clear()
-    await reloadProcessTreeKeepExpanded()
+    removeProcessRowLocal(row.id)
+    await refreshExpandedJobTypeRows()
+    await nextTick()
+    restoreScrollTop()
   } catch (e) {
     if ((e as string) !== 'cancel') ElMessage.error('删除失败')
+  }
+}
+
+function patchProcessRowLocal(item: ProductionProcessItem) {
+  const stack: ProcessTreeRow[] = [...processTreeData.value]
+  let patched = false
+  // 先 patch 分页缓存（响应式安全：用 splice 替换数组项）
+  for (const [key, list] of processRowsCacheRef.value.entries()) {
+    const idx = list.findIndex((x) => x.id === item.id)
+    if (idx < 0) continue
+    const next = [...list]
+    next.splice(idx, 1, { ...next[idx], ...item })
+    processRowsCacheRef.value.set(key, next)
+    patched = true
+  }
+  while (stack.length) {
+    const cur = stack.shift()!
+    const children = ((cur as unknown as { children?: ProcessTreeRow[] }).children ?? [])
+    for (const child of children) {
+      if (child.rowType === 'process' && child.processRow?.id === item.id) {
+        const idx = children.findIndex((x) => x.id === child.id)
+        if (idx >= 0) {
+          const nextChildren = [...children]
+          nextChildren.splice(idx, 1, {
+            ...child,
+            displayName: item.name,
+            department: item.department,
+            jobType: item.jobType,
+            processName: item.name,
+            price: item.unitPrice,
+            processRow: item,
+          })
+          ;(cur as unknown as { children?: ProcessTreeRow[] }).children = nextChildren
+          patched = true
+        }
+        break
+      }
+    }
+    if (children.length) stack.unshift(...children)
+  }
+  // 当前正展开的父节点，立即更新其 children（不等待重拉）
+  for (const [nodeId, meta] of processJobMetaByNodeIdRef.value.entries()) {
+    const cacheKey = `${meta.department}__${meta.jobTypePath}__${Math.max(getVisibleCount(nodeId), 50)}`
+    const list = processRowsCacheRef.value.get(cacheKey)
+    if (!list) continue
+    if (!list.some((x) => x.id === item.id)) continue
+    const rows = buildProcessRowsWithLoadMore(
+      nodeId,
+      meta.department,
+      meta.jobTypePath,
+      list,
+      list.length,
+    )
+    ;(processTreeTableRef.value as unknown as { updateKeyChildren?: (key: string | number, rows: ProcessTreeRow[]) => void })?.updateKeyChildren?.(`job-${nodeId}`, rows)
+    patched = true
+  }
+  return patched
+}
+
+function removeProcessRowLocal(processId: number) {
+  const stack: ProcessTreeRow[] = [...processTreeData.value]
+  while (stack.length) {
+    const cur = stack.shift()!
+    const holder = (cur as unknown as { children?: ProcessTreeRow[] })
+    if (holder.children?.length) {
+      holder.children = holder.children.filter((x) => !(x.rowType === 'process' && x.processRow?.id === processId))
+      stack.unshift(...holder.children)
+    }
+  }
+}
+
+async function refreshExpandedJobTypeRows() {
+  const keys = [...expandedKeys.value]
+  for (const key of keys) {
+    if (typeof key !== 'string' || !key.startsWith('job-')) continue
+    const nodeId = Number(key.replace('job-', ''))
+    if (Number.isNaN(nodeId)) continue
+    const meta = processJobMetaByNodeIdRef.value.get(nodeId)
+    if (!meta) continue
+    await refreshJobTypeChildrenByMeta(nodeId, meta.department, meta.jobTypePath)
   }
 }
 

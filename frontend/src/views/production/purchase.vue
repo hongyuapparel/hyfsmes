@@ -7,7 +7,7 @@
           <el-radio-button
             v-for="tab in PURCHASE_TABS"
             :key="tab.value"
-            :label="tab.value"
+            :value="tab.value"
           >
             {{ getTabLabel(tab) }}
           </el-radio-button>
@@ -116,9 +116,9 @@
           v-if="hasSelection"
           type="primary"
           size="large"
-          @click="openRegisterDialog"
+          @click="onBatchHandle"
         >
-          登记实际采购
+          {{ currentTab === 'picking' ? '领料' : '登记实际采购' }}
         </el-button>
       </div>
     </div>
@@ -144,11 +144,11 @@
       </el-table-column>
       <el-table-column prop="purchaseCompletedAt" label="完成时间" width="155" align="center">
         <template #default="{ row }">
-          {{ formatDateTime(row.purchaseCompletedAt) }}
+          {{ formatDateTime(row.processRoute === 'picking' ? row.pickCompletedAt : row.purchaseCompletedAt) }}
         </template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
           <el-image
@@ -162,8 +162,9 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="supplierName" label="供应商" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="materialName" label="物料名称" min-width="120" show-overflow-tooltip />
+      <el-table-column prop="supplierName" label="供应商" min-width="100" />
+      <el-table-column prop="materialSource" label="物料来源" min-width="110" />
+      <el-table-column prop="materialName" label="物料名称" min-width="120" />
       <el-table-column prop="planQuantity" label="计划用量" width="96" align="right">
         <template #default="{ row }">
           {{ row.planQuantity != null ? row.planQuantity : '-' }}
@@ -181,12 +182,12 @@
       </el-table-column>
       <el-table-column prop="purchaseStatus" label="采购状态" width="100" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'warning'" size="small">
-            {{ row.purchaseStatus === 'completed' ? '采购完成' : '等待采购' }}
+          <el-tag :type="displayStatus(row) === 'completed' ? 'success' : 'warning'" size="small">
+            {{ displayStatusLabel(row) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="订单类型" width="100" show-overflow-tooltip>
+      <el-table-column label="订单类型" width="100">
         <template #default="{ row }">
           {{ orderTypeDisplay(row) }}
         </template>
@@ -284,6 +285,74 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="pickDialog.visible"
+      title="领料"
+      width="620"
+      destroy-on-close
+      @close="resetPickForm"
+    >
+      <template v-if="pickDialog.row">
+        <div class="register-brief pick-brief-grid">
+          <div><span class="pick-brief-label">订单号：</span>{{ pickDialog.row.orderNo }}</div>
+          <div><span class="pick-brief-label">SKU：</span>{{ pickDialog.row.skuCode }}</div>
+          <div><span class="pick-brief-label">物料：</span>{{ pickDialog.row.materialName }}</div>
+          <div><span class="pick-brief-label">物料类型：</span>{{ displayMaterialType(pickDialog.row) }}</div>
+          <div><span class="pick-brief-label">物料来源：</span>{{ pickDialog.row.materialSource || '-' }}</div>
+          <div><span class="pick-brief-label">颜色：</span>{{ pickDialog.row.color || '-' }}</div>
+          <div><span class="pick-brief-label">计划用量：</span>{{ pickDialog.row.planQuantity ?? '-' }} 米</div>
+          <div v-if="pickDialog.total > 1"><span class="pick-brief-label">当前处理：</span>{{ pickDialog.index + 1 }} / {{ pickDialog.total }}</div>
+        </div>
+        <el-alert
+          v-if="pickDialog.row.materialSource === '客供面料'"
+          type="warning"
+          :closable="false"
+          title="请联系对应业务员或跟单领取客供面料"
+          style="margin-bottom: 12px"
+        />
+        <el-form ref="pickFormRef" :model="pickForm" :rules="pickRules" label-width="120px">
+          <el-form-item label="库存来源类型">
+            <el-select v-model="pickForm.inventorySourceType" clearable placeholder="可选（不选则仅备注处理）" @change="onPickSourceTypeChange">
+              <el-option label="面料库存" value="fabric" />
+              <el-option label="辅料库存" value="accessory" />
+              <el-option label="成衣库存" value="finished" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="具体库存">
+            <el-select v-model="pickForm.inventoryId" clearable filterable placeholder="先选择库存来源类型" :disabled="!pickForm.inventorySourceType">
+              <el-option v-for="opt in pickInventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
+                <div class="pick-stock-option">
+                  <el-image
+                    v-if="opt.imageUrl"
+                    :src="opt.imageUrl"
+                    fit="cover"
+                    class="pick-stock-thumb"
+                    :preview-src-list="[opt.imageUrl]"
+                    preview-teleported
+                  />
+                  <span v-else class="pick-stock-thumb-empty">-</span>
+                  <span class="pick-stock-option-label">{{ opt.label }}</span>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="调取数量" prop="quantity">
+            <div class="pick-qty-row">
+              <el-input-number v-model="pickForm.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
+              <span class="pick-qty-unit">米</span>
+            </div>
+          </el-form-item>
+          <el-form-item label="备注" prop="remark">
+            <el-input v-model="pickForm.remark" type="textarea" :rows="3" maxlength="300" show-word-limit />
+          </el-form-item>
+        </el-form>
+      </template>
+      <template #footer>
+        <el-button @click="pickDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="pickDialog.submitting" @click="submitPick">确认</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -291,11 +360,12 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { getPurchaseItems, registerPurchase, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
+import { getPurchaseItems, registerPick, registerPurchase, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
+import { getAccessoriesList, getFabricList, getFinishedStockList } from '@/api/inventory'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import {
   ACTIVE_FILTER_COLOR,
@@ -309,6 +379,7 @@ import { formatDate, formatDateTime } from '@/utils/date-format'
 const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
   { label: '等待采购', value: 'pending' },
+  { label: '待领料', value: 'picking' },
   { label: '采购完成', value: 'completed' },
 ] as const
 
@@ -397,6 +468,55 @@ const registerForm = reactive({
 })
 const registerRules: FormRules = {
   actualPurchaseQuantity: [{ required: true, message: '请输入实际采购数量', trigger: 'blur' }],
+}
+
+type PickInventorySourceType = 'fabric' | 'accessory' | 'finished'
+const pickDialog = reactive<{ visible: boolean; submitting: boolean; row: PurchaseItemRow | null; index: number; total: number }>({
+  visible: false,
+  submitting: false,
+  row: null,
+  index: 0,
+  total: 0,
+})
+const pickFormRef = ref<FormInstance>()
+const pickForm = reactive<{
+  inventorySourceType: PickInventorySourceType | null
+  inventoryId: number | null
+  quantity: number | null
+  remark: string
+}>({
+  inventorySourceType: null,
+  inventoryId: null,
+  quantity: null,
+  remark: '',
+})
+const pickInventoryOptions = ref<Array<{ id: number; label: string; availableQuantity: number; imageUrl: string }>>([])
+const pickRules: FormRules = {
+  quantity: [
+    {
+      validator: (_rule, value, callback) => {
+        const hasStock = !!(pickForm.inventorySourceType && pickForm.inventoryId)
+        if (!hasStock) return callback()
+        const qty = Number(value ?? 0)
+        if (!Number.isFinite(qty) || qty <= 0) return callback(new Error('选择库存后，调取数量必须大于 0'))
+        const selected = pickInventoryOptions.value.find((x) => x.id === pickForm.inventoryId)
+        if (selected && qty > selected.availableQuantity) return callback(new Error('调取数量不能大于可用库存'))
+        callback()
+      },
+      trigger: 'blur',
+    },
+  ],
+  remark: [
+    {
+      validator: (_rule, value, callback) => {
+        const hasStock = !!(pickForm.inventorySourceType && pickForm.inventoryId && Number(pickForm.quantity) > 0)
+        if (hasStock) return callback()
+        if (String(value ?? '').trim()) return callback()
+        callback(new Error('未选择库存时请至少填写备注说明'))
+      },
+      trigger: 'blur',
+    },
+  ],
 }
 
 watch(
@@ -520,6 +640,18 @@ function onSelectionChange(rows: PurchaseItemRow[]) {
   selectedRows.value = rows
 }
 
+function displayStatus(row: PurchaseItemRow): 'pending' | 'completed' {
+  if (row.processRoute === 'picking') {
+    return row.pickStatus === 'completed' ? 'completed' : 'pending'
+  }
+  return row.purchaseStatus === 'completed' ? 'completed' : 'pending'
+}
+
+function displayStatusLabel(row: PurchaseItemRow): string {
+  if (row.processRoute === 'picking') return displayStatus(row) === 'completed' ? '领料完成' : '待领料'
+  return displayStatus(row) === 'completed' ? '采购完成' : '等待采购'
+}
+
 function openRegisterDialog() {
   if (selectedRows.value.length === 0) return
   const row = selectedRows.value[0]
@@ -531,6 +663,106 @@ function openRegisterDialog() {
   registerForm.remark = row.purchaseRemark ?? ''
   registerForm.imageUrl = row.purchaseImageUrl ?? ''
   registerDialog.visible = true
+}
+
+function onBatchHandle() {
+  if (!hasSelection.value) return
+  if (currentTab.value === 'picking') {
+    openPickDialog()
+    return
+  }
+  openRegisterDialog()
+}
+
+async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
+  pickForm.inventoryId = null
+  pickInventoryOptions.value = []
+  if (!val) return
+  try {
+    if (val === 'fabric') {
+      const res = await getFabricList({ page: 1, pageSize: 200 })
+      pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
+        id: item.id,
+        label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
+        availableQuantity: Number(item.quantity) || 0,
+        imageUrl: item.imageUrl ?? '',
+      }))
+      return
+    }
+    if (val === 'accessory') {
+      const res = await getAccessoriesList({ page: 1, pageSize: 200 })
+      pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
+        id: item.id,
+        label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
+        availableQuantity: Number(item.quantity) || 0,
+        imageUrl: item.imageUrl ?? '',
+      }))
+      return
+    }
+    const res = await getFinishedStockList({ tab: 'stored', page: 1, pageSize: 200 })
+    pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
+      id: item.id,
+      label: `${item.skuCode}（可用:${item.quantity}）`,
+      availableQuantity: Number(item.quantity) || 0,
+      imageUrl: item.imageUrl ?? '',
+    }))
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '库存列表加载失败'))
+  }
+}
+
+function openPickDialog() {
+  const row = selectedRows.value[0]
+  if (!row) return
+  pickDialog.row = row
+  pickDialog.index = 0
+  pickDialog.total = selectedRows.value.length
+  pickDialog.visible = true
+}
+
+function resetPickForm() {
+  pickDialog.row = null
+  pickDialog.index = 0
+  pickDialog.total = 0
+  pickForm.inventorySourceType = null
+  pickForm.inventoryId = null
+  pickForm.quantity = null
+  pickForm.remark = ''
+  pickInventoryOptions.value = []
+  pickFormRef.value?.clearValidate()
+}
+
+async function submitPick() {
+  if (!pickDialog.row) return
+  const rows = selectedRows.value.slice()
+  if (!rows.length) return
+  pickDialog.submitting = true
+  try {
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]
+      pickDialog.row = row
+      pickDialog.index = i
+      pickDialog.total = rows.length
+      await pickFormRef.value?.validate()
+      await registerPick({
+        orderId: row.orderId,
+        materialIndex: row.materialIndex,
+        inventorySourceType: pickForm.inventorySourceType,
+        inventoryId: pickForm.inventoryId,
+        quantity: pickForm.quantity,
+        remark: pickForm.remark.trim() || null,
+      })
+    }
+    ElMessage.success('领料处理成功')
+    pickDialog.visible = false
+    await load()
+    void loadTabCounts()
+    selectedRows.value = []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '领料处理失败'))
+  } finally {
+    pickDialog.submitting = false
+  }
 }
 
 function resetRegisterForm() {
@@ -584,6 +816,10 @@ function orderTypeDisplay(row: PurchaseItemRow): string {
     if (label && label.trim()) return label.trim()
   }
   return ''
+}
+
+function displayMaterialType(row: PurchaseItemRow): string {
+  return (row.materialType ?? '').trim() || '-'
 }
 
 onMounted(() => {
@@ -644,6 +880,65 @@ onMounted(() => {
 
 .register-brief > div + div {
   margin-top: 4px;
+}
+
+.pick-brief-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 16px;
+}
+
+.pick-brief-grid > div + div {
+  margin-top: 0;
+}
+
+.pick-brief-label {
+  color: var(--el-text-color-secondary);
+}
+
+.pick-stock-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pick-stock-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px solid var(--el-border-color-lighter);
+  flex: 0 0 auto;
+}
+
+.pick-stock-thumb-empty {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  border: 1px dashed var(--el-border-color-lighter);
+  color: var(--el-text-color-placeholder);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.pick-stock-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick-qty-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.pick-qty-unit {
+  color: var(--el-text-color-secondary);
+  flex: 0 0 auto;
 }
 
 .register-form {
