@@ -25,7 +25,7 @@
     <el-card class="block-card summary-card" shadow="never">
       <div class="order-summary">
         <span><strong>客户：</strong>{{ order?.customerName ?? '-' }}</span>
-        <span><strong>数量：</strong>{{ order?.quantity ?? 0 }}</span>
+        <span><strong>数量：</strong>{{ formatDisplayNumber(order?.quantity ?? 0) }}</span>
         <span><strong>当前销售价：</strong>{{ order?.salePrice ?? '-' }} 元</span>
         <span class="cost-notice">{{ costNotice }}</span>
       </div>
@@ -138,7 +138,7 @@
             <el-input v-model="row.remark" size="small" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="56" fixed="right" align="center">
+        <el-table-column label="操作" width="56" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" size="small" @click="removeMaterialRow($index)">
               <el-icon><Delete /></el-icon>
@@ -233,7 +233,7 @@
             {{ formatMoney(processItemAmount(row)) }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="56" fixed="right" align="center">
+        <el-table-column label="操作" width="56" align="center">
           <template #default="{ $index }">
             <el-button link type="danger" size="small" @click="removeProcessItemRow($index)">
               <el-icon><Delete /></el-icon>
@@ -338,7 +338,7 @@
             <el-input v-model="row.remark" size="small" />
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="56" fixed="right" align="center">
+        <el-table-column label="操作" width="56" align="center">
           <template #default="{ row }">
             <el-button link type="danger" size="small" @click="removeProductionRow(row)">
               <el-icon><Delete /></el-icon>
@@ -454,6 +454,7 @@ import {
   type SupplierBusinessScopeTreeNode,
 } from '@/api/suppliers'
 import { useAuthStore } from '@/stores/auth'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const route = useRoute()
 const router = useRouter()
@@ -572,7 +573,8 @@ const computedExFactoryPrice = computed(() => {
 })
 
 function formatMoney(n: number): string {
-  return Number.isNaN(n) ? '0.00' : n.toFixed(2)
+  if (!Number.isFinite(n)) return formatDisplayNumber(0)
+  return formatDisplayNumber(n)
 }
 
 function normalizeProfitMargin(v: unknown): number {

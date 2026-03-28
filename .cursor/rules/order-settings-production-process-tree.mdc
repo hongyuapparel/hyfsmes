@@ -1,0 +1,55 @@
+---
+description: 订单设置-生产工序树形页：禁止整页刷新、保存后局部更新、保留展开/加载更多/滚动
+globs: frontend/src/views/settings/order-settings.vue
+alwaysApply: false
+---
+
+# 订单设置 / 生产工序树形页（硬性规则）
+
+凡修改 **订单设置 → 生产工序**（`order-settings.vue` 中 `activeTab === 'productionProcesses'` 段落），或日后抽出的 **共用树形表格 / 折叠懒加载** 组件，须遵守：
+
+## 1. 禁止整页刷新
+
+- 禁止 `window.location.reload()`、`location.reload()`、`router.go(0)`。
+- 禁止用外层动态 `key` 强制整表重建。
+- 禁止保存成功后 **整棵树回到仅根节点** 且 **丢失展开态**（若必须重载根数据，须 **恢复 `expandedKeys` / `visibleCountMap` / `scrollTop`**，并 **立即重挂懒加载子节点**）。
+
+## 2. 保存后必须立即更新当前界面
+
+- 提示「已更新」时，**当前行/相关子树** 须立刻反映新数据。
+- 优先 **`patch` 本地 `processTreeData` / 缓存 Map**（如 `patchProcessRowLocal`、`updateKeyChildren`）；禁止依赖用户手动 F5。
+- 改数组须 **响应式安全**（`splice`、展开新数组再赋值、`Map.set` 新数组引用等）。
+
+## 3. 保留用户现场
+
+- 保存后保留 **`expandedKeys`**、**`visibleCountMap`**、**滚动位置**（本页使用 `captureScrollTop` / `restoreScrollTop` 与 `reloadProcessTreeKeepExpanded` 内快照）。
+- 禁止保存后无故收起、跳顶、重置「加载更多」步长。
+
+## 4. 加载更多
+
+- 仅增加 **当前父节点** `visibleCountMap[parentId]`，用 `buildProcessRowsWithLoadMore` + `refreshJobTypeChildrenByMeta` 更新该父节点 `children`。
+- 禁止为了一次加载更多而重建整棵树。
+
+## 5. 树表稳定性
+
+- 使用 **`row-key="id"`**；本表历史上存在 `dept-*` / `job-*` 字符串与工序数字 `id` 混用，**新增行类型时不要引入新的不稳定键型**；若统一类型需单独评审回归。
+- 新功能不得破坏：**展开**、**编辑后即时显示**、**加载更多**。
+
+## 6. 提交前自测（改此页必过）
+
+- A. 展开 2～3 层，编辑一条并保存 → **当前行立刻变新值**。
+- B. 保存后 **不收起**、**不跳顶**、滚动 **基本不变**。
+- C. 「加载更多」→ **仅当前父级** 多出行。
+- D. 刷新浏览器后数据与后端一致。
+- E. 新功能不破坏 A～D。
+
+## 7. 给 AI / 协作者的交付说明
+
+每次改完须明确写出：**改了哪些文件**；**是否动到共用组件**；**如何保证未破坏「保存即显 + 展开 + 加载更多」**；**做了哪些回归**（对应 A～E）。做不到则不要合并。
+
+## 实现锚点（本仓库）
+
+- 根数据：`loadProcessTreeRoots`；懒加载：`loadProcessTreeNode`。
+- 保留现场：`reloadProcessTreeKeepExpanded`、`expandedKeys`、`visibleCountMap`、`scrollTop`。
+- 工序保存后：`patchProcessRowLocal`、`refreshExpandedJobTypeRows`。
+- 工种列表变更后：在重载根并恢复快照后，须调用 **`resyncLazyChildrenForExpandedRows`**，用 `updateKeyChildren` 重挂已展开部门的工种子行与已展开工种的子层/工序，避免「提示成功但树仍旧数据」。

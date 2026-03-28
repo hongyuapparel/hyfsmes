@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card cutting-page">
+  <div class="page-card page-card--fill cutting-page">
     <!-- Tab：全部 / 等待裁床 / 裁床完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -75,6 +75,7 @@
     <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
     <!-- 待裁床订单列表 -->
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="cuttingTableRef"
       v-loading="loading"
@@ -82,6 +83,7 @@
       border
       stripe
       class="cutting-table"
+      :height="tableHeight"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -96,14 +98,7 @@
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
-          <el-image
-            v-if="row.imageUrl"
-            :src="row.imageUrl"
-            fit="cover"
-            class="table-thumb"
-            :preview-teleported="true"
-            :preview-src-list="[row.imageUrl]"
-          />
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -117,7 +112,7 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.quantity }}</span>
+              <span class="qty-trigger">{{ formatDisplayNumber(row.quantity) }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -147,7 +142,7 @@
                         :key="vIdx"
                         class="qty-value"
                       >
-                        {{ v != null ? v : '-' }}
+                        {{ v != null ? formatDisplayNumber(v) : '-' }}
                       </td>
                     </tr>
                   </tbody>
@@ -168,7 +163,9 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.actualCutTotal != null ? row.actualCutTotal : '-' }}</span>
+              <span class="qty-trigger">{{
+                row.actualCutTotal != null ? formatDisplayNumber(row.actualCutTotal) : '-'
+              }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -198,7 +195,7 @@
                         :key="vIdx"
                         class="qty-value"
                       >
-                        {{ v != null ? v : '-' }}
+                        {{ v != null ? formatDisplayNumber(v) : '-' }}
                       </td>
                     </tr>
                   </tbody>
@@ -209,18 +206,53 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column prop="actualFabricMeters" label="实际用布(米)" width="110" align="right">
+      <el-table-column prop="cuttingUnitPrice" label="裁剪单价(元/件)" width="120" align="right">
         <template #default="{ row }">
-          {{ row.actualFabricMeters != null && String(row.actualFabricMeters).trim() !== '' ? row.actualFabricMeters : '-' }}
+          {{
+            row.cuttingUnitPrice != null && String(row.cuttingUnitPrice).trim() !== ''
+              ? formatDisplayNumber(row.cuttingUnitPrice)
+              : '-'
+          }}
         </template>
       </el-table-column>
-      <el-table-column prop="cuttingCost" label="裁剪成本(元)" width="110" align="right">
+      <el-table-column prop="cuttingCost" label="裁剪总成本(元)" width="120" align="right">
         <template #default="{ row }">
-          {{ row.cuttingCost != null && String(row.cuttingCost).trim() !== '' ? row.cuttingCost : '-' }}
+          {{
+            row.cuttingCost != null && String(row.cuttingCost).trim() !== ''
+              ? formatDisplayNumber(row.cuttingCost)
+              : '-'
+          }}
         </template>
       </el-table-column>
-      <el-table-column prop="timeRating" label="时效判定" width="90" align="center" />
+      <el-table-column prop="actualFabricMeters" label="本次净耗合计(米)" width="130" align="right">
+        <template #default="{ row }">
+          {{
+            row.actualFabricMeters != null && String(row.actualFabricMeters).trim() !== ''
+              ? formatDisplayNumber(row.actualFabricMeters)
+              : '-'
+          }}
+        </template>
+      </el-table-column>
+      <el-table-column label="详情" width="88" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button
+            v-if="row.cuttingStatus === 'completed'"
+            link
+            type="primary"
+            @click.stop="openCompletedDetailDrawer(row)"
+          >
+            用量详情
+          </el-button>
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
+        </template>
+      </el-table-column>
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -234,54 +266,32 @@
       />
     </div>
 
-    <!-- 裁床登记弹窗：填写实际裁剪数量 + 裁剪成本 -->
+    <!-- 裁床登记弹窗 -->
     <el-dialog
       v-model="registerDialog.visible"
       title="裁床登记"
-      width="720"
+      class="cutting-register-dialog"
+      width="1020px"
+      align-center
       destroy-on-close
       @close="resetRegisterForm"
     >
       <template v-if="registerDialog.row">
-        <div class="register-brief">
-          <div>订单号：{{ registerDialog.row.orderNo }}</div>
-          <div>SKU：{{ registerDialog.row.skuCode }}</div>
-          <div>订单数量：{{ registerDialog.row.quantity }}</div>
-        </div>
-        <p class="register-hint">请填写实际裁剪数量明细（与订单 B 区颜色尺码对应），并填写裁剪成本。</p>
-        <el-table :data="registerForm.actualCutRows" border class="cut-grid" size="small">
-          <el-table-column prop="colorName" label="颜色" width="100" />
-          <el-table-column
-            v-for="(header, idx) in registerForm.colorSizeHeaders"
-            :key="idx"
-            :label="header"
-            width="80"
-            align="center"
-          >
-            <template #default="{ row }">
-              <el-input-number
-                v-model="row.quantities[idx]"
-                :min="0"
-                :precision="0"
-                controls-position="right"
-                size="small"
-                style="width: 100%"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="合计" width="80" align="right">
-            <template #default="{ row }">
-              {{ actualCutRowTotal(row) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="remark" label="备注" min-width="80">
-            <template #default="{ row }">
-              <el-input v-model="row.remark" size="small" placeholder="备注" clearable />
-            </template>
-          </el-table-column>
-        </el-table>
-        <div class="cut-grid-total">数量合计：<strong>{{ actualCutGrandTotal }}</strong></div>
-        <el-form :model="registerForm" label-width="110px" class="cut-cost-form">
+        <CuttingBasicInfoBar :order-brief="registerForm.orderBrief" />
+        <p class="register-hint">
+          按颜色、尺码填写<strong>实际裁剪件数</strong>（与订单 B 区一致）；下方登记布料领用与裁剪单价。
+        </p>
+        <CuttingQuantityMatrix
+          v-model="registerForm.actualCutRows"
+          :headers="registerForm.colorSizeHeaders"
+          :matrix-max-height="320"
+        />
+        <el-divider content-position="left">物料用量明细</el-divider>
+        <CuttingMaterialUsageTable
+          v-model="registerForm.materialUsageRows"
+          :grand-pieces="actualCutGrandTotal"
+        />
+        <el-form :model="registerForm" label-width="132px" class="cut-cost-form">
           <el-form-item label="裁剪部门">
             <el-select
               v-model="registerForm.cuttingDepartment"
@@ -316,18 +326,23 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item v-if="isSelfCutting" label="实际用布(米)">
+          <el-form-item v-if="isSelfCutting" label="本次净耗合计(米)">
+            <span class="cut-readonly-num">{{ formatFabricGrand(fabricNetGrandTotal) }}</span>
+            <span class="cut-readonly-hint">由上方物料明细自动汇总（领用 − 退回）</span>
+          </el-form-item>
+          <el-form-item label="裁剪单价（元/件）">
             <el-input-number
-              v-model="registerForm.actualFabricMeters"
+              v-model="cuttingUnitPriceNum"
               :min="0"
-              :precision="3"
+              :precision="2"
               :controls="false"
-              placeholder="米"
-              style="width: 240px"
+              placeholder="元/件"
+              style="width: 200px"
             />
           </el-form-item>
-          <el-form-item label="裁剪成本（元）">
-            <el-input v-model="registerForm.cuttingCost" placeholder="元" clearable style="width: 160px" />
+          <el-form-item label="裁剪总成本（元）">
+            <span class="cut-readonly-num">{{ formatDisplayNumber(cuttingTotalCostDisplay) }}</span>
+            <span class="cut-readonly-hint">裁剪单价 × 实际裁剪数量合计</span>
           </el-form-item>
         </el-form>
       </template>
@@ -338,6 +353,67 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 裁床完成：登记用量详情抽屉 -->
+    <el-drawer
+      v-model="detailDrawer.visible"
+      title="裁床登记详情"
+      direction="rtl"
+      :size="940"
+      destroy-on-close
+      class="cutting-detail-drawer"
+      @closed="onDetailDrawerClosed"
+    >
+      <div v-loading="detailDrawer.loading" class="cutting-detail-drawer__body">
+        <template v-if="detailPayload">
+          <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" />
+          <p class="register-hint">以下为该订单裁床完成时登记的裁剪数量与物料用量（只读）。</p>
+          <CuttingQuantityMatrix
+            :model-value="detailPayload.actualCutRows"
+            :headers="detailPayload.colorSizeHeaders"
+            :matrix-max-height="360"
+            readonly
+          />
+          <el-divider content-position="left">物料用量明细</el-divider>
+          <CuttingMaterialUsageTable
+            :model-value="detailPayload.materialUsageRows"
+            :grand-pieces="detailGrandPieces"
+            :table-max-height="420"
+            readonly
+          />
+          <div class="cut-detail-meta">
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">到裁床时间</span>
+              <span>{{ formatDateTime(detailPayload.arrivedAt) }}</span>
+            </div>
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">完成时间</span>
+              <span>{{ formatDateTime(detailPayload.completedAt) }}</span>
+            </div>
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">裁剪部门</span>
+              <span>{{ displayDash(detailPayload.cuttingDepartment) }}</span>
+            </div>
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">裁剪人</span>
+              <span>{{ displayDash(detailPayload.cutterName) }}</span>
+            </div>
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">本次净耗合计(米)</span>
+              <span>{{ fabricMetersDisplay(detailPayload.actualFabricMeters) }}</span>
+            </div>
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">裁剪单价(元/件)</span>
+              <span>{{ moneyDisplay(detailPayload.cuttingUnitPrice) }}</span>
+            </div>
+            <div class="cut-detail-meta__row">
+              <span class="cut-detail-meta__label">裁剪总成本(元)</span>
+              <span>{{ moneyDisplay(detailPayload.cuttingTotalCost ?? detailPayload.cuttingCost) }}</span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -346,19 +422,28 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getCuttingItems,
-  getOrderColorSize,
+  getCuttingRegisterForm,
   getCuttingQuantityBreakdown,
+  getCuttingCompletedDetail,
   completeCutting,
   exportCuttingItems,
   type CuttingListItem,
   type CuttingListQuery,
   type ColorSizeRow,
   type CuttingQuantityBreakdownRes,
+  type CuttingMaterialUsagePayloadRow,
+  type CuttingRegisterOrderBrief,
+  type CuttingCompletedDetailRes,
 } from '@/api/production-cutting'
+import CuttingBasicInfoBar from '@/components/production-cutting/CuttingBasicInfoBar.vue'
+import CuttingQuantityMatrix from '@/components/production-cutting/CuttingQuantityMatrix.vue'
+import CuttingMaterialUsageTable from '@/components/production-cutting/CuttingMaterialUsageTable.vue'
+import { CUTTING_ABNORMAL_REASONS } from '@/constants/cutting-register'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSupplierList, type SupplierItem } from '@/api/suppliers'
 import { getEmployeeList, type EmployeeItem } from '@/api/hr'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -366,6 +451,8 @@ import {
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },
@@ -384,6 +471,8 @@ const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<CuttingListItem[]>([])
 const cuttingTableRef = ref()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef, { tableRef: cuttingTableRef })
 const loading = ref(false)
 const sizeBreakdownCache = ref<Record<number, CuttingQuantityBreakdownRes>>({})
 const sizePopoverLoadingId = ref<number | null>(null)
@@ -407,21 +496,77 @@ const registerDialog = reactive<{
   submitting: boolean
   row: CuttingListItem | null
 }>({ visible: false, submitting: false, row: null })
+const defaultOrderBrief = (): CuttingRegisterOrderBrief => ({
+  orderNo: '',
+  skuCode: '',
+  quantity: 0,
+  customerName: '',
+  orderDate: null,
+})
+
 const registerForm = reactive<{
+  orderBrief: CuttingRegisterOrderBrief
   colorSizeHeaders: string[]
   actualCutRows: { colorName: string; quantities: number[]; remark?: string }[]
-  cuttingCost: string
+  materialUsageRows: CuttingMaterialUsagePayloadRow[]
   cuttingDepartment: string
   cutterName: string
-  actualFabricMeters: number | null
 }>({
+  orderBrief: defaultOrderBrief(),
   colorSizeHeaders: [],
   actualCutRows: [],
-  cuttingCost: '',
+  materialUsageRows: [],
   cuttingDepartment: '',
   cutterName: '',
-  actualFabricMeters: null,
 })
+
+const detailDrawer = reactive({ visible: false, loading: false })
+const detailPayload = ref<CuttingCompletedDetailRes | null>(null)
+
+const detailGrandPieces = computed(() => {
+  const rows = detailPayload.value?.actualCutRows ?? []
+  return rows.reduce(
+    (sum, r) =>
+      sum +
+      (Array.isArray(r.quantities) ? r.quantities.reduce((a, q) => a + (Number(q) || 0), 0) : 0),
+    0,
+  )
+})
+
+function onDetailDrawerClosed() {
+  detailPayload.value = null
+}
+
+function displayDash(v: string | null | undefined) {
+  const s = (v ?? '').trim()
+  return s || '—'
+}
+
+function moneyDisplay(v: string | null | undefined) {
+  if (v == null || String(v).trim() === '') return '—'
+  return formatDisplayNumber(v)
+}
+
+function fabricMetersDisplay(v: string | null | undefined) {
+  if (v == null || String(v).trim() === '') return '—'
+  return formatDisplayNumber(v)
+}
+
+async function openCompletedDetailDrawer(row: CuttingListItem) {
+  if (row.cuttingStatus !== 'completed') return
+  detailDrawer.visible = true
+  detailDrawer.loading = true
+  detailPayload.value = null
+  try {
+    const res = await getCuttingCompletedDetail(row.orderId)
+    detailPayload.value = res.data ?? null
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载详情失败'))
+    detailDrawer.visible = false
+  } finally {
+    detailDrawer.loading = false
+  }
+}
 
 const SELF_DEPARTMENT_LABEL = '本厂'
 const cuttingDepartmentOptions = ref<string[]>([])
@@ -436,6 +581,44 @@ function actualCutRowTotal(row: { quantities: number[] }): number {
 const actualCutGrandTotal = computed(() =>
   (registerForm.actualCutRows ?? []).reduce((sum, r) => sum + actualCutRowTotal(r as any), 0),
 )
+
+const registerFormCuttingUnitPrice = ref('')
+
+const cuttingUnitPriceNum = computed({
+  get() {
+    const t = registerFormCuttingUnitPrice.value.trim()
+    if (t === '') return undefined
+    const n = Number(t)
+    return Number.isFinite(n) ? n : undefined
+  },
+  set(v: number | undefined) {
+    registerFormCuttingUnitPrice.value = v == null || !Number.isFinite(v) ? '' : String(v)
+  },
+})
+
+const cuttingTotalCostDisplay = computed(() => {
+  const u = Number(registerFormCuttingUnitPrice.value.trim())
+  const g = actualCutGrandTotal.value
+  if (!Number.isFinite(u) || u < 0) return 0
+  if (!Number.isFinite(g) || g <= 0) return 0
+  return Math.round(u * g * 100) / 100
+})
+
+function fabricNetForRow(r: CuttingMaterialUsagePayloadRow): number {
+  const a = Number(r.issuedMeters)
+  const b = Number(r.returnedMeters)
+  const x = (Number.isFinite(a) ? a : 0) - (Number.isFinite(b) ? b : 0)
+  return x > 0 ? x : 0
+}
+
+const fabricNetGrandTotal = computed(() =>
+  (registerForm.materialUsageRows ?? []).reduce((s, r) => s + fabricNetForRow(r), 0),
+)
+
+function formatFabricGrand(v: number) {
+  if (!Number.isFinite(v)) return '—'
+  return formatDisplayNumber(v)
+}
 
 function buildQuery(): CuttingListQuery {
   return {
@@ -574,10 +757,15 @@ async function openRegisterDialog() {
   registerDialog.row = row
   registerDialog.visible = true
   try {
-    const res = await getOrderColorSize(row.orderId)
+    const res = await getCuttingRegisterForm(row.orderId)
     const data = res.data
-    registerForm.colorSizeHeaders = data?.colorSizeHeaders ?? []
-    const rows = data?.colorSizeRows ?? []
+    if (!data) {
+      registerDialog.visible = false
+      return
+    }
+    registerForm.orderBrief = { ...data.orderBrief }
+    registerForm.colorSizeHeaders = data.colorSizeHeaders ?? []
+    const rows = data.colorSizeRows ?? []
     registerForm.actualCutRows = rows.map((r: ColorSizeRow) => ({
       colorName: r.colorName ?? '',
       quantities: Array.isArray(r.quantities) ? [...r.quantities] : [],
@@ -590,10 +778,10 @@ async function openRegisterDialog() {
     registerForm.actualCutRows.forEach((r) => {
       while (r.quantities.length < len) r.quantities.push(0)
     })
-    registerForm.cuttingCost = ''
+    registerForm.materialUsageRows = JSON.parse(JSON.stringify(data.materialUsageRows ?? []))
+    registerFormCuttingUnitPrice.value = ''
     registerForm.cuttingDepartment = SELF_DEPARTMENT_LABEL
     registerForm.cutterName = ''
-    registerForm.actualFabricMeters = null
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     registerDialog.visible = false
@@ -602,12 +790,35 @@ async function openRegisterDialog() {
 
 function resetRegisterForm() {
   registerDialog.row = null
+  registerForm.orderBrief = defaultOrderBrief()
   registerForm.colorSizeHeaders = []
   registerForm.actualCutRows = []
-  registerForm.cuttingCost = ''
+  registerForm.materialUsageRows = []
+  registerFormCuttingUnitPrice.value = ''
   registerForm.cuttingDepartment = ''
   registerForm.cutterName = ''
-  registerForm.actualFabricMeters = null
+}
+
+const abnormalReasonSet = new Set<string>(CUTTING_ABNORMAL_REASONS as unknown as string[])
+
+function validateMaterialUsageClient(): string | null {
+  for (const r of registerForm.materialUsageRows) {
+    const issued = Number(r.issuedMeters)
+    const returned = Number(r.returnedMeters)
+    const abnormal = Number(r.abnormalLossMeters)
+    if (!Number.isFinite(issued) || issued < 0) return `「${r.materialName}」本次领用米数须为非负数`
+    if (!Number.isFinite(returned) || returned < 0) return `「${r.materialName}」退回米数须为非负数`
+    if (!Number.isFinite(abnormal) || abnormal < 0) return `「${r.materialName}」异常损耗须为非负数`
+    if (returned > issued) return `「${r.materialName}」退回不能大于领用`
+    const net = issued - returned
+    if (abnormal > net + 1e-9) return `「${r.materialName}」异常损耗不能大于实际净耗`
+    if (abnormal > 0) {
+      const reason = (r.abnormalReason ?? '').trim()
+      if (!reason || !abnormalReasonSet.has(reason)) return `「${r.materialName}」有异常损耗时请填写异常原因`
+      if (reason === '其他' && !(r.remark ?? '').trim()) return `「${r.materialName}」原因为「其他」时请填写备注`
+    }
+  }
+  return null
 }
 
 async function submitRegister() {
@@ -621,12 +832,16 @@ async function submitRegister() {
     ElMessage.warning('本厂裁床请填写裁剪人')
     return
   }
-  if (dep === SELF_DEPARTMENT_LABEL) {
-    const meters = registerForm.actualFabricMeters
-    if (meters == null || Number.isNaN(Number(meters)) || Number(meters) <= 0) {
-      ElMessage.warning('本厂裁床请填写实际用布（米）')
-      return
-    }
+  const unitTrim = registerFormCuttingUnitPrice.value.trim()
+  const unitNum = unitTrim === '' ? 0 : Number(unitTrim)
+  if (!Number.isFinite(unitNum) || unitNum < 0) {
+    ElMessage.warning('裁剪单价须为非负数')
+    return
+  }
+  const matErr = validateMaterialUsageClient()
+  if (matErr) {
+    ElMessage.warning(matErr)
+    return
   }
   registerDialog.submitting = true
   try {
@@ -635,16 +850,29 @@ async function submitRegister() {
       quantities: r.quantities,
       remark: r.remark,
     }))
+    const g = actualCutGrandTotal.value
+    const totalCost = Math.round(unitNum * g * 100) / 100
+    const materialUsage: CuttingMaterialUsagePayloadRow[] = registerForm.materialUsageRows.map((r) => ({
+      rowKey: r.rowKey,
+      materialTypeId: r.materialTypeId,
+      categoryLabel: r.categoryLabel,
+      materialName: r.materialName,
+      colorSpec: r.colorSpec,
+      expectedUsagePerPiece: r.expectedUsagePerPiece,
+      issuedMeters: Number(r.issuedMeters) || 0,
+      returnedMeters: Number(r.returnedMeters) || 0,
+      abnormalLossMeters: Number(r.abnormalLossMeters) || 0,
+      abnormalReason: r.abnormalReason,
+      remark: r.remark ?? '',
+    }))
     await completeCutting({
       orderId: registerDialog.row.orderId,
-      cuttingCost: registerForm.cuttingCost.trim() || '0',
       actualCutRows,
       cuttingDepartment: dep,
       cutterName: dep === SELF_DEPARTMENT_LABEL ? (registerForm.cutterName ?? '').trim() : null,
-      actualFabricMeters:
-        dep === SELF_DEPARTMENT_LABEL && registerForm.actualFabricMeters != null
-          ? String(registerForm.actualFabricMeters)
-          : null,
+      cuttingUnitPrice: unitTrim === '' ? '0' : unitTrim,
+      cuttingTotalCost: totalCost.toFixed(2),
+      materialUsage,
     })
     ElMessage.success('裁床登记完成，订单已进入待车缝')
     registerDialog.visible = false
@@ -694,7 +922,6 @@ function onCuttingDepartmentChange() {
   const dep = (registerForm.cuttingDepartment ?? '').trim()
   if (dep !== SELF_DEPARTMENT_LABEL) {
     registerForm.cutterName = ''
-    registerForm.actualFabricMeters = null
   }
 }
 
@@ -712,6 +939,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .status-tabs {
@@ -725,25 +953,14 @@ onMounted(() => {
 }
 
 .cutting-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
-}
-
-.register-brief {
-  margin-bottom: var(--space-md);
-  padding: var(--space-sm);
-  background: var(--el-fill-color-light);
-  border-radius: var(--radius);
-  font-size: var(--font-size-caption, 12px);
-}
-
-.register-brief > div + div {
-  margin-top: 4px;
 }
 
 .register-hint {
@@ -806,10 +1023,50 @@ onMounted(() => {
   color: var(--color-text-muted, #909399);
 }
 
-.cut-grid-total {
-  margin-top: 6px;
-  text-align: right;
+.cut-readonly-num {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  margin-right: 8px;
+}
+
+.cut-readonly-hint {
+  font-size: 12px;
   color: var(--el-text-color-secondary);
-  font-size: var(--font-size-caption, 12px);
+}
+
+.cutting-detail-drawer__body {
+  min-height: 120px;
+}
+
+.cut-detail-meta {
+  margin-top: var(--space-md);
+  padding: 12px;
+  background: var(--el-fill-color-light);
+  border-radius: var(--radius);
+  border: 1px solid var(--el-border-color-lighter);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cut-detail-meta__row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.cut-detail-meta__label {
+  color: var(--el-text-color-secondary);
+  min-width: 9em;
+  flex-shrink: 0;
+}
+</style>
+
+<style>
+/* 对话框 teleport 到 body，非 scoped */
+.cutting-register-dialog.el-dialog {
+  max-width: min(1020px, 96vw);
 }
 </style>

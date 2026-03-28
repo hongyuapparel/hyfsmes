@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card finishing-page">
+  <div class="page-card page-card--fill finishing-page">
     <!-- Tab：全部 / 尾部完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -84,6 +84,7 @@
     <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
     <!-- 待尾部订单列表 -->
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="finishingTableRef"
       v-loading="loading"
@@ -91,6 +92,7 @@
       border
       stripe
       class="finishing-table"
+      :height="tableHeight"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -101,18 +103,16 @@
       <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
+        </template>
+      </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
-          <el-image
-            v-if="row.imageUrl"
-            :src="row.imageUrl"
-            fit="cover"
-            class="table-thumb"
-            :preview-teleported="true"
-            :preview-src-list="[row.imageUrl]"
-          />
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -126,7 +126,7 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.cutTotal != null ? row.cutTotal : '-' }}</span>
+              <span class="qty-trigger">{{ row.cutTotal != null ? formatDisplayNumber(row.cutTotal) : '-' }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -142,7 +142,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -162,7 +162,9 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.sewingQuantity != null ? row.sewingQuantity : '-' }}</span>
+              <span class="qty-trigger">{{
+                row.sewingQuantity != null ? formatDisplayNumber(row.sewingQuantity) : '-'
+              }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -178,7 +180,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -198,7 +200,9 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.tailReceivedQty != null ? row.tailReceivedQty : '-' }}</span>
+              <span class="qty-trigger">{{
+                row.tailReceivedQty != null ? formatDisplayNumber(row.tailReceivedQty) : '-'
+              }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -214,7 +218,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -234,7 +238,9 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.tailInboundQty != null ? row.tailInboundQty : '-' }}</span>
+              <span class="qty-trigger">{{
+                row.tailInboundQty != null ? formatDisplayNumber(row.tailInboundQty) : '-'
+              }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -250,7 +256,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -261,9 +267,12 @@
         </template>
       </el-table-column>
       <el-table-column label="次品数" width="80" align="right">
-        <template #default="{ row }">{{ row.defectQuantity != null ? row.defectQuantity : '-' }}</template>
+        <template #default="{ row }">{{
+          row.defectQuantity != null ? formatDisplayNumber(row.defectQuantity) : '-'
+        }}</template>
       </el-table-column>
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -304,7 +313,7 @@
             >
               <template #default="{ row }">
                 <template v-if="row.key === 'order' || row.key === 'cut' || row.key === 'sewing'">
-                  {{ row.values[idx] != null ? row.values[idx] : '-' }}
+                  {{ row.values[idx] != null ? formatDisplayNumber(row.values[idx]) : '-' }}
                 </template>
                 <template v-else-if="row.key === 'tail' && idx === receiveDialog.headers.length - 1 && receiveDialog.headers.length > 1">
                   {{ receiveTailReceivedTotal }}
@@ -353,7 +362,7 @@
           <div class="register-brief">
             <div>订单号：{{ item.row.orderNo }}</div>
             <div>SKU：{{ item.row.skuCode }}</div>
-            <div>尾部收货数合计：{{ item.row.tailReceivedQty ?? 0 }}</div>
+            <div>尾部收货数合计：{{ formatDisplayNumber(item.row.tailReceivedQty ?? 0) }}</div>
           </div>
           <template v-if="item.headers?.length">
             <div class="register-qty-title">尾部收货数 / 入库数</div>
@@ -368,11 +377,11 @@
               >
                 <template #default="{ row }">
                   <template v-if="row.key === 'tail_received'">
-                    {{ row.values[hIdx] != null ? row.values[hIdx] : '-' }}
+                    {{ row.values[hIdx] != null ? formatDisplayNumber(row.values[hIdx]) : '-' }}
                   </template>
                   <template v-else-if="row.key === 'inbound'">
                     <template v-if="item.headers.length > 1 && hIdx === item.headers.length - 1">
-                      {{ row.values[hIdx] != null ? row.values[hIdx] : 0 }}
+                      {{ row.values[hIdx] != null ? formatDisplayNumber(row.values[hIdx]) : formatDisplayNumber(0) }}
                     </template>
                     <el-input-number
                       v-else
@@ -387,7 +396,7 @@
                   </template>
                   <template v-else-if="row.key === 'defect'">
                     <template v-if="item.headers.length > 1 && hIdx === item.headers.length - 1">
-                      {{ defectTotal(item) }}
+                      {{ formatDisplayNumber(defectTotal(item)) }}
                     </template>
                     <el-input-number
                       v-else
@@ -401,7 +410,7 @@
                     />
                   </template>
                   <template v-else>
-                    {{ row.values[hIdx] != null ? row.values[hIdx] : '-' }}
+                    {{ row.values[hIdx] != null ? formatDisplayNumber(row.values[hIdx]) : '-' }}
                   </template>
                 </template>
               </el-table-column>
@@ -449,6 +458,7 @@ import {
 import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -456,6 +466,8 @@ import {
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
@@ -475,6 +487,8 @@ const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<FinishingListItem[]>([])
 const finishingTableRef = ref()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const loading = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
@@ -891,6 +905,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .status-tabs {
@@ -910,7 +925,8 @@ onMounted(() => {
 }
 
 .finishing-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {

@@ -28,7 +28,7 @@
             @click="triggerOrderImageUpload"
           >
             <div class="image-preview-wrap" v-if="form.imageUrl">
-              <el-image :src="form.imageUrl" fit="cover" :preview-src-list="[form.imageUrl]" />
+              <el-image :src="form.imageUrl" fit="contain" :preview-src-list="[form.imageUrl]" />
               <el-button text type="danger" size="small" class="image-remove" @click.stop="form.imageUrl = ''">
                 移除
               </el-button>
@@ -325,13 +325,13 @@
               @click="startEditBCell($index, sIndex)"
               @focus="startEditBCell($index, sIndex)"
             >
-              {{ row.quantities[sIndex] ?? 0 }}
+              {{ formatDisplayNumber(row.quantities[sIndex] ?? 0) }}
             </div>
           </template>
         </el-table-column>
         <el-table-column label="合计" width="80" align="center" header-align="center">
           <template #default="{ row }">
-            {{ calcRowTotal(row) }}
+            {{ formatDisplayNumber(calcRowTotal(row)) }}
           </template>
         </el-table-column>
         <el-table-column label="备注" min-width="120" align="center" header-align="center">
@@ -473,6 +473,7 @@
             <el-input-number
               v-model="row.usagePerPiece"
               :min="0"
+              :precision="2"
               :controls="false"
               :input-style="{ textAlign: 'center' }"
               @update:modelValue="recalcPurchaseQuantity(row)"
@@ -512,6 +513,7 @@
             <el-input-number
               v-model="row.purchaseQuantity"
               :min="0"
+              :precision="2"
               :controls="false"
               :input-style="{ textAlign: 'center' }"
               :readonly="true"
@@ -796,13 +798,7 @@
       >
         <el-table-column label="图片" width="90">
           <template #default="{ row }">
-            <el-image
-              v-if="row.imageUrl"
-              :src="row.imageUrl"
-              fit="cover"
-              lazy
-              style="width: 64px; height: 64px"
-            />
+            <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="dialog" />
             <span v-else>无</span>
           </template>
         </el-table-column>
@@ -841,13 +837,7 @@
       >
         <el-table-column label="图片" width="90">
           <template #default="{ row }">
-            <el-image
-              v-if="row.imageUrl"
-              :src="toSkuThumbUrl(row.imageUrl)"
-              fit="cover"
-              lazy
-              style="width: 64px; height: 64px"
-            />
+            <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="dialog" />
             <span v-else>无</span>
           </template>
         </el-table-column>
@@ -887,7 +877,13 @@
           :key="url + idx"
           class="attachment-item"
         >
-          <el-image :src="url" fit="cover" :preview-src-list="attachments" />
+          <AppImageThumb
+            :raw-url="url"
+            :width="120"
+            :height="120"
+            :preview-gallery="attachments"
+            :preview-gallery-index="idx"
+          />
           <el-tooltip content="删除" placement="top">
             <el-button
               link
@@ -939,9 +935,11 @@ import { Delete, CircleClose } from '@element-plus/icons-vue'
 import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
 import { getProductSkus, type ProductSkuOption } from '@/api/products'
 import { useAuthStore } from '@/stores/auth'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const route = useRoute()
 const router = useRouter()
+
 
 /** 用于「再回订单编辑时打开上次编辑的订单」的 sessionStorage 键 */
 const ORDERS_LAST_EDIT_ID = 'orders_last_edit_id'
@@ -1056,22 +1054,6 @@ const selectedSkuMeta = computed(() => {
 })
 
 const filteredSkuProducts = computed(() => skuProducts.value)
-
-function toSkuThumbUrl(rawUrl: string | undefined): string {
-  const source = String(rawUrl ?? '').trim()
-  if (!source) return ''
-  if (/\/migration-old\/small_/i.test(source)) return source
-  // 旧系统迁移图片目录同时存在 small_ 缩略图，优先走小图减少 SKU 弹窗首屏加载压力。
-  if (/\/migration-old\//i.test(source)) {
-    const idx = source.lastIndexOf('/')
-    if (idx >= 0) {
-      const prefix = source.slice(0, idx + 1)
-      const name = source.slice(idx + 1)
-      if (name) return `${prefix}small_${name}`
-    }
-  }
-  return source
-}
 
 let skuSearchTimer: ReturnType<typeof setTimeout> | null = null
 async function searchSkus(keyword: string) {
@@ -1652,14 +1634,24 @@ function syncMaterialSourceIdsFromLabel() {
   })
 }
 
+/** C 区用量、采购总量：保留两位小数，避免浮点显示一长串 */
+function roundMaterialQty2(n: number): number {
+  if (!Number.isFinite(n)) return 0
+  return Number.parseFloat(n.toFixed(2))
+}
+
 /** 自动计算采购总量：单件用量 * 订单件数 * (1 + 损耗%) */
 function recalcPurchaseQuantity(row: MaterialRow) {
-  const usage = Number(row.usagePerPiece) || 0
+  const usageRaw = Number(row.usagePerPiece) || 0
+  const usage = roundMaterialQty2(usageRaw)
+  if (row.usagePerPiece != null) {
+    row.usagePerPiece = usage
+  }
   const lossPercent = Number(row.lossPercent) || 0
   const pieces = Number(row.orderPieces) || 0
   const lossRate = lossPercent / 100
   const result = usage * pieces * (1 + lossRate)
-  row.purchaseQuantity = Number.isFinite(result) ? result : 0
+  row.purchaseQuantity = Number.isFinite(result) ? roundMaterialQty2(result) : 0
 }
 
 function onSupplierChange(_row: MaterialRow) {
@@ -2383,13 +2375,20 @@ async function loadDetail() {
       materialName: m.materialName ?? '',
       color: m.color ?? '',
       fabricWidth: m.fabricWidth ?? '',
-      usagePerPiece: m.usagePerPiece ?? null,
+      usagePerPiece:
+        m.usagePerPiece != null && m.usagePerPiece !== ''
+          ? roundMaterialQty2(Number(m.usagePerPiece))
+          : null,
       lossPercent: m.lossPercent ?? null,
       orderPieces: m.orderPieces ?? null,
-      purchaseQuantity: m.purchaseQuantity ?? null,
+      purchaseQuantity:
+        m.purchaseQuantity != null && m.purchaseQuantity !== ''
+          ? roundMaterialQty2(Number(m.purchaseQuantity))
+          : null,
       cuttingQuantity: m.cuttingQuantity ?? null,
       remark: m.remark ?? '',
     }))
+    materials.value.forEach((row) => recalcPurchaseQuantity(row))
     // D 区
     sizeMetaHeaders.value = (d as any).sizeInfoMetaHeaders && Array.isArray((d as any).sizeInfoMetaHeaders)
       ? [...(d as any).sizeInfoMetaHeaders]
@@ -2617,7 +2616,10 @@ watch(skuKeyword, (val) => {
 .image-preview-wrap :deep(.el-image) {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+}
+
+.image-preview-wrap :deep(.el-image__inner) {
+  object-fit: contain;
 }
 
 .image-remove {
@@ -2815,7 +2817,7 @@ watch(skuKeyword, (val) => {
 .packaging-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .packaging-footer {
@@ -2861,11 +2863,6 @@ watch(skuKeyword, (val) => {
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--color-border);
-}
-
-.attachment-item :deep(.el-image) {
-  width: 100%;
-  height: 100%;
 }
 
 .attachment-remove {

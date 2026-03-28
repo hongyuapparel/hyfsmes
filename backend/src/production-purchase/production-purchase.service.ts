@@ -12,6 +12,7 @@ import { FabricStockService } from '../fabric-stock/fabric-stock.service';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
 import { User } from '../entities/user.entity';
+import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 
 /** 已审单：非草稿、非待审单，即待纸样及之后的状态 */
 const PURCHASE_ORDER_STATUSES = [
@@ -53,6 +54,8 @@ export interface PurchaseItemRow {
   materialSourceId: number | null;
   materialSource: string;
   processRoute: 'purchase' | 'picking';
+  /** 时效判定：本行物料从到采购至采购/领料完成（与订单时效配置 pending_purchase 对比） */
+  timeRating: string;
 }
 
 export interface PurchaseListQuery {
@@ -88,6 +91,7 @@ export class ProductionPurchaseService {
     private readonly fabricStockService: FabricStockService,
     private readonly inventoryAccessoriesService: InventoryAccessoriesService,
     private readonly finishedGoodsStockService: FinishedGoodsStockService,
+    private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
   private materialSourceOptionsLoadedAt = 0;
@@ -265,6 +269,7 @@ export class ProductionPurchaseService {
       where: orderIds.map((id) => ({ orderId: id })),
     });
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
+    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     const rows: PurchaseItemRow[] = [];
     for (const order of orders) {
@@ -301,6 +306,18 @@ export class ProductionPurchaseService {
         if (tab === 'picking' && !(processRoute === 'picking' && routeStatus === 'pending')) continue;
         if (tab === 'completed' && routeStatus !== 'completed') continue;
 
+        const phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(pendingPurchaseAt);
+        const materialDone = routeStatus === 'completed';
+        const endRaw = processRoute === 'purchase' ? m.purchaseCompletedAt : m.pickCompletedAt;
+        const phaseEnd = materialDone ? this.orderStatusConfigService.parseProductionPhaseInstant(endRaw) : null;
+        const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
+          'pending_purchase',
+          phaseStart,
+          phaseEnd,
+          order.status ?? '',
+          slaCtx,
+        );
+
         rows.push({
           orderId: order.id,
           materialIndex: i,
@@ -329,6 +346,7 @@ export class ProductionPurchaseService {
           materialSourceId,
           materialSource,
           processRoute,
+          timeRating,
         });
       }
     }

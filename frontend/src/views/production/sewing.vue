@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card sewing-page">
+  <div class="page-card page-card--fill sewing-page">
     <!-- Tab：全部 / 等待车缝 / 车缝完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -83,6 +83,7 @@
     <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
     <!-- 待车缝订单列表 -->
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="sewingTableRef"
       v-loading="loading"
@@ -90,6 +91,7 @@
       border
       stripe
       class="sewing-table"
+      :height="tableHeight"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -104,14 +106,7 @@
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
-          <el-image
-            v-if="row.imageUrl"
-            :src="row.imageUrl"
-            fit="cover"
-            class="table-thumb"
-            :preview-teleported="true"
-            :preview-src-list="[row.imageUrl]"
-          />
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -126,7 +121,7 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.quantity }}</span>
+              <span class="qty-trigger">{{ formatDisplayNumber(row.quantity) }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -142,7 +137,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -162,7 +157,7 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.cutTotal != null ? row.cutTotal : '-' }}</span>
+              <span class="qty-trigger">{{ row.cutTotal != null ? formatDisplayNumber(row.cutTotal) : '-' }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -178,7 +173,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -198,7 +193,9 @@
             @show="onShowQtyPopover(row)"
           >
             <template #reference>
-              <span class="qty-trigger">{{ row.sewingQuantity != null ? row.sewingQuantity : '-' }}</span>
+              <span class="qty-trigger">{{
+                row.sewingQuantity != null ? formatDisplayNumber(row.sewingQuantity) : '-'
+              }}</span>
             </template>
             <div class="qty-popover">
               <div class="qty-popover-title">数量追踪</div>
@@ -214,7 +211,7 @@
                   <tbody>
                     <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
                       <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? v : '-' }}</td>
+                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -224,8 +221,13 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column prop="timeRating" label="时效判定" width="90" align="center" />
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
+        </template>
+      </el-table-column>
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -336,10 +338,10 @@
             >
               <template #default="{ row }">
                 <template v-if="row.key === 'order' || row.key === 'cut'">
-                  {{ row.values[idx] != null ? row.values[idx] : '-' }}
+                  {{ row.values[idx] != null ? formatDisplayNumber(row.values[idx]) : '-' }}
                 </template>
                 <template v-else-if="row.key === 'sewing' && idx === registerForm.headers.length - 1 && registerForm.headers.length > 1">
-                  {{ registerSewingTotal }}
+                  {{ formatDisplayNumber(registerSewingTotal) }}
                 </template>
                 <template v-else>
                   <el-input-number
@@ -355,7 +357,7 @@
               </template>
             </el-table-column>
           </el-table>
-          <p class="register-qty-sum">车缝数量合计：{{ registerSewingTotal }}</p>
+          <p class="register-qty-sum">车缝数量合计：{{ formatDisplayNumber(registerSewingTotal) }}</p>
         </template>
         <el-form
           ref="registerFormRef"
@@ -411,6 +413,7 @@ import { getSupplierList, type SupplierItem } from '@/api/suppliers'
 import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -418,6 +421,8 @@ import {
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const SEWING_TABS = [
   { label: '全部', value: 'all' },
@@ -436,6 +441,8 @@ const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<SewingListItem[]>([])
 const sewingTableRef = ref()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const loading = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
@@ -791,6 +798,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .status-tabs {
@@ -804,7 +812,8 @@ onMounted(() => {
 }
 
 .sewing-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {

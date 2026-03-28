@@ -186,8 +186,9 @@
         value-format="YYYY-MM-DD"
         :shortcuts="rangeShortcuts"
         unlink-panels
+        clearable
         size="large"
-        :class="['filter-bar-item', { 'range-single': !orderDateRange }]"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !orderDateRange }]"
         :style="getFilterRangeStyle(orderDateRange)"
         @change="onSearch"
       />
@@ -200,8 +201,9 @@
         value-format="YYYY-MM-DD"
         :shortcuts="rangeShortcuts"
         unlink-panels
+        clearable
         size="large"
-        :class="['filter-bar-item', { 'range-single': !completedRange }]"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
         :style="getFilterRangeStyle(completedRange)"
         @change="onSearch"
       />
@@ -288,13 +290,10 @@
             </div>
             <div class="order-card-header-main">
               <div class="order-card-image">
-                <el-image
+                <AppImageThumb
                   v-if="item.imageUrl"
-                  :src="getOrderListImageUrl(item.imageUrl)"
-                  fit="cover"
-                  lazy
-                  :preview-src-list="[item.imageUrl]"
-                  @error="onOrderListImageError(item.imageUrl)"
+                  :raw-url="item.imageUrl"
+                  variant="card"
                 />
                 <div v-else class="image-placeholder">图片</div>
               </div>
@@ -337,7 +336,7 @@
               >
                 <template #reference>
                   <span class="field-value qty-trigger">
-                    {{ item.quantity }} 件
+                    {{ formatDisplayNumber(item.quantity) }} 件
                   </span>
                 </template>
                 <div class="qty-popover">
@@ -373,7 +372,7 @@
                             :key="vIdx"
                             class="qty-value"
                           >
-                            {{ v != null ? v : '-' }}
+                            {{ v != null ? formatDisplayNumber(v) : '-' }}
                           </td>
                         </tr>
                       </tbody>
@@ -385,16 +384,24 @@
                 </div>
               </el-popover>
               <span v-else class="field-value">
-                {{ item.quantity }} 件
+                {{ formatDisplayNumber(item.quantity) }} 件
               </span>
             </div>
             <div class="field-row">
               <span class="field-label">出厂价：</span>
-              <span class="field-value price-value">￥{{ item.exFactoryPrice }}</span>
+              <span class="field-value price-value">{{
+                item.exFactoryPrice != null && item.exFactoryPrice !== ''
+                  ? `￥${formatDisplayNumber(item.exFactoryPrice)}`
+                  : '-'
+              }}</span>
             </div>
             <div class="field-row">
               <span class="field-label">销售价：</span>
-              <span class="field-value price-value">￥{{ item.salePrice }}</span>
+              <span class="field-value price-value">{{
+                item.salePrice != null && item.salePrice !== ''
+                  ? `￥${formatDisplayNumber(item.salePrice)}`
+                  : '-'
+              }}</span>
             </div>
             <div v-if="getOrderMetaTags(item).length" class="field-row order-tags-row">
               <el-tag
@@ -607,6 +614,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, watch, watchEffect, onMounted, onBeforeUnmount, onDeactivated, computed } from 'vue'
+import { formatDisplayNumber } from '@/utils/display-number'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -619,7 +627,6 @@ import { getSupplierBusinessScopeTreeOptions, type SupplierBusinessScopeTreeNode
 import { type SystemOptionTreeNode } from '@/api/system-options'
 import { useAuthStore } from '@/stores/auth'
 import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
-import { toMigrationThumbUrl } from '@/utils/image'
 
 const router = useRouter()
 const route = useRoute()
@@ -754,6 +761,7 @@ function getProcessItemDisplayLabel(v: string | undefined): string {
 }
 
 const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
+/** 与财务管理「订单报表」时效/利润页日期筛选一致：空态 170px，有值 220px */
 const DATE_RANGE_WIDTH_EMPTY = '170px'
 const DATE_RANGE_WIDTH_FILLED = '220px'
 const FILTER_AUTO_MIN_WIDTH = 140
@@ -809,10 +817,10 @@ function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
 }
 
 function getFilterRangeStyle(v: [string, string] | null) {
-  const hasValue = v && v.length === 2
+  const hasValue = !!(v && v.length === 2)
   const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  const base = { width, flex: `0 0 ${width}` }
-  return hasValue ? { ...base, ...activeSelectStyle } : base
+  // minWidth 覆盖 design-system 里 .filter-bar .filter-bar-item 的 min-width:120px
+  return { width, minWidth: width, flex: `0 0 ${width}` }
 }
 
 const filter = reactive({
@@ -1681,23 +1689,6 @@ let listReqId = 0
 let countsReqId = 0
 let listAbortController: AbortController | null = null
 let countsAbortController: AbortController | null = null
-const failedThumbByOriginal = ref<Record<string, boolean>>({})
-
-function getOrderListImageUrl(rawUrl: string | undefined): string {
-  const source = String(rawUrl ?? '').trim()
-  if (!source) return ''
-  if (failedThumbByOriginal.value[source]) return source
-  return toMigrationThumbUrl(source)
-}
-
-function onOrderListImageError(rawUrl: string | undefined) {
-  const source = String(rawUrl ?? '').trim()
-  if (!source) return
-  const thumb = toMigrationThumbUrl(source)
-  if (thumb !== source) {
-    failedThumbByOriginal.value[source] = true
-  }
-}
 </script>
 
 <style scoped>
@@ -1813,11 +1804,6 @@ function onOrderListImageError(rawUrl: string | undefined) {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-}
-
-.order-card-image :deep(.el-image) {
-  width: 100%;
-  height: 100%;
 }
 
 .image-placeholder {

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card">
+  <div class="page-card page-card--fill">
     <!-- 顶部筛选 -->
     <div class="filter-bar">
       <el-input
@@ -55,11 +55,13 @@
     <div v-if="selectedIds.length" class="table-selection-count">已选 {{ selectedIds.length }} 项</div>
 
     <!-- 表格：字段驱动 -->
+    <div ref="tableShellRef" class="list-page-table-shell">
       <el-table
         ref="tableRef"
         :data="list"
         border
         stripe
+        :height="tableHeight"
         @selection-change="onSelectionChange"
         @sort-change="onSortChange"
       >
@@ -84,6 +86,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <!-- 分页 -->
     <div class="pagination-wrap">
@@ -275,8 +278,11 @@ import {
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { Delete } from '@element-plus/icons-vue'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const formRef = ref<FormInstance>()
 const list = ref<CustomerItem[]>([])
 const salespeople = ref<string[]>([])
@@ -291,7 +297,9 @@ const selectedIds = ref<number[]>([])
 const CUSTOMER_TABLE_FIELDS = computed(() =>
   CUSTOMER_FIELDS_SORTED.filter((f) => !['cooperationDate', 'contactInfo', 'productGroup'].includes(f.code)),
 )
-const CUSTOMER_FORM_FIELDS = computed(() => CUSTOMER_FIELDS_SORTED.filter((f) => f.code !== 'cooperationDate'))
+const CUSTOMER_FORM_FIELDS = computed(() =>
+  CUSTOMER_FIELDS_SORTED.filter((f) => !['cooperationDate', 'createdAt', 'lastOrderReferencedAt'].includes(f.code)),
+)
 
 function toProductGroupTreeSelect(
   nodes: SystemOptionTreeNode[],
@@ -354,7 +362,7 @@ const companyNameLabelVisible = ref(false)
 const form = reactive<Record<string, string | number | null>>({})
 const formRules = computed<FormRules>(() => {
   const r: FormRules = {}
-  for (const f of CUSTOMER_FIELDS_SORTED) {
+  for (const f of CUSTOMER_FORM_FIELDS.value) {
     if (f.code === 'companyName') r[f.code] = [{ required: true, message: `请输入${f.label}`, trigger: 'blur' }]
   }
   return r
@@ -441,7 +449,7 @@ function onSortChange({ prop, order }: { prop?: string; order?: string }) {
 async function openCreate() {
   isEdit.value = false
   editId.value = 0
-  for (const f of CUSTOMER_FIELDS_SORTED) {
+  for (const f of CUSTOMER_FORM_FIELDS.value) {
     form[f.code] = f.type === 'date' ? null : ''
   }
   form.contactCountryCode = ''
@@ -458,7 +466,7 @@ async function openCreate() {
 function openEdit(row: CustomerItem) {
   isEdit.value = true
   editId.value = row.id
-  for (const f of CUSTOMER_FIELDS_SORTED) {
+  for (const f of CUSTOMER_FORM_FIELDS.value) {
     if (f.code === 'productGroup') {
       form.productGroup = row.productGroupId != null ? row.productGroupId : ''
       continue
@@ -488,7 +496,7 @@ async function submit() {
   submitLoading.value = true
   try {
     const payload: Record<string, string | number | null> = {}
-    for (const f of CUSTOMER_FIELDS_SORTED) {
+    for (const f of CUSTOMER_FORM_FIELDS.value) {
       if (f.code === 'contactInfo') {
         const parts = [form.contactCountryCode, form.contactPhone]
           .map((s) => String(s ?? '').trim())
@@ -643,6 +651,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 .filter-actions {
   margin-left: auto;

@@ -213,6 +213,144 @@ a:hover {
   text-align: center;
 }
 
+/* ========== 7.0 列表页主卡片：填满主内容高度，表格在内部滚动（表头固定）========== */
+.page-card.page-card--fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.page-card.page-card--fill .pagination-wrap {
+  flex-shrink: 0;
+}
+
+.list-page-table-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-page-table-shell > .el-table {
+  width: 100%;
+}
+
+/**
+ * 带 el-tabs 的列表页：tab 内容区参与纵向 flex，子级用 .tab-pane-scroll 包一层
+ * （filter + list-page-table-shell + pagination）
+ */
+.page-card.page-card--fill .list-page-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-card.page-card--fill .list-page-tabs :deep(.el-tabs__header) {
+  flex-shrink: 0;
+}
+
+.page-card.page-card--fill .list-page-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-card.page-card--fill .list-page-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.tab-pane-scroll {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* ========== 7.1 表格内滚动条（全站与产品列表一致：细、浅灰、圆角；仅作用于表格滚动容器）========== */
+:root {
+  --app-table-scrollbar-size: 6px;
+  --app-table-scrollbar-thumb: var(--el-border-color-darker, #c0c4cc);
+  --app-table-scrollbar-thumb-hover: var(--el-text-color-secondary, #909399);
+  --app-table-scrollbar-track: transparent;
+  --app-table-scrollbar-radius: 3px;
+  /**
+   * 悬浮横向辅助条轨道总高度（viewport fixed 条），
+   * 须与 utils/floatingHorizontalScrollbar.ts 内 FLOATING_BAR_HEIGHT 保持一致。
+   */
+  --app-table-floating-x-track-height: 10px;
+}
+
+.el-table .el-table__body-wrapper,
+.el-table .el-table__header-wrapper,
+.el-table .el-table__footer-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-table-scrollbar-thumb) var(--app-table-scrollbar-track);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar,
+.el-table .el-table__header-wrapper::-webkit-scrollbar,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size);
+  height: var(--app-table-scrollbar-size);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-thumb,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-thumb,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-thumb {
+  background-color: var(--app-table-scrollbar-thumb);
+  border-radius: var(--app-table-scrollbar-radius);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-thumb:hover,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-thumb:hover,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-table-scrollbar-thumb-hover);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-track,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-track,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-track {
+  background: var(--app-table-scrollbar-track);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-corner,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-corner,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ElScrollbar 默认隐藏原生条；勿对 hidden-default 的 wrap 设 thin/::-webkit，否则会挤压表体、fixed 右列错位。native-scrollbar 时无该 class，仍可细条样式。 */
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-table-scrollbar-thumb) var(--app-table-scrollbar-track);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size);
+  height: var(--app-table-scrollbar-size);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-thumb {
+  background-color: var(--app-table-scrollbar-thumb);
+  border-radius: var(--app-table-scrollbar-radius);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-table-scrollbar-thumb-hover);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-track {
+  background: var(--app-table-scrollbar-track);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 /* ========== 8. 按钮样式（圆角参考「新增用户」按钮）========== */
 .btn {
   display: inline-flex;

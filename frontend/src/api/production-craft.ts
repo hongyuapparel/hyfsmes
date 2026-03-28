@@ -18,6 +18,8 @@ export interface CraftListItem {
   collaborationTypeId: number | null
   purchaseStatus: string
   craftStatus: string
+  /** 时效判定 */
+  timeRating: string
 }
 
 export interface CraftListRes {

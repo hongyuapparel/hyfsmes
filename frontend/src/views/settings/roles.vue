@@ -13,7 +13,7 @@
       <el-table-column prop="id" label="ID" width="70" />
       <el-table-column prop="code" label="编码" width="140" />
       <el-table-column prop="name" label="名称" width="140" />
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="180">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
           <el-tooltip content="删除" placement="top">

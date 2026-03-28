@@ -15,6 +15,7 @@ import { RequirePermission } from '../auth/require-permission.decorator';
 import { diskStorage } from 'multer';
 import { extname, join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { generateSmallThumbnailBeside } from './thumbnail.util';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
@@ -49,8 +50,14 @@ export class UploadsController {
   @Post('image')
   @RequirePermission('/orders/products')
   @UseInterceptors(imageInterceptor)
-  uploadImage(@UploadedFile() file: any) {
+  async uploadImage(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('请选择图片文件');
+    const absPath = join(UPLOAD_DIR, file.filename);
+    try {
+      await generateSmallThumbnailBeside(absPath);
+    } catch (e) {
+      console.error('[uploads] thumbnail generation failed', absPath, e);
+    }
     return { url: buildUploadUrl(file.filename) };
   }
 
@@ -58,8 +65,14 @@ export class UploadsController {
   @Post('outbound-image')
   @RequirePermission('/inventory/fabric')
   @UseInterceptors(imageInterceptor)
-  uploadOutboundImage(@UploadedFile() file: any) {
+  async uploadOutboundImage(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('请选择图片文件');
+    const absPath = join(UPLOAD_DIR, file.filename);
+    try {
+      await generateSmallThumbnailBeside(absPath);
+    } catch (e) {
+      console.error('[uploads] outbound thumbnail failed', absPath, e);
+    }
     return { url: buildUploadUrl(file.filename) };
   }
 
@@ -67,8 +80,14 @@ export class UploadsController {
   @Post('finance-image')
   @RequirePermission('/finance/income')
   @UseInterceptors(imageInterceptor)
-  uploadFinanceImage(@UploadedFile() file: any) {
+  async uploadFinanceImage(@UploadedFile() file: any) {
     if (!file) throw new BadRequestException('请选择图片文件');
+    const absPath = join(UPLOAD_DIR, file.filename);
+    try {
+      await generateSmallThumbnailBeside(absPath);
+    } catch (e) {
+      console.error('[uploads] finance thumbnail failed', absPath, e);
+    }
     return { url: buildUploadUrl(file.filename) };
   }
 }

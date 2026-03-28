@@ -6,6 +6,7 @@ import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entit
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 
 export interface SewingListItem {
   orderId: number;
@@ -58,6 +59,7 @@ export class ProductionSewingService {
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
     private readonly orderWorkflowService: OrderWorkflowService,
+    private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
   private sumActualCut(rows: ActualCutRow[] | null): number | null {
@@ -194,6 +196,7 @@ export class ProductionSewingService {
     ]);
     const sewingMap = new Map(sewings.map((s) => [s.orderId, s]));
     const cuttingMap = new Map(cuttings.map((c) => [c.orderId, c]));
+    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     const rows: SewingListItem[] = [];
     for (const order of orders) {
@@ -210,6 +213,22 @@ export class ProductionSewingService {
       const distributedAt = this.toDateTimeString(sewing?.distributedAt);
       const factoryDueDate = this.toDateOnlyString(sewing?.factoryDueDate);
       const sewingFee = sewing?.sewingFee != null ? String(sewing.sewingFee) : '0';
+
+      let phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(sewing?.arrivedAt ?? null);
+      if (!phaseStart && order.status === 'pending_sewing') {
+        phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(order.statusTime);
+      }
+      const phaseEnd =
+        sewingStatus === 'completed' && sewing?.completedAt
+          ? this.orderStatusConfigService.parseProductionPhaseInstant(sewing.completedAt)
+          : null;
+      const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
+        'pending_sewing',
+        phaseStart,
+        phaseEnd,
+        order.status ?? '',
+        slaCtx,
+      );
 
       rows.push({
         orderId: order.id,
@@ -230,7 +249,7 @@ export class ProductionSewingService {
         sewingStatus: sewingStatus === 'completed' ? 'completed' : 'pending',
         cutTotal: this.sumActualCut(cutting?.actualCutRows ?? null),
         sewingQuantity: sewing?.sewingQuantity ?? null,
-        timeRating: '-',
+        timeRating,
       });
     }
 

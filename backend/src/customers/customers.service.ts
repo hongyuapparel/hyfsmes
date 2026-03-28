@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Customer } from '../entities/customer.entity';
+import { Order } from '../entities/order.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { XiaomanService } from '../xiaoman/xiaoman.service';
@@ -21,6 +22,8 @@ export class CustomersService {
   constructor(
     @InjectRepository(Customer)
     private customerRepo: Repository<Customer>,
+    @InjectRepository(Order)
+    private orderRepo: Repository<Order>,
     @InjectRepository(User)
     private userRepo: Repository<User>,
     @InjectRepository(Role)
@@ -41,8 +44,20 @@ export class CustomersService {
     }
 
     const sortColumn = this.toSnakeCase(sortBy);
-    const validSortColumns = ['id', 'customer_id', 'company_name', 'cooperation_date', 'salesperson'];
-    if (validSortColumns.includes(sortColumn)) {
+    /** 最近活跃：该客户被订单引用（orders.customer_id）后，订单行的最后更新时间 */
+    const lastOrderRefSubquery = '(SELECT MAX(o.updated_at) FROM orders o WHERE o.customer_id = c.id)';
+    const validSortColumns = [
+      'id',
+      'customer_id',
+      'company_name',
+      'cooperation_date',
+      'salesperson',
+      'created_at',
+    ];
+    if (sortColumn === 'last_order_referenced_at') {
+      qb.addOrderBy(`${lastOrderRefSubquery} IS NULL`, 'ASC');
+      qb.addOrderBy(lastOrderRefSubquery, sortOrder.toUpperCase() as 'ASC' | 'DESC');
+    } else if (validSortColumns.includes(sortColumn)) {
       qb.orderBy(`c.${sortColumn}`, sortOrder.toUpperCase() as 'ASC' | 'DESC');
     }
 
@@ -52,14 +67,38 @@ export class CustomersService {
       .take(pageSize)
       .getMany();
 
-    const ids = list.map((c) => c.productGroupId).filter((id): id is number => id != null);
-    const pathMap = ids.length ? await this.systemOptionsService.getProductGroupPathsByIds(ids) : {};
+    const productGroupIds = list.map((c) => c.productGroupId).filter((id): id is number => id != null);
+    const pathMap = productGroupIds.length ? await this.systemOptionsService.getProductGroupPathsByIds(productGroupIds) : {};
+    const refMap = await this.getLastOrderReferencedAtMap(list.map((c) => c.id));
     const listWithPath = list.map((c) => ({
       ...c,
       productGroup: c.productGroupId != null ? (pathMap[c.productGroupId] ?? '') : '',
+      lastOrderReferencedAt: refMap.get(c.id) ?? null,
     }));
 
     return { list: listWithPath, total, page, pageSize };
+  }
+
+  /** 各客户最后一次被订单引用的时间：关联订单中 updated_at 的最大值 */
+  private async getLastOrderReferencedAtMap(customerIds: number[]): Promise<Map<number, Date | null>> {
+    const map = new Map<number, Date | null>();
+    if (!customerIds.length) return map;
+    for (const id of customerIds) {
+      map.set(id, null);
+    }
+    const rows = await this.orderRepo
+      .createQueryBuilder('o')
+      .select('o.customer_id', 'cid')
+      .addSelect('MAX(o.updated_at)', 'lastRef')
+      .where('o.customer_id IN (:...ids)', { ids: customerIds })
+      .groupBy('o.customer_id')
+      .getRawMany<{ cid: number; lastRef: Date | string | null }>();
+    for (const r of rows) {
+      const id = Number(r.cid);
+      if (!Number.isFinite(id)) continue;
+      map.set(id, r.lastRef ? new Date(r.lastRef) : null);
+    }
+    return map;
   }
 
   async findOne(id: number) {
@@ -101,10 +140,19 @@ export class CustomersService {
     const exists = await this.customerRepo.findOne({ where: { customerId } });
     if (exists) throw new ConflictException('客户编号已存在');
 
+    const companyTrimmed = (dto.company_name ?? '').trim();
+    if (!companyTrimmed) {
+      throw new BadRequestException('公司名称不能为空');
+    }
+    const dupCompany = await this.findCustomerByTrimmedCompanyName(companyTrimmed);
+    if (dupCompany) {
+      throw new ConflictException('该公司名称已存在，无法创建重复客户');
+    }
+
     const customer = this.customerRepo.create({
       customerId,
       country: dto.country ?? '',
-      companyName: dto.company_name,
+      companyName: companyTrimmed,
       contactPerson: dto.contact_person ?? '',
       contactInfo: dto.contact_info ?? '',
       cooperationDate: dto.cooperation_date ? new Date(dto.cooperation_date) : null,
@@ -143,7 +191,12 @@ export class CustomersService {
       customer.productGroupId = typeof dto.product_group_id === 'number' ? dto.product_group_id : null;
     // 公司名称：不允许用 null/空 覆盖已有值
     if (dto.company_name !== undefined && dto.company_name != null && String(dto.company_name).trim() !== '') {
-      customer.companyName = dto.company_name.trim();
+      const nextName = dto.company_name.trim();
+      const dup = await this.findCustomerByTrimmedCompanyName(nextName, id);
+      if (dup) {
+        throw new ConflictException('该公司名称已存在，请使用其他名称');
+      }
+      customer.companyName = nextName;
     }
     if (dto.cooperation_date !== undefined) customer.cooperationDate = dto.cooperation_date ? new Date(dto.cooperation_date) : null;
 
@@ -198,6 +251,17 @@ export class CustomersService {
 
   private toSnakeCase(str: string): string {
     return str.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+  }
+
+  /** 与库中已有客户公司名称是否重复（按首尾空白 trim 后完全一致） */
+  private async findCustomerByTrimmedCompanyName(trimmedName: string, excludeId?: number): Promise<Customer | null> {
+    const qb = this.customerRepo
+      .createQueryBuilder('c')
+      .where('TRIM(c.company_name) = :name', { name: trimmedName });
+    if (excludeId != null) {
+      qb.andWhere('c.id != :excludeId', { excludeId });
+    }
+    return qb.getOne();
   }
 
   /** 从小满获取客户列表（供前端选择），支持 keyword 模糊搜索 */

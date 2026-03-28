@@ -30,6 +30,8 @@ export interface PurchaseItemRow {
   purchaseOtherCost: string | null
   purchaseRemark: string | null
   purchaseImageUrl: string | null
+  /** 时效判定 */
+  timeRating: string
 }
 
 export interface PurchaseListRes {

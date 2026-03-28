@@ -88,12 +88,12 @@
                 min-width="60"
               >
                 <template #default="{ row }">
-                  <span>{{ row.quantities[index] ?? '' }}</span>
+                  <span>{{ formatDisplayNumber(row.quantities[index]) }}</span>
                 </template>
               </el-table-column>
               <el-table-column label="合计" min-width="60">
                 <template #default="{ row }">
-                  <span>{{ row.total }}</span>
+                  <span>{{ formatDisplayNumber(row.total) }}</span>
                 </template>
               </el-table-column>
               <el-table-column v-if="hasColorRemark" label="备注" min-width="100">
@@ -124,7 +124,11 @@
             :label="col.label"
             :min-width="col.minWidth"
             :show-overflow-tooltip="col.showOverflowTooltip"
-          />
+          >
+            <template #default="{ row }">
+              {{ formatDetailMaterialCell(row, col.key) }}
+            </template>
+          </el-table-column>
         </el-table>
         </div>
       </section>
@@ -146,7 +150,7 @@
             :min-width="sizeMetaColWidth"
           >
             <template #default="{ row }">
-              <span>{{ row.metaValues[index] ?? '' }}</span>
+              <span>{{ formatDisplayNumber(row.metaValues[index]) }}</span>
             </template>
           </el-table-column>
           <el-table-column
@@ -156,7 +160,7 @@
             :min-width="sizeValueColWidth"
           >
             <template #default="{ row }">
-              <span>{{ row.sizeValues[index] ?? '' }}</span>
+              <span>{{ formatDisplayNumber(row.sizeValues[index]) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -180,7 +184,11 @@
             :label="col.label"
             :min-width="col.minWidth"
             :show-overflow-tooltip="col.showOverflowTooltip"
-          />
+          >
+            <template #default="{ row }">
+              {{ formatDetailProcessCell(row, col.key) }}
+            </template>
+          </el-table-column>
         </el-table>
         </div>
       </section>
@@ -245,6 +253,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems, getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { formatDate } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const route = useRoute()
 const router = useRouter()
@@ -401,6 +410,30 @@ const materialsForView = computed(() => {
 })
 
 const hasMaterials = computed(() => materialsForView.value.length > 0)
+
+const DETAIL_MATERIAL_NUMERIC_KEYS = new Set([
+  'usagePerPiece',
+  'lossPercent',
+  'orderPieces',
+  'purchaseQuantity',
+  'cuttingQuantity',
+])
+
+const DETAIL_PROCESS_TEXT_KEYS = new Set(['processName', 'supplierName', 'part', 'remark'])
+
+function formatDetailMaterialCell(row: Record<string, unknown>, key: string): string {
+  const v = row[key]
+  if (v === null || v === undefined || v === '') return ''
+  if (DETAIL_MATERIAL_NUMERIC_KEYS.has(key)) return formatDisplayNumber(v)
+  return String(v)
+}
+
+function formatDetailProcessCell(row: Record<string, unknown>, key: string): string {
+  const v = row[key]
+  if (v === null || v === undefined || v === '') return ''
+  if (DETAIL_PROCESS_TEXT_KEYS.has(key)) return String(v)
+  return formatDisplayNumber(v)
+}
 
 function toPrintLabelByKey(key: string): string {
   const labelMap: Record<string, string> = {

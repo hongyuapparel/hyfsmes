@@ -115,14 +115,15 @@ import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDashboardSummary, type DashboardSummary } from '@/api/finance'
 import { getErrorMessage } from '@/api/request'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(false)
 
 function fmtAmt(v: string | number | undefined | null) {
-  if (v == null) return '0.00'
+  if (v == null) return formatDisplayNumber(0)
   const n = Number(v)
-  return Number.isNaN(n) ? '0.00' : n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Number.isNaN(n) ? formatDisplayNumber(0) : formatDisplayNumber(n)
 }
 
 const profitColor = computed(() => {

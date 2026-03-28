@@ -104,7 +104,9 @@
       <el-table-column prop="skuCode" label="sku" width="90" show-overflow-tooltip />
       <el-table-column prop="collaborationTypeLabel" :label="'\u5408\u4f5c\u65b9\u5f0f'" width="90" show-overflow-tooltip />
       <el-table-column prop="orderTypeLabel" :label="'\u8ba2\u5355\u7c7b\u578b'" width="90" show-overflow-tooltip />
-      <el-table-column prop="quantity" :label="'\u6570\u91cf'" width="70" show-overflow-tooltip />
+      <el-table-column :label="'\u6570\u91cf'" width="70" show-overflow-tooltip>
+        <template #default="{ row }">{{ formatBizNumberForTable(row.quantity) }}</template>
+      </el-table-column>
       <el-table-column prop="merchandiser" :label="'\u8ddf\u5355\u5458'" width="80" show-overflow-tooltip />
       <el-table-column prop="salesperson" :label="'\u4e1a\u52a1\u5458'" width="80" show-overflow-tooltip />
       <el-table-column prop="customerName" :label="'\u5ba2\u6237'" width="110" show-overflow-tooltip />
@@ -118,10 +120,10 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.reviewAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u5ba1\u5355\u8017\u65f6\uff08\u5c0f\u65f6\uff09'" width="120" show-overflow-tooltip>
-        <template #default="{ row }">{{ formatMaybeNumber(row.reviewDurationHours) }}</template>
+        <template #default="{ row }">{{ formatBizNumberForTable(row.reviewDurationHours) }}</template>
       </el-table-column>
       <el-table-column :label="'\u5ba1\u5355\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.reviewJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.reviewJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5230\u91c7\u8d2d\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.purchaseArrivedAt) }}</template>
@@ -130,7 +132,7 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.purchaseCompletedAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u91c7\u8d2d\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.purchaseJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.purchaseJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5230\u7eb8\u6837\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.patternArrivedAt) }}</template>
@@ -139,7 +141,7 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.patternCompletedAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u7eb8\u6837\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.patternJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.patternJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5230\u88c1\u5e8a\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.cuttingArrivedAt) }}</template>
@@ -148,7 +150,7 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.cuttingCompletedAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u88c1\u5e8a\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.cuttingJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.cuttingJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5230\u5de5\u827a\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.craftArrivedAt) }}</template>
@@ -157,7 +159,7 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.craftCompletedAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u5de5\u827a\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.craftJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.craftJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5230\u8f66\u7f1d\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.sewingArrivedAt) }}</template>
@@ -166,7 +168,7 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.sewingCompletedAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u8f66\u7f1d\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.sewingJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.sewingJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5230\u5c3e\u90e8\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.finishingArrivedAt) }}</template>
@@ -175,7 +177,7 @@
         <template #default="{ row }">{{ formatMaybeDateTime(row.finishingCompletedAt) }}</template>
       </el-table-column>
       <el-table-column :label="'\u5c3e\u90e8\u5224\u5b9a'" width="90" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.finishingJudge || '-' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="row.finishingJudge" /></template>
       </el-table-column>
       <el-table-column :label="'\u5b8c\u6210\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.completedAt) }}</template>
@@ -184,9 +186,11 @@
       <el-table-column :label="'\u8fdb\u5165\u72b6\u6001\u65f6\u95f4'" width="150" show-overflow-tooltip>
         <template #default="{ row }">{{ formatMaybeDateTime(row.enteredAt) }}</template>
       </el-table-column>
-      <el-table-column prop="durationHours" :label="'\u8017\u65f6\uff08\u5c0f\u65f6\uff09'" width="110" show-overflow-tooltip />
+      <el-table-column :label="'\u8017\u65f6\uff08\u5c0f\u65f6\uff09'" width="110" show-overflow-tooltip>
+        <template #default="{ row }">{{ formatBizNumberForTable(row.durationHours) }}</template>
+      </el-table-column>
       <el-table-column :label="'\u65f6\u6548\u5224\u5b9a'" width="90" align="center" show-overflow-tooltip>
-        <template #default="{ row }">{{ row.isOverdue ? '\u8d85\u671f' : '\u6b63\u5e38' }}</template>
+        <template #default="{ row }"><SlaJudgeTag :text="currentSegmentSlaLabel(row)" /></template>
       </el-table-column>
     </el-table>
 
@@ -221,18 +225,32 @@
         <el-table-column prop="skuCode" label="SKU" width="100" />
         <el-table-column prop="collaborationTypeLabel" label="合作方式" width="100" />
         <el-table-column prop="orderTypeLabel" label="订单类型" width="100" />
-        <el-table-column prop="shipmentQty" label="出货数量" width="90" />
+        <el-table-column label="出货数量" width="90">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.shipmentQty) }}</template>
+        </el-table-column>
         <el-table-column prop="merchandiser" label="跟单" width="90" />
         <el-table-column prop="salesperson" label="业务员" width="90" />
         <el-table-column prop="customerName" label="客户" width="120" />
-        <el-table-column prop="salePrice" label="销售价" width="90" />
-        <el-table-column prop="factoryPrice" label="出厂价" width="90" />
-        <el-table-column prop="materialCost" label="材料成本" width="150" />
-        <el-table-column prop="processCost" label="工艺项目" width="150" />
-        <el-table-column prop="productionCost" label="生产工序" width="150" />
-        <el-table-column prop="unitProfit" label="单件利润" width="130" />
+        <el-table-column label="销售价" width="90">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.salePrice) }}</template>
+        </el-table-column>
+        <el-table-column label="出厂价" width="90">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.factoryPrice) }}</template>
+        </el-table-column>
+        <el-table-column label="材料成本" width="150">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.materialCost) }}</template>
+        </el-table-column>
+        <el-table-column label="工艺项目" width="150">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.processCost) }}</template>
+        </el-table-column>
+        <el-table-column label="生产工序" width="150">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.productionCost) }}</template>
+        </el-table-column>
+        <el-table-column label="单件利润" width="130">
+          <template #default="{ row }">{{ formatBizNumberForTable(row.unitProfit) }}</template>
+        </el-table-column>
         <el-table-column label="工厂总利润" width="130">
-          <template #default="{ row }">{{ formatMaybeNumber(calcFactoryTotalProfit(row)) }}</template>
+          <template #default="{ row }">{{ formatBizNumberForTable(calcFactoryTotalProfit(row)) }}</template>
         </el-table-column>
       </el-table>
 
@@ -265,6 +283,8 @@ import type { OrderStatusItem } from '@/api/order-status-config'
 import { getDictItems } from '@/api/dicts'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const loading = ref(false)
 const list = ref<OrderSlaReportRow[]>([])
@@ -303,6 +323,12 @@ function centerStyle() {
   return { textAlign: 'center' }
 }
 
+/** 与生产列表一致：当前停留段未配置 SLA 时不显示「未超期」 */
+function currentSegmentSlaLabel(row: OrderSlaReportRow): string {
+  if (row.limitHours == null) return '未配置时限'
+  return row.isOverdue ? '超期' : '未超期'
+}
+
 function onSelectionChange(rows: OrderSlaReportRow[]) {
   selection.value = rows ?? []
 }
@@ -327,6 +353,11 @@ function formatMaybeDateTime(v: string | null | undefined): string {
 function formatMaybeNumber(v: number | null | undefined): string {
   if (v == null) return '-'
   return String(v)
+}
+
+function formatBizNumberForTable(v: unknown): string {
+  if (v === null || v === undefined || v === '') return '-'
+  return formatDisplayNumber(v)
 }
 
 function calcFactoryTotalProfit(row: { unitProfit?: number | null; shipmentQty?: number | null }): number {
@@ -376,7 +407,7 @@ function buildCsv(rows: OrderSlaReportRow[]): string {
       r.statusLabel,
       formatMaybeDateTime(r.enteredAt),
       r.durationHours,
-      r.isOverdue ? '\u8d85\u671f' : '\u6b63\u5e38',
+      currentSegmentSlaLabel(r),
     ].map(toCsvCell).join(','))
   }
   return `\uFEFF${lines.join('\n')}`

@@ -204,7 +204,7 @@
               >
                 <td class="ellipsis" :title="item.orderNo">{{ item.orderNo }}</td>
                 <td class="ellipsis" :title="item.skuCode">{{ item.skuCode }}</td>
-                <td>{{ item.quantity }}</td>
+                <td>{{ formatDisplayNumber(item.quantity) }}</td>
               </tr>
             </tbody>
           </table>
@@ -258,6 +258,7 @@ import type { OrderStatusItem } from '@/api/order-status-config'
 import { getPendingInboundList } from '@/api/inventory-pending'
 import type { PendingInboundItem } from '@/api/inventory-pending'
 import { formatDate } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const router = useRouter()
 const authStore = useAuthStore()

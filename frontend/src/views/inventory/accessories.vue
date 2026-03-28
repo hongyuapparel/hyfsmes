@@ -86,21 +86,16 @@
           <el-table-column type="selection" width="46" fixed />
           <el-table-column label="图片" width="90" align="center">
             <template #default="{ row }">
-              <el-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                fit="cover"
-                style="width: 56px; height: 56px; border-radius: 6px"
-                :preview-src-list="[row.imageUrl]"
-                preview-teleported
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
               <span v-else>-</span>
             </template>
           </el-table-column>
           <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="category" label="类别" width="100" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="quantity" label="数量" width="90" align="center" header-align="center" />
+          <el-table-column label="数量" width="90" align="center" header-align="center">
+            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+          </el-table-column>
           <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
           <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
@@ -185,14 +180,7 @@
           <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="图片" width="90" align="center">
             <template #default="{ row }">
-              <el-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                fit="cover"
-                style="width: 56px; height: 56px; border-radius: 6px"
-                :preview-src-list="[row.imageUrl]"
-                preview-teleported
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -203,7 +191,9 @@
               {{ row.outboundType === 'order_auto' ? '订单自动出库' : '手动出库' }}
             </template>
           </el-table-column>
-          <el-table-column prop="quantity" label="出库数量" width="100" align="center" header-align="center" />
+          <el-table-column label="出库数量" width="100" align="center" header-align="center">
+            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+          </el-table-column>
           <el-table-column prop="beforeQuantity" label="出库前库存" width="110" align="center" header-align="center" />
           <el-table-column prop="afterQuantity" label="出库后库存" width="110" align="center" header-align="center" />
           <el-table-column prop="operatorUsername" label="操作人" width="120" show-overflow-tooltip align="center" header-align="center" />
@@ -367,7 +357,7 @@
         <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
         <div><span class="detail-label">类别：</span>{{ detailDrawer.row.category || '-' }}</div>
         <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
-        <div><span class="detail-label">当前库存：</span>{{ detailDrawer.row.quantity }} {{ detailDrawer.row.unit || '' }}</div>
+        <div><span class="detail-label">当前库存：</span>{{ formatDisplayNumber(detailDrawer.row.quantity) }} {{ detailDrawer.row.unit || '' }}</div>
         <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
       </div>
       <div class="detail-log-title">操作记录</div>
@@ -414,6 +404,7 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime as formatDate } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const filter = reactive({ name: '', category: '', customerName: '' })

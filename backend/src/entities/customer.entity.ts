@@ -2,7 +2,8 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 
 /**
  * 客户实体
- * 字段与 frontend/src/fields/customer-fields.ts 的 code 一一对应（camelCase -> snake_case）
+ * 字段与 frontend/src/fields/customer-fields.ts 的 code 一一对应（camelCase -> snake_case）；
+ * createdAt 对应列表「创建日期」；「最近活跃日期」由订单关联在列表接口中单独计算，见 lastOrderReferencedAt
  */
 @Entity('customers')
 export class Customer {

@@ -14,8 +14,11 @@ export interface CuttingListItem {
   completedAt: string | null
   cuttingStatus: string
   actualCutTotal: number | null
+  /** 裁剪总成本（元） */
   cuttingCost: string | null
-  /** 实际用布总米数（m，仅本厂裁床），可为空 */
+  /** 裁剪单价（元/件），新数据可能有值 */
+  cuttingUnitPrice?: string | null
+  /** 本次实际净耗合计（米） */
   actualFabricMeters?: string | null
   timeRating: string
 }
@@ -53,13 +56,45 @@ export interface ColorSizeRow {
   remark?: string
 }
 
+export interface CuttingRegisterOrderBrief {
+  orderNo: string
+  skuCode: string
+  quantity: number
+  customerName: string
+  orderDate: string | null
+}
+
+export interface CuttingMaterialUsagePayloadRow {
+  rowKey: string
+  materialTypeId?: number | null
+  categoryLabel: string
+  materialName: string
+  colorSpec: string
+  expectedUsagePerPiece: number | null
+  issuedMeters: number
+  returnedMeters: number
+  abnormalLossMeters: number
+  abnormalReason: string | null
+  remark: string
+}
+
+export interface CuttingRegisterFormRes {
+  orderBrief: CuttingRegisterOrderBrief
+  colorSizeHeaders: string[]
+  colorSizeRows: ColorSizeRow[]
+  materialUsageRows: CuttingMaterialUsagePayloadRow[]
+}
+
+export function getCuttingRegisterForm(orderId: number) {
+  return request.get<CuttingRegisterFormRes>(`/production/cutting/items/${orderId}/register-form`)
+}
+
 export function getOrderColorSize(orderId: number) {
   return request.get<{ colorSizeHeaders: string[]; colorSizeRows: ColorSizeRow[] }>(
     `/production/cutting/items/${orderId}/color-size`,
   )
 }
 
-/** 裁床列表用：订单数量/裁床数量按尺码明细（与订单列表数量追踪同结构） */
 export interface CuttingQuantityBreakdownRes {
   headers: string[]
   rows: Array<{ label: string; values: (number | null)[] }>
@@ -71,16 +106,36 @@ export function getCuttingQuantityBreakdown(orderId: number) {
   )
 }
 
+/** 裁床已完成：抽屉详情（与后端 CuttingCompletedDetailResponse 一致） */
+export interface CuttingCompletedDetailRes {
+  orderBrief: CuttingRegisterOrderBrief
+  colorSizeHeaders: string[]
+  actualCutRows: ColorSizeRow[]
+  materialUsageRows: CuttingMaterialUsagePayloadRow[]
+  cuttingDepartment: string | null
+  cutterName: string | null
+  cuttingUnitPrice: string | null
+  cuttingTotalCost: string | null
+  cuttingCost: string | null
+  actualFabricMeters: string | null
+  arrivedAt: string | null
+  completedAt: string | null
+}
+
+export function getCuttingCompletedDetail(orderId: number) {
+  return request.get<CuttingCompletedDetailRes>(`/production/cutting/items/${orderId}/completed-detail`)
+}
+
 export function completeCutting(payload: {
   orderId: number
-  cuttingCost: string
   actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[]
-  /** 裁剪部门/加工厂：本厂或外发加工厂名称 */
   cuttingDepartment?: string | null
-  /** 裁剪人：仅本厂裁床时填写 */
   cutterName?: string | null
-  /** 实际用布总米数（m，仅本厂裁床） */
-  actualFabricMeters?: string | null
+  cuttingUnitPrice?: string | null
+  cuttingTotalCost?: string | null
+  /** 兼容旧前端 */
+  cuttingCost?: string | null
+  materialUsage?: CuttingMaterialUsagePayloadRow[]
 }) {
   return request.post<void>('/production/cutting/items/complete', payload)
 }

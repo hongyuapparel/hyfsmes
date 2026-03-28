@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card purchase-page">
+  <div class="page-card page-card--fill purchase-page">
     <!-- Tab：全部 / 等待采购 / 采购完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -126,6 +126,7 @@
     <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
     <!-- 物料列表表格 -->
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="purchaseTableRef"
       v-loading="loading"
@@ -133,6 +134,7 @@
       border
       stripe
       class="purchase-table"
+      :height="tableHeight"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -147,18 +149,16 @@
           {{ formatDateTime(row.processRoute === 'picking' ? row.pickCompletedAt : row.purchaseCompletedAt) }}
         </template>
       </el-table-column>
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
+        </template>
+      </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
-          <el-image
-            v-if="row.imageUrl"
-            :src="row.imageUrl"
-            fit="cover"
-            class="table-thumb"
-            :preview-teleported="true"
-            :preview-src-list="[row.imageUrl]"
-          />
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -167,17 +167,21 @@
       <el-table-column prop="materialName" label="物料名称" min-width="120" />
       <el-table-column prop="planQuantity" label="计划用量" width="96" align="right">
         <template #default="{ row }">
-          {{ row.planQuantity != null ? row.planQuantity : '-' }}
+          {{ row.planQuantity != null ? formatDisplayNumber(row.planQuantity) : '-' }}
         </template>
       </el-table-column>
       <el-table-column prop="actualPurchaseQuantity" label="实际采购" width="96" align="right">
         <template #default="{ row }">
-          {{ row.actualPurchaseQuantity != null ? row.actualPurchaseQuantity : '-' }}
+          {{ row.actualPurchaseQuantity != null ? formatDisplayNumber(row.actualPurchaseQuantity) : '-' }}
         </template>
       </el-table-column>
       <el-table-column prop="purchaseAmount" label="采购金额" width="100" align="right">
         <template #default="{ row }">
-          {{ row.purchaseAmount != null && row.purchaseAmount !== '' ? `￥${row.purchaseAmount}` : '-' }}
+          {{
+            row.purchaseAmount != null && row.purchaseAmount !== ''
+              ? `￥${formatDisplayNumber(row.purchaseAmount)}`
+              : '-'
+          }}
         </template>
       </el-table-column>
       <el-table-column prop="purchaseStatus" label="采购状态" width="100" align="center">
@@ -193,6 +197,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -301,7 +306,9 @@
           <div><span class="pick-brief-label">物料类型：</span>{{ displayMaterialType(pickDialog.row) }}</div>
           <div><span class="pick-brief-label">物料来源：</span>{{ pickDialog.row.materialSource || '-' }}</div>
           <div><span class="pick-brief-label">颜色：</span>{{ pickDialog.row.color || '-' }}</div>
-          <div><span class="pick-brief-label">计划用量：</span>{{ pickDialog.row.planQuantity ?? '-' }} 米</div>
+          <div>
+            <span class="pick-brief-label">计划用量：</span>{{ pickDialog.row.planQuantity != null ? formatDisplayNumber(pickDialog.row.planQuantity) : '-' }} 米
+          </div>
           <div v-if="pickDialog.total > 1"><span class="pick-brief-label">当前处理：</span>{{ pickDialog.index + 1 }} / {{ pickDialog.total }}</div>
         </div>
         <el-alert
@@ -323,13 +330,11 @@
             <el-select v-model="pickForm.inventoryId" clearable filterable placeholder="先选择库存来源类型" :disabled="!pickForm.inventorySourceType">
               <el-option v-for="opt in pickInventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
                 <div class="pick-stock-option">
-                  <el-image
+                  <AppImageThumb
                     v-if="opt.imageUrl"
-                    :src="opt.imageUrl"
-                    fit="cover"
-                    class="pick-stock-thumb"
-                    :preview-src-list="[opt.imageUrl]"
-                    preview-teleported
+                    :raw-url="opt.imageUrl"
+                    :width="28"
+                    :height="28"
                   />
                   <span v-else class="pick-stock-thumb-empty">-</span>
                   <span class="pick-stock-option-label">{{ opt.label }}</span>
@@ -375,6 +380,9 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
@@ -440,6 +448,8 @@ const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<PurchaseItemRow[]>([])
 const purchaseTableRef = ref()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PurchaseItemRow[]>([])
@@ -531,7 +541,7 @@ watch(
     const u = parseNumber(unit)
     const o = parseNumber(other)
     const total = q * u + o
-    registerForm.purchaseAmount = Number.isFinite(total) ? total.toFixed(2) : '0'
+    registerForm.purchaseAmount = Number.isFinite(total) ? formatDisplayNumber(total) : formatDisplayNumber(0)
   },
   { immediate: true },
 )
@@ -835,6 +845,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .status-tabs {
@@ -849,7 +860,8 @@ onMounted(() => {
 }
 
 .purchase-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {

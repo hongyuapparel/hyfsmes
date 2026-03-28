@@ -13,7 +13,16 @@ export const CUSTOMER_FIELDS: FieldDefinition[] = [
   { code: 'contactInfo', label: '联系方式', type: 'phone', order: 5, filterable: false, placeholder: '国家代码', placeholderSuffix: '电话号码' },
   { code: 'cooperationDate', label: '合作日期', type: 'date', order: 6, sortable: true, filterable: false },
   { code: 'salesperson', label: '业务员', type: 'select', order: 7, filterable: true, optionsKey: 'salespeople', placeholder: '选择业务员' },
-  { code: 'productGroup', label: '产品分组', type: 'select', order: 8, filterable: false, optionsKey: 'productGroups', placeholder: '选择产品分组' },
+  { code: 'createdAt', label: '创建日期', type: 'date', order: 8, sortable: true, filterable: false },
+  {
+    code: 'lastOrderReferencedAt',
+    label: '最近活跃日期',
+    type: 'date',
+    order: 9,
+    sortable: true,
+    filterable: false,
+  },
+  { code: 'productGroup', label: '产品分组', type: 'select', order: 10, filterable: false, optionsKey: 'productGroups', placeholder: '选择产品分组' },
 ]
 
 /** 按 order 排序后的字段列表 */

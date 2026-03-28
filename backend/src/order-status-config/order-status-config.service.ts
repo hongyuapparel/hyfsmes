@@ -10,6 +10,12 @@ import { Order } from '../entities/order.entity';
 import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
+/** 生产列表时效判定：单次列表请求内复用 SLA 与状态 code → 实体映射 */
+export type ProductionSlaJudgeContext = {
+  slaMap: Map<number, number>;
+  statusByCode: Map<string, OrderStatus>;
+};
+
 @Injectable()
 export class OrderStatusConfigService {
   constructor(
@@ -574,7 +580,7 @@ export class OrderStatusConfigService {
         if (endAt) {
           if (limit == null) return '未配置时限';
           const hours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
-          return hours > limit ? '超期' : '正常';
+          return hours > limit ? '超期' : '未超期';
         }
         return orderStatusCode === phaseCode ? '进行中' : '-';
       };
@@ -810,6 +816,59 @@ export class OrderStatusConfigService {
     const page = Math.max(1, params.page ?? 1);
     const start = (page - 1) * pageSize;
     return { list: list.slice(start, start + pageSize), summary: { total: list.length } };
+  }
+
+  async loadProductionSlaJudgeContext(): Promise<ProductionSlaJudgeContext> {
+    const slaRows = await this.slaRepo.find({ where: { enabled: true } });
+    const slaMap = new Map<number, number>();
+    for (const r of slaRows) {
+      const n = parseFloat(String(r.limitHours));
+      if (Number.isFinite(n)) slaMap.set(r.orderStatusId, n);
+    }
+    const allStatuses = await this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
+    const statusByCode = new Map(allStatuses.map((s) => [s.code, s]));
+    return { slaMap, statusByCode };
+  }
+
+  /** 列表中的时间字符串或 Date 解析为 Date（YYYY-MM-DD、YYYY-MM-DD HH:mm:ss、ISO） */
+  parseProductionPhaseInstant(value: Date | string | null | undefined): Date | null {
+    if (value == null) return null;
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    const s = String(value).trim();
+    if (!s || s === '-') return null;
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+      const d = new Date(`${s}T00:00:00`);
+      return Number.isNaN(d.getTime()) ? null : d;
+    }
+    const normalized = s.includes('T') ? s : s.replace(' ', 'T');
+    const d = new Date(normalized);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+
+  /**
+   * 生产模块列表：「进入该阶段时间 → 完成时间」小时数对比订单时效配置（order_status_sla，按状态 code）。
+   * 未完成且订单当前正处于该阶段：进行中；无开始时间：-；该阶段未配置时限：未配置时限。
+   */
+  judgeProductionPhaseDuration(
+    phaseCode: string,
+    startAt: Date | null,
+    endAt: Date | null,
+    orderStatusCode: string,
+    ctx: ProductionSlaJudgeContext,
+  ): string {
+    if (!startAt) return '-';
+    const code = (phaseCode ?? '').trim();
+    const phaseStatus = ctx.statusByCode.get(code);
+    const limit = phaseStatus != null ? ctx.slaMap.get(phaseStatus.id) ?? null : null;
+    if (endAt) {
+      if (limit == null) return '未配置时限';
+      const hours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
+      return hours > limit ? '超期' : '未超期';
+    }
+    const cur = (orderStatusCode ?? '').trim();
+    return cur === code ? '进行中' : '-';
   }
 }
 

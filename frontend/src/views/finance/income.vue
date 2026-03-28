@@ -111,7 +111,13 @@
           <div class="attachment-area">
             <div v-if="form.attachments.length" class="attachment-list">
               <div v-for="(url, idx) in form.attachments" :key="idx" class="attachment-item">
-                <el-image :src="url" fit="cover" class="attachment-thumb" :preview-src-list="form.attachments" :initial-index="idx" />
+                <AppImageThumb
+                  :raw-url="url"
+                  :width="72"
+                  :height="72"
+                  :preview-gallery="form.attachments"
+                  :preview-gallery-index="idx"
+                />
                 <el-button link type="danger" size="small" class="attachment-del" @click="removeAttachment(idx)">删除</el-button>
               </div>
             </div>
@@ -149,6 +155,7 @@ import { uploadFinanceImage } from '@/api/uploads'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const options = reactive<{ incomeTypes: FinanceIncomeType[]; fundAccounts: FinanceFundAccount[] }>({
   incomeTypes: [],
@@ -169,7 +176,7 @@ const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const rawTotalAmount = ref(0)
 const summary = computed(() => ({
-  totalAmount: rawTotalAmount.value > 0 ? rawTotalAmount.value.toLocaleString('zh-CN', { minimumFractionDigits: 2 }) : '',
+  totalAmount: rawTotalAmount.value > 0 ? formatDisplayNumber(rawTotalAmount.value) : '',
 }))
 
 const dialog = reactive({ visible: false, isEdit: false, submitting: false })
@@ -193,7 +200,7 @@ const previewDialog = reactive({ visible: false, urls: [] as string[] })
 
 function fmtAmt(v: string | number) {
   const n = Number(v)
-  return Number.isNaN(n) ? '-' : n.toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Number.isNaN(n) ? '-' : formatDisplayNumber(n)
 }
 
 function hasDateRangeValue(v: DateRangeValue | undefined) {
@@ -357,7 +364,6 @@ onMounted(async () => {
 .attachment-area { display: flex; flex-direction: column; gap: 8px; }
 .attachment-list { display: flex; flex-wrap: wrap; gap: 8px; }
 .attachment-item { position: relative; }
-.attachment-thumb { width: 72px; height: 72px; border-radius: 4px; border: 1px solid var(--color-border); cursor: zoom-in; }
 .attachment-del { position: absolute; top: 2px; right: 2px; padding: 0 4px; background: rgba(0,0,0,.45); color: #fff; border-radius: 2px; }
 .preview-grid { display: flex; flex-wrap: wrap; gap: 12px; }
 .preview-img { width: 180px; height: 180px; border-radius: 6px; border: 1px solid var(--color-border); cursor: zoom-in; }

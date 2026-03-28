@@ -1,7 +1,8 @@
 <template>
-  <div class="page-card inventory-fabric-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
+  <div class="page-card page-card--fill inventory-fabric-page">
+    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="库存" name="stock">
+        <div class="tab-pane-scroll">
         <div class="filter-bar">
           <el-input
             v-model="filter.name"
@@ -55,6 +56,7 @@
           </div>
         </div>
 
+        <div ref="fabricStockShellRef" class="list-page-table-shell">
         <el-table
           ref="fabricStockTableRef"
           v-loading="loading"
@@ -62,26 +64,22 @@
           border
           stripe
           class="fabric-table"
+          :height="fabricStockTableHeight"
           @header-dragend="onFabricStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="48" align="center" header-align="center" />
           <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
-              <el-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                fit="cover"
-                style="width: 56px; height: 56px; border-radius: 6px"
-                :preview-src-list="[row.imageUrl]"
-                preview-teleported
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
           <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="quantity" label="数量" width="100" align="center" header-align="center" />
+          <el-table-column label="数量" width="100" align="center" header-align="center">
+            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+          </el-table-column>
           <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
           <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
@@ -94,6 +92,7 @@
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
         <div class="pagination-wrap">
           <el-pagination
@@ -106,9 +105,11 @@
             @size-change="onPageSizeChange"
           />
         </div>
+        </div>
       </el-tab-pane>
 
       <el-tab-pane label="出库记录" name="outbounds">
+        <div class="tab-pane-scroll">
         <div class="filter-bar">
           <el-input v-model="outboundFilter.name" placeholder="面料名称" clearable size="large" class="filter-bar-item" @keyup.enter="onOutboundSearch(true)" />
           <el-select v-model="outboundFilter.customerName" placeholder="客户" filterable clearable size="large" class="filter-bar-item" @change="onOutboundSearch(true)">
@@ -134,6 +135,7 @@
           </div>
         </div>
 
+        <div ref="fabricOutboundShellRef" class="list-page-table-shell">
         <el-table
           ref="fabricOutboundTableRef"
           v-loading="outboundLoading2"
@@ -141,29 +143,24 @@
           border
           stripe
           class="fabric-table"
+          :height="fabricOutboundTableHeight"
           @header-dragend="onFabricOutboundHeaderDragEnd"
         >
           <el-table-column prop="createdAt" label="时间" width="160" align="center" header-align="center" />
           <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="出库数量" width="110" align="center" header-align="center">
-            <template #default="{ row }">{{ row.quantity }} {{ row.unit }}</template>
+            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }} {{ row.unit }}</template>
           </el-table-column>
           <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="照片" width="90" align="center" header-align="center">
             <template #default="{ row }">
-              <el-image
-                v-if="row.photoUrl"
-                :src="row.photoUrl"
-                fit="cover"
-                style="width: 56px; height: 56px; border-radius: 6px"
-                :preview-src-list="[row.photoUrl]"
-                preview-teleported
-              />
+              <AppImageThumb v-if="row.photoUrl" :raw-url="row.photoUrl" variant="table" />
               <span v-else>-</span>
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
         <div class="pagination-wrap">
           <el-pagination
@@ -175,6 +172,7 @@
             @current-change="loadOutbounds"
             @size-change="onOutboundPageSizeChange"
           />
+        </div>
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -290,7 +288,7 @@
       <div v-if="detailDrawer.row" class="detail-base">
         <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
         <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
-        <div><span class="detail-label">当前库存：</span>{{ detailDrawer.row.quantity }} {{ detailDrawer.row.unit || '' }}</div>
+        <div><span class="detail-label">当前库存：</span>{{ formatDisplayNumber(detailDrawer.row.quantity) }} {{ detailDrawer.row.unit || '' }}</div>
         <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
       </div>
       <div class="detail-log-title">操作记录</div>
@@ -334,12 +332,18 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime as formatDate } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const filter = reactive({ name: '', customerName: '' })
 const nameLabelVisible = ref(false)
 const list = ref<FabricItem[]>([])
 const fabricStockTableRef = ref()
 const fabricOutboundTableRef = ref()
+const fabricStockShellRef = ref<HTMLElement | null>(null)
+const fabricOutboundShellRef = ref<HTMLElement | null>(null)
+const { tableHeight: fabricStockTableHeight } = useFlexShellTableHeight(fabricStockShellRef)
+const { tableHeight: fabricOutboundTableHeight } = useFlexShellTableHeight(fabricOutboundShellRef)
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -665,10 +669,12 @@ function onOutboundPageSizeChange() {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .inventory-fabric-page .fabric-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .detail-base {

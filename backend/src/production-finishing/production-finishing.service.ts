@@ -8,6 +8,7 @@ import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 
 export interface FinishingListItem {
   orderId: number;
@@ -37,6 +38,8 @@ export interface FinishingListItem {
   defectQuantity: number | null;
   /** 登记包装完成时的备注 */
   remark: string | null;
+  /** 时效判定（与订单时效配置对比） */
+  timeRating: string;
 }
 
 export interface FinishingListQuery {
@@ -63,6 +66,7 @@ export class ProductionFinishingService {
     @InjectRepository(InboundPending)
     private readonly inboundPendingRepo: Repository<InboundPending>,
     private readonly orderWorkflowService: OrderWorkflowService,
+    private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
@@ -186,6 +190,7 @@ export class ProductionFinishingService {
     const finishingMap = new Map(finishings.map((f) => [f.orderId, f]));
     const cuttingMap = new Map(cuttings.map((c) => [c.orderId, c]));
     const sewingMap = new Map(sewings.map((s) => [s.orderId, s]));
+    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     const rows: FinishingListItem[] = [];
     for (const order of orders) {
@@ -207,6 +212,21 @@ export class ProductionFinishingService {
         (order.status === 'pending_finishing' ? this.toDateTimeLocalString(order.statusTime) : null);
       const completedAt = this.toDateTimeLocalString(finishing?.completedAt);
 
+      let phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(finishing?.arrivedAt ?? null);
+      if (!phaseStart && order.status === 'pending_finishing') {
+        phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(order.statusTime);
+      }
+      const phaseEnd = finishing?.completedAt
+        ? this.orderStatusConfigService.parseProductionPhaseInstant(finishing.completedAt)
+        : null;
+      const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
+        'pending_finishing',
+        phaseStart,
+        phaseEnd,
+        order.status ?? '',
+        slaCtx,
+      );
+
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
@@ -227,6 +247,7 @@ export class ProductionFinishingService {
         tailInboundQty: finishing?.tailInboundQty ?? null,
         defectQuantity: finishing?.defectQuantity ?? null,
         remark: finishing?.remark ?? null,
+        timeRating,
       });
     }
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card">
+  <div class="page-card page-card--fill">
     <!-- 图片上传用隐藏 input，放在 v-for 外避免 ref 被覆盖 -->
     <input
       ref="imageFileInputRef"
@@ -47,9 +47,9 @@
         </div>
       </aside>
       <!-- 右侧：产品详情 -->
-      <main ref="productsMainRef" class="products-main">
+      <main class="products-main">
         <!-- 顶部筛选 -->
-        <div ref="filterBarRef" class="filter-bar">
+        <div class="filter-bar">
           <el-input
             v-model="filter.productName"
             placeholder="产品名称"
@@ -177,7 +177,8 @@
           stripe
           :fit="true"
           :height="tableHeight"
-          :row-style="() => ({ height: '34px' })"
+          scrollbar-always-on
+          :row-style="() => ({ minHeight: '58px' })"
           :cell-style="getCellStyle"
           :header-cell-style="getHeaderCellStyle"
           @selection-change="onSelectionChange"
@@ -187,7 +188,8 @@
           <el-table-column
             v-for="f in tableFields"
             :key="f.code"
-            :prop="f.code === 'companyName' ? undefined : f.code"
+            :column-key="f.code"
+            :prop="productListColumnProp(f)"
             :label="f.label"
             :min-width="getColumnMinWidth(f)"
             :sortable="f.sortable ? 'custom' : false"
@@ -195,31 +197,7 @@
           >
             <template #default="{ row }">
               <template v-if="f.type === 'image'">
-                <el-popover
-                  v-if="row[f.code]"
-                  placement="right"
-                  trigger="hover"
-                  :width="320"
-                  popper-class="product-image-popover"
-                >
-                  <template #reference>
-                    <el-image
-                      :src="getProductListImageUrl(row[f.code])"
-                      fit="cover"
-                      lazy
-                      :preview-teleported="true"
-                      :preview-src-list="[row[f.code]]"
-                      @error="onProductListImageError(row[f.code])"
-                      style="width: 40px; height: 40px; border-radius: 4px; cursor: pointer"
-                    />
-                  </template>
-                  <el-image
-                    :src="row[f.code]"
-                    fit="contain"
-                    lazy
-                    style="max-width: 300px; max-height: 300px; border-radius: 6px"
-                  />
-                </el-popover>
+                <AppImageThumb v-if="row[f.code]" :raw-url="String(row[f.code])" variant="table" />
                 <span v-else>-</span>
               </template>
               <span v-else-if="f.type === 'date'">{{ formatDate(row[f.code]) }}</span>
@@ -236,7 +214,7 @@
         </el-table>
 
         <!-- 分页 -->
-        <div ref="paginationWrapRef" class="pagination-wrap">
+        <div class="pagination-wrap">
           <el-pagination
             v-model:current-page="pagination.page"
             v-model:page-size="pagination.pageSize"
@@ -313,7 +291,7 @@
               <template v-if="form[f.code]">
                 <el-image
                   :src="form[f.code]"
-                  fit="cover"
+                  fit="contain"
                   class="image-preview"
                   :preview-teleported="true"
                   :preview-src-list="[form[f.code]]"
@@ -392,9 +370,19 @@ import { getSystemOptionsList, getSystemOptionsTree, type SystemOptionItem, type
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { checkSkuExists } from '@/api/products'
-import { toMigrationThumbUrl } from '@/utils/image'
-
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
+
+function productListColumnProp(f: { code: string }) {
+  return f.code === 'companyName' ? undefined : f.code
+}
+
+function scheduleProductTableLayout() {
+  nextTick(() => {
+    tableRef.value?.doLayout?.()
+  })
+}
+
 const formRef = ref<FormInstance>()
 const list = ref<ProductItem[]>([])
 const productGroupOptions = ref<{ id: number; path: string }[]>([])
@@ -414,32 +402,10 @@ const imageFileInputRef = ref<HTMLInputElement | null>(null)
 const imageDragOver = ref(false)
 const imageUploading = ref(false)
 
-const productsMainRef = ref<HTMLElement | null>(null)
-const filterBarRef = ref<HTMLElement | null>(null)
-const paginationWrapRef = ref<HTMLElement | null>(null)
-const tableHeight = ref<number | undefined>(undefined)
-let tableResizeObserver: ResizeObserver | null = null
-let tableResizeBound = false
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 let loadReqId = 0
 let listAbortController: AbortController | null = null
-const failedThumbByOriginal = ref<Record<string, boolean>>({})
-
-function getProductListImageUrl(rawUrl: string | undefined): string {
-  const source = String(rawUrl ?? '').trim()
-  if (!source) return ''
-  if (failedThumbByOriginal.value[source]) return source
-  return toMigrationThumbUrl(source)
-}
-
-function onProductListImageError(rawUrl: string | undefined) {
-  const source = String(rawUrl ?? '').trim()
-  if (!source) return
-  const thumb = toMigrationThumbUrl(source)
-  if (thumb !== source) {
-    failedThumbByOriginal.value[source] = true
-  }
-}
-
 const filter = reactive<{
   productName: string
   companyName: string
@@ -812,6 +778,7 @@ async function load() {
     if (data && currentReqId === loadReqId) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      scheduleProductTableLayout()
     }
   } catch (e: unknown) {
     if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
@@ -958,41 +925,6 @@ function getColumnMinWidth(f: { code: string; type: string }): number {
   return 110
 }
 
-function updateTableHeight() {
-  const main = productsMainRef.value
-  if (!main) return
-  const mainH = main.clientHeight
-  const filterH = filterBarRef.value?.offsetHeight ?? 0
-  const paginationH = paginationWrapRef.value?.offsetHeight ?? 0
-
-  const cs = window.getComputedStyle(main)
-  const gap = parseFloat(cs.rowGap || cs.gap || '0') || 0
-  const paddingTop = parseFloat(cs.paddingTop || '0') || 0
-  const paddingBottom = parseFloat(cs.paddingBottom || '0') || 0
-
-  // filter + table + pagination 为纵向排列，gap 大约出现两次
-  const available = mainH - paddingTop - paddingBottom - filterH - paginationH - gap * 2
-  tableHeight.value = Math.max(240, Math.floor(available))
-}
-
-function bindTableResize() {
-  if (tableResizeBound) return
-  tableResizeBound = true
-  tableResizeObserver = new ResizeObserver(() => updateTableHeight())
-  if (productsMainRef.value) tableResizeObserver.observe(productsMainRef.value)
-  if (filterBarRef.value) tableResizeObserver.observe(filterBarRef.value)
-  if (paginationWrapRef.value) tableResizeObserver.observe(paginationWrapRef.value)
-  window.addEventListener('resize', updateTableHeight)
-}
-
-function unbindTableResize() {
-  if (!tableResizeBound) return
-  tableResizeBound = false
-  tableResizeObserver?.disconnect()
-  tableResizeObserver = null
-  window.removeEventListener('resize', updateTableHeight)
-}
-
 async function openCreate() {
   isEdit.value = false
   editId.value = 0
@@ -1109,20 +1041,19 @@ watch(
   },
 )
 
+watch(
+  () => tableHeight.value,
+  () => scheduleProductTableLayout(),
+)
+
 onMounted(async () => {
   loadFieldDefinitions()
   load()
   loadOptions()
-
-  await nextTick()
-  updateTableHeight()
-  bindTableResize()
 })
 
-onActivated(async () => {
-  await nextTick()
-  updateTableHeight()
-  bindTableResize()
+onActivated(() => {
+  void nextTick(() => scheduleProductTableLayout())
 })
 
 onDeactivated(() => {
@@ -1131,7 +1062,6 @@ onDeactivated(() => {
     clearTimeout(searchTimer)
     searchTimer = null
   }
-  unbindTableResize()
 })
 
 onBeforeUnmount(() => {
@@ -1140,7 +1070,6 @@ onBeforeUnmount(() => {
     clearTimeout(searchTimer)
     searchTimer = null
   }
-  unbindTableResize()
 })
 </script>
 
@@ -1150,9 +1079,7 @@ onBeforeUnmount(() => {
   padding: var(--space-sm);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
-  display: flex;
-  flex-direction: column;
-  height: 100%;
+  min-height: 0;
 }
 
 .products-layout {
@@ -1290,6 +1217,11 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: flex-end;
 }
+.products-table {
+  flex: 1;
+  min-height: 0;
+}
+
 .products-table :deep(.el-table__header .cell) {
   white-space: nowrap;
 }

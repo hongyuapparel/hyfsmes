@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card">
+  <div class="page-card page-card--fill">
     <div class="filter-bar">
       <div class="filter-left">
         <el-input
@@ -37,7 +37,8 @@
         <el-button type="primary" size="large" @click="openCreate">新增用户</el-button>
       </div>
     </div>
-    <el-table ref="tableRef" :data="list" border stripe row-key="id">
+    <div ref="tableShellRef" class="list-page-table-shell">
+    <el-table ref="tableRef" :data="list" border stripe row-key="id" :height="tableHeight">
       <el-table-column prop="id" label="ID" width="88">
         <template #default="{ row }">
           <span class="id-cell">
@@ -78,6 +79,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="400" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80">
@@ -124,6 +126,7 @@ import { getUsers, searchUsers, createUser, updateUser, resetUserPassword, type 
 import { getRoles, type RoleItem } from '@/api/roles'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { formatDateTime as formatDate } from '@/utils/date-format'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const list = ref<UserItem[]>([])
 const roles = ref<RoleItem[]>([])
@@ -135,6 +138,8 @@ const formRef = ref<FormInstance>()
 const submitLoading = ref(false)
 const pwdLoading = ref(false)
 const tableRef = ref<{ $el?: HTMLElement }>()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 let rowSortable: Sortable | null = null
 
 const filter = ref<{ keyword: string; role: string }>({ keyword: '', role: '' })
@@ -340,6 +345,7 @@ onBeforeUnmount(() => {
   background: #fff;
   padding: 24px;
   border-radius: 8px;
+  min-height: 0;
 }
 .filter-bar {
   margin-bottom: 16px;

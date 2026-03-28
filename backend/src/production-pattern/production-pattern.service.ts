@@ -5,6 +5,7 @@ import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 
@@ -34,6 +35,8 @@ export interface PatternListItem {
   patternMaster: string;
   sampleMaker: string;
   sampleImageUrl: string;
+  /** 时效判定（与订单时效配置对比） */
+  timeRating: string;
 }
 
 export interface PatternListQuery {
@@ -74,6 +77,7 @@ export class ProductionPatternService {
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
     private readonly orderWorkflowService: OrderWorkflowService,
+    private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
   private async hasPatternMaterialsColumns(): Promise<boolean> {
@@ -276,6 +280,7 @@ export class ProductionPatternService {
     ]);
     const patternMap = new Map(patterns.map((p) => [p.orderId, p]));
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
+    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     const rows: PatternListItem[] = [];
     for (const order of orders) {
@@ -296,6 +301,23 @@ export class ProductionPatternService {
         arrivedAtPatternMap.get(order.id) ??
         this.toDateTimeLocalString(order.statusTime) ??
         this.toDateTimeLocalString(pattern?.completedAt ?? null);
+
+      let phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(arrivedAtPatternMap.get(order.id));
+      if (!phaseStart && order.status === 'pending_pattern') {
+        phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(order.statusTime);
+      }
+      const phaseEnd =
+        pStatus === 'completed' && pattern?.completedAt
+          ? this.orderStatusConfigService.parseProductionPhaseInstant(pattern.completedAt)
+          : null;
+      const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
+        'pending_pattern',
+        phaseStart,
+        phaseEnd,
+        order.status ?? '',
+        slaCtx,
+      );
+
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
@@ -320,6 +342,7 @@ export class ProductionPatternService {
         patternMaster: pattern?.patternMaster ?? '',
         sampleMaker: pattern?.sampleMaker ?? '',
         sampleImageUrl: pattern?.sampleImageUrl ?? '',
+        timeRating,
       });
     }
 

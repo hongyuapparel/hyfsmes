@@ -32,7 +32,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="70" align="center" />
-            <el-table-column label="操作" width="140" fixed="right">
+            <el-table-column label="操作" width="140">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="openAccountDialog(row)">编辑</el-button>
                 <el-button link type="danger" size="small" @click="removeAccount(row)">删除</el-button>
@@ -56,7 +56,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="70" align="center" />
-            <el-table-column label="操作" width="140" fixed="right">
+            <el-table-column label="操作" width="140">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="openTypeDialog('income', row)">编辑</el-button>
                 <el-button link type="danger" size="small" @click="removeType('income', row)">删除</el-button>
@@ -80,7 +80,7 @@
               </template>
             </el-table-column>
             <el-table-column prop="sortOrder" label="排序" width="70" align="center" />
-            <el-table-column label="操作" width="140" fixed="right">
+            <el-table-column label="操作" width="140">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="openTypeDialog('expense', row)">编辑</el-button>
                 <el-button link type="danger" size="small" @click="removeType('expense', row)">删除</el-button>

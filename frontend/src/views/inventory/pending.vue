@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card inventory-pending-page">
+  <div class="page-card page-card--fill inventory-pending-page">
     <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="待处理" name="pending" />
       <el-tab-pane label="已发货" name="shipped" />
@@ -72,6 +72,7 @@
 
     <div v-if="pageTab === 'pending' && hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="pendingTableRef"
       v-loading="loading"
@@ -79,6 +80,7 @@
       border
       stripe
       class="pending-table"
+      :height="tableHeight"
       @header-dragend="onPendingHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -88,14 +90,7 @@
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
       <el-table-column label="图片" width="90" align="center">
         <template #default="{ row }">
-          <el-image
-            v-if="row.imageUrl"
-            :src="row.imageUrl"
-            fit="cover"
-            style="width: 56px; height: 56px; border-radius: 6px"
-            :preview-src-list="[row.imageUrl]"
-            preview-teleported
-          />
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
           <span v-else class="text-placeholder">-</span>
         </template>
       </el-table-column>
@@ -145,7 +140,7 @@
                         :key="vIdx"
                         class="qty-tooltip-cell qty-tooltip-num"
                       >
-                        {{ v }}
+                        {{ formatDisplayNumber(v) }}
                       </div>
                     </div>
                   </div>
@@ -153,13 +148,13 @@
               </div>
             </template>
             <span class="qty-inline">
-              <span class="qty-hover">{{ row.quantity }}</span>
+              <span class="qty-hover">{{ formatDisplayNumber(row.quantity) }}</span>
               <el-tag v-if="row.sourceType === 'defect'" type="danger" size="small" effect="light" class="defect-tag">
                 次品
               </el-tag>
             </span>
           </el-tooltip>
-          <span v-else>{{ row.quantity }}</span>
+          <span v-else>{{ formatDisplayNumber(row.quantity) }}</span>
         </template>
       </el-table-column>
       <el-table-column :label="pageTab === 'pending' ? '完成时间' : '发货时间'" prop="createdAt" width="160" align="center" />
@@ -167,6 +162,7 @@
       <el-table-column v-if="pageTab === 'shipped'" prop="operatorUsername" label="操作人" width="120" show-overflow-tooltip />
       <el-table-column v-if="pageTab === 'shipped'" prop="remark" label="备注" min-width="140" show-overflow-tooltip />
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -325,7 +321,7 @@
                   </template>
                 </el-table-column>
               </el-table>
-              <div class="outbound-size-footer">该记录合计：{{ getOutboundItemTotal(item) }}</div>
+              <div class="outbound-size-footer">该记录合计：{{ formatDisplayNumber(getOutboundItemTotal(item)) }}</div>
             </div>
             <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法发货。</div>
           </div>
@@ -356,12 +352,14 @@ import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-option
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const filter = reactive({ orderNo: '', skuCode: '' })
 const pageTab = ref<'pending' | 'shipped'>('pending')
@@ -369,6 +367,8 @@ const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 const list = ref<PendingListItem[]>([])
 const pendingTableRef = ref()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const loading = ref(false)
 const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -849,10 +849,12 @@ onMounted(async () => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .inventory-pending-page .pending-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {

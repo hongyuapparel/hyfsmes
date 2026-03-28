@@ -8,6 +8,7 @@ import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
+import { OrderStatusConfigModule } from '../order-status-config/order-status-config.module';
 import { ProductionSewingController } from './production-sewing.controller';
 import { ProductionSewingService } from './production-sewing.service';
 
@@ -16,6 +17,7 @@ import { ProductionSewingService } from './production-sewing.service';
     TypeOrmModule.forFeature([Order, OrderSewing, OrderCutting, OrderExt, User, RolePermission]),
     AuthModule,
     OrderWorkflowModule,
+    OrderStatusConfigModule,
   ],
   controllers: [ProductionSewingController],
   providers: [ProductionSewingService],

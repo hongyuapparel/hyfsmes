@@ -13,6 +13,7 @@ import { SystemOptionsModule } from '../system-options/system-options.module';
 import { FabricStockModule } from '../fabric-stock/fabric-stock.module';
 import { InventoryAccessoriesModule } from '../inventory-accessories/inventory-accessories.module';
 import { FinishedGoodsStockModule } from '../finished-goods-stock/finished-goods-stock.module';
+import { OrderStatusConfigModule } from '../order-status-config/order-status-config.module';
 import { ProductionPurchaseController } from './production-purchase.controller';
 import { ProductionPurchaseService } from './production-purchase.service';
 
@@ -26,6 +27,7 @@ import { ProductionPurchaseService } from './production-purchase.service';
     FabricStockModule,
     InventoryAccessoriesModule,
     FinishedGoodsStockModule,
+    OrderStatusConfigModule,
   ],
   controllers: [ProductionPurchaseController],
   providers: [ProductionPurchaseService],

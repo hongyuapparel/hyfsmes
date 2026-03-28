@@ -14,6 +14,8 @@ export interface CustomerItem {
   productGroup: string
   createdAt: string
   updatedAt: string
+  /** 列表专用：该客户最后一次被订单引用的时间（关联订单 updated_at 的最大值） */
+  lastOrderReferencedAt?: string | null
 }
 
 export interface CustomerListRes {

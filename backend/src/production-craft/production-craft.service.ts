@@ -5,6 +5,7 @@ import { Order } from '../entities/order.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 
 export interface CraftListItem {
   orderId: number;
@@ -24,6 +25,8 @@ export interface CraftListItem {
   collaborationTypeId: number | null;
   purchaseStatus: string;
   craftStatus: string;
+  /** 时效判定（与订单时效配置对比） */
+  timeRating: string;
 }
 
 export interface CraftListQuery {
@@ -50,6 +53,7 @@ export class ProductionCraftService {
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
     private readonly orderWorkflowService: OrderWorkflowService,
+    private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
@@ -210,6 +214,7 @@ export class ProductionCraftService {
     ]);
     const craftMap = new Map(crafts.map((c) => [c.orderId, c]));
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
+    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     // 对历史“已工艺完成但订单未流转”的数据进行一次按规则补流转（无硬编码状态）。
     // 只在可识别当前操作人时执行，以遵守 allowRoles 角色限制。
@@ -268,6 +273,23 @@ export class ProductionCraftService {
             ? this.toDateTimeLocalString(order.statusTime)
             : null;
       const summary = this.buildCraftSummaryFromProcessItems(processItems);
+
+      let phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(craft?.arrivedAtCraft ?? null);
+      if (!phaseStart && order.status === 'pending_craft') {
+        phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(order.statusTime);
+      }
+      const phaseEnd =
+        craftStatus === 'completed' && craft?.completedAt
+          ? this.orderStatusConfigService.parseProductionPhaseInstant(craft.completedAt)
+          : null;
+      const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
+        'pending_craft',
+        phaseStart,
+        phaseEnd,
+        order.status ?? '',
+        slaCtx,
+      );
+
       rows.push({
         orderId: order.id,
         orderNo: order.orderNo ?? '',
@@ -284,6 +306,7 @@ export class ProductionCraftService {
         collaborationTypeId: order.collaborationTypeId ?? null,
         purchaseStatus: purchaseCompleted ? 'completed' : 'pending',
         craftStatus: craftStatus === 'completed' ? 'completed' : 'pending',
+        timeRating,
       });
     }
 

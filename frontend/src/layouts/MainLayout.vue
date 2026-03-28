@@ -297,6 +297,8 @@ onMounted(async () => {
 }
 
 .layout-main {
+  flex: 1;
+  min-height: 0;
   padding: var(--space-sm);
   background: var(--color-bg);
   overflow: auto;

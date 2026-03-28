@@ -24,6 +24,8 @@ export interface PatternListItem {
   patternMaster: string
   sampleMaker: string
   sampleImageUrl: string
+  /** 时效判定 */
+  timeRating: string
 }
 
 export interface PatternListRes {

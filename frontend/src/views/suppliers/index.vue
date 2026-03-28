@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card suppliers-page">
+  <div class="page-card page-card--fill suppliers-page">
     <div class="filter-bar">
       <el-input
         v-model="filter.name"
@@ -61,6 +61,7 @@
 
     <div v-if="selectedIds.length" class="table-selection-count">已选 {{ selectedIds.length }} 项</div>
 
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       v-loading="loading"
       :data="list"
@@ -68,6 +69,8 @@
       stripe
       row-key="id"
       class="suppliers-table"
+      :height="tableHeight"
+      scrollbar-always-on
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -104,6 +107,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -291,6 +295,7 @@ import {
   getTextFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime } from '@/utils/date-format'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 interface BusinessScopeTreeNode {
   id: number
@@ -322,6 +327,8 @@ const filter = reactive<{ name: string; supplierTypeId: number | null }>({ name:
 const nameLabelVisible = ref(false)
 const list = ref<SupplierItem[]>([])
 const selectedIds = ref<number[]>([])
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 
@@ -712,10 +719,12 @@ onBeforeUnmount(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .suppliers-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {

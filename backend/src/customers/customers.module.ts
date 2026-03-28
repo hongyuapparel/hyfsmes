@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Customer } from '../entities/customer.entity';
+import { Order } from '../entities/order.entity';
 import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
@@ -12,7 +13,7 @@ import { CustomersService } from './customers.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Customer, User, Role, RolePermission]),
+    TypeOrmModule.forFeature([Customer, Order, User, Role, RolePermission]),
     SystemOptionsModule,
     AuthModule,
     XiaomanModule,

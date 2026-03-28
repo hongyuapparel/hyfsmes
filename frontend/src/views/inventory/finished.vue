@@ -118,14 +118,7 @@
           <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
-              <el-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                fit="cover"
-                style="width: 56px; height: 56px; border-radius: 6px"
-                :preview-src-list="[row.imageUrl]"
-                preview-teleported
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
@@ -181,7 +174,7 @@
                     </template>
                   </div>
                 </template>
-                <span class="qty-hover">{{ row.quantity }}</span>
+                <span class="qty-hover">{{ formatDisplayNumber(row.quantity) }}</span>
               </el-tooltip>
             </template>
           </el-table-column>
@@ -269,14 +262,7 @@
           <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
           <el-table-column label="图片" width="90" align="center">
             <template #default="{ row }">
-              <el-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                fit="cover"
-                style="width: 56px; height: 56px; border-radius: 6px"
-                :preview-src-list="[row.imageUrl]"
-                preview-teleported
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
@@ -306,9 +292,9 @@
                     </div>
                   </div>
                 </template>
-                <span class="qty-hover">{{ row.quantity }}</span>
+                <span class="qty-hover">{{ formatDisplayNumber(row.quantity) }}</span>
               </el-tooltip>
-              <span v-else>{{ row.quantity }}</span>
+              <span v-else>{{ formatDisplayNumber(row.quantity) }}</span>
             </template>
           </el-table-column>
           <el-table-column prop="department" label="部门" min-width="90" show-overflow-tooltip />
@@ -461,7 +447,7 @@
               <div>订单号：{{ item.row.orderNo }}</div>
               <div>SKU：{{ item.row.skuCode }}</div>
               <div>客户：{{ item.row.customerName || '-' }}</div>
-              <div>当前库存：{{ item.row.quantity }}</div>
+              <div>当前库存：{{ formatDisplayNumber(item.row.quantity) }}</div>
             </div>
             <div v-if="item.headers.length" class="outbound-size-wrap">
               <el-table :data="item.rows" border size="small">
@@ -741,14 +727,7 @@
       >
         <el-table-column label="图片" width="90" align="center">
           <template #default="{ row }">
-            <el-image
-              v-if="row.imageUrl"
-              :src="row.imageUrl"
-              fit="cover"
-              style="width: 56px; height: 56px; border-radius: 6px"
-              :preview-src-list="[row.imageUrl]"
-              preview-teleported
-            />
+            <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
             <span v-else class="text-placeholder">-</span>
           </template>
         </el-table-column>
@@ -901,13 +880,11 @@
                     :model-value="getDisplayProductImage()"
                     @update:model-value="saveProductImage"
                   />
-                  <el-image
+                  <AppImageThumb
                     v-else-if="getDisplayProductImage()"
-                    :src="getDisplayProductImage()"
-                    fit="cover"
-                    style="width: 160px; height: 120px; border-radius: 8px"
-                    :preview-src-list="[getDisplayProductImage()]"
-                    preview-teleported
+                    :raw-url="getDisplayProductImage()!"
+                    :width="160"
+                    :height="120"
                   />
                   <div v-else class="detail-image-empty">-</div>
                 </div>
@@ -943,13 +920,10 @@
                       :model-value="getColorImageUrl(row.colorName)"
                       @update:model-value="(url) => saveColorImage(row.colorName, url)"
                     />
-                    <el-image
+                    <AppImageThumb
                       v-else-if="getColorImageUrl(row.colorName)"
-                      :src="getColorImageUrl(row.colorName)"
-                      fit="cover"
-                      class="detail-color-thumb"
-                      :preview-src-list="[getColorImageUrl(row.colorName)]"
-                      preview-teleported
+                      :raw-url="getColorImageUrl(row.colorName)!"
+                      variant="table"
                     />
                     <span v-else class="text-placeholder">-</span>
                   </template>
@@ -1044,6 +1018,7 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const currentTab = ref<string>('stored')
@@ -1954,15 +1929,15 @@ async function submitCreate() {
 }
 
 function formatPrice(unitPrice: string | undefined): string {
-  if (unitPrice == null || unitPrice === '') return '￥0.00'
+  if (unitPrice == null || unitPrice === '') return '￥0'
   const n = Number(unitPrice)
-  return Number.isFinite(n) ? `￥${n.toFixed(2)}` : '￥0.00'
+  return Number.isFinite(n) ? `￥${formatDisplayNumber(n)}` : '￥0'
 }
 
 function formatTotalPrice(quantity: number, unitPrice: string | undefined): string {
   const n = Number(unitPrice)
-  if (!Number.isFinite(n) || !Number.isFinite(quantity)) return '￥0.00'
-  return `￥${(quantity * n).toFixed(2)}`
+  if (!Number.isFinite(n) || !Number.isFinite(quantity)) return '￥0'
+  return `￥${formatDisplayNumber(quantity * n)}`
 }
 
 function findWarehouseLabelById(id: number | null | undefined): string {
@@ -2343,13 +2318,6 @@ function onOutboundPageSizeChange() {
 
 .finished-detail-drawer :deep(.detail-basic-grid .el-select__wrapper) {
   min-width: 0 !important;
-}
-
-.detail-color-thumb {
-  width: 56px;
-  height: 56px;
-  border-radius: 6px;
-  border: 1px solid var(--el-border-color-lighter);
 }
 
 .finished-detail-drawer :deep(.detail-color-image-editor.image-upload-area) {

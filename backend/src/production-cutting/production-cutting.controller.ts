@@ -55,8 +55,9 @@ export class ProductionCuttingController {
       '裁床完成时间',
       '订单数量',
       '裁床数量',
-      '裁剪成本',
-      '实际用布(米)',
+      '裁剪单价(元/件)',
+      '裁剪总成本(元)',
+      '本次净耗合计(米)',
     ];
     const escape = (v: unknown) => {
       const str = v == null ? '' : String(v);
@@ -78,6 +79,7 @@ export class ProductionCuttingController {
           r.completedAt ?? '',
           r.quantity,
           r.actualCutTotal ?? '',
+          r.cuttingUnitPrice ?? '',
           r.cuttingCost ?? '',
           r.actualFabricMeters ?? '',
         ].map(escape).join(','),
@@ -95,28 +97,44 @@ export class ProductionCuttingController {
     return this.cuttingService.getOrderColorSize(orderId);
   }
 
+  @Get('items/:orderId/register-form')
+  getRegisterForm(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.cuttingService.getRegisterForm(orderId);
+  }
+
   @Get('items/:orderId/quantity-breakdown')
   getQuantityBreakdown(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.cuttingService.getQuantityBreakdown(orderId);
   }
 
+  @Get('items/:orderId/completed-detail')
+  getCompletedCuttingDetail(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.cuttingService.getCompletedCuttingDetail(orderId);
+  }
+
   @Post('items/complete')
   complete(
     @Body('orderId') orderId: number,
-    @Body('cuttingCost') cuttingCost: string,
     @Body('actualCutRows') actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[],
     @Body('cuttingDepartment') cuttingDepartment?: string,
     @Body('cutterName') cutterName?: string,
-    @Body('actualFabricMeters') actualFabricMeters?: string,
+    @Body('cuttingUnitPrice') cuttingUnitPrice?: string,
+    @Body('cuttingTotalCost') cuttingTotalCost?: string,
+    @Body('cuttingCost') cuttingCostLegacy?: string,
+    @Body('materialUsage') materialUsage?: unknown,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.cuttingService.completeCutting(
       Number(orderId),
-      cuttingCost ?? '0',
       Array.isArray(actualCutRows) ? actualCutRows : [],
       cuttingDepartment ?? null,
       cutterName ?? null,
-      actualFabricMeters ?? null,
+      {
+        cuttingUnitPrice: cuttingUnitPrice ?? null,
+        cuttingTotalCost: cuttingTotalCost ?? null,
+        cuttingCostLegacy: cuttingCostLegacy ?? null,
+        materialUsage: Array.isArray(materialUsage) ? (materialUsage as any) : null,
+      },
       user?.userId,
     );
   }

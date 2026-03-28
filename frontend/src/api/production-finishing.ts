@@ -21,6 +21,8 @@ export interface FinishingListItem {
   tailInboundQty: number | null
   defectQuantity: number | null
   remark: string | null
+  /** 时效判定 */
+  timeRating: string
 }
 
 export interface FinishingListRes {

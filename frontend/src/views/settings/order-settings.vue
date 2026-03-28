@@ -62,7 +62,7 @@
             </el-table-column>
             <el-table-column label="合理时长（小时）" width="140" align="right">
               <template #default="{ row }">
-                {{ row.limitHours }}
+                {{ formatDisplayNumber(row.limitHours) }}
               </template>
             </el-table-column>
             <el-table-column label="启用" width="80">
@@ -71,7 +71,7 @@
                 <el-tag v-else type="info" size="small">否</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="140" fixed="right">
+            <el-table-column label="操作" width="140">
               <template #default="{ row }">
                 <el-button link type="primary" size="small" @click="openSlaDialog(row)">编辑</el-button>
                 <el-button link type="danger" size="small" @click="removeSla(row)">删除</el-button>
@@ -161,7 +161,7 @@
             </el-table-column>
             <el-table-column label="价格(元)" width="100" align="center">
               <template #default="{ row }">
-                <template v-if="row.rowType === 'process'">{{ row.price }}</template>
+                <template v-if="row.rowType === 'process'">{{ formatDisplayNumber(row.price) }}</template>
                 <template v-else>-</template>
               </template>
             </el-table-column>
@@ -190,7 +190,9 @@
                 <template v-else-if="row.rowType === 'load_more'">
                   <div class="process-row-actions">
                     <el-button link type="primary" size="small" @click="loadMoreProcesses(row)">
-                      加载更多（{{ row.loadedCount ?? 0 }}/{{ row.totalCount ?? 0 }}）
+                      加载更多（{{ formatDisplayNumber(row.loadedCount ?? 0) }}/{{
+                        formatDisplayNumber(row.totalCount ?? 0)
+                      }}）
                     </el-button>
                   </div>
                 </template>
@@ -200,10 +202,25 @@
           <el-dialog
             v-model="jobTypeDialog.visible"
             :title="jobTypeDialogTitle"
-            width="400px"
-            @close="jobTypeDialog.nodeId = undefined; jobTypeDialog.parentId = undefined"
+            width="440px"
+            @close="onJobTypeDialogClose"
           >
             <el-form :model="jobTypeForm" label-width="80px" size="default">
+              <el-form-item v-if="jobTypeDialog.mode === 'edit'" label="部门">
+                <el-select
+                  v-model="jobTypeForm.parentId"
+                  placeholder="选择部门"
+                  filterable
+                  style="width: 100%"
+                >
+                  <el-option
+                    v-for="opt in jobTypeEditDepartmentOptions"
+                    :key="opt.value"
+                    :label="opt.label"
+                    :value="opt.value"
+                  />
+                </el-select>
+              </el-form-item>
               <el-form-item label="名称">
                 <el-input v-model="jobTypeForm.value" placeholder="请输入工种或分组名称" />
               </el-form-item>
@@ -280,7 +297,9 @@
                   <el-table-column prop="department" label="部门" min-width="100" align="center" />
                   <el-table-column prop="jobType" label="工种" min-width="120" align="center" />
                   <el-table-column prop="processName" label="工序" min-width="120" align="center" />
-                  <el-table-column prop="unitPrice" label="价格(元)" width="100" align="center" />
+                  <el-table-column label="价格(元)" width="100" align="center">
+                    <template #default="{ row }">{{ formatDisplayNumber(row.unitPrice) }}</template>
+                  </el-table-column>
                 </el-table>
                 <p v-if="!quoteTemplateItemsLoadingMap[row.id] && !(quoteTemplateItemsMap[row.id]?.length)" class="empty-hint">
                   该模板暂无工序，可点击右上“编辑工序”维护。
@@ -325,7 +344,7 @@
                 <el-option
                   v-for="p in quoteTemplateProcessOptions"
                   :key="p.id"
-                  :label="`${p.department} · ${p.jobType} · ${p.name}（${p.unitPrice} 元）`"
+                    :label="`${p.department} · ${p.jobType} · ${p.name}（${formatDisplayNumber(p.unitPrice)} 元）`"
                   :value="p.id"
                   :disabled="quoteTemplateItemsEdit.some((x) => x.processId === p.id)"
                 />
@@ -336,8 +355,10 @@
               <el-table-column prop="department" label="部门" width="90" />
               <el-table-column prop="jobType" label="工种" min-width="100" />
               <el-table-column prop="processName" label="工序" min-width="100" />
-              <el-table-column prop="unitPrice" label="单价(元)" width="90" align="right" />
-              <el-table-column label="操作" width="70" fixed="right" align="center">
+              <el-table-column label="单价(元)" width="90" align="right">
+                <template #default="{ row }">{{ formatDisplayNumber(row.unitPrice) }}</template>
+              </el-table-column>
+              <el-table-column label="操作" width="70" align="center">
                 <template #default="{ row }">
                   <el-button link type="danger" size="small" @click="removeQuoteTemplateItem(row)">删除</el-button>
                 </template>
@@ -379,7 +400,7 @@
                   </template>
                 </el-table-column>
                 <!-- 启用开关暂时下线，避免保存异常导致订单列表状态全部消失 -->
-                <el-table-column label="操作" width="120" fixed="right">
+                <el-table-column label="操作" width="120">
                   <template #default="{ row }">
                     <el-button link type="primary" size="small" @click="openEditStatus(row)">编辑</el-button>
                     <el-button link type="danger" size="small" @click="removeStatus(row)">删除</el-button>
@@ -410,7 +431,7 @@
                 <el-table-column label="链路内容" min-width="360" show-overflow-tooltip>
                   <template #default="{ row }">{{ buildChainSummary(row.steps) }}</template>
                 </el-table-column>
-                <el-table-column label="操作" width="200" fixed="right">
+                <el-table-column label="操作" width="200">
                   <template #default="{ row }">
                     <el-button link type="primary" size="small" @click="openEditChain(row)">编辑链路</el-button>
                     <el-button link type="primary" size="small" @click="duplicateChain(row)">复制链路</el-button>
@@ -456,7 +477,7 @@
                     <el-switch v-model="row.enabled" size="small" @change="onToggleTransitionEnabled(row)" />
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="120" fixed="right">
+                <el-table-column label="操作" width="120">
                   <template #default="{ row }">
                     <el-button link type="primary" size="small" @click="openEditTransition(row)">编辑</el-button>
                     <el-button link type="danger" size="small" @click="removeTransition(row)">删除</el-button>
@@ -743,6 +764,7 @@ import {
   type OrderStatusSlaItem,
 } from '@/api/order-status-config'
 import { ArrowRight } from '@element-plus/icons-vue'
+import { formatDisplayNumber } from '@/utils/display-number'
 
 /** 树表行：部门 / 工种 / 工序（懒加载用）；displayName 为单列树展示用，不重复父级 */
 interface ProcessTreeRow {
@@ -794,13 +816,39 @@ const jobTypeDialog = ref<{
   parentId?: number | null
   isTopLevel?: boolean
 }>({ visible: false, mode: 'add' })
-const jobTypeForm = ref({ value: '' })
+const jobTypeForm = ref<{ value: string; parentId: number | null }>({ value: '', parentId: null })
 const jobTypeSubmitLoading = ref(false)
 
 const jobTypeDialogTitle = computed(() => {
   if (jobTypeDialog.value.mode === 'edit') return '编辑工种'
   return jobTypeDialog.value.isTopLevel ? '新增部门' : '新建工种'
 })
+
+/** 编辑工种时仅可选部门（process_job_types 根节点，parentId 为空） */
+const jobTypeEditDepartmentOptions = computed(() => {
+  if (jobTypeDialog.value.mode !== 'edit') return []
+  const list = processJobTypeListRef.value
+  return list
+    .filter((x) => x.parentId == null)
+    .map((x) => ({ value: x.id, label: x.value }))
+    .sort((a, b) => a.label.localeCompare(b.label, 'zh-CN'))
+})
+
+/** 从工种节点沿 parent 链找到所属部门根节点 id */
+function getJobTypeRootDepartmentId(nodeId: number): number | null {
+  const list = processJobTypeListRef.value
+  let cur = list.find((x) => x.id === nodeId) ?? null
+  while (cur && cur.parentId != null) {
+    cur = list.find((x) => x.id === cur.parentId) ?? null
+  }
+  return cur?.id ?? null
+}
+
+function onJobTypeDialogClose() {
+  jobTypeDialog.value.nodeId = undefined
+  jobTypeDialog.value.parentId = undefined
+  jobTypeForm.value = { value: '', parentId: null }
+}
 
 // 服装类型报价模板
 const quoteTemplateList = ref<QuoteTemplateType[]>([])
@@ -888,6 +936,83 @@ async function reloadProcessTreeKeepExpanded() {
   visibleCountMap.value = snapshotVisibleCount
   await nextTick()
   restoreScrollTop()
+}
+
+/** 工种配置变更后：在已恢复快照的前提下，重挂已展开节点的懒加载子行（避免仅重载根行导致界面仍显示旧工种/工序名） */
+function processJobTypeNodeDepth(nodeId: number): number {
+  const list = processJobTypeListRef.value
+  let depth = 0
+  let cur = list.find((x) => x.id === nodeId)
+  while (cur?.parentId != null) {
+    depth += 1
+    cur = list.find((x) => x.id === cur.parentId)
+  }
+  return depth
+}
+
+async function resyncLazyChildrenForExpandedRows() {
+  const table = processTreeTableRef.value as unknown as {
+    updateKeyChildren?: (key: string | number, rows: ProcessTreeRow[]) => void
+  }
+  if (!table?.updateKeyChildren) return
+
+  async function childrenLazyNodesForParent(parentId: number): Promise<SystemOptionLazyNode[]> {
+    let raw = processJobTypeChildrenMapRef.value.get(parentId)
+    if (raw === undefined) {
+      try {
+        const res = await getSystemOptionsChildren('process_job_types', parentId)
+        raw = (res.data ?? []) as unknown as SystemOptionItem[]
+      } catch {
+        raw = []
+      }
+    }
+    return raw.map((child) => ({
+      id: child.id,
+      value: child.value,
+      sortOrder: child.sortOrder,
+      hasChildren: processJobTypeChildrenMapRef.value.has(child.id),
+    }))
+  }
+
+  const keys = expandedKeys.value.filter((k): k is string => typeof k === 'string')
+  const deptKeys = keys.filter((k) => k.startsWith('dept-'))
+  const jobKeys = keys
+    .filter((k) => k.startsWith('job-'))
+    .sort((a, b) => {
+      const na = Number(a.replace('job-', ''))
+      const nb = Number(b.replace('job-', ''))
+      if (Number.isNaN(na) || Number.isNaN(nb)) return 0
+      return processJobTypeNodeDepth(na) - processJobTypeNodeDepth(nb)
+    })
+
+  for (const key of deptKeys) {
+    const rootId = Number(key.replace('dept-', ''))
+    if (Number.isNaN(rootId)) continue
+    const parentRow = processTreeData.value.find((r) => r.id === key)
+    if (!parentRow || parentRow.rowType !== 'department') continue
+    const nodes = await childrenLazyNodesForParent(rootId)
+    const rows = mapJobTypeRowsFromChildren(nodes, parentRow)
+    table.updateKeyChildren(key, rows)
+  }
+
+  for (const key of jobKeys) {
+    const nodeId = Number(key.replace('job-', ''))
+    if (Number.isNaN(nodeId)) continue
+    const jobRow = findProcessTreeRowByNodeId(nodeId)
+    if (!jobRow || jobRow.rowType !== 'job_type' || !jobRow.jobTypePath) continue
+
+    const nodes = await childrenLazyNodesForParent(nodeId)
+    if (nodes.length > 0) {
+      const rows = mapJobTypeRowsFromChildren(nodes, jobRow)
+      table.updateKeyChildren(key, rows)
+      continue
+    }
+
+    const meta = processJobMetaByNodeIdRef.value.get(nodeId)
+    if (meta) {
+      await refreshJobTypeChildrenByMeta(nodeId, meta.department, meta.jobTypePath)
+    }
+  }
 }
 
 function onProcessTreeExpandChange(row: ProcessTreeRow, expanded: boolean | ProcessTreeRow[]) {
@@ -1819,19 +1944,22 @@ function canMoveDownJobType(row: ProcessTreeRow): boolean {
 function openEditJobType(row: ProcessTreeRow) {
   if (row.rowType !== 'job_type' || row.nodeId == null) return
   jobTypeDialog.value = { visible: true, mode: 'edit', nodeId: row.nodeId }
-  jobTypeForm.value = { value: row.displayName }
+  jobTypeForm.value = {
+    value: row.displayName,
+    parentId: getJobTypeRootDepartmentId(row.nodeId),
+  }
 }
 
 function openAddDepartment() {
   jobTypeDialog.value = { visible: true, mode: 'add', parentId: null, isTopLevel: true }
-  jobTypeForm.value = { value: '' }
+  jobTypeForm.value = { value: '', parentId: null }
 }
 
 function openAddChildJobType(row: ProcessTreeRow) {
   const parentId = row.rowType === 'department' ? row.nodeId ?? null : row.rowType === 'job_type' ? row.nodeId ?? null : null
   if (parentId == null) return
   jobTypeDialog.value = { visible: true, mode: 'add', parentId, isTopLevel: false }
-  jobTypeForm.value = { value: '' }
+  jobTypeForm.value = { value: '', parentId: null }
 }
 
 async function submitJobType() {
@@ -1843,7 +1971,25 @@ async function submitJobType() {
   jobTypeSubmitLoading.value = true
   try {
     if (jobTypeDialog.value.mode === 'edit' && jobTypeDialog.value.nodeId != null) {
-      await updateSystemOption(jobTypeDialog.value.nodeId, { value: val })
+      const nodeId = jobTypeDialog.value.nodeId
+      const newParentId = jobTypeForm.value.parentId
+      if (newParentId == null) {
+        ElMessage.warning('请选择部门')
+        return
+      }
+      const currentItem = processJobTypeListRef.value.find((x) => x.id === nodeId)
+      const oldParentId = currentItem?.parentId ?? null
+      const payload: { value: string; parent_id?: number | null; sort_order?: number } = { value: val }
+      if (oldParentId !== newParentId) {
+        const list = processJobTypeListRef.value
+        const siblings = list.filter((x) => (x.parentId ?? null) === newParentId && x.id !== nodeId)
+        const sortOrder = siblings.length
+          ? Math.max(...siblings.map((s) => s.sortOrder)) + 1
+          : 0
+        payload.parent_id = newParentId
+        payload.sort_order = sortOrder
+      }
+      await updateSystemOption(nodeId, payload)
       ElMessage.success('已更新')
     } else if (jobTypeDialog.value.mode === 'add') {
       const pid = jobTypeDialog.value.parentId ?? null
@@ -1862,6 +2008,9 @@ async function submitJobType() {
     jobTypeDialog.value.visible = false
     await refreshProcessJobTypeList()
     await reloadProcessTreeKeepExpanded()
+    await resyncLazyChildrenForExpandedRows()
+    await nextTick()
+    restoreScrollTop()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '操作失败')
   } finally {
@@ -1892,6 +2041,9 @@ async function removeJobType(row: ProcessTreeRow) {
     ElMessage.success('已删除')
     await refreshProcessJobTypeList()
     await reloadProcessTreeKeepExpanded()
+    await resyncLazyChildrenForExpandedRows()
+    await nextTick()
+    restoreScrollTop()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '删除失败')
   }
@@ -1912,6 +2064,9 @@ async function moveJobTypeRow(row: ProcessTreeRow, delta: number) {
     ElMessage.success('已移动')
     await refreshProcessJobTypeList()
     await reloadProcessTreeKeepExpanded()
+    await resyncLazyChildrenForExpandedRows()
+    await nextTick()
+    restoreScrollTop()
   } catch (e: unknown) {
     ElMessage.error((e as { message?: string })?.message ?? '移动失败')
   }

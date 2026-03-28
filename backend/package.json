@@ -7,7 +7,8 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main"
+    "start:prod": "node dist/main",
+    "thumbs:migration-old": "node scripts/generate-missing-thumbnails.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
@@ -25,6 +26,7 @@
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
+    "sharp": "^0.33.5",
     "typeorm": "^0.3.17"
   },
   "devDependencies": {

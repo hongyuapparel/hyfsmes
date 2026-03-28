@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card pattern-page">
+  <div class="page-card page-card--fill pattern-page">
     <!-- Tab：全部 / 待分单 / 打样中 / 订单完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -162,6 +162,7 @@
     <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
     <!-- 待纸样订单列表 -->
+    <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="patternTableRef"
       v-loading="loading"
@@ -169,6 +170,7 @@
       border
       stripe
       class="pattern-table"
+      :height="tableHeight"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -179,18 +181,16 @@
       <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
+        </template>
+      </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
-          <el-image
-            v-if="row.imageUrl"
-            :src="row.imageUrl"
-            fit="cover"
-            class="table-thumb"
-            :preview-teleported="true"
-            :preview-src-list="[row.imageUrl]"
-          />
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -204,6 +204,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <div class="pagination-wrap">
       <el-pagination
@@ -292,7 +293,7 @@
             @click="triggerSampleImageUpload"
           >
             <div v-if="completeForm.sampleImageUrl" class="image-preview-wrap">
-              <el-image :src="completeForm.sampleImageUrl" fit="cover" :preview-teleported="true" :preview-src-list="[completeForm.sampleImageUrl]" />
+              <el-image :src="completeForm.sampleImageUrl" fit="contain" :preview-teleported="true" :preview-src-list="[completeForm.sampleImageUrl]" />
               <el-button text type="danger" size="small" class="image-remove" @click.stop="clearSampleImage">移除</el-button>
             </div>
             <div v-else class="image-placeholder">
@@ -437,6 +438,7 @@ import type { SystemOptionTreeNode } from '@/api/system-options'
 import { getEmployeeList, type EmployeeItem } from '@/api/hr'
 import { useAuthStore } from '@/stores/auth'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -445,6 +447,7 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
+import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const PATTERN_TABS = [
   { label: '全部', value: 'all' },
@@ -517,6 +520,8 @@ const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<PatternListItem[]>([])
 const patternTableRef = ref()
+const tableShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const loading = ref(false)
 const exporting = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -941,6 +946,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .status-tabs {
@@ -955,7 +961,8 @@ onMounted(() => {
 }
 
 .pattern-table {
-  margin-bottom: var(--space-md);
+  flex: 1;
+  min-height: 0;
 }
 
 .table-selection-count {
