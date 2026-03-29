@@ -36,6 +36,9 @@ npm-debug.log*
 # Uploads (user-uploaded files)
 backend/uploads/
 
+# Local image download staging (npm run download:product-images-staged)
+backend/staging/
+
 # Keep backend source module tracked
 !backend/src/uploads/
 !backend/src/uploads/**

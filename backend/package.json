@@ -8,7 +8,8 @@
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",
     "start:prod": "node dist/main",
-    "thumbs:migration-old": "node scripts/generate-missing-thumbnails.mjs"
+    "thumbs:migration-old": "node scripts/generate-missing-thumbnails.mjs",
+    "download:product-images-staged": "node scripts/download-product-images-staged.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
