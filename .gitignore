@@ -39,3 +39,8 @@ backend/uploads/
 # Keep backend source module tracked
 !backend/src/uploads/
 !backend/src/uploads/**
+
+# One-off data sync exports at repo root (do not deploy)
+/*_sync.sql
+/*_sync_utf8.sql
+/*.tsv
