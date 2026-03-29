@@ -20,6 +20,9 @@
  *
  * 当库里日期目录与磁盘不一致（如库是 2020-xx，盘上只有 2022-xx）时，可用按文件名全盘索引（哈希名通常唯一）：
  *   node scripts/copy-referenced-images-local.js --images-dir "/www/wwwroot/hyfs/WebRoot/Public/images" --resolve-by-basename --dry-run --limit 50
+ *
+ * 只迁移「旧站磁盘上确实存在」的图片（库里有记录但盘上已删的日期路径会跳过，不报失败）：
+ *   node scripts/copy-referenced-images-local.js --images-dir "/www/wwwroot/hyfs/WebRoot/Public/images" --match-disk-only --dry-run
  */
 const fs = require('fs');
 const os = require('os');
@@ -46,6 +49,7 @@ function parseArgs(argv) {
     webRoot: process.env.OLD_WEBROOT || '/www/wwwroot/hyfs/WebRoot',
     imagesDir: process.env.OLD_IMAGES_DIR || '',
     resolveByBasename: process.env.RESOLVE_IMAGE_BY_BASENAME === '1',
+    matchDiskOnly: process.env.MATCH_DISK_ONLY === '1',
   };
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
@@ -55,6 +59,10 @@ function parseArgs(argv) {
     }
     if (token === '--resolve-by-basename') {
       args.resolveByBasename = true;
+      continue;
+    }
+    if (token === '--match-disk-only') {
+      args.matchDiskOnly = true;
       continue;
     }
     if (token === '--limit') {
@@ -256,13 +264,14 @@ async function main() {
   }
 
   let basenameIndex = null;
-  if (args.resolveByBasename) {
+  if (args.resolveByBasename || args.matchDiskOnly) {
     console.error('[copy-referenced-images-local] building basename index under', imagesBaseDir, '...');
     basenameIndex = buildBasenameIndex(imagesBaseDir);
     console.error(
       JSON.stringify({
         indexBasenames: basenameIndex.map.size,
         basenameCollisionRows: basenameIndex.collisionKeys,
+        matchDiskOnly: args.matchDiskOnly,
       }),
     );
   }
@@ -315,8 +324,14 @@ async function main() {
       seenOriginal.add(t.original);
       uniqueByOriginal.push(t);
     }
-    let toProcess = uniqueByOriginal;
-    if (args.limit > 0) toProcess = uniqueByOriginal.slice(0, args.limit);
+    let workList = uniqueByOriginal;
+    if (args.matchDiskOnly && basenameIndex) {
+      workList = uniqueByOriginal.filter((t) => basenameIndex.map.has(t.filename));
+    }
+    const skippedNotOnDisk =
+      args.matchDiskOnly && basenameIndex ? uniqueByOriginal.length - workList.length : 0;
+    let toProcess = workList;
+    if (args.limit > 0) toProcess = workList.slice(0, args.limit);
 
     let copied = 0;
     let existed = 0;
@@ -329,7 +344,9 @@ async function main() {
     for (const t of toProcess) {
       try {
         let sourcePath = t.sourceAbs;
-        if (!fs.existsSync(sourcePath) && basenameIndex) {
+        if (args.matchDiskOnly && basenameIndex) {
+          sourcePath = basenameIndex.map.get(t.filename);
+        } else if (!fs.existsSync(sourcePath) && basenameIndex) {
           const alt = basenameIndex.map.get(t.filename);
           if (alt && fs.existsSync(alt)) {
             sourcePath = alt;
@@ -375,11 +392,13 @@ async function main() {
           sourceRows: sourceRows.length,
           candidateRows: targets.length,
           uniqueOriginalUrls: uniqueByOriginal.length,
+          skippedNotOnDisk: args.matchDiskOnly ? skippedNotOnDisk : undefined,
+          onDiskCandidates: args.matchDiskOnly ? workList.length : undefined,
           processedOriginalUrls: toProcess.length,
           copied,
           existedDestBeforeOrSkip: existed,
           missingSource,
-          resolvedByBasename: basenameIndex ? resolvedByBasename : undefined,
+          resolvedByBasename: basenameIndex && !args.matchDiskOnly ? resolvedByBasename : undefined,
           failed,
           failures: failures.slice(0, 30),
         },
