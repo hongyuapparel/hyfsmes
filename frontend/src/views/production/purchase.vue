@@ -139,6 +139,22 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
+      <el-table-column label="图片" width="72" align="center">
+        <template #default="{ row }">
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
+      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
+      <el-table-column label="客户交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
+      </el-table-column>
+      <el-table-column label="订单件数" width="88" align="right">
+        <template #default="{ row }">{{ formatDisplayNumber(row.orderQuantity) }}</template>
+      </el-table-column>
       <el-table-column prop="pendingPurchaseAt" label="到采购时间" width="155" align="center">
         <template #default="{ row }">
           {{ formatDateTime(row.pendingPurchaseAt) }}
@@ -154,17 +170,11 @@
           <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" width="72" align="center">
-        <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
-          <span v-else class="text-muted">-</span>
-        </template>
-      </el-table-column>
       <el-table-column prop="supplierName" label="供应商" min-width="100" />
       <el-table-column prop="materialSource" label="物料来源" min-width="110" />
+      <el-table-column prop="materialType" label="物料类型" min-width="100" show-overflow-tooltip />
       <el-table-column prop="materialName" label="物料名称" min-width="120" />
+      <el-table-column prop="color" label="颜色" width="88" show-overflow-tooltip />
       <el-table-column prop="planQuantity" label="计划用量" width="96" align="right">
         <template #default="{ row }">
           {{ row.planQuantity != null ? formatDisplayNumber(row.planQuantity) : '-' }}
@@ -184,7 +194,7 @@
           }}
         </template>
       </el-table-column>
-      <el-table-column prop="purchaseStatus" label="采购状态" width="100" align="center">
+      <el-table-column prop="purchaseStatus" :label="materialProgressColumnLabel" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="displayStatus(row) === 'completed' ? 'success' : 'warning'" size="small">
             {{ displayStatusLabel(row) }}
@@ -194,6 +204,11 @@
       <el-table-column label="订单类型" width="100">
         <template #default="{ row }">
           {{ orderTypeDisplay(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="概要" width="64" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click.stop="openPurchaseBriefDrawer(row)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -210,6 +225,58 @@
         @size-change="onPageSizeChange"
       />
     </div>
+
+    <el-drawer
+      v-model="purchaseBriefDrawer.visible"
+      title="订单与物料概要"
+      direction="rtl"
+      size="460px"
+      destroy-on-close
+      @closed="purchaseBriefDrawer.row = null"
+    >
+      <template v-if="purchaseBriefDrawer.row">
+        <ProductionOrderBriefPanel :brief="purchaseBriefFromRow(purchaseBriefDrawer.row)" />
+        <el-divider content-position="left">本行物料</el-divider>
+        <el-descriptions :column="1" border size="small" class="purchase-brief-material">
+          <el-descriptions-item label="物料序号">
+            {{ purchaseBriefDrawer.row.materialIndex + 1 }}
+          </el-descriptions-item>
+          <el-descriptions-item label="处理路线">
+            {{ purchaseBriefDrawer.row.processRoute === 'picking' ? '领料' : '采购' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="物料类型">
+            {{ (purchaseBriefDrawer.row.materialType ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="物料名称">
+            {{ (purchaseBriefDrawer.row.materialName ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="颜色">
+            {{ (purchaseBriefDrawer.row.color ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="供应商">
+            {{ (purchaseBriefDrawer.row.supplierName ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="物料来源">
+            {{ (purchaseBriefDrawer.row.materialSource ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="到采购时间">
+            {{ formatDateTime(purchaseBriefDrawer.row.pendingPurchaseAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="完成时间">
+            {{
+              formatDateTime(
+                purchaseBriefDrawer.row.processRoute === 'picking'
+                  ? purchaseBriefDrawer.row.pickCompletedAt
+                  : purchaseBriefDrawer.row.purchaseCompletedAt,
+              )
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="时效判定">
+            <SlaJudgeTag :text="purchaseBriefDrawer.row.timeRating" />
+          </el-descriptions-item>
+        </el-descriptions>
+      </template>
+    </el-drawer>
 
     <!-- 登记实际采购弹窗 -->
     <el-dialog
@@ -382,6 +449,9 @@ import {
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import ProductionOrderBriefPanel, {
+  type ProductionOrderBriefModel,
+} from '@/components/production/ProductionOrderBriefPanel.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const PURCHASE_TABS = [
@@ -444,6 +514,9 @@ const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
 
 const currentTab = ref<string>('all')
+const materialProgressColumnLabel = computed(() =>
+  currentTab.value === 'picking' ? '领料状态' : '采购状态',
+)
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<PurchaseItemRow[]>([])
@@ -826,6 +899,30 @@ function orderTypeDisplay(row: PurchaseItemRow): string {
     if (label && label.trim()) return label.trim()
   }
   return ''
+}
+
+const purchaseBriefDrawer = reactive<{ visible: boolean; row: PurchaseItemRow | null }>({
+  visible: false,
+  row: null,
+})
+
+function openPurchaseBriefDrawer(row: PurchaseItemRow) {
+  purchaseBriefDrawer.row = row
+  purchaseBriefDrawer.visible = true
+}
+
+function purchaseBriefFromRow(row: PurchaseItemRow): ProductionOrderBriefModel {
+  return {
+    orderNo: row.orderNo,
+    skuCode: row.skuCode,
+    imageUrl: row.imageUrl,
+    customerName: row.customerName,
+    merchandiser: row.merchandiser,
+    customerDueDate: row.customerDueDate,
+    orderQuantity: row.orderQuantity,
+    orderDate: row.orderDate,
+    orderTypeLabel: orderTypeDisplay(row),
+  }
 }
 
 function displayMaterialType(row: PurchaseItemRow): string {

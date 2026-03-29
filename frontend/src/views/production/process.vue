@@ -130,6 +130,22 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
+      <el-table-column label="图片" width="72" align="center">
+        <template #default="{ row }">
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
+      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
+      <el-table-column label="客户交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
+      </el-table-column>
+      <el-table-column label="订单数量" width="88" align="right">
+        <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+      </el-table-column>
       <el-table-column prop="arrivedAtCraft" label="到工艺时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.arrivedAtCraft) }}</template>
       </el-table-column>
@@ -141,31 +157,17 @@
           <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" width="72" align="center">
+      <el-table-column prop="supplierName" label="供应商" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="processItem" label="工艺项目" min-width="120" show-overflow-tooltip />
+      <el-table-column label="订单属性" min-width="108">
         <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
-          <span v-else class="text-muted">-</span>
+          <div>{{ orderTypeDisplay(row) }}</div>
+          <div class="text-muted craft-sub-attr">{{ collaborationDisplay(row) }}</div>
         </template>
       </el-table-column>
-      <el-table-column prop="supplierName" label="供应商" min-width="100" />
-      <el-table-column prop="processItem" label="工艺项目" min-width="120" />
-      <el-table-column label="订单类型" width="100">
+      <el-table-column label="明细" width="72" align="center" fixed="right">
         <template #default="{ row }">
-          {{ orderTypeDisplay(row) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="合作方式" width="100">
-        <template #default="{ row }">
-          {{ collaborationDisplay(row) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="purchaseStatus" label="采购状态" width="96" align="center">
-        <template #default="{ row }">
-          <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'info'" size="small">
-            {{ row.purchaseStatus === 'completed' ? '已完成' : '未完成' }}
-          </el-tag>
+          <el-button link type="primary" @click.stop="openCraftDetailDrawer(row)">明细</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -182,6 +184,49 @@
         @size-change="onPageSizeChange"
       />
     </div>
+
+    <el-drawer
+      v-model="craftDetailDrawer.visible"
+      title="工艺明细"
+      direction="rtl"
+      size="520px"
+      destroy-on-close
+      @closed="craftDetailDrawer.row = null"
+    >
+      <template v-if="craftDetailDrawer.row">
+        <ProductionOrderBriefPanel :brief="craftBriefFromRow(craftDetailDrawer.row)" />
+        <el-descriptions :column="1" border size="small" class="craft-drawer-meta">
+          <el-descriptions-item label="采购齐套">
+            <el-tag
+              :type="craftDetailDrawer.row.purchaseStatus === 'completed' ? 'success' : 'info'"
+              size="small"
+            >
+              {{ craftDetailDrawer.row.purchaseStatus === 'completed' ? '已完成' : '未完成' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="到工艺时间">
+            {{ formatDateTime(craftDetailDrawer.row.arrivedAtCraft) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="完成时间">
+            {{ formatDateTime(craftDetailDrawer.row.completedAt) }}
+          </el-descriptions-item>
+        </el-descriptions>
+        <el-divider content-position="left">E 区工艺项目</el-divider>
+        <el-table
+          :data="craftDetailDrawer.row.processItems || []"
+          border
+          stripe
+          size="small"
+          max-height="360"
+          empty-text="暂无工艺行"
+        >
+          <el-table-column prop="processName" label="工艺项目" min-width="100" show-overflow-tooltip />
+          <el-table-column prop="supplierName" label="供应商" min-width="90" show-overflow-tooltip />
+          <el-table-column prop="part" label="部位" width="88" show-overflow-tooltip />
+          <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
+        </el-table>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -190,7 +235,6 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCraftItems, completeCraft, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
-import { getOrderDetail } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -202,6 +246,10 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
+import ProductionOrderBriefPanel, {
+  type ProductionOrderBriefModel,
+} from '@/components/production/ProductionOrderBriefPanel.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const CRAFT_TABS = [
@@ -280,48 +328,6 @@ const canCompleteSelection = computed(() =>
 )
 const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-craft-main')
 
-function buildCraftSummaryFromOrderDetail(detail: any): { supplierName: string; processItem: string } {
-  const items = Array.isArray(detail?.processItems) ? detail.processItems : []
-  const suppliers = Array.from(
-    new Set(
-      items
-        .map((p: any) => (p?.supplierName ?? '').trim())
-        .filter((v: string) => !!v),
-    ),
-  )
-  const processes = Array.from(
-    new Set(
-      items
-        .map((p: any) => (p?.processName ?? '').trim())
-        .filter((v: string) => !!v),
-    ),
-  )
-  return {
-    supplierName: suppliers.join(' / '),
-    processItem: processes.join(' / '),
-  }
-}
-
-async function enrichCraftRowsFromOrderDetail(rows: CraftListItem[]) {
-  if (!rows.length) return rows
-  const enriched = await Promise.all(
-    rows.map(async (row) => {
-      try {
-        const res = await getOrderDetail(row.orderId)
-        const summary = buildCraftSummaryFromOrderDetail(res.data as any)
-        return {
-          ...row,
-          supplierName: summary.supplierName,
-          processItem: summary.processItem,
-        } as CraftListItem
-      } catch {
-        return row
-      }
-    }),
-  )
-  return enriched
-}
-
 function getTabLabel(tab: CraftTabConfig): string {
   const counts = tabCounts.value
   const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
@@ -373,7 +379,7 @@ async function load() {
     if (data) {
       const baseRows = data.list ?? []
       // 强制以订单编辑 E 区 processItems 为准覆盖展示，避免供应商显示成旧来源
-      list.value = await enrichCraftRowsFromOrderDetail(baseRows)
+      list.value = baseRows
       pagination.total = data.total ?? 0
       restoreColumnWidths(craftTableRef.value)
     }
@@ -477,6 +483,32 @@ function collaborationDisplay(row: CraftListItem): string {
   return ''
 }
 
+const craftDetailDrawer = reactive<{ visible: boolean; row: CraftListItem | null }>({
+  visible: false,
+  row: null,
+})
+
+function openCraftDetailDrawer(row: CraftListItem) {
+  craftDetailDrawer.row = row
+  craftDetailDrawer.visible = true
+}
+
+function craftBriefFromRow(row: CraftListItem | null): ProductionOrderBriefModel | null {
+  if (!row) return null
+  return {
+    orderNo: row.orderNo,
+    skuCode: row.skuCode,
+    imageUrl: row.imageUrl,
+    customerName: row.customerName,
+    merchandiser: row.merchandiser,
+    customerDueDate: row.customerDueDate,
+    orderQuantity: row.quantity,
+    orderDate: row.orderDate,
+    orderTypeLabel: orderTypeDisplay(row),
+    collaborationLabel: collaborationDisplay(row),
+  }
+}
+
 onMounted(() => {
   loadOptions()
   load()
@@ -524,6 +556,15 @@ onMounted(() => {
 
 .text-muted {
   color: var(--el-text-color-secondary);
+}
+
+.craft-sub-attr {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.craft-drawer-meta {
+  margin-top: 12px;
 }
 
 </style>

@@ -175,6 +175,25 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
+      <el-table-column label="图片" width="72" align="center">
+        <template #default="{ row }">
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
+      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
+      <el-table-column label="订单数量" width="88" align="right">
+        <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+      </el-table-column>
+      <el-table-column label="客户交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
+      </el-table-column>
+      <el-table-column label="下单日期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.orderDate) }}</template>
+      </el-table-column>
       <el-table-column prop="arrivedAtPattern" label="到纸样时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.arrivedAtPattern) }}</template>
       </el-table-column>
@@ -186,16 +205,26 @@
           <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" width="72" align="center">
+      <el-table-column label="订单属性" min-width="108">
         <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
-          <span v-else class="text-muted">-</span>
+          <div>{{ findOrderTypeLabelById(row.orderTypeId) }}</div>
+          <div class="text-muted pattern-sub-attr">{{ findCollaborationLabelById(row.collaborationTypeId) }}</div>
+        </template>
+      </el-table-column>
+      <el-table-column label="采购" width="80" align="center">
+        <template #default="{ row }">
+          <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'info'" size="small">
+            {{ purchaseStatusLabel(row.purchaseStatus) }}
+          </el-tag>
         </template>
       </el-table-column>
       <el-table-column prop="patternMaster" label="纸样师" width="90" />
       <el-table-column prop="sampleMaker" label="车版师" width="90" />
+      <el-table-column label="概要" width="64" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" size="small" @click.stop="openPatternBriefDrawer(row)">查看</el-button>
+        </template>
+      </el-table-column>
       <el-table-column label="纸样物料" width="98" align="center" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openMaterialsDialog(row)">
@@ -217,6 +246,39 @@
         @size-change="onPageSizeChange"
       />
     </div>
+
+    <el-drawer
+      v-model="patternBriefDrawer.visible"
+      title="纸样订单概要"
+      direction="rtl"
+      size="440px"
+      destroy-on-close
+      @closed="patternBriefDrawer.row = null"
+    >
+      <template v-if="patternBriefDrawer.row">
+        <ProductionOrderBriefPanel :brief="patternBriefFromRow(patternBriefDrawer.row)" />
+        <el-descriptions :column="1" border size="small" class="pattern-brief-extra">
+          <el-descriptions-item label="纸样师">
+            {{ (patternBriefDrawer.row.patternMaster ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="车版师">
+            {{ (patternBriefDrawer.row.sampleMaker ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="纸样状态">
+            {{ patternBriefDrawer.row.patternStatus }}
+          </el-descriptions-item>
+          <el-descriptions-item label="到纸样时间">
+            {{ formatDateTime(patternBriefDrawer.row.arrivedAtPattern) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="完成时间">
+            {{ formatDateTime(patternBriefDrawer.row.completedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="时效判定">
+            <SlaJudgeTag :text="patternBriefDrawer.row.timeRating" />
+          </el-descriptions-item>
+        </el-descriptions>
+      </template>
+    </el-drawer>
 
     <!-- 分配纸样师和车版师弹窗 -->
     <el-dialog
@@ -447,7 +509,11 @@ import {
   getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import ProductionOrderBriefPanel, {
+  type ProductionOrderBriefModel,
+} from '@/components/production/ProductionOrderBriefPanel.vue'
 
 const PATTERN_TABS = [
   { label: '全部', value: 'all' },
@@ -488,6 +554,32 @@ function findCollaborationLabelById(id: number | null | undefined): string {
   const found = collaborationOptions.value.find((opt) => opt.id === id)
   return found?.label ?? ''
 }
+
+const patternBriefDrawer = reactive<{ visible: boolean; row: PatternListItem | null }>({
+  visible: false,
+  row: null,
+})
+
+function openPatternBriefDrawer(row: PatternListItem) {
+  patternBriefDrawer.row = row
+  patternBriefDrawer.visible = true
+}
+
+function patternBriefFromRow(row: PatternListItem): ProductionOrderBriefModel {
+  return {
+    orderNo: row.orderNo,
+    skuCode: row.skuCode,
+    imageUrl: row.imageUrl,
+    customerName: row.customerName,
+    merchandiser: row.merchandiser,
+    customerDueDate: row.customerDueDate,
+    orderQuantity: row.quantity,
+    orderDate: row.orderDate,
+    orderTypeLabel: findOrderTypeLabelById(row.orderTypeId),
+    collaborationLabel: findCollaborationLabelById(row.collaborationTypeId),
+  }
+}
+
 function purchaseStatusLabel(v: string): string {
   return v === 'completed' ? '已完成' : v === 'pending' ? '未完成' : v
 }
@@ -1103,5 +1195,14 @@ onMounted(() => {
 
 .materials-remark :deep(.el-textarea__inner) {
   font-size: var(--el-font-size-base);
+}
+
+.pattern-sub-attr {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.pattern-brief-extra {
+  margin-top: 12px;
 }
 </style>

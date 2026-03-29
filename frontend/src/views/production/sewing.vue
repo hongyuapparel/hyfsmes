@@ -96,12 +96,6 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="arrivedAt" label="到车缝时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
-      </el-table-column>
-      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
-      </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
@@ -110,7 +104,34 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
-      <el-table-column prop="factoryName" label="加工厂" min-width="100" />
+      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
+      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
+      <el-table-column label="客户交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
+      </el-table-column>
+      <el-table-column prop="arrivedAt" label="到车缝时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
+      </el-table-column>
+      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
+      </el-table-column>
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
+        </template>
+      </el-table-column>
+      <el-table-column prop="factoryName" label="加工厂" min-width="100" show-overflow-tooltip />
+      <el-table-column label="分单时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.distributedAt) }}</template>
+      </el-table-column>
+      <el-table-column label="加工厂交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.factoryDueDate) }}</template>
+      </el-table-column>
+      <el-table-column label="加工费(元)" width="100" align="right">
+        <template #default="{ row }">
+          {{ row.sewingFee != null && String(row.sewingFee).trim() !== '' ? formatDisplayNumber(row.sewingFee) : '-' }}
+        </template>
+      </el-table-column>
       <el-table-column label="订单数量" width="96" align="right">
         <template #default="{ row }">
           <el-popover
@@ -221,9 +242,9 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column label="时效判定" width="96" align="center">
+      <el-table-column label="概要" width="64" align="center" fixed="right">
         <template #default="{ row }">
-          <SlaJudgeTag :text="row.timeRating" />
+          <el-button link type="primary" @click.stop="openSewingBriefDrawer(row)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -394,6 +415,46 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-drawer
+      v-model="sewingBriefDrawer.visible"
+      title="车缝外发概要"
+      direction="rtl"
+      size="440px"
+      destroy-on-close
+      @closed="sewingBriefDrawer.row = null"
+    >
+      <template v-if="sewingBriefDrawer.row">
+        <ProductionOrderBriefPanel :brief="sewingBriefFromRow(sewingBriefDrawer.row)" />
+        <el-descriptions :column="1" border size="small" class="sewing-brief-extra">
+          <el-descriptions-item label="加工厂">
+            {{ (sewingBriefDrawer.row.factoryName ?? '').trim() || '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="分单时间">
+            {{ formatDateTime(sewingBriefDrawer.row.distributedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="加工厂交期">
+            {{ formatDate(sewingBriefDrawer.row.factoryDueDate) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="车缝加工费(元)">
+            {{
+              sewingBriefDrawer.row.sewingFee != null && String(sewingBriefDrawer.row.sewingFee).trim() !== ''
+                ? formatDisplayNumber(sewingBriefDrawer.row.sewingFee)
+                : '—'
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="到车缝时间">
+            {{ formatDateTime(sewingBriefDrawer.row.arrivedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="完成时间">
+            {{ formatDateTime(sewingBriefDrawer.row.completedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="时效判定">
+            <SlaJudgeTag :text="sewingBriefDrawer.row.timeRating" />
+          </el-descriptions-item>
+        </el-descriptions>
+      </template>
+    </el-drawer>
   </div>
 </template>
 
@@ -420,9 +481,12 @@ import {
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
-import { formatDateTime } from '@/utils/date-format'
+import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import ProductionOrderBriefPanel, {
+  type ProductionOrderBriefModel,
+} from '@/components/production/ProductionOrderBriefPanel.vue'
 
 const SEWING_TABS = [
   { label: '全部', value: 'all' },
@@ -440,6 +504,28 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<SewingListItem[]>([])
+const sewingBriefDrawer = reactive<{ visible: boolean; row: SewingListItem | null }>({
+  visible: false,
+  row: null,
+})
+
+function openSewingBriefDrawer(row: SewingListItem) {
+  sewingBriefDrawer.row = row
+  sewingBriefDrawer.visible = true
+}
+
+function sewingBriefFromRow(row: SewingListItem): ProductionOrderBriefModel {
+  return {
+    orderNo: row.orderNo,
+    skuCode: row.skuCode,
+    imageUrl: row.imageUrl,
+    customerName: row.customerName,
+    merchandiser: row.merchandiser,
+    customerDueDate: row.customerDueDate,
+    orderQuantity: row.quantity,
+  }
+}
+
 const sewingTableRef = ref()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
@@ -919,5 +1005,9 @@ onMounted(() => {
 
 .currency-prefix {
   color: var(--el-text-color-regular);
+}
+
+.sewing-brief-extra {
+  margin-top: 12px;
 }
 </style>

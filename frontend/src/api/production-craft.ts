@@ -1,5 +1,12 @@
 import request from './request'
 
+export interface CraftProcessItemRow {
+  processName?: string
+  supplierName?: string
+  part?: string
+  remark?: string
+}
+
 export interface CraftListItem {
   orderId: number
   orderNo: string
@@ -20,6 +27,11 @@ export interface CraftListItem {
   craftStatus: string
   /** 时效判定 */
   timeRating: string
+  customerName: string
+  merchandiser: string
+  customerDueDate: string | null
+  quantity: number
+  processItems: CraftProcessItemRow[]
 }
 
 export interface CraftListRes {

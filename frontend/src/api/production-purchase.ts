@@ -32,6 +32,10 @@ export interface PurchaseItemRow {
   purchaseImageUrl: string | null
   /** 时效判定 */
   timeRating: string
+  customerName: string
+  merchandiser: string
+  customerDueDate: string | null
+  orderQuantity: number
 }
 
 export interface PurchaseListRes {

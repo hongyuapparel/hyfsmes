@@ -56,6 +56,14 @@ export interface PurchaseItemRow {
   processRoute: 'purchase' | 'picking';
   /** 时效判定：本行物料从到采购至采购/领料完成（与订单时效配置 pending_purchase 对比） */
   timeRating: string;
+  /** 订单维度：客户 */
+  customerName: string;
+  /** 订单维度：跟单 */
+  merchandiser: string;
+  /** 订单维度：客户交期 */
+  customerDueDate: string | null;
+  /** 订单件数 */
+  orderQuantity: number;
 }
 
 export interface PurchaseListQuery {
@@ -347,6 +355,10 @@ export class ProductionPurchaseService {
           materialSource,
           processRoute,
           timeRating,
+          customerName: order.customerName ?? '',
+          merchandiser: order.merchandiser ?? '',
+          customerDueDate: this.toDateOnlyLocalString(order.customerDueDate),
+          orderQuantity: order.quantity ?? 0,
         });
       }
     }

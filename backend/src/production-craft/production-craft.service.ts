@@ -7,6 +7,9 @@ import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/or
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 
+/** 列表返回：工艺项目行（与 order_ext.process_items 一致） */
+export type CraftProcessItemRow = Pick<ProcessRow, 'processName' | 'supplierName' | 'part' | 'remark'>;
+
 export interface CraftListItem {
   orderId: number;
   orderNo: string;
@@ -27,6 +30,11 @@ export interface CraftListItem {
   craftStatus: string;
   /** 时效判定（与订单时效配置对比） */
   timeRating: string;
+  customerName: string;
+  merchandiser: string;
+  customerDueDate: string | null;
+  quantity: number;
+  processItems: CraftProcessItemRow[];
 }
 
 export interface CraftListQuery {
@@ -273,6 +281,13 @@ export class ProductionCraftService {
             ? this.toDateTimeLocalString(order.statusTime)
             : null;
       const summary = this.buildCraftSummaryFromProcessItems(processItems);
+      const itemsNorm = this.normalizeProcessItems(processItems);
+      const processItemsPayload: CraftProcessItemRow[] = itemsNorm.map((r) => ({
+        processName: r.processName,
+        supplierName: r.supplierName,
+        part: r.part,
+        remark: r.remark,
+      }));
 
       let phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(craft?.arrivedAtCraft ?? null);
       if (!phaseStart && order.status === 'pending_craft') {
@@ -307,6 +322,13 @@ export class ProductionCraftService {
         purchaseStatus: purchaseCompleted ? 'completed' : 'pending',
         craftStatus: craftStatus === 'completed' ? 'completed' : 'pending',
         timeRating,
+        customerName: order.customerName ?? '',
+        merchandiser: order.merchandiser ?? '',
+        customerDueDate: order.customerDueDate
+          ? this.toDateOnlyLocalString(order.customerDueDate)
+          : null,
+        quantity: order.quantity ?? 0,
+        processItems: processItemsPayload,
       });
     }
 

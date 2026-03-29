@@ -88,18 +88,28 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="arrivedAt" label="到裁床时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
-      </el-table-column>
-      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
-      </el-table-column>
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" width="72" align="center">
         <template #default="{ row }">
           <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
           <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
+      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
+      <el-table-column label="客户交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
+      </el-table-column>
+      <el-table-column prop="arrivedAt" label="到裁床时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
+      </el-table-column>
+      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
+      </el-table-column>
+      <el-table-column label="时效判定" width="96" align="center">
+        <template #default="{ row }">
+          <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
       <el-table-column label="订单数量" width="96" align="right">
@@ -206,7 +216,13 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column prop="cuttingUnitPrice" label="裁剪单价(元/件)" width="120" align="right">
+      <el-table-column
+        v-if="currentTab !== 'pending'"
+        prop="cuttingUnitPrice"
+        label="裁剪单价(元/件)"
+        width="120"
+        align="right"
+      >
         <template #default="{ row }">
           {{
             row.cuttingUnitPrice != null && String(row.cuttingUnitPrice).trim() !== ''
@@ -215,7 +231,13 @@
           }}
         </template>
       </el-table-column>
-      <el-table-column prop="cuttingCost" label="裁剪总成本(元)" width="120" align="right">
+      <el-table-column
+        v-if="currentTab !== 'pending'"
+        prop="cuttingCost"
+        label="裁剪总成本(元)"
+        width="120"
+        align="right"
+      >
         <template #default="{ row }">
           {{
             row.cuttingCost != null && String(row.cuttingCost).trim() !== ''
@@ -224,7 +246,13 @@
           }}
         </template>
       </el-table-column>
-      <el-table-column prop="actualFabricMeters" label="本次净耗合计(米)" width="130" align="right">
+      <el-table-column
+        v-if="currentTab !== 'pending'"
+        prop="actualFabricMeters"
+        label="本次净耗合计(米)"
+        width="130"
+        align="right"
+      >
         <template #default="{ row }">
           {{
             row.actualFabricMeters != null && String(row.actualFabricMeters).trim() !== ''
@@ -233,8 +261,9 @@
           }}
         </template>
       </el-table-column>
-      <el-table-column label="详情" width="88" align="center" fixed="right">
+      <el-table-column label="操作" width="120" align="center" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" @click.stop="openCuttingBriefDrawer(row)">概要</el-button>
           <el-button
             v-if="row.cuttingStatus === 'completed'"
             link
@@ -243,12 +272,6 @@
           >
             用量详情
           </el-button>
-          <span v-else class="text-muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="时效判定" width="96" align="center">
-        <template #default="{ row }">
-          <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
     </el-table>
@@ -366,7 +389,7 @@
     >
       <div v-loading="detailDrawer.loading" class="cutting-detail-drawer__body">
         <template v-if="detailPayload">
-          <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" />
+          <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" show-extended />
           <p class="register-hint">以下为该订单裁床完成时登记的裁剪数量与物料用量（只读）。</p>
           <CuttingQuantityMatrix
             :model-value="detailPayload.actualCutRows"
@@ -414,6 +437,17 @@
         </template>
       </div>
     </el-drawer>
+
+    <el-drawer
+      v-model="briefDrawer.visible"
+      title="订单概要"
+      direction="rtl"
+      size="400px"
+      destroy-on-close
+      @closed="briefDrawer.row = null"
+    >
+      <ProductionOrderBriefPanel v-if="briefDrawer.row" :brief="cuttingBriefFromRow(briefDrawer.row)" />
+    </el-drawer>
   </div>
 </template>
 
@@ -450,9 +484,12 @@ import {
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
-import { formatDateTime } from '@/utils/date-format'
+import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import ProductionOrderBriefPanel, {
+  type ProductionOrderBriefModel,
+} from '@/components/production/ProductionOrderBriefPanel.vue'
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },
@@ -522,6 +559,28 @@ const registerForm = reactive<{
 
 const detailDrawer = reactive({ visible: false, loading: false })
 const detailPayload = ref<CuttingCompletedDetailRes | null>(null)
+
+const briefDrawer = reactive<{ visible: boolean; row: CuttingListItem | null }>({
+  visible: false,
+  row: null,
+})
+
+function openCuttingBriefDrawer(row: CuttingListItem) {
+  briefDrawer.row = row
+  briefDrawer.visible = true
+}
+
+function cuttingBriefFromRow(row: CuttingListItem): ProductionOrderBriefModel {
+  return {
+    orderNo: row.orderNo,
+    skuCode: row.skuCode,
+    imageUrl: row.imageUrl,
+    customerName: row.customerName,
+    merchandiser: row.merchandiser,
+    customerDueDate: row.customerDueDate,
+    orderQuantity: row.quantity,
+  }
+}
 
 const detailGrandPieces = computed(() => {
   const rows = detailPayload.value?.actualCutRows ?? []

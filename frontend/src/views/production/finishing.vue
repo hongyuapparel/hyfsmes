@@ -97,6 +97,22 @@
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
+      <el-table-column prop="orderNo" label="订单号" min-width="100" />
+      <el-table-column prop="skuCode" label="SKU" min-width="100" />
+      <el-table-column label="图片" width="72" align="center">
+        <template #default="{ row }">
+          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
+      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
+      <el-table-column label="客户交期" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
+      </el-table-column>
+      <el-table-column label="订单数量" width="88" align="right">
+        <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+      </el-table-column>
       <el-table-column prop="arrivedAt" label="到尾部时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
       </el-table-column>
@@ -106,14 +122,6 @@
       <el-table-column label="时效判定" width="96" align="center">
         <template #default="{ row }">
           <SlaJudgeTag :text="row.timeRating" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="orderNo" label="订单号" min-width="100" />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" width="72" align="center">
-        <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
-          <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
       <el-table-column label="裁床数量" width="96" align="right">
@@ -271,6 +279,11 @@
           row.defectQuantity != null ? formatDisplayNumber(row.defectQuantity) : '-'
         }}</template>
       </el-table-column>
+      <el-table-column label="概要" width="64" align="center" fixed="right">
+        <template #default="{ row }">
+          <el-button link type="primary" @click.stop="openFinishingBriefDrawer(row)">查看</el-button>
+        </template>
+      </el-table-column>
     </el-table>
     </div>
 
@@ -285,6 +298,71 @@
         @size-change="onPageSizeChange"
       />
     </div>
+
+    <el-drawer
+      v-model="finishingBriefDrawer.visible"
+      title="尾部进度概要"
+      direction="rtl"
+      size="460px"
+      destroy-on-close
+      @closed="finishingBriefDrawer.row = null"
+    >
+      <template v-if="finishingBriefDrawer.row">
+        <ProductionOrderBriefPanel :brief="finishingBriefFromRow(finishingBriefDrawer.row)" />
+        <el-descriptions :column="1" border size="small" class="finishing-brief-extra">
+          <el-descriptions-item label="尾部状态">
+            {{ finishingBriefDrawer.row.finishingStatus }}
+          </el-descriptions-item>
+          <el-descriptions-item label="到尾部时间">
+            {{ formatDateTime(finishingBriefDrawer.row.arrivedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="完成时间">
+            {{ formatDateTime(finishingBriefDrawer.row.completedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="时效判定">
+            <SlaJudgeTag :text="finishingBriefDrawer.row.timeRating" />
+          </el-descriptions-item>
+          <el-descriptions-item label="裁床数量">
+            {{
+              finishingBriefDrawer.row.cutTotal != null
+                ? formatDisplayNumber(finishingBriefDrawer.row.cutTotal)
+                : '—'
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="车缝数量">
+            {{
+              finishingBriefDrawer.row.sewingQuantity != null
+                ? formatDisplayNumber(finishingBriefDrawer.row.sewingQuantity)
+                : '—'
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="尾部收货">
+            {{
+              finishingBriefDrawer.row.tailReceivedQty != null
+                ? formatDisplayNumber(finishingBriefDrawer.row.tailReceivedQty)
+                : '—'
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="尾部入库">
+            {{
+              finishingBriefDrawer.row.tailInboundQty != null
+                ? formatDisplayNumber(finishingBriefDrawer.row.tailInboundQty)
+                : '—'
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="次品数">
+            {{
+              finishingBriefDrawer.row.defectQuantity != null
+                ? formatDisplayNumber(finishingBriefDrawer.row.defectQuantity)
+                : '—'
+            }}
+          </el-descriptions-item>
+          <el-descriptions-item label="包装备注">
+            {{ (finishingBriefDrawer.row.remark ?? '').trim() || '—' }}
+          </el-descriptions-item>
+        </el-descriptions>
+      </template>
+    </el-drawer>
 
     <!-- 登记收货弹窗：待尾部 tab 使用，支持按尺码填写收货数量 -->
     <el-dialog
@@ -465,9 +543,12 @@ import {
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
-import { formatDateTime } from '@/utils/date-format'
+import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import ProductionOrderBriefPanel, {
+  type ProductionOrderBriefModel,
+} from '@/components/production/ProductionOrderBriefPanel.vue'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
@@ -486,6 +567,28 @@ const currentTab = ref<string>('all')
 const tabCounts = ref<Record<string, number>>({})
 const tabTotal = ref(0)
 const list = ref<FinishingListItem[]>([])
+const finishingBriefDrawer = reactive<{ visible: boolean; row: FinishingListItem | null }>({
+  visible: false,
+  row: null,
+})
+
+function openFinishingBriefDrawer(row: FinishingListItem) {
+  finishingBriefDrawer.row = row
+  finishingBriefDrawer.visible = true
+}
+
+function finishingBriefFromRow(row: FinishingListItem): ProductionOrderBriefModel {
+  return {
+    orderNo: row.orderNo,
+    skuCode: row.skuCode,
+    imageUrl: row.imageUrl,
+    customerName: row.customerName,
+    merchandiser: row.merchandiser,
+    customerDueDate: row.customerDueDate,
+    orderQuantity: row.quantity,
+  }
+}
+
 const finishingTableRef = ref()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
