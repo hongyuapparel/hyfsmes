@@ -17,6 +17,9 @@
  * 若终端里「路径不存在」但宝塔文件管理器能看到图：多为 SSH 连的不是同一台机，或目录名大小写不一致。
  * 可直接指定图片根目录（日期文件夹的上一级）：
  *   node scripts/copy-referenced-images-local.js --images-dir "/www/wwwroot/hyfs/WebRoot/Public/Images" --dry-run --limit 20
+ *
+ * 当库里日期目录与磁盘不一致（如库是 2020-xx，盘上只有 2022-xx）时，可用按文件名全盘索引（哈希名通常唯一）：
+ *   node scripts/copy-referenced-images-local.js --images-dir "/www/wwwroot/hyfs/WebRoot/Public/images" --resolve-by-basename --dry-run --limit 50
  */
 const fs = require('fs');
 const os = require('os');
@@ -42,11 +45,16 @@ function parseArgs(argv) {
     limit: 0,
     webRoot: process.env.OLD_WEBROOT || '/www/wwwroot/hyfs/WebRoot',
     imagesDir: process.env.OLD_IMAGES_DIR || '',
+    resolveByBasename: process.env.RESOLVE_IMAGE_BY_BASENAME === '1',
   };
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === '--dry-run') {
       args.dryRun = true;
+      continue;
+    }
+    if (token === '--resolve-by-basename') {
+      args.resolveByBasename = true;
       continue;
     }
     if (token === '--limit') {
@@ -177,6 +185,40 @@ function resolveImagesBaseDir(webRootPreferred, explicitImagesDir) {
   return '';
 }
 
+/**
+ * 遍历图片根目录，建立 文件名 -> 绝对路径（首个命中）。跳过 thumb 等目录以免误用缩略图。
+ * 若同一文件名出现多次，保留先遍历到的路径，并统计冲突数。
+ */
+function buildBasenameIndex(rootDir) {
+  const map = new Map();
+  let collisionKeys = 0;
+  const skipDirs = new Set(['thumb', '.git', 'node_modules']);
+  const stack = [rootDir];
+  while (stack.length) {
+    const dir = stack.pop();
+    let entries;
+    try {
+      entries = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      continue;
+    }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (skipDirs.has(e.name) || skipDirs.has(e.name.toLowerCase())) continue;
+        stack.push(full);
+      } else if (e.isFile()) {
+        if (map.has(e.name)) {
+          if (map.get(e.name) !== full) collisionKeys += 1;
+        } else {
+          map.set(e.name, full);
+        }
+      }
+    }
+  }
+  return { map, collisionKeys };
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const backendDir = path.resolve(__dirname, '..');
@@ -211,6 +253,18 @@ async function main() {
       ),
     );
     process.exit(1);
+  }
+
+  let basenameIndex = null;
+  if (args.resolveByBasename) {
+    console.error('[copy-referenced-images-local] building basename index under', imagesBaseDir, '...');
+    basenameIndex = buildBasenameIndex(imagesBaseDir);
+    console.error(
+      JSON.stringify({
+        indexBasenames: basenameIndex.map.size,
+        basenameCollisionRows: basenameIndex.collisionKeys,
+      }),
+    );
   }
 
   const env = loadEnv(path.join(backendDir, '.env'));
@@ -267,13 +321,22 @@ async function main() {
     let copied = 0;
     let existed = 0;
     let missingSource = 0;
+    let resolvedByBasename = 0;
     let failed = 0;
     const failures = [];
 
     if (!args.dryRun) await conn.beginTransaction();
     for (const t of toProcess) {
       try {
-        if (!fs.existsSync(t.sourceAbs)) {
+        let sourcePath = t.sourceAbs;
+        if (!fs.existsSync(sourcePath) && basenameIndex) {
+          const alt = basenameIndex.map.get(t.filename);
+          if (alt && fs.existsSync(alt)) {
+            sourcePath = alt;
+            resolvedByBasename += 1;
+          }
+        }
+        if (!fs.existsSync(sourcePath)) {
           missingSource += 1;
           failures.push({
             filename: t.filename,
@@ -285,7 +348,7 @@ async function main() {
         if (fs.existsSync(t.localPath)) {
           existed += 1;
         } else if (!args.dryRun) {
-          fs.copyFileSync(t.sourceAbs, t.localPath);
+          fs.copyFileSync(sourcePath, t.localPath);
           copied += 1;
         }
 
@@ -316,6 +379,7 @@ async function main() {
           copied,
           existedDestBeforeOrSkip: existed,
           missingSource,
+          resolvedByBasename: basenameIndex ? resolvedByBasename : undefined,
           failed,
           failures: failures.slice(0, 30),
         },
