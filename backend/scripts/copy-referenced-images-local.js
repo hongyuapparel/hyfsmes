@@ -11,8 +11,9 @@
  * 用法：
  *   cd backend
  *   node scripts/copy-referenced-images-local.js --dry-run --limit 20
- *   node scripts/copy-referenced-images-local.js --limit 100
- *   OLD_WEBROOT=/www/wwwroot/hyfs/WebRoot node scripts/copy-referenced-images-local.js
+ *   # 若本机没有 hyfs/WebRoot/Public/Images，请指定「日期文件夹的父目录」（即 Images 这一层）：
+ *   node scripts/copy-referenced-images-local.js --images-root /实际路径/Public/Images --dry-run --limit 20
+ *   OLD_IMAGES_ROOT=/path/to/Public/Images node scripts/copy-referenced-images-local.js
  */
 const fs = require('fs');
 const path = require('path');
@@ -32,7 +33,12 @@ function loadEnv(envPath) {
 }
 
 function parseArgs(argv) {
-  const args = { dryRun: false, limit: 0, webRoot: process.env.OLD_WEBROOT || '/www/wwwroot/hyfs/WebRoot' };
+  const args = {
+    dryRun: false,
+    limit: 0,
+    webRoot: process.env.OLD_WEBROOT || '/www/wwwroot/hyfs/WebRoot',
+    imagesRoot: (process.env.OLD_IMAGES_ROOT || '').trim(),
+  };
   for (let i = 2; i < argv.length; i += 1) {
     const token = argv[i];
     if (token === '--dry-run') {
@@ -46,6 +52,10 @@ function parseArgs(argv) {
     }
     if (token === '--webroot' && argv[i + 1]) {
       args.webRoot = argv[i + 1];
+      i += 1;
+    }
+    if (token === '--images-root' && argv[i + 1]) {
+      args.imagesRoot = argv[i + 1].trim();
       i += 1;
     }
   }
@@ -80,31 +90,39 @@ function toMirrorUrl(filename) {
 /**
  * 从 URL 路径解析旧站磁盘上的原图绝对路径。
  * 库内多为 /public/images/日期/文件，磁盘常为 WebRoot/Public/Images/日期/文件。
+ * @param {string|null} directImagesRoot 若指定，则为「Images」目录本身（其下为 2020-11-17 等日期文件夹）
  */
-function resolveLocalSourceFile(webRoot, pathname) {
+function resolveLocalSourceFile(webRoot, pathname, directImagesRoot) {
   const norm = pathname.replace(/\\/g, '/');
   const m = norm.match(/\/public\/images\/(.+)$/i);
   const rest = m ? m[1] : '';
   const partsFromUrl = norm.replace(/^\/+/, '').split('/').filter(Boolean);
+  const segs = rest ? rest.split('/').filter(Boolean) : [];
 
-  const candidates = []
+  const candidates = [];
+  if (directImagesRoot && segs.length) {
+    const base = path.resolve(directImagesRoot);
+    candidates.push(path.join(base, ...segs));
+  }
   if (rest) {
-    const segs = rest.split('/').filter(Boolean)
     candidates.push(
       path.join(webRoot, 'Public', 'Images', ...segs),
       path.join(webRoot, 'Public', 'images', ...segs),
       path.join(webRoot, 'public', 'Images', ...segs),
       path.join(webRoot, 'public', 'images', ...segs),
-    )
+    );
   }
   if (partsFromUrl.length) {
-    candidates.push(path.join(webRoot, ...partsFromUrl))
+    candidates.push(path.join(webRoot, ...partsFromUrl));
   }
 
   for (const p of candidates) {
-    if (p && fs.existsSync(p)) return p
+    if (p && fs.existsSync(p)) return p;
   }
-  return candidates[0] || path.join(webRoot, 'Public', 'Images', ...(rest ? rest.split('/').filter(Boolean) : []))
+  return (
+    candidates[0] ||
+    path.join(webRoot, 'Public', 'Images', ...(rest ? rest.split('/').filter(Boolean) : []))
+  );
 }
 
 /** 宝塔常见：WebRoot / webroot；其下 Public/Images 为旧系统上传目录 */
@@ -131,26 +149,46 @@ async function main() {
   if (!fs.existsSync(uploadDir)) fs.mkdirSync(uploadDir, { recursive: true });
 
   const webRoot = resolveOldSiteWebRoot(args.webRoot);
-  if (!fs.existsSync(webRoot)) {
-    console.error(JSON.stringify({ ok: false, error: `OLD_WEBROOT 不存在: ${webRoot}` }, null, 2));
-    process.exit(1);
-  }
-  const imagesProbe = path.join(webRoot, 'Public', 'Images');
-  if (!fs.existsSync(imagesProbe)) {
-    console.error(
-      JSON.stringify(
-        {
-          ok: false,
-          error: `未找到旧系统图片目录（请确认宝塔里站点根是否为 WebRoot）`,
-          webRoot,
-          expected: imagesProbe,
-          hint: '数据库 URL 多为 /Public/images/...（小写 i），磁盘上多为 Public/Images（大写 I）；脚本会自动尝试多种路径。',
-        },
-        null,
-        2,
-      ),
-    );
-    process.exit(1);
+  const imagesRoot = args.imagesRoot ? path.resolve(args.imagesRoot) : '';
+
+  if (imagesRoot) {
+    if (!fs.existsSync(imagesRoot)) {
+      console.error(
+        JSON.stringify(
+          { ok: false, error: '--images-root 目录不存在', imagesRoot },
+          null,
+          2,
+        ),
+      );
+      process.exit(1);
+    }
+  } else {
+    if (!fs.existsSync(webRoot)) {
+      console.error(JSON.stringify({ ok: false, error: `OLD_WEBROOT 不存在: ${webRoot}` }, null, 2));
+      process.exit(1);
+    }
+    const imagesProbe = path.join(webRoot, 'Public', 'Images');
+    if (!fs.existsSync(imagesProbe)) {
+      console.error(
+        JSON.stringify(
+          {
+            ok: false,
+            error: '未在默认路径找到旧系统图片目录（本机可能没有 hyfs/WebRoot 或路径不同）',
+            webRoot,
+            expected: imagesProbe,
+            hint: '请在宝塔「文件」里点开旧站站点，找到下面一层层文件夹里含有「大量 YYYY-MM-DD 子目录」的那一层，一般为 Public/Images。',
+            fix: '把该层完整路径传给 --images-root，例如：',
+            example:
+              'node scripts/copy-referenced-images-local.js --images-root /www/wwwroot/某站点/Public/Images --dry-run --limit 5',
+            discover:
+              '在终端尝试：find /www/wwwroot -maxdepth 10 -type d -name "thumb" 2>/dev/null | head -5   （thumb 常与 Images 同级）',
+          },
+          null,
+          2,
+        ),
+      );
+      process.exit(1);
+    }
   }
 
   const env = loadEnv(path.join(backendDir, '.env'));
@@ -182,7 +220,7 @@ async function main() {
       const filename = path.basename(pathname);
       if (!filename) continue;
 
-      const sourceAbs = resolveLocalSourceFile(webRoot, pathname);
+      const sourceAbs = resolveLocalSourceFile(webRoot, pathname, imagesRoot || null);
       targets.push({
         id: Number(row.id),
         original,
@@ -248,6 +286,7 @@ async function main() {
           ok: true,
           dryRun: args.dryRun,
           webRoot,
+          imagesRoot: imagesRoot || null,
           uploadDir,
           sourceRows: sourceRows.length,
           candidateRows: targets.length,
