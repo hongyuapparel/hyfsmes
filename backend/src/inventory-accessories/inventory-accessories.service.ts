@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { InventoryAccessory } from '../entities/inventory-accessory.entity';
@@ -8,6 +8,8 @@ import { User, UserStatus } from '../entities/user.entity';
 
 @Injectable()
 export class InventoryAccessoriesService {
+  private readonly logger = new Logger(InventoryAccessoriesService.name);
+
   constructor(
     @InjectRepository(InventoryAccessory)
     private readonly repo: Repository<InventoryAccessory>,
@@ -18,6 +20,12 @@ export class InventoryAccessoriesService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
   ) {}
+
+  private isMissingTableError(error: unknown): boolean {
+    const e = error as { code?: string; errno?: number; message?: string } | undefined;
+    const msg = String(e?.message ?? '').toLowerCase();
+    return e?.code === 'ER_NO_SUCH_TABLE' || e?.errno === 1146 || msg.includes("doesn't exist");
+  }
 
   private toSnapshot(item: InventoryAccessory): Record<string, unknown> {
     return {
@@ -41,15 +49,23 @@ export class InventoryAccessoriesService {
     afterSnapshot?: Record<string, unknown> | null;
     remark?: string;
   }) {
-    const row = this.operationLogRepo.create({
-      accessoryId: params.accessoryId,
-      action: params.action,
-      operatorUsername: (params.operatorUsername ?? '').trim(),
-      beforeSnapshot: params.beforeSnapshot ?? null,
-      afterSnapshot: params.afterSnapshot ?? null,
-      remark: (params.remark ?? '').trim(),
-    });
-    await this.operationLogRepo.save(row);
+    try {
+      const row = this.operationLogRepo.create({
+        accessoryId: params.accessoryId,
+        action: params.action,
+        operatorUsername: (params.operatorUsername ?? '').trim(),
+        beforeSnapshot: params.beforeSnapshot ?? null,
+        afterSnapshot: params.afterSnapshot ?? null,
+        remark: (params.remark ?? '').trim(),
+      });
+      await this.operationLogRepo.save(row);
+    } catch (error) {
+      if (this.isMissingTableError(error)) {
+        this.logger.warn('操作记录表不存在，已跳过本次辅料操作日志写入');
+        return;
+      }
+      throw error;
+    }
   }
 
   async getList(params: {
@@ -258,16 +274,21 @@ export class InventoryAccessoriesService {
         remark: (params.remark ?? '').trim(),
       });
       const savedRecord = await recordRepo.save(record);
-      await operationLogRepo.save(
-        operationLogRepo.create({
-          accessoryId: params.accessoryId,
-          action: 'outbound',
-          operatorUsername: (params.operatorUsername ?? '').trim(),
-          beforeSnapshot,
-          afterSnapshot: this.toSnapshot(savedAccessory),
-          remark: (params.remark ?? '').trim(),
-        }),
-      );
+      try {
+        await operationLogRepo.save(
+          operationLogRepo.create({
+            accessoryId: params.accessoryId,
+            action: 'outbound',
+            operatorUsername: (params.operatorUsername ?? '').trim(),
+            beforeSnapshot,
+            afterSnapshot: this.toSnapshot(savedAccessory),
+            remark: (params.remark ?? '').trim(),
+          }),
+        );
+      } catch (error) {
+        if (!this.isMissingTableError(error)) throw error;
+        this.logger.warn('操作记录表不存在，已跳过本次辅料出库日志写入');
+      }
 
       return { accessory: savedAccessory, record: savedRecord };
     });
