@@ -1,9 +1,11 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { User, UserStatus } from '../entities/user.entity';
 import { Order } from '../entities/order.entity';
+import { UserRole } from '../entities/user-role.entity';
+import { Role } from '../entities/role.entity';
 
 @Injectable()
 export class UsersService {
@@ -12,17 +14,18 @@ export class UsersService {
     private userRepo: Repository<User>,
     @InjectRepository(Order)
     private orderRepo: Repository<Order>,
+    @InjectRepository(UserRole)
+    private userRoleRepo: Repository<UserRole>,
+    @InjectRepository(Role)
+    private roleRepo: Repository<Role>,
   ) {}
 
   async findAll() {
     const list = await this.userRepo.find({
-      relations: ['role'],
+      relations: ['role', 'userRoles', 'userRoles.role'],
       order: { id: 'ASC' },
     });
-    return list.map((u) => {
-      const { passwordHash: _, ...rest } = u;
-      return rest;
-    });
+    return list.map((u) => this.toSafeUser(u));
   }
 
   /**
@@ -32,21 +35,20 @@ export class UsersService {
     const qb = this.userRepo
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.role', 'r')
+      .leftJoinAndSelect('u.userRoles', 'ur')
+      .leftJoinAndSelect('ur.role', 'urRole')
       .where('u.status = :status', { status: UserStatus.ACTIVE });
 
     if (keyword?.trim()) {
       qb.andWhere('(u.username LIKE :kw OR u.display_name LIKE :kw)', { kw: `%${keyword.trim()}%` });
     }
     if (roleCode?.trim()) {
-      qb.andWhere('r.code = :code', { code: roleCode.trim() });
+      qb.andWhere('(r.code = :code OR urRole.code = :code)', { code: roleCode.trim() });
     }
 
-    qb.orderBy('u.id', 'ASC');
+    qb.distinct(true).orderBy('u.id', 'ASC');
     const list = await qb.getMany();
-    return list.map((u) => {
-      const { passwordHash: _, ...rest } = u;
-      return rest;
-    });
+    return list.map((u) => this.toSafeUser(u));
   }
 
   /**
@@ -55,7 +57,9 @@ export class UsersService {
   async searchForManagement(keyword?: string, roleCode?: string, status?: UserStatus) {
     const qb = this.userRepo
       .createQueryBuilder('u')
-      .leftJoinAndSelect('u.role', 'r');
+      .leftJoinAndSelect('u.role', 'r')
+      .leftJoinAndSelect('u.userRoles', 'ur')
+      .leftJoinAndSelect('ur.role', 'urRole');
 
     if (status) {
       qb.where('u.status = :status', { status });
@@ -67,36 +71,41 @@ export class UsersService {
       qb.andWhere('(u.username LIKE :kw OR u.display_name LIKE :kw)', { kw: `%${keyword.trim()}%` });
     }
     if (roleCode?.trim()) {
-      qb.andWhere('r.code = :code', { code: roleCode.trim() });
+      qb.andWhere('(r.code = :code OR urRole.code = :code)', { code: roleCode.trim() });
     }
 
-    qb.orderBy('u.id', 'ASC');
+    qb.distinct(true).orderBy('u.id', 'ASC');
     const list = await qb.getMany();
-    return list.map((u) => {
-      const { passwordHash: _, ...rest } = u;
-      return rest;
-    });
+    return list.map((u) => this.toSafeUser(u));
   }
 
-  async create(dto: { username: string; password: string; displayName?: string; roleId: number }) {
+  async create(dto: { username: string; password: string; displayName?: string; roleId?: number; roleIds?: number[] }) {
     const exists = await this.userRepo.findOne({ where: { username: dto.username } });
     if (exists) throw new ConflictException('用户名已存在');
+    const normalizedRoleIds = await this.normalizeRoleIds(dto.roleIds, dto.roleId);
+    const primaryRoleId = normalizedRoleIds[0];
     const hash = await bcrypt.hash(dto.password, 10);
     const user = this.userRepo.create({
       username: dto.username,
       passwordHash: hash,
       displayName: dto.displayName ?? dto.username,
-      roleId: dto.roleId,
+      roleId: primaryRoleId,
       status: UserStatus.ACTIVE,
     });
-    return this.userRepo.save(user);
+    const saved = await this.userRepo.save(user);
+    await this.syncUserRoles(saved.id, normalizedRoleIds);
+    const full = await this.userRepo.findOne({
+      where: { id: saved.id },
+      relations: ['role', 'userRoles', 'userRoles.role'],
+    });
+    return full ? this.toSafeUser(full) : saved;
   }
 
   async update(
     id: number,
-    dto: { username?: string; displayName?: string; roleId?: number; status?: UserStatus },
-  ): Promise<User> {
-    const user = await this.userRepo.findOne({ where: { id } });
+    dto: { username?: string; displayName?: string; roleId?: number; roleIds?: number[]; status?: UserStatus },
+  ): Promise<any> {
+    const user = await this.userRepo.findOne({ where: { id }, relations: ['userRoles'] });
     if (!user) throw new NotFoundException('用户不存在');
 
     // 允许修改用户名（登录账号），并做唯一性校验；同时联动更新依赖 username 的业务字段
@@ -125,9 +134,18 @@ export class UsersService {
       }
     }
     if (dto.displayName !== undefined) user.displayName = dto.displayName;
-    if (dto.roleId !== undefined) user.roleId = dto.roleId;
+    if (dto.roleIds !== undefined || dto.roleId !== undefined) {
+      const normalizedRoleIds = await this.normalizeRoleIds(dto.roleIds, dto.roleId ?? user.roleId);
+      user.roleId = normalizedRoleIds[0];
+      await this.syncUserRoles(user.id, normalizedRoleIds);
+    }
     if (dto.status !== undefined) user.status = dto.status;
-    return this.userRepo.save(user);
+    await this.userRepo.save(user);
+    const full = await this.userRepo.findOne({
+      where: { id: user.id },
+      relations: ['role', 'userRoles', 'userRoles.role'],
+    });
+    return full ? this.toSafeUser(full) : user;
   }
 
   async resetPassword(id: number, newPassword: string): Promise<void> {
@@ -135,5 +153,44 @@ export class UsersService {
     if (!user) throw new NotFoundException('用户不存在');
     user.passwordHash = await bcrypt.hash(newPassword, 10);
     await this.userRepo.save(user);
+  }
+
+  private async normalizeRoleIds(roleIds?: number[], fallbackRoleId?: number): Promise<number[]> {
+    const source = Array.isArray(roleIds) && roleIds.length ? roleIds : (fallbackRoleId ? [fallbackRoleId] : []);
+    const normalized = Array.from(new Set(source.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
+    if (!normalized.length) throw new ConflictException('请选择至少一个角色');
+    const exists = await this.roleRepo.find({ where: { id: In(normalized) }, select: ['id'] });
+    const existsIds = new Set(exists.map((r) => r.id));
+    const valid = normalized.filter((id) => existsIds.has(id));
+    if (!valid.length) throw new ConflictException('角色不存在');
+    return valid;
+  }
+
+  private async syncUserRoles(userId: number, roleIds: number[]): Promise<void> {
+    await this.userRoleRepo.delete({ userId });
+    const rows = roleIds.map((roleId) => this.userRoleRepo.create({ userId, roleId }));
+    await this.userRoleRepo.save(rows);
+  }
+
+  private toSafeUser(u: User): any {
+    const { passwordHash: _, ...rest } = u as any;
+    const roles = (u.userRoles ?? [])
+      .map((ur) => ur.role)
+      .filter(Boolean);
+    const seen = new Set<number>();
+    const normalizedRoles: Role[] = [];
+    for (const r of roles) {
+      if (!seen.has(r.id)) {
+        seen.add(r.id);
+        normalizedRoles.push(r);
+      }
+    }
+    if (u.role && !seen.has(u.role.id)) normalizedRoles.unshift(u.role);
+    return {
+      ...rest,
+      roles: normalizedRoles.map((r) => ({ id: r.id, code: r.code, name: r.name })),
+      roleIds: normalizedRoles.map((r) => r.id),
+      roleNames: normalizedRoles.map((r) => r.name),
+    };
   }
 }

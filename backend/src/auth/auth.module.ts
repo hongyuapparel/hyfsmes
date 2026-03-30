@@ -6,6 +6,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './jwt.strategy';
@@ -13,7 +14,7 @@ import { PermissionGuard } from './permission.guard';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, RolePermission, RoleOrderPolicy]),
+    TypeOrmModule.forFeature([User, UserRole, RolePermission, RoleOrderPolicy]),
     ConfigModule,
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.registerAsync({

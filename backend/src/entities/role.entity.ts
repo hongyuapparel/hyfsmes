@@ -8,6 +8,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { RolePermission } from './role-permission.entity';
+import { UserRole } from './user-role.entity';
 
 export enum RoleStatus {
   ACTIVE = 'active',
@@ -36,6 +37,9 @@ export class Role {
 
   @OneToMany(() => User, (u) => u.role)
   users: User[];
+
+  @OneToMany(() => UserRole, (ur) => ur.role)
+  userRoles: UserRole[];
 
   @OneToMany(() => RolePermission, (rp) => rp.role)
   rolePermissions: RolePermission[];

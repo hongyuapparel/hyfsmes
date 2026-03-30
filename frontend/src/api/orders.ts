@@ -176,7 +176,7 @@ export interface OrderFormPayload {
   sizeInfoMetaHeaders?: string[]
   sizeInfoRows?: Array<{
     metaValues: string[]
-    sizeValues: number[]
+    sizeValues: Array<number | string>
   }>
   /** E 区：工艺项目 */
   processItems?: Array<{

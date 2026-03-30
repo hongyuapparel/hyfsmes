@@ -5,20 +5,17 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, In } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { REQUIRE_PERMISSION } from './require-permission.decorator';
 
 @Injectable()
 export class PermissionGuard implements CanActivate {
   constructor(
     private reflector: Reflector,
-    @InjectRepository(User)
-    private userRepo: Repository<User>,
-    @InjectRepository(RolePermission)
-    private rpRepo: Repository<RolePermission>,
+    private dataSource: DataSource,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -32,11 +29,17 @@ export class PermissionGuard implements CanActivate {
     const user = request.user as { userId?: number } | undefined;
     if (!user?.userId) throw new ForbiddenException('未登录');
 
-    const u = await this.userRepo.findOne({ where: { id: user.userId }, select: ['roleId'] });
-    if (!u?.roleId) throw new ForbiddenException('无权限访问');
+    const userRepo = this.dataSource.getRepository(User);
+    const userRoleRepo = this.dataSource.getRepository(UserRole);
+    const rpRepo = this.dataSource.getRepository(RolePermission);
 
-    const perms = await this.rpRepo.find({
-      where: { roleId: u.roleId },
+    const u = await userRepo.findOne({ where: { id: user.userId }, select: ['roleId'] });
+    const links = await userRoleRepo.find({ where: { userId: user.userId }, select: ['roleId'] });
+    const roleIds = Array.from(new Set([u?.roleId, ...links.map((x) => x.roleId)].filter(Boolean))) as number[];
+    if (!roleIds.length) throw new ForbiddenException('无权限访问');
+
+    const perms = await rpRepo.find({
+      where: { roleId: In(roleIds) },
       relations: ['permission'],
     });
     const routes = perms.map((p) => p.permission?.routePath).filter(Boolean);

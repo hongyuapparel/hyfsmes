@@ -10,6 +10,8 @@ export interface MeRes {
   displayName: string
   roleId: number
   roleName: string
+  roleIds?: number[]
+  roleNames?: string[]
   permissions: { id: number; code: string; name: string; type: string; routePath: string }[]
   orderPolicies?: {
     edit: string[]

@@ -36,13 +36,14 @@ export class UsersController {
   @Post()
   create(
     @Body()
-    body: { username: string; password: string; display_name?: string; role_id: number },
+    body: { username: string; password: string; display_name?: string; role_id?: number; role_ids?: number[] },
   ) {
     return this.usersService.create({
       username: body.username,
       password: body.password,
       displayName: body.display_name,
       roleId: body.role_id,
+      roleIds: body.role_ids,
     });
   }
 
@@ -50,13 +51,14 @@ export class UsersController {
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body()
-    body: { username?: string; display_name?: string; role_id?: number; status?: string },
+    body: { username?: string; display_name?: string; role_id?: number; role_ids?: number[]; status?: string },
   ) {
     const status = body.status as UserStatus | undefined;
     return this.usersService.update(id, {
       username: body.username,
       displayName: body.display_name,
       roleId: body.role_id,
+      roleIds: body.role_ids,
       status: status as UserStatus | undefined,
     });
   }

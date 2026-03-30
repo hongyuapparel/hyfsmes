@@ -9,7 +9,8 @@ import { User } from '../entities/user.entity';
 export interface JwtPayload {
   sub: number;
   username: string;
-  roleId: number;
+  roleId?: number;
+  roleIds?: number[];
 }
 
 @Injectable()
@@ -39,6 +40,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         sub: payload.sub,
         username: payload.username,
         roleId: payload.roleId,
+        roleIds: payload.roleIds,
       });
     }
     const user = await this.userRepo.findOne({ where: { id: payload.sub } });

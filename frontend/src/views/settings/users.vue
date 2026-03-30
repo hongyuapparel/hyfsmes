@@ -50,7 +50,7 @@
       <el-table-column prop="username" label="登录账号" width="140" />
       <el-table-column prop="displayName" label="显示名" width="120" />
       <el-table-column label="角色" width="120">
-        <template #default="{ row }">{{ row.role?.name ?? '-' }}</template>
+        <template #default="{ row }">{{ getRoleNames(row) }}</template>
       </el-table-column>
       <el-table-column prop="status" label="状态" width="90">
         <template #default="{ row }">
@@ -92,8 +92,8 @@
         <el-form-item label="显示名" prop="displayName">
           <el-input v-model="form.displayName" placeholder="显示名称" />
         </el-form-item>
-        <el-form-item label="角色" prop="roleId">
-          <el-select v-model="form.roleId" placeholder="选择角色" filterable style="width: 100%">
+        <el-form-item label="角色" prop="roleIds">
+          <el-select v-model="form.roleIds" placeholder="选择角色" filterable multiple collapse-tags collapse-tags-tooltip style="width: 100%">
             <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
           </el-select>
         </el-form-item>
@@ -176,11 +176,11 @@ function getKeywordFilterStyle(value: unknown, showLabel: boolean) {
   return { width: `${width}px`, flex: `0 0 ${width}px` }
 }
 
-const form = ref({ username: '', password: '', displayName: '', roleId: 0 })
+const form = ref({ username: '', password: '', displayName: '', roleIds: [] as number[] })
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  roleId: [{ required: true, message: '请选择角色', trigger: 'change' }],
+  roleIds: [{ required: true, message: '请选择至少一个角色', trigger: 'change' }],
 }
 const pwdForm = ref({ password: '' })
 const pwdRules: FormRules = {
@@ -190,7 +190,7 @@ const pwdRules: FormRules = {
 async function load() {
   const [r] = await Promise.all([getRoles()])
   roles.value = r.data ?? []
-  if (roles.value.length && !form.value.roleId) form.value.roleId = roles.value[0].id
+  if (roles.value.length && !form.value.roleIds.length) form.value.roleIds = [roles.value[0].id]
   await onSearch()
   await nextTick()
   initRowDrag()
@@ -248,7 +248,7 @@ function initRowDrag() {
 function openCreate() {
   isEdit.value = false
   editId.value = 0
-  form.value = { username: '', password: '', displayName: '', roleId: roles.value[0]?.id ?? 0 }
+  form.value = { username: '', password: '', displayName: '', roleIds: roles.value[0] ? [roles.value[0].id] : [] }
   dialogVisible.value = true
 }
 
@@ -259,7 +259,9 @@ function openEdit(row: UserItem) {
     username: row.username,
     password: '',
     displayName: row.displayName,
-    roleId: row.roleId,
+    roleIds: row.roleIds?.length
+      ? [...row.roleIds]
+      : (row.roles?.map((x) => x.id) ?? (row.roleId ? [row.roleId] : [])),
   }
   dialogVisible.value = true
 }
@@ -276,7 +278,8 @@ async function submitUser() {
       await updateUser(editId.value, {
         username: form.value.username,
         display_name: form.value.displayName,
-        role_id: form.value.roleId,
+        role_id: form.value.roleIds[0],
+        role_ids: form.value.roleIds,
       })
       ElMessage.success('保存成功')
     } else {
@@ -284,7 +287,8 @@ async function submitUser() {
         username: form.value.username,
         password: form.value.password,
         display_name: form.value.displayName,
-        role_id: form.value.roleId,
+        role_id: form.value.roleIds[0],
+        role_ids: form.value.roleIds,
       })
       ElMessage.success('创建成功')
     }
@@ -329,6 +333,12 @@ async function toggleStatus(row: UserItem) {
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
+}
+
+function getRoleNames(row: UserItem): string {
+  if (row.roleNames?.length) return row.roleNames.join('、')
+  if (row.roles?.length) return row.roles.map((x) => x.name).join('、')
+  return row.role?.name ?? '-'
 }
 
 onMounted(load)

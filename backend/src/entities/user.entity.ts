@@ -3,11 +3,13 @@ import {
   PrimaryGeneratedColumn,
   Column,
   ManyToOne,
+  OneToMany,
   JoinColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Role } from './role.entity';
+import { UserRole } from './user-role.entity';
 
 export enum UserStatus {
   ACTIVE = 'active',
@@ -34,6 +36,9 @@ export class User {
   @ManyToOne(() => Role, { onDelete: 'RESTRICT' })
   @JoinColumn({ name: 'role_id' })
   role: Role;
+
+  @OneToMany(() => UserRole, (ur) => ur.user)
+  userRoles: UserRole[];
 
   @Column({ type: 'enum', enum: UserStatus, default: UserStatus.ACTIVE })
   status: UserStatus;

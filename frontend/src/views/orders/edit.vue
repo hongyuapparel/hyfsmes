@@ -559,7 +559,19 @@
           </div>
         </div>
       </template>
-      <el-table :data="sizeInfoRows" border size="small" class="size-info-table" header-align="center">
+      <el-table
+        ref="sizeInfoTableRef"
+        :data="sizeInfoRows"
+        border
+        size="small"
+        class="size-info-table"
+        header-align="center"
+      >
+        <el-table-column width="32" align="center" header-align="center">
+          <template #default>
+            <span class="size-row-drag-handle" title="拖拽排序">≡</span>
+          </template>
+        </el-table-column>
         <el-table-column
           v-for="(header, idx) in sizeMetaHeaders"
           :key="'meta-' + idx"
@@ -991,7 +1003,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -1015,6 +1027,7 @@ import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
 import { getProductSkus, type ProductSkuOption } from '@/api/products'
 import { useAuthStore } from '@/stores/auth'
 import { formatDisplayNumber } from '@/utils/display-number'
+import Sortable from 'sortablejs'
 
 const route = useRoute()
 const router = useRouter()
@@ -1839,6 +1852,8 @@ interface SizeInfoRow {
 }
 
 const sizeInfoRows = ref<SizeInfoRow[]>([])
+const sizeInfoTableRef = ref<any>()
+let sizeInfoSortable: Sortable | null = null
 
 // D 区表格编辑能力：单元格引用与键盘导航、批量粘贴
 const sizeGridRefs = ref<InputComponentInstance[][]>([])
@@ -1964,6 +1979,30 @@ function addSizeInfoRow() {
 
 function removeSizeInfoRow(index: number) {
   sizeInfoRows.value.splice(index, 1)
+}
+
+function initSizeInfoSortable() {
+  nextTick(() => {
+    const root = sizeInfoTableRef.value?.$el as HTMLElement | undefined
+    const tbody = root?.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
+    if (!tbody) return
+
+    if (sizeInfoSortable) {
+      sizeInfoSortable.destroy()
+      sizeInfoSortable = null
+    }
+
+    sizeInfoSortable = Sortable.create(tbody, {
+      animation: 120,
+      handle: '.size-row-drag-handle',
+      onEnd: ({ oldIndex, newIndex }) => {
+        if (oldIndex == null || newIndex == null || oldIndex === newIndex) return
+        const moved = sizeInfoRows.value.splice(oldIndex, 1)[0]
+        if (!moved) return
+        sizeInfoRows.value.splice(newIndex, 0, moved)
+      },
+    })
+  })
 }
 
 function addSizeMetaColumn() {
@@ -2661,6 +2700,7 @@ onMounted(async () => {
     }
   } finally {
     pageLoading.value = false
+    initSizeInfoSortable()
     // 初始化完成后不视为“未保存”，避免新建订单的默认值触发离开提示
     nextTick(() => {
       hasUnsavedChanges.value = false
@@ -2677,6 +2717,20 @@ watch(skuKeyword, (val) => {
 watch(customerKeyword, (val) => {
   if (!customerDialogVisible.value) return
   searchCustomersDebounced(String(val ?? ''))
+})
+
+watch(
+  () => sizeInfoRows.value.length,
+  () => {
+    initSizeInfoSortable()
+  },
+)
+
+onBeforeUnmount(() => {
+  if (sizeInfoSortable) {
+    sizeInfoSortable.destroy()
+    sizeInfoSortable = null
+  }
 })
 </script>
 
@@ -2945,6 +2999,16 @@ watch(customerKeyword, (val) => {
 .size-info-table :deep(.el-input__inner),
 .size-info-table :deep(.el-input-number .el-input__inner) {
   text-align: center;
+}
+.size-row-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  margin-right: 4px;
+  color: var(--el-text-color-secondary);
+  cursor: move;
+  user-select: none;
 }
 
 .packaging-grid {
