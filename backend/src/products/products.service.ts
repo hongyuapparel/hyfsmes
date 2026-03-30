@@ -5,6 +5,7 @@ import { Product } from '../entities/product.entity';
 import { Customer } from '../entities/customer.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
 export interface ProductListQuery {
@@ -33,6 +34,8 @@ export class ProductsService {
     private userRepo: Repository<User>,
     @InjectRepository(Role)
     private roleRepo: Repository<Role>,
+    @InjectRepository(UserRole)
+    private userRoleRepo: Repository<UserRole>,
     private systemOptionsService: SystemOptionsService,
   ) {}
 
@@ -291,10 +294,14 @@ export class ProductsService {
   async getSalespeople(): Promise<string[]> {
     const role = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
     if (!role) return [];
-    const users = await this.userRepo.find({
-      where: { roleId: role.id, status: UserStatus.ACTIVE },
-      order: { displayName: 'ASC' },
-    });
+    const links = await this.userRoleRepo.find({ where: { roleId: role.id }, select: ['userId'] });
+    const userIds = Array.from(new Set(links.map((x) => x.userId)));
+    const users = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.status = :status', { status: UserStatus.ACTIVE })
+      .andWhere('(u.role_id = :rid OR u.id IN (:...ids))', { rid: role.id, ids: userIds.length ? userIds : [0] })
+      .orderBy('u.display_name', 'ASC')
+      .getMany();
     return users.map((u) => (u.displayName?.trim() || u.username) || '').filter(Boolean);
   }
 

@@ -5,6 +5,7 @@ import { Customer } from '../entities/customer.entity';
 import { Order } from '../entities/order.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { XiaomanService } from '../xiaoman/xiaoman.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
@@ -28,6 +29,8 @@ export class CustomersService {
     private userRepo: Repository<User>,
     @InjectRepository(Role)
     private roleRepo: Repository<Role>,
+    @InjectRepository(UserRole)
+    private userRoleRepo: Repository<UserRole>,
     private xiaomanService: XiaomanService,
     private systemOptionsService: SystemOptionsService,
   ) {}
@@ -224,10 +227,14 @@ export class CustomersService {
   async getSalespeople(): Promise<string[]> {
     const role = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
     if (!role) return [];
-    const users = await this.userRepo.find({
-      where: { roleId: role.id, status: UserStatus.ACTIVE },
-      order: { displayName: 'ASC' },
-    });
+    const links = await this.userRoleRepo.find({ where: { roleId: role.id }, select: ['userId'] });
+    const userIds = Array.from(new Set(links.map((x) => x.userId)));
+    const users = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.status = :status', { status: UserStatus.ACTIVE })
+      .andWhere('(u.role_id = :rid OR u.id IN (:...ids))', { rid: role.id, ids: userIds.length ? userIds : [0] })
+      .orderBy('u.display_name', 'ASC')
+      .getMany();
     return users.map((u) => (u.displayName?.trim() || u.username) || '').filter(Boolean);
   }
 
@@ -235,10 +242,14 @@ export class CustomersService {
   async getMerchandisers(): Promise<string[]> {
     const role = await this.roleRepo.findOne({ where: { code: 'merchandiser' } });
     if (!role) return [];
-    const users = await this.userRepo.find({
-      where: { roleId: role.id, status: UserStatus.ACTIVE },
-      order: { displayName: 'ASC' },
-    });
+    const links = await this.userRoleRepo.find({ where: { roleId: role.id }, select: ['userId'] });
+    const userIds = Array.from(new Set(links.map((x) => x.userId)));
+    const users = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.status = :status', { status: UserStatus.ACTIVE })
+      .andWhere('(u.role_id = :rid OR u.id IN (:...ids))', { rid: role.id, ids: userIds.length ? userIds : [0] })
+      .orderBy('u.display_name', 'ASC')
+      .getMany();
     return users.map((u) => (u.displayName?.trim() || u.username) || '').filter(Boolean);
   }
 

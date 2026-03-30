@@ -4,6 +4,7 @@ import { Customer } from '../entities/customer.entity';
 import { Order } from '../entities/order.entity';
 import { User } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { SystemOptionsModule } from '../system-options/system-options.module';
@@ -13,7 +14,7 @@ import { CustomersService } from './customers.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Customer, Order, User, Role, RolePermission]),
+    TypeOrmModule.forFeature([Customer, Order, User, Role, UserRole, RolePermission]),
     SystemOptionsModule,
     AuthModule,
     XiaomanModule,

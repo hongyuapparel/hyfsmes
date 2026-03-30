@@ -347,14 +347,19 @@ function onDialogClose() {
 }
 
 /**
- * INSTANT_REFRESH_FREEZE
- * 供应商设置的“操作后即时可见”兜底逻辑：
- * - 所有增删改排序成功后必须调用本方法；
- * - 统一重载树并恢复展开状态，避免懒加载缓存导致“保存成功但需手动刷新”。
- * 非必要不要改动此方法与调用点。
+ * SINGLE_REFRESH_ENTRY (防复发冻结点)
+ * 供应商设置唯一刷新入口：所有新增/编辑/删除/上移/下移成功后只允许调用本函数。
+ * 目标：立即显示最新数据，且保留展开状态与滚动位置，不依赖浏览器手动刷新。
  */
-async function refreshTreeInstantly(anchorIds: number[] = []) {
-  const keepExpanded = new Set<number>([...expandedIds.value, ...anchorIds.filter((n) => !Number.isNaN(n))])
+async function reloadSupplierTree(options?: { anchorIds?: number[] }) {
+  const anchorIds = options?.anchorIds ?? []
+  const keepExpanded = new Set<number>([
+    ...expandedIds.value,
+    ...anchorIds.filter((n) => !Number.isNaN(n)),
+  ])
+  const tableWrap = tableRef.value?.$el?.querySelector?.('.el-scrollbar__wrap') as HTMLElement | undefined
+  const prevScrollTop = tableWrap?.scrollTop ?? 0
+
   await loadRoots()
   await nextTick()
 
@@ -390,6 +395,8 @@ async function refreshTreeInstantly(anchorIds: number[] = []) {
   }
 
   expandedIds.value = nextExpanded
+  await nextTick()
+  if (tableWrap) tableWrap.scrollTop = prevScrollTop
 }
 
 function collectDescendants(nodes: SystemOptionTreeNode[]): SystemOptionTreeNode[] {
@@ -512,6 +519,7 @@ async function submit() {
   submitLoading.value = true
   try {
     let editedNextParentId: number | null | undefined
+    let successText = ''
     if (isEdit.value) {
       const nextParentId =
         addLevel.value > 0 ? (editParentGroupId.value ?? editSupplierTypeId.value ?? null) : undefined
@@ -520,7 +528,7 @@ async function submit() {
         value: val,
         parent_id: nextParentId,
       })
-      ElMessage.success('保存成功')
+      successText = '保存成功'
     } else {
       let sortOrder: number
       if (parentId.value != null) {
@@ -535,9 +543,9 @@ async function submit() {
         sort_order: sortOrder,
         parent_id: parentId.value ?? undefined,
       })
-      ElMessage.success('添加成功')
+      successText = '添加成功'
     }
-    dialogVisible.value = false
+
     const anchors: number[] = []
     if (isEdit.value) {
       if (editSupplierTypeId.value != null) anchors.push(editSupplierTypeId.value)
@@ -545,7 +553,11 @@ async function submit() {
     } else if (parentId.value != null) {
       anchors.push(parentId.value)
     }
-    await refreshTreeInstantly(anchors)
+    // 顺序约束：API成功 -> 统一刷新 -> nextTick -> 关闭弹窗/提示成功
+    await reloadSupplierTree({ anchorIds: anchors })
+    await nextTick()
+    dialogVisible.value = false
+    ElMessage.success(successText)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -562,10 +574,11 @@ async function remove(row: TreeRow) {
   }
   try {
     await deleteSystemOption(row.id)
-    ElMessage.success('已删除')
     const anchors: number[] = []
     if (row.parentId != null) anchors.push(row.parentId)
-    await refreshTreeInstantly(anchors)
+    await reloadSupplierTree({ anchorIds: anchors })
+    await nextTick()
+    ElMessage.success('已删除')
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
@@ -586,13 +599,37 @@ async function moveRow(row: TreeRow, delta: number) {
     const anchors: number[] = []
     if (row.level === 0) anchors.push(row.id)
     if (row.parentId != null) anchors.push(row.parentId)
-    await refreshTreeInstantly(anchors)
+    await reloadSupplierTree({ anchorIds: anchors })
+    await nextTick()
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
 }
 
 onMounted(() => loadRoots())
+
+defineExpose({
+  __test: {
+    reloadSupplierTree,
+    submit,
+    remove,
+    moveRow,
+    openAdd,
+    openEdit,
+    state: {
+      treeData,
+      expandedIds,
+      dialogVisible,
+      form,
+      parentId,
+      isEdit,
+      editId,
+      addLevel,
+      editSupplierTypeId,
+      editParentGroupId,
+    },
+  },
+})
 </script>
 
 <style scoped>

@@ -7,6 +7,7 @@ import { Order } from '../entities/order.entity';
 import { Role } from '../entities/role.entity';
 import { Product } from '../entities/product.entity';
 import { User } from '../entities/user.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryPendingController } from './inventory-pending.controller';
@@ -21,6 +22,7 @@ import { InventoryPendingService } from './inventory-pending.service';
       Order,
       Product,
       User,
+      UserRole,
       Role,
       RolePermission,
     ]),

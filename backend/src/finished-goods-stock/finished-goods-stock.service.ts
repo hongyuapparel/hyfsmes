@@ -11,6 +11,7 @@ import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-ad
 import { OrderExt } from '../entities/order-ext.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
+import { UserRole } from '../entities/user-role.entity';
 
 export interface FinishedStockRow {
   id: number;
@@ -58,6 +59,8 @@ export class FinishedGoodsStockService {
     private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
     private readonly roleRepo: Repository<Role>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepo: Repository<UserRole>,
   ) {}
 
   private isTableMissingError(e: unknown, tableName: string): boolean {
@@ -78,9 +81,14 @@ export class FinishedGoodsStockService {
     const salespersonRole = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
     if (!salespersonRole) throw new NotFoundException('未配置业务员角色');
     const pickupUser = await this.userRepo.findOne({
-      where: { id: Number(pickupUserId), roleId: salespersonRole.id, status: UserStatus.ACTIVE },
+      where: { id: Number(pickupUserId), status: UserStatus.ACTIVE },
+      select: ['id', 'username', 'displayName', 'roleId', 'status'],
     });
     if (!pickupUser) throw new NotFoundException('领走人不存在或不是在职业务员');
+    const link = await this.userRoleRepo.findOne({ where: { userId: pickupUser.id, roleId: salespersonRole.id } });
+    if (!(pickupUser.roleId === salespersonRole.id || !!link)) {
+      throw new NotFoundException('领走人不存在或不是在职业务员');
+    }
     return {
       pickupId: pickupUser.id,
       pickupUserName: (pickupUser.displayName?.trim() || pickupUser.username || '').trim(),
@@ -742,10 +750,14 @@ export class FinishedGoodsStockService {
   async getPickupUserOptions(): Promise<Array<{ id: number; username: string; displayName: string }>> {
     const role = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
     if (!role) return [];
-    const users = await this.userRepo.find({
-      where: { roleId: role.id, status: UserStatus.ACTIVE },
-      order: { displayName: 'ASC' },
-    });
+    const links = await this.userRoleRepo.find({ where: { roleId: role.id }, select: ['userId'] });
+    const userIds = Array.from(new Set(links.map((x) => x.userId)));
+    const users = await this.userRepo
+      .createQueryBuilder('u')
+      .where('u.status = :status', { status: UserStatus.ACTIVE })
+      .andWhere('(u.role_id = :rid OR u.id IN (:...ids))', { rid: role.id, ids: userIds.length ? userIds : [0] })
+      .orderBy('u.display_name', 'ASC')
+      .getMany();
     return users.map((u) => ({
       id: u.id,
       username: u.username,

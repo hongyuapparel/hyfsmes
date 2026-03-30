@@ -10,6 +10,7 @@ import { OrderExt } from '../entities/order-ext.entity';
 import { Product } from '../entities/product.entity';
 import { Employee } from '../entities/employee.entity';
 import { User } from '../entities/user.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { Role } from '../entities/role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
@@ -29,6 +30,7 @@ import { FinishedGoodsStockService } from './finished-goods-stock.service';
       Product,
       Employee,
       User,
+      UserRole,
       Role,
       RolePermission,
     ]),
