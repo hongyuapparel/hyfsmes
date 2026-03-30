@@ -27,6 +27,7 @@ export class InventoryAccessoriesService {
       quantity: item.quantity,
       unit: item.unit,
       customerName: item.customerName,
+      salesperson: item.salesperson,
       imageUrl: item.imageUrl,
       remark: item.remark,
     };
@@ -55,10 +56,11 @@ export class InventoryAccessoriesService {
     name?: string;
     category?: string;
     customerName?: string;
+    salesperson?: string;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: InventoryAccessory[]; total: number; page: number; pageSize: number }> {
-    const { name, category, customerName, page = 1, pageSize = 20 } = params;
+    const { name, category, customerName, salesperson, page = 1, pageSize = 20 } = params;
     const qb = this.repo.createQueryBuilder('a');
 
     if (name?.trim()) {
@@ -67,10 +69,13 @@ export class InventoryAccessoriesService {
     if (category?.trim()) {
       qb.andWhere('a.category = :category', { category: category.trim() });
     }
-     if (customerName?.trim()) {
+    if (customerName?.trim()) {
       qb.andWhere('a.customer_name LIKE :customerName', {
         customerName: `%${customerName.trim()}%`,
       });
+    }
+    if (salesperson?.trim()) {
+      qb.andWhere('a.salesperson = :salesperson', { salesperson: salesperson.trim() });
     }
     qb.orderBy('a.created_at', 'DESC');
 
@@ -97,8 +102,11 @@ export class InventoryAccessoriesService {
     remark?: string;
     imageUrl?: string;
     customerName?: string;
+    salesperson?: string;
     operatorUsername?: string;
   }): Promise<InventoryAccessory> {
+    const salesperson = (dto.salesperson ?? '').trim();
+    if (!salesperson) throw new BadRequestException('业务员不能为空');
     const entity = this.repo.create({
       name: dto.name?.trim() ?? '',
       category: dto.category?.trim() ?? '',
@@ -107,6 +115,7 @@ export class InventoryAccessoriesService {
       remark: dto.remark?.trim() ?? '',
       imageUrl: dto.imageUrl?.trim() ?? '',
       customerName: dto.customerName?.trim() ?? '',
+      salesperson,
     });
     const saved = await this.repo.save(entity);
     await this.addOperationLog({
@@ -129,6 +138,7 @@ export class InventoryAccessoriesService {
       remark?: string;
       imageUrl?: string;
       customerName?: string;
+      salesperson?: string;
       operatorUsername?: string;
     },
   ): Promise<InventoryAccessory> {
@@ -142,6 +152,11 @@ export class InventoryAccessoriesService {
     if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
     if (dto.imageUrl !== undefined) item.imageUrl = dto.imageUrl?.trim() ?? '';
     if (dto.customerName !== undefined) item.customerName = dto.customerName?.trim() ?? '';
+    if (dto.salesperson !== undefined) {
+      const salesperson = dto.salesperson?.trim() ?? '';
+      if (!salesperson) throw new BadRequestException('业务员不能为空');
+      item.salesperson = salesperson;
+    }
     const saved = await this.repo.save(item);
     await this.addOperationLog({
       accessoryId: saved.id,

@@ -185,48 +185,51 @@
       />
     </div>
 
-    <el-drawer
+    <ProductionDetailDrawerShell
       v-model="craftDetailDrawer.visible"
       title="工艺明细"
-      direction="rtl"
       size="520px"
-      destroy-on-close
       @closed="craftDetailDrawer.row = null"
     >
       <template v-if="craftDetailDrawer.row">
-        <ProductionOrderBriefPanel :brief="craftBriefFromRow(craftDetailDrawer.row)" />
-        <el-descriptions :column="1" border size="small" class="craft-drawer-meta">
-          <el-descriptions-item label="采购齐套">
-            <el-tag
-              :type="craftDetailDrawer.row.purchaseStatus === 'completed' ? 'success' : 'info'"
-              size="small"
-            >
-              {{ craftDetailDrawer.row.purchaseStatus === 'completed' ? '已完成' : '未完成' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="到工艺时间">
-            {{ formatDateTime(craftDetailDrawer.row.arrivedAtCraft) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="完成时间">
-            {{ formatDateTime(craftDetailDrawer.row.completedAt) }}
-          </el-descriptions-item>
-        </el-descriptions>
-        <el-divider content-position="left">E 区工艺项目</el-divider>
-        <el-table
-          :data="craftDetailDrawer.row.processItems || []"
-          border
-          stripe
-          size="small"
-          max-height="360"
-          empty-text="暂无工艺行"
-        >
-          <el-table-column prop="processName" label="工艺项目" min-width="100" show-overflow-tooltip />
-          <el-table-column prop="supplierName" label="供应商" min-width="90" show-overflow-tooltip />
-          <el-table-column prop="part" label="部位" width="88" show-overflow-tooltip />
-          <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
-        </el-table>
+        <ProductionDetailSection>
+          <ProductionOrderBriefPanel :brief="craftBriefFromRow(craftDetailDrawer.row)" />
+        </ProductionDetailSection>
+        <ProductionDetailSection title="时效与节点">
+          <el-descriptions :column="1" border size="small" class="craft-drawer-meta">
+            <el-descriptions-item label="采购齐套">
+              <el-tag
+                :type="craftDetailDrawer.row.purchaseStatus === 'completed' ? 'success' : 'info'"
+                size="small"
+              >
+                {{ craftDetailDrawer.row.purchaseStatus === 'completed' ? '已完成' : '未完成' }}
+              </el-tag>
+            </el-descriptions-item>
+            <el-descriptions-item label="到工艺时间">
+              {{ formatDateTime(craftDetailDrawer.row.arrivedAtCraft) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="完成时间">
+              {{ formatDateTime(craftDetailDrawer.row.completedAt) }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
+        <ProductionDetailSection title="E 区工艺项目">
+          <el-table
+            :data="craftDetailDrawer.row.processItems || []"
+            border
+            stripe
+            size="small"
+            max-height="360"
+            empty-text="暂无工艺行"
+          >
+            <el-table-column prop="processName" label="工艺项目" min-width="100" show-overflow-tooltip />
+            <el-table-column prop="supplierName" label="供应商" min-width="90" show-overflow-tooltip />
+            <el-table-column prop="part" label="部位" width="88" show-overflow-tooltip />
+            <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
+          </el-table>
+        </ProductionDetailSection>
       </template>
-    </el-drawer>
+    </ProductionDetailDrawerShell>
   </div>
 </template>
 
@@ -244,12 +247,15 @@ import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getFilterRangeStyle,
+  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import ProductionOrderBriefPanel, {
   type ProductionOrderBriefModel,
 } from '@/components/production/ProductionOrderBriefPanel.vue'
+import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
+import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
 const CRAFT_TABS = [
@@ -337,8 +343,8 @@ function getTabLabel(tab: CraftTabConfig): string {
 function buildQuery(): CraftListQuery {
   const q: CraftListQuery = {
     tab: currentTab.value,
-    supplier: filter.supplier || undefined,
-    processItem: filter.processItem || undefined,
+    supplier: normalizeTextFilter(filter.supplier),
+    processItem: normalizeTextFilter(filter.processItem),
     orderTypeId: filter.orderTypeId ?? undefined,
     collaborationTypeId: filter.collaborationTypeId ?? undefined,
     page: pagination.page,

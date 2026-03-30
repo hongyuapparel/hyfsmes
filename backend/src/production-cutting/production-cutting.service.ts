@@ -607,7 +607,7 @@ export class ProductionCuttingService {
     const completedIds = completedOrderIds.length > 0 ? completedOrderIds : [0];
 
     const qb = this.orderRepo.createQueryBuilder('o').where(
-      'o.status = :pendingCutting OR (o.id IN (:...completedIds))',
+      '(o.status = :pendingCutting OR o.id IN (:...completedIds))',
       { pendingCutting: 'pending_cutting', completedIds: completedIds },
     );
 

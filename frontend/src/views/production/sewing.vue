@@ -416,45 +416,51 @@
       </template>
     </el-dialog>
 
-    <el-drawer
+    <ProductionDetailDrawerShell
       v-model="sewingBriefDrawer.visible"
       title="车缝外发概要"
-      direction="rtl"
-      size="440px"
-      destroy-on-close
+      size="460px"
       @closed="sewingBriefDrawer.row = null"
     >
       <template v-if="sewingBriefDrawer.row">
-        <ProductionOrderBriefPanel :brief="sewingBriefFromRow(sewingBriefDrawer.row)" />
-        <el-descriptions :column="1" border size="small" class="sewing-brief-extra">
-          <el-descriptions-item label="加工厂">
-            {{ (sewingBriefDrawer.row.factoryName ?? '').trim() || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="分单时间">
-            {{ formatDateTime(sewingBriefDrawer.row.distributedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="加工厂交期">
-            {{ formatDate(sewingBriefDrawer.row.factoryDueDate) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="车缝加工费(元)">
-            {{
-              sewingBriefDrawer.row.sewingFee != null && String(sewingBriefDrawer.row.sewingFee).trim() !== ''
-                ? formatDisplayNumber(sewingBriefDrawer.row.sewingFee)
-                : '—'
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="到车缝时间">
-            {{ formatDateTime(sewingBriefDrawer.row.arrivedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="完成时间">
-            {{ formatDateTime(sewingBriefDrawer.row.completedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="时效判定">
-            <SlaJudgeTag :text="sewingBriefDrawer.row.timeRating" />
-          </el-descriptions-item>
-        </el-descriptions>
+        <ProductionDetailSection>
+          <ProductionOrderBriefPanel :brief="sewingBriefFromRow(sewingBriefDrawer.row)" />
+        </ProductionDetailSection>
+        <ProductionDetailSection title="业务扩展信息">
+          <el-descriptions :column="1" border size="small" class="sewing-brief-extra">
+            <el-descriptions-item label="加工厂">
+              {{ (sewingBriefDrawer.row.factoryName ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="分单时间">
+              {{ formatDateTime(sewingBriefDrawer.row.distributedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="加工厂交期">
+              {{ formatDate(sewingBriefDrawer.row.factoryDueDate) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="车缝加工费(元)">
+              {{
+                sewingBriefDrawer.row.sewingFee != null && String(sewingBriefDrawer.row.sewingFee).trim() !== ''
+                  ? formatDisplayNumber(sewingBriefDrawer.row.sewingFee)
+                  : '—'
+              }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
+        <ProductionDetailSection title="时效与节点">
+          <el-descriptions :column="1" border size="small" class="sewing-brief-extra">
+            <el-descriptions-item label="到车缝时间">
+              {{ formatDateTime(sewingBriefDrawer.row.arrivedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="完成时间">
+              {{ formatDateTime(sewingBriefDrawer.row.completedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="时效判定">
+              <SlaJudgeTag :text="sewingBriefDrawer.row.timeRating" />
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
       </template>
-    </el-drawer>
+    </ProductionDetailDrawerShell>
   </div>
 </template>
 
@@ -480,6 +486,7 @@ import {
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
+  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -487,6 +494,8 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel, {
   type ProductionOrderBriefModel,
 } from '@/components/production/ProductionOrderBriefPanel.vue'
+import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
+import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 
 const SEWING_TABS = [
   { label: '全部', value: 'all' },
@@ -677,8 +686,8 @@ async function submitAssign() {
 function buildQuery(): SewingListQuery {
   return {
     tab: currentTab.value,
-    orderNo: filter.orderNo || undefined,
-    skuCode: filter.skuCode || undefined,
+    orderNo: normalizeTextFilter(filter.orderNo),
+    skuCode: normalizeTextFilter(filter.skuCode),
     page: pagination.page,
     pageSize: pagination.pageSize,
   }

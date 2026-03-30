@@ -299,70 +299,75 @@
       />
     </div>
 
-    <el-drawer
+    <ProductionDetailDrawerShell
       v-model="finishingBriefDrawer.visible"
       title="尾部进度概要"
-      direction="rtl"
-      size="460px"
-      destroy-on-close
       @closed="finishingBriefDrawer.row = null"
     >
       <template v-if="finishingBriefDrawer.row">
-        <ProductionOrderBriefPanel :brief="finishingBriefFromRow(finishingBriefDrawer.row)" />
-        <el-descriptions :column="1" border size="small" class="finishing-brief-extra">
-          <el-descriptions-item label="尾部状态">
-            {{ finishingBriefDrawer.row.finishingStatus }}
-          </el-descriptions-item>
-          <el-descriptions-item label="到尾部时间">
-            {{ formatDateTime(finishingBriefDrawer.row.arrivedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="完成时间">
-            {{ formatDateTime(finishingBriefDrawer.row.completedAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="时效判定">
-            <SlaJudgeTag :text="finishingBriefDrawer.row.timeRating" />
-          </el-descriptions-item>
-          <el-descriptions-item label="裁床数量">
-            {{
-              finishingBriefDrawer.row.cutTotal != null
-                ? formatDisplayNumber(finishingBriefDrawer.row.cutTotal)
-                : '—'
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="车缝数量">
-            {{
-              finishingBriefDrawer.row.sewingQuantity != null
-                ? formatDisplayNumber(finishingBriefDrawer.row.sewingQuantity)
-                : '—'
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="尾部收货">
-            {{
-              finishingBriefDrawer.row.tailReceivedQty != null
-                ? formatDisplayNumber(finishingBriefDrawer.row.tailReceivedQty)
-                : '—'
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="尾部入库">
-            {{
-              finishingBriefDrawer.row.tailInboundQty != null
-                ? formatDisplayNumber(finishingBriefDrawer.row.tailInboundQty)
-                : '—'
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="次品数">
-            {{
-              finishingBriefDrawer.row.defectQuantity != null
-                ? formatDisplayNumber(finishingBriefDrawer.row.defectQuantity)
-                : '—'
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="包装备注">
-            {{ (finishingBriefDrawer.row.remark ?? '').trim() || '—' }}
-          </el-descriptions-item>
-        </el-descriptions>
+        <ProductionDetailSection>
+          <ProductionOrderBriefPanel :brief="finishingBriefFromRow(finishingBriefDrawer.row)" />
+        </ProductionDetailSection>
+        <ProductionDetailSection title="业务扩展信息">
+          <el-descriptions :column="1" border size="small" class="finishing-brief-extra">
+            <el-descriptions-item label="尾部状态">
+              {{ finishingBriefDrawer.row.finishingStatus }}
+            </el-descriptions-item>
+            <el-descriptions-item label="裁床数量">
+              {{
+                finishingBriefDrawer.row.cutTotal != null
+                  ? formatDisplayNumber(finishingBriefDrawer.row.cutTotal)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="车缝数量">
+              {{
+                finishingBriefDrawer.row.sewingQuantity != null
+                  ? formatDisplayNumber(finishingBriefDrawer.row.sewingQuantity)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="尾部收货">
+              {{
+                finishingBriefDrawer.row.tailReceivedQty != null
+                  ? formatDisplayNumber(finishingBriefDrawer.row.tailReceivedQty)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="尾部入库">
+              {{
+                finishingBriefDrawer.row.tailInboundQty != null
+                  ? formatDisplayNumber(finishingBriefDrawer.row.tailInboundQty)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="次品数">
+              {{
+                finishingBriefDrawer.row.defectQuantity != null
+                  ? formatDisplayNumber(finishingBriefDrawer.row.defectQuantity)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="包装备注">
+              {{ (finishingBriefDrawer.row.remark ?? '').trim() || '—' }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
+        <ProductionDetailSection title="时效与节点">
+          <el-descriptions :column="1" border size="small" class="finishing-brief-extra">
+            <el-descriptions-item label="到尾部时间">
+              {{ formatDateTime(finishingBriefDrawer.row.arrivedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="完成时间">
+              {{ formatDateTime(finishingBriefDrawer.row.completedAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="时效判定">
+              <SlaJudgeTag :text="finishingBriefDrawer.row.timeRating" />
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
       </template>
-    </el-drawer>
+    </ProductionDetailDrawerShell>
 
     <!-- 登记收货弹窗：待尾部 tab 使用，支持按尺码填写收货数量 -->
     <el-dialog
@@ -542,6 +547,7 @@ import {
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
+  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -549,6 +555,8 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel, {
   type ProductionOrderBriefModel,
 } from '@/components/production/ProductionOrderBriefPanel.vue'
+import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
+import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
@@ -745,8 +753,8 @@ async function onShowQtyPopover(row: FinishingListItem) {
 function buildQuery(): FinishingListQuery {
   return {
     tab: currentTab.value,
-    orderNo: filter.orderNo || undefined,
-    skuCode: filter.skuCode || undefined,
+    orderNo: normalizeTextFilter(filter.orderNo),
+    skuCode: normalizeTextFilter(filter.skuCode),
     page: pagination.page,
     pageSize: pagination.pageSize,
   }

@@ -42,17 +42,31 @@ export class XiaomanService {
   private tokenExpiry = 0;
   private companyListCache: { list: XiaomanCompanyItem[]; fetchedAt: number } | null = null;
   private companyListCacheTtlMs = 5 * 60 * 1000; // 5 分钟
+  private listLoggedOnce = false;
 
   constructor(private config: ConfigService) {}
 
   /**
-   * 搜索仅匹配：公司名称 name、联系人 contactPerson。
+   * 搜索匹配：公司名 + 客户编号 + 联系人（按小满列表真实字段做兼容）。
    */
   private matchesKeyword(item: XiaomanCompanyItem, lowerKeyword: string): boolean {
     const anyItem = item as unknown as Record<string, unknown>;
     const companyName = String(anyItem.name ?? '').toLowerCase();
-    const contactPerson = String(anyItem.contactPerson ?? '').toLowerCase();
-    return companyName.includes(lowerKeyword) || contactPerson.includes(lowerKeyword);
+    const serialId = String(anyItem.serial_id ?? anyItem.serialId ?? '').toLowerCase();
+    const contactPerson = String(
+      anyItem.contactPerson ??
+        anyItem.contact_person ??
+        anyItem.main_contact_name ??
+        anyItem.main_contact ??
+        anyItem.contact_name ??
+        anyItem.linkman ??
+        '',
+    ).toLowerCase();
+    return (
+      companyName.includes(lowerKeyword) ||
+      serialId.includes(lowerKeyword) ||
+      contactPerson.includes(lowerKeyword)
+    );
   }
 
   private getBaseUrl(): string {
@@ -161,6 +175,14 @@ export class XiaomanService {
             }
             if (!json.data) {
               throw new Error('小满 API 返回数据为空，请确认账号权限与 API 范围');
+            }
+            if (!this.listLoggedOnce) {
+              this.listLoggedOnce = true;
+              // eslint-disable-next-line no-console
+              console.log(
+                '[Xiaoman DEBUG] company/list first rows:',
+                JSON.stringify((json.data.list ?? []).slice(0, 3), null, 2),
+              );
             }
             return { list: json.data.list ?? [], totalItem: json.data.totalItem };
           } catch (e) {

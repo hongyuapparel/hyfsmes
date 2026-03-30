@@ -14,6 +14,10 @@ export class InventoryAccessory {
   @Column({ name: 'customer_name', length: 255, default: '' })
   customerName: string;
 
+  /** 业务员（必填，来自客户业务员选项） */
+  @Column({ name: 'salesperson', length: 128, default: '' })
+  salesperson: string;
+
   @Column({ length: 128 })
   name: string;
 

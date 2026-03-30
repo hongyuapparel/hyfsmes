@@ -261,17 +261,9 @@
           }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column label="操作" width="72" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click.stop="openCuttingBriefDrawer(row)">概要</el-button>
-          <el-button
-            v-if="row.cuttingStatus === 'completed'"
-            link
-            type="primary"
-            @click.stop="openCompletedDetailDrawer(row)"
-          >
-            用量详情
-          </el-button>
+          <el-button link type="primary" @click.stop="openCuttingDetailDrawer(row)">查看</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -377,77 +369,85 @@
       </template>
     </el-dialog>
 
-    <!-- 裁床完成：登记用量详情抽屉 -->
-    <el-drawer
+    <ProductionDetailDrawerShell
       v-model="detailDrawer.visible"
-      title="裁床登记详情"
-      direction="rtl"
-      :size="940"
-      destroy-on-close
-      class="cutting-detail-drawer"
+      title="裁床详情"
+      :size="cuttingDetailDrawerSize"
       @closed="onDetailDrawerClosed"
     >
       <div v-loading="detailDrawer.loading" class="cutting-detail-drawer__body">
-        <template v-if="detailPayload">
-          <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" show-extended />
-          <p class="register-hint">以下为该订单裁床完成时登记的裁剪数量与物料用量（只读）。</p>
-          <CuttingQuantityMatrix
-            :model-value="detailPayload.actualCutRows"
-            :headers="detailPayload.colorSizeHeaders"
-            :matrix-max-height="360"
-            readonly
-          />
-          <el-divider content-position="left">物料用量明细</el-divider>
-          <CuttingMaterialUsageTable
-            :model-value="detailPayload.materialUsageRows"
-            :grand-pieces="detailGrandPieces"
-            :table-max-height="420"
-            readonly
-          />
-          <div class="cut-detail-meta">
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">到裁床时间</span>
-              <span>{{ formatDateTime(detailPayload.arrivedAt) }}</span>
-            </div>
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">完成时间</span>
-              <span>{{ formatDateTime(detailPayload.completedAt) }}</span>
-            </div>
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">裁剪部门</span>
-              <span>{{ displayDash(detailPayload.cuttingDepartment) }}</span>
-            </div>
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">裁剪人</span>
-              <span>{{ displayDash(detailPayload.cutterName) }}</span>
-            </div>
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">本次净耗合计(米)</span>
-              <span>{{ fabricMetersDisplay(detailPayload.actualFabricMeters) }}</span>
-            </div>
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">裁剪单价(元/件)</span>
-              <span>{{ moneyDisplay(detailPayload.cuttingUnitPrice) }}</span>
-            </div>
-            <div class="cut-detail-meta__row">
-              <span class="cut-detail-meta__label">裁剪总成本(元)</span>
-              <span>{{ moneyDisplay(detailPayload.cuttingTotalCost ?? detailPayload.cuttingCost) }}</span>
-            </div>
-          </div>
+        <template v-if="detailDrawer.row">
+          <ProductionDetailSection v-if="!detailPayload">
+            <ProductionOrderBriefPanel :brief="cuttingBriefFromRow(detailDrawer.row)" />
+          </ProductionDetailSection>
+          <template v-if="detailPayload">
+            <ProductionDetailSection>
+              <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" show-extended />
+              <p class="register-hint">以下为该订单裁床完成时登记的裁剪数量与物料用量（只读）。</p>
+              <CuttingQuantityMatrix
+                :model-value="detailPayload.actualCutRows"
+                :headers="detailPayload.colorSizeHeaders"
+                :matrix-max-height="360"
+                readonly
+              />
+              <el-divider content-position="left">物料用量明细</el-divider>
+              <CuttingMaterialUsageTable
+                :model-value="detailPayload.materialUsageRows"
+                :grand-pieces="detailGrandPieces"
+                :table-max-height="420"
+                readonly
+              />
+              <div class="cut-detail-meta">
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">到裁床时间</span>
+                  <span>{{ formatDateTime(detailPayload.arrivedAt) }}</span>
+                </div>
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">完成时间</span>
+                  <span>{{ formatDateTime(detailPayload.completedAt) }}</span>
+                </div>
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">裁剪部门</span>
+                  <span>{{ displayDash(detailPayload.cuttingDepartment) }}</span>
+                </div>
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">裁剪人</span>
+                  <span>{{ displayDash(detailPayload.cutterName) }}</span>
+                </div>
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">本次净耗合计(米)</span>
+                  <span>{{ fabricMetersDisplay(detailPayload.actualFabricMeters) }}</span>
+                </div>
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">裁剪单价(元/件)</span>
+                  <span>{{ moneyDisplay(detailPayload.cuttingUnitPrice) }}</span>
+                </div>
+                <div class="cut-detail-meta__row">
+                  <span class="cut-detail-meta__label">裁剪总成本(元)</span>
+                  <span>{{ moneyDisplay(detailPayload.cuttingTotalCost ?? detailPayload.cuttingCost) }}</span>
+                </div>
+              </div>
+            </ProductionDetailSection>
+          </template>
+          <ProductionDetailSection v-else title="时效与节点">
+            <el-descriptions :column="1" border size="small">
+              <el-descriptions-item label="裁床状态">
+                {{ detailDrawer.row.cuttingStatus === 'completed' ? '裁床完成' : '等待裁床' }}
+              </el-descriptions-item>
+              <el-descriptions-item label="到裁床时间">
+                {{ formatDateTime(detailDrawer.row.arrivedAt) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="完成时间">
+                {{ formatDateTime(detailDrawer.row.completedAt) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="时效判定">
+                <SlaJudgeTag :text="detailDrawer.row.timeRating" />
+              </el-descriptions-item>
+            </el-descriptions>
+          </ProductionDetailSection>
         </template>
       </div>
-    </el-drawer>
-
-    <el-drawer
-      v-model="briefDrawer.visible"
-      title="订单概要"
-      direction="rtl"
-      size="400px"
-      destroy-on-close
-      @closed="briefDrawer.row = null"
-    >
-      <ProductionOrderBriefPanel v-if="briefDrawer.row" :brief="cuttingBriefFromRow(briefDrawer.row)" />
-    </el-drawer>
+    </ProductionDetailDrawerShell>
   </div>
 </template>
 
@@ -483,6 +483,7 @@ import {
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
+  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -490,6 +491,8 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel, {
   type ProductionOrderBriefModel,
 } from '@/components/production/ProductionOrderBriefPanel.vue'
+import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
+import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },
@@ -557,18 +560,12 @@ const registerForm = reactive<{
   cutterName: '',
 })
 
-const detailDrawer = reactive({ visible: false, loading: false })
-const detailPayload = ref<CuttingCompletedDetailRes | null>(null)
-
-const briefDrawer = reactive<{ visible: boolean; row: CuttingListItem | null }>({
+const detailDrawer = reactive<{ visible: boolean; loading: boolean; row: CuttingListItem | null }>({
   visible: false,
+  loading: false,
   row: null,
 })
-
-function openCuttingBriefDrawer(row: CuttingListItem) {
-  briefDrawer.row = row
-  briefDrawer.visible = true
-}
+const detailPayload = ref<CuttingCompletedDetailRes | null>(null)
 
 function cuttingBriefFromRow(row: CuttingListItem): ProductionOrderBriefModel {
   return {
@@ -592,8 +589,13 @@ const detailGrandPieces = computed(() => {
   )
 })
 
+const cuttingDetailDrawerSize = computed(() =>
+  detailDrawer.row?.cuttingStatus === 'completed' ? 940 : '460px',
+)
+
 function onDetailDrawerClosed() {
   detailPayload.value = null
+  detailDrawer.row = null
 }
 
 function displayDash(v: string | null | undefined) {
@@ -611,11 +613,12 @@ function fabricMetersDisplay(v: string | null | undefined) {
   return formatDisplayNumber(v)
 }
 
-async function openCompletedDetailDrawer(row: CuttingListItem) {
-  if (row.cuttingStatus !== 'completed') return
+async function openCuttingDetailDrawer(row: CuttingListItem) {
+  detailDrawer.row = row
   detailDrawer.visible = true
-  detailDrawer.loading = true
   detailPayload.value = null
+  if (row.cuttingStatus !== 'completed') return
+  detailDrawer.loading = true
   try {
     const res = await getCuttingCompletedDetail(row.orderId)
     detailPayload.value = res.data ?? null
@@ -682,8 +685,8 @@ function formatFabricGrand(v: number) {
 function buildQuery(): CuttingListQuery {
   return {
     tab: currentTab.value,
-    orderNo: filter.orderNo || undefined,
-    skuCode: filter.skuCode || undefined,
+    orderNo: normalizeTextFilter(filter.orderNo),
+    skuCode: normalizeTextFilter(filter.skuCode),
     page: pagination.page,
     pageSize: pagination.pageSize,
   }

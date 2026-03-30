@@ -10,6 +10,20 @@ export function getFilterInputStyle(v: unknown) {
   return v ? { color: ACTIVE_FILTER_COLOR } : undefined
 }
 
+/**
+ * 统一清洗文本筛选值：
+ * - 去除首尾空格
+ * - 支持用户误输入 "SKU:" / "SKU：" / "订单号:" / "订单号：" 前缀
+ * - 空字符串转为 undefined，避免把无效条件发给后端
+ */
+export function normalizeTextFilter(v: unknown): string | undefined {
+  if (v == null) return undefined
+  let text = String(v).trim()
+  if (!text) return undefined
+  text = text.replace(/^(SKU|订单号)\s*[:：]\s*/i, '').trim()
+  return text || undefined
+}
+
 export function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
   if (!val || !showLabel) return undefined
   const text = `${prefix}${String(val)}`

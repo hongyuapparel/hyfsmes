@@ -87,6 +87,7 @@
         placeholder="订单类型"
         filterable
         clearable
+        check-strictly
         default-expand-all
         :render-after-expand="false"
         node-key="value"
@@ -721,13 +722,10 @@ function toOrderTypeTreeSelect(
 ): { label: string; value: number; children?: any[]; disabled?: boolean }[] {
   return nodes.map((n) => {
     const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
-    const hasChildren = children.length > 0
     return {
       label: n.value,
       value: n.id,
-      children: hasChildren ? children : undefined,
-      // 有子分组的父节点禁用，只允许选择叶子节点
-      disabled: hasChildren,
+      children: children.length ? children : undefined,
     }
   })
 }

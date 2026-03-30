@@ -163,7 +163,7 @@ export class ProductionFinishingService {
         : [];
 
     const qb = this.orderRepo.createQueryBuilder('o').where(
-      'o.status = :pendingFinishing OR (o.id IN (:...inboundIds))',
+      '(o.status = :pendingFinishing OR o.id IN (:...inboundIds))',
       { pendingFinishing: 'pending_finishing', inboundIds: completedWithInbound.length ? completedWithInbound : [0] },
     );
 

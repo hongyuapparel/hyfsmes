@@ -225,6 +225,7 @@ export interface AccessoryItem {
   unit: string
   remark: string
   customerName?: string
+  salesperson?: string
   imageUrl?: string
   createdAt: string
 }
@@ -233,6 +234,7 @@ export function getAccessoriesList(params?: {
   name?: string
   category?: string
   customerName?: string
+  salesperson?: string
   page?: number
   pageSize?: number
 }) {
@@ -252,6 +254,7 @@ export function createAccessory(body: {
   quantity?: number
   unit?: string
   customerName?: string
+  salesperson: string
   remark?: string
   imageUrl?: string
 }) {
@@ -266,6 +269,7 @@ export function updateAccessory(
     quantity?: number
     unit?: string
     customerName?: string
+    salesperson?: string
     remark?: string
     imageUrl?: string
   }

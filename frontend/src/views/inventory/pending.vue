@@ -183,6 +183,45 @@
       destroy-on-close
       @close="resetInboundForm"
     >
+      <div v-if="inboundPreviewItems.length" class="inbound-preview">
+        <div class="inbound-preview-title">待处理数量明细</div>
+        <div
+          v-for="item in inboundPreviewItems"
+          :key="item.id"
+          class="inbound-preview-item"
+        >
+          <div class="inbound-preview-meta">
+            <span>订单号：{{ item.orderNo }}</span>
+            <span>SKU：{{ item.skuCode }}</span>
+            <span>待处理：{{ formatDisplayNumber(item.quantity) }}</span>
+          </div>
+          <div v-if="item.headers.length && item.rows.length" class="inbound-preview-breakdown">
+            <el-table :data="toInboundPreviewTableRows(item)" border size="small" class="inbound-preview-table">
+              <el-table-column label="颜色" min-width="90" align="center">
+                <template #default="{ row }">
+                  {{ row.colorName || '-' }}
+                </template>
+              </el-table-column>
+              <el-table-column
+                v-for="(h, hIdx) in item.headers"
+                :key="`${item.id}-${hIdx}`"
+                :label="h"
+                min-width="72"
+                align="center"
+              >
+                <template #default="{ row }">
+                  {{ formatDisplayNumber(row.values[hIdx] ?? 0) }}
+                </template>
+              </el-table-column>
+              <el-table-column label="总数" min-width="80" align="center">
+                <template #default="{ row }">
+                  {{ formatDisplayNumber(getInboundPreviewRowTotal(row.values)) }}
+                </template>
+              </el-table-column>
+            </el-table>
+          </div>
+        </div>
+      </div>
       <el-form
         ref="inboundFormRef"
         :model="inboundForm"
@@ -253,6 +292,7 @@
       v-model="outboundDialog.visible"
       title="发货"
       width="860"
+      class="outbound-dialog-centered"
       destroy-on-close
       @close="resetOutboundForm"
     >
@@ -403,6 +443,16 @@ type PendingOutboundDialogItem = {
   rows: Array<{ colorName: string; quantities: number[] }>
 }
 
+type InboundPreviewItem = {
+  id: number
+  orderId: number
+  orderNo: string
+  skuCode: string
+  quantity: number
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+}
+
 const outboundDialog = reactive<{
   visible: boolean
   submitting: boolean
@@ -422,6 +472,21 @@ const outboundSelectedCustomer = computed(() => {
 })
 const outboundGrandTotal = computed(() =>
   outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
+)
+const inboundPreviewItems = computed<InboundPreviewItem[]>(() =>
+  selectedRows.value.map((row) => {
+    const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
+    const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+    return {
+      id: row.id,
+      orderId: row.orderId,
+      orderNo: row.orderNo,
+      skuCode: row.skuCode,
+      quantity: row.quantity,
+      headers,
+      rows: breakdown?.rows ?? [],
+    }
+  }),
 )
 
 const warehouseOptions = ref<{ id: number; label: string }[]>([])
@@ -524,8 +589,14 @@ function onPageTabChange() {
   load()
 }
 
-function openInboundDialog() {
+async function openInboundDialog() {
   if (!selectedRows.value.length) return
+  await Promise.all(
+    selectedRows.value
+      .map((row) => row.orderId)
+      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
+      .map((orderId) => ensureColorSizeBreakdown(orderId)),
+  )
   inboundDialog.visible = true
 }
 
@@ -646,6 +717,17 @@ function getOutboundItemTotal(item: PendingOutboundDialogItem) {
     (sum, row) => sum + row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0),
     0,
   )
+}
+
+function toInboundPreviewTableRows(item: InboundPreviewItem) {
+  return item.rows.map((row) => ({
+    colorName: row.colorName,
+    values: item.headers.map((_, idx) => Number(row.values?.[idx] ?? 0)),
+  }))
+}
+
+function getInboundPreviewRowTotal(values: number[]) {
+  return values.reduce((sum, v) => sum + (Number(v) || 0), 0)
 }
 
 async function submitOutbound() {
@@ -779,7 +861,7 @@ onMounted(async () => {
 
 .outbound-size-footer {
   margin-top: 8px;
-  text-align: right;
+  text-align: center;
   color: var(--el-text-color-secondary);
 }
 
@@ -789,6 +871,8 @@ onMounted(async () => {
   gap: 12px 20px;
   margin-bottom: 12px;
   color: var(--el-text-color-secondary);
+  justify-content: center;
+  text-align: center;
 }
 
 .outbound-batch-list {
@@ -813,6 +897,43 @@ onMounted(async () => {
   gap: 8px 12px;
   margin-bottom: 10px;
   color: var(--el-text-color-regular);
+  text-align: center;
+}
+
+.inbound-preview {
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 8px;
+  background: var(--el-fill-color-light);
+}
+
+.inbound-preview-title {
+  margin-bottom: 8px;
+  font-weight: 600;
+  color: var(--el-text-color-regular);
+}
+
+.inbound-preview-item + .inbound-preview-item {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--el-border-color-lighter);
+}
+
+.inbound-preview-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  color: var(--el-text-color-regular);
+}
+
+.inbound-preview-breakdown {
+  margin-top: 6px;
+}
+
+.inbound-preview-table :deep(th),
+.inbound-preview-table :deep(td) {
+  text-align: center;
 }
 </style>
 
@@ -840,6 +961,23 @@ onMounted(async () => {
 .pending-qty-popper .qty-tooltip-head .qty-tooltip-cell {
   background: #eef1f6;
   font-weight: 600;
+}
+
+.outbound-dialog-centered .outbound-batch-card .el-table th.is-leaf,
+.outbound-dialog-centered .outbound-batch-card .el-table td {
+  text-align: center;
+}
+
+.outbound-dialog-centered .outbound-batch-card .cell {
+  justify-content: center;
+}
+
+.outbound-dialog-centered .el-form-item__label {
+  text-align: center;
+}
+
+.outbound-dialog-centered .el-input-number .el-input__inner {
+  text-align: center;
 }
 </style>
 

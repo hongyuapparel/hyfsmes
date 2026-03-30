@@ -8,7 +8,14 @@ import type { FieldDefinition } from './types'
 export const CUSTOMER_FIELDS: FieldDefinition[] = [
   { code: 'customerId', label: '客户编号', type: 'text', order: 1, filterable: false },
   { code: 'country', label: '国家', type: 'text', order: 2, filterable: false },
-  { code: 'companyName', label: '公司名称', type: 'text', order: 3, filterable: true, placeholder: '输入公司名称' },
+  {
+    code: 'companyName',
+    label: '公司名称',
+    type: 'text',
+    order: 3,
+    filterable: true,
+    placeholder: '输入公司名称或联系人',
+  },
   { code: 'contactPerson', label: '联系人', type: 'text', order: 4, filterable: false },
   { code: 'contactInfo', label: '联系方式', type: 'phone', order: 5, filterable: false, placeholder: '国家代码', placeholderSuffix: '电话号码' },
   { code: 'cooperationDate', label: '合作日期', type: 'date', order: 6, sortable: true, filterable: false },

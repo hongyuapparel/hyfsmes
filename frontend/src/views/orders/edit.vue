@@ -132,23 +132,25 @@
 
           <el-col :xs="24" :sm="12" :md="8">
             <el-form-item label="客户" prop="customerId">
-              <el-select
-                v-model="form.customerId"
+              <el-input
+                :model-value="customerDisplayText"
                 placeholder="选择客户"
-                filterable
-                remote
+                readonly
                 clearable
-                :remote-method="searchCustomers"
                 :loading="customerLoading"
-                @change="onCustomerChange"
+                @clear="clearSelectedCustomer"
               >
-                <el-option
-                  v-for="item in customerOptions"
-                  :key="item.id"
-                  :label="item.companyName"
-                  :value="item.id"
-                />
-              </el-select>
+                <template #suffix>
+                  <el-button
+                    link
+                    type="primary"
+                    size="small"
+                    @click.stop="openCustomerDialog"
+                  >
+                    选择
+                  </el-button>
+                </template>
+              </el-input>
             </el-form-item>
           </el-col>
 
@@ -608,10 +610,8 @@
             <span>{{ sizeHeaders[sIndex] }}</span>
           </template>
           <template #default="{ row, $index }">
-            <el-input-number
+            <el-input
               v-model="row.sizeValues[sIndex]"
-              :min="0"
-              :controls="false"
               size="small"
               :ref="(el) => setSizeGridCellRef(el, $index, sizeMetaHeaders.length + sIndex)"
               @keydown.stop="onSizeGridKeydown($event, $index, sizeMetaHeaders.length + sIndex)"
@@ -832,6 +832,7 @@
       <el-table
         v-loading="skuDialogLoading"
         :data="filteredSkuProducts"
+        class="dialog-select-table"
         height="360px"
         border
       >
@@ -858,8 +859,86 @@
           </template>
         </el-table-column>
       </el-table>
+      <div class="dialog-pagination">
+        <el-pagination
+          v-model:current-page="skuPage"
+          v-model:page-size="skuPageSize"
+          small
+          background
+          layout="total, sizes, prev, pager, next"
+          :total="skuTotal"
+          :page-sizes="[20, 50, 100]"
+          @current-change="onSkuPageChange"
+          @size-change="onSkuPageSizeChange"
+        />
+      </div>
       <template #footer>
         <el-button @click="skuDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="customerDialogVisible"
+      title="选择客户"
+      width="860px"
+    >
+      <div class="customer-dialog-filter">
+        <el-input
+          v-model="customerKeyword"
+          placeholder="输入客户编号/国家/公司名称/联系人/业务员进行模糊搜索"
+          clearable
+          size="small"
+        />
+      </div>
+      <el-table
+        v-loading="customerDialogLoading"
+        :data="customerDialogList"
+        class="dialog-select-table"
+        height="360px"
+        border
+      >
+        <el-table-column prop="customerId" label="客户编号" min-width="120">
+          <template #default="{ row }">
+            {{ row.customerId || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="country" label="国家" min-width="120">
+          <template #default="{ row }">
+            {{ row.country || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="companyName" label="公司名称" min-width="180" />
+        <el-table-column prop="contactPerson" label="联系人" min-width="120">
+          <template #default="{ row }">
+            {{ row.contactPerson || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="salesperson" label="业务员" min-width="120">
+          <template #default="{ row }">
+            {{ row.salesperson || '-' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="90" align="center">
+          <template #default="{ row }">
+            <el-button type="primary" link size="small" @click="onSelectCustomer(row)">选择</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+      <div class="dialog-pagination">
+        <el-pagination
+          v-model:current-page="customerPage"
+          v-model:page-size="customerPageSize"
+          small
+          background
+          layout="total, sizes, prev, pager, next"
+          :total="customerTotal"
+          :page-sizes="[20, 50, 100]"
+          @current-change="onCustomerPageChange"
+          @size-change="onCustomerPageSizeChange"
+        />
+      </div>
+      <template #footer>
+        <el-button @click="customerDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
 
@@ -1014,11 +1093,23 @@ const rules: FormRules = {
   ],
 }
 
+interface CustomerSelectItem {
+  id: number
+  customerId: string
+  country: string
+  companyName: string
+  contactPerson: string
+  salesperson: string
+}
+
 // SKU 选择弹窗（从产品列表中选择）
 const skuDialogVisible = ref(false)
 const skuDialogLoading = ref(false)
 const skuKeyword = ref('')
 const skuProducts = ref<ProductSkuOption[]>([])
+const skuTotal = ref(0)
+const skuPage = ref(1)
+const skuPageSize = ref(20)
 const skuProductGroupName = ref('')
 const skuApplicablePeopleName = ref('')
 
@@ -1056,18 +1147,20 @@ const selectedSkuMeta = computed(() => {
 const filteredSkuProducts = computed(() => skuProducts.value)
 
 let skuSearchTimer: ReturnType<typeof setTimeout> | null = null
-async function searchSkus(keyword: string) {
+async function searchSkus(keyword: string, page = skuPage.value, pageSize = skuPageSize.value) {
   skuDialogLoading.value = true
   try {
     const kw = keyword.trim()
     const res = await getProductSkus({
       keyword: kw || undefined,
-      page: 1,
-      // 首屏先取较小批次，配合缩略图与懒加载降低 SKU 弹窗打开时延迟
-      pageSize: 20,
+      page,
+      pageSize,
     })
     const data = res.data
     skuProducts.value = data?.list ?? []
+    skuTotal.value = Number(data?.total ?? 0)
+    skuPage.value = Number(data?.page ?? page)
+    skuPageSize.value = Number(data?.pageSize ?? pageSize)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('SKU 产品列表加载失败', getErrorMessage(e))
   } finally {
@@ -1079,13 +1172,26 @@ function searchSkusDebounced(keyword: string) {
   if (skuSearchTimer) clearTimeout(skuSearchTimer)
   skuSearchTimer = setTimeout(() => {
     skuSearchTimer = null
-    void searchSkus(keyword)
+    skuPage.value = 1
+    void searchSkus(keyword, 1, skuPageSize.value)
   }, 300)
 }
 
 async function openSkuDialog() {
   skuDialogVisible.value = true
-  await searchSkus(skuKeyword.value)
+  skuPage.value = 1
+  await searchSkus(skuKeyword.value, 1, skuPageSize.value)
+}
+
+function onSkuPageChange(page: number) {
+  skuPage.value = page
+  void searchSkus(skuKeyword.value, page, skuPageSize.value)
+}
+
+function onSkuPageSizeChange(size: number) {
+  skuPageSize.value = size
+  skuPage.value = 1
+  void searchSkus(skuKeyword.value, 1, size)
 }
 
 function onSelectSku(row: ProductSkuOption) {
@@ -1098,45 +1204,98 @@ function onSelectSku(row: ProductSkuOption) {
   if (row.customerId && row.customerName) {
     form.customerId = row.customerId
     form.customerName = row.customerName
-    if (!customerOptions.value.some((c) => c.id === row.customerId)) {
-      customerOptions.value.unshift({ id: row.customerId, companyName: row.customerName })
+    selectedCustomer.value = {
+      id: row.customerId,
+      customerId: '',
+      country: '',
+      companyName: row.customerName,
+      contactPerson: '',
+      salesperson: '',
     }
+    void ensureCustomerById(row.customerId)
   }
   skuDialogVisible.value = false
 }
 
-// 客户下拉
-const customerOptions = ref<{ id: number; companyName: string }[]>([])
+// 客户选择弹窗
 const customerLoading = ref(false)
+const customerDialogVisible = ref(false)
+const customerDialogLoading = ref(false)
+const customerDialogList = ref<CustomerSelectItem[]>([])
+const customerKeyword = ref('')
+const selectedCustomer = ref<CustomerSelectItem | null>(null)
+const customerTotal = ref(0)
+const customerPage = ref(1)
+const customerPageSize = ref(20)
 
-async function searchCustomers(keyword: string) {
+const customerDisplayText = computed(() => String(form.customerName ?? '').trim())
+
+function normalizeCustomer(raw: Partial<CustomerSelectItem> & { id?: number }): CustomerSelectItem {
+  return {
+    id: Number(raw.id ?? 0),
+    customerId: String(raw.customerId ?? '').trim(),
+    country: String(raw.country ?? '').trim(),
+    companyName: String(raw.companyName ?? '').trim(),
+    contactPerson: String(raw.contactPerson ?? '').trim(),
+    salesperson: String(raw.salesperson ?? '').trim(),
+  }
+}
+
+async function searchCustomersForDialog(
+  keyword: string,
+  page = customerPage.value,
+  pageSize = customerPageSize.value,
+) {
+  const q = keyword?.trim() ?? ''
+  customerDialogLoading.value = true
   customerLoading.value = true
   try {
     const res = await request.get('/customers', {
-      params: { keyword: keyword || undefined, pageSize: 20 },
+      params: { companyName: q || undefined, page, pageSize },
       skipGlobalErrorHandler: true,
     })
-    const data = res.data as { list?: { id: number; companyName: string }[] }
-    customerOptions.value = data.list ?? []
+    const data = res.data as { list?: CustomerSelectItem[]; total?: number; page?: number; pageSize?: number }
+    customerDialogList.value = (data.list ?? []).map((item) => normalizeCustomer(item))
+    customerTotal.value = Number(data.total ?? 0)
+    customerPage.value = Number(data.page ?? page)
+    customerPageSize.value = Number(data.pageSize ?? pageSize)
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) console.warn('客户下拉加载失败', getErrorMessage(e))
+    if (!isErrorHandled(e)) console.warn('客户弹窗加载失败', getErrorMessage(e))
   } finally {
+    customerDialogLoading.value = false
     customerLoading.value = false
   }
 }
 
-async function ensureCustomerOptionById(customerId: number | null | undefined) {
+async function openCustomerDialog() {
+  customerDialogVisible.value = true
+  customerPage.value = 1
+  await searchCustomersForDialog(customerKeyword.value, 1, customerPageSize.value)
+}
+
+function onSelectCustomer(row: CustomerSelectItem) {
+  form.customerId = row.id
+  form.customerName = row.companyName
+  selectedCustomer.value = row
+  customerDialogVisible.value = false
+}
+
+function clearSelectedCustomer() {
+  form.customerId = null
+  form.customerName = ''
+  selectedCustomer.value = null
+}
+
+async function ensureCustomerById(customerId: number | null | undefined) {
   if (customerId == null || Number.isNaN(Number(customerId))) return
-  if (customerOptions.value.some((item) => item.id === customerId)) return
+  if (selectedCustomer.value?.id === Number(customerId)) return
   try {
     const res = await request.get(`/customers/${customerId}`, { skipGlobalErrorHandler: true })
-    const data = res.data as { id?: number; companyName?: string }
-    const id = Number(data?.id ?? customerId)
-    const companyName = String(data?.companyName ?? '').trim()
-    if (!Number.isNaN(id) && companyName) {
-      customerOptions.value.unshift({ id, companyName })
+    const normalized = normalizeCustomer((res.data ?? {}) as CustomerSelectItem)
+    if (Number.isFinite(normalized.id) && normalized.id > 0) {
+      selectedCustomer.value = normalized
       if (!String(form.customerName ?? '').trim()) {
-        form.customerName = companyName
+        form.customerName = normalized.companyName
       }
     }
   } catch (e: unknown) {
@@ -1144,13 +1303,25 @@ async function ensureCustomerOptionById(customerId: number | null | undefined) {
   }
 }
 
-function onCustomerChange(val: number | null | undefined) {
-  if (val == null) {
-    form.customerName = ''
-    return
-  }
-  const found = customerOptions.value.find((item) => item.id === val)
-  form.customerName = found?.companyName ?? form.customerName ?? ''
+let customerSearchTimer: ReturnType<typeof setTimeout> | null = null
+function searchCustomersDebounced(keyword: string) {
+  if (customerSearchTimer) clearTimeout(customerSearchTimer)
+  customerSearchTimer = setTimeout(() => {
+    customerSearchTimer = null
+    customerPage.value = 1
+    void searchCustomersForDialog(keyword, 1, customerPageSize.value)
+  }, 300)
+}
+
+function onCustomerPageChange(page: number) {
+  customerPage.value = page
+  void searchCustomersForDialog(customerKeyword.value, page, customerPageSize.value)
+}
+
+function onCustomerPageSizeChange(size: number) {
+  customerPageSize.value = size
+  customerPage.value = 1
+  void searchCustomersForDialog(customerKeyword.value, 1, size)
 }
 
 // 业务员 / 跟单员
@@ -1664,7 +1835,7 @@ const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
 
 interface SizeInfoRow {
   metaValues: string[]
-  sizeValues: number[]
+  sizeValues: string[]
 }
 
 const sizeInfoRows = ref<SizeInfoRow[]>([])
@@ -1759,9 +1930,7 @@ function onSizeGridPaste(e: ClipboardEvent, startRow: number, startCol: number) 
         sizeInfoRows.value[rowIndex].metaValues[gridCol] = value ?? ''
       } else {
         const sizeCol = gridCol - sizeMetaHeaders.value.length
-        const clean = (value ?? '').replace(/[^\d.-]/g, '')
-        const num = Number(clean)
-        sizeInfoRows.value[rowIndex].sizeValues[sizeCol] = Number.isNaN(num) ? 0 : num
+        sizeInfoRows.value[rowIndex].sizeValues[sizeCol] = value ?? ''
       }
     })
   })
@@ -1779,7 +1948,7 @@ function normalizeSizeInfoRows() {
       row.metaValues.splice(metaLen)
     }
     if (row.sizeValues.length < sizeLen) {
-      row.sizeValues.push(...Array(sizeLen - row.sizeValues.length).fill(0))
+      row.sizeValues.push(...Array(sizeLen - row.sizeValues.length).fill(''))
     } else if (row.sizeValues.length > sizeLen) {
       row.sizeValues.splice(sizeLen)
     }
@@ -1789,7 +1958,7 @@ function normalizeSizeInfoRows() {
 function addSizeInfoRow() {
   sizeInfoRows.value.push({
     metaValues: Array(sizeMetaHeaders.value.length).fill(''),
-    sizeValues: Array(sizeHeaders.value.length).fill(0),
+    sizeValues: Array(sizeHeaders.value.length).fill(''),
   })
 }
 
@@ -1815,7 +1984,7 @@ async function copySizeInfoToClipboard() {
   const headers = [...sizeMetaHeaders.value, ...sizeHeaders.value]
   const rows = sizeInfoRows.value.map((row) => {
     const meta = sizeMetaHeaders.value.map((_, idx) => row.metaValues?.[idx] ?? '')
-    const sizes = sizeHeaders.value.map((_, idx) => String(row.sizeValues?.[idx] ?? 0))
+    const sizes = sizeHeaders.value.map((_, idx) => String(row.sizeValues?.[idx] ?? ''))
     return [...meta, ...sizes]
   })
   const lines = [headers, ...rows].map((r) => r.join('\t')).join('\n')
@@ -2201,10 +2370,7 @@ async function collectPayload(): Promise<OrderFormPayload> {
     throw new Error('invalid form')
   }
   await formRef.value?.validate()
-  const selectedCustomerName =
-    customerOptions.value.find((item) => item.id === form.customerId)?.companyName ??
-    form.customerName ??
-    ''
+  const selectedCustomerName = form.customerName ?? ''
   const processItemSummary = processItems.value
     .map((p) => (p.processName ?? '').trim())
     .filter((name, idx, arr) => name && arr.indexOf(name) === idx)
@@ -2341,12 +2507,8 @@ async function loadDetail() {
     ;(form as any).collaborationTypeId = (d as any).collaborationTypeId ?? null
     // 订单类型仅通过 ID 回显
     ;(form as any).orderTypeId = (d as any).orderTypeId ?? null
-    // 客户下拉若无当前客户，会显示 raw id；补一条 option 让 el-select 正常展示
-    if (form.customerId && form.customerName && !customerOptions.value.some((c) => c.id === form.customerId)) {
-      customerOptions.value.unshift({ id: form.customerId, companyName: form.customerName })
-    }
     // 历史数据可能只有 customerId 没有 customerName，这里按 id 拉取客户名称，避免显示成数字 id
-    await ensureCustomerOptionById(form.customerId)
+    await ensureCustomerById(form.customerId)
     form.secondaryProcess = d.processItem ?? ''
     form.quantity = d.quantity ?? 0
     form.exFactoryPrice = d.exFactoryPrice ?? ''
@@ -2395,7 +2557,9 @@ async function loadDetail() {
       : [...defaultSizeMetaHeaders]
     sizeInfoRows.value = ((d as any).sizeInfoRows ?? []).map((r: any) => ({
       metaValues: Array.isArray(r.metaValues) ? [...r.metaValues] : Array(sizeMetaHeaders.value.length).fill(''),
-      sizeValues: Array.isArray(r.sizeValues) ? [...r.sizeValues] : Array(sizeHeaders.value.length).fill(0),
+      sizeValues: Array.isArray(r.sizeValues)
+        ? r.sizeValues.map((v: unknown) => (v == null ? '' : String(v)))
+        : Array(sizeHeaders.value.length).fill(''),
     }))
     normalizeSizeInfoRows()
     // E 区
@@ -2508,6 +2672,11 @@ onMounted(async () => {
 watch(skuKeyword, (val) => {
   if (!skuDialogVisible.value) return
   searchSkusDebounced(String(val ?? ''))
+})
+
+watch(customerKeyword, (val) => {
+  if (!customerDialogVisible.value) return
+  searchCustomersDebounced(String(val ?? ''))
 })
 </script>
 
@@ -2848,6 +3017,26 @@ watch(skuKeyword, (val) => {
 
 .sku-dialog-filter {
   margin-bottom: var(--space-sm);
+}
+
+.customer-dialog-filter {
+  margin-bottom: var(--space-sm);
+}
+
+.dialog-pagination {
+  margin-top: var(--space-sm);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dialog-select-table :deep(.el-table__row) {
+  height: 44px;
+}
+
+.dialog-select-table :deep(.el-table__cell) {
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
 }
 
 .attachments {

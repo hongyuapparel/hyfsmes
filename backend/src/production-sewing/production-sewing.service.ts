@@ -171,7 +171,7 @@ export class ProductionSewingService {
         : [];
 
     const qb = this.orderRepo.createQueryBuilder('o').where(
-      'o.status = :pendingSewing OR (o.id IN (:...completedIds))',
+      '(o.status = :pendingSewing OR o.id IN (:...completedIds))',
       { pendingSewing: 'pending_sewing', completedIds: pendingFinishingWithSewIds.length ? pendingFinishingWithSewIds : [0] },
     );
 

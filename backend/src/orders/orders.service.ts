@@ -130,6 +130,9 @@ export class OrdersService {
   private craftReconcileRunning = false;
   private craftReconcileLastRunAt = 0;
   private readonly craftReconcileIntervalMs = 5 * 60 * 1000;
+  private finishingReconcileRunning = false;
+  private finishingReconcileLastRunAt = 0;
+  private readonly finishingReconcileIntervalMs = 5 * 60 * 1000;
 
   constructor(
     @InjectRepository(Order)
@@ -234,6 +237,47 @@ export class OrdersService {
       })
       .finally(() => {
         this.craftReconcileRunning = false;
+      });
+  }
+
+  /**
+   * 自愈历史数据：尾部已完成（inbound）但订单状态仍停留在待尾部时，按 tailing_inbound_completed 规则补齐。
+   */
+  private async reconcileFinishingCompletedOrders(actorUserId?: number): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    const finishings = await this.orderFinishingRepo.find({ where: { status: 'inbound' } });
+    if (!finishings.length) return;
+    const orderIds = finishings.map((f) => f.orderId);
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_finishing' } });
+    if (!orders.length) return;
+    const finishingMap = new Map(finishings.map((f) => [f.orderId, f]));
+    for (const order of orders) {
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'tailing_inbound_completed',
+        actorUserId,
+      });
+      if (!next || next === order.status) continue;
+      const finishing = finishingMap.get(order.id);
+      order.status = next;
+      order.statusTime = finishing?.completedAt ?? new Date();
+      await this.orderRepo.save(order);
+    }
+  }
+
+  private scheduleFinishingReconcile(actorUserId?: number): void {
+    if (typeof actorUserId !== 'number') return;
+    if (this.finishingReconcileRunning) return;
+    const now = Date.now();
+    if (now - this.finishingReconcileLastRunAt < this.finishingReconcileIntervalMs) return;
+    this.finishingReconcileRunning = true;
+    this.finishingReconcileLastRunAt = now;
+    void this.reconcileFinishingCompletedOrders(actorUserId)
+      .catch(() => {
+        // 自愈失败不影响列表主链路；下个间隔继续尝试。
+      })
+      .finally(() => {
+        this.finishingReconcileRunning = false;
       });
   }
 
@@ -985,6 +1029,7 @@ export class OrdersService {
 
   async findAll(query: OrderListQuery, actorUserId?: number) {
     this.scheduleCraftReconcile(actorUserId);
+    this.scheduleFinishingReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
 
     const qb = this.orderRepo.createQueryBuilder('o');
@@ -1213,6 +1258,7 @@ export class OrdersService {
 
   async countByStatus(query: OrderListQuery, actorUserId?: number) {
     this.scheduleCraftReconcile(actorUserId);
+    this.scheduleFinishingReconcile(actorUserId);
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
 
     const groupQb = this.orderRepo.createQueryBuilder('o');

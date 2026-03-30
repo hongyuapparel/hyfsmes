@@ -233,7 +233,7 @@ export class ProductsService {
     const product = await this.productRepo.findOne({ where: { id } });
     if (!product) throw new NotFoundException('产品不存在');
 
-    if (dto.product_name !== undefined) product.productName = dto.product_name;
+    if (dto.product_name !== undefined) product.productName = dto.product_name?.trim() ?? '';
     if (dto.image_url !== undefined) product.imageUrl = dto.image_url;
     if (dto.product_group_id !== undefined)
       product.productGroupId = typeof dto.product_group_id === 'number' ? dto.product_group_id : null;

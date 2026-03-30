@@ -55,6 +55,22 @@
               :value="opt.value"
             />
           </el-select>
+          <el-select
+            v-model="filter.salesperson"
+            placeholder="业务员"
+            filterable
+            clearable
+            size="large"
+            class="filter-bar-item"
+            @change="onSearch(true)"
+          >
+            <el-option
+              v-for="s in salespersonOptions"
+              :key="s"
+              :label="s"
+              :value="s"
+            />
+          </el-select>
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
             <el-button size="large" @click="onReset">清空</el-button>
@@ -265,6 +281,22 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="业务员" prop="salesperson" required>
+          <el-select
+            v-model="form.salesperson"
+            placeholder="请选择业务员"
+            filterable
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="s in salespersonOptions"
+              :key="s"
+              :label="s"
+              :value="s"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="数量" prop="quantity">
           <div class="qty-unit-row">
             <el-input-number
@@ -379,7 +411,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { getCustomers, type CustomerItem } from '@/api/customers'
+import { getCustomers, getSalespeople, type CustomerItem } from '@/api/customers'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import {
   getAccessoriesList,
@@ -407,12 +439,13 @@ import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
-const filter = reactive({ name: '', category: '', customerName: '' })
+const filter = reactive({ name: '', category: '', customerName: '', salesperson: '' })
 const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
 const accessoriesStockTableRef = ref()
 const accessoriesOutboundTableRef = ref()
 const customerOptions = ref<{ label: string; value: string }[]>([])
+const salespersonOptions = ref<string[]>([])
 const categoryOptions = ref<string[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -461,11 +494,13 @@ const form = reactive({
   quantity: 0,
   unit: '个',
   customerName: '',
+  salesperson: '',
   imageUrl: '',
   remark: '',
 })
 const formRules: FormRules = {
   name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+  salesperson: [{ required: true, message: '请选择业务员', trigger: 'change' }],
 }
 
 async function load() {
@@ -475,6 +510,7 @@ async function load() {
       name: filter.name || undefined,
       category: filter.category || undefined,
       customerName: filter.customerName || undefined,
+      salesperson: filter.salesperson || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -511,6 +547,15 @@ async function loadCustomerOptions() {
   }
 }
 
+async function loadSalespersonOptions() {
+  try {
+    const res = await getSalespeople()
+    salespersonOptions.value = (res.data ?? []).filter((v) => !!String(v ?? '').trim())
+  } catch {
+    salespersonOptions.value = []
+  }
+}
+
 function onSearch(byUser = false) {
   if (byUser) {
     if (filter.name && String(filter.name).trim()) nameLabelVisible.value = true
@@ -533,6 +578,7 @@ function onReset() {
   filter.name = ''
   filter.category = ''
   filter.customerName = ''
+  filter.salesperson = ''
   pagination.page = 1
   load()
 }
@@ -574,6 +620,7 @@ function openForm(row: AccessoryItem | null) {
     form.quantity = row.quantity ?? 0
     form.unit = row.unit ?? '个'
     form.customerName = row.customerName ?? ''
+    form.salesperson = row.salesperson ?? ''
     form.imageUrl = row.imageUrl ?? ''
     form.remark = row.remark ?? ''
   } else {
@@ -582,6 +629,7 @@ function openForm(row: AccessoryItem | null) {
     form.quantity = 0
     form.unit = '个'
     form.customerName = ''
+    form.salesperson = ''
     form.imageUrl = ''
     form.remark = ''
   }
@@ -603,6 +651,7 @@ async function submitForm() {
         quantity: form.quantity,
         unit: form.unit,
         customerName: form.customerName || undefined,
+        salesperson: form.salesperson,
         imageUrl: form.imageUrl || undefined,
         remark: form.remark,
       })
@@ -614,6 +663,7 @@ async function submitForm() {
         quantity: form.quantity,
         unit: form.unit,
         customerName: form.customerName || undefined,
+        salesperson: form.salesperson,
         imageUrl: form.imageUrl || undefined,
         remark: form.remark,
       })
@@ -752,6 +802,7 @@ async function submitOutbound() {
 
 onMounted(() => {
   loadCustomerOptions()
+  loadSalespersonOptions()
   loadCategoryOptions()
   load()
 })

@@ -170,40 +170,11 @@
           <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
-      <el-table-column prop="supplierName" label="供应商" min-width="100" />
-      <el-table-column prop="materialSource" label="物料来源" min-width="110" />
-      <el-table-column prop="materialType" label="物料类型" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="materialName" label="物料名称" min-width="120" />
-      <el-table-column prop="color" label="颜色" width="88" show-overflow-tooltip />
-      <el-table-column prop="planQuantity" label="计划用量" width="96" align="right">
-        <template #default="{ row }">
-          {{ row.planQuantity != null ? formatDisplayNumber(row.planQuantity) : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="actualPurchaseQuantity" label="实际采购" width="96" align="right">
-        <template #default="{ row }">
-          {{ row.actualPurchaseQuantity != null ? formatDisplayNumber(row.actualPurchaseQuantity) : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="purchaseAmount" label="采购金额" width="100" align="right">
-        <template #default="{ row }">
-          {{
-            row.purchaseAmount != null && row.purchaseAmount !== ''
-              ? `￥${formatDisplayNumber(row.purchaseAmount)}`
-              : '-'
-          }}
-        </template>
-      </el-table-column>
       <el-table-column prop="purchaseStatus" :label="materialProgressColumnLabel" width="100" align="center">
         <template #default="{ row }">
           <el-tag :type="displayStatus(row) === 'completed' ? 'success' : 'warning'" size="small">
             {{ displayStatusLabel(row) }}
           </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="订单类型" width="100">
-        <template #default="{ row }">
-          {{ orderTypeDisplay(row) }}
         </template>
       </el-table-column>
       <el-table-column label="概要" width="64" align="center" fixed="right">
@@ -226,57 +197,114 @@
       />
     </div>
 
-    <el-drawer
+    <ProductionDetailDrawerShell
       v-model="purchaseBriefDrawer.visible"
       title="订单与物料概要"
-      direction="rtl"
-      size="460px"
-      destroy-on-close
       @closed="purchaseBriefDrawer.row = null"
     >
       <template v-if="purchaseBriefDrawer.row">
-        <ProductionOrderBriefPanel :brief="purchaseBriefFromRow(purchaseBriefDrawer.row)" />
-        <el-divider content-position="left">本行物料</el-divider>
-        <el-descriptions :column="1" border size="small" class="purchase-brief-material">
-          <el-descriptions-item label="物料序号">
-            {{ purchaseBriefDrawer.row.materialIndex + 1 }}
-          </el-descriptions-item>
-          <el-descriptions-item label="处理路线">
-            {{ purchaseBriefDrawer.row.processRoute === 'picking' ? '领料' : '采购' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="物料类型">
-            {{ (purchaseBriefDrawer.row.materialType ?? '').trim() || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="物料名称">
-            {{ (purchaseBriefDrawer.row.materialName ?? '').trim() || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="颜色">
-            {{ (purchaseBriefDrawer.row.color ?? '').trim() || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="供应商">
-            {{ (purchaseBriefDrawer.row.supplierName ?? '').trim() || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="物料来源">
-            {{ (purchaseBriefDrawer.row.materialSource ?? '').trim() || '—' }}
-          </el-descriptions-item>
-          <el-descriptions-item label="到采购时间">
-            {{ formatDateTime(purchaseBriefDrawer.row.pendingPurchaseAt) }}
-          </el-descriptions-item>
-          <el-descriptions-item label="完成时间">
-            {{
-              formatDateTime(
-                purchaseBriefDrawer.row.processRoute === 'picking'
-                  ? purchaseBriefDrawer.row.pickCompletedAt
-                  : purchaseBriefDrawer.row.purchaseCompletedAt,
-              )
-            }}
-          </el-descriptions-item>
-          <el-descriptions-item label="时效判定">
-            <SlaJudgeTag :text="purchaseBriefDrawer.row.timeRating" />
-          </el-descriptions-item>
-        </el-descriptions>
+        <ProductionDetailSection>
+          <ProductionOrderBriefPanel :brief="purchaseBriefFromRow(purchaseBriefDrawer.row)" />
+        </ProductionDetailSection>
+        <ProductionDetailSection title="本行物料">
+          <el-descriptions :column="2" border size="small" class="purchase-brief-material">
+            <el-descriptions-item label="物料序号">
+              {{ purchaseBriefDrawer.row.materialIndex + 1 }}
+            </el-descriptions-item>
+            <el-descriptions-item label="处理路线">
+              {{ purchaseBriefDrawer.row.processRoute === 'picking' ? '领料' : '采购' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="订单类型">
+              {{ orderTypeDisplay(purchaseBriefDrawer.row) || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="物料类型">
+              {{ (purchaseBriefDrawer.row.materialType ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="物料名称">
+              {{ (purchaseBriefDrawer.row.materialName ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="颜色">
+              {{ (purchaseBriefDrawer.row.color ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="供应商">
+              {{ (purchaseBriefDrawer.row.supplierName ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="物料来源">
+              {{ (purchaseBriefDrawer.row.materialSource ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="计划用量">
+              {{
+                purchaseBriefDrawer.row.planQuantity != null
+                  ? formatDisplayNumber(purchaseBriefDrawer.row.planQuantity)
+                  : '—'
+              }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
+        <ProductionDetailSection title="采购登记信息">
+          <el-descriptions :column="2" border size="small" class="purchase-brief-material">
+            <el-descriptions-item label="实际采购数量">
+              {{
+                purchaseBriefDrawer.row.actualPurchaseQuantity != null
+                  ? formatDisplayNumber(purchaseBriefDrawer.row.actualPurchaseQuantity)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="单价(元)">
+              {{
+                purchaseBriefDrawer.row.purchaseUnitPrice != null && purchaseBriefDrawer.row.purchaseUnitPrice !== ''
+                  ? formatDisplayNumber(purchaseBriefDrawer.row.purchaseUnitPrice)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="其他费用(元)">
+              {{
+                purchaseBriefDrawer.row.purchaseOtherCost != null && purchaseBriefDrawer.row.purchaseOtherCost !== ''
+                  ? formatDisplayNumber(purchaseBriefDrawer.row.purchaseOtherCost)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="采购总金额(元)">
+              {{
+                purchaseBriefDrawer.row.purchaseAmount != null && purchaseBriefDrawer.row.purchaseAmount !== ''
+                  ? formatDisplayNumber(purchaseBriefDrawer.row.purchaseAmount)
+                  : '—'
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="采购凭证">
+              <AppImageThumb
+                v-if="purchaseBriefDrawer.row.purchaseImageUrl"
+                :raw-url="purchaseBriefDrawer.row.purchaseImageUrl"
+                variant="compact"
+              />
+              <span v-else>—</span>
+            </el-descriptions-item>
+            <el-descriptions-item label="采购备注">
+              {{ (purchaseBriefDrawer.row.purchaseRemark ?? '').trim() || '—' }}
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
+        <ProductionDetailSection title="时效与节点">
+          <el-descriptions :column="2" border size="small" class="purchase-brief-material">
+            <el-descriptions-item label="到采购时间">
+              {{ formatDateTime(purchaseBriefDrawer.row.pendingPurchaseAt) }}
+            </el-descriptions-item>
+            <el-descriptions-item label="完成时间">
+              {{
+                formatDateTime(
+                  purchaseBriefDrawer.row.processRoute === 'picking'
+                    ? purchaseBriefDrawer.row.pickCompletedAt
+                    : purchaseBriefDrawer.row.purchaseCompletedAt,
+                )
+              }}
+            </el-descriptions-item>
+            <el-descriptions-item label="时效判定">
+              <SlaJudgeTag :text="purchaseBriefDrawer.row.timeRating" />
+            </el-descriptions-item>
+          </el-descriptions>
+        </ProductionDetailSection>
       </template>
-    </el-drawer>
+    </ProductionDetailDrawerShell>
 
     <!-- 登记实际采购弹窗 -->
     <el-dialog
@@ -445,6 +473,7 @@ import {
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
   getFilterRangeStyle,
+  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -452,6 +481,8 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel, {
   type ProductionOrderBriefModel,
 } from '@/components/production/ProductionOrderBriefPanel.vue'
+import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
+import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const PURCHASE_TABS = [
@@ -622,9 +653,9 @@ watch(
 function buildQuery(): PurchaseListQuery {
   const q: PurchaseListQuery = {
     tab: currentTab.value,
-    orderNo: filter.orderNo || undefined,
-    skuCode: filter.skuCode || undefined,
-    supplier: filter.supplier || undefined,
+    orderNo: normalizeTextFilter(filter.orderNo),
+    skuCode: normalizeTextFilter(filter.skuCode),
+    supplier: normalizeTextFilter(filter.supplier),
     orderTypeId: filter.orderTypeId ?? undefined,
     page: pagination.page,
     pageSize: pagination.pageSize,

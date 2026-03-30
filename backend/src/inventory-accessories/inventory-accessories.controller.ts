@@ -32,6 +32,7 @@ export class InventoryAccessoriesController {
     @Query('name') name?: string,
     @Query('category') category?: string,
     @Query('customerName') customerName?: string,
+    @Query('salesperson') salesperson?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -39,6 +40,7 @@ export class InventoryAccessoriesController {
       name,
       category,
       customerName,
+      salesperson,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -58,9 +60,10 @@ export class InventoryAccessoriesController {
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
     @Body('customerName') customerName?: string,
+    @Body('salesperson') salesperson?: string,
     @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.create({ name, category, quantity, unit, remark, imageUrl, customerName, operatorUsername: user?.username ?? '' });
+    return this.service.create({ name, category, quantity, unit, remark, imageUrl, customerName, salesperson, operatorUsername: user?.username ?? '' });
   }
 
   @Put('items/:id')
@@ -73,6 +76,7 @@ export class InventoryAccessoriesController {
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
     @Body('customerName') customerName?: string,
+    @Body('salesperson') salesperson?: string,
     @CurrentUser() user?: { username?: string },
   ) {
     return this.service.update(Number(id), {
@@ -83,6 +87,7 @@ export class InventoryAccessoriesController {
       remark,
       imageUrl,
       customerName,
+      salesperson,
       operatorUsername: user?.username ?? '',
     });
   }

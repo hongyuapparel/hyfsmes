@@ -33,11 +33,12 @@ export class CustomersService {
   ) {}
 
   async findAll(query: CustomerListQuery) {
-    const { companyName, salesperson, page = 1, pageSize = 20, sortBy = 'id', sortOrder = 'asc' } = query;
+    const { companyName, salesperson, page = 1, pageSize = 20, sortBy = 'createdAt', sortOrder = 'desc' } = query;
     const qb = this.customerRepo.createQueryBuilder('c');
 
     if (companyName?.trim()) {
-      qb.andWhere('c.company_name LIKE :companyName', { companyName: `%${companyName.trim()}%` });
+      const kw = `%${companyName.trim()}%`;
+      qb.andWhere('(c.company_name LIKE :kw OR c.contact_person LIKE :kw)', { kw });
     }
     if (salesperson?.trim()) {
       qb.andWhere('c.salesperson = :salesperson', { salesperson: salesperson.trim() });
