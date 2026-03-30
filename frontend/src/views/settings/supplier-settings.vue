@@ -346,6 +346,52 @@ function onDialogClose() {
   editTree.value = []
 }
 
+/**
+ * INSTANT_REFRESH_FREEZE
+ * 供应商设置的“操作后即时可见”兜底逻辑：
+ * - 所有增删改排序成功后必须调用本方法；
+ * - 统一重载树并恢复展开状态，避免懒加载缓存导致“保存成功但需手动刷新”。
+ * 非必要不要改动此方法与调用点。
+ */
+async function refreshTreeInstantly(anchorIds: number[] = []) {
+  const keepExpanded = new Set<number>([...expandedIds.value, ...anchorIds.filter((n) => !Number.isNaN(n))])
+  await loadRoots()
+  await nextTick()
+
+  const nextExpanded = new Set<number>()
+
+  // 先展开根节点并同步其子节点
+  for (const id of keepExpanded) {
+    const rootRow = findNodeById(id)
+    if (!rootRow || rootRow.level !== 0) continue
+    tableRef.value?.toggleRowExpansion?.(rootRow, true)
+    nextExpanded.add(Number(rootRow.id))
+    const res = await getSystemOptionsChildren(OPTION_TYPE, rootRow.id)
+    syncParentChildren(rootRow, res.data ?? [])
+  }
+
+  // 再展开二级父分组并同步其子节点（若有）
+  for (const id of keepExpanded) {
+    const row = findNodeById(id)
+    if (!row || row.level !== 1 || !row.hasChildren) continue
+    const parent = row.parentId != null ? findNodeById(row.parentId) : null
+    if (parent) {
+      tableRef.value?.toggleRowExpansion?.(parent, true)
+      nextExpanded.add(Number(parent.id))
+      if (!parent.children?.length) {
+        const parentRes = await getSystemOptionsChildren(OPTION_TYPE, parent.id)
+        syncParentChildren(parent, parentRes.data ?? [])
+      }
+    }
+    tableRef.value?.toggleRowExpansion?.(row, true)
+    nextExpanded.add(Number(row.id))
+    const childRes = await getSystemOptionsChildren(OPTION_TYPE, row.id)
+    syncParentChildren(row, childRes.data ?? [])
+  }
+
+  expandedIds.value = nextExpanded
+}
+
 function collectDescendants(nodes: SystemOptionTreeNode[]): SystemOptionTreeNode[] {
   const out: SystemOptionTreeNode[] = []
   const stack = [...nodes]
@@ -492,51 +538,14 @@ async function submit() {
       ElMessage.success('添加成功')
     }
     dialogVisible.value = false
+    const anchors: number[] = []
     if (isEdit.value) {
-      // 编辑后统一重载并自动定位，避免“保存成功但界面未即时反映”
-      await loadRoots()
-      await nextTick()
-      if (addLevel.value > 0 && editSupplierTypeId.value != null) {
-        const rootRow = findNodeById(editSupplierTypeId.value)
-        if (rootRow) {
-          tableRef.value?.toggleRowExpansion?.(rootRow, true)
-          expandedIds.value.add(Number(rootRow.id))
-          const rootChildrenRes = await getSystemOptionsChildren(OPTION_TYPE, rootRow.id)
-          syncParentChildren(rootRow, rootChildrenRes.data ?? [])
-        }
-        if (
-          editedNextParentId != null &&
-          editSupplierTypeId.value != null &&
-          editedNextParentId !== editSupplierTypeId.value
-        ) {
-          const parentRow = findNodeById(editedNextParentId)
-          if (parentRow) {
-            tableRef.value?.toggleRowExpansion?.(parentRow, true)
-            expandedIds.value.add(Number(parentRow.id))
-            if (parentRow.level < 2) {
-              const parentChildrenRes = await getSystemOptionsChildren(OPTION_TYPE, parentRow.id)
-              syncParentChildren(parentRow, parentChildrenRes.data ?? [])
-            }
-          }
-        }
-      }
+      if (editSupplierTypeId.value != null) anchors.push(editSupplierTypeId.value)
+      if (editedNextParentId != null) anchors.push(editedNextParentId)
     } else if (parentId.value != null) {
-      const parent = findNodeById(parentId.value)
-      if (parent) {
-        const res = await getSystemOptionsChildren(OPTION_TYPE, parentId.value)
-        const list = res.data ?? []
-        syncParentChildren(parent, list)
-        // 新增后自动展开父节点，确保第一时间看到新增项
-        if (list.length > 0) {
-          tableRef.value?.toggleRowExpansion?.(parent, true)
-          expandedIds.value.add(Number(parent.id))
-        }
-      } else {
-        await loadRoots()
-      }
-    } else {
-      await loadRoots()
+      anchors.push(parentId.value)
     }
+    await refreshTreeInstantly(anchors)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
@@ -554,22 +563,9 @@ async function remove(row: TreeRow) {
   try {
     await deleteSystemOption(row.id)
     ElMessage.success('已删除')
-    // 懒加载树：优先局部刷新当前父节点，保证删除后立即可见
-    if (row.level > 0 && row.parentId != null) {
-      const parent = findNodeById(row.parentId)
-      if (parent) {
-        const res = await getSystemOptionsChildren(OPTION_TYPE, parent.id)
-        const list = res.data ?? []
-        syncParentChildren(parent, list)
-        expandedIds.value.delete(Number(row.id))
-      } else {
-        await loadRoots()
-      }
-    } else {
-      // 删除根节点时刷新根列表
-      await loadRoots()
-      expandedIds.value.delete(Number(row.id))
-    }
+    const anchors: number[] = []
+    if (row.parentId != null) anchors.push(row.parentId)
+    await refreshTreeInstantly(anchors)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
@@ -587,16 +583,10 @@ async function moveRow(row: TreeRow, delta: number) {
   const pid = row.level === 0 ? null : row.parentId ?? null
   try {
     await batchUpdateSystemOptionOrder(OPTION_TYPE, pid, items)
-    if (row.level > 0 && row.parentId != null) {
-      const parent = findNodeById(row.parentId)
-      if (parent) {
-        const res = await getSystemOptionsChildren(OPTION_TYPE, parent.id)
-        const list = res.data ?? []
-        syncParentChildren(parent, list)
-      }
-    } else {
-      await loadRoots()
-    }
+    const anchors: number[] = []
+    if (row.level === 0) anchors.push(row.id)
+    if (row.parentId != null) anchors.push(row.parentId)
+    await refreshTreeInstantly(anchors)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
