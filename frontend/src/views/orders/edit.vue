@@ -967,6 +967,15 @@
           v-for="(url, idx) in attachments"
           :key="url + idx"
           class="attachment-item"
+          :class="{
+            'is-dragging': draggingAttachmentIndex === idx,
+            'is-drag-over': dragOverAttachmentIndex === idx,
+          }"
+          draggable="true"
+          @dragstart="onAttachmentDragStart(idx, $event)"
+          @dragover="onAttachmentDragOver(idx, $event)"
+          @drop="onAttachmentDrop(idx, $event)"
+          @dragend="onAttachmentDragEnd"
         >
           <AppImageThumb
             :raw-url="url"
@@ -2225,6 +2234,8 @@ function onSelectAccessory(row: AccessoryItem) {
 // H 区：图片附件
 const attachments = ref<string[]>([])
 const attachmentFileInputRef = ref<HTMLInputElement | null>(null)
+const draggingAttachmentIndex = ref<number | null>(null)
+const dragOverAttachmentIndex = ref<number | null>(null)
 
 function triggerAttachmentUpload() {
   attachmentFileInputRef.value?.click()
@@ -2247,6 +2258,51 @@ async function onAttachmentFileChange(e: Event) {
 
 function removeAttachment(index: number) {
   attachments.value.splice(index, 1)
+}
+
+function moveAttachment(fromIndex: number, toIndex: number) {
+  if (fromIndex === toIndex) return
+  if (fromIndex < 0 || toIndex < 0) return
+  if (fromIndex >= attachments.value.length || toIndex >= attachments.value.length) return
+  const [moved] = attachments.value.splice(fromIndex, 1)
+  if (!moved) return
+  attachments.value.splice(toIndex, 0, moved)
+}
+
+function onAttachmentDragStart(index: number, e: DragEvent) {
+  draggingAttachmentIndex.value = index
+  dragOverAttachmentIndex.value = index
+  if (e.dataTransfer) {
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', String(index))
+  }
+}
+
+function onAttachmentDragOver(index: number, e: DragEvent) {
+  if (draggingAttachmentIndex.value == null) return
+  e.preventDefault()
+  dragOverAttachmentIndex.value = index
+  if (e.dataTransfer) {
+    e.dataTransfer.dropEffect = 'move'
+  }
+}
+
+function onAttachmentDrop(index: number, e: DragEvent) {
+  e.preventDefault()
+  const from = draggingAttachmentIndex.value
+  const fromByTransfer = Number(e.dataTransfer?.getData('text/plain') ?? '')
+  const fromIndex = from ?? (Number.isNaN(fromByTransfer) ? null : fromByTransfer)
+  if (fromIndex == null) {
+    onAttachmentDragEnd()
+    return
+  }
+  moveAttachment(fromIndex, index)
+  onAttachmentDragEnd()
+}
+
+function onAttachmentDragEnd() {
+  draggingAttachmentIndex.value = null
+  dragOverAttachmentIndex.value = null
 }
 
 // 监听表单与各区块数据变化，用于离开前未保存提示（程序赋值时用 skipDirtyCheck 忽略）
@@ -3116,6 +3172,18 @@ onBeforeUnmount(() => {
   border-radius: var(--radius);
   overflow: hidden;
   border: 1px solid var(--color-border);
+  cursor: grab;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.attachment-item.is-dragging {
+  opacity: 0.65;
+  cursor: grabbing;
+}
+
+.attachment-item.is-drag-over {
+  border-color: var(--color-primary, #409eff);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.22);
 }
 
 .attachment-remove {

@@ -105,8 +105,9 @@ export class UsersService {
     id: number,
     dto: { username?: string; displayName?: string; roleId?: number; roleIds?: number[]; status?: UserStatus },
   ): Promise<any> {
-    const user = await this.userRepo.findOne({ where: { id }, relations: ['userRoles'] });
+    const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('用户不存在');
+    const patch: Partial<User> = {};
 
     // 允许修改用户名（登录账号），并做唯一性校验；同时联动更新依赖 username 的业务字段
     if (dto.username !== undefined) {
@@ -117,7 +118,7 @@ export class UsersService {
         const exists = await this.userRepo.findOne({ where: { username: next } });
         if (exists) throw new ConflictException('用户名已存在');
         const prev = user.username;
-        user.username = next;
+        patch.username = next;
         // 订单表目前以字符串保存业务员/跟单员；更改用户名时做一次联动更新，避免历史单据丢失关联
         await this.orderRepo
           .createQueryBuilder()
@@ -133,14 +134,16 @@ export class UsersService {
           .execute();
       }
     }
-    if (dto.displayName !== undefined) user.displayName = dto.displayName;
+    if (dto.displayName !== undefined) patch.displayName = dto.displayName;
     if (dto.roleIds !== undefined || dto.roleId !== undefined) {
-      const normalizedRoleIds = await this.normalizeRoleIds(dto.roleIds, dto.roleId ?? user.roleId);
-      user.roleId = normalizedRoleIds[0];
-      await this.syncUserRoles(user.id, normalizedRoleIds);
+      const nextRoleIds = await this.normalizeRoleIds(dto.roleIds, dto.roleId ?? user.roleId);
+      patch.roleId = nextRoleIds[0];
+      await this.syncUserRoles(id, nextRoleIds);
     }
-    if (dto.status !== undefined) user.status = dto.status;
-    await this.userRepo.save(user);
+    if (dto.status !== undefined) patch.status = dto.status;
+    if (Object.keys(patch).length) {
+      await this.userRepo.update(id, patch);
+    }
     const full = await this.userRepo.findOne({
       where: { id: user.id },
       relations: ['role', 'userRoles', 'userRoles.role'],
@@ -167,9 +170,20 @@ export class UsersService {
   }
 
   private async syncUserRoles(userId: number, roleIds: number[]): Promise<void> {
+    if (!userId || !Number.isInteger(userId)) {
+      throw new ConflictException('用户ID无效，无法保存角色');
+    }
     await this.userRoleRepo.delete({ userId });
-    const rows = roleIds.map((roleId) => this.userRoleRepo.create({ userId, roleId }));
-    await this.userRoleRepo.save(rows);
+    const normalized = Array.from(
+      new Set(roleIds.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)),
+    );
+    if (!normalized.length) return;
+    await this.userRoleRepo
+      .createQueryBuilder()
+      .insert()
+      .into(UserRole)
+      .values(normalized.map((roleId) => ({ userId, roleId })))
+      .execute();
   }
 
   private toSafeUser(u: User): any {
