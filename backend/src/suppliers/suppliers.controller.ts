@@ -76,7 +76,7 @@ export class SuppliersController {
   }
 
   /**
-   * 供应商管理页：列表。支持按类型名称 type（如「生产加工厂」）或 supplierTypeId 筛选。
+   * 供应商管理页：列表。支持按类型名称 type（如「加工供应商」）或 supplierTypeId 筛选。
    */
   @Get('items')
   async getList(

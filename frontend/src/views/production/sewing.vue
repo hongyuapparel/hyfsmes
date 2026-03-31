@@ -120,11 +120,11 @@
           <SlaJudgeTag :text="row.timeRating" />
         </template>
       </el-table-column>
-      <el-table-column prop="factoryName" label="加工厂" min-width="100" show-overflow-tooltip />
+      <el-table-column prop="factoryName" label="加工供应商" min-width="100" show-overflow-tooltip />
       <el-table-column label="分单时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.distributedAt) }}</template>
       </el-table-column>
-      <el-table-column label="加工厂交期" width="110" align="center">
+      <el-table-column label="加工供应商交期" width="110" align="center">
         <template #default="{ row }">{{ formatDate(row.factoryDueDate) }}</template>
       </el-table-column>
       <el-table-column label="加工费(元)" width="100" align="right">
@@ -262,7 +262,7 @@
       />
     </div>
 
-    <!-- 分单弹窗：分单时间、交期、加工厂、车缝加工费 -->
+    <!-- 分单弹窗：分单时间、交期、加工供应商、车缝加工费 -->
     <el-dialog
       v-model="assignDialog.visible"
       title="分单"
@@ -291,14 +291,14 @@
             v-model="assignForm.factoryDueDate"
             type="date"
             value-format="YYYY-MM-DD"
-            placeholder="加工厂需交货给我们的日期"
+            placeholder="加工供应商需交货给我们的日期"
             style="width: 100%"
           />
         </el-form-item>
-        <el-form-item label="加工厂" prop="factoryName">
+        <el-form-item label="加工供应商" prop="factoryName">
           <el-select
             v-model="assignForm.factoryName"
-            placeholder="请选择生产加工厂"
+            placeholder="请选择加工供应商"
             filterable
             clearable
             style="width: 100%"
@@ -428,13 +428,13 @@
         </ProductionDetailSection>
         <ProductionDetailSection title="业务扩展信息">
           <el-descriptions :column="1" border size="small" class="sewing-brief-extra">
-            <el-descriptions-item label="加工厂">
+            <el-descriptions-item label="加工供应商">
               {{ (sewingBriefDrawer.row.factoryName ?? '').trim() || '—' }}
             </el-descriptions-item>
             <el-descriptions-item label="分单时间">
               {{ formatDateTime(sewingBriefDrawer.row.distributedAt) }}
             </el-descriptions-item>
-            <el-descriptions-item label="加工厂交期">
+            <el-descriptions-item label="加工供应商交期">
               {{ formatDate(sewingBriefDrawer.row.factoryDueDate) }}
             </el-descriptions-item>
             <el-descriptions-item label="车缝加工费(元)">
@@ -563,7 +563,7 @@ const assignForm = reactive({
   sewingFee: '',
 })
 const assignRules: FormRules = {
-  factoryName: [{ required: true, message: '请选择加工厂', trigger: 'change' }],
+  factoryName: [{ required: true, message: '请选择加工供应商', trigger: 'change' }],
 }
 
 function getTabLabel(tab: SewingTabConfig): string {
@@ -624,7 +624,7 @@ function nowDatetimeStr(): string {
 
 async function loadFactorySuppliers() {
   try {
-    const res = await getSupplierList({ type: '生产加工厂', pageSize: 500 })
+    const res = await getSupplierList({ type: '加工供应商', pageSize: 500 })
     factorySuppliers.value = res.data?.list ?? []
   } catch {
     factorySuppliers.value = []

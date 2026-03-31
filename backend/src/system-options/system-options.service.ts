@@ -48,7 +48,7 @@ export class SystemOptionsService {
     return list.map((o) => o.value);
   }
 
-  /** 按一级节点值返回其 id（如按「生产加工厂」取供应商类型 id） */
+  /** 按一级节点值返回其 id（如按「加工供应商」取供应商类型 id） */
   async findRootIdByValue(optionType: string, value: string): Promise<number | null> {
     if (!value?.trim()) return null;
     const option = await this.repo.findOne({

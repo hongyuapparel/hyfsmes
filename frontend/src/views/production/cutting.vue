@@ -949,7 +949,7 @@ async function submitRegister() {
 
 async function loadCuttingDepartments() {
   try {
-    const res = await getSupplierList({ type: '生产加工厂', page: 1, pageSize: 200 })
+    const res = await getSupplierList({ type: '加工供应商', page: 1, pageSize: 200 })
     const list: SupplierItem[] = res.data?.list ?? []
     const names = list.map((s) => (s.name ?? '').trim()).filter((v) => !!v)
     // 去重 + 排序，且避免和“本厂”重复展示

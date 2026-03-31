@@ -32,11 +32,11 @@ export interface SupplierBusinessScopeTreeNode {
   children: SupplierBusinessScopeTreeNode[]
 }
 
-/** 管理页列表（支持名称、类型筛选）。type 为类型名称，如「生产加工厂」 */
+/** 管理页列表（支持名称、类型筛选）。type 为类型名称，如「加工供应商」 */
 export function getSupplierList(params?: {
   name?: string
   supplierTypeId?: number | null
-  /** 按类型名称筛选（如「生产加工厂」），与 supplierTypeId 二选一 */
+  /** 按类型名称筛选（如「加工供应商」），与 supplierTypeId 二选一 */
   type?: string
   page?: number
   pageSize?: number

@@ -210,16 +210,16 @@
       />
       <el-select
         v-model="filter.factory"
-        placeholder="加工厂"
+        placeholder="加工供应商"
         filterable
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.factory)"
+        :style="getFilterSelectAutoWidthStyle(filter.factory && `加工供应商：${filter.factory}`)"
         @change="onSearch"
       >
         <template #label="{ label }">
-          <span v-if="filter.factory">加工厂：{{ label }}</span>
+          <span v-if="filter.factory">加工供应商：{{ label }}</span>
           <span v-else>{{ label }}</span>
         </template>
         <el-option
@@ -623,8 +623,12 @@ import { Edit, Download, Printer, Clock, Coin, Document, ChatDotRound } from '@e
 import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, reviewRejectOrders, copyOrdersToDraft, getOrderLogs, getOrderRemarks, addOrderRemark, getOrderSizeBreakdown, type OrderListItem, type OrderListQuery, type OrderOperationLogItem, type OrderRemarkItem, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getCustomers, type CustomerItem, getSalespeople, getMerchandisers } from '@/api/customers'
-import { getDictItems, getDictOptions, getDictTree } from '@/api/dicts'
-import { getSupplierBusinessScopeTreeOptions, type SupplierBusinessScopeTreeNode } from '@/api/suppliers'
+import { getDictItems, getDictTree } from '@/api/dicts'
+import {
+  getSupplierBusinessScopeTreeOptions,
+  getSupplierBusinessScopeOptions,
+  type SupplierBusinessScopeTreeNode,
+} from '@/api/suppliers'
 import { type SystemOptionTreeNode } from '@/api/system-options'
 import { useAuthStore } from '@/stores/auth'
 import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
@@ -1043,7 +1047,7 @@ function collaborationDisplay(item: OrderListItem): string {
 }
 
 async function loadOptions() {
-  // 1）基础选项：客户 / 业务员 / 订单类型 / 合作方式 / 工艺项目 / 加工厂
+  // 1）基础选项：客户 / 业务员 / 订单类型 / 合作方式 / 工艺项目 / 加工供应商
   try {
     const [custRes, salesRes, orderTypeRes, collabRes, processRes, factoryRes] = await Promise.all([
       getCustomers({ page: 1, pageSize: 200 }),
@@ -1051,7 +1055,7 @@ async function loadOptions() {
       getDictTree('order_types'),
       getDictItems('collaboration'),
       getSupplierBusinessScopeTreeOptions('工艺供应商'),
-      getDictOptions('factories'),
+      getSupplierBusinessScopeOptions('加工供应商'),
     ])
 
     const custList = (custRes.data?.list ?? []) as CustomerItem[]
@@ -1084,8 +1088,9 @@ async function loadOptions() {
       })
     processOptions.value = toProcessTreeSelect(processRes.data ?? [])
 
-    const factoryVals = factoryRes.data ?? []
-    factoryOptions.value = factoryVals.map((v: string) => ({ label: v, value: v }))
+    const factoryVals = [...(factoryRes.data ?? [])]
+    const uniqueFactoryVals = Array.from(new Set(factoryVals.map((v) => String(v).trim()).filter(Boolean)))
+    factoryOptions.value = uniqueFactoryVals.map((v) => ({ label: v, value: v }))
   } catch (e: unknown) {
     if (!isErrorHandled(e)) {
       console.warn('订单筛选选项加载失败：', getErrorMessage(e, '选项加载失败'))
