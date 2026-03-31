@@ -27,6 +27,10 @@ export class Employee {
   @Column({ name: 'name', length: 64 })
   name: string;
 
+  /** 性别：male / female / unknown */
+  @Column({ name: 'gender', length: 16, default: 'unknown' })
+  gender: string;
+
   /** 部门 */
   @Column({ name: 'department', length: 128, default: '' })
   department: string;
@@ -51,6 +55,42 @@ export class Employee {
   @Column({ name: 'contact_phone', length: 64, default: '' })
   contactPhone: string;
 
+  /** 学历 */
+  @Column({ name: 'education', length: 64, default: '' })
+  education: string;
+
+  /** 宿舍 */
+  @Column({ name: 'dormitory', length: 128, default: '' })
+  dormitory: string;
+
+  /** 身份证号码 */
+  @Column({ name: 'id_card_no', length: 64, default: '' })
+  idCardNo: string;
+
+  /** 籍贯 */
+  @Column({ name: 'native_place', length: 128, default: '' })
+  nativePlace: string;
+
+  /** 家庭地址 */
+  @Column({ name: 'home_address', length: 255, default: '' })
+  homeAddress: string;
+
+  /** 紧急联系人 */
+  @Column({ name: 'emergency_contact', length: 64, default: '' })
+  emergencyContact: string;
+
+  /** 紧急联系电话 */
+  @Column({ name: 'emergency_phone', length: 64, default: '' })
+  emergencyPhone: string;
+
+  /** 离职日期 */
+  @Column({ name: 'leave_date', type: 'date', nullable: true })
+  leaveDate: Date | null;
+
+  /** 离职原因 */
+  @Column({ name: 'leave_reason', length: 255, default: '' })
+  leaveReason: string;
+
   /** 状态：active 在职 / left 离职 */
   @Column({ name: 'status', length: 32, default: 'active' })
   status: string;
@@ -66,6 +106,14 @@ export class Employee {
   /** 备注 */
   @Column({ name: 'remark', length: 500, default: '' })
   remark: string;
+
+  /** 员工照片 URL */
+  @Column({ name: 'photo_url', length: 500, default: '' })
+  photoUrl: string;
+
+  /** 排序（手动拖拽） */
+  @Column({ name: 'sort_order', type: 'int', default: 0 })
+  sortOrder: number;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

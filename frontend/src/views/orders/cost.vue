@@ -39,7 +39,7 @@
           <el-button link type="primary" size="small" @click="addMaterialRow">新增</el-button>
         </div>
       </template>
-      <el-table :data="materialRows" border size="small" class="cost-table">
+      <el-table :data="materialRows" border size="small" class="cost-table" :span-method="materialSpanMethod">
         <el-table-column label="物料类型" min-width="90">
           <template #default="{ row }">
             <el-select
@@ -252,7 +252,16 @@
           <div class="block-header-actions">
             <el-button link type="primary" size="small" @click="openImportTemplateDialog">导入模板</el-button>
             <el-button link type="primary" size="small" @click="openSaveTemplateDialog">保存为模板</el-button>
-            <el-button link type="primary" size="small" @click="addProductionRow">新增</el-button>
+            <el-button link type="primary" size="small" @click="openProductionPickerDialog">新增</el-button>
+            <el-button
+              link
+              type="danger"
+              size="small"
+              :disabled="!selectedProductionRows.length"
+              @click="batchRemoveProductionRows"
+            >
+              批量删除
+            </el-button>
           </div>
         </div>
       </template>
@@ -262,7 +271,9 @@
         size="small"
         class="cost-table production-cost-table"
         :span-method="productionSpanMethod"
+        @selection-change="onProductionSelectionChange"
       >
+        <el-table-column type="selection" width="44" align="center" />
         <el-table-column label="部门" min-width="100" align="center" header-align="center">
           <template #default="{ row }">
             <el-select
@@ -355,7 +366,10 @@
       <p v-if="!productionProcesses.length" class="empty-hint">
         暂无配置工序，请在系统设置中维护生产工序部门/工种/工序及单价。
       </p>
-      <div class="subtotal">生产工序小计：<strong>{{ formatMoney(productionProcessTotal) }}</strong> 元</div>
+      <div class="subtotal production-subtotal">
+        <span class="production-selected-count">已选 {{ selectedProductionRows.length }} 条</span>
+        <span>生产工序小计：<strong>{{ formatMoney(productionProcessTotal) }}</strong> 元</span>
+      </div>
       <el-dialog
         v-model="importTemplateDialog.visible"
         title="导入工序模板"
@@ -405,6 +419,88 @@
             @click="saveCurrentProcessesAsTemplate"
           >
             保存
+          </el-button>
+        </template>
+      </el-dialog>
+      <el-dialog
+        v-model="productionPickerDialog.visible"
+        title="批量添加工序"
+        width="760px"
+        class="production-picker-dialog"
+        :close-on-click-modal="false"
+      >
+        <div class="production-picker-toolbar">
+          <span class="import-template-hint">
+            左侧选择工种，右侧可搜索并勾选工序，点击“添加所选”后自动加入并关闭弹窗。
+          </span>
+        </div>
+        <div class="production-picker-layout">
+          <div class="production-picker-tree">
+            <el-tree
+              :data="pickerTreeData"
+              node-key="key"
+              :expand-on-click-node="false"
+              default-expand-all
+              highlight-current
+              @node-click="onPickerTreeNodeClick"
+            >
+              <template #default="{ data }">
+                <span class="picker-tree-node">
+                  <span>{{ data.label }}</span>
+                  <span v-if="data.jobType && getPickerSelectedCountByJob(data.department, data.jobType) > 0" class="picker-tree-selected-count">
+                    已选 {{ getPickerSelectedCountByJob(data.department, data.jobType) }}
+                  </span>
+                </span>
+              </template>
+            </el-tree>
+          </div>
+          <div class="production-picker-list">
+            <el-input
+              v-model="productionPickerDialog.keyword"
+              placeholder="搜索工序关键词"
+              clearable
+              size="small"
+              class="picker-search-input"
+            />
+            <el-table
+              :data="pickerProcessOptions"
+              size="small"
+              border
+              height="300"
+              class="picker-process-table"
+            >
+              <el-table-column label="选择" width="72" align="center" header-align="center">
+                <template #default="{ row }">
+                  <el-checkbox
+                    :disabled="row.added"
+                    :model-value="productionPickerDialog.selectedIds.includes(row.id)"
+                    @change="(checked) => onPickerProcessChecked(row.id, Boolean(checked))"
+                  />
+                </template>
+              </el-table-column>
+              <el-table-column label="工序" min-width="260" align="center" header-align="center" show-overflow-tooltip>
+                <template #default="{ row }">
+                  <span>{{ row.name }}</span>
+                  <span v-if="row.added" class="picker-added-tag">（已添加）</span>
+                </template>
+              </el-table-column>
+              <el-table-column label="价格(元)" width="110" align="center" header-align="center">
+                <template #default="{ row }">
+                  {{ formatMoney(row.unitPrice) }}
+                </template>
+              </el-table-column>
+            </el-table>
+            <p v-if="!pickerProcessOptions.length" class="empty-hint">当前工种下暂无可选工序</p>
+          </div>
+        </div>
+        <template #footer>
+          <el-button @click="productionPickerDialog.visible = false">关闭</el-button>
+          <el-button
+            type="primary"
+            :disabled="!productionPickerDialog.selectedIds.length"
+            @click="appendSelectedProcesses"
+          >
+            添加所选（{{ pickerSelectedCount }}）
           </el-button>
         </template>
       </el-dialog>
@@ -472,7 +568,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { confirmOrderCost, getOrderDetail, getOrderCost, saveOrderCost, type OrderDetail } from '@/api/orders'
 import { getProductionProcesses, type ProductionProcessItem } from '@/api/production-processes'
@@ -506,6 +602,7 @@ const materialRows = ref<MaterialRow[]>([])
 const processItemRows = ref<ProcessItemRow[]>([])
 const productionProcesses = ref<ProductionProcessItem[]>([])
 const productionRows = ref<ProductionRow[]>([])
+const selectedProductionRows = ref<ProductionRow[]>([])
 const profitMargin = ref(0.1)
 const savingDraft = ref(false)
 const confirmingQuote = ref(false)
@@ -547,6 +644,27 @@ const saveTemplateDialog = ref<{ visible: boolean; name: string; submitting: boo
   name: '',
   submitting: false,
 })
+const productionPickerDialog = ref<{
+  visible: boolean
+  activeDepartment: string
+  activeJobType: string
+  selectedIds: number[]
+  keyword: string
+}>({
+  visible: false,
+  activeDepartment: '',
+  activeJobType: '',
+  selectedIds: [],
+  keyword: '',
+})
+
+interface PickerTreeNode {
+  key: string
+  label: string
+  department: string
+  jobType: string
+  children?: PickerTreeNode[]
+}
 
 interface MaterialRow {
   materialTypeId?: number | null
@@ -616,6 +734,71 @@ const computedExFactoryPrice = computed(() => {
 function formatMoney(n: number): string {
   if (!Number.isFinite(n)) return formatDisplayNumber(0)
   return formatDisplayNumber(n)
+}
+
+function getMaterialTypeMergeKey(row: MaterialRow): string {
+  if (typeof row.materialTypeId === 'number' && Number.isFinite(row.materialTypeId)) {
+    return `id:${row.materialTypeId}`
+  }
+  const label = String(row.materialType ?? '').trim()
+  return label ? `label:${label}` : ''
+}
+
+const materialSpanMeta = computed(() => {
+  const rows = materialRows.value
+  const typeRowspanByIndex = new Map<number, number>()
+  const supplierRowspanByIndex = new Map<number, number>()
+  const hiddenTypeIndexes = new Set<number>()
+  const hiddenSupplierIndexes = new Set<number>()
+
+  let i = 0
+  while (i < rows.length) {
+    const typeKey = getMaterialTypeMergeKey(rows[i])
+    let j = i + 1
+    while (typeKey && j < rows.length && getMaterialTypeMergeKey(rows[j]) === typeKey) j += 1
+    const typeSpan = j - i
+    typeRowspanByIndex.set(i, typeSpan)
+    for (let k = i + 1; k < j; k += 1) hiddenTypeIndexes.add(k)
+
+    let p = i
+    while (p < j) {
+      const supplier = String(rows[p].supplierName ?? '').trim()
+      let q = p + 1
+      while (supplier && q < j && String(rows[q].supplierName ?? '').trim() === supplier) q += 1
+      const supplierSpan = q - p
+      supplierRowspanByIndex.set(p, supplierSpan)
+      for (let k = p + 1; k < q; k += 1) hiddenSupplierIndexes.add(k)
+      p = q
+    }
+    i = j
+  }
+
+  return {
+    typeRowspanByIndex,
+    supplierRowspanByIndex,
+    hiddenTypeIndexes,
+    hiddenSupplierIndexes,
+  }
+})
+
+function materialSpanMethod({
+  columnIndex,
+  rowIndex,
+}: {
+  row: MaterialRow
+  columnIndex: number
+  rowIndex: number
+}): { rowspan: number; colspan: number } {
+  const meta = materialSpanMeta.value
+  if (columnIndex === 0) {
+    if (meta.hiddenTypeIndexes.has(rowIndex)) return { rowspan: 0, colspan: 0 }
+    return { rowspan: meta.typeRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
+  }
+  if (columnIndex === 1) {
+    if (meta.hiddenSupplierIndexes.has(rowIndex)) return { rowspan: 0, colspan: 0 }
+    return { rowspan: meta.supplierRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
+  }
+  return { rowspan: 1, colspan: 1 }
 }
 
 function normalizeProfitMargin(v: unknown): number {
@@ -724,6 +907,91 @@ function getProductionProcessSelectOptions(row: ProductionRow): Array<{ value: n
     }))
 }
 
+const pickerTreeData = computed<PickerTreeNode[]>(() => {
+  const deptMap = new Map<string, Set<string>>()
+  productionProcesses.value.forEach((p) => {
+    const dept = (p.department ?? '').trim()
+    const job = (p.jobType ?? '').trim()
+    if (!dept || !job) return
+    if (!deptMap.has(dept)) deptMap.set(dept, new Set())
+    deptMap.get(dept)!.add(job)
+  })
+  const orderMap = new Map(DEPARTMENT_ORDER.map((d, i) => [d, i]))
+  return Array.from(deptMap.entries())
+    .sort((a, b) => {
+      const ai = orderMap.get(a[0]) ?? DEPARTMENT_ORDER.length
+      const bi = orderMap.get(b[0]) ?? DEPARTMENT_ORDER.length
+      if (ai !== bi) return ai - bi
+      return a[0].localeCompare(b[0])
+    })
+    .map(([dept, jobs]) => ({
+    key: `dept:${dept}`,
+    label: dept,
+    department: dept,
+    jobType: '',
+      children: Array.from(jobs)
+        .sort((a, b) => a.localeCompare(b))
+        .map((job) => ({
+          key: `job:${dept}::${job}`,
+          label: getJobTypeLabel(job),
+          department: dept,
+          jobType: job,
+        })),
+    }))
+})
+
+const pickerProcessOptions = computed(() => {
+  const dept = productionPickerDialog.value.activeDepartment.trim()
+  const job = productionPickerDialog.value.activeJobType.trim()
+  const keyword = productionPickerDialog.value.keyword.trim().toLowerCase()
+  const addedIds = new Set(
+    productionRows.value
+      .map((row) => Number(row.processId))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  )
+  return productionProcesses.value
+    .filter((p) => {
+      const hitDept = !dept || (p.department ?? '').trim() === dept
+      const hitJob = !job || (p.jobType ?? '').trim() === job
+      const name = String(p.name ?? '').toLowerCase()
+      const hitKeyword = !keyword || name.includes(keyword)
+      return hitDept && hitJob && hitKeyword
+    })
+    .map((p) => ({
+      id: p.id,
+      name: p.name || '未命名工序',
+      added: addedIds.has(p.id),
+      unitPrice: Number(p.unitPrice) || 0,
+    }))
+})
+
+const pickerSelectedCount = computed(() => productionPickerDialog.value.selectedIds.length)
+const productionProcessById = computed(() => {
+  const map = new Map<number, ProductionProcessItem>()
+  productionProcesses.value.forEach((p) => {
+    if (typeof p.id === 'number') map.set(p.id, p)
+  })
+  return map
+})
+const pickerSelectedCountMap = computed(() => {
+  const selected = new Set(productionPickerDialog.value.selectedIds)
+  const map = new Map<string, number>()
+  productionProcesses.value.forEach((p) => {
+    if (!selected.has(p.id)) return
+    const dept = (p.department ?? '').trim()
+    const job = (p.jobType ?? '').trim()
+    if (!dept || !job) return
+    const key = `${dept}::${job}`
+    map.set(key, (map.get(key) ?? 0) + 1)
+  })
+  return map
+})
+
+function getPickerSelectedCountByJob(department: string, jobType: string): number {
+  const key = `${(department ?? '').trim()}::${(jobType ?? '').trim()}`
+  return pickerSelectedCountMap.value.get(key) ?? 0
+}
+
 /** 生产工序行按部门(裁床→车缝→尾部)、工种、工序排序，用于表格展示与合并 */
 const productionRowsSorted = computed(() => {
   const rows = [...productionRows.value]
@@ -801,25 +1069,25 @@ function productionSpanMethod({
   rowIndex: number
 }): { rowspan: number; colspan: number } {
   const meta = productionSpanMeta.value
-  if (columnIndex === 0) {
+  if (columnIndex === 1) {
     if (meta.hiddenDeptIndexes.has(rowIndex)) {
       return { rowspan: 0, colspan: 0 }
     }
     return { rowspan: meta.deptRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
-  if (columnIndex === 1) {
-    if (meta.hiddenJobIndexes.has(rowIndex)) {
-      return { rowspan: 0, colspan: 0 }
-    }
-    return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
-  }
-  if (columnIndex === 4) {
+  if (columnIndex === 2) {
     if (meta.hiddenJobIndexes.has(rowIndex)) {
       return { rowspan: 0, colspan: 0 }
     }
     return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
   if (columnIndex === 5) {
+    if (meta.hiddenJobIndexes.has(rowIndex)) {
+      return { rowspan: 0, colspan: 0 }
+    }
+    return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
+  }
+  if (columnIndex === 6) {
     if (meta.hiddenDeptIndexes.has(rowIndex)) {
       return { rowspan: 0, colspan: 0 }
     }
@@ -1062,8 +1330,85 @@ function addProductionRow() {
   })
 }
 
+function openProductionPickerDialog() {
+  if (!productionPickerDialog.value.activeDepartment || !productionPickerDialog.value.activeJobType) {
+    const firstDept = pickerTreeData.value[0]
+    const firstJob = firstDept?.children?.[0]
+    productionPickerDialog.value.activeDepartment = firstJob?.department ?? ''
+    productionPickerDialog.value.activeJobType = firstJob?.jobType ?? ''
+  }
+  productionPickerDialog.value.selectedIds = []
+  productionPickerDialog.value.keyword = ''
+  productionPickerDialog.value.visible = true
+}
+
+function onPickerTreeNodeClick(node: PickerTreeNode) {
+  if (!node?.jobType) return
+  productionPickerDialog.value.activeDepartment = node.department
+  productionPickerDialog.value.activeJobType = node.jobType
+}
+
+function onPickerProcessChecked(id: number, checked: boolean) {
+  const current = new Set(productionPickerDialog.value.selectedIds)
+  if (checked) current.add(id)
+  else current.delete(id)
+  productionPickerDialog.value.selectedIds = Array.from(current)
+}
+
+function appendSelectedProcesses() {
+  const selectedIds = productionPickerDialog.value.selectedIds.filter((id) => Number.isInteger(id) && id > 0)
+  if (!selectedIds.length) return
+  const existing = new Set(
+    productionRows.value
+      .map((row) => Number(row.processId))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  )
+  const toAdd: ProductionProcessItem[] = []
+  selectedIds.forEach((id) => {
+    if (existing.has(id)) return
+    const found = productionProcessById.value.get(id)
+    if (found) toAdd.push(found)
+  })
+  if (!toAdd.length) {
+    ElMessage.warning('所选工序均已存在')
+    return
+  }
+  const rows = toAdd.map((p) => ({
+      processId: p.id,
+      department: p.department ?? '',
+      jobType: p.jobType ?? '',
+      processName: p.name ?? '',
+      remark: '',
+      unitPrice: Number(p.unitPrice) || 0,
+    }))
+  productionRows.value = [...productionRows.value, ...rows]
+  productionPickerDialog.value.selectedIds = []
+  productionPickerDialog.value.visible = false
+  ElMessage.success(`已添加 ${toAdd.length} 条工序`)
+}
+
 function removeProductionRow(row: ProductionRow) {
   productionRows.value = productionRows.value.filter((r) => r !== row)
+  selectedProductionRows.value = selectedProductionRows.value.filter((r) => r !== row)
+}
+
+function onProductionSelectionChange(rows: ProductionRow[]) {
+  selectedProductionRows.value = rows
+}
+
+async function batchRemoveProductionRows() {
+  if (!selectedProductionRows.value.length) return
+  try {
+    await ElMessageBox.confirm(`确认删除已选 ${selectedProductionRows.value.length} 条工序吗？`, '批量删除', {
+      type: 'warning',
+    })
+  } catch {
+    return
+  }
+  const selectedSet = new Set(selectedProductionRows.value)
+  productionRows.value = productionRows.value.filter((r) => !selectedSet.has(r))
+  selectedProductionRows.value = []
+  ElMessage.success('已批量删除工序')
 }
 
 function syncProductionIdsFromName() {
@@ -1462,6 +1807,17 @@ watch(
   font-size: var(--font-size-body);
 }
 
+.production-subtotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.production-selected-count {
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
+}
+
 .process-checkbox-wrap {
   min-height: 40px;
 }
@@ -1522,5 +1878,117 @@ watch(
   display: flex;
   justify-content: flex-end;
   gap: var(--space-sm);
+}
+
+.production-picker-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.production-picker-layout {
+  --picker-row-height: 28px;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: var(--space-sm);
+}
+
+.production-picker-tree {
+  max-height: 360px;
+  overflow: auto;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  padding: var(--space-xs);
+}
+
+.production-picker-tree :deep(.el-tree-node__content) {
+  height: var(--picker-row-height);
+  line-height: var(--picker-row-height);
+}
+
+.picker-tree-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.picker-tree-selected-count {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
+}
+
+.production-picker-list {
+  height: 360px;
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  padding: var(--space-xs);
+  overflow: hidden;
+}
+
+.picker-search-input {
+  margin-bottom: var(--space-xs);
+}
+
+.production-picker-list-header {
+  display: flex;
+  justify-content: space-between;
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
+  margin-bottom: var(--space-xs);
+}
+
+.production-picker-item {
+  padding: 4px 0;
+}
+
+.picker-process-table :deep(.el-table__header-wrapper .el-table__cell),
+.picker-process-table :deep(.el-table__body-wrapper .el-table__cell) {
+  height: var(--picker-row-height);
+  padding-top: 0;
+  padding-bottom: 0;
+  box-sizing: border-box;
+}
+
+.picker-process-table :deep(.el-table__header-wrapper tr),
+.picker-process-table :deep(.el-table__body-wrapper tr) {
+  height: var(--picker-row-height);
+}
+
+.picker-process-table :deep(.el-table__header-wrapper .el-table__cell .cell),
+.picker-process-table :deep(.el-table__body-wrapper .el-table__cell .cell) {
+  height: var(--picker-row-height);
+  line-height: var(--picker-row-height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  box-sizing: border-box;
+}
+
+.picker-process-table :deep(.el-checkbox) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+:deep(.el-dialog.production-picker-dialog),
+.production-picker-dialog :deep(.el-dialog) {
+  resize: both;
+  overflow: auto;
+  min-width: 720px;
+  min-height: 520px;
+  max-width: 95vw;
+  max-height: 90vh;
+}
+
+.production-picker-price {
+  color: var(--el-text-color-regular);
+  min-width: 72px;
+  text-align: right;
+}
+
+.picker-added-tag {
+  color: var(--el-text-color-secondary);
 }
 </style>

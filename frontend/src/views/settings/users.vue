@@ -38,19 +38,18 @@
       </div>
     </div>
     <div ref="tableShellRef" class="list-page-table-shell">
-    <el-table ref="tableRef" :data="list" border stripe row-key="id" :height="tableHeight">
-      <el-table-column prop="id" label="ID" width="88">
+    <el-table ref="tableRef" :data="list" border stripe row-key="id" :height="tableHeight" @header-dragend="onHeaderDragEnd">
+      <el-table-column label="序号" width="88" column-key="user-sort-index">
         <template #default="{ row }">
-          <span class="id-cell">
-            <span class="option-drag-handle" title="拖拽调整顺序">≡</span>
-            <span>{{ row.id }}</span>
-          </span>
+          <span>{{ getRowIndex(row.id) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="username" label="登录账号" width="140" />
       <el-table-column prop="displayName" label="显示名" width="120" />
-      <el-table-column label="角色" width="120">
-        <template #default="{ row }">{{ getRoleNames(row) }}</template>
+      <el-table-column label="角色" min-width="220" column-key="user-roles" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span class="role-text">{{ getRoleNames(row) }}</span>
+        </template>
       </el-table-column>
       <el-table-column prop="status" label="状态" width="90">
         <template #default="{ row }">
@@ -92,6 +91,9 @@
         <el-form-item label="显示名" prop="displayName">
           <el-input v-model="form.displayName" placeholder="显示名称" />
         </el-form-item>
+        <el-form-item v-if="isEdit" label="序号">
+          <el-input-number v-model="form.sortIndex" :min="1" :max="list.length || 1" controls-position="right" style="width: 100%" />
+        </el-form-item>
         <el-form-item label="角色" prop="roleIds">
           <el-select v-model="form.roleIds" placeholder="选择角色" filterable multiple collapse-tags collapse-tags-tooltip style="width: 100%">
             <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.id" />
@@ -119,14 +121,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
+import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import Sortable from 'sortablejs'
-import { getUsers, searchUsers, createUser, updateUser, resetUserPassword, type UserItem } from '@/api/users'
+import { searchUsers, createUser, updateUser, resetUserPassword, type UserItem } from '@/api/users'
 import { getRoles, type RoleItem } from '@/api/roles'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const list = ref<UserItem[]>([])
 const roles = ref<RoleItem[]>([])
@@ -140,7 +142,7 @@ const pwdLoading = ref(false)
 const tableRef = ref<{ $el?: HTMLElement }>()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
-let rowSortable: Sortable | null = null
+const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('settings-users-main')
 
 const filter = ref<{ keyword: string; role: string }>({ keyword: '', role: '' })
 const keywordLabelVisible = ref(false)
@@ -151,6 +153,7 @@ const FILTER_AUTO_MAX_WIDTH = 320
 const FILTER_CHAR_PX = 14
 const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
 const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
+const USER_ROW_ORDER_STORAGE_KEY = 'settings-users-row-order-v1'
 
 function getFilterInputStyle(v: unknown) {
   return v ? activeInputStyle : undefined
@@ -176,7 +179,7 @@ function getKeywordFilterStyle(value: unknown, showLabel: boolean) {
   return { width: `${width}px`, flex: `0 0 ${width}px` }
 }
 
-const form = ref({ username: '', password: '', displayName: '', roleIds: [] as number[] })
+const form = ref({ username: '', password: '', displayName: '', roleIds: [] as number[], sortIndex: 1 })
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
@@ -192,8 +195,6 @@ async function load() {
   roles.value = r.data ?? []
   if (roles.value.length && !form.value.roleIds.length) form.value.roleIds = [roles.value[0].id]
   await onSearch()
-  await nextTick()
-  initRowDrag()
 }
 
 async function onSearch() {
@@ -207,7 +208,9 @@ async function onSearch() {
       keyword: kw || undefined,
       role: role || undefined,
     })
-    list.value = res.data ?? []
+    list.value = applyStoredRowOrder(res.data ?? [])
+    await nextTick()
+    restoreColumnWidths(tableRef.value as any)
   } catch (e: unknown) {
     list.value = []
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -220,35 +223,67 @@ async function onReset() {
   await onSearch()
 }
 
-function initRowDrag() {
-  const tableEl = tableRef.value?.$el
-  if (!tableEl) return
-  const tbody = tableEl.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
-  if (!tbody) return
-  if (rowSortable) {
-    rowSortable.destroy()
-    rowSortable = null
+function getRowIndex(id: number): number {
+  const idx = list.value.findIndex((x) => x.id === id)
+  return idx >= 0 ? idx + 1 : 1
+}
+
+function applySortIndex(id: number, value: number | string | undefined) {
+  const to = Number(value)
+  if (!Number.isFinite(to)) return
+  const fromIdx = list.value.findIndex((x) => x.id === id)
+  if (fromIdx < 0) return
+  const targetIdx = Math.max(0, Math.min(list.value.length - 1, Math.floor(to) - 1))
+  if (fromIdx === targetIdx) return
+  const rows = list.value.slice()
+  const [moved] = rows.splice(fromIdx, 1)
+  if (!moved) return
+  rows.splice(targetIdx, 0, moved)
+  list.value = rows
+  persistRowOrder(rows)
+}
+
+function persistRowOrder(rows: UserItem[]) {
+  const ids = rows.map((x) => Number(x.id)).filter((id) => Number.isInteger(id) && id > 0)
+  try {
+    localStorage.setItem(USER_ROW_ORDER_STORAGE_KEY, JSON.stringify(ids))
+  } catch {
+    // 忽略本地存储异常，不影响页面主流程
   }
-  rowSortable = Sortable.create(tbody, {
-    handle: '.option-drag-handle',
-    animation: 150,
-    ghostClass: 'option-drag-ghost',
-    onEnd(evt) {
-      if (evt.oldIndex == null || evt.newIndex == null) return
-      if (evt.oldIndex === evt.newIndex) return
-      const rows = list.value.slice()
-      const [moved] = rows.splice(evt.oldIndex, 1)
-      if (!moved) return
-      rows.splice(evt.newIndex, 0, moved)
-      list.value = rows
-    },
-  })
+}
+
+function readStoredRowOrder(): number[] {
+  try {
+    const raw = localStorage.getItem(USER_ROW_ORDER_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.map((x) => Number(x)).filter((id) => Number.isInteger(id) && id > 0)
+  } catch {
+    return []
+  }
+}
+
+function applyStoredRowOrder(rows: UserItem[]): UserItem[] {
+  if (!rows.length) return rows
+  const stored = readStoredRowOrder()
+  if (!stored.length) return rows
+  const byId = new Map(rows.map((x) => [x.id, x]))
+  const ordered: UserItem[] = []
+  for (const id of stored) {
+    const row = byId.get(id)
+    if (row) ordered.push(row)
+  }
+  for (const row of rows) {
+    if (!stored.includes(row.id)) ordered.push(row)
+  }
+  return ordered
 }
 
 function openCreate() {
   isEdit.value = false
   editId.value = 0
-  form.value = { username: '', password: '', displayName: '', roleIds: roles.value[0] ? [roles.value[0].id] : [] }
+  form.value = { username: '', password: '', displayName: '', roleIds: roles.value[0] ? [roles.value[0].id] : [], sortIndex: 1 }
   dialogVisible.value = true
 }
 
@@ -259,6 +294,7 @@ function openEdit(row: UserItem) {
     username: row.username,
     password: '',
     displayName: row.displayName,
+    sortIndex: getRowIndex(row.id),
     roleIds: row.roleIds?.length
       ? [...row.roleIds]
       : (row.roles?.map((x) => x.id) ?? (row.roleId ? [row.roleId] : [])),
@@ -281,6 +317,7 @@ async function submitUser() {
         role_id: form.value.roleIds[0],
         role_ids: form.value.roleIds,
       })
+      applySortIndex(editId.value, form.value.sortIndex)
       ElMessage.success('保存成功')
     } else {
       await createUser({
@@ -342,12 +379,6 @@ function getRoleNames(row: UserItem): string {
 }
 
 onMounted(load)
-onBeforeUnmount(() => {
-  if (rowSortable) {
-    rowSortable.destroy()
-    rowSortable = null
-  }
-})
 </script>
 
 <style scoped>
@@ -380,32 +411,25 @@ onBeforeUnmount(() => {
 .filter-bar-item {
   width: 200px;
 }
-.id-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.option-drag-handle {
-  display: inline-block;
-  width: 18px;
-  height: 18px;
-  line-height: 18px;
-  text-align: center;
-  cursor: grab;
-  user-select: none;
-  color: var(--el-text-color-secondary);
-  font-size: 12px;
-}
-.option-drag-handle:active {
-  cursor: grabbing;
-}
-.option-drag-ghost {
-  opacity: 0.6;
-}
 .op-cell {
   display: inline-flex;
   align-items: center;
   gap: 2px;
   white-space: nowrap;
+}
+.role-text {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+:deep(.el-table .el-table__cell) {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+:deep(.el-table .cell) {
+  line-height: 22px;
 }
 </style>
