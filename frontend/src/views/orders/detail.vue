@@ -175,7 +175,7 @@
           :data="processItemsForView"
           border
           size="small"
-          class="compact-table table-full"
+          class="compact-table table-full process-table-view"
         >
           <el-table-column
             v-for="col in processColumns"
@@ -576,7 +576,11 @@ const processColumns = computed(() =>
     processItemsForView.value as Record<string, unknown>[],
     ['processName', 'supplierName', 'part', 'remark'],
     100,
-  ),
+  ).map((col) => ({
+    ...col,
+    // 详情页工艺项目需完整阅读长文本，关闭省略 tooltip，改为单元格内换行展示
+    showOverflowTooltip: false,
+  })),
 )
 
 // G 区
@@ -849,6 +853,16 @@ onMounted(async () => {
 /* C 区：允许长文本换行，避免挤出表格 */
 .materials-table :deep(.el-table__body .el-table__cell) {
   word-break: break-word;
+}
+
+.process-table-view :deep(.el-table__body .el-table__cell) {
+  vertical-align: top;
+}
+
+.process-table-view :deep(.el-table__body .cell) {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
 }
 
 /* 与整页统一文字颜色，避免 F/G 区与表格等不一致 */

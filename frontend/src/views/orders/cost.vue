@@ -251,6 +251,7 @@
           <span class="block-title">生产工序成本</span>
           <div class="block-header-actions">
             <el-button link type="primary" size="small" @click="openImportTemplateDialog">导入模板</el-button>
+            <el-button link type="primary" size="small" @click="openSaveTemplateDialog">保存为模板</el-button>
             <el-button link type="primary" size="small" @click="addProductionRow">新增</el-button>
           </div>
         </div>
@@ -259,10 +260,10 @@
         :data="productionRowsSorted"
         border
         size="small"
-        class="cost-table"
+        class="cost-table production-cost-table"
         :span-method="productionSpanMethod"
       >
-        <el-table-column label="部门" min-width="100">
+        <el-table-column label="部门" min-width="100" align="center" header-align="center">
           <template #default="{ row }">
             <el-select
               v-model="row.department"
@@ -282,7 +283,7 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="工种" min-width="100">
+        <el-table-column label="工种" min-width="100" align="center" header-align="center">
           <template #default="{ row }">
             <el-select
               v-model="row.jobType"
@@ -302,7 +303,7 @@
             </el-select>
           </template>
         </el-table-column>
-        <el-table-column label="工序" min-width="140">
+        <el-table-column label="工序" min-width="140" align="center" header-align="center">
           <template #default="{ row }">
             <el-select-v2
               v-model="row.processId"
@@ -316,7 +317,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="单价(元)" width="90" align="right">
+        <el-table-column label="单价(元)" width="90" align="center" header-align="center">
           <template #default="{ row }">
             <el-input-number
               v-model="row.unitPrice"
@@ -328,12 +329,17 @@
             />
           </template>
         </el-table-column>
-        <el-table-column label="小计(元)" width="90" align="right">
-          <template #default="{ row }">
-            {{ formatMoney(productionAmount(row)) }}
+        <el-table-column label="工种价格(元)" width="100" align="center" header-align="center">
+          <template #default="{ $index }">
+            {{ formatMoney(getJobTypeGroupAmountByRowIndex($index)) }}
           </template>
         </el-table-column>
-        <el-table-column label="备注" min-width="120">
+        <el-table-column label="小计(元)" width="90" align="center" header-align="center">
+          <template #default="{ $index }">
+            {{ formatMoney(getDepartmentGroupAmountByRowIndex($index)) }}
+          </template>
+        </el-table-column>
+        <el-table-column label="备注" min-width="120" align="center" header-align="center">
           <template #default="{ row }">
             <el-input v-model="row.remark" size="small" />
           </template>
@@ -375,6 +381,30 @@
           <el-button @click="importTemplateDialog.visible = false">取消</el-button>
           <el-button type="primary" :disabled="!importTemplateDialog.templateId" @click="applyImportTemplate">
             确定导入
+          </el-button>
+        </template>
+      </el-dialog>
+      <el-dialog
+        v-model="saveTemplateDialog.visible"
+        title="保存为工序报价模板"
+        width="420px"
+        @close="saveTemplateDialog.name = ''"
+      >
+        <el-input
+          v-model="saveTemplateDialog.name"
+          placeholder="请输入模板名称（如：卫衣-基础版）"
+          maxlength="40"
+          show-word-limit
+        />
+        <template #footer>
+          <el-button :disabled="saveTemplateDialog.submitting" @click="saveTemplateDialog.visible = false">取消</el-button>
+          <el-button
+            type="primary"
+            :loading="saveTemplateDialog.submitting"
+            :disabled="!saveTemplateDialog.name.trim()"
+            @click="saveCurrentProcessesAsTemplate"
+          >
+            保存
           </el-button>
         </template>
       </el-dialog>
@@ -446,7 +476,12 @@ import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { confirmOrderCost, getOrderDetail, getOrderCost, saveOrderCost, type OrderDetail } from '@/api/orders'
 import { getProductionProcesses, type ProductionProcessItem } from '@/api/production-processes'
-import { getProcessQuoteTemplates, getProcessQuoteTemplateItems } from '@/api/process-quote-templates'
+import {
+  createProcessQuoteTemplate,
+  getProcessQuoteTemplates,
+  getProcessQuoteTemplateItems,
+  setProcessQuoteTemplateItems,
+} from '@/api/process-quote-templates'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems } from '@/api/dicts'
 import {
@@ -482,6 +517,7 @@ const suppressDirtyTracking = ref(true)
 const PERF_TAG = '[orders-cost-perf]'
 const mountStartAt = performance.now()
 const hasPreloadedSuppliers = ref(false)
+const LOAD_RETRY_DELAY_MS = 300
 const hasLoadedProcessOptions = ref(false)
 let dirtyDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let dirtyTriggerCount = 0
@@ -506,6 +542,11 @@ const processOptions = ref<ProcessOptionNode[]>([])
 
 const importTemplateDialog = ref<{ visible: boolean; templateId: number | null }>({ visible: false, templateId: null })
 const importTemplateOptions = ref<{ id: number; name: string }[]>([])
+const saveTemplateDialog = ref<{ visible: boolean; name: string; submitting: boolean }>({
+  visible: false,
+  name: '',
+  submitting: false,
+})
 
 interface MaterialRow {
   materialTypeId?: number | null
@@ -705,6 +746,8 @@ const productionSpanMeta = computed(() => {
   const rows = productionRowsSorted.value
   const deptRowspanByIndex = new Map<number, number>()
   const jobRowspanByIndex = new Map<number, number>()
+  const deptAmountByIndex = new Map<number, number>()
+  const jobAmountByIndex = new Map<number, number>()
   const hiddenDeptIndexes = new Set<number>()
   const hiddenJobIndexes = new Set<number>()
 
@@ -715,6 +758,8 @@ const productionSpanMeta = computed(() => {
     while (j < rows.length && (rows[j].department ?? '').toString() === dept) j += 1
     const deptSpan = j - i
     deptRowspanByIndex.set(i, deptSpan)
+    const deptAmount = rows.slice(i, j).reduce((sum, row) => sum + productionAmount(row), 0)
+    deptAmountByIndex.set(i, deptAmount)
     for (let k = i + 1; k < j; k += 1) hiddenDeptIndexes.add(k)
 
     let p = i
@@ -728,6 +773,8 @@ const productionSpanMeta = computed(() => {
       ) q += 1
       const jobSpan = q - p
       jobRowspanByIndex.set(p, jobSpan)
+      const jobAmount = rows.slice(p, q).reduce((sum, row) => sum + productionAmount(row), 0)
+      jobAmountByIndex.set(p, jobAmount)
       for (let k = p + 1; k < q; k += 1) hiddenJobIndexes.add(k)
       p = q
     }
@@ -737,6 +784,8 @@ const productionSpanMeta = computed(() => {
   return {
     deptRowspanByIndex,
     jobRowspanByIndex,
+    deptAmountByIndex,
+    jobAmountByIndex,
     hiddenDeptIndexes,
     hiddenJobIndexes,
   }
@@ -764,12 +813,32 @@ function productionSpanMethod({
     }
     return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
+  if (columnIndex === 4) {
+    if (meta.hiddenJobIndexes.has(rowIndex)) {
+      return { rowspan: 0, colspan: 0 }
+    }
+    return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
+  }
+  if (columnIndex === 5) {
+    if (meta.hiddenDeptIndexes.has(rowIndex)) {
+      return { rowspan: 0, colspan: 0 }
+    }
+    return { rowspan: meta.deptRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
+  }
   return { rowspan: 1, colspan: 1 }
 }
 
 function productionAmount(row: ProductionRow): number {
   const price = Number(row.unitPrice) || 0
   return price
+}
+
+function getJobTypeGroupAmountByRowIndex(rowIndex: number): number {
+  return productionSpanMeta.value.jobAmountByIndex.get(rowIndex) ?? 0
+}
+
+function getDepartmentGroupAmountByRowIndex(rowIndex: number): number {
+  return productionSpanMeta.value.deptAmountByIndex.get(rowIndex) ?? 0
 }
 
 function getJobTypeLabel(v: string): string {
@@ -892,6 +961,16 @@ function addProcessItemRow() {
 
 function removeProcessItemRow(index: number) {
   processItemRows.value.splice(index, 1)
+}
+
+/** 防止接口偶发失败时出现空表 No Data：保证基础行存在 */
+function ensureBaseCostRows() {
+  if (!materialRows.value.length) {
+    materialRows.value = [{ unitPrice: 0 } as MaterialRow]
+  }
+  if (!processItemRows.value.length) {
+    processItemRows.value = [{ unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY } as ProcessItemRow]
+  }
 }
 
 function syncFromOrder(d: OrderDetail) {
@@ -1125,11 +1204,65 @@ function goBack() {
 
 async function openImportTemplateDialog() {
   importTemplateDialog.value = { visible: true, templateId: null }
+  await loadImportTemplateOptions()
+}
+
+async function loadImportTemplateOptions() {
   try {
     const res = await getProcessQuoteTemplates()
     importTemplateOptions.value = (res.data ?? []).map((t) => ({ id: t.id, name: t.name }))
   } catch {
     importTemplateOptions.value = []
+  }
+}
+
+function openSaveTemplateDialog() {
+  const hasAnyValidProcess = productionRows.value.some((row) => Number(row.processId) > 0)
+  if (!hasAnyValidProcess) {
+    ElMessage.warning('请先至少选择一条有效工序，再保存为模板')
+    return
+  }
+  const orderNo = (order.value?.orderNo ?? '').trim()
+  const skuCode = (order.value?.skuCode ?? '').trim()
+  const fallback = [orderNo, skuCode].filter(Boolean).join('-')
+  saveTemplateDialog.value = {
+    visible: true,
+    name: fallback ? `${fallback}-报价模板` : '',
+    submitting: false,
+  }
+}
+
+async function saveCurrentProcessesAsTemplate() {
+  const name = saveTemplateDialog.value.name.trim()
+  if (!name) {
+    ElMessage.warning('请填写模板名称')
+    return
+  }
+  const processIds = Array.from(
+    new Set(
+      productionRowsSorted.value
+        .map((row) => Number(row.processId))
+        .filter((id) => Number.isInteger(id) && id > 0),
+    ),
+  )
+  if (!processIds.length) {
+    ElMessage.warning('当前没有可保存的工序')
+    return
+  }
+  saveTemplateDialog.value.submitting = true
+  try {
+    const created = await createProcessQuoteTemplate({ name })
+    const templateId = created.data?.id
+    if (!templateId) throw new Error('模板创建失败')
+    await setProcessQuoteTemplateItems(templateId, processIds)
+    saveTemplateDialog.value.visible = false
+    saveTemplateDialog.value.name = ''
+    await loadImportTemplateOptions()
+    ElMessage.success(`已保存模板：${name}`)
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存模板失败'))
+  } finally {
+    saveTemplateDialog.value.submitting = false
   }
 }
 
@@ -1161,14 +1294,24 @@ onMounted(async () => {
   logPerf('页面 mount 次数', { mountCount: w.__ordersCostMountCount })
 
   suppressDirtyTracking.value = true
-  await loadOrder()
-  await loadCostSnapshot()
+  await Promise.all([loadOrder(), loadCostSnapshot()])
+  // 订单详情/成本快照在少数情况下会偶发失败，这里做一次轻量重试，避免同单据“忽好忽坏”
+  if (!order.value) {
+    await new Promise((resolve) => setTimeout(resolve, LOAD_RETRY_DELAY_MS))
+    await loadOrder()
+  }
+  if (!materialRows.value.length && !processItemRows.value.length) {
+    await new Promise((resolve) => setTimeout(resolve, LOAD_RETRY_DELAY_MS))
+    await loadCostSnapshot()
+  }
+  ensureBaseCostRows()
   await loadProcesses()
   syncProductionIdsFromName()
   await loadMaterialTypes()
   // 物料类型：旧订单/快照里可能只有 materialType 字符串，这里在字典和明细都加载完后做一次自动映射
   syncMaterialTypeIdsFromLabel()
   // 工艺项目与供应商选项改为下拉打开时按需加载，降低首屏负担
+  ensureBaseCostRows()
   suppressDirtyTracking.value = false
   await nextTick()
   logPerf('首屏渲染时间(ms)', { elapsedMs: Math.round(performance.now() - mountStartAt) })
@@ -1300,6 +1443,13 @@ watch(
 
 .cost-table :deep(.el-input-number .el-input__inner) {
   text-align: right;
+}
+
+.production-cost-table :deep(.el-input__inner),
+.production-cost-table :deep(.el-select__placeholder),
+.production-cost-table :deep(.el-select__selected-item),
+.production-cost-table :deep(.el-input-number .el-input__inner) {
+  text-align: center;
 }
 
 .price-input {

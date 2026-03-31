@@ -562,6 +562,7 @@
       <el-table
         ref="sizeInfoTableRef"
         :data="sizeInfoRows"
+        row-key="__rowKey"
         border
         size="small"
         class="size-info-table"
@@ -651,7 +652,7 @@
           <el-button link type="primary" @click="addProcessRow">新增工艺</el-button>
         </div>
       </template>
-      <el-table :data="processItems" border>
+      <el-table :data="processItems" border class="process-items-table">
         <el-table-column label="工艺项目" min-width="160">
           <template #default="{ row }">
             <el-tree-select
@@ -688,12 +689,24 @@
         </el-table-column>
         <el-table-column label="部位" min-width="140">
           <template #default="{ row }">
-            <el-input v-model="row.part" placeholder="如：前幅 / 后幅 / 袖子" />
+            <el-input
+              v-model="row.part"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 6 }"
+              resize="none"
+              placeholder="如：前幅 / 后幅 / 袖子"
+            />
           </template>
         </el-table-column>
         <el-table-column label="工艺说明 / 备注" min-width="200">
           <template #default="{ row }">
-            <el-input v-model="row.remark" placeholder="说明 / 备注" />
+            <el-input
+              v-model="row.remark"
+              type="textarea"
+              :autosize="{ minRows: 2, maxRows: 8 }"
+              resize="none"
+              placeholder="说明 / 备注"
+            />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="80" fixed="right">
@@ -1856,6 +1869,7 @@ const defaultSizeMetaHeaders = ['部位cm', '英文部位', '量法', '纸样尺
 const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
 
 interface SizeInfoRow {
+  __rowKey: string
   metaValues: string[]
   sizeValues: string[]
 }
@@ -1863,6 +1877,12 @@ interface SizeInfoRow {
 const sizeInfoRows = ref<SizeInfoRow[]>([])
 const sizeInfoTableRef = ref<any>()
 let sizeInfoSortable: Sortable | null = null
+let sizeInfoRowKeySeed = 0
+
+function nextSizeInfoRowKey() {
+  sizeInfoRowKeySeed += 1
+  return `size-row-${Date.now()}-${sizeInfoRowKeySeed}`
+}
 
 // D 区表格编辑能力：单元格引用与键盘导航、批量粘贴
 const sizeGridRefs = ref<InputComponentInstance[][]>([])
@@ -1964,6 +1984,7 @@ function normalizeSizeInfoRows() {
   const metaLen = sizeMetaHeaders.value.length
   const sizeLen = sizeHeaders.value.length
   sizeInfoRows.value.forEach((row) => {
+    if (!row.__rowKey) row.__rowKey = nextSizeInfoRowKey()
     if (!Array.isArray(row.metaValues)) row.metaValues = []
     if (!Array.isArray(row.sizeValues)) row.sizeValues = []
     if (row.metaValues.length < metaLen) {
@@ -1981,6 +2002,7 @@ function normalizeSizeInfoRows() {
 
 function addSizeInfoRow() {
   sizeInfoRows.value.push({
+    __rowKey: nextSizeInfoRowKey(),
     metaValues: Array(sizeMetaHeaders.value.length).fill(''),
     sizeValues: Array(sizeHeaders.value.length).fill(''),
   })
@@ -2004,8 +2026,36 @@ function initSizeInfoSortable() {
     sizeInfoSortable = Sortable.create(tbody, {
       animation: 120,
       handle: '.size-row-drag-handle',
-      onEnd: ({ oldIndex, newIndex }) => {
+      draggable: '> tr',
+      onEnd: (evt) => {
+        const orderedKeys = Array.from(tbody.querySelectorAll('tr.el-table__row'))
+          .map((tr) => tr.getAttribute('data-row-key'))
+          .filter((k): k is string => !!k)
+        if (orderedKeys.length === sizeInfoRows.value.length) {
+          const rowMap = new Map(sizeInfoRows.value.map((r) => [r.__rowKey, r]))
+          const nextRows = orderedKeys.map((k) => rowMap.get(k)).filter((r): r is SizeInfoRow => !!r)
+          if (nextRows.length === sizeInfoRows.value.length) {
+            sizeInfoRows.value = nextRows
+            return
+          }
+        }
+        const anyEvt = evt as unknown as {
+          oldIndex?: number
+          newIndex?: number
+          oldDraggableIndex?: number
+          newDraggableIndex?: number
+        }
+        const oldIndex = anyEvt.oldDraggableIndex ?? anyEvt.oldIndex
+        const newIndex = anyEvt.newDraggableIndex ?? anyEvt.newIndex
         if (oldIndex == null || newIndex == null || oldIndex === newIndex) return
+        if (
+          oldIndex < 0 ||
+          newIndex < 0 ||
+          oldIndex >= sizeInfoRows.value.length ||
+          newIndex >= sizeInfoRows.value.length
+        ) {
+          return
+        }
         const moved = sizeInfoRows.value.splice(oldIndex, 1)[0]
         if (!moved) return
         sizeInfoRows.value.splice(newIndex, 0, moved)
@@ -2651,6 +2701,7 @@ async function loadDetail() {
       ? [...(d as any).sizeInfoMetaHeaders]
       : [...defaultSizeMetaHeaders]
     sizeInfoRows.value = ((d as any).sizeInfoRows ?? []).map((r: any) => ({
+      __rowKey: nextSizeInfoRowKey(),
       metaValues: Array.isArray(r.metaValues) ? [...r.metaValues] : Array(sizeMetaHeaders.value.length).fill(''),
       sizeValues: Array.isArray(r.sizeValues)
         ? r.sizeValues.map((v: unknown) => (v == null ? '' : String(v)))
@@ -3157,6 +3208,10 @@ onBeforeUnmount(() => {
   height: 44px;
   padding-top: 0;
   padding-bottom: 0;
+}
+
+.process-items-table :deep(.el-table__cell) {
+  vertical-align: top;
 }
 
 .attachments {

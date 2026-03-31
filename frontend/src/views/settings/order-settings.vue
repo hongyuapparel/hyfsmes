@@ -53,7 +53,7 @@
           </p>
           <div class="sla-actions">
             <el-button type="primary" size="small" @click="openSlaDialog()">新增配置</el-button>
-          </div>
+      </div>
           <el-table :data="slaList" size="small" border row-key="id">
             <el-table-column label="状态" width="140">
               <template #default="{ row }">
@@ -127,7 +127,7 @@
 
           <div class="process-actions">
             <el-button type="primary" size="small" @click="openAddDepartment()">新增部门</el-button>
-          </div>
+    </div>
           <el-table
             ref="processTreeTableRef"
             :data="processTreeData"

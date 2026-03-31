@@ -33,7 +33,7 @@
         placeholder="选择角色"
         filterable
         style="width: 200px"
-        @change="loadRolePermissions"
+        @change="onRoleChange"
       >
         <el-option v-for="r in list" :key="r.id" :label="r.name" :value="r.id" />
       </el-select>
@@ -162,6 +162,8 @@ let roleSortable: Sortable | null = null
 const roleSortSupported = ref(true)
 const permissions = ref<PermissionItem[]>([])
 const selectedRoleId = ref<number | null>(null)
+const lastStableRoleId = ref<number | null>(null)
+const isRevertingRoleChange = ref(false)
 const checkedIds = ref<number[]>([])
 const saving = ref(false)
 const menuTreeRef = ref<InstanceType<typeof import('element-plus')['ElTree']>>()
@@ -172,6 +174,7 @@ const roleOrderPolicies = ref<{ edit: string[]; review: string[]; delete: string
   review: [],
   delete: [],
 })
+const savedPermissionSnapshot = ref<string>('')
 
 const dialogVisible = ref(false)
 const isEdit = ref(false)
@@ -400,6 +403,7 @@ async function load() {
   const res = await getRoles()
   list.value = res.data ?? []
   if (list.value.length && !selectedRoleId.value) selectedRoleId.value = list.value[0].id
+  lastStableRoleId.value = selectedRoleId.value
   await nextTick()
   initRoleDragSort()
   await loadRolePermissions()
@@ -472,6 +476,7 @@ async function loadRolePermissions() {
     checkedIds.value = []
     menuTreeRef.value?.setCheckedKeys?.([])
     roleOrderPolicies.value = { edit: [], review: [], delete: [] }
+    savedPermissionSnapshot.value = ''
     return
   }
   const roleId = selectedRoleId.value
@@ -495,6 +500,51 @@ async function loadRolePermissions() {
     delete: policyData?.delete ?? [],
   }
   menuTreeRef.value?.setCheckedKeys?.(menuCheckedKeys.value)
+  savedPermissionSnapshot.value = buildPermissionSnapshot()
+  lastStableRoleId.value = selectedRoleId.value
+}
+
+function buildPermissionSnapshot(): string {
+  const fullMenu = (menuTreeRef.value?.getCheckedKeys?.() ?? []) as Array<number | string>
+  const menuIds = [...new Set(fullMenu)].filter((id): id is number => typeof id === 'number')
+  const actionIds = checkedIds.value.filter((id) => actionPermissionIds.value.includes(id))
+  const ids = [...new Set([...menuIds, ...actionIds])].sort((a, b) => a - b)
+  const norm = (arr: string[]) => [...new Set((arr ?? []).map((x) => (x ?? '').trim()).filter(Boolean))].sort()
+  const payload = {
+    ids,
+    policies: {
+      edit: norm(roleOrderPolicies.value.edit),
+      review: norm(roleOrderPolicies.value.review),
+      delete: norm(roleOrderPolicies.value.delete),
+    },
+  }
+  return JSON.stringify(payload)
+}
+
+function hasUnsavedPermissionChanges(): boolean {
+  if (!selectedRoleId.value || !savedPermissionSnapshot.value) return false
+  return buildPermissionSnapshot() !== savedPermissionSnapshot.value
+}
+
+async function onRoleChange(nextRoleId: number) {
+  if (isRevertingRoleChange.value) return
+  const prevRoleId = lastStableRoleId.value
+  if (prevRoleId != null && nextRoleId !== prevRoleId && hasUnsavedPermissionChanges()) {
+    try {
+      await ElMessageBox.confirm(
+        '当前角色权限有未保存修改，切换后将丢失。是否继续切换？',
+        '提示',
+        { type: 'warning', confirmButtonText: '继续切换', cancelButtonText: '留在当前角色' },
+      )
+    } catch {
+      isRevertingRoleChange.value = true
+      selectedRoleId.value = prevRoleId
+      await nextTick()
+      isRevertingRoleChange.value = false
+      return
+    }
+  }
+  await loadRolePermissions()
 }
 
 function openCreate() {
@@ -568,6 +618,8 @@ async function savePermissions() {
       }
     }
     checkedIds.value = ids
+    savedPermissionSnapshot.value = buildPermissionSnapshot()
+    lastStableRoleId.value = selectedRoleId.value
     ElMessage.success('保存成功')
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))

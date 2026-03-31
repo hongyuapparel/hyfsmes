@@ -826,15 +826,20 @@ export class OrdersService {
     if (!order.orderNo) {
       order.orderNo = await this.generateNextOrderNo();
     }
-    // 下单时间定义为“保存并提交”的时间
+    // 业务规则：
+    // - 草稿首次提交：进入待审单并记录下单时间；
+    // - 非草稿再次提交：仅保存，不回退到待审单，保持原状态。
+    if (beforeStatus === 'draft') {
+      // 下单时间定义为“草稿首次提交”的时间
     order.orderDate = new Date();
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'submit',
-      actorUserId: actor.userId,
-    });
-    order.status = next ?? 'pending_review';
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'submit',
+        actorUserId: actor.userId,
+      });
+      order.status = next ?? 'pending_review';
     order.statusTime = new Date();
+    }
     const saved = await this.orderRepo.save(order);
     // 状态未变化时不记录提交日志（例如：待审单 -> 待审单），避免冗余
     if ((beforeStatus || '') !== (saved.status || '')) {
