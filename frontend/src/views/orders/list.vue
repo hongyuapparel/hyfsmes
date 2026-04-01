@@ -443,13 +443,6 @@
                 </el-tooltip>
               </span>
               <span class="footer-action-item">
-                <el-tooltip content="下载" placement="top">
-                  <el-button link size="small" circle class="action-btn" @click="downloadExcel">
-                    <el-icon><Download /></el-icon>
-                  </el-button>
-                </el-tooltip>
-              </span>
-              <span class="footer-action-item">
                 <el-tooltip content="操作记录" placement="top">
                   <el-button link size="small" circle class="action-btn" @click="openOperationLog(item)">
                     <el-icon><Clock /></el-icon>
@@ -619,7 +612,7 @@ import { formatDisplayNumber } from '@/utils/display-number'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { Edit, Download, Printer, Clock, Coin, Document, ChatDotRound } from '@element-plus/icons-vue'
+import { Edit, Printer, Clock, Coin, Document, ChatDotRound } from '@element-plus/icons-vue'
 import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, reviewRejectOrders, copyOrdersToDraft, getOrderLogs, getOrderRemarks, addOrderRemark, getOrderSizeBreakdown, type OrderListItem, type OrderListQuery, type OrderOperationLogItem, type OrderRemarkItem, type OrderSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getCustomers, type CustomerItem, getSalespeople, getMerchandisers } from '@/api/customers'
@@ -1486,10 +1479,6 @@ async function onSubmitRemark() {
   } finally {
     remarkDialog.submitting = false
   }
-}
-
-function downloadExcel() {
-  ElMessage.info('下载 Excel 功能将在后续统一实现')
 }
 
 function printOrder(_order: OrderListItem) {

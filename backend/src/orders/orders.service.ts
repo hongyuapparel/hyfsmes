@@ -483,7 +483,41 @@ export class OrdersService {
     return changes.length ? changes.join('; ') : '无关键字段变更';
   }
 
-  private applyListFilters(qb: SelectQueryBuilder<Order>, query: OrderListQuery, options?: { includeStatus?: boolean }) {
+  /**
+   * 订单类型筛选：支持选择父分组（如「样品」）。
+   * 订单表仅存叶子 order_type_id，故需将选中节点展开为 [自身 + 全部后代] 再 IN 查询。
+   */
+  private async resolveOrderTypeFilterIds(orderTypeId: number): Promise<number[]> {
+    const all = await this.systemOptionsService.findAllByType('order_types');
+    if (!all.length) return [orderTypeId];
+
+    const byParent = new Map<number, number[]>();
+    for (const item of all) {
+      if (item.parentId == null) continue;
+      const list = byParent.get(item.parentId) ?? [];
+      list.push(item.id);
+      byParent.set(item.parentId, list);
+    }
+
+    const result = new Set<number>([orderTypeId]);
+    const queue: number[] = [orderTypeId];
+    while (queue.length) {
+      const cur = queue.shift() as number;
+      const children = byParent.get(cur) ?? [];
+      for (const childId of children) {
+        if (result.has(childId)) continue;
+        result.add(childId);
+        queue.push(childId);
+      }
+    }
+    return Array.from(result);
+  }
+
+  private async applyListFilters(
+    qb: SelectQueryBuilder<Order>,
+    query: OrderListQuery,
+    options?: { includeStatus?: boolean },
+  ) {
     const {
       orderNo,
       skuCode,
@@ -512,7 +546,8 @@ export class OrdersService {
       qb.andWhere('o.customer_name LIKE :customer', { customer: `%${customer.trim()}%` });
     }
     if (typeof query.orderTypeId === 'number') {
-      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: query.orderTypeId });
+      const orderTypeIds = await this.resolveOrderTypeFilterIds(query.orderTypeId);
+      qb.andWhere('o.order_type_id IN (:...orderTypeIds)', { orderTypeIds });
     }
     if (typeof query.collaborationTypeId === 'number') {
       qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
@@ -1038,7 +1073,7 @@ export class OrdersService {
     const { page = 1, pageSize = 20 } = query;
 
     const qb = this.orderRepo.createQueryBuilder('o');
-    this.applyListFilters(qb, query, { includeStatus: true });
+    await this.applyListFilters(qb, query, { includeStatus: true });
 
     qb.orderBy('o.id', 'DESC');
 
@@ -1267,7 +1302,7 @@ export class OrdersService {
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
 
     const groupQb = this.orderRepo.createQueryBuilder('o');
-    this.applyListFilters(groupQb, baseQuery, { includeStatus: false });
+    await this.applyListFilters(groupQb, baseQuery, { includeStatus: false });
     const rows = await groupQb
       .select('o.status', 'status')
       .addSelect('COUNT(1)', 'count')

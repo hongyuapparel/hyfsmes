@@ -20,7 +20,7 @@ export class OrderCostController {
     return this.ordersService.getCostSnapshot(orderId);
   }
 
-  /** 保存草稿：仅保存成本快照，不同步订单卡片出厂价 */
+  /** 保存草稿：仅保存成本快照，不同步订单卡片出厂价（不按订单 edit 状态拦截，终态可补录成本） */
   @Put()
   @RequirePermission('orders_cost_submit')
   saveCost(
@@ -28,12 +28,10 @@ export class OrderCostController {
     @Body() body: { snapshot: Record<string, unknown> },
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.ordersService.assertOrderActionById(orderId, user.userId, 'edit').then(() =>
-      this.ordersService.saveCostSnapshot(orderId, body, user),
-    );
+    return this.ordersService.saveCostSnapshot(orderId, body, user);
   }
 
-  /** 确认报价：保存快照并同步订单卡片出厂价 */
+  /** 确认报价：保存快照并同步订单卡片出厂价（同上，不按订单 edit 状态拦截） */
   @Post('confirm')
   @RequirePermission('orders_cost_submit')
   confirmCost(
@@ -41,8 +39,6 @@ export class OrderCostController {
     @Body() body: { snapshot: Record<string, unknown> },
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.ordersService.assertOrderActionById(orderId, user.userId, 'edit').then(() =>
-      this.ordersService.confirmCostQuote(orderId, body, user),
-    );
+    return this.ordersService.confirmCostQuote(orderId, body, user);
   }
 }
