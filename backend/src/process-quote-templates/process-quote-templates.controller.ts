@@ -40,9 +40,18 @@ export class ProcessQuoteTemplatesController {
     return this.service.findItemsWithProcess(id);
   }
 
-  /** 新增模板（仅订单设置权限） */
+  /**
+   * 新增模板：设置页维护，或订单成本页「保存为模板」。
+   * 含 `/orders/list` 时，具备订单成本列表/导入能力的跟单员也可从成本页保存模板；
+   * 另可通过 `orders_cost_save_process_quote_template` 单独授权保存模板（不必给完整提交权限）。
+   */
   @Post()
-  @RequirePermission('/settings/orders')
+  @RequirePermission([
+    '/settings/orders',
+    'orders_cost_submit',
+    'orders_cost_save_process_quote_template',
+    '/orders/list',
+  ])
   create(
     @Body()
     body: { name: string; sortOrder?: number },
@@ -67,9 +76,18 @@ export class ProcessQuoteTemplatesController {
     return this.service.remove(id);
   }
 
-  /** 设置模板工序列表（覆盖，仅订单设置权限） */
+  /**
+   * 设置模板工序列表（覆盖）：设置页维护，或成本页保存模板第二步。
+   * 含 `/orders/list` 时，具备订单成本列表/导入能力的跟单员也可从成本页保存模板；
+   * 另可通过 `orders_cost_save_process_quote_template` 单独授权保存模板（不必给完整提交权限）。
+   */
   @Put(':id/items')
-  @RequirePermission('/settings/orders')
+  @RequirePermission([
+    '/settings/orders',
+    'orders_cost_submit',
+    'orders_cost_save_process_quote_template',
+    '/orders/list',
+  ])
   setItems(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { processIds: number[] },

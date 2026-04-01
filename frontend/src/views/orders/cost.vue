@@ -251,7 +251,23 @@
           <span class="block-title">生产工序成本</span>
           <div class="block-header-actions">
             <el-button link type="primary" size="small" @click="openImportTemplateDialog">导入模板</el-button>
-            <el-button link type="primary" size="small" @click="openSaveTemplateDialog">保存为模板</el-button>
+            <el-tooltip
+              content="需要以下权限之一：订单列表、订单成本可提交、订单成本可保存工序报价模板或订单设置菜单；通常具备订单列表（可打开成本页）即可，与接口校验一致"
+              placement="top"
+              :disabled="canSaveProcessQuoteTemplate"
+            >
+              <span class="save-template-btn-wrap">
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  :disabled="!canSaveProcessQuoteTemplate"
+                  @click="openSaveTemplateDialog"
+                >
+                  保存为模板
+                </el-button>
+              </span>
+            </el-tooltip>
             <el-button link type="primary" size="small" @click="openProductionPickerDialog">新增</el-button>
             <el-button
               link
@@ -306,7 +322,7 @@
               @change="() => onProductionJobTypeChange(row)"
             >
               <el-option
-                v-for="j in getJobTypeOptions(row)"
+                v-for="j in jobTypeOptionsForRow(row)"
                 :key="j"
                 :label="getJobTypeLabel(j)"
                 :value="j"
@@ -318,7 +334,7 @@
           <template #default="{ row }">
             <el-select-v2
               v-model="row.processId"
-              :options="getProductionProcessSelectOptions(row)"
+              :options="productionProcessOptionsForRow(row)"
               placeholder="选择工序"
               filterable
               clearable
@@ -622,6 +638,7 @@ let recomputeCountInCurrentEdit = 0
 let recomputeLogTimer: ReturnType<typeof setTimeout> | null = null
 
 function logPerf(message: string, extra?: Record<string, unknown>) {
+  if (!import.meta.env.DEV) return
   if (extra) console.info(PERF_TAG, message, extra)
   else console.info(PERF_TAG, message)
 }
@@ -811,6 +828,14 @@ function normalizeProfitMargin(v: unknown): number {
 
 const canSubmitCost = computed(() => authStore.hasPermission('orders_cost_submit'))
 
+const canSaveProcessQuoteTemplate = computed(
+  () =>
+    authStore.hasRoutePermission('/orders/list') ||
+    authStore.hasPermission('orders_cost_submit') ||
+    authStore.hasPermission('orders_cost_save_process_quote_template') ||
+    authStore.hasRoutePermission('/settings/orders'),
+)
+
 function formatTimeLabel(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -879,32 +904,68 @@ const departmentOptions = computed(() =>
   Array.from(new Set(productionProcesses.value.map((p) => p.department).filter((v) => !!v)))
 )
 
-const jobTypeOptions = computed(() =>
-  Array.from(new Set(productionProcesses.value.map((p) => p.jobType).filter((v) => !!v)))
-)
-
-function getJobTypeOptions(row: ProductionRow): string[] {
-  const dept = (row.department ?? '').trim()
-  const list = productionProcesses.value
-    .filter((p) => !dept || (p.department ?? '').trim() === dept)
-    .map((p) => p.jobType)
-    .filter((v): v is string => !!v)
-  return Array.from(new Set(list))
+/** 工序下拉选项缓存 key，避免表格每格每次渲染都全量 filter productionProcesses（长时间编辑易卡顿） */
+function makeProductionDeptJobKey(dept: string, job: string) {
+  return `${(dept ?? '').trim()}\0${(job ?? '').trim()}`
 }
 
-function getProductionProcessSelectOptions(row: ProductionRow): Array<{ value: number; label: string }> {
-  const dept = (row.department ?? '').trim()
-  const job = (row.jobType ?? '').trim()
-  return productionProcesses.value
-    .filter((p) => {
-      const hitDept = !dept || (p.department ?? '').trim() === dept
-      const hitJob = !job || (p.jobType ?? '').trim() === job
-      return hitDept && hitJob
-    })
-    .map((p) => ({
-      value: p.id,
-      label: formatProductionProcessSelectLabel(p),
-    }))
+const productionProcessSelectOptionsMap = computed(() => {
+  const processes = productionProcesses.value
+  const keySet = new Set<string>()
+  keySet.add(makeProductionDeptJobKey('', ''))
+  for (const p of processes) {
+    const d = (p.department ?? '').trim()
+    const j = (p.jobType ?? '').trim()
+    keySet.add(makeProductionDeptJobKey(d, j))
+    keySet.add(makeProductionDeptJobKey(d, ''))
+    keySet.add(makeProductionDeptJobKey('', j))
+  }
+  for (const row of productionRows.value) {
+    keySet.add(makeProductionDeptJobKey(row.department ?? '', row.jobType ?? ''))
+  }
+  const map = new Map<string, Array<{ value: number; label: string }>>()
+  for (const key of keySet) {
+    const [dept, job] = key.split('\0')
+    const opts = processes
+      .filter((p) => {
+        const hitDept = !dept || (p.department ?? '').trim() === dept
+        const hitJob = !job || (p.jobType ?? '').trim() === job
+        return hitDept && hitJob
+      })
+      .map((p) => ({
+        value: p.id,
+        label: formatProductionProcessSelectLabel(p),
+      }))
+    map.set(key, opts)
+  }
+  return map
+})
+
+function productionProcessOptionsForRow(row: ProductionRow): Array<{ value: number; label: string }> {
+  const k = makeProductionDeptJobKey(row.department ?? '', row.jobType ?? '')
+  return productionProcessSelectOptionsMap.value.get(k) ?? []
+}
+
+const jobTypeOptionsByDepartment = computed(() => {
+  const processes = productionProcesses.value
+  const depts = new Set<string>()
+  depts.add('')
+  for (const p of processes) depts.add((p.department ?? '').trim())
+  for (const row of productionRows.value) depts.add((row.department ?? '').trim())
+  const map = new Map<string, string[]>()
+  for (const dept of depts) {
+    const list = processes
+      .filter((p) => !dept || (p.department ?? '').trim() === dept)
+      .map((p) => p.jobType)
+      .filter((v): v is string => !!v)
+    map.set(dept, Array.from(new Set(list)))
+  }
+  return map
+})
+
+function jobTypeOptionsForRow(row: ProductionRow): string[] {
+  const d = (row.department ?? '').trim()
+  return jobTypeOptionsByDepartment.value.get(d) ?? []
 }
 
 const pickerTreeData = computed<PickerTreeNode[]>(() => {
@@ -1448,7 +1509,7 @@ function onProductionProcessChange(row: ProductionRow) {
 function onProductionDepartmentChange(row: ProductionRow) {
   const dept = (row.department ?? '').trim()
   if (!dept) return
-  const jobOptions = getJobTypeOptions(row)
+  const jobOptions = jobTypeOptionsForRow(row)
   if (row.jobType && !jobOptions.includes(row.jobType)) {
     row.jobType = ''
     row.processId = null
@@ -1456,7 +1517,7 @@ function onProductionDepartmentChange(row: ProductionRow) {
     row.unitPrice = 0
     return
   }
-  const options = getProductionProcessSelectOptions(row)
+  const options = productionProcessOptionsForRow(row)
   if (!options.some((opt) => opt.value === row.processId)) {
     row.processId = null
     row.processName = ''
@@ -1465,7 +1526,7 @@ function onProductionDepartmentChange(row: ProductionRow) {
 }
 
 function onProductionJobTypeChange(row: ProductionRow) {
-  const options = getProductionProcessSelectOptions(row)
+  const options = productionProcessOptionsForRow(row)
   if (!options.some((opt) => opt.value === row.processId)) {
     row.processId = null
     row.processName = ''
@@ -1990,5 +2051,10 @@ watch(
 
 .picker-added-tag {
   color: var(--el-text-color-secondary);
+}
+
+.save-template-btn-wrap {
+  display: inline-block;
+  vertical-align: middle;
 }
 </style>
