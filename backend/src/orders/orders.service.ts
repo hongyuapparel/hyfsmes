@@ -27,6 +27,7 @@ import { InventoryAccessoriesService } from '../inventory-accessories/inventory-
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
+import { UserRole } from '../entities/user-role.entity';
 
 const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   draft: '草稿',
@@ -147,6 +148,8 @@ export class OrdersService {
     private readonly orderCostSnapshotRepo: Repository<OrderCostSnapshot>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(UserRole)
+    private readonly userRoleRepo: Repository<UserRole>,
     @InjectRepository(OrderCutting)
     private readonly orderCuttingRepo: Repository<OrderCutting>,
     @InjectRepository(OrderSewing)
@@ -1622,8 +1625,12 @@ export class OrdersService {
   private async assertOrderActionByStatuses(statuses: string[], userId: number, action: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'roleId'] });
     if (!user?.roleId) throw new ForbiddenException('无权限访问');
-    const role = await this.roleRepo.findOne({ where: { id: user.roleId }, select: ['code'] });
-    if (role?.code === 'admin') return;
+    const links = await this.userRoleRepo.find({ where: { userId }, select: ['roleId'] });
+    const roleIds = Array.from(new Set([user.roleId, ...links.map((x) => x.roleId)].filter(Boolean))) as number[];
+    if (!roleIds.length) throw new ForbiddenException('无权限访问');
+
+    const roles = await this.roleRepo.find({ where: { id: In(roleIds) }, select: ['code'] });
+    if (roles.some((r) => r.code === 'admin')) return;
 
     const normalized = [...new Set((statuses ?? []).map((s) => (s ?? '').trim()).filter(Boolean))];
     if (!normalized.length) return;
@@ -1632,7 +1639,7 @@ export class OrdersService {
     if (!['edit', 'review', 'delete'].includes(actionKey)) return;
 
     const rows = await this.roleOrderPolicyRepo.find({
-      where: { roleId: user.roleId, action: actionKey as any },
+      where: { roleId: In(roleIds), action: actionKey as any },
       select: ['statusCode'],
     });
     if (!rows.length) {

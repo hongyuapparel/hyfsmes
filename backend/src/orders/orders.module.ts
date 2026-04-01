@@ -16,6 +16,7 @@ import { OrderCraft } from '../entities/order-craft.entity';
 import { Product } from '../entities/product.entity';
 import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
 import { Role } from '../entities/role.entity';
+import { UserRole } from '../entities/user-role.entity';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryAccessoriesModule } from '../inventory-accessories/inventory-accessories.module';
 import { SystemOptionsModule } from '../system-options/system-options.module';
@@ -44,6 +45,7 @@ import { OrdersService } from './orders.service';
       OrderStatusHistory,
       Product,
       Role,
+      UserRole,
     ]),
     AuthModule,
     InventoryAccessoriesModule,

@@ -251,23 +251,7 @@
           <span class="block-title">生产工序成本</span>
           <div class="block-header-actions">
             <el-button link type="primary" size="small" @click="openImportTemplateDialog">导入模板</el-button>
-            <el-tooltip
-              content="需要以下权限之一：订单列表、订单成本可提交、订单成本可保存工序报价模板或订单设置菜单；通常具备订单列表（可打开成本页）即可，与接口校验一致"
-              placement="top"
-              :disabled="canSaveProcessQuoteTemplate"
-            >
-              <span class="save-template-btn-wrap">
-                <el-button
-                  link
-                  type="primary"
-                  size="small"
-                  :disabled="!canSaveProcessQuoteTemplate"
-                  @click="openSaveTemplateDialog"
-                >
-                  保存为模板
-                </el-button>
-              </span>
-            </el-tooltip>
+            <el-button link type="primary" size="small" @click="openSaveTemplateDialog">保存为模板</el-button>
             <el-button link type="primary" size="small" @click="openProductionPickerDialog">新增</el-button>
             <el-button
               link
@@ -322,7 +306,7 @@
               @change="() => onProductionJobTypeChange(row)"
             >
               <el-option
-                v-for="j in jobTypeOptionsForRow(row)"
+                v-for="j in getJobTypeOptions(row)"
                 :key="j"
                 :label="getJobTypeLabel(j)"
                 :value="j"
@@ -334,7 +318,7 @@
           <template #default="{ row }">
             <el-select-v2
               v-model="row.processId"
-              :options="productionProcessOptionsForRow(row)"
+              :options="getProductionProcessSelectOptions(row)"
               placeholder="选择工序"
               filterable
               clearable
@@ -438,88 +422,12 @@
           </el-button>
         </template>
       </el-dialog>
-      <el-dialog
-        v-model="productionPickerDialog.visible"
-        title="批量添加工序"
-        width="760px"
-        class="production-picker-dialog"
-        :close-on-click-modal="false"
-      >
-        <div class="production-picker-toolbar">
-          <span class="import-template-hint">
-            左侧选择工种，右侧可搜索并勾选工序，点击“添加所选”后自动加入并关闭弹窗。
-          </span>
-        </div>
-        <div class="production-picker-layout">
-          <div class="production-picker-tree">
-            <el-tree
-              :data="pickerTreeData"
-              node-key="key"
-              :expand-on-click-node="false"
-              default-expand-all
-              highlight-current
-              @node-click="onPickerTreeNodeClick"
-            >
-              <template #default="{ data }">
-                <span class="picker-tree-node">
-                  <span>{{ data.label }}</span>
-                  <span v-if="data.jobType && getPickerSelectedCountByJob(data.department, data.jobType) > 0" class="picker-tree-selected-count">
-                    已选 {{ getPickerSelectedCountByJob(data.department, data.jobType) }}
-                  </span>
-                </span>
-              </template>
-            </el-tree>
-          </div>
-          <div class="production-picker-list">
-            <el-input
-              v-model="productionPickerDialog.keyword"
-              placeholder="搜索工序关键词"
-              clearable
-              size="small"
-              class="picker-search-input"
-            />
-            <el-table
-              :data="pickerProcessOptions"
-              size="small"
-              border
-              height="300"
-              class="picker-process-table"
-            >
-              <el-table-column label="选择" width="72" align="center" header-align="center">
-                <template #default="{ row }">
-                  <el-checkbox
-                    :disabled="row.added"
-                    :model-value="productionPickerDialog.selectedIds.includes(row.id)"
-                    @change="(checked) => onPickerProcessChecked(row.id, Boolean(checked))"
-                  />
-                </template>
-              </el-table-column>
-              <el-table-column label="工序" min-width="260" align="center" header-align="center" show-overflow-tooltip>
-                <template #default="{ row }">
-                  <span>{{ row.name }}</span>
-                  <span v-if="row.added" class="picker-added-tag">（已添加）</span>
-                </template>
-              </el-table-column>
-              <el-table-column label="价格(元)" width="110" align="center" header-align="center">
-                <template #default="{ row }">
-                  {{ formatMoney(row.unitPrice) }}
-                </template>
-              </el-table-column>
-            </el-table>
-            <p v-if="!pickerProcessOptions.length" class="empty-hint">当前工种下暂无可选工序</p>
-          </div>
-        </div>
-        <template #footer>
-          <el-button @click="productionPickerDialog.visible = false">关闭</el-button>
-          <el-button
-            type="primary"
-            :disabled="!productionPickerDialog.selectedIds.length"
-            @click="appendSelectedProcesses"
-          >
-            添加所选（{{ pickerSelectedCount }}）
-          </el-button>
-        </template>
-      </el-dialog>
+      <ProductionProcessPickerDialog
+        v-model="productionPickerVisible"
+        :production-processes="productionProcesses"
+        :added-process-ids="productionAddedProcessIds"
+        @append="onProductionPickerAppend"
+      />
     </el-card>
 
     <!-- 汇总与出厂价 -->
@@ -602,6 +510,7 @@ import {
 } from '@/api/suppliers'
 import { useAuthStore } from '@/stores/auth'
 import { formatDisplayNumber } from '@/utils/display-number'
+import ProductionProcessPickerDialog from './components/ProductionProcessPickerDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -618,6 +527,12 @@ const materialRows = ref<MaterialRow[]>([])
 const processItemRows = ref<ProcessItemRow[]>([])
 const productionProcesses = ref<ProductionProcessItem[]>([])
 const productionRows = ref<ProductionRow[]>([])
+const productionPickerVisible = ref(false)
+const productionAddedProcessIds = computed(() =>
+  productionRows.value
+    .map((row) => Number(row.processId))
+    .filter((id): id is number => Number.isInteger(id) && id > 0),
+)
 const selectedProductionRows = ref<ProductionRow[]>([])
 const profitMargin = ref(0.1)
 const savingDraft = ref(false)
@@ -638,7 +553,6 @@ let recomputeCountInCurrentEdit = 0
 let recomputeLogTimer: ReturnType<typeof setTimeout> | null = null
 
 function logPerf(message: string, extra?: Record<string, unknown>) {
-  if (!import.meta.env.DEV) return
   if (extra) console.info(PERF_TAG, message, extra)
   else console.info(PERF_TAG, message)
 }
@@ -661,27 +575,6 @@ const saveTemplateDialog = ref<{ visible: boolean; name: string; submitting: boo
   name: '',
   submitting: false,
 })
-const productionPickerDialog = ref<{
-  visible: boolean
-  activeDepartment: string
-  activeJobType: string
-  selectedIds: number[]
-  keyword: string
-}>({
-  visible: false,
-  activeDepartment: '',
-  activeJobType: '',
-  selectedIds: [],
-  keyword: '',
-})
-
-interface PickerTreeNode {
-  key: string
-  label: string
-  department: string
-  jobType: string
-  children?: PickerTreeNode[]
-}
 
 interface MaterialRow {
   materialTypeId?: number | null
@@ -828,14 +721,6 @@ function normalizeProfitMargin(v: unknown): number {
 
 const canSubmitCost = computed(() => authStore.hasPermission('orders_cost_submit'))
 
-const canSaveProcessQuoteTemplate = computed(
-  () =>
-    authStore.hasRoutePermission('/orders/list') ||
-    authStore.hasPermission('orders_cost_submit') ||
-    authStore.hasPermission('orders_cost_save_process_quote_template') ||
-    authStore.hasRoutePermission('/settings/orders'),
-)
-
 function formatTimeLabel(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso)
@@ -904,153 +789,32 @@ const departmentOptions = computed(() =>
   Array.from(new Set(productionProcesses.value.map((p) => p.department).filter((v) => !!v)))
 )
 
-/** 工序下拉选项缓存 key，避免表格每格每次渲染都全量 filter productionProcesses（长时间编辑易卡顿） */
-function makeProductionDeptJobKey(dept: string, job: string) {
-  return `${(dept ?? '').trim()}\0${(job ?? '').trim()}`
+const jobTypeOptions = computed(() =>
+  Array.from(new Set(productionProcesses.value.map((p) => p.jobType).filter((v) => !!v)))
+)
+
+function getJobTypeOptions(row: ProductionRow): string[] {
+  const dept = (row.department ?? '').trim()
+  const list = productionProcesses.value
+    .filter((p) => !dept || (p.department ?? '').trim() === dept)
+    .map((p) => p.jobType)
+    .filter((v): v is string => !!v)
+  return Array.from(new Set(list))
 }
 
-const productionProcessSelectOptionsMap = computed(() => {
-  const processes = productionProcesses.value
-  const keySet = new Set<string>()
-  keySet.add(makeProductionDeptJobKey('', ''))
-  for (const p of processes) {
-    const d = (p.department ?? '').trim()
-    const j = (p.jobType ?? '').trim()
-    keySet.add(makeProductionDeptJobKey(d, j))
-    keySet.add(makeProductionDeptJobKey(d, ''))
-    keySet.add(makeProductionDeptJobKey('', j))
-  }
-  for (const row of productionRows.value) {
-    keySet.add(makeProductionDeptJobKey(row.department ?? '', row.jobType ?? ''))
-  }
-  const map = new Map<string, Array<{ value: number; label: string }>>()
-  for (const key of keySet) {
-    const [dept, job] = key.split('\0')
-    const opts = processes
-      .filter((p) => {
-        const hitDept = !dept || (p.department ?? '').trim() === dept
-        const hitJob = !job || (p.jobType ?? '').trim() === job
-        return hitDept && hitJob
-      })
-      .map((p) => ({
-        value: p.id,
-        label: formatProductionProcessSelectLabel(p),
-      }))
-    map.set(key, opts)
-  }
-  return map
-})
-
-function productionProcessOptionsForRow(row: ProductionRow): Array<{ value: number; label: string }> {
-  const k = makeProductionDeptJobKey(row.department ?? '', row.jobType ?? '')
-  return productionProcessSelectOptionsMap.value.get(k) ?? []
-}
-
-const jobTypeOptionsByDepartment = computed(() => {
-  const processes = productionProcesses.value
-  const depts = new Set<string>()
-  depts.add('')
-  for (const p of processes) depts.add((p.department ?? '').trim())
-  for (const row of productionRows.value) depts.add((row.department ?? '').trim())
-  const map = new Map<string, string[]>()
-  for (const dept of depts) {
-    const list = processes
-      .filter((p) => !dept || (p.department ?? '').trim() === dept)
-      .map((p) => p.jobType)
-      .filter((v): v is string => !!v)
-    map.set(dept, Array.from(new Set(list)))
-  }
-  return map
-})
-
-function jobTypeOptionsForRow(row: ProductionRow): string[] {
-  const d = (row.department ?? '').trim()
-  return jobTypeOptionsByDepartment.value.get(d) ?? []
-}
-
-const pickerTreeData = computed<PickerTreeNode[]>(() => {
-  const deptMap = new Map<string, Set<string>>()
-  productionProcesses.value.forEach((p) => {
-    const dept = (p.department ?? '').trim()
-    const job = (p.jobType ?? '').trim()
-    if (!dept || !job) return
-    if (!deptMap.has(dept)) deptMap.set(dept, new Set())
-    deptMap.get(dept)!.add(job)
-  })
-  const orderMap = new Map(DEPARTMENT_ORDER.map((d, i) => [d, i]))
-  return Array.from(deptMap.entries())
-    .sort((a, b) => {
-      const ai = orderMap.get(a[0]) ?? DEPARTMENT_ORDER.length
-      const bi = orderMap.get(b[0]) ?? DEPARTMENT_ORDER.length
-      if (ai !== bi) return ai - bi
-      return a[0].localeCompare(b[0])
-    })
-    .map(([dept, jobs]) => ({
-    key: `dept:${dept}`,
-    label: dept,
-    department: dept,
-    jobType: '',
-      children: Array.from(jobs)
-        .sort((a, b) => a.localeCompare(b))
-        .map((job) => ({
-          key: `job:${dept}::${job}`,
-          label: getJobTypeLabel(job),
-          department: dept,
-          jobType: job,
-        })),
-    }))
-})
-
-const pickerProcessOptions = computed(() => {
-  const dept = productionPickerDialog.value.activeDepartment.trim()
-  const job = productionPickerDialog.value.activeJobType.trim()
-  const keyword = productionPickerDialog.value.keyword.trim().toLowerCase()
-  const addedIds = new Set(
-    productionRows.value
-      .map((row) => Number(row.processId))
-      .filter((id) => Number.isInteger(id) && id > 0),
-  )
+function getProductionProcessSelectOptions(row: ProductionRow): Array<{ value: number; label: string }> {
+  const dept = (row.department ?? '').trim()
+  const job = (row.jobType ?? '').trim()
   return productionProcesses.value
     .filter((p) => {
       const hitDept = !dept || (p.department ?? '').trim() === dept
       const hitJob = !job || (p.jobType ?? '').trim() === job
-      const name = String(p.name ?? '').toLowerCase()
-      const hitKeyword = !keyword || name.includes(keyword)
-      return hitDept && hitJob && hitKeyword
+      return hitDept && hitJob
     })
     .map((p) => ({
-      id: p.id,
-      name: p.name || '未命名工序',
-      added: addedIds.has(p.id),
-      unitPrice: Number(p.unitPrice) || 0,
+      value: p.id,
+      label: formatProductionProcessSelectLabel(p),
     }))
-})
-
-const pickerSelectedCount = computed(() => productionPickerDialog.value.selectedIds.length)
-const productionProcessById = computed(() => {
-  const map = new Map<number, ProductionProcessItem>()
-  productionProcesses.value.forEach((p) => {
-    if (typeof p.id === 'number') map.set(p.id, p)
-  })
-  return map
-})
-const pickerSelectedCountMap = computed(() => {
-  const selected = new Set(productionPickerDialog.value.selectedIds)
-  const map = new Map<string, number>()
-  productionProcesses.value.forEach((p) => {
-    if (!selected.has(p.id)) return
-    const dept = (p.department ?? '').trim()
-    const job = (p.jobType ?? '').trim()
-    if (!dept || !job) return
-    const key = `${dept}::${job}`
-    map.set(key, (map.get(key) ?? 0) + 1)
-  })
-  return map
-})
-
-function getPickerSelectedCountByJob(department: string, jobType: string): number {
-  const key = `${(department ?? '').trim()}::${(jobType ?? '').trim()}`
-  return pickerSelectedCountMap.value.get(key) ?? 0
 }
 
 /** 生产工序行按部门(裁床→车缝→尾部)、工种、工序排序，用于表格展示与合并 */
@@ -1392,60 +1156,19 @@ function addProductionRow() {
 }
 
 function openProductionPickerDialog() {
-  if (!productionPickerDialog.value.activeDepartment || !productionPickerDialog.value.activeJobType) {
-    const firstDept = pickerTreeData.value[0]
-    const firstJob = firstDept?.children?.[0]
-    productionPickerDialog.value.activeDepartment = firstJob?.department ?? ''
-    productionPickerDialog.value.activeJobType = firstJob?.jobType ?? ''
-  }
-  productionPickerDialog.value.selectedIds = []
-  productionPickerDialog.value.keyword = ''
-  productionPickerDialog.value.visible = true
+  productionPickerVisible.value = true
 }
 
-function onPickerTreeNodeClick(node: PickerTreeNode) {
-  if (!node?.jobType) return
-  productionPickerDialog.value.activeDepartment = node.department
-  productionPickerDialog.value.activeJobType = node.jobType
-}
-
-function onPickerProcessChecked(id: number, checked: boolean) {
-  const current = new Set(productionPickerDialog.value.selectedIds)
-  if (checked) current.add(id)
-  else current.delete(id)
-  productionPickerDialog.value.selectedIds = Array.from(current)
-}
-
-function appendSelectedProcesses() {
-  const selectedIds = productionPickerDialog.value.selectedIds.filter((id) => Number.isInteger(id) && id > 0)
-  if (!selectedIds.length) return
-  const existing = new Set(
-    productionRows.value
-      .map((row) => Number(row.processId))
-      .filter((id) => Number.isInteger(id) && id > 0),
-  )
-  const toAdd: ProductionProcessItem[] = []
-  selectedIds.forEach((id) => {
-    if (existing.has(id)) return
-    const found = productionProcessById.value.get(id)
-    if (found) toAdd.push(found)
-  })
-  if (!toAdd.length) {
-    ElMessage.warning('所选工序均已存在')
-    return
-  }
-  const rows = toAdd.map((p) => ({
-      processId: p.id,
-      department: p.department ?? '',
-      jobType: p.jobType ?? '',
-      processName: p.name ?? '',
-      remark: '',
-      unitPrice: Number(p.unitPrice) || 0,
-    }))
+function onProductionPickerAppend(items: ProductionProcessItem[]) {
+  const rows = items.map((p) => ({
+    processId: p.id,
+    department: p.department ?? '',
+    jobType: p.jobType ?? '',
+    processName: p.name ?? '',
+    remark: '',
+    unitPrice: Number(p.unitPrice) || 0,
+  }))
   productionRows.value = [...productionRows.value, ...rows]
-  productionPickerDialog.value.selectedIds = []
-  productionPickerDialog.value.visible = false
-  ElMessage.success(`已添加 ${toAdd.length} 条工序`)
 }
 
 function removeProductionRow(row: ProductionRow) {
@@ -1509,7 +1232,7 @@ function onProductionProcessChange(row: ProductionRow) {
 function onProductionDepartmentChange(row: ProductionRow) {
   const dept = (row.department ?? '').trim()
   if (!dept) return
-  const jobOptions = jobTypeOptionsForRow(row)
+  const jobOptions = getJobTypeOptions(row)
   if (row.jobType && !jobOptions.includes(row.jobType)) {
     row.jobType = ''
     row.processId = null
@@ -1517,7 +1240,7 @@ function onProductionDepartmentChange(row: ProductionRow) {
     row.unitPrice = 0
     return
   }
-  const options = productionProcessOptionsForRow(row)
+  const options = getProductionProcessSelectOptions(row)
   if (!options.some((opt) => opt.value === row.processId)) {
     row.processId = null
     row.processName = ''
@@ -1526,7 +1249,7 @@ function onProductionDepartmentChange(row: ProductionRow) {
 }
 
 function onProductionJobTypeChange(row: ProductionRow) {
-  const options = productionProcessOptionsForRow(row)
+  const options = getProductionProcessSelectOptions(row)
   if (!options.some((opt) => opt.value === row.processId)) {
     row.processId = null
     row.processName = ''
@@ -1941,120 +1664,4 @@ watch(
   gap: var(--space-sm);
 }
 
-.production-picker-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-sm);
-}
-
-.production-picker-layout {
-  --picker-row-height: 28px;
-  display: grid;
-  grid-template-columns: 240px 1fr;
-  gap: var(--space-sm);
-}
-
-.production-picker-tree {
-  max-height: 360px;
-  overflow: auto;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  padding: var(--space-xs);
-}
-
-.production-picker-tree :deep(.el-tree-node__content) {
-  height: var(--picker-row-height);
-  line-height: var(--picker-row-height);
-}
-
-.picker-tree-node {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.picker-tree-selected-count {
-  font-size: var(--font-size-caption);
-  color: var(--el-text-color-secondary);
-}
-
-.production-picker-list {
-  height: 360px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  padding: var(--space-xs);
-  overflow: hidden;
-}
-
-.picker-search-input {
-  margin-bottom: var(--space-xs);
-}
-
-.production-picker-list-header {
-  display: flex;
-  justify-content: space-between;
-  color: var(--el-text-color-secondary);
-  font-size: var(--font-size-caption);
-  margin-bottom: var(--space-xs);
-}
-
-.production-picker-item {
-  padding: 4px 0;
-}
-
-.picker-process-table :deep(.el-table__header-wrapper .el-table__cell),
-.picker-process-table :deep(.el-table__body-wrapper .el-table__cell) {
-  height: var(--picker-row-height);
-  padding-top: 0;
-  padding-bottom: 0;
-  box-sizing: border-box;
-}
-
-.picker-process-table :deep(.el-table__header-wrapper tr),
-.picker-process-table :deep(.el-table__body-wrapper tr) {
-  height: var(--picker-row-height);
-}
-
-.picker-process-table :deep(.el-table__header-wrapper .el-table__cell .cell),
-.picker-process-table :deep(.el-table__body-wrapper .el-table__cell .cell) {
-  height: var(--picker-row-height);
-  line-height: var(--picker-row-height);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.picker-process-table :deep(.el-checkbox) {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-:deep(.el-dialog.production-picker-dialog),
-.production-picker-dialog :deep(.el-dialog) {
-  resize: both;
-  overflow: auto;
-  min-width: 720px;
-  min-height: 520px;
-  max-width: 95vw;
-  max-height: 90vh;
-}
-
-.production-picker-price {
-  color: var(--el-text-color-regular);
-  min-width: 72px;
-  text-align: right;
-}
-
-.picker-added-tag {
-  color: var(--el-text-color-secondary);
-}
-
-.save-template-btn-wrap {
-  display: inline-block;
-  vertical-align: middle;
-}
 </style>
