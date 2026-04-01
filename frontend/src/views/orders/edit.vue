@@ -1865,7 +1865,7 @@ function onSupplierChange(_row: MaterialRow) {
 }
 
 // D 区：尺寸信息（默认部位单位为 cm）
-const defaultSizeMetaHeaders = ['部位cm', '英文部位', '量法', '纸样尺寸', '样衣尺寸', '公差']
+const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
 const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
 
 interface SizeInfoRow {
@@ -1960,6 +1960,15 @@ function onSizeGridPaste(e: ClipboardEvent, startRow: number, startCol: number) 
 
   const matrix = parseClipboardText(text)
   if (!matrix.length) return
+
+  const requiredRows = startRow + matrix.length
+  while (sizeInfoRows.value.length < requiredRows) {
+    sizeInfoRows.value.push({
+      __rowKey: nextSizeInfoRowKey(),
+      metaValues: Array(sizeMetaHeaders.value.length).fill(''),
+      sizeValues: Array(sizeHeaders.value.length).fill(''),
+    })
+  }
 
   const maxRows = sizeInfoRows.value.length
   const totalCols = sizeMetaHeaders.value.length + sizeHeaders.value.length
