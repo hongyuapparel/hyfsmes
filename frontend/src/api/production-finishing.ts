@@ -15,6 +15,7 @@ export interface FinishingListItem {
   finishingStatus: string
   cutTotal: number | null
   sewingQuantity: number | null
+  factoryName: string | null
   tailReceivedQty: number | null
   tailShippedQty: number | null
   /** 尾部入库数 */

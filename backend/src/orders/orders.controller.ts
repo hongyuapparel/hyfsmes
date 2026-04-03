@@ -122,12 +122,10 @@ export class OrdersController {
    * GET /orders/:id
    */
   @Get(':id')
-  @RequirePermission('orders_edit')
+  // 详情页（含打印）是查看行为，不应受“可编辑状态”策略约束（如 completed）。
   async findOne(
     @Param('id', ParseIntPipe) id: number,
-    @CurrentUser() user: { userId: number; username: string },
   ) {
-    await this.ordersService.assertOrderActionById(id, user.userId, 'edit');
     return this.ordersService.findOne(id);
   }
 

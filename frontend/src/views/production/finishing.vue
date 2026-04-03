@@ -105,6 +105,7 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
+      <el-table-column prop="factoryName" label="加工供应商" min-width="100" show-overflow-tooltip />
       <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
       <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
       <el-table-column label="客户交期" width="110" align="center">

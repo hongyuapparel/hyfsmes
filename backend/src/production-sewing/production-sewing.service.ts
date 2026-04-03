@@ -274,7 +274,7 @@ export class ProductionSewingService {
     return this.buildSewingRows(query);
   }
 
-  /** 分单：记录分单时间、加工厂交期、加工厂名称（写入订单）、车缝加工费 */
+  /** 分单/补录分单：记录分单时间、加工供应商交期、加工供应商名称（写入订单）、车缝加工费 */
   async assignSewing(
     orderId: number,
     distributedAt: Date,
@@ -286,8 +286,9 @@ export class ProductionSewingService {
     if (!order) {
       throw new NotFoundException('订单不存在');
     }
-    if (order.status !== 'pending_sewing') {
-      throw new NotFoundException('仅待车缝订单可分单');
+    // 临时放开：已车缝完成（待尾部）订单允许补录分单信息，不改动其完成状态。
+    if (order.status !== 'pending_sewing' && order.status !== 'pending_finishing') {
+      throw new NotFoundException('仅待车缝或待尾部订单可分单');
     }
 
     order.factoryName = (factoryName ?? '').trim();

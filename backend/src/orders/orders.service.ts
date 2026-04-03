@@ -1422,20 +1422,20 @@ export class OrdersService {
     const existingSnapshot =
       existing?.snapshot && typeof existing.snapshot === 'object' ? (existing.snapshot as any) : null;
 
+    const existingMaterialRows = Array.isArray(existingSnapshot?.materialRows) ? (existingSnapshot.materialRows as any[]) : [];
     const mergedMaterialRows = keepPricing
-      ? nextMaterialRows.map((row) => {
-          const found = Array.isArray(existingSnapshot?.materialRows)
-            ? (existingSnapshot.materialRows as any[]).find((r) => this.isSameMaterialCostRow(r, row))
-            : null;
+      ? nextMaterialRows.map((row, index) => {
+          const found = this.findBestMaterialCostRow(existingMaterialRows, row, index);
           return found ? { ...row, unitPrice: Number(found.unitPrice) || 0 } : row;
         })
       : nextMaterialRows;
 
+    const existingProcessItemRows = Array.isArray(existingSnapshot?.processItemRows)
+      ? (existingSnapshot.processItemRows as any[])
+      : [];
     const mergedProcessItemRows = keepPricing
-      ? nextProcessItemRows.map((row) => {
-          const found = Array.isArray(existingSnapshot?.processItemRows)
-            ? (existingSnapshot.processItemRows as any[]).find((r) => this.isSameProcessItemCostRow(r, row))
-            : null;
+      ? nextProcessItemRows.map((row, index) => {
+          const found = this.findBestProcessItemCostRow(existingProcessItemRows, row, index);
           return found
             ? {
                 ...row,
@@ -1477,9 +1477,40 @@ export class OrdersService {
     return key(a) === key(b);
   }
 
+  private findBestMaterialCostRow(existingRows: any[], row: any, index: number): any | null {
+    if (!existingRows.length) return null;
+    const exact = existingRows.find((r) => this.isSameMaterialCostRow(r, row));
+    if (exact) return exact;
+
+    // 兜底一：弱匹配（避免非关键展示字段微调后单价丢失）
+    const relaxed = existingRows.find((r) =>
+      String(r?.materialTypeId ?? '') === String(row?.materialTypeId ?? '') &&
+      String(r?.materialName ?? '') === String(row?.materialName ?? ''),
+    );
+    if (relaxed) return relaxed;
+
+    // 兜底二：按行号回填（结构基本不变但字段格式变化时保留报价）
+    const byIndex = existingRows[index];
+    return byIndex ?? null;
+  }
+
   private isSameProcessItemCostRow(a: any, b: any): boolean {
     const key = (r: any) => [String(r?.processName ?? ''), String(r?.supplierName ?? ''), String(r?.part ?? '')].join('|');
     return key(a) === key(b);
+  }
+
+  private findBestProcessItemCostRow(existingRows: any[], row: any, index: number): any | null {
+    if (!existingRows.length) return null;
+    const exact = existingRows.find((r) => this.isSameProcessItemCostRow(r, row));
+    if (exact) return exact;
+
+    // 兜底一：弱匹配（供应商/部位改动时仍尽量保留工艺单价）
+    const relaxed = existingRows.find((r) => String(r?.processName ?? '') === String(row?.processName ?? ''));
+    if (relaxed) return relaxed;
+
+    // 兜底二：按行号回填
+    const byIndex = existingRows[index];
+    return byIndex ?? null;
   }
 
   private normalizeProfitMargin(v: unknown): number {

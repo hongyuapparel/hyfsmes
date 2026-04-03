@@ -70,6 +70,14 @@
           分单
         </el-button>
         <el-button
+          v-if="hasSelection && canAssignCompletedSelection"
+          type="primary"
+          size="large"
+          @click="openAssignDialog"
+        >
+          补录分单
+        </el-button>
+        <el-button
           v-if="hasSelection && canRegisterSelection"
           type="primary"
           size="large"
@@ -547,6 +555,9 @@ const selectedRows = ref<SewingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
 const canAssignSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.sewingStatus !== 'completed'),
+)
+const canAssignCompletedSelection = computed(() =>
+  selectedRows.value.length > 0 && selectedRows.value.some((r) => r.sewingStatus === 'completed'),
 )
 const canRegisterSelection = computed(() =>
   selectedRows.value.length > 0 && selectedRows.value.some((r) => r.sewingStatus !== 'completed'),

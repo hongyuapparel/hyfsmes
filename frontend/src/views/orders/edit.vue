@@ -282,6 +282,17 @@
         >
           <template #header>
             <div class="b-header-cell">
+              <el-tooltip content="在当前列前新增尺码列" placement="top">
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  class="b-header-insert"
+                  @click.stop="insertSizeColumnBefore(sIndex)"
+                >
+                  <el-icon><Plus /></el-icon>
+                </el-button>
+              </el-tooltip>
               <el-input
                 v-model="sizeHeaders[sIndex]"
                 size="small"
@@ -1044,7 +1055,7 @@ import {
 import { uploadImage } from '@/api/uploads'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getDictItems } from '@/api/dicts'
-import { Delete, CircleClose } from '@element-plus/icons-vue'
+import { Delete, CircleClose, Plus } from '@element-plus/icons-vue'
 import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
 import { getProductSkus, type ProductSkuOption } from '@/api/products'
 import { useAuthStore } from '@/stores/auth'
@@ -1648,6 +1659,30 @@ function removeColorRow(index: number) {
 
 function addSizeColumn() {
   sizeHeaders.value.push(`尺码${sizeHeaders.value.length + 1}`)
+  normalizeColorRows()
+  normalizeSizeInfoRows()
+}
+
+function guessSizeLabelBefore(sIndex: number): string {
+  const current = String(sizeHeaders.value[sIndex] ?? '').trim().toUpperCase()
+  if (current === 'S') {
+    const hasXS = sizeHeaders.value.some((h) => String(h ?? '').trim().toUpperCase() === 'XS')
+    if (!hasXS) return 'XS'
+  }
+  return `尺码${sizeHeaders.value.length + 1}`
+}
+
+function insertSizeColumnBefore(sIndex: number) {
+  if (sIndex < 0 || sIndex > sizeHeaders.value.length) return
+  sizeHeaders.value.splice(sIndex, 0, guessSizeLabelBefore(sIndex))
+  colorRows.value.forEach((row) => {
+    if (!Array.isArray(row.quantities)) row.quantities = []
+    row.quantities.splice(sIndex, 0, 0)
+  })
+  const cur = editingCell.value
+  if (cur && typeof cur.col === 'number' && cur.col >= sIndex) {
+    editingCell.value = { ...cur, col: cur.col + 1 }
+  }
   normalizeColorRows()
   normalizeSizeInfoRows()
 }
@@ -3037,6 +3072,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   width: 100%;
   box-sizing: border-box;
+  padding-left: 10px;
   padding-right: 10px;
 }
 .b-header-input {
@@ -3069,10 +3105,31 @@ onBeforeUnmount(() => {
   opacity: 0;
   transition: opacity 0.15s;
 }
+.b-header-insert {
+  position: absolute;
+  top: 50%;
+  left: 2px;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 10px;
+  padding: 0;
+  min-height: 10px;
+  min-width: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.b-header-insert :deep(.el-icon) {
+  font-size: 8px;
+  line-height: 8px;
+}
 .b-header-remove :deep(.el-icon) {
   font-size: 8px;
   line-height: 8px;
 }
+.b-header-cell:hover .b-header-insert,
 .b-header-cell:hover .b-header-remove {
   opacity: 1;
 }

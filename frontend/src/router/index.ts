@@ -61,7 +61,8 @@ const routes: RouteRecordRaw[] = [
             path: 'detail/:id',
             name: 'OrdersDetail',
             component: () => import('@/views/orders/detail.vue'),
-            meta: { title: '订单详情', permissionPath: '/orders/list' },
+            // 订单详情（含打印）仅要求已登录，不走菜单权限拦截。
+            meta: { title: '订单详情', skipRoutePermissionCheck: true },
           },
           {
             path: 'edit/:id?',
@@ -288,6 +289,7 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
   const leaf = to.matched[to.matched.length - 1]
+  if (leaf?.meta?.skipRoutePermissionCheck) return next()
   const permissionPath = (leaf?.meta?.permissionPath as string) || (to.meta?.permissionPath as string)
   if (permissionPath && !auth.hasRoutePermission(permissionPath)) return next('/no-permission')
   next()

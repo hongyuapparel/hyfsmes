@@ -31,6 +31,8 @@ export interface FinishingListItem {
   cutTotal: number | null;
   /** 车缝数量 */
   sewingQuantity: number | null;
+  /** 车缝分单选择的加工供应商 */
+  factoryName: string | null;
   tailReceivedQty: number | null;
   tailShippedQty: number | null;
   /** 尾部入库数（可多次累加） */
@@ -242,6 +244,8 @@ export class ProductionFinishingService {
         finishingStatus: fStatus,
         cutTotal: this.sumActualCut(cutting?.actualCutRows ?? null),
         sewingQuantity: sewing?.sewingQuantity ?? null,
+        // 车缝分单时写入订单主表的 factory_name，尾部列表应从订单读取
+        factoryName: order.factoryName ?? null,
         tailReceivedQty: finishing?.tailReceivedQty ?? null,
         tailShippedQty: finishing?.tailShippedQty ?? null,
         tailInboundQty: finishing?.tailInboundQty ?? null,
