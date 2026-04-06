@@ -1081,6 +1081,11 @@ export class OrdersService {
     qb.orderBy('o.id', 'DESC');
 
     const total = await qb.getCount();
+    const totalQuantityRaw = await qb
+      .clone()
+      .select('COALESCE(SUM(o.quantity), 0)', 'totalQuantity')
+      .getRawOne<{ totalQuantity?: string | number }>();
+    const totalQuantity = Number(totalQuantityRaw?.totalQuantity ?? 0) || 0;
     const list = await qb
       .skip((page - 1) * pageSize)
       .take(pageSize)
@@ -1142,7 +1147,7 @@ export class OrdersService {
       tailShippedQty: tailShippedMap[o.id] ?? null,
     }));
 
-    return { list: listWithCount, total, page, pageSize };
+    return { list: listWithCount, total, totalQuantity, page, pageSize };
   }
 
   async getSizeBreakdown(orderId: number) {
@@ -1454,6 +1459,7 @@ export class OrdersService {
         ? mergedProcessItemRows
         : [{ unitPrice: 0, quantity: defaultProcessItemQty } as any],
       productionRows: Array.isArray(existingSnapshot?.productionRows) ? existingSnapshot.productionRows : [],
+      productionCostMultiplier: this.normalizeProductionCostMultiplier(existingSnapshot?.productionCostMultiplier),
       profitMargin: this.normalizeProfitMargin(existingSnapshot?.profitMargin),
     };
 
@@ -1521,6 +1527,12 @@ export class OrdersService {
     return n;
   }
 
+  private normalizeProductionCostMultiplier(v: unknown): number {
+    const n = typeof v === 'number' ? v : Number(v);
+    if (!Number.isFinite(n) || n < 0) return 2;
+    return n;
+  }
+
   private calculateExFactoryPriceFromSnapshot(snapshot: Record<string, unknown> | null | undefined): number {
     if (!snapshot || typeof snapshot !== 'object') return 0;
     const materialRows = Array.isArray(snapshot.materialRows) ? (snapshot.materialRows as any[]) : [];
@@ -1538,7 +1550,9 @@ export class OrdersService {
       const unitPrice = Number(row?.unitPrice) || 0;
       return sum + qty * unitPrice;
     }, 0);
-    const productionTotal = productionRows.reduce((sum, row) => sum + (Number(row?.unitPrice) || 0), 0);
+    const productionBaseTotal = productionRows.reduce((sum, row) => sum + (Number(row?.unitPrice) || 0), 0);
+    const productionCostMultiplier = this.normalizeProductionCostMultiplier(snapshot.productionCostMultiplier);
+    const productionTotal = productionBaseTotal * productionCostMultiplier;
 
     const totalCost = materialTotal + processItemTotal + productionTotal;
     const margin = this.normalizeProfitMargin(snapshot.profitMargin);

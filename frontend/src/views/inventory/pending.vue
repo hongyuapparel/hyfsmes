@@ -336,7 +336,13 @@
               <div>当前待处理：{{ item.row.quantity }}</div>
             </div>
             <div v-if="item.headers.length" class="outbound-size-wrap">
-              <el-table :data="item.rows" border size="small">
+              <el-table
+                :data="item.rows"
+                border
+                size="small"
+                show-summary
+                :summary-method="(p) => getOutboundTableSummaries(item, p)"
+              >
                 <el-table-column label="颜色" min-width="100">
                   <template #default="{ row }">
                     {{ row.colorName || '-' }}
@@ -347,7 +353,7 @@
                   :key="hIdx"
                   :label="h"
                   min-width="80"
-                  align="right"
+                  align="center"
                 >
                   <template #default="{ row }">
                     <el-input-number
@@ -360,8 +366,17 @@
                     />
                   </template>
                 </el-table-column>
+                <el-table-column label="行计" min-width="80" align="center">
+                  <template #default="{ row }">
+                    {{ formatDisplayNumber(getOutboundRowTotal(row)) }}
+                  </template>
+                </el-table-column>
               </el-table>
-              <div class="outbound-size-footer">该记录合计：{{ formatDisplayNumber(getOutboundItemTotal(item)) }}</div>
+              <div class="outbound-size-footer">
+                待处理数量：{{ formatDisplayNumber(item.row.quantity) }}，当前填写合计：{{
+                  formatDisplayNumber(getOutboundItemTotal(item))
+                }}
+              </div>
             </div>
             <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法发货。</div>
           </div>
@@ -694,13 +709,16 @@ async function openOutboundDialog() {
   outboundDialog.items = rows.map((row) => {
     const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
     const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+    const br = breakdown?.rows ?? []
+    const dialogRows = br.map((r) => ({
+      colorName: r.colorName,
+      quantities: headers.map(() => 0),
+    }))
+    distributePendingToColorSizeGrid(dialogRows, br, headers.length, Number(row.quantity) || 0)
     return {
       row,
       headers,
-      rows: (breakdown?.rows ?? []).map((r) => ({
-        colorName: r.colorName,
-        quantities: headers.map(() => 0),
-      })),
+      rows: dialogRows,
     }
   })
   outboundDialog.visible = true
@@ -717,6 +735,85 @@ function getOutboundItemTotal(item: PendingOutboundDialogItem) {
     (sum, row) => sum + row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0),
     0,
   )
+}
+
+function getOutboundRowTotal(row: { quantities: number[] }) {
+  return row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0)
+}
+
+/**
+ * 按订单颜色×尺码比例，将「待处理数量」预填到各格（合计等于 targetTotal，可直接改）。
+ * baseRows 来自接口，values 末尾可能含「合计」列，仅取前 headersLen 格参与比例。
+ */
+function distributePendingToColorSizeGrid(
+  dialogRows: Array<{ quantities: number[] }>,
+  baseRows: Array<{ colorName?: string; values: number[] }>,
+  headersLen: number,
+  targetTotal: number,
+) {
+  if (!headersLen || !dialogRows.length) return
+  const flatBase: number[] = []
+  const rowCount = Math.min(dialogRows.length, baseRows.length)
+  for (let ri = 0; ri < rowCount; ri++) {
+    const vals = baseRows[ri]?.values ?? []
+    for (let ci = 0; ci < headersLen; ci++) {
+      flatBase.push(Math.max(0, Number(vals[ci]) || 0))
+    }
+  }
+  const n = flatBase.length
+  const baseSum = flatBase.reduce((a, b) => a + b, 0)
+  let flatOut: number[]
+  if (targetTotal <= 0 || n === 0) {
+    flatOut = new Array(n).fill(0)
+  } else if (baseSum === 0) {
+    flatOut = new Array(n).fill(0)
+    flatOut[0] = targetTotal
+  } else {
+    const scaled = flatBase.map((v) => (v / baseSum) * targetTotal)
+    const floors = scaled.map((x) => Math.floor(x))
+    let rem = targetTotal - floors.reduce((a, b) => a + b, 0)
+    const order = scaled
+      .map((x, i) => ({ i, f: x - floors[i] }))
+      .sort((a, b) => b.f - a.f || a.i - b.i)
+    for (let k = 0; k < rem; k++) {
+      floors[order[k].i]++
+    }
+    flatOut = floors
+  }
+  let idx = 0
+  for (let ri = 0; ri < dialogRows.length; ri++) {
+    for (let ci = 0; ci < headersLen; ci++) {
+      dialogRows[ri].quantities[ci] = idx < flatOut.length ? flatOut[idx] : 0
+      idx++
+    }
+  }
+}
+
+function getOutboundTableSummaries(
+  item: PendingOutboundDialogItem,
+  param: { columns: unknown[]; data: Array<{ quantities: number[] }> },
+) {
+  const { columns, data } = param
+  const sums: string[] = []
+  const lastCol = columns.length - 1
+  columns.forEach((_, index) => {
+    if (index === 0) {
+      sums[index] = '合计'
+      return
+    }
+    if (index === lastCol) {
+      sums[index] = formatDisplayNumber(getOutboundItemTotal(item))
+      return
+    }
+    const colIdx = index - 1
+    if (colIdx < 0 || colIdx >= item.headers.length) {
+      sums[index] = ''
+      return
+    }
+    const total = data.reduce((sum, row) => sum + (Number(row.quantities[colIdx]) || 0), 0)
+    sums[index] = formatDisplayNumber(total)
+  })
+  return sums
 }
 
 function toInboundPreviewTableRows(item: InboundPreviewItem) {
@@ -977,6 +1074,10 @@ onMounted(async () => {
 }
 
 .outbound-dialog-centered .el-input-number .el-input__inner {
+  text-align: center;
+}
+
+.outbound-dialog-centered .outbound-batch-card .el-table__footer .cell {
   text-align: center;
 }
 </style>

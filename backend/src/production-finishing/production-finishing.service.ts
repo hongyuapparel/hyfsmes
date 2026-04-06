@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -414,6 +414,32 @@ export class ProductionFinishingService {
     await this.finishingRepo.save(finishing);
   }
 
+  /**
+   * 修改登记前校验：该订单下待仓记录须全部为 pending，且待仓数量合计与当前尾部登记的入库+次品一致
+   * （避免仓库已部分入库/待仓直发后，尾部改数导致账务不一致）
+   */
+  private async assertCanAmendPackagingPending(orderId: number, finishing: OrderFinishing): Promise<void> {
+    const all = await this.inboundPendingRepo.find({ where: { orderId } });
+    const hasCompleted = all.some((p) => (p.status ?? '') === 'completed');
+    if (hasCompleted) {
+      throw new BadRequestException(
+        '该订单已有待仓记录完成入库或发货，无法在尾部修改入库/次品数量，请通过仓库库存或业务单据调整。',
+      );
+    }
+    const pendingList = all.filter((p) => (p.status ?? 'pending') === 'pending');
+    const expectedTotal =
+      (Number(finishing.tailInboundQty) || 0) + (Number(finishing.defectQuantity) || 0);
+    const pendingSum = pendingList.reduce((s, p) => s + (Number(p.quantity) || 0), 0);
+    if (pendingList.length > 0 && pendingSum !== expectedTotal) {
+      throw new BadRequestException(
+        '待仓处理数量与当前登记不一致（可能已在仓库部分处理），无法在尾部修改。',
+      );
+    }
+    if (pendingList.length === 0 && expectedTotal > 0) {
+      throw new BadRequestException('未找到可调整的待仓记录，可能已全部完成入库；无法在尾部修改。');
+    }
+  }
+
   /** 登记包装完成：尾部 tab 内填写发货数、入库数、次品数、备注；三者之和须等于尾部收货数 */
   async registerPackagingComplete(
     orderId: number,
@@ -431,13 +457,16 @@ export class ProductionFinishingService {
     if (!finishing) {
       throw new NotFoundException('请先登记收货');
     }
-    if (finishing.status !== 'pending_assign') {
-      throw new NotFoundException('仅「尾部」中待登记包装的订单可操作');
-    }
 
     const received = Number(finishing.tailReceivedQty) || 0;
     if (received <= 0) {
       throw new NotFoundException('尾部收货数无效，请先登记收货');
+    }
+
+    const isFirstRegister = finishing.status === 'pending_assign';
+    const isAmend = finishing.status === 'inbound';
+    if (!isFirstRegister && !isAmend) {
+      throw new NotFoundException('仅「尾部中」待登记包装或「尾部完成」且待仓未处理的订单可操作');
     }
 
     /**
@@ -458,24 +487,34 @@ export class ProductionFinishingService {
       throw new NotFoundException(`入库数(${inbound})+次品数(${defect}) 须等于尾部收货数(${received})`);
     }
 
+    if (isAmend) {
+      await this.assertCanAmendPackagingPending(orderId, finishing);
+    }
+
     finishing.tailShippedQty = ship;
     finishing.tailInboundQty = inbound;
     finishing.defectQuantity = defect;
     finishing.remark = remark?.trim() || null;
-    finishing.completedAt = new Date();
-    /** 生成待入库并直接完成订单 */
-    finishing.status = 'inbound';
-    await this.finishingRepo.save(finishing);
 
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'tailing_inbound_completed',
-      actorUserId: actorUserId ?? 0,
-    });
-    if (next && next !== order.status) {
-      order.status = next;
-      order.statusTime = new Date();
-      await this.orderRepo.save(order);
+    if (isFirstRegister) {
+      finishing.completedAt = new Date();
+      /** 生成待入库并直接完成订单 */
+      finishing.status = 'inbound';
+      await this.finishingRepo.save(finishing);
+
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'tailing_inbound_completed',
+        actorUserId: actorUserId ?? 0,
+      });
+      if (next && next !== order.status) {
+        order.status = next;
+        order.statusTime = new Date();
+        await this.orderRepo.save(order);
+      }
+    } else {
+      await this.finishingRepo.save(finishing);
+      await this.inboundPendingRepo.delete({ orderId: order.id, status: 'pending' });
     }
 
     const pendingRows: InboundPending[] = [];

@@ -368,7 +368,22 @@
       </p>
       <div class="subtotal production-subtotal">
         <span class="production-selected-count">已选 {{ selectedProductionRows.length }} 条</span>
-        <span>生产工序小计：<strong>{{ formatMoney(productionProcessTotal) }}</strong> 元</span>
+        <span class="production-multiplier-wrap">
+          工序倍率
+          <el-input-number
+            v-model="productionCostMultiplier"
+            :min="0"
+            :step="0.1"
+            :controls="false"
+            size="small"
+            class="production-multiplier-input"
+          />
+          ×
+        </span>
+        <span>
+          生产工序小计：<strong>{{ formatMoney(productionProcessBaseTotal) }}</strong> × {{ formatDisplayNumber(productionCostMultiplier) }}
+          = <strong>{{ formatMoney(productionProcessTotal) }}</strong> 元
+        </span>
       </div>
       <el-dialog
         v-model="importTemplateDialog.visible"
@@ -534,6 +549,7 @@ const productionAddedProcessIds = computed(() =>
     .filter((id): id is number => Number.isInteger(id) && id > 0),
 )
 const selectedProductionRows = ref<ProductionRow[]>([])
+const productionCostMultiplier = ref(2)
 const profitMargin = ref(0.1)
 const savingDraft = ref(false)
 const confirmingQuote = ref(false)
@@ -630,9 +646,10 @@ const materialTotal = computed(() =>
 const processItemTotal = computed(() =>
   processItemRows.value.reduce((sum, row) => sum + processItemAmount(row), 0)
 )
-const productionProcessTotal = computed(() =>
+const productionProcessBaseTotal = computed(() =>
   productionRows.value.reduce((sum, row) => sum + productionAmount(row), 0)
 )
+const productionProcessTotal = computed(() => productionProcessBaseTotal.value * productionCostMultiplier.value)
 const totalCost = computed(() => materialTotal.value + processItemTotal.value + productionProcessTotal.value)
 const computedExFactoryPrice = computed(() => {
   const cost = totalCost.value
@@ -719,6 +736,12 @@ function normalizeProfitMargin(v: unknown): number {
   return n
 }
 
+function normalizeProductionCostMultiplier(v: unknown): number {
+  const n = typeof v === 'number' ? v : Number(v)
+  if (!Number.isFinite(n) || n < 0) return 2
+  return n
+}
+
 const canSubmitCost = computed(() => authStore.hasPermission('orders_cost_submit'))
 
 function formatTimeLabel(iso: string): string {
@@ -760,6 +783,7 @@ function buildSnapshotPayload() {
       unitPrice: row.unitPrice,
       remark: row.remark ?? '',
     })),
+    productionCostMultiplier: productionCostMultiplier.value,
     profitMargin: profitMargin.value,
   }
 }
@@ -1113,6 +1137,9 @@ async function loadCostSnapshot() {
       if (Array.isArray(s.materialRows) && s.materialRows.length) materialRows.value = s.materialRows as MaterialRow[]
       if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows as ProcessItemRow[]
       if (Array.isArray(s.productionRows) && s.productionRows.length) productionRows.value = s.productionRows as ProductionRow[]
+      if (s.productionCostMultiplier !== undefined) {
+        productionCostMultiplier.value = normalizeProductionCostMultiplier(s.productionCostMultiplier)
+      }
       if (s.profitMargin !== undefined) profitMargin.value = normalizeProfitMargin(s.profitMargin)
       quoteConfirmedAt.value = typeof s.quoteConfirmedAt === 'string' ? s.quoteConfirmedAt : ''
       quoteConfirmedBy.value = typeof s.quoteConfirmedBy === 'string' ? s.quoteConfirmedBy : ''
@@ -1595,11 +1622,23 @@ watch(
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
 }
 
 .production-selected-count {
   color: var(--el-text-color-secondary);
   font-size: var(--font-size-caption);
+}
+
+.production-multiplier-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.production-multiplier-input {
+  width: 88px;
 }
 
 .process-checkbox-wrap {

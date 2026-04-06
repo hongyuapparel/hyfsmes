@@ -464,6 +464,7 @@
 
     <!-- 分页 -->
     <div class="pagination-wrap">
+      <div class="pagination-summary">总件数：{{ totalQuantity }} 件</div>
       <el-pagination
         v-model:current-page="pagination.page"
         v-model:page-size="pagination.pageSize"
@@ -848,6 +849,7 @@ const list = ref<OrderListItem[]>([])
 const loading = ref(false)
 const statusCounts = ref<Record<string, number>>({})
 const statusTotal = ref<number>(0)
+const totalQuantity = ref<number>(0)
 
 const viewDialog = reactive<{ visible: boolean; order: OrderListItem | null }>({
   visible: false,
@@ -1182,6 +1184,7 @@ async function loadList() {
     if (data && currentReqId === listReqId) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
     }
   } catch (e: unknown) {
     if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
@@ -2028,7 +2031,13 @@ let countsAbortController: AbortController | null = null
 .pagination-wrap {
   margin-top: var(--space-md);
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pagination-summary {
+  font-size: var(--font-size-caption, 12px);
+  color: var(--color-text-secondary, #606266);
 }
 
 .json-preview {

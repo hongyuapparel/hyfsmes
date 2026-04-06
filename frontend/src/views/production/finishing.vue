@@ -77,6 +77,14 @@
         >
           登记包装完成
         </el-button>
+        <el-button
+          v-if="hasSelection && canAmendPackagingSelection"
+          type="primary"
+          size="large"
+          @click="openPackagingAmendDialog"
+        >
+          修改入库/次品
+        </el-button>
         <!-- 新流程：尾部不再处理发货/入库/财务审批，交由仓库模块 -->
       </div>
     </div>
@@ -430,12 +438,17 @@
     <!-- 登记包装完成弹窗：默认全部入库，生成待入库并完成订单 -->
     <el-dialog
       v-model="packagingCompleteDialog.visible"
-      title="登记包装完成"
+      :title="packagingCompleteDialog.mode === 'amend' ? '修改入库/次品' : '登记包装完成'"
       width="800"
       destroy-on-close
-      @close="packagingCompleteDialog.items = []"
+      @close="resetPackagingCompleteDialog"
     >
-      <p class="dialog-tip">登记包装完成后将默认“全部入库”，自动生成一条仓库「待仓处理」记录，同时订单状态变为「订单完成」。后续发货/入库等由仓库模块处理。</p>
+      <p v-if="packagingCompleteDialog.mode === 'register'" class="dialog-tip">
+        登记包装完成后将默认“全部入库”，自动生成一条仓库「待仓处理」记录，同时订单状态变为「订单完成」。后续发货/入库等由仓库模块处理。
+      </p>
+      <p v-else class="dialog-tip">
+        在仓库尚未对「待仓处理」记录完成入库或发货前，可修正入库数与次品数；保存后将按新数量重建待仓记录。若待仓已处理，请改走仓库调整流程。
+      </p>
       <div v-if="packagingCompleteDialog.formLoading" class="register-loading">加载尺寸细数...</div>
       <template v-else>
         <div
@@ -519,7 +532,7 @@
       <template #footer>
         <el-button @click="packagingCompleteDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="packagingCompleteDialog.submitting" @click="submitPackagingComplete">
-          确定
+          {{ packagingCompleteDialog.mode === 'amend' ? '保存修改' : '确定' }}
         </el-button>
       </template>
     </el-dialog>
@@ -618,6 +631,11 @@ const canPackagingCompleteSelection = computed(() =>
   selectedRows.value.length > 0 &&
   selectedRows.value.every((r) => r.finishingStatus === 'pending_assign'),
 )
+/** 尾部完成：待仓尚未处理时可改入库/次品（与后端校验一致） */
+const canAmendPackagingSelection = computed(() =>
+  selectedRows.value.length > 0 &&
+  selectedRows.value.every((r) => r.finishingStatus === 'inbound'),
+)
 const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-finishing-main')
 
 function getTabLabel(tab: FinishingTabConfig): string {
@@ -683,10 +701,16 @@ interface PackagingCompleteItem {
 
 const packagingCompleteDialog = reactive<{
   visible: boolean
+  mode: 'register' | 'amend'
   submitting: boolean
   formLoading: boolean
   items: PackagingCompleteItem[]
-}>({ visible: false, submitting: false, formLoading: false, items: [] })
+}>({ visible: false, mode: 'register', submitting: false, formLoading: false, items: [] })
+
+function resetPackagingCompleteDialog() {
+  packagingCompleteDialog.items = []
+  packagingCompleteDialog.mode = 'register'
+}
 
 function packagingSizeTableRows(item: PackagingCompleteItem) {
   const received = item.row.tailReceivedQty ?? 0
@@ -933,6 +957,7 @@ async function submitReceive() {
 async function openPackagingCompleteDialog() {
   const rows = selectedRows.value.filter((r) => r.finishingStatus === 'pending_assign')
   if (rows.length === 0) return
+  packagingCompleteDialog.mode = 'register'
   packagingCompleteDialog.visible = true
   packagingCompleteDialog.formLoading = true
   packagingCompleteDialog.items = []
@@ -969,6 +994,50 @@ async function openPackagingCompleteDialog() {
   }
 }
 
+async function openPackagingAmendDialog() {
+  const rows = selectedRows.value.filter((r) => r.finishingStatus === 'inbound')
+  if (rows.length === 0) return
+  packagingCompleteDialog.mode = 'amend'
+  packagingCompleteDialog.visible = true
+  packagingCompleteDialog.formLoading = true
+  packagingCompleteDialog.items = []
+  try {
+    for (const row of rows) {
+      const res = await getFinishingRegisterFormData(row.orderId)
+      const data = res.data
+      const headers = data?.headers ?? ['合计']
+      const orderRow = data?.orderRow ?? []
+      const cutRow = data?.cutRow ?? []
+      const sewingRow = data?.sewingRow ?? []
+      const tailReceivedRow = data?.tailReceivedRow ?? []
+      const sizeCount = headers.length > 1 ? headers.length - 1 : 1
+      const item: PackagingCompleteItem = {
+        row,
+        headers,
+        orderRow,
+        cutRow,
+        sewingRow,
+        tailReceivedRow,
+        inboundQuantities: Array(sizeCount).fill(0),
+        defectQuantities: Array(sizeCount).fill(0),
+        remark: row.remark?.trim() ?? '',
+      }
+      const inb = row.tailInboundQty ?? 0
+      const def = row.defectQuantity ?? 0
+      if (sizeCount >= 1) {
+        item.inboundQuantities[0] = inb
+        item.defectQuantities[0] = def
+      }
+      packagingCompleteDialog.items.push(item)
+    }
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
+    packagingCompleteDialog.visible = false
+  } finally {
+    packagingCompleteDialog.formLoading = false
+  }
+}
+
 async function submitPackagingComplete() {
   if (packagingCompleteDialog.items.length === 0) return
   for (const item of packagingCompleteDialog.items) {
@@ -994,8 +1063,13 @@ async function submitPackagingComplete() {
         remark: item.remark?.trim() || undefined,
       })
     }
-    ElMessage.success('登记包装完成：已生成待仓处理记录，订单已完成')
+    ElMessage.success(
+      packagingCompleteDialog.mode === 'amend'
+        ? '已更新入库/次品登记，待仓处理记录已按新数量重建'
+        : '登记包装完成：已生成待仓处理记录，订单已完成',
+    )
     packagingCompleteDialog.visible = false
+    resetPackagingCompleteDialog()
     await load()
     void loadTabCounts()
   } catch (e: unknown) {

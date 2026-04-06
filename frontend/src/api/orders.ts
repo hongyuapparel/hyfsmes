@@ -69,6 +69,8 @@ export interface OrderListItem {
 export interface OrderListRes {
   list: OrderListItem[]
   total: number
+  /** 当前筛选条件下的总件数（quantity 求和） */
+  totalQuantity?: number
   page: number
   pageSize: number
 }
@@ -274,6 +276,7 @@ export interface OrderCostSnapshotRes {
     materialRows?: unknown[]
     processItemRows?: unknown[]
     productionRows?: unknown[]
+    productionCostMultiplier?: number
     profitMargin?: number
     quoteNeedsReconfirm?: boolean
     quoteConfirmedAt?: string
