@@ -13,7 +13,7 @@
       </span>
     </div>
     <div class="production-picker-layout">
-      <div class="production-picker-tree">
+      <div v-loading="jobTypesLoading" class="production-picker-tree">
         <el-tree
           :data="pickerTreeData"
           node-key="key"
@@ -84,9 +84,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ProductionProcessItem } from '@/api/production-processes'
+import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { formatDisplayNumber } from '@/utils/display-number'
 
 const props = defineProps<{
@@ -115,6 +116,9 @@ const activeDepartment = ref('')
 const activeJobType = ref('')
 const selectedIds = ref<number[]>([])
 const keyword = ref('')
+/** 与「订单设置-生产工序」同源：process_job_types 扁平列表，用于左侧树与系统配置一致 */
+const jobTypeOptionsFlat = ref<SystemOptionItem[]>([])
+const jobTypesLoading = ref(false)
 
 function formatMoney(n: number): string {
   if (!Number.isFinite(n)) return formatDisplayNumber(0)
@@ -127,9 +131,10 @@ function getJobTypeLabel(v: string): string {
   return parts.length ? parts[parts.length - 1] : v
 }
 
-const pickerTreeData = computed<PickerTreeNode[]>(() => {
+/** 仅从已有工序行推导树（无工种配置或接口失败时的兜底） */
+function buildPickerTreeFromProcessesOnly(processes: ProductionProcessItem[]): PickerTreeNode[] {
   const deptMap = new Map<string, Set<string>>()
-  props.productionProcesses.forEach((p) => {
+  processes.forEach((p) => {
     const dept = (p.department ?? '').trim()
     const job = (p.jobType ?? '').trim()
     if (!dept || !job) return
@@ -158,6 +163,78 @@ const pickerTreeData = computed<PickerTreeNode[]>(() => {
           jobType: job,
         })),
     }))
+}
+
+/**
+ * 与 order-settings 生产工序树一致：部门根下工种路径为 `部门 > 子 > 孙`，
+ * 仅叶子工种节点可选（与懒加载树中「先有子工种则不出工序」一致）。
+ */
+function buildPickerTreeFromJobTypes(flat: SystemOptionItem[]): PickerTreeNode[] {
+  const childrenMap = new Map<number | null, SystemOptionItem[]>()
+  for (const item of flat) {
+    const pid = item.parentId ?? null
+    if (!childrenMap.has(pid)) childrenMap.set(pid, [])
+    childrenMap.get(pid)!.push(item)
+  }
+  for (const arr of childrenMap.values()) {
+    arr.sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+  }
+  const roots = childrenMap.get(null) ?? []
+  const orderMap = new Map(DEPARTMENT_ORDER.map((d, i) => [d, i]))
+  const sortedRoots = roots.slice().sort((a, b) => {
+    const ai = orderMap.get(a.value) ?? DEPARTMENT_ORDER.length
+    const bi = orderMap.get(b.value) ?? DEPARTMENT_ORDER.length
+    if (ai !== bi) return ai - bi
+    return a.value.localeCompare(b.value)
+  })
+
+  function collectLeaves(
+    department: string,
+    nodeId: number,
+    pathPrefix: string,
+  ): PickerTreeNode[] {
+    const kids = childrenMap.get(nodeId) ?? []
+    if (kids.length === 0) {
+      return [
+        {
+          key: `job:${department}::${pathPrefix}`,
+          label: getJobTypeLabel(pathPrefix),
+          department,
+          jobType: pathPrefix,
+        },
+      ]
+    }
+    const out: PickerTreeNode[] = []
+    for (const c of kids) {
+      const nextPath = `${pathPrefix} > ${c.value}`
+      out.push(...collectLeaves(department, c.id, nextPath))
+    }
+    return out
+  }
+
+  return sortedRoots.map((root) => {
+    const department = root.value.trim()
+    const topKids = childrenMap.get(root.id) ?? []
+    const leaves: PickerTreeNode[] = []
+    for (const c of topKids) {
+      const path = `${department} > ${c.value}`
+      leaves.push(...collectLeaves(department, c.id, path))
+    }
+    return {
+      key: `dept:${department}`,
+      label: department,
+      department,
+      jobType: '',
+      children: leaves,
+    }
+  })
+}
+
+const pickerTreeData = computed<PickerTreeNode[]>(() => {
+  if (jobTypeOptionsFlat.value.length) {
+    return buildPickerTreeFromJobTypes(jobTypeOptionsFlat.value)
+  }
+  return buildPickerTreeFromProcessesOnly(props.productionProcesses)
 })
 
 const addedIdSet = computed(() => new Set(props.addedProcessIds))
@@ -248,16 +325,32 @@ function confirmAppend() {
 
 watch(
   () => props.modelValue,
-  (open) => {
-    if (!open) return
-    if (!activeDepartment.value || !activeJobType.value) {
-      const firstDept = pickerTreeData.value[0]
-      const firstJob = firstDept?.children?.[0]
-      activeDepartment.value = firstJob?.department ?? ''
-      activeJobType.value = firstJob?.jobType ?? ''
+  async (open) => {
+    if (!open) {
+      jobTypesLoading.value = false
+      return
+    }
+    jobTypesLoading.value = true
+    try {
+      const res = await getSystemOptionsList('process_job_types')
+      jobTypeOptionsFlat.value = res.data ?? []
+    } catch {
+      jobTypeOptionsFlat.value = []
+    } finally {
+      jobTypesLoading.value = false
     }
     selectedIds.value = []
     keyword.value = ''
+    await nextTick()
+    const firstDept = pickerTreeData.value[0]
+    const firstJob = firstDept?.children?.[0]
+    if (firstJob?.department && firstJob?.jobType) {
+      activeDepartment.value = firstJob.department
+      activeJobType.value = firstJob.jobType
+    } else {
+      activeDepartment.value = ''
+      activeJobType.value = ''
+    }
   },
 )
 </script>

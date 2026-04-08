@@ -183,7 +183,7 @@
           </el-col>
 
           <el-col :xs="24" :sm="12" :md="8">
-            <el-form-item label="跟单员">
+            <el-form-item label="跟单员" prop="merchandiser">
               <el-select
                 v-model="form.merchandiser"
                 placeholder="选择跟单员"
@@ -1137,6 +1137,7 @@ const rules: FormRules = {
       trigger: 'blur',
     },
   ],
+  merchandiser: [{ required: true, message: '请选择跟单员', trigger: 'change' }],
 }
 
 interface CustomerSelectItem {
@@ -2539,6 +2540,7 @@ function checkRequiredFields(): boolean {
   if (form.collaborationTypeId == null || form.collaborationTypeId === undefined) missing.push('合作方式')
   if ((form as any).orderTypeId == null || (form as any).orderTypeId === undefined) missing.push('订单类型')
   if (!form.customerDueDate) missing.push('客户交期')
+  if (!String(form.merchandiser ?? '').trim()) missing.push('跟单员')
   {
     const str = String(form.salePrice ?? '').trim()
     const num = Number(str)

@@ -1182,7 +1182,8 @@ function addProductionRow() {
   })
 }
 
-function openProductionPickerDialog() {
+async function openProductionPickerDialog() {
+  await loadProcesses()
   productionPickerVisible.value = true
 }
 
