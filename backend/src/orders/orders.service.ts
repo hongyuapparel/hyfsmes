@@ -1150,6 +1150,66 @@ export class OrdersService {
     return { list: listWithCount, total, totalQuantity, page, pageSize };
   }
 
+  private normColorNameForBreakdown(s: unknown): string {
+    return String(s ?? '').trim();
+  }
+
+  /** B 区单行 -> [各尺码, 合计]，长度与 headers 一致 */
+  private orderRowFromColorSizeRow(row: ColorSizeRow, sizeLen: number): number[] {
+    const q = Array.isArray(row?.quantities) ? row.quantities! : [];
+    const sizes = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Number(q[i]) || 0));
+    const tot = sizes.reduce((a, b) => a + b, 0);
+    return [...sizes, tot];
+  }
+
+  /** 裁床 actualCutRows 中按颜色汇总一行（与 B 区结构一致） */
+  private cutRowForColor(colorName: string, actualCutRows: ActualCutRow[] | null | undefined, sizeLen: number): number[] | null {
+    if (!actualCutRows?.length) return null;
+    const target = this.normColorNameForBreakdown(colorName);
+    const matching = actualCutRows.filter((r) => this.normColorNameForBreakdown((r as ActualCutRow).colorName) === target);
+    if (!matching.length) return null;
+    const sums = Array(sizeLen).fill(0) as number[];
+    for (const r of matching) {
+      const q = Array.isArray(r.quantities) ? r.quantities : [];
+      for (let i = 0; i < sizeLen; i++) sums[i] += Math.max(0, Number(q[i]) || 0);
+    }
+    const tot = sums.reduce((a, b) => a + b, 0);
+    return [...sums, tot];
+  }
+
+  /**
+   * 将「全单聚合」的一行按各尺码列上订单占比，拆到某一颜色行（车缝/入库等无颜色明细时使用）
+   */
+  private allocateAggByOrderColumns(
+    agg: (number | null)[] | null,
+    orderC: number[],
+    orderAll: number[],
+  ): (number | null)[] | null {
+    if (!agg || orderC.length !== agg.length || orderAll.length !== agg.length) return null;
+    const L = orderC.length;
+    const sizeLen = L - 1;
+    const out: (number | null)[] = [];
+    for (let i = 0; i < sizeLen; i++) {
+      const a = agg[i];
+      if (a == null) {
+        out.push(null);
+        continue;
+      }
+      const an = Number(a);
+      const oc = Number(orderC[i]) || 0;
+      const oa = Number(orderAll[i]) || 0;
+      if (oa > 0) out.push(Math.round((an * oc) / oa));
+      else out.push(null);
+    }
+    const aT = agg[sizeLen];
+    const cT = Number(orderC[sizeLen]) || 0;
+    const allT = Number(orderAll[sizeLen]) || 0;
+    if (aT == null) out.push(null);
+    else if (allT > 0) out.push(Math.round((Number(aT) * cT) / allT));
+    else out.push(cT > 0 ? Number(aT) : null);
+    return out;
+  }
+
   async getSizeBreakdown(orderId: number) {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -1277,7 +1337,52 @@ export class OrdersService {
       rows.push({ label: '尾部入库数', values: inboundRow });
     }
 
-    return { headers, rows };
+    const colorSizeRowsList = Array.isArray((ext as any)?.colorSizeRows) ? ((ext as any).colorSizeRows as ColorSizeRow[]) : [];
+
+    let orderAllNumeric: number[] = [];
+    if (orderPerSize && orderPerSize.length === headers.length) {
+      orderAllNumeric = orderPerSize.map((x) => Number(x) || 0);
+    } else {
+      orderAllNumeric = Array(headers.length).fill(0);
+      for (const cr of colorSizeRowsList) {
+        const r = this.orderRowFromColorSizeRow(cr, sizeLen);
+        for (let i = 0; i < r.length; i++) orderAllNumeric[i] += r[i];
+      }
+    }
+
+    const cutAggNullable: (number | null)[] | null = cutPerSize ? cutPerSize.map((x) => Number(x)) : null;
+    const byColor: Array<{ colorName: string; rows: Array<{ label: string; values: (number | null)[] }> }> = [];
+
+    if (!colorSizeRowsList.length) {
+      byColor.push({
+        colorName: '-',
+        rows: rows.map((r) => ({ label: r.label, values: [...r.values] })),
+      });
+    } else {
+      for (const cr of colorSizeRowsList) {
+        const displayName = this.normColorNameForBreakdown(cr?.colorName) || '-';
+        const orderC = this.orderRowFromColorSizeRow(cr, sizeLen);
+
+        const cutExact = this.cutRowForColor(this.normColorNameForBreakdown(cr?.colorName), cutting?.actualCutRows ?? null, sizeLen);
+        let cutVals: (number | null)[] | null = cutExact ? cutExact.map((x) => x) : null;
+        if (!cutVals && cutAggNullable) {
+          cutVals = this.allocateAggByOrderColumns(cutAggNullable, orderC, orderAllNumeric);
+        }
+
+        const sewVals = sewingRow ? this.allocateAggByOrderColumns(sewingRow, orderC, orderAllNumeric) : null;
+        const inbVals = inboundRow ? this.allocateAggByOrderColumns(inboundRow, orderC, orderAllNumeric) : null;
+
+        const blockRows: Array<{ label: string; values: (number | null)[] }> = [];
+        blockRows.push({ label: '订单数量', values: orderC.map((x) => x) });
+        if (cutVals) blockRows.push({ label: '裁床数量', values: cutVals });
+        if (sewVals) blockRows.push({ label: '车缝数量', values: sewVals });
+        if (inbVals) blockRows.push({ label: '尾部入库数', values: inbVals });
+
+        byColor.push({ colorName: displayName, rows: blockRows });
+      }
+    }
+
+    return { headers, rows, byColor };
   }
 
   /** 颜色×尺码明细（用于待入库数量悬停展示） */

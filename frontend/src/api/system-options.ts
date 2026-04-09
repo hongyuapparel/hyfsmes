@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 export interface SystemOptionItem {
   id: number
@@ -16,8 +17,8 @@ export function getSystemOptions(type: string) {
   return request.get<string[]>('/system-options', { params: { type } })
 }
 
-export function getSystemOptionsList(type: string) {
-  return request.get<SystemOptionItem[]>('/system-options/list', { params: { type } })
+export function getSystemOptionsList(type: string, config?: AxiosRequestConfig) {
+  return request.get<SystemOptionItem[]>('/system-options/list', { params: { type }, ...(config ?? {}) })
 }
 
 export function getSystemOptionsTree(type: string) {

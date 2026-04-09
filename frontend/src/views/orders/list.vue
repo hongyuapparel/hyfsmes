@@ -331,7 +331,7 @@
                 v-if="!isSampleOrder(item)"
                 placement="top-start"
                 trigger="hover"
-                :width="Math.max(320, (sizeBreakdownCache[item.id]?.headers.length || 1) * 72)"
+                :width="getSizePopoverWidth(item.id)"
                 :show-arrow="true"
                 @show="onShowSizePopover(item)"
               >
@@ -346,38 +346,44 @@
                     加载中...
                   </div>
                   <div v-else>
-                    <table
-                      v-if="sizeBreakdownCache[item.id]"
-                      class="qty-popover-table"
-                    >
-                      <thead>
-                        <tr>
-                          <th class="qty-header">尺码</th>
-                          <th
-                            v-for="(h, hIdx) in sizeBreakdownCache[item.id].headers"
-                            :key="h + hIdx"
-                            class="qty-header"
-                          >
-                            {{ h }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          v-for="row in sizeBreakdownCache[item.id].rows"
-                          :key="row.label"
-                        >
-                          <td class="qty-label">{{ row.label }}</td>
-                          <td
-                            v-for="(v, vIdx) in row.values"
-                            :key="vIdx"
-                            class="qty-value"
-                          >
-                            {{ v != null ? formatDisplayNumber(v) : '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
+                    <template v-if="sizePopoverBlocks(item.id).length">
+                      <div
+                        v-for="(block, bIdx) in sizePopoverBlocks(item.id)"
+                        :key="`${item.id}-bc-${bIdx}`"
+                        class="qty-popover-block"
+                      >
+                        <div class="qty-popover-subtitle">{{ block.colorName }}</div>
+                        <table class="qty-popover-table">
+                          <thead>
+                            <tr>
+                              <th class="qty-header">尺码</th>
+                              <th
+                                v-for="(h, hIdx) in sizeBreakdownCache[item.id]?.headers ?? []"
+                                :key="h + hIdx"
+                                class="qty-header"
+                              >
+                                {{ h }}
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr
+                              v-for="row in block.rows"
+                              :key="row.label"
+                            >
+                              <td class="qty-label">{{ row.label }}</td>
+                              <td
+                                v-for="(v, vIdx) in row.values"
+                                :key="vIdx"
+                                class="qty-value"
+                              >
+                                {{ v != null ? formatDisplayNumber(v) : '-' }}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </template>
                     <div v-else class="qty-popover-empty">
                       暂无尺码明细
                     </div>
@@ -614,7 +620,7 @@ import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { Edit, Printer, Clock, Coin, Document, ChatDotRound } from '@element-plus/icons-vue'
-import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, reviewRejectOrders, copyOrdersToDraft, getOrderLogs, getOrderRemarks, addOrderRemark, getOrderSizeBreakdown, type OrderListItem, type OrderListQuery, type OrderOperationLogItem, type OrderRemarkItem, type OrderSizeBreakdownRes } from '@/api/orders'
+import { getOrders, getOrderStatusCounts, deleteOrders, reviewOrders, reviewRejectOrders, copyOrdersToDraft, getOrderLogs, getOrderRemarks, addOrderRemark, getOrderSizeBreakdown, type OrderListItem, type OrderListQuery, type OrderOperationLogItem, type OrderRemarkItem, type OrderSizeBreakdownRes, type OrderSizeBreakdownColorBlock } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getCustomers, type CustomerItem, getSalespeople, getMerchandisers } from '@/api/customers'
 import { getDictItems, getDictTree } from '@/api/dicts'
@@ -1359,8 +1365,8 @@ async function onShowSizePopover(order: OrderListItem) {
   if (sizeBreakdownCache.value[id] || sizePopoverLoadingId.value === id) return
   sizePopoverLoadingId.value = id
   try {
-    const res = await getOrderSizeBreakdown(id)
-    sizeBreakdownCache.value[id] = normalizeSizeBreakdown(res.data ?? { headers: [], rows: [] })
+    const sizeRes = await getOrderSizeBreakdown(id)
+    sizeBreakdownCache.value[id] = normalizeSizeBreakdown(sizeRes.data ?? { headers: [], rows: [] })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) {
       ElMessage.error(getErrorMessage(e, '尺码明细加载失败'))
@@ -1370,51 +1376,79 @@ async function onShowSizePopover(order: OrderListItem) {
   }
 }
 
-function normalizeSizeBreakdown(data: OrderSizeBreakdownRes): OrderSizeBreakdownRes {
-  const headers = Array.isArray(data.headers) ? data.headers : []
-  const expectedLen = headers.length
-  let rows = Array.isArray(data.rows) ? data.rows.map((r) => ({ ...r, values: [...(r.values ?? [])] })) : []
+function getSizePopoverWidth(orderId: number): number {
+  const cols = sizeBreakdownCache.value[orderId]?.headers?.length || 1
+  return Math.max(320, cols * 72)
+}
 
-  // 兼容旧后端返回：前端不再展示“尾部出货数”
+function sizePopoverBlocks(orderId: number): OrderSizeBreakdownColorBlock[] {
+  const d = sizeBreakdownCache.value[orderId]
+  if (!d) return []
+  if (d.byColor?.length) return d.byColor
+  if (d.rows?.length) return [{ colorName: '-', rows: d.rows }]
+  return []
+}
+
+function normalizeBlockRows(
+  headers: string[],
+  rowsIn: Array<{ label: string; values: (number | null)[] }>,
+): Array<{ label: string; values: (number | null)[] }> {
+  const expectedLen = headers.length
+  let rows = Array.isArray(rowsIn) ? rowsIn.map((r) => ({ ...r, values: [...(r.values ?? [])] })) : []
+
   rows = rows.filter((r) => r.label !== '尾部出货数')
 
-  if (expectedLen <= 1) return { headers, rows }
+  if (expectedLen <= 1) return rows
 
   const inbound = rows.find((r) => r.label === '尾部入库数')
-  if (!inbound) return { headers, rows }
+  if (!inbound) return rows
 
   while (inbound.values.length < expectedLen) inbound.values.push(null)
   inbound.values = inbound.values.slice(0, expectedLen)
 
   const inboundTotalRaw = inbound.values[expectedLen - 1]
   const inboundTotal = Number(inboundTotalRaw)
-  if (!Number.isFinite(inboundTotal) || inboundTotal <= 0) return { headers, rows }
+  if (!Number.isFinite(inboundTotal) || inboundTotal <= 0) return rows
 
   const hasInboundPerSize = inbound.values.slice(0, expectedLen - 1).some((v) => Number(v) > 0)
-  if (hasInboundPerSize) return { headers, rows }
+  if (hasInboundPerSize) return rows
 
   const referenceLabels = ['尾部收货数', '车缝数量', '裁床数量', '订单数量']
   const refRow = rows.find((r) => referenceLabels.includes(r.label))
-  if (!refRow || !Array.isArray(refRow.values) || refRow.values.length < expectedLen) return { headers, rows }
+  if (!refRow || !Array.isArray(refRow.values) || refRow.values.length < expectedLen) return rows
 
   const base = refRow.values.slice(0, expectedLen - 1).map((v) => Math.max(0, Number(v) || 0))
   const baseTotal = base.reduce((sum, n) => sum + n, 0)
-  if (baseTotal <= 0) return { headers, rows }
+  if (baseTotal <= 0) return rows
 
   const exact = base.map((n) => (n * inboundTotal) / baseTotal)
   const floors = exact.map((n) => Math.floor(n))
   let remain = inboundTotal - floors.reduce((sum, n) => sum + n, 0)
-  const order = exact
+  const orderFr = exact
     .map((n, idx) => ({ idx, frac: n - Math.floor(n) }))
     .sort((a, b) => b.frac - a.frac)
-  for (const item of order) {
+  for (const x of orderFr) {
     if (remain <= 0) break
-    floors[item.idx] += 1
+    floors[x.idx] += 1
     remain -= 1
   }
 
   inbound.values = [...floors, inboundTotal]
-  return { headers, rows }
+  return rows
+}
+
+function normalizeSizeBreakdown(data: OrderSizeBreakdownRes): OrderSizeBreakdownRes {
+  const headers = Array.isArray(data.headers) ? data.headers : []
+  const rows = normalizeBlockRows(headers, data.rows ?? [])
+  const byColor = Array.isArray(data.byColor) && data.byColor.length
+    ? data.byColor.map((bc) => ({
+        colorName: bc.colorName,
+        rows: normalizeBlockRows(headers, bc.rows ?? []),
+      }))
+    : rows.length
+      ? [{ colorName: '-', rows }]
+      : []
+  return { headers, rows, byColor }
 }
 
 function openEdit(order: OrderListItem) {
@@ -1903,6 +1937,17 @@ let countsAbortController: AbortController | null = null
 .qty-popover-title {
   font-weight: 600;
   margin-bottom: 6px;
+}
+
+.qty-popover-subtitle {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.qty-popover-block:not(:first-child) {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
 }
 
 .qty-popover-table {

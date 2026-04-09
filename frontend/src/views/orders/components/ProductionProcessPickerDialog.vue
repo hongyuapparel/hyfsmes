@@ -5,6 +5,7 @@
     width="760px"
     class="production-picker-dialog"
     :close-on-click-modal="false"
+    destroy-on-close
     @update:model-value="emit('update:modelValue', $event)"
   >
     <div class="production-picker-toolbar">
@@ -45,6 +46,7 @@
         />
         <el-table
           :data="pickerProcessOptions"
+          row-key="id"
           size="small"
           border
           height="300"
@@ -76,7 +78,7 @@
     </div>
     <template #footer>
       <el-button @click="emit('update:modelValue', false)">关闭</el-button>
-      <el-button type="primary" :disabled="!selectedIds.length" @click="confirmAppend">
+      <el-button type="primary" :loading="appendSubmitting" :disabled="!selectedIds.length || appendSubmitting" @click="confirmAppend">
         添加所选（{{ selectedIds.length }}）
       </el-button>
     </template>
@@ -84,7 +86,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ProductionProcessItem } from '@/api/production-processes'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
@@ -116,9 +118,15 @@ const activeDepartment = ref('')
 const activeJobType = ref('')
 const selectedIds = ref<number[]>([])
 const keyword = ref('')
+const debouncedKeyword = ref('')
+const appendSubmitting = ref(false)
 /** 与「订单设置-生产工序」同源：process_job_types 扁平列表，用于左侧树与系统配置一致 */
 const jobTypeOptionsFlat = ref<SystemOptionItem[]>([])
 const jobTypesLoading = ref(false)
+let keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let jobTypesController: AbortController | null = null
+let loadToken = 0
+let jobTypeCache: SystemOptionItem[] | null = null
 
 function formatMoney(n: number): string {
   if (!Number.isFinite(n)) return formatDisplayNumber(0)
@@ -247,23 +255,36 @@ const processById = computed(() => {
   return map
 })
 
+const processPoolByDeptJob = computed(() => {
+  const map = new Map<string, Array<{ id: number; name: string; nameLower: string; unitPrice: number }>>()
+  props.productionProcesses.forEach((p) => {
+    const dept = (p.department ?? '').trim()
+    const job = (p.jobType ?? '').trim()
+    const key = `${dept}::${job}`
+    if (!map.has(key)) map.set(key, [])
+    map.get(key)!.push({
+      id: p.id,
+      name: p.name || '未命名工序',
+      nameLower: String(p.name ?? '').toLowerCase(),
+      unitPrice: Number(p.unitPrice) || 0,
+    })
+  })
+  return map
+})
+
 const pickerProcessOptions = computed(() => {
   const dept = activeDepartment.value.trim()
   const job = activeJobType.value.trim()
-  const kw = keyword.value.trim().toLowerCase()
-  return props.productionProcesses
-    .filter((p) => {
-      const hitDept = !dept || (p.department ?? '').trim() === dept
-      const hitJob = !job || (p.jobType ?? '').trim() === job
-      const name = String(p.name ?? '').toLowerCase()
-      const hitKeyword = !kw || name.includes(kw)
-      return hitDept && hitJob && hitKeyword
-    })
+  const kw = debouncedKeyword.value.trim().toLowerCase()
+  const key = `${dept}::${job}`
+  const pool = processPoolByDeptJob.value.get(key) ?? []
+  return pool
+    .filter((p) => !kw || p.nameLower.includes(kw))
     .map((p) => ({
       id: p.id,
-      name: p.name || '未命名工序',
+      name: p.name,
       added: addedIdSet.value.has(p.id),
-      unitPrice: Number(p.unitPrice) || 0,
+      unitPrice: p.unitPrice,
     }))
 })
 
@@ -304,6 +325,7 @@ function onPickerProcessChecked(id: number, checked: boolean) {
 }
 
 function confirmAppend() {
+  if (appendSubmitting.value) return
   const ids = selectedIds.value.filter((id) => Number.isInteger(id) && id > 0)
   if (!ids.length) return
   const existing = addedIdSet.value
@@ -317,30 +339,68 @@ function confirmAppend() {
     ElMessage.warning('所选工序均已存在')
     return
   }
+  appendSubmitting.value = true
   emit('append', toAdd)
   selectedIds.value = []
   emit('update:modelValue', false)
   ElMessage.success(`已添加 ${toAdd.length} 条工序`)
+  nextTick(() => {
+    appendSubmitting.value = false
+  })
+}
+
+watch(keyword, (v) => {
+  if (keywordDebounceTimer) clearTimeout(keywordDebounceTimer)
+  keywordDebounceTimer = setTimeout(() => {
+    debouncedKeyword.value = v
+    keywordDebounceTimer = null
+  }, 120)
+})
+
+function cancelPendingJobTypeRequest() {
+  if (jobTypesController) {
+    jobTypesController.abort()
+    jobTypesController = null
+  }
+  jobTypesLoading.value = false
+}
+
+async function ensureJobTypesLoaded() {
+  if (jobTypeCache) {
+    jobTypeOptionsFlat.value = jobTypeCache
+    return
+  }
+  cancelPendingJobTypeRequest()
+  const token = ++loadToken
+  const controller = new AbortController()
+  jobTypesController = controller
+  jobTypesLoading.value = true
+  try {
+    const res = await getSystemOptionsList('process_job_types', { signal: controller.signal })
+    if (token !== loadToken) return
+    jobTypeCache = res.data ?? []
+    jobTypeOptionsFlat.value = jobTypeCache
+  } catch {
+    if (token !== loadToken) return
+    jobTypeOptionsFlat.value = []
+  } finally {
+    if (token === loadToken) jobTypesLoading.value = false
+    if (jobTypesController === controller) jobTypesController = null
+  }
 }
 
 watch(
   () => props.modelValue,
   async (open) => {
     if (!open) {
-      jobTypesLoading.value = false
+      cancelPendingJobTypeRequest()
+      appendSubmitting.value = false
       return
     }
-    jobTypesLoading.value = true
-    try {
-      const res = await getSystemOptionsList('process_job_types')
-      jobTypeOptionsFlat.value = res.data ?? []
-    } catch {
-      jobTypeOptionsFlat.value = []
-    } finally {
-      jobTypesLoading.value = false
-    }
+    await ensureJobTypesLoaded()
     selectedIds.value = []
     keyword.value = ''
+    debouncedKeyword.value = ''
     await nextTick()
     const firstDept = pickerTreeData.value[0]
     const firstJob = firstDept?.children?.[0]
@@ -353,6 +413,14 @@ watch(
     }
   },
 )
+
+onBeforeUnmount(() => {
+  cancelPendingJobTypeRequest()
+  if (keywordDebounceTimer) {
+    clearTimeout(keywordDebounceTimer)
+    keywordDebounceTimer = null
+  }
+})
 </script>
 
 <style scoped>

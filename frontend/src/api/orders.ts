@@ -209,12 +209,24 @@ export function getOrderDetail(id: number) {
   return request.get<OrderDetail>(`/orders/${id}`)
 }
 
-export interface OrderSizeBreakdownRes {
-  headers: string[]
+/** 数量追踪：按颜色分块，每块含订单/裁床/车缝/尾部入库等行 */
+export interface OrderSizeBreakdownColorBlock {
+  colorName: string
   rows: Array<{
     label: string
     values: (number | null)[]
   }>
+}
+
+export interface OrderSizeBreakdownRes {
+  headers: string[]
+  /** 全单聚合行（车缝/尾部等页悬停仍用） */
+  rows: Array<{
+    label: string
+    values: (number | null)[]
+  }>
+  /** 按 B 区颜色行拆分；订单列表悬停优先展示 */
+  byColor?: OrderSizeBreakdownColorBlock[]
 }
 
 /** 订单尺码数量追踪明细（列表数量悬停用） */

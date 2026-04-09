@@ -1188,6 +1188,11 @@ async function openProductionPickerDialog() {
 }
 
 function onProductionPickerAppend(items: ProductionProcessItem[]) {
+  const existing = new Set(
+    productionRows.value
+      .map((r) => Number(r.processId))
+      .filter((id): id is number => Number.isInteger(id) && id > 0),
+  )
   const rows = items.map((p) => ({
     processId: p.id,
     department: p.department ?? '',
@@ -1195,7 +1200,8 @@ function onProductionPickerAppend(items: ProductionProcessItem[]) {
     processName: p.name ?? '',
     remark: '',
     unitPrice: Number(p.unitPrice) || 0,
-  }))
+  })).filter((r) => !existing.has(Number(r.processId)))
+  if (!rows.length) return
   productionRows.value = [...productionRows.value, ...rows]
 }
 
