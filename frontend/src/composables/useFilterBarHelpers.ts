@@ -1,5 +1,6 @@
 export const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const DATE_RANGE_WIDTH_EMPTY = '140px'
+/** 与订单列表日期筛选项一致，避免 placeholder（如「入库时间」）被截断 */
+const DATE_RANGE_WIDTH_EMPTY = '170px'
 const DATE_RANGE_WIDTH_FILLED = '220px'
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
@@ -43,6 +44,7 @@ export function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
 export function getFilterRangeStyle(v: [string, string] | [] | null | undefined) {
   const hasValue = Array.isArray(v) && v.length === 2
   const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  const base = { width, flex: `0 0 ${width}` }
+  // minWidth 覆盖 design-system 里 .filter-bar .filter-bar-item 的 min-width:120px
+  const base = { width, minWidth: width, flex: `0 0 ${width}` }
   return hasValue ? { ...base, ...ACTIVE_SELECT_STYLE } : base
 }

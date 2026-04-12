@@ -14,6 +14,18 @@ export class FabricStock {
   @Column({ name: 'customer_name', length: 255, default: '' })
   customerName: string;
 
+  /** 面料供应商 suppliers.id */
+  @Column({ name: 'supplier_id', type: 'int', nullable: true })
+  supplierId: number | null;
+
+  /** 仓库 system_options.id（option_type = warehouses） */
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
+
+  /** 存放地址（自由文本） */
+  @Column({ name: 'storage_location', length: 255, default: '' })
+  storageLocation: string;
+
   /** 面料名称/编号 */
   @Column({ name: 'name', length: 128, default: '' })
   name: string;

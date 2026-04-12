@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, Repository, SelectQueryBuilder } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
@@ -74,6 +74,136 @@ export class FinishedGoodsStockService {
     return n.toFixed(2);
   }
 
+  /** 解析新增库存传入的颜色尺码；返回落库快照（不含图）与待写入的颜色图片行 */
+  private parseColorSizeInput(raw: unknown): {
+    snapshot: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null;
+    imageRows: Array<{ colorName: string; imageUrl: string }>;
+  } {
+    if (!raw || typeof raw !== 'object') return { snapshot: null, imageRows: [] };
+    const o = raw as Record<string, unknown>;
+    const headersRaw = Array.isArray(o.headers) ? (o.headers as unknown[]) : [];
+    const headers = headersRaw.map((h) => String(h ?? '').trim()).filter((h) => h.length > 0);
+    const rowsRaw = Array.isArray(o.rows) ? (o.rows as unknown[]) : [];
+    if (!headers.length || !rowsRaw.length) return { snapshot: null, imageRows: [] };
+    const rows: Array<{ colorName: string; quantities: number[] }> = [];
+    const imageRows: Array<{ colorName: string; imageUrl: string }> = [];
+    for (const item of rowsRaw) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      const colorName = String(row.colorName ?? '').trim();
+      const qa = Array.isArray(row.quantities) ? (row.quantities as unknown[]) : [];
+      const quantities = headers.map((_, i) => {
+        const n = Number(qa[i]);
+        return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
+      });
+      rows.push({ colorName, quantities });
+      const img = String(row.imageUrl ?? '').trim();
+      if (colorName && img) imageRows.push({ colorName, imageUrl: img });
+    }
+    if (!rows.length) return { snapshot: null, imageRows: [] };
+    return { snapshot: { headers, rows }, imageRows };
+  }
+
+  /** 待入库列表：与列表筛选一致的总件数 */
+  private applyInboundTimeRange(
+    qb: SelectQueryBuilder<any>,
+    columnSql: string,
+    startDate?: string,
+    endDate?: string,
+  ) {
+    if (startDate?.trim()) {
+      qb.andWhere(`${columnSql} >= :inboundStart`, { inboundStart: `${startDate.trim()} 00:00:00` });
+    }
+    if (endDate?.trim()) {
+      qb.andWhere(`${columnSql} <= :inboundEnd`, { inboundEnd: `${endDate.trim()} 23:59:59` });
+    }
+  }
+
+  private async sumPendingQuantitiesForList(filters: {
+    orderNo?: string;
+    skuCode?: string;
+    customerName?: string;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<number> {
+    const qb = this.pendingRepo
+      .createQueryBuilder('p')
+      .innerJoin(Order, 'o', 'o.id = p.order_id')
+      .where('p.status = :status', { status: 'pending' })
+      .select('COALESCE(SUM(p.quantity), 0)', 'qty');
+    if (filters.orderNo?.trim()) {
+      qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${filters.orderNo.trim()}%` });
+    }
+    if (filters.skuCode?.trim()) {
+      qb.andWhere('p.sku_code LIKE :skuCode', { skuCode: `%${filters.skuCode.trim()}%` });
+    }
+    if (filters.customerName?.trim()) {
+      qb.andWhere('o.customer_name LIKE :customerName', {
+        customerName: `%${filters.customerName.trim()}%`,
+      });
+    }
+    this.applyInboundTimeRange(qb, 'p.created_at', filters.startDate, filters.endDate);
+    const row = await qb.getRawOne<{ qty: string | number }>();
+    return Number(row?.qty ?? 0) || 0;
+  }
+
+  /** 已入库列表：与列表筛选一致的总件数 */
+  private async sumStoredQuantitiesForList(filters: {
+    orderNo?: string;
+    skuCode?: string;
+    customerName?: string;
+    inventoryTypeId?: number | null;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<number> {
+    const qb = this.stockRepo
+      .createQueryBuilder('s')
+      .leftJoin(Order, 'o', 'o.id = s.order_id')
+      .select('COALESCE(SUM(s.quantity), 0)', 'qty');
+    if (filters.orderNo?.trim()) {
+      qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${filters.orderNo.trim()}%` });
+    }
+    if (filters.skuCode?.trim()) {
+      qb.andWhere('s.sku_code LIKE :skuCode', { skuCode: `%${filters.skuCode.trim()}%` });
+    }
+    if (filters.customerName?.trim()) {
+      qb.andWhere('s.customer_name LIKE :customerName', {
+        customerName: `%${filters.customerName.trim()}%`,
+      });
+    }
+    if (filters.inventoryTypeId != null) {
+      qb.andWhere('s.inventory_type_id = :inventoryTypeId', { inventoryTypeId: filters.inventoryTypeId });
+    }
+    this.applyInboundTimeRange(qb, 's.created_at', filters.startDate, filters.endDate);
+    const row = await qb.getRawOne<{ qty: string | number }>();
+    return Number(row?.qty ?? 0) || 0;
+  }
+
+  private async persistColorImagesForStock(
+    stockId: number,
+    imageRows: Array<{ colorName: string; imageUrl: string }>,
+  ): Promise<void> {
+    for (const { colorName, imageUrl } of imageRows) {
+      if (!colorName) continue;
+      try {
+        if (!imageUrl) {
+          const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: stockId, colorName } });
+          if (existing) await this.colorImageRepo.remove(existing);
+          continue;
+        }
+        const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: stockId, colorName } });
+        if (existing) {
+          existing.imageUrl = imageUrl;
+          await this.colorImageRepo.save(existing);
+        } else {
+          await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: stockId, colorName, imageUrl }));
+        }
+      } catch (e) {
+        if (!this.isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+      }
+    }
+  }
+
   private async resolvePickupUser(pickupUserId?: number | null): Promise<{ pickupId: number | null; pickupUserName: string }> {
     if (pickupUserId == null) {
       return { pickupId: null, pickupUserName: '' };
@@ -95,19 +225,85 @@ export class FinishedGoodsStockService {
     };
   }
 
-  /** 手动新增成品库存（仓库直接入库）；订单号可选，不填则不关联订单 */
-  async createManual(dto: {
-    orderNo?: string;
+  /** 与「新增库存」合并维度一致：同 SKU + 同订单关联 + 同仓库 + 同库存类型 + 同部门 + 同存放地址 → 累加数量并记操作日志 */
+  private async findMergeableFinishedStock(params: {
     skuCode: string;
-    quantity: number;
-    unitPrice?: string | number;
-    warehouseId?: number | null;
-    inventoryTypeId?: number | null;
+    orderId: number | null;
+    warehouseId: number | null;
+    inventoryTypeId: number | null;
     department: string;
     location: string;
-    imageUrl?: string;
-  }): Promise<FinishedGoodsStock> {
+  }): Promise<FinishedGoodsStock | null> {
+    const sku = params.skuCode.trim();
+    const dep = params.department.trim();
+    const loc = params.location.trim();
+    if (!sku) return null;
+    const qb = this.stockRepo
+      .createQueryBuilder('s')
+      .where('s.skuCode = :sku', { sku })
+      .andWhere('s.department = :dep', { dep })
+      .andWhere('s.location = :loc', { loc });
+    if (params.orderId != null) qb.andWhere('s.orderId = :oid', { oid: params.orderId });
+    else qb.andWhere('s.orderId IS NULL');
+    if (params.warehouseId != null) qb.andWhere('s.warehouseId = :wid', { wid: params.warehouseId });
+    else qb.andWhere('s.warehouseId IS NULL');
+    if (params.inventoryTypeId != null) qb.andWhere('s.inventoryTypeId = :iid', { iid: params.inventoryTypeId });
+    else qb.andWhere('s.inventoryTypeId IS NULL');
+    qb.orderBy('s.id', 'DESC');
+    return (await qb.getOne()) ?? null;
+  }
+
+  private stockAdjustSnapshot(stock: FinishedGoodsStock) {
+    return {
+      department: stock.department ?? '',
+      inventoryTypeId: stock.inventoryTypeId ?? null,
+      warehouseId: stock.warehouseId ?? null,
+      location: stock.location ?? '',
+      quantity: stock.quantity ?? 0,
+      unitPrice: stock.unitPrice != null ? String(stock.unitPrice) : '0',
+    };
+  }
+
+  private async appendFinishedStockAdjustLog(
+    finishedStockId: number,
+    operatorUsername: string,
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    remark: string,
+  ): Promise<void> {
+    try {
+      await this.adjustLogRepo.save(
+        this.adjustLogRepo.create({
+          finishedStockId,
+          operatorUsername: (operatorUsername ?? '').trim(),
+          before,
+          after,
+          remark: (remark ?? '').trim(),
+        }),
+      );
+    } catch (e) {
+      if (!this.isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
+    }
+  }
+
+  /** 手动新增成品库存（仓库直接入库）；仅填写订单号时才关联订单并从订单带出客户与出厂价；不按 SKU 自动匹配订单 */
+  async createManual(
+    dto: {
+      orderNo?: string;
+      skuCode: string;
+      quantity: number;
+      unitPrice?: string | number;
+      warehouseId?: number | null;
+      inventoryTypeId?: number | null;
+      department: string;
+      location: string;
+      imageUrl?: string;
+      colorSize?: unknown;
+    },
+    operatorUsername = '',
+  ): Promise<FinishedGoodsStock> {
     const orderNo = dto.orderNo?.trim();
+    const { snapshot, imageRows } = this.parseColorSizeInput(dto.colorSize);
     const q = Number(dto.quantity);
     if (!Number.isInteger(q) || q <= 0) {
       throw new NotFoundException('数量必须为正整数');
@@ -122,14 +318,6 @@ export class FinishedGoodsStockService {
       if (!linkedOrder) {
         throw new NotFoundException('订单不存在');
       }
-    } else {
-      const skuCode = dto.skuCode?.trim() ?? '';
-      if (skuCode) {
-        linkedOrder = await this.orderRepo.findOne({
-          where: { skuCode },
-          order: { id: 'DESC' },
-        });
-      }
     }
 
     if (linkedOrder) {
@@ -142,22 +330,80 @@ export class FinishedGoodsStockService {
     const unitPriceStr =
       dto.unitPrice != null && dto.unitPrice !== ''
         ? this.normalizeOrderUnitPrice(dto.unitPrice)
-        : this.normalizeOrderUnitPrice(orderExFactoryPrice);
+        : linkedOrder
+          ? this.normalizeOrderUnitPrice(orderExFactoryPrice)
+          : this.normalizeOrderUnitPrice('0');
+    const warehouseId = dto.warehouseId != null ? Number(dto.warehouseId) : null;
+    const inventoryTypeId = dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null;
+    const department = dto.department?.trim() ?? '';
+    const location = dto.location?.trim() ?? '';
+    const imageUrl = dto.imageUrl?.trim() ?? '';
+    const skuCode = dto.skuCode?.trim() ?? '';
+
+    const existing = await this.findMergeableFinishedStock({
+      skuCode,
+      orderId,
+      warehouseId,
+      inventoryTypeId,
+      department,
+      location,
+    });
+    if (existing) {
+      const before = this.stockAdjustSnapshot(existing);
+      const oldQty = Math.max(0, Math.trunc(Number(existing.quantity) || 0));
+      const newQty = q;
+      const totalQty = oldQty + newQty;
+      const oldP = Number(existing.unitPrice);
+      const newP = Number(unitPriceStr);
+      const safeOldP = Number.isFinite(oldP) ? oldP : 0;
+      const safeNewP = Number.isFinite(newP) ? newP : 0;
+      const mergedUnit =
+        totalQty > 0 ? this.normalizeOrderUnitPrice((safeOldP * oldQty + safeNewP * newQty) / totalQty) : unitPriceStr;
+      existing.quantity = totalQty;
+      existing.unitPrice = mergedUnit;
+      if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl;
+      if (snapshot) {
+        existing.colorSizeSnapshot = snapshot;
+      }
+      try {
+        const saved = await this.stockRepo.save(existing);
+        await this.persistColorImagesForStock(saved.id, imageRows);
+        const after = this.stockAdjustSnapshot(saved);
+        await this.appendFinishedStockAdjustLog(
+          saved.id,
+          operatorUsername,
+          before,
+          after,
+          `合并入库 +${newQty} 件`,
+        );
+        return saved;
+      } catch (e: any) {
+        const msg = String(e?.message ?? '');
+        if (msg.includes("Column 'order_id' cannot be null")) {
+          throw new BadRequestException('当前环境要求关联订单，请选择订单号后再保存');
+        }
+        throw e;
+      }
+    }
+
     const stock = this.stockRepo.create({
       orderId,
-      skuCode: dto.skuCode?.trim() ?? '',
+      skuCode,
       quantity: q,
       unitPrice: unitPriceStr,
-      warehouseId: dto.warehouseId != null ? Number(dto.warehouseId) : null,
-      inventoryTypeId: dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null,
-      department: dto.department?.trim() ?? '',
-      location: dto.location?.trim() ?? '',
+      warehouseId,
+      inventoryTypeId,
+      department,
+      location,
       customerId,
       customerName,
-      imageUrl: dto.imageUrl?.trim() ?? '',
+      imageUrl,
+      colorSizeSnapshot: snapshot,
     });
     try {
-      return await this.stockRepo.save(stock);
+      const saved = await this.stockRepo.save(stock);
+      await this.persistColorImagesForStock(saved.id, imageRows);
+      return saved;
     } catch (e: any) {
       const msg = String(e?.message ?? '');
       if (msg.includes("Column 'order_id' cannot be null")) {
@@ -173,10 +419,45 @@ export class FinishedGoodsStockService {
     skuCode?: string;
     customerName?: string;
     inventoryTypeId?: number | null;
+    startDate?: string;
+    endDate?: string;
     page?: number;
     pageSize?: number;
-  }): Promise<{ list: FinishedStockRow[]; total: number; page: number; pageSize: number }> {
-    const { tab = 'all', orderNo, skuCode, customerName, inventoryTypeId, page = 1, pageSize = 20 } = params;
+  }): Promise<{
+    list: FinishedStockRow[];
+    total: number;
+    page: number;
+    pageSize: number;
+    totalQuantity: number;
+  }> {
+    const {
+      tab = 'all',
+      orderNo,
+      skuCode,
+      customerName,
+      inventoryTypeId,
+      startDate,
+      endDate,
+      page = 1,
+      pageSize = 20,
+    } = params;
+
+    const [pendingQtyTotal, storedQtyTotal] = await Promise.all([
+      tab === 'pending' || tab === 'all'
+        ? this.sumPendingQuantitiesForList({ orderNo, skuCode, customerName, startDate, endDate })
+        : Promise.resolve(0),
+      tab === 'stored' || tab === 'all'
+        ? this.sumStoredQuantitiesForList({
+            orderNo,
+            skuCode,
+            customerName,
+            inventoryTypeId,
+            startDate,
+            endDate,
+          })
+        : Promise.resolve(0),
+    ]);
+    const listTotalQuantity = pendingQtyTotal + storedQtyTotal;
 
     const list: FinishedStockRow[] = [];
     let total = 0;
@@ -197,6 +478,7 @@ export class FinishedGoodsStockService {
           customerName: `%${customerName.trim()}%`,
         });
       }
+      this.applyInboundTimeRange(countQb, 'p.created_at', startDate, endDate);
       const pendingTotal = await countQb.getCount();
 
       const pendingQb = this.pendingRepo
@@ -223,6 +505,7 @@ export class FinishedGoodsStockService {
           customerName: `%${customerName.trim()}%`,
         });
       }
+      this.applyInboundTimeRange(pendingQb, 'p.created_at', startDate, endDate);
       pendingQb.orderBy('p.created_at', 'DESC');
       const pendingRows = await pendingQb.getRawMany<{
         id: number;
@@ -257,6 +540,7 @@ export class FinishedGoodsStockService {
           total,
           page,
           pageSize,
+          totalQuantity: pendingQtyTotal,
         };
       }
       list.push(...pendingList);
@@ -301,6 +585,7 @@ export class FinishedGoodsStockService {
       if (inventoryTypeId != null) {
         stockQb.andWhere('s.inventory_type_id = :inventoryTypeId', { inventoryTypeId });
       }
+      this.applyInboundTimeRange(stockQb, 's.created_at', startDate, endDate);
       stockQb.orderBy('s.created_at', 'DESC');
       const storedCount = await stockQb.getCount();
       const storedRows = await stockQb
@@ -343,6 +628,7 @@ export class FinishedGoodsStockService {
           total: storedCount,
           page,
           pageSize,
+          totalQuantity: storedQtyTotal,
         };
       }
       list.push(...storedList);
@@ -361,10 +647,11 @@ export class FinishedGoodsStockService {
         total,
         page,
         pageSize,
+        totalQuantity: listTotalQuantity,
       };
     }
 
-    return { list: [], total: 0, page, pageSize };
+    return { list: [], total: 0, page, pageSize, totalQuantity: 0 };
   }
 
   /** 出库：支持单条或同一客户多条库存批量出库 */
@@ -590,7 +877,9 @@ export class FinishedGoodsStockService {
 
     const [order, product, ext] = await Promise.all([
       stock.orderId != null ? this.orderRepo.findOne({ where: { id: stock.orderId } }) : Promise.resolve(null),
-      stock.skuCode?.trim() ? this.productRepo.findOne({ where: { skuCode: stock.skuCode.trim() } }) : Promise.resolve(null),
+      stock.orderId != null && stock.skuCode?.trim()
+        ? this.productRepo.findOne({ where: { skuCode: stock.skuCode.trim() } })
+        : Promise.resolve(null),
       stock.orderId != null ? this.orderExtRepo.findOne({ where: { orderId: stock.orderId } }) : Promise.resolve(null),
     ]);
     let colorImages: FinishedGoodsStockColorImage[] = [];
@@ -606,18 +895,42 @@ export class FinishedGoodsStockService {
       if (!this.isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
     }
 
-    const headers = Array.isArray(ext?.colorSizeHeaders) ? ext!.colorSizeHeaders! : [];
-    const rows = Array.isArray(ext?.colorSizeRows) ? ext!.colorSizeRows! : [];
-    const colors = rows.map((r: any) => String(r?.colorName ?? '')).filter((v) => v);
-    const mappedRows = rows.map((r: any) => ({
-      colorName: String(r?.colorName ?? ''),
-      quantities: Array.isArray(r?.quantities)
-        ? r.quantities.map((q: unknown) => {
-            const n = Number(q);
-            return Number.isFinite(n) ? n : 0;
-          })
-        : [],
-    }));
+    const snap = stock.colorSizeSnapshot;
+    const snapOk =
+      snap &&
+      typeof snap === 'object' &&
+      Array.isArray(snap.headers) &&
+      Array.isArray(snap.rows) &&
+      snap.headers.length > 0 &&
+      snap.rows.length > 0;
+
+    let headers: string[] = [];
+    let mappedRows: Array<{ colorName: string; quantities: number[] }> = [];
+    if (snapOk) {
+      headers = snap.headers.map((h: unknown) => String(h ?? '').trim()).filter((h) => h.length > 0);
+      mappedRows = snap.rows.map((r: any) => ({
+        colorName: String(r?.colorName ?? ''),
+        quantities: Array.isArray(r?.quantities)
+          ? r.quantities.map((q: unknown) => {
+              const n = Number(q);
+              return Number.isFinite(n) ? n : 0;
+            })
+          : [],
+      }));
+    } else {
+      headers = Array.isArray(ext?.colorSizeHeaders) ? ext!.colorSizeHeaders! : [];
+      const rows = Array.isArray(ext?.colorSizeRows) ? ext!.colorSizeRows! : [];
+      mappedRows = rows.map((r: any) => ({
+        colorName: String(r?.colorName ?? ''),
+        quantities: Array.isArray(r?.quantities)
+          ? r.quantities.map((q: unknown) => {
+              const n = Number(q);
+              return Number.isFinite(n) ? n : 0;
+            })
+          : [],
+      }));
+    }
+    const colors = mappedRows.map((r) => r.colorName).filter((v) => v);
 
     const stockUnitPrice = Number(stock.unitPrice);
     const orderUnitPrice = Number(order?.exFactoryPrice);
@@ -632,7 +945,7 @@ export class FinishedGoodsStockService {
     return {
       stock,
       orderNo: order?.orderNo ?? '',
-      productImageUrl: product?.imageUrl ?? '',
+      productImageUrl: stock.orderId != null ? (product?.imageUrl ?? '') : (stock.imageUrl ?? ''),
       colorImages: colorImages.map((r) => ({
         colorName: r.colorName ?? '',
         imageUrl: r.imageUrl ?? '',

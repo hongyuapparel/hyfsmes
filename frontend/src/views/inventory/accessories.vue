@@ -71,6 +71,21 @@
               :value="s"
             />
           </el-select>
+          <el-date-picker
+            v-model="inboundDateRange"
+            type="daterange"
+            range-separator=""
+            start-placeholder="入库时间"
+            end-placeholder=""
+            value-format="YYYY-MM-DD"
+            :shortcuts="rangeShortcuts"
+            unlink-panels
+            clearable
+            size="large"
+            :class="['filter-bar-item', 'filter-range', { 'range-single': !inboundDateRange }]"
+            :style="getFilterRangeStyle(inboundDateRange)"
+            @change="onSearch(true)"
+          />
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
             <el-button size="large" @click="onReset">清空</el-button>
@@ -440,6 +455,7 @@ import { formatDisplayNumber } from '@/utils/display-number'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const filter = reactive({ name: '', category: '', customerName: '', salesperson: '' })
+const inboundDateRange = ref<[string, string] | null>(null)
 const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
 const accessoriesStockTableRef = ref()
@@ -477,8 +493,9 @@ const {
 
 function getInventoryOutboundRangeStyle(v: [string, string] | []) {
   const hasValue = Array.isArray(v) && v.length === 2
-  if (!hasValue) return { ...getFilterRangeStyle(v), width: '160px', flex: '0 0 160px' }
-  return { ...getFilterRangeStyle(v), width: '240px', flex: '0 0 240px' }
+  if (!hasValue) return getFilterRangeStyle(v)
+  const w = '240px'
+  return { ...getFilterRangeStyle(v), width: w, minWidth: w, flex: `0 0 ${w}` }
 }
 
 const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
@@ -506,11 +523,15 @@ const formRules: FormRules = {
 async function load() {
   loading.value = true
   try {
+    const [startDate, endDate] =
+      inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
     const res = await getAccessoriesList({
       name: filter.name || undefined,
       category: filter.category || undefined,
       customerName: filter.customerName || undefined,
       salesperson: filter.salesperson || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -579,6 +600,7 @@ function onReset() {
   filter.category = ''
   filter.customerName = ''
   filter.salesperson = ''
+  inboundDateRange.value = null
   pagination.page = 1
   load()
 }

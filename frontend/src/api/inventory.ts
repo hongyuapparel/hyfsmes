@@ -79,6 +79,9 @@ export function getFinishedStockList(params?: {
   skuCode?: string
   customerName?: string
   inventoryTypeId?: number | null
+  /** 入库时间：按记录 created_at，YYYY-MM-DD */
+  startDate?: string
+  endDate?: string
   page?: number
   pageSize?: number
 }) {
@@ -87,6 +90,8 @@ export function getFinishedStockList(params?: {
     total: number
     page: number
     pageSize: number
+    /** 当前筛选条件下全部匹配记录的总件数（非仅本页） */
+    totalQuantity: number
   }>('/inventory/finished/items', { params })
 }
 
@@ -212,6 +217,10 @@ export function createFinishedStock(body: {
   location: string
   imageUrl?: string
   remark?: string
+  colorSize?: {
+    headers: string[]
+    rows: Array<{ colorName: string; imageUrl?: string; quantities: number[] }>
+  }
 }) {
   return request.post<FinishedStockRow>('/inventory/finished/items', body)
 }
@@ -235,6 +244,9 @@ export function getAccessoriesList(params?: {
   category?: string
   customerName?: string
   salesperson?: string
+  /** 入库时间：created_at，YYYY-MM-DD */
+  startDate?: string
+  endDate?: string
   page?: number
   pageSize?: number
 }) {
@@ -354,11 +366,40 @@ export interface FabricItem {
   customerName?: string
   imageUrl?: string
   createdAt: string
+  supplierId?: number | null
+  warehouseId?: number | null
+  storageLocation?: string
+  /** 仅展示：由 supplierId 解析 */
+  supplierName?: string
+  /** 仅展示：由 warehouseId 解析 */
+  warehouseLabel?: string
+}
+
+export interface FabricSupplierOption {
+  id: number
+  name: string
+}
+
+export interface FabricPickupUserOption {
+  id: number
+  username: string
+  displayName: string
+}
+
+export function getFabricSupplierOptions() {
+  return request.get<FabricSupplierOption[]>('/inventory/fabric/supplier-options')
+}
+
+export function getFabricPickupUserOptions() {
+  return request.get<FabricPickupUserOption[]>('/inventory/fabric/pickup-users')
 }
 
 export function getFabricList(params?: {
   name?: string
   customerName?: string
+  /** 入库时间：created_at，YYYY-MM-DD */
+  startDate?: string
+  endDate?: string
   page?: number
   pageSize?: number
 }) {
@@ -379,13 +420,26 @@ export function createFabric(body: {
   customerName?: string
   remark?: string
   imageUrl?: string
+  supplierId?: number | null
+  warehouseId?: number | null
+  storageLocation?: string
 }) {
   return request.post<FabricItem>('/inventory/fabric/items', body)
 }
 
 export function updateFabric(
   id: number,
-  body: { name?: string; quantity?: number; unit?: string; customerName?: string; remark?: string; imageUrl?: string }
+  body: {
+    name?: string
+    quantity?: number
+    unit?: string
+    customerName?: string
+    remark?: string
+    imageUrl?: string
+    supplierId?: number | null
+    warehouseId?: number | null
+    storageLocation?: string
+  }
 ) {
   return request.put<FabricItem>(`/inventory/fabric/items/${id}`, body)
 }
@@ -399,6 +453,7 @@ export function fabricOutbound(body: {
   quantity: number
   photoUrl: string
   remark: string
+  pickupUserId: number
 }) {
   return request.post<void>('/inventory/fabric/outbound', body)
 }
@@ -412,6 +467,9 @@ export interface FabricOutboundRecord {
   quantity: string
   photoUrl: string
   remark: string
+  pickupUserId?: number | null
+  /** 仅展示 */
+  pickupUserName?: string
   createdAt: string
 }
 

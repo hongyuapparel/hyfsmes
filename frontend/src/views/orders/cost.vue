@@ -340,6 +340,16 @@
             />
           </template>
         </el-table-column>
+        <el-table-column label="数量" width="80" align="center" header-align="center">
+          <template #default="{ row }">
+            <el-input-number
+              v-model="row.quantity"
+              :min="0"
+              :controls="false"
+              size="small"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="工种价格(元)" width="100" align="center" header-align="center">
           <template #default="{ $index }">
             {{ formatMoney(getJobTypeGroupAmountByRowIndex($index)) }}
@@ -440,7 +450,7 @@
       <ProductionProcessPickerDialog
         v-model="productionPickerVisible"
         :production-processes="productionProcesses"
-        :added-process-ids="productionAddedProcessIds"
+        :added-ids-signature="productionAddedIdsSignature"
         @append="onProductionPickerAppend"
       />
     </el-card>
@@ -543,11 +553,14 @@ const processItemRows = ref<ProcessItemRow[]>([])
 const productionProcesses = ref<ProductionProcessItem[]>([])
 const productionRows = ref<ProductionRow[]>([])
 const productionPickerVisible = ref(false)
-const productionAddedProcessIds = computed(() =>
-  productionRows.value
+/** 稳定字符串签名，避免子弹窗因父层每次渲染拿到新数组引用而整表重算 */
+const productionAddedIdsSignature = computed(() => {
+  const ids = productionRows.value
     .map((row) => Number(row.processId))
-    .filter((id): id is number => Number.isInteger(id) && id > 0),
-)
+    .filter((id): id is number => Number.isInteger(id) && id > 0)
+  const uniq = [...new Set(ids)].sort((a, b) => a - b)
+  return uniq.join(',')
+})
 const selectedProductionRows = ref<ProductionRow[]>([])
 const productionCostMultiplier = ref(2)
 const profitMargin = ref(0.1)
@@ -624,6 +637,8 @@ interface ProductionRow {
   processName?: string
   remark?: string
   unitPrice: number
+  /** 工序数量，默认 1；工种价格(元)=单价×数量 */
+  quantity?: number | null
 }
 
 function materialAmount(row: MaterialRow): number {
@@ -781,6 +796,7 @@ function buildSnapshotPayload() {
       jobType: row.jobType ?? '',
       processName: row.processName ?? '',
       unitPrice: row.unitPrice,
+      quantity: productionLineQuantity(row),
       remark: row.remark ?? '',
     })),
     productionCostMultiplier: productionCostMultiplier.value,
@@ -930,13 +946,13 @@ function productionSpanMethod({
     }
     return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
-  if (columnIndex === 5) {
+  if (columnIndex === 6) {
     if (meta.hiddenJobIndexes.has(rowIndex)) {
       return { rowspan: 0, colspan: 0 }
     }
     return { rowspan: meta.jobRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
-  if (columnIndex === 6) {
+  if (columnIndex === 7) {
     if (meta.hiddenDeptIndexes.has(rowIndex)) {
       return { rowspan: 0, colspan: 0 }
     }
@@ -945,9 +961,17 @@ function productionSpanMethod({
   return { rowspan: 1, colspan: 1 }
 }
 
+function productionLineQuantity(row: ProductionRow): number {
+  const q = row.quantity
+  if (q == null) return DEFAULT_PRODUCTION_PROCESS_QTY
+  const n = Number(q)
+  if (!Number.isFinite(n) || n < 0) return DEFAULT_PRODUCTION_PROCESS_QTY
+  return n
+}
+
 function productionAmount(row: ProductionRow): number {
   const price = Number(row.unitPrice) || 0
-  return price
+  return price * productionLineQuantity(row)
 }
 
 function getJobTypeGroupAmountByRowIndex(rowIndex: number): number {
@@ -1064,6 +1088,8 @@ function removeMaterialRow(index: number) {
 
 /** 工艺项目成本数量：与订单件数无关，默认 1，由跟单按工艺自行填写 */
 const DEFAULT_PROCESS_ITEM_QTY = 1
+/** 生产工序行数量：默认 1，与单价相乘得到工种价格 */
+const DEFAULT_PRODUCTION_PROCESS_QTY = 1
 
 function addProcessItemRow() {
   processItemRows.value.push({
@@ -1136,7 +1162,15 @@ async function loadCostSnapshot() {
       const s = data.snapshot
       if (Array.isArray(s.materialRows) && s.materialRows.length) materialRows.value = s.materialRows as MaterialRow[]
       if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows as ProcessItemRow[]
-      if (Array.isArray(s.productionRows) && s.productionRows.length) productionRows.value = s.productionRows as ProductionRow[]
+      if (Array.isArray(s.productionRows) && s.productionRows.length) {
+        productionRows.value = (s.productionRows as ProductionRow[]).map((r) => {
+          const raw = r.quantity
+          const n = raw == null || raw === undefined ? NaN : Number(raw)
+          const quantity =
+            Number.isFinite(n) && n >= 0 ? n : DEFAULT_PRODUCTION_PROCESS_QTY
+          return { ...r, quantity }
+        })
+      }
       if (s.productionCostMultiplier !== undefined) {
         productionCostMultiplier.value = normalizeProductionCostMultiplier(s.productionCostMultiplier)
       }
@@ -1164,6 +1198,7 @@ async function loadProcesses() {
         processName: first?.name ?? '',
         remark: '',
         unitPrice: first ? Number(first.unitPrice) || 0 : 0,
+        quantity: DEFAULT_PRODUCTION_PROCESS_QTY,
       })
     }
   } catch (e: unknown) {
@@ -1179,6 +1214,7 @@ function addProductionRow() {
     processName: '',
     remark: '',
     unitPrice: 0,
+    quantity: DEFAULT_PRODUCTION_PROCESS_QTY,
   })
 }
 
@@ -1200,6 +1236,7 @@ function onProductionPickerAppend(items: ProductionProcessItem[]) {
     processName: p.name ?? '',
     remark: '',
     unitPrice: Number(p.unitPrice) || 0,
+    quantity: DEFAULT_PRODUCTION_PROCESS_QTY,
   })).filter((r) => !existing.has(Number(r.processId)))
   if (!rows.length) return
   productionRows.value = [...productionRows.value, ...rows]
@@ -1293,6 +1330,7 @@ function onProductionJobTypeChange(row: ProductionRow) {
 
 function scheduleMarkLocalDirty() {
   if (suppressDirtyTracking.value) return
+  if (productionPickerVisible.value) return
   dirtyTriggerCount += 1
   if (dirtyDebounceTimer) clearTimeout(dirtyDebounceTimer)
   dirtyDebounceTimer = setTimeout(() => {
@@ -1442,6 +1480,7 @@ async function applyImportTemplate() {
       processName: item.processName ?? '',
       remark: '',
       unitPrice: Number(item.unitPrice) || 0,
+      quantity: DEFAULT_PRODUCTION_PROCESS_QTY,
     }))
     productionRows.value.push(...rows)
     importTemplateDialog.value.visible = false
@@ -1484,6 +1523,7 @@ watch(
   [materialTotal, processItemTotal, productionProcessTotal, totalCost, computedExFactoryPrice],
   () => {
     if (suppressDirtyTracking.value) return
+    if (productionPickerVisible.value) return
     recomputeCountInCurrentEdit += 1
     if (recomputeLogTimer) clearTimeout(recomputeLogTimer)
     recomputeLogTimer = setTimeout(() => {

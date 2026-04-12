@@ -44,9 +44,17 @@ export class OrderFinishing {
   @Column({ name: 'tail_inbound_qty', type: 'int', default: 0 })
   tailInboundQty: number;
 
+  /** 尾部入库数按尺码明细（与 B 区尺码列一致，最后一项为合计） */
+  @Column({ name: 'tail_inbound_qty_row', type: 'json', nullable: true, select: false })
+  tailInboundQtyRow: number[] | null;
+
   /** 次品数 */
   @Column({ name: 'defect_quantity', type: 'int', default: 0 })
   defectQuantity: number;
+
+  /** 次品数按尺码明细（与 B 区尺码列一致，最后一项为合计） */
+  @Column({ name: 'defect_quantity_row', type: 'json', nullable: true, select: false })
+  defectQuantityRow: number[] | null;
 
   /** 登记包装完成时的备注（发货/入库/次品分配说明等） */
   @Column({ name: 'remark', type: 'varchar', length: 500, nullable: true })

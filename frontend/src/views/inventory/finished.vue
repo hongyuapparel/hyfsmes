@@ -75,6 +75,21 @@
               :value="opt.id"
             />
           </el-select>
+          <el-date-picker
+            v-model="inboundDateRange"
+            type="daterange"
+            range-separator=""
+            start-placeholder="入库时间"
+            end-placeholder=""
+            value-format="YYYY-MM-DD"
+            :shortcuts="rangeShortcuts"
+            unlink-panels
+            clearable
+            size="large"
+            :class="['filter-bar-item', 'filter-range', { 'range-single': !inboundDateRange }]"
+            :style="getFilterRangeStyle(inboundDateRange)"
+            @change="onSearch(true)"
+          />
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
             <el-button size="large" @click="onReset">清空</el-button>
@@ -207,7 +222,8 @@
           </el-table-column>
         </el-table>
 
-        <div class="pagination-wrap">
+        <div class="pagination-wrap pagination-wrap--with-summary">
+          <div class="pagination-summary">总件数：{{ stockListFooterQuantity }} 件</div>
           <el-pagination
             v-model:current-page="pagination.page"
             v-model:page-size="pagination.pageSize"
@@ -1030,6 +1046,7 @@ const filter = reactive<{
 }>({ orderNo: '', skuCode: '', customerName: '', inventoryTypeId: null })
 const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
+const inboundDateRange = ref<[string, string] | null>(null)
 const list = ref<FinishedStockRow[]>([])
 const finishedStockTableRef = ref()
 const finishedOutboundTableRef = ref()
@@ -1044,7 +1061,16 @@ const departmentOptions = ref<{ value: string; label: string }[]>([])
 const loading = ref(false)
 const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+/** 当前筛选下全量匹配的总件数（接口返回）；有表格勾选时底部改为已选行的件数合计 */
+const stockTotalQuantity = ref(0)
 const selectedRows = ref<FinishedStockRow[]>([])
+
+const stockListFooterQuantity = computed(() => {
+  if (selectedRows.value.length > 0) {
+    return selectedRows.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0)
+  }
+  return stockTotalQuantity.value
+})
 
 const detailDrawer = reactive<{
   visible: boolean
@@ -1091,7 +1117,9 @@ function formatMetaSnapshot(v: any): string {
   const it = v.inventoryTypeId != null ? findInventoryTypeLabelById(v.inventoryTypeId) : ''
   const wh = v.warehouseId != null ? findWarehouseLabelById(v.warehouseId) : ''
   const loc = v.location ?? ''
-  return [dep, it, wh, loc].filter((x) => x).join(' / ') || '-'
+  const qty = v.quantity != null && v.quantity !== '' ? `数量 ${v.quantity}` : ''
+  const up = v.unitPrice != null && v.unitPrice !== '' ? `出厂价 ${formatPrice(String(v.unitPrice))}` : ''
+  return [dep, it, wh, loc, qty, up].filter((x) => x).join(' / ') || '-'
 }
 
 function getColorImageUrl(colorName: string): string {
@@ -1458,8 +1486,9 @@ const { onHeaderDragEnd: onFinishedOutboundHeaderDragEnd, restoreColumnWidths: r
 
 function getInventoryOutboundRangeStyle(v: [string, string] | []) {
   const hasValue = Array.isArray(v) && v.length === 2
-  if (!hasValue) return { ...getFilterRangeStyle(v), width: '160px', flex: '0 0 160px' }
-  return { ...getFilterRangeStyle(v), width: '240px', flex: '0 0 240px' }
+  if (!hasValue) return getFilterRangeStyle(v)
+  const w = '240px'
+  return { ...getFilterRangeStyle(v), width: w, minWidth: w, flex: `0 0 ${w}` }
 }
 
 const pendingRows = computed(() => selectedRows.value.filter((r) => r.type === 'pending'))
@@ -1672,12 +1701,16 @@ function onSelectCreateSku(row: ProductItem) {
 async function load() {
   loading.value = true
   try {
+    const [startDate, endDate] =
+      inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
     const res = await getFinishedStockList({
       tab: currentTab.value,
       orderNo: filter.orderNo || undefined,
       skuCode: filter.skuCode || undefined,
       customerName: filter.customerName || undefined,
       inventoryTypeId: filter.inventoryTypeId ?? undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -1685,6 +1718,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      stockTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       restoreFinishedStockColumnWidths(finishedStockTableRef.value)
     }
   } catch (e: unknown) {
@@ -1726,6 +1760,7 @@ function onReset() {
   filter.skuCode = ''
   filter.customerName = ''
   filter.inventoryTypeId = null
+  inboundDateRange.value = null
   currentTab.value = 'stored'
   pagination.page = 1
   selectedRows.value = []
@@ -1917,6 +1952,14 @@ async function submitCreate() {
       location: createForm.location,
       imageUrl: createForm.imageUrl || undefined,
       remark: createForm.remark?.trim() || undefined,
+      colorSize: {
+        headers: createSizeHeaders.value.map((h) => String(h ?? '').trim()),
+        rows: createSizeTableRows.value.map((r) => ({
+          colorName: r.colorName,
+          imageUrl: r.imageUrl,
+          quantities: [...r.quantities],
+        })),
+      },
     })
     ElMessage.success('新增库存成功')
     createDialog.visible = false
@@ -2072,6 +2115,17 @@ function onOutboundPageSizeChange() {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
+}
+
+.inventory-finished-page .pagination-wrap--with-summary {
+  margin-top: var(--space-md);
+  justify-content: space-between;
+  align-items: center;
+}
+
+.inventory-finished-page .pagination-summary {
+  font-size: var(--font-size-caption, 12px);
+  color: var(--color-text-secondary, #606266);
 }
 
 .qty-hover {

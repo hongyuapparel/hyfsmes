@@ -105,7 +105,13 @@ function calcExFactoryPrice(snapshot) {
     return sum + qty * price;
   }, 0);
 
-  const productionTotal = productionRows.reduce((sum, row) => sum + (Number(row?.unitPrice) || 0), 0);
+  const productionTotal = productionRows.reduce((sum, row) => {
+    const unit = Number(row?.unitPrice) || 0;
+    const rawQty = row?.quantity;
+    const q = rawQty === undefined || rawQty === null ? 1 : Number(rawQty);
+    const qty = Number.isFinite(q) && q >= 0 ? q : 1;
+    return sum + unit * qty;
+  }, 0);
   const totalCost = materialTotal + processItemTotal + productionTotal;
   const margin = Number(snapshot?.profitMargin) || 0;
   const exFactory = margin >= 1 ? totalCost : totalCost / (1 - margin);

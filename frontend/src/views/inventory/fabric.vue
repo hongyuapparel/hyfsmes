@@ -40,6 +40,21 @@
               :value="opt.value"
             />
           </el-select>
+          <el-date-picker
+            v-model="inboundDateRange"
+            type="daterange"
+            range-separator=""
+            start-placeholder="入库时间"
+            end-placeholder=""
+            value-format="YYYY-MM-DD"
+            :shortcuts="rangeShortcuts"
+            unlink-panels
+            clearable
+            size="large"
+            :class="['filter-bar-item', 'filter-range', { 'range-single': !inboundDateRange }]"
+            :style="getFilterRangeStyle(inboundDateRange)"
+            @change="onSearch(true)"
+          />
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
             <el-button size="large" @click="onReset">清空</el-button>
@@ -77,6 +92,9 @@
           </el-table-column>
           <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="supplierName" label="供应商" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="warehouseLabel" label="仓库" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="storageLocation" label="存放地址" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="数量" width="100" align="center" header-align="center">
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
           </el-table-column>
@@ -149,6 +167,7 @@
           <el-table-column prop="createdAt" label="时间" width="160" align="center" header-align="center" />
           <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="pickupUserName" label="领取人" min-width="100" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="出库数量" width="110" align="center" header-align="center">
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }} {{ row.unit }}</template>
           </el-table-column>
@@ -180,11 +199,11 @@
     <el-dialog
       v-model="formDialog.visible"
       :title="formDialog.isEdit ? '编辑面料' : '新增面料'"
-      width="480"
+      width="560"
       destroy-on-close
       @close="resetForm"
     >
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px">
+      <el-form ref="formRef" :model="form" :rules="formRules" label-width="88px">
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="面料名称/编号" clearable />
         </el-form-item>
@@ -215,6 +234,34 @@
             />
           </el-select>
         </el-form-item>
+        <el-form-item label="供应商">
+          <el-select
+            v-model="form.supplierId"
+            placeholder="面料供应商（可选）"
+            filterable
+            clearable
+          >
+            <el-option
+              v-for="opt in fabricSupplierOptions"
+              :key="opt.id"
+              :label="opt.name"
+              :value="opt.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="仓库">
+          <el-select v-model="form.warehouseId" placeholder="仓库（可选）" filterable clearable>
+            <el-option
+              v-for="opt in warehouseOptions"
+              :key="opt.id"
+              :label="opt.label"
+              :value="opt.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="存放地址">
+          <el-input v-model="form.storageLocation" placeholder="存放位置（可选）" clearable />
+        </el-form-item>
         <el-form-item label="图片" prop="imageUrl">
           <ImageUploadArea v-model="form.imageUrl" />
         </el-form-item>
@@ -243,6 +290,22 @@
         :rules="outboundRules"
         label-width="90px"
       >
+        <el-form-item label="领取人" prop="pickupUserId">
+          <el-select
+            v-model="outboundForm.pickupUserId"
+            placeholder="请选择领取人"
+            filterable
+            clearable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="opt in fabricPickupUserOptions"
+              :key="opt.id"
+              :label="opt.displayName?.trim() || opt.username"
+              :value="opt.id"
+            />
+          </el-select>
+        </el-form-item>
         <el-form-item label="出库数量" prop="quantity">
           <el-input-number
             v-model="outboundForm.quantity"
@@ -271,7 +334,11 @@
         <el-button
           type="primary"
           :loading="outboundDialog.submitting"
-          :disabled="!outboundForm.photoUrl || !outboundForm.remark?.trim()"
+          :disabled="
+            !outboundForm.pickupUserId ||
+            !outboundForm.photoUrl ||
+            !outboundForm.remark?.trim()
+          "
           @click="submitOutbound"
         >
           确定出库
@@ -288,6 +355,9 @@
       <div v-if="detailDrawer.row" class="detail-base">
         <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
         <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
+        <div><span class="detail-label">供应商：</span>{{ detailDrawer.row.supplierName || '-' }}</div>
+        <div><span class="detail-label">仓库：</span>{{ detailDrawer.row.warehouseLabel || '-' }}</div>
+        <div><span class="detail-label">存放地址：</span>{{ detailDrawer.row.storageLocation || '-' }}</div>
         <div><span class="detail-label">当前库存：</span>{{ formatDisplayNumber(detailDrawer.row.quantity) }} {{ detailDrawer.row.unit || '' }}</div>
         <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
       </div>
@@ -319,10 +389,15 @@ import {
   fabricOutbound,
   getFabricOutboundRecords,
   getFabricOperationLogs,
+  getFabricSupplierOptions,
+  getFabricPickupUserOptions,
   type FabricItem,
   type FabricOutboundRecord,
   type FabricOperationLog,
+  type FabricSupplierOption,
+  type FabricPickupUserOption,
 } from '@/api/inventory'
+import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import {
@@ -336,6 +411,7 @@ import { formatDisplayNumber } from '@/utils/display-number'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const filter = reactive({ name: '', customerName: '' })
+const inboundDateRange = ref<[string, string] | null>(null)
 const nameLabelVisible = ref(false)
 const list = ref<FabricItem[]>([])
 const fabricStockTableRef = ref()
@@ -345,6 +421,9 @@ const fabricOutboundShellRef = ref<HTMLElement | null>(null)
 const { tableHeight: fabricStockTableHeight } = useFlexShellTableHeight(fabricStockShellRef)
 const { tableHeight: fabricOutboundTableHeight } = useFlexShellTableHeight(fabricOutboundShellRef)
 const customerOptions = ref<{ label: string; value: string }[]>([])
+const fabricSupplierOptions = ref<FabricSupplierOption[]>([])
+const warehouseOptions = ref<{ id: number; label: string }[]>([])
+const fabricPickupUserOptions = ref<FabricPickupUserOption[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<FabricItem[]>([])
@@ -371,8 +450,9 @@ const { onHeaderDragEnd: onFabricOutboundHeaderDragEnd, restoreColumnWidths: res
 
 function getInventoryOutboundRangeStyle(v: [string, string] | []) {
   const hasValue = Array.isArray(v) && v.length === 2
-  if (!hasValue) return { ...getFilterRangeStyle(v), width: '160px', flex: '0 0 160px' }
-  return { ...getFilterRangeStyle(v), width: '240px', flex: '0 0 240px' }
+  if (!hasValue) return getFilterRangeStyle(v)
+  const w = '240px'
+  return { ...getFilterRangeStyle(v), width: w, minWidth: w, flex: `0 0 ${w}` }
 }
 
 const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
@@ -387,6 +467,9 @@ const form = reactive({
   quantity: 0,
   unit: '米',
   customerName: '',
+  supplierId: null as number | null,
+  warehouseId: null as number | null,
+  storageLocation: '',
   imageUrl: '',
   remark: '',
 })
@@ -400,8 +483,14 @@ const outboundDialog = reactive<{
   row: FabricItem | null
 }>({ visible: false, submitting: false, row: null })
 const outboundFormRef = ref<FormInstance>()
-const outboundForm = reactive({ quantity: 0, photoUrl: '', remark: '' })
+const outboundForm = reactive({
+  pickupUserId: null as number | null,
+  quantity: 0,
+  photoUrl: '',
+  remark: '',
+})
 const outboundRules: FormRules = {
+  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
   quantity: [{ required: true, message: '请输入出库数量', trigger: 'blur' }],
   remark: [{ required: true, message: '请填写谁领走及用途', trigger: 'blur' }],
 }
@@ -415,9 +504,13 @@ const outboundMaxQty = computed(() => {
 async function load() {
   loading.value = true
   try {
+    const [startDate, endDate] =
+      inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
     const res = await getFabricList({
       name: filter.name || undefined,
       customerName: filter.customerName || undefined,
+      startDate: startDate || undefined,
+      endDate: endDate || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
@@ -460,6 +553,7 @@ function onReset() {
   nameLabelVisible.value = false
   filter.name = ''
   filter.customerName = ''
+  inboundDateRange.value = null
   pagination.page = 1
   load()
 }
@@ -474,6 +568,34 @@ async function loadCustomerOptions() {
     }))
   } catch (e: unknown) {
     console.warn('客户选项加载失败')
+  }
+}
+
+async function loadFabricSupplierOptions() {
+  try {
+    const res = await getFabricSupplierOptions()
+    fabricSupplierOptions.value = res.data ?? []
+  } catch {
+    fabricSupplierOptions.value = []
+  }
+}
+
+async function loadWarehouseOptions() {
+  try {
+    const res = await getSystemOptionsList('warehouses')
+    const list = (res.data ?? []) as SystemOptionItem[]
+    warehouseOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
+  } catch {
+    warehouseOptions.value = []
+  }
+}
+
+async function loadFabricPickupUserOptions() {
+  try {
+    const res = await getFabricPickupUserOptions()
+    fabricPickupUserOptions.value = res.data ?? []
+  } catch {
+    fabricPickupUserOptions.value = []
   }
 }
 
@@ -494,6 +616,9 @@ function openForm(row: FabricItem | null) {
     form.quantity = parseFloat(String(row.quantity)) || 0
     form.unit = row.unit ?? '米'
     form.customerName = row.customerName ?? ''
+    form.supplierId = row.supplierId != null && row.supplierId > 0 ? row.supplierId : null
+    form.warehouseId = row.warehouseId != null && row.warehouseId > 0 ? row.warehouseId : null
+    form.storageLocation = row.storageLocation ?? ''
     form.imageUrl = row.imageUrl ?? ''
     form.remark = row.remark ?? ''
   } else {
@@ -501,6 +626,9 @@ function openForm(row: FabricItem | null) {
     form.quantity = 0
     form.unit = '米'
     form.customerName = ''
+    form.supplierId = null
+    form.warehouseId = null
+    form.storageLocation = ''
     form.imageUrl = ''
     form.remark = ''
   }
@@ -523,6 +651,9 @@ async function submitForm() {
         customerName: form.customerName || undefined,
         imageUrl: form.imageUrl || undefined,
         remark: form.remark,
+        supplierId: form.supplierId,
+        warehouseId: form.warehouseId,
+        storageLocation: form.storageLocation,
       })
       ElMessage.success('保存成功')
     } else {
@@ -533,6 +664,9 @@ async function submitForm() {
         customerName: form.customerName || undefined,
         imageUrl: form.imageUrl || undefined,
         remark: form.remark,
+        supplierId: form.supplierId,
+        warehouseId: form.warehouseId,
+        storageLocation: form.storageLocation,
       })
       ElMessage.success('新增成功')
     }
@@ -576,6 +710,7 @@ function openOutboundDialog(row?: FabricItem) {
   }
   outboundDialog.row = target
   const q = parseFloat(String(target.quantity))
+  outboundForm.pickupUserId = null
   outboundForm.quantity = Number.isFinite(q) && q > 0 ? Math.min(1, q) : 0
   outboundForm.photoUrl = ''
   outboundForm.remark = ''
@@ -584,6 +719,7 @@ function openOutboundDialog(row?: FabricItem) {
 
 function resetOutboundForm() {
   outboundDialog.row = null
+  outboundForm.pickupUserId = null
   outboundForm.quantity = 0
   outboundForm.photoUrl = ''
   outboundForm.remark = ''
@@ -592,8 +728,8 @@ function resetOutboundForm() {
 
 async function submitOutbound() {
   if (!outboundDialog.row) return
-  if (!outboundForm.photoUrl || !outboundForm.remark?.trim()) {
-    ElMessage.warning('请上传出库照片并填写备注（谁领走、用途）')
+  if (!outboundForm.pickupUserId || !outboundForm.photoUrl || !outboundForm.remark?.trim()) {
+    ElMessage.warning('请选择领取人，并上传出库照片、填写备注（谁领走、用途）')
     return
   }
   await outboundFormRef.value?.validate().catch(() => {})
@@ -604,6 +740,7 @@ async function submitOutbound() {
       quantity: outboundForm.quantity,
       photoUrl: outboundForm.photoUrl,
       remark: outboundForm.remark,
+      pickupUserId: outboundForm.pickupUserId,
     })
     ElMessage.success('出库成功')
     outboundDialog.visible = false
@@ -618,6 +755,9 @@ async function submitOutbound() {
 
 onMounted(() => {
   loadCustomerOptions()
+  loadFabricSupplierOptions()
+  loadWarehouseOptions()
+  loadFabricPickupUserOptions()
   load()
 })
 

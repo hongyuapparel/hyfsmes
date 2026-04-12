@@ -12,11 +12,12 @@
       <span class="import-template-hint">
         左侧选择工种，右侧可搜索并勾选工序，点击“添加所选”后自动加入并关闭弹窗。
       </span>
+      <span v-if="selectedIds.length" class="picker-selected-summary">已选 {{ selectedIds.length }} 条工序</span>
     </div>
     <div class="production-picker-layout">
       <div v-loading="jobTypesLoading" class="production-picker-tree">
         <el-tree
-          :data="pickerTreeData"
+          :data="treeData"
           node-key="key"
           :expand-on-click-node="false"
           default-expand-all
@@ -26,12 +27,6 @@
           <template #default="{ data }">
             <span class="picker-tree-node">
               <span>{{ data.label }}</span>
-              <span
-                v-if="data.jobType && getPickerSelectedCountByJob(data.department, data.jobType) > 0"
-                class="picker-tree-selected-count"
-              >
-                已选 {{ getPickerSelectedCountByJob(data.department, data.jobType) }}
-              </span>
             </span>
           </template>
         </el-tree>
@@ -44,36 +39,21 @@
           size="small"
           class="picker-search-input"
         />
-        <el-table
-          :data="pickerProcessOptions"
-          row-key="id"
-          size="small"
-          border
-          height="300"
-          class="picker-process-table"
-        >
-          <el-table-column label="选择" width="72" align="center" header-align="center">
-            <template #default="{ row }">
-              <el-checkbox
-                :disabled="row.added"
-                :model-value="pickerSelectedIdSet.has(row.id)"
-                @change="(v) => onPickerProcessChecked(row.id, v === true)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column label="工序" min-width="260" align="center" header-align="center" show-overflow-tooltip>
-            <template #default="{ row }">
-              <span>{{ row.name }}</span>
-              <span v-if="row.added" class="picker-added-tag">（已添加）</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="价格(元)" width="110" align="center" header-align="center">
-            <template #default="{ row }">
-              {{ formatMoney(row.unitPrice) }}
-            </template>
-          </el-table-column>
-        </el-table>
-        <p v-if="!pickerProcessOptions.length" class="empty-hint">当前工种下暂无可选工序</p>
+        <div class="picker-table-v2-wrap">
+          <el-table-v2
+            v-if="tableRows.length"
+            class="picker-process-table-v2"
+            :columns="pickerColumns"
+            :data="tableRows"
+            :width="pickerTableWidth"
+            :height="300"
+            :row-height="28"
+            :header-height="32"
+            row-key="id"
+            :cache="8"
+          />
+          <p v-else class="empty-hint">当前工种下暂无可选工序</p>
+        </div>
       </div>
     </div>
     <template #footer>
@@ -86,17 +66,19 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { ElCheckbox, ElTableV2 } from 'element-plus'
+import { computed, h, markRaw, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ProductionProcessItem } from '@/api/production-processes'
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { formatDisplayNumber } from '@/utils/display-number'
+import type { Column } from 'element-plus/es/components/table-v2/src/types'
 
 const props = defineProps<{
   modelValue: boolean
   productionProcesses: ProductionProcessItem[]
-  /** 订单成本表中已存在的工序 ID，用于标记「已添加」与去重 */
-  addedProcessIds: number[]
+  /** 已加入订单成本表的工序 ID 的稳定签名（排序后逗号拼接），避免父组件每次渲染用新数组引用触发子组件整表重算 */
+  addedIdsSignature: string
 }>()
 
 const emit = defineEmits<{
@@ -114,19 +96,58 @@ interface PickerTreeNode {
   children?: PickerTreeNode[]
 }
 
+interface PickerRowLite {
+  id: number
+  name: string
+  nameLower: string
+  unitPrice: number
+}
+
 const activeDepartment = ref('')
 const activeJobType = ref('')
 const selectedIds = ref<number[]>([])
 const keyword = ref('')
 const debouncedKeyword = ref('')
 const appendSubmitting = ref(false)
-/** 与「订单设置-生产工序」同源：process_job_types 扁平列表，用于左侧树与系统配置一致 */
+
 const jobTypeOptionsFlat = ref<SystemOptionItem[]>([])
 const jobTypesLoading = ref(false)
+
+/** 弹窗打开时从 props 拍一份非深层响应式的工序快照，避免 computed 深度追踪整表 productionProcesses */
+const snapshotProcesses = shallowRef<ProductionProcessItem[]>([])
+/** 工种 -> 工序轻量行（markRaw），仅用于右侧过滤展示 */
+let processPoolByJob = new Map<string, PickerRowLite[]>()
+/** 右侧表格数据源：仅在工种/关键词变化时整体替换，勾选不重建数组，避免 el-table 全量 diff */
+const tableRows = shallowRef<PickerRowLite[]>([])
+/** 左侧树：打开时构建一次，避免 computed 反复读 props.productionProcesses 建立深层依赖 */
+const treeData = shallowRef<PickerTreeNode[]>([])
+const pickerTableWidth = 500
+
 let keywordDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let jobTypesController: AbortController | null = null
 let loadToken = 0
 let jobTypeCache: SystemOptionItem[] | null = null
+
+const addedIdSet = computed(() => {
+  const s = (props.addedIdsSignature ?? '').trim()
+  if (!s) return new Set<number>()
+  return new Set(
+    s
+      .split(',')
+      .map((x) => Number(x.trim()))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  )
+})
+
+const selectedIdSet = computed(() => new Set(selectedIds.value))
+
+const idToSnapshotItem = computed(() => {
+  const m = new Map<number, ProductionProcessItem>()
+  snapshotProcesses.value.forEach((p) => {
+    if (typeof p.id === 'number') m.set(p.id, p)
+  })
+  return m
+})
 
 function formatMoney(n: number): string {
   if (!Number.isFinite(n)) return formatDisplayNumber(0)
@@ -139,7 +160,6 @@ function getJobTypeLabel(v: string): string {
   return parts.length ? parts[parts.length - 1] : v
 }
 
-/** 仅从已有工序行推导树（无工种配置或接口失败时的兜底） */
 function buildPickerTreeFromProcessesOnly(processes: ProductionProcessItem[]): PickerTreeNode[] {
   const deptMap = new Map<string, Set<string>>()
   processes.forEach((p) => {
@@ -173,10 +193,6 @@ function buildPickerTreeFromProcessesOnly(processes: ProductionProcessItem[]): P
     }))
 }
 
-/**
- * 与 order-settings 生产工序树一致：部门根下工种路径为 `部门 > 子 > 孙`，
- * 仅叶子工种节点可选（与懒加载树中「先有子工种则不出工序」一致）。
- */
 function buildPickerTreeFromJobTypes(flat: SystemOptionItem[]): PickerTreeNode[] {
   const childrenMap = new Map<number | null, SystemOptionItem[]>()
   for (const item of flat) {
@@ -196,11 +212,7 @@ function buildPickerTreeFromJobTypes(flat: SystemOptionItem[]): PickerTreeNode[]
     return a.value.localeCompare(b.value)
   })
 
-  function collectLeaves(
-    department: string,
-    nodeId: number,
-    pathPrefix: string,
-  ): PickerTreeNode[] {
+  function collectLeaves(department: string, nodeId: number, pathPrefix: string): PickerTreeNode[] {
     const kids = childrenMap.get(nodeId) ?? []
     if (kids.length === 0) {
       return [
@@ -238,83 +250,81 @@ function buildPickerTreeFromJobTypes(flat: SystemOptionItem[]): PickerTreeNode[]
   })
 }
 
-const pickerTreeData = computed<PickerTreeNode[]>(() => {
-  if (jobTypeOptionsFlat.value.length) {
-    return buildPickerTreeFromJobTypes(jobTypeOptionsFlat.value)
-  }
-  return buildPickerTreeFromProcessesOnly(props.productionProcesses)
-})
-
-const addedIdSet = computed(() => new Set(props.addedProcessIds))
-
-const processById = computed(() => {
-  const map = new Map<number, ProductionProcessItem>()
-  props.productionProcesses.forEach((p) => {
-    if (typeof p.id === 'number') map.set(p.id, p)
-  })
-  return map
-})
-
-const processPoolByDeptJob = computed(() => {
-  const map = new Map<string, Array<{ id: number; name: string; nameLower: string; unitPrice: number }>>()
-  props.productionProcesses.forEach((p) => {
+function rebuildProcessPoolFromSnapshot(list: ProductionProcessItem[]) {
+  const map = new Map<string, PickerRowLite[]>()
+  for (const p of list) {
     const dept = (p.department ?? '').trim()
     const job = (p.jobType ?? '').trim()
     const key = `${dept}::${job}`
     if (!map.has(key)) map.set(key, [])
-    map.get(key)!.push({
-      id: p.id,
-      name: p.name || '未命名工序',
-      nameLower: String(p.name ?? '').toLowerCase(),
-      unitPrice: Number(p.unitPrice) || 0,
-    })
-  })
-  return map
-})
+    map.get(key)!.push(
+      markRaw({
+        id: p.id,
+        name: p.name || '未命名工序',
+        nameLower: String(p.name ?? '').toLowerCase(),
+        unitPrice: Number(p.unitPrice) || 0,
+      }),
+    )
+  }
+  processPoolByJob = map
+}
 
-const pickerProcessOptions = computed(() => {
+function refreshFilteredTableRows() {
   const dept = activeDepartment.value.trim()
   const job = activeJobType.value.trim()
   const kw = debouncedKeyword.value.trim().toLowerCase()
   const key = `${dept}::${job}`
-  const pool = processPoolByDeptJob.value.get(key) ?? []
-  return pool
-    .filter((p) => !kw || p.nameLower.includes(kw))
-    .map((p) => ({
-      id: p.id,
-      name: p.name,
-      added: addedIdSet.value.has(p.id),
-      unitPrice: p.unitPrice,
-    }))
-})
-
-/** O(1) 勾选判断，避免每格 selectedIds.includes */
-const pickerSelectedIdSet = computed(() => new Set(selectedIds.value))
-
-/** 仅遍历已选 ID，避免每次勾选全表工序 */
-const pickerSelectedCountMap = computed(() => {
-  const map = new Map<string, number>()
-  for (const id of selectedIds.value) {
-    const p = processById.value.get(id)
-    if (!p) continue
-    const d = (p.department ?? '').trim()
-    const j = (p.jobType ?? '').trim()
-    if (!d || !j) continue
-    const key = `${d}::${j}`
-    map.set(key, (map.get(key) ?? 0) + 1)
-  }
-  return map
-})
-
-function getPickerSelectedCountByJob(department: string, jobType: string): number {
-  const key = `${(department ?? '').trim()}::${(jobType ?? '').trim()}`
-  return pickerSelectedCountMap.value.get(key) ?? 0
+  const pool = processPoolByJob.get(key) ?? []
+  const next = pool.filter((p) => !kw || p.nameLower.includes(kw)).map((p) => markRaw({ ...p }))
+  tableRows.value = next
 }
+
+/** 依赖勾选与已添加签名，保证虚拟表在 selection / 禁用态变化时刷新可见单元格 */
+const pickerColumns = computed<Column<any>[]>(() => {
+  const sel = selectedIdSet.value
+  const added = addedIdSet.value
+  return [
+    {
+      key: 'select',
+      width: 72,
+      title: '选择',
+      align: 'center',
+      cellRenderer: ({ rowData }) =>
+        h(ElCheckbox, {
+          modelValue: sel.has(rowData.id),
+          disabled: added.has(rowData.id),
+          onChange: (v: unknown) => onPickerProcessChecked(rowData.id, v === true),
+        }),
+    },
+    {
+      key: 'name',
+      title: '工序',
+      width: 268,
+      align: 'center',
+      cellRenderer: ({ rowData }) => {
+        const isAdded = added.has(rowData.id)
+        return h('div', { class: 'picker-name-cell' }, [
+          h('span', rowData.name),
+          isAdded ? h('span', { class: 'picker-added-tag' }, '（已添加）') : null,
+        ])
+      },
+    },
+    {
+      key: 'unitPrice',
+      dataKey: 'unitPrice',
+      title: '价格(元)',
+      width: 110,
+      align: 'center',
+      cellRenderer: ({ rowData }) => h('span', formatMoney(rowData.unitPrice)),
+    },
+  ]
+})
 
 function onPickerTreeNodeClick(node: PickerTreeNode) {
   if (!node?.jobType) return
   activeDepartment.value = node.department
   activeJobType.value = node.jobType
+  refreshFilteredTableRows()
 }
 
 function onPickerProcessChecked(id: number, checked: boolean) {
@@ -332,7 +342,7 @@ function confirmAppend() {
   const toAdd: ProductionProcessItem[] = []
   for (const id of ids) {
     if (existing.has(id)) continue
-    const found = processById.value.get(id)
+    const found = idToSnapshotItem.value.get(id)
     if (found) toAdd.push(found)
   }
   if (!toAdd.length) {
@@ -355,6 +365,11 @@ watch(keyword, (v) => {
     debouncedKeyword.value = v
     keywordDebounceTimer = null
   }, 120)
+})
+
+watch(debouncedKeyword, () => {
+  if (!props.modelValue) return
+  refreshFilteredTableRows()
 })
 
 function cancelPendingJobTypeRequest() {
@@ -398,11 +413,22 @@ watch(
       return
     }
     await ensureJobTypesLoaded()
+
+    const snap = (props.productionProcesses ?? []).map((p) => markRaw({ ...p }))
+    snapshotProcesses.value = snap
+    rebuildProcessPoolFromSnapshot(snap)
+
+    if (jobTypeOptionsFlat.value.length) {
+      treeData.value = markRaw(buildPickerTreeFromJobTypes(jobTypeOptionsFlat.value))
+    } else {
+      treeData.value = markRaw(buildPickerTreeFromProcessesOnly(snap))
+    }
+
     selectedIds.value = []
     keyword.value = ''
     debouncedKeyword.value = ''
     await nextTick()
-    const firstDept = pickerTreeData.value[0]
+    const firstDept = treeData.value[0]
     const firstJob = firstDept?.children?.[0]
     if (firstJob?.department && firstJob?.jobType) {
       activeDepartment.value = firstJob.department
@@ -411,6 +437,7 @@ watch(
       activeDepartment.value = ''
       activeJobType.value = ''
     }
+    refreshFilteredTableRows()
   },
 )
 
@@ -434,8 +461,15 @@ onBeforeUnmount(() => {
 .production-picker-toolbar {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-sm);
   margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.picker-selected-summary {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
 }
 
 .production-picker-layout {
@@ -464,11 +498,6 @@ onBeforeUnmount(() => {
   gap: 6px;
 }
 
-.picker-tree-selected-count {
-  font-size: var(--font-size-caption);
-  color: var(--el-text-color-secondary);
-}
-
 .production-picker-list {
   height: 360px;
   border: 1px solid var(--el-border-color-lighter);
@@ -487,34 +516,22 @@ onBeforeUnmount(() => {
   margin: 0;
 }
 
-.picker-process-table :deep(.el-table__header-wrapper .el-table__cell),
-.picker-process-table :deep(.el-table__body-wrapper .el-table__cell) {
-  height: var(--picker-row-height);
-  padding-top: 0;
-  padding-bottom: 0;
-  box-sizing: border-box;
+.picker-table-v2-wrap {
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: 4px;
+  overflow: hidden;
 }
 
-.picker-process-table :deep(.el-table__header-wrapper tr),
-.picker-process-table :deep(.el-table__body-wrapper tr) {
-  height: var(--picker-row-height);
+.picker-process-table-v2 {
+  font-size: var(--font-size-caption);
 }
 
-.picker-process-table :deep(.el-table__header-wrapper .el-table__cell .cell),
-.picker-process-table :deep(.el-table__body-wrapper .el-table__cell .cell) {
-  height: var(--picker-row-height);
-  line-height: var(--picker-row-height);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  box-sizing: border-box;
-}
-
-.picker-process-table :deep(.el-checkbox) {
+.picker-name-cell {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .picker-added-tag {

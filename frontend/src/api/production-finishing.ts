@@ -52,6 +52,10 @@ export interface FinishingRegisterFormDataRes {
   cutRow: (number | null)[]
   sewingRow: (number | null)[]
   tailReceivedRow: (number | null)[]
+  /** 已登记入库按尺码（与 headers 对齐，无明细时为 null） */
+  tailInboundRow: (number | null)[] | null
+  /** 已登记次品按尺码（与 headers 对齐，无明细时为 null） */
+  defectRow: (number | null)[] | null
 }
 
 export function getFinishingRegisterFormData(orderId: number) {
@@ -84,6 +88,9 @@ export function registerFinishingPackagingComplete(payload: {
   tailInboundQty: number
   defectQuantity: number
   remark?: string
+  /** 与登记弹窗尺码列一致（不含合计列），有 DB 列时后端会持久化 */
+  tailInboundQuantities?: number[]
+  defectQuantities?: number[]
 }) {
   return request.post<void>('/production/finishing/items/register-packaging-complete', payload)
 }

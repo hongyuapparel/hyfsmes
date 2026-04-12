@@ -120,7 +120,61 @@
         <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
       </el-table-column>
       <el-table-column label="订单数量" width="88" align="right">
-        <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+        <template #default="{ row }">
+          <el-popover
+            placement="top-start"
+            trigger="hover"
+            :width="qtyPopoverWidth(row.orderId)"
+            :show-arrow="true"
+            @show="onShowQtyPopover(row)"
+          >
+            <template #reference>
+              <span class="qty-trigger">{{ formatDisplayNumber(row.quantity) }}</span>
+            </template>
+            <div class="qty-popover">
+              <div class="qty-popover-title">数量追踪</div>
+              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
+              <div v-else>
+                <template v-if="qtyPopoverBlocks(row.orderId).length">
+                  <div
+                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
+                    :key="`${row.orderId}-bc-${bIdx}`"
+                    class="qty-popover-block"
+                  >
+                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
+                    <table class="qty-popover-table">
+                      <thead>
+                        <tr>
+                          <th class="qty-header">尺码</th>
+                          <th
+                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
+                            :key="`${h}-${hIdx}`"
+                            class="qty-header"
+                          >
+                            {{ h }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="br in block.rows" :key="br.label">
+                          <td class="qty-label">{{ br.label }}</td>
+                          <td
+                            v-for="(v, vIdx) in br.values"
+                            :key="vIdx"
+                            class="qty-value"
+                          >
+                            {{ v != null ? formatDisplayNumber(v) : '-' }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
+                <div v-else class="qty-popover-empty">暂无尺码明细</div>
+              </div>
+            </div>
+          </el-popover>
+        </template>
       </el-table-column>
       <el-table-column prop="arrivedAt" label="到尾部时间" width="110" align="center">
         <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
@@ -138,7 +192,7 @@
           <el-popover
             placement="top-start"
             trigger="hover"
-            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :width="qtyPopoverWidth(row.orderId)"
             :show-arrow="true"
             @show="onShowQtyPopover(row)"
           >
@@ -149,20 +203,41 @@
               <div class="qty-popover-title">数量追踪</div>
               <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
               <div v-else>
-                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
-                  <thead>
-                    <tr>
-                      <th class="qty-header">尺码</th>
-                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
-                      <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <template v-if="qtyPopoverBlocks(row.orderId).length">
+                  <div
+                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
+                    :key="`${row.orderId}-bc-${bIdx}`"
+                    class="qty-popover-block"
+                  >
+                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
+                    <table class="qty-popover-table">
+                      <thead>
+                        <tr>
+                          <th class="qty-header">尺码</th>
+                          <th
+                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
+                            :key="`${h}-${hIdx}`"
+                            class="qty-header"
+                          >
+                            {{ h }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="br in block.rows" :key="br.label">
+                          <td class="qty-label">{{ br.label }}</td>
+                          <td
+                            v-for="(v, vIdx) in br.values"
+                            :key="vIdx"
+                            class="qty-value"
+                          >
+                            {{ v != null ? formatDisplayNumber(v) : '-' }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
                 <div v-else class="qty-popover-empty">暂无尺码明细</div>
               </div>
             </div>
@@ -174,7 +249,7 @@
           <el-popover
             placement="top-start"
             trigger="hover"
-            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :width="qtyPopoverWidth(row.orderId)"
             :show-arrow="true"
             @show="onShowQtyPopover(row)"
           >
@@ -187,20 +262,41 @@
               <div class="qty-popover-title">数量追踪</div>
               <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
               <div v-else>
-                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
-                  <thead>
-                    <tr>
-                      <th class="qty-header">尺码</th>
-                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
-                      <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <template v-if="qtyPopoverBlocks(row.orderId).length">
+                  <div
+                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
+                    :key="`${row.orderId}-bc-${bIdx}`"
+                    class="qty-popover-block"
+                  >
+                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
+                    <table class="qty-popover-table">
+                      <thead>
+                        <tr>
+                          <th class="qty-header">尺码</th>
+                          <th
+                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
+                            :key="`${h}-${hIdx}`"
+                            class="qty-header"
+                          >
+                            {{ h }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="br in block.rows" :key="br.label">
+                          <td class="qty-label">{{ br.label }}</td>
+                          <td
+                            v-for="(v, vIdx) in br.values"
+                            :key="vIdx"
+                            class="qty-value"
+                          >
+                            {{ v != null ? formatDisplayNumber(v) : '-' }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
                 <div v-else class="qty-popover-empty">暂无尺码明细</div>
               </div>
             </div>
@@ -212,7 +308,7 @@
           <el-popover
             placement="top-start"
             trigger="hover"
-            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :width="qtyPopoverWidth(row.orderId)"
             :show-arrow="true"
             @show="onShowQtyPopover(row)"
           >
@@ -225,20 +321,41 @@
               <div class="qty-popover-title">数量追踪</div>
               <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
               <div v-else>
-                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
-                  <thead>
-                    <tr>
-                      <th class="qty-header">尺码</th>
-                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
-                      <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <template v-if="qtyPopoverBlocks(row.orderId).length">
+                  <div
+                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
+                    :key="`${row.orderId}-bc-${bIdx}`"
+                    class="qty-popover-block"
+                  >
+                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
+                    <table class="qty-popover-table">
+                      <thead>
+                        <tr>
+                          <th class="qty-header">尺码</th>
+                          <th
+                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
+                            :key="`${h}-${hIdx}`"
+                            class="qty-header"
+                          >
+                            {{ h }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="br in block.rows" :key="br.label">
+                          <td class="qty-label">{{ br.label }}</td>
+                          <td
+                            v-for="(v, vIdx) in br.values"
+                            :key="vIdx"
+                            class="qty-value"
+                          >
+                            {{ v != null ? formatDisplayNumber(v) : '-' }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
                 <div v-else class="qty-popover-empty">暂无尺码明细</div>
               </div>
             </div>
@@ -250,7 +367,7 @@
           <el-popover
             placement="top-start"
             trigger="hover"
-            :width="Math.max(320, (sizeBreakdownCache[row.orderId]?.headers?.length ?? 1) * 72)"
+            :width="qtyPopoverWidth(row.orderId)"
             :show-arrow="true"
             @show="onShowQtyPopover(row)"
           >
@@ -263,20 +380,41 @@
               <div class="qty-popover-title">数量追踪</div>
               <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
               <div v-else>
-                <table v-if="sizeBreakdownCache[row.orderId]?.rows?.length" class="qty-popover-table">
-                  <thead>
-                    <tr>
-                      <th class="qty-header">尺码</th>
-                      <th v-for="(h, hIdx) in sizeBreakdownCache[row.orderId].headers" :key="hIdx" class="qty-header">{{ h }}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr v-for="r in sizeBreakdownCache[row.orderId].rows" :key="r.label">
-                      <td class="qty-label">{{ r.label }}</td>
-                      <td v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-value">{{ v != null ? formatDisplayNumber(v) : '-' }}</td>
-                    </tr>
-                  </tbody>
-                </table>
+                <template v-if="qtyPopoverBlocks(row.orderId).length">
+                  <div
+                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
+                    :key="`${row.orderId}-bc-${bIdx}`"
+                    class="qty-popover-block"
+                  >
+                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
+                    <table class="qty-popover-table">
+                      <thead>
+                        <tr>
+                          <th class="qty-header">尺码</th>
+                          <th
+                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
+                            :key="`${h}-${hIdx}`"
+                            class="qty-header"
+                          >
+                            {{ h }}
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="br in block.rows" :key="br.label">
+                          <td class="qty-label">{{ br.label }}</td>
+                          <td
+                            v-for="(v, vIdx) in br.values"
+                            :key="vIdx"
+                            class="qty-value"
+                          >
+                            {{ v != null ? formatDisplayNumber(v) : '-' }}
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </template>
                 <div v-else class="qty-popover-empty">暂无尺码明细</div>
               </div>
             </div>
@@ -499,7 +637,7 @@
                       v-else
                       v-model="item.defectQuantities[hIdx]"
                       :min="0"
-                      :max="item.row.tailReceivedQty ?? 0"
+                      :max="maxDefectQtyForSize(item, hIdx)"
                       :precision="0"
                       controls-position="right"
                       size="small"
@@ -553,6 +691,11 @@ import {
   type FinishingListQuery,
 } from '@/api/production-finishing'
 import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
+import {
+  normalizeSizeBreakdown,
+  orderSizePopoverBlocks as qtyPopoverBlocksFromData,
+  orderSizePopoverWidth as qtyPopoverWidthFromData,
+} from '@/utils/order-size-popover-breakdown'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
@@ -618,6 +761,13 @@ const loading = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
 const sizePopoverLoadingId = ref<number | null>(null)
+
+function qtyPopoverBlocks(orderId: number) {
+  return qtyPopoverBlocksFromData(sizeBreakdownCache.value[orderId])
+}
+function qtyPopoverWidth(orderId: number) {
+  return qtyPopoverWidthFromData(sizeBreakdownCache.value[orderId])
+}
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<FinishingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
@@ -757,8 +907,72 @@ function packagingSetInboundToReceived(item: PackagingCompleteItem) {
   item.defectQuantities.fill(0)
 }
 
-function maxPackagingQtyForSize(item: PackagingCompleteItem, _hIdx: number): number {
+function maxPackagingQtyForSize(item: PackagingCompleteItem, hIdx: number): number {
+  const tr = item.tailReceivedRow
+  if (Array.isArray(tr) && tr.length > hIdx && tr[hIdx] != null && Number.isFinite(Number(tr[hIdx]))) {
+    return Number(tr[hIdx]) || 0
+  }
   return item.row.tailReceivedQty ?? 0
+}
+
+function maxDefectQtyForSize(item: PackagingCompleteItem, hIdx: number): number {
+  return maxPackagingQtyForSize(item, hIdx)
+}
+
+/** 有按码收货明细时，校验每码入库+次品=该码收货 */
+function assertPackagingPerSize(item: PackagingCompleteItem): string | null {
+  const h = item.headers
+  if (h.length <= 1) return null
+  const tr = item.tailReceivedRow
+  if (!Array.isArray(tr) || tr.length !== h.length) return null
+  const sizeCount = h.length - 1
+  for (let i = 0; i < sizeCount; i++) {
+    if (tr[i] == null || !Number.isFinite(Number(tr[i]))) return null
+  }
+  for (let i = 0; i < sizeCount; i++) {
+    const a = Number(item.inboundQuantities[i]) || 0
+    const b = Number(item.defectQuantities[i]) || 0
+    const r = Number(tr[i]) || 0
+    if (a + b !== r) {
+      return `订单 ${item.row.orderNo}：尺码 ${h[i]} 入库数+次品数须等于该码尾部收货数(${r})`
+    }
+  }
+  return null
+}
+
+/** 修改弹窗：从接口返回的按码行回填各尺码（无明细时退化为总数落在首列） */
+function hydratePackagingQtyFromSaved(
+  item: PackagingCompleteItem,
+  inbRow: (number | null)[] | null | undefined,
+  defRow: (number | null)[] | null | undefined,
+  inbTotal: number,
+  defTotal: number,
+) {
+  const headers = item.headers
+  const sizeCount = headers.length > 1 ? headers.length - 1 : 1
+  const takePerSize = (r: (number | null)[] | null | undefined): number[] | null => {
+    if (!r || r.length === 0) return null
+    if (r.length >= headers.length) return r.slice(0, sizeCount).map((v) => Number(v) || 0)
+    if (r.length === sizeCount) return r.map((v) => Number(v) || 0)
+    return null
+  }
+  const perIn = takePerSize(inbRow)
+  const perDef = takePerSize(defRow)
+  if (perIn && perDef && perIn.length === sizeCount && perDef.length === sizeCount) {
+    const sumI = perIn.reduce((a, b) => a + b, 0)
+    const sumD = perDef.reduce((a, b) => a + b, 0)
+    if (sumI === inbTotal && sumD === defTotal) {
+      for (let i = 0; i < sizeCount; i++) {
+        item.inboundQuantities[i] = perIn[i]
+        item.defectQuantities[i] = perDef[i]
+      }
+      return
+    }
+  }
+  item.inboundQuantities[0] = inbTotal
+  for (let i = 1; i < sizeCount; i++) item.inboundQuantities[i] = 0
+  item.defectQuantities[0] = defTotal
+  for (let i = 1; i < sizeCount; i++) item.defectQuantities[i] = 0
 }
 
 async function onShowQtyPopover(row: FinishingListItem) {
@@ -767,7 +981,7 @@ async function onShowQtyPopover(row: FinishingListItem) {
   sizePopoverLoadingId.value = id
   try {
     const res = await getOrderSizeBreakdown(id)
-    sizeBreakdownCache.value[id] = res.data ?? { headers: [], rows: [] }
+    sizeBreakdownCache.value[id] = normalizeSizeBreakdown(res.data ?? { headers: [], rows: [] })
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '尺码明细加载失败'))
   } finally {
@@ -1024,10 +1238,7 @@ async function openPackagingAmendDialog() {
       }
       const inb = row.tailInboundQty ?? 0
       const def = row.defectQuantity ?? 0
-      if (sizeCount >= 1) {
-        item.inboundQuantities[0] = inb
-        item.defectQuantities[0] = def
-      }
+      hydratePackagingQtyFromSaved(item, data?.tailInboundRow, data?.defectRow, inb, def)
       packagingCompleteDialog.items.push(item)
     }
   } catch (e: unknown) {
@@ -1041,6 +1252,11 @@ async function openPackagingAmendDialog() {
 async function submitPackagingComplete() {
   if (packagingCompleteDialog.items.length === 0) return
   for (const item of packagingCompleteDialog.items) {
+    const perMsg = assertPackagingPerSize(item)
+    if (perMsg) {
+      ElMessage.warning(perMsg)
+      return
+    }
     const received = item.row.tailReceivedQty ?? 0
     const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
     const defect = defectTotal(item)
@@ -1061,6 +1277,8 @@ async function submitPackagingComplete() {
         tailInboundQty: sumInbound,
         defectQuantity: defect,
         remark: item.remark?.trim() || undefined,
+        tailInboundQuantities: [...item.inboundQuantities],
+        defectQuantities: [...item.defectQuantities],
       })
     }
     ElMessage.success(
@@ -1212,16 +1430,28 @@ onMounted(() => {
   margin-bottom: 6px;
 }
 
+.qty-popover-subtitle {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.qty-popover-block:not(:first-child) {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border);
+}
+
 .qty-popover-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
 }
 
 .qty-popover-table .qty-label {
   padding: 2px 4px;
   color: var(--color-text-muted, #909399);
   white-space: nowrap;
-  text-align: center;
+  text-align: left;
 }
 
 .qty-popover-table .qty-value {

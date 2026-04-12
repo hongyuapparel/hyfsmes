@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -21,16 +22,30 @@ import { FabricStockService } from './fabric-stock.service';
 export class FabricStockController {
   constructor(private readonly service: FabricStockService) {}
 
+  @Get('supplier-options')
+  getFabricSupplierOptions() {
+    return this.service.listFabricSupplierOptions();
+  }
+
+  @Get('pickup-users')
+  getPickupUsers() {
+    return this.service.getPickupUserOptions();
+  }
+
   @Get('items')
   getList(
     @Query('name') name?: string,
     @Query('customerName') customerName?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
     return this.service.getList({
       name,
       customerName,
+      startDate,
+      endDate,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -49,9 +64,23 @@ export class FabricStockController {
     @Body('customerName') customerName?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('supplierId') supplierId?: unknown,
+    @Body('warehouseId') warehouseId?: unknown,
+    @Body('storageLocation') storageLocation?: string,
     @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.create({ name, quantity, unit, customerName, remark, imageUrl, operatorUsername: user?.username ?? '' });
+    return this.service.create({
+      name,
+      quantity,
+      unit,
+      customerName,
+      remark,
+      imageUrl,
+      supplierId,
+      warehouseId,
+      storageLocation,
+      operatorUsername: user?.username ?? '',
+    });
   }
 
   @Put('items/:id')
@@ -63,9 +92,23 @@ export class FabricStockController {
     @Body('customerName') customerName?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('supplierId') supplierId?: unknown,
+    @Body('warehouseId') warehouseId?: unknown,
+    @Body('storageLocation') storageLocation?: string,
     @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.update(Number(id), { name, quantity, unit, customerName, remark, imageUrl, operatorUsername: user?.username ?? '' });
+    return this.service.update(Number(id), {
+      name,
+      quantity,
+      unit,
+      customerName,
+      remark,
+      imageUrl,
+      supplierId,
+      warehouseId,
+      storageLocation,
+      operatorUsername: user?.username ?? '',
+    });
   }
 
   @Delete('items/:id')
@@ -79,9 +122,21 @@ export class FabricStockController {
     @Body('quantity') quantity: number,
     @Body('photoUrl') photoUrl: string,
     @Body('remark') remark: string,
+    @Body('pickupUserId') pickupUserId?: unknown,
     @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.outbound(Number(id), Number(quantity), photoUrl ?? '', remark ?? '', user?.username ?? '');
+    const uid = Number(pickupUserId);
+    if (!Number.isFinite(uid) || uid <= 0) {
+      throw new BadRequestException('请选择领取人');
+    }
+    return this.service.outbound(
+      Number(id),
+      Number(quantity),
+      photoUrl ?? '',
+      remark ?? '',
+      user?.username ?? '',
+      uid,
+    );
   }
 
   @Get('items/:id/logs')

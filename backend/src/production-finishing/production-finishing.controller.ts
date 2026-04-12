@@ -121,6 +121,8 @@ export class ProductionFinishingController {
     @Body('tailInboundQty') tailInboundQty: number,
     @Body('defectQuantity') defectQuantity: number,
     @Body('remark') remark?: string,
+    @Body('tailInboundQuantities') tailInboundQuantities?: number[],
+    @Body('defectQuantities') defectQuantities?: number[],
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.finishingService.registerPackagingComplete(
@@ -130,6 +132,8 @@ export class ProductionFinishingController {
       Number(defectQuantity ?? 0),
       remark ?? null,
       user?.userId,
+      Array.isArray(tailInboundQuantities) ? tailInboundQuantities : null,
+      Array.isArray(defectQuantities) ? defectQuantities : null,
     );
   }
 

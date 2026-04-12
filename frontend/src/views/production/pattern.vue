@@ -699,7 +699,11 @@ function buildQuery(): PatternListQuery {
   return q
 }
 
+let tabCountsReqId = 0
+
 async function loadTabCounts() {
+  tabCountsReqId++
+  const reqId = tabCountsReqId
   const base = buildQuery()
   base.page = 1
   base.pageSize = 1
@@ -715,14 +719,30 @@ async function loadTabCounts() {
       }
     }),
   )
+  if (reqId !== tabCountsReqId) return
   tabCounts.value = counts
   tabTotal.value = counts.all ?? 0
 }
 
+/** 避免「进入页无筛选的首次请求」晚于「带订单号/SKU 的请求」返回而覆盖表格（与订单列表 Abort 策略一致） */
+let listAbortController: AbortController | null = null
+let patternListReqId = 0
+
+function isRequestCanceled(err: unknown): boolean {
+  const e = err as { code?: string; name?: string }
+  return e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError'
+}
+
 async function load() {
+  patternListReqId++
+  const reqId = patternListReqId
+  listAbortController?.abort()
+  listAbortController = new AbortController()
+  const signal = listAbortController.signal
   loading.value = true
   try {
-    const res = await getPatternItems(buildQuery())
+    const res = await getPatternItems(buildQuery(), { signal })
+    if (reqId !== patternListReqId) return
     const data = res.data
     if (data) {
       list.value = data.list ?? []
@@ -730,9 +750,10 @@ async function load() {
       restoreColumnWidths(patternTableRef.value)
     }
   } catch (e: unknown) {
+    if (isRequestCanceled(e)) return
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (reqId === patternListReqId) loading.value = false
   }
 }
 

@@ -21,6 +21,10 @@ export class FabricOutbound {
   @Column({ name: 'remark', length: 500, default: '' })
   remark: string;
 
+  /** 领取人 users.id */
+  @Column({ name: 'pickup_user_id', type: 'int', nullable: true })
+  pickupUserId: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

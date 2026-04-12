@@ -776,7 +776,13 @@ export class OrderStatusConfigService {
         return sum + usage * (1 + loss / 100) * unitPrice;
       }, 0);
       const process = processRows.reduce((sum, row) => sum + toNum(row?.quantity) * toNum(row?.unitPrice), 0);
-      const production = productionRows.reduce((sum, row) => sum + toNum(row?.unitPrice), 0);
+      const production = productionRows.reduce((sum, row) => {
+        const unit = toNum(row?.unitPrice);
+        const rawQty = row?.quantity;
+        const q = rawQty === undefined || rawQty === null ? 1 : toNum(rawQty);
+        const qty = Number.isFinite(q) && q >= 0 ? q : 1;
+        return sum + unit * qty;
+      }, 0);
       return { material: round2(material), process: round2(process), production: round2(production) };
     };
 

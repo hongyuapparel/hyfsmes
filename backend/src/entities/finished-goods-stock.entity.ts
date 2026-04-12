@@ -46,6 +46,13 @@ export class FinishedGoodsStock {
   @Column({ name: 'image_url', length: 512, default: '' })
   imageUrl: string;
 
+  /**
+   * 手动录入的颜色尺码明细（优先于关联订单的 order_ext）
+   * 结构：{ headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> }
+   */
+  @Column({ name: 'color_size_snapshot', type: 'json', nullable: true })
+  colorSizeSnapshot: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

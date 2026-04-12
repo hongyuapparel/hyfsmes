@@ -487,6 +487,10 @@ export class ProductionPurchaseService {
           quantity!,
           '',
           `领料出库 订单:${order.orderNo} SKU:${order.skuCode ?? ''} 物料:${row.materialName ?? ''} 来源:${sourceLabel} 批次:${params.stockBatch ?? ''} 色号:${params.stockColorCode ?? ''} 规格:${params.stockSpec ?? ''} 备注:${remark}`,
+          operatorName,
+          params.actorUserId != null && Number.isFinite(Number(params.actorUserId))
+            ? Number(params.actorUserId)
+            : null,
         );
       } else if (inventorySourceType === 'accessory') {
         const stock = await this.inventoryAccessoriesService.getOne(inventoryId!);

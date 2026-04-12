@@ -73,10 +73,12 @@ export class InventoryAccessoriesService {
     category?: string;
     customerName?: string;
     salesperson?: string;
+    startDate?: string;
+    endDate?: string;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: InventoryAccessory[]; total: number; page: number; pageSize: number }> {
-    const { name, category, customerName, salesperson, page = 1, pageSize = 20 } = params;
+    const { name, category, customerName, salesperson, startDate, endDate, page = 1, pageSize = 20 } = params;
     const qb = this.repo.createQueryBuilder('a');
 
     if (name?.trim()) {
@@ -92,6 +94,12 @@ export class InventoryAccessoriesService {
     }
     if (salesperson?.trim()) {
       qb.andWhere('a.salesperson = :salesperson', { salesperson: salesperson.trim() });
+    }
+    if (startDate?.trim()) {
+      qb.andWhere('a.created_at >= :inboundStart', { inboundStart: `${startDate.trim()} 00:00:00` });
+    }
+    if (endDate?.trim()) {
+      qb.andWhere('a.created_at <= :inboundEnd', { inboundEnd: `${endDate.trim()} 23:59:59` });
     }
     qb.orderBy('a.created_at', 'DESC');
 

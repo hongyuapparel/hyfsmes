@@ -94,6 +94,27 @@ export class ProductionFinishingService {
     return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
   }
 
+  /** 将库内按尺码行（可能缺合计列）规范为与表头同长 */
+  private normalizeFinishingQtyRowToHeaders(
+    stored: number[] | null,
+    headers: string[],
+  ): (number | null)[] | null {
+    if (!stored || stored.length === 0) return null;
+    const hLen = headers.length;
+    const sizeLen = Math.max(0, hLen - 1);
+    if (stored.length === hLen) {
+      return stored.map((n) => (typeof n === 'number' && Number.isFinite(n) ? n : Number(n) || 0));
+    }
+    if (hLen > 1 && stored.length === sizeLen) {
+      const sum = stored.reduce((a, b) => a + (Number(b) || 0), 0);
+      return [...stored.map((n) => Number(n) || 0), sum];
+    }
+    if (hLen === 1 && stored.length >= 1) {
+      return [Number(stored[0]) || 0];
+    }
+    return null;
+  }
+
   // 尾部收货尺码明细字段是否已在 DB 中落地（缓存一次，避免每次请求都查元数据）
   private hasTailReceivedQtyRowColumn: boolean | null = null;
   private async hasTailReceivedQtyRow(): Promise<boolean> {
@@ -128,6 +149,66 @@ export class ProductionFinishingService {
       if (typeof raw === 'object') {
         // 有些驱动会直接返回对象/数组
         return Array.isArray(raw) ? (raw as number[]) : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** 入库/次品按尺码 JSON 列是否已落地（两列同时存在才写入） */
+  private hasPackagingQtyRowColumns: boolean | null = null;
+  private async hasPackagingQtyRows(): Promise<boolean> {
+    if (this.hasPackagingQtyRowColumns != null) return this.hasPackagingQtyRowColumns;
+    try {
+      const r1 = await this.finishingRepo.query(
+        "SHOW COLUMNS FROM `order_finishing` LIKE 'tail_inbound_qty_row'",
+      );
+      const r2 = await this.finishingRepo.query(
+        "SHOW COLUMNS FROM `order_finishing` LIKE 'defect_quantity_row'",
+      );
+      this.hasPackagingQtyRowColumns =
+        Array.isArray(r1) && r1.length > 0 && Array.isArray(r2) && r2.length > 0;
+      return this.hasPackagingQtyRowColumns;
+    } catch {
+      this.hasPackagingQtyRowColumns = false;
+      return false;
+    }
+  }
+
+  private async fetchTailInboundQtyRow(orderId: number): Promise<number[] | null> {
+    if (!(await this.hasPackagingQtyRows())) return null;
+    try {
+      const rows = await this.finishingRepo.query(
+        'SELECT tail_inbound_qty_row AS tailInboundQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as any).tailInboundQtyRow : null;
+      if (raw == null) return null;
+      if (Array.isArray(raw)) return raw.map((n: unknown) => Number(n) || 0);
+      if (typeof raw === 'string') {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.map((n: unknown) => Number(n) || 0) : null;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchDefectQuantityRow(orderId: number): Promise<number[] | null> {
+    if (!(await this.hasPackagingQtyRows())) return null;
+    try {
+      const rows = await this.finishingRepo.query(
+        'SELECT defect_quantity_row AS defectQuantityRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as any).defectQuantityRow : null;
+      if (raw == null) return null;
+      if (Array.isArray(raw)) return raw.map((n: unknown) => Number(n) || 0);
+      if (typeof raw === 'string') {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.map((n: unknown) => Number(n) || 0) : null;
       }
       return null;
     } catch {
@@ -283,6 +364,10 @@ export class ProductionFinishingService {
     cutRow: (number | null)[];
     sewingRow: (number | null)[];
     tailReceivedRow: (number | null)[];
+    /** 已登记的入库按尺码（含合计列），无明细时为 null */
+    tailInboundRow: (number | null)[] | null;
+    /** 已登记的次品按尺码（含合计列），无明细时为 null */
+    defectRow: (number | null)[] | null;
   }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -339,6 +424,14 @@ export class ProductionFinishingService {
     } else {
       tailReceivedRow = headers.length === 1 ? [receivedTotal] : [...Array(headers.length - 1).fill(null), receivedTotal];
     }
+
+    const [inboundStored, defectStored] = await Promise.all([
+      this.fetchTailInboundQtyRow(orderId),
+      this.fetchDefectQuantityRow(orderId),
+    ]);
+    const tailInboundRow = this.normalizeFinishingQtyRowToHeaders(inboundStored, headers);
+    const defectRow = this.normalizeFinishingQtyRowToHeaders(defectStored, headers);
+
     return {
       headers,
       orderRow:
@@ -349,6 +442,8 @@ export class ProductionFinishingService {
         (headers.length === 1 ? [cutTotal != null ? cutTotal : null] : [...Array(headers.length).fill(null)]),
       sewingRow,
       tailReceivedRow,
+      tailInboundRow,
+      defectRow,
     };
   }
 
@@ -448,6 +543,8 @@ export class ProductionFinishingService {
     defectQuantity: number,
     remark?: string | null,
     actorUserId?: number,
+    tailInboundQuantities?: number[] | null,
+    defectQuantities?: number[] | null,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -489,6 +586,59 @@ export class ProductionFinishingService {
 
     if (isAmend) {
       await this.assertCanAmendPackagingPending(orderId, finishing);
+    }
+
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const headers =
+      Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
+        ? [...ext.colorSizeHeaders, '合计']
+        : ['合计'];
+    const sizeCount = headers.length > 1 ? headers.length - 1 : 1;
+
+    if (await this.hasPackagingQtyRows()) {
+      const tin = tailInboundQuantities;
+      const tdq = defectQuantities;
+      const hasArrays =
+        Array.isArray(tin) &&
+        Array.isArray(tdq) &&
+        tin.length >= sizeCount &&
+        tdq.length >= sizeCount;
+      if (hasArrays) {
+        const perIn = tin!.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
+        const perDef = tdq!.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
+        while (perIn.length < sizeCount) perIn.push(0);
+        while (perDef.length < sizeCount) perDef.push(0);
+        const sumIn = perIn.reduce((a, b) => a + b, 0);
+        const sumDef = perDef.reduce((a, b) => a + b, 0);
+        if (sumIn !== inbound || sumDef !== defect) {
+          throw new BadRequestException('按尺码填写的入库数、次品数合计与汇总不一致');
+        }
+        const receivedRow = await this.fetchTailReceivedQtyRow(orderId);
+        if (Array.isArray(receivedRow) && receivedRow.length === headers.length && headers.length > 1) {
+          let allNumeric = true;
+          for (let i = 0; i < sizeCount; i++) {
+            const r = receivedRow[i];
+            if (r == null || !Number.isFinite(Number(r))) {
+              allNumeric = false;
+              break;
+            }
+          }
+          if (allNumeric) {
+            for (let i = 0; i < sizeCount; i++) {
+              const r = Number(receivedRow[i]) || 0;
+              if (perIn[i] + perDef[i] !== r) {
+                throw new BadRequestException(
+                  `${String(headers[i] ?? '尺码')}：入库数+次品数须等于该码尾部收货数(${r})`,
+                );
+              }
+            }
+          }
+        }
+        const tailInboundQtyRow = headers.length === 1 ? [inbound] : [...perIn, inbound];
+        const defectQuantityRow = headers.length === 1 ? [defect] : [...perDef, defect];
+        (finishing as any).tailInboundQtyRow = tailInboundQtyRow;
+        (finishing as any).defectQuantityRow = defectQuantityRow;
+      }
     }
 
     finishing.tailShippedQty = ship;

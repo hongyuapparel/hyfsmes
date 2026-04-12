@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 export interface PatternListItem {
   orderId: number
@@ -50,8 +51,8 @@ export interface PatternListQuery {
   pageSize?: number
 }
 
-export function getPatternItems(params?: PatternListQuery) {
-  return request.get<PatternListRes>('/production/pattern/items', { params })
+export function getPatternItems(params?: PatternListQuery, config?: AxiosRequestConfig) {
+  return request.get<PatternListRes>('/production/pattern/items', { params, ...(config ?? {}) })
 }
 
 export function exportPatternItems(params?: Omit<PatternListQuery, 'page' | 'pageSize'>) {

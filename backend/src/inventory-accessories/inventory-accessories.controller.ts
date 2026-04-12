@@ -33,6 +33,8 @@ export class InventoryAccessoriesController {
     @Query('category') category?: string,
     @Query('customerName') customerName?: string,
     @Query('salesperson') salesperson?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -41,6 +43,8 @@ export class InventoryAccessoriesController {
       category,
       customerName,
       salesperson,
+      startDate,
+      endDate,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });

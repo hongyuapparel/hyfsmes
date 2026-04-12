@@ -18,6 +18,8 @@ export class FinishedGoodsStockController {
     @Query('skuCode') skuCode?: string,
     @Query('customerName') customerName?: string,
     @Query('inventoryTypeId') inventoryTypeIdStr?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -31,6 +33,8 @@ export class FinishedGoodsStockController {
       skuCode,
       customerName,
       inventoryTypeId,
+      startDate,
+      endDate,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -38,6 +42,7 @@ export class FinishedGoodsStockController {
 
   @Post('items')
   createManual(
+    @CurrentUser() user: { userId: number; username: string },
     @Body('orderNo') orderNo: string,
     @Body('skuCode') skuCode: string,
     @Body('quantity') quantity: number,
@@ -47,18 +52,23 @@ export class FinishedGoodsStockController {
     @Body('department') department: string,
     @Body('location') location: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('colorSize') colorSize?: unknown,
   ) {
-    return this.service.createManual({
-      orderNo,
-      skuCode,
-      quantity: Number(quantity),
-      unitPrice,
-      warehouseId,
-      inventoryTypeId,
-      department,
-      location,
-      imageUrl,
-    });
+    return this.service.createManual(
+      {
+        orderNo,
+        skuCode,
+        quantity: Number(quantity),
+        unitPrice,
+        warehouseId,
+        inventoryTypeId,
+        department,
+        location,
+        imageUrl,
+        colorSize,
+      },
+      user?.username ?? '',
+    );
   }
 
   @Post('outbound')
