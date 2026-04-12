@@ -128,8 +128,6 @@
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="48" align="center" />
-          <el-table-column prop="createdAt" label="入库时间" width="160" align="center" header-align="center" />
-          <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
@@ -144,20 +142,20 @@
                 effect="light"
                 :show-after="250"
                 :hide-after="0"
-                :disabled="!row.orderId"
+                :disabled="!qtyTooltipEnabled(row)"
                 popper-class="finished-qty-popper"
-                @show="ensureColorSizeBreakdown(row.orderId)"
+                @show="onQtyTooltipShow(row)"
               >
                 <template #content>
                   <div class="qty-tooltip">
-                    <template v-if="row.orderId && colorSizeCache[row.orderId]?.loading">
+                    <template v-if="row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.loading">
                       <div class="qty-tooltip-loading">加载中...</div>
                     </template>
-                    <template v-else-if="row.orderId && colorSizeCache[row.orderId]?.error">
+                    <template v-else-if="row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.error">
                       <div class="qty-tooltip-error">明细加载失败</div>
                     </template>
                     <template v-else>
-                      <div v-if="!row.orderId || getPreviewHeaders(row).length === 0 || getPreviewRows(row).length === 0" class="qty-tooltip-empty">
+                      <div v-if="getPreviewHeaders(row).length === 0 || getPreviewRows(row).length === 0" class="qty-tooltip-empty">
                         暂无明细
                       </div>
                       <div v-else class="qty-tooltip-grid">
@@ -182,7 +180,7 @@
                             :key="vIdx"
                             class="qty-tooltip-cell qty-tooltip-num"
                           >
-                            {{ v }}
+                            {{ formatDisplayNumber(v) }}
                           </div>
                         </div>
                       </div>
@@ -215,6 +213,8 @@
             </template>
           </el-table-column>
           <el-table-column prop="location" label="存放地址" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="createdAt" label="入库时间" width="160" align="center" header-align="center" />
+          <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="操作" width="88" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
               <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -324,7 +324,7 @@
               {{ findWarehouseLabelById(row.warehouseId) || '-' }}
             </template>
           </el-table-column>
-          <el-table-column prop="pickupUserName" label="领走人" width="120" show-overflow-tooltip />
+          <el-table-column prop="pickupUserName" label="领取人" width="120" show-overflow-tooltip />
           <el-table-column prop="operatorUsername" label="操作人" width="120" show-overflow-tooltip />
           <el-table-column prop="remark" label="备注" min-width="160" show-overflow-tooltip />
         </el-table>
@@ -1285,13 +1285,15 @@ function getDetailColorSizeSummary({ columns }: { columns: Array<{ label?: strin
   })
 }
 
-function getOrderBreakdownTotal(orderId: number | null | undefined): number {
-  if (!orderId) return 0
-  const rows = colorSizeCache[orderId]?.rows ?? []
-  return rows.reduce(
-    (sum, row) => sum + (Array.isArray(row.values) ? row.values.reduce((s, q) => s + (Number(q) || 0), 0) : 0),
-    0,
-  )
+/** 有订单可走接口拉明细，或手动入库带了 sizeBreakdown（列表快照） */
+function qtyTooltipEnabled(row: FinishedStockRow): boolean {
+  if (row.sizeBreakdown?.headers?.length && row.sizeBreakdown.rows?.length) return true
+  return !!row.orderId
+}
+
+function onQtyTooltipShow(row: FinishedStockRow) {
+  if (row.sizeBreakdown?.headers?.length && row.sizeBreakdown.rows?.length) return
+  if (row.orderId) void ensureColorSizeBreakdown(row.orderId)
 }
 
 function allocateByWeight(weights: number[], total: number): number[] {
@@ -1319,31 +1321,36 @@ function allocateByWeight(weights: number[], total: number): number[] {
   return base
 }
 
-function getPreviewHeaders(row: { orderId?: number | null }): string[] {
-  if (!row.orderId) return []
-  return colorSizeCache[row.orderId]?.headers ?? []
-}
-
-function getPreviewRows(row: { orderId?: number | null; quantity: number }) {
-  if (!row.orderId) return []
-  const cache = colorSizeCache[row.orderId]
-  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return []
-
-  const targetQty = Math.max(0, Math.trunc(Number(row.quantity) || 0))
-  const orderTotal = getOrderBreakdownTotal(row.orderId)
-  if (orderTotal === targetQty) return cache.rows
-
-  const hasTotalCol = cache.headers[cache.headers.length - 1] === '合计'
-  const sizeColCount = hasTotalCol ? Math.max(0, cache.headers.length - 1) : cache.headers.length
+/**
+ * 将颜色×尺码格按权重缩放到 targetQty（与当前库存 row.quantity 对齐）。
+ * 支持表头末列为「合计」时仅对尺码列分摊，末列写每行小计。
+ */
+function scaleColorSizeRowsToQuantity(
+  headers: string[],
+  rows: Array<{ colorName?: string; values?: number[] }>,
+  targetQty: number,
+): Array<{ colorName: string; values: number[] }> {
+  if (!headers.length || !rows.length) return []
+  const hasTotalCol = headers[headers.length - 1] === '合计'
+  const sizeColCount = hasTotalCol ? Math.max(0, headers.length - 1) : headers.length
+  if (sizeColCount <= 0) return []
   const weights: number[] = []
-  cache.rows.forEach((r) => {
+  rows.forEach((r) => {
     for (let i = 0; i < sizeColCount; i += 1) {
       weights.push(Math.max(0, Number(r.values?.[i]) || 0))
     }
   })
-  const allocated = allocateByWeight(weights, targetQty)
+  const weightSum = weights.reduce((s, n) => s + n, 0)
+  const safeTarget = Math.max(0, Math.trunc(Number(targetQty) || 0))
+  if (weightSum <= 0) {
+    return rows.map((r) => ({
+      colorName: String(r.colorName ?? ''),
+      values: hasTotalCol ? [...Array(sizeColCount).fill(0), 0] : Array(sizeColCount).fill(0),
+    }))
+  }
+  const allocated = weightSum === safeTarget ? [...weights] : allocateByWeight(weights, safeTarget)
   let cursor = 0
-  return cache.rows.map((r) => {
+  return rows.map((r) => {
     const sizeValues: number[] = []
     for (let i = 0; i < sizeColCount; i += 1) {
       sizeValues.push(allocated[cursor] ?? 0)
@@ -1351,10 +1358,81 @@ function getPreviewRows(row: { orderId?: number | null; quantity: number }) {
     }
     const rowTotal = sizeValues.reduce((s, n) => s + n, 0)
     return {
-      colorName: r.colorName,
+      colorName: String(r.colorName ?? ''),
       values: hasTotalCol ? [...sizeValues, rowTotal] : sizeValues,
     }
   })
+}
+
+/** 出库弹窗：用手动快照初始化各尺码出库数，与列表悬停同一套「按当前库存缩放」逻辑 */
+function initOutboundRowsFromStockSnapshot(
+  row: FinishedStockRow,
+  headers: string[],
+): Array<{ colorName: string; quantities: number[] }> {
+  const snap = row.sizeBreakdown
+  if (!snap?.rows?.length || !headers.length) return []
+  const cacheLikeRows = snap.rows.map((r) => ({
+    colorName: r.colorName,
+    values: Array.isArray(r.values) ? [...r.values] : [],
+  }))
+  const scaled = scaleColorSizeRowsToQuantity(headers, cacheLikeRows, row.quantity)
+  return scaled.map((r) => ({ colorName: r.colorName, quantities: [...r.values] }))
+}
+
+function buildOutboundDialogItem(row: FinishedStockRow): FinishedOutboundDialogItem {
+  const snap = row.sizeBreakdown
+  if (snap?.headers?.length && snap.rows?.length) {
+    const headers = snap.headers.filter((h) => h !== '合计')
+    const rows = initOutboundRowsFromStockSnapshot(row, headers)
+    return { row, headers, rows }
+  }
+  const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
+  const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+  return {
+    row,
+    headers,
+    rows: (breakdown?.rows ?? []).map((r) => ({
+      colorName: r.colorName,
+      quantities: headers.map(() => 0),
+    })),
+  }
+}
+
+function outboundRowLabel(item: FinishedOutboundDialogItem): string {
+  const no = item.row.orderNo?.trim()
+  return no ? `订单 ${no} / ${item.row.skuCode}` : `SKU ${item.row.skuCode}`
+}
+
+/** 列表悬停：手动快照表头常无「合计」列，与订单明细一致需在右侧补一列行小计 */
+function getSnapshotTooltipHeaders(snap: NonNullable<FinishedStockRow['sizeBreakdown']>): string[] {
+  const h = snap.headers
+  if (!h.length) return []
+  if (h[h.length - 1] === '合计') return [...h]
+  return [...h, '合计']
+}
+
+function getPreviewHeaders(row: FinishedStockRow): string[] {
+  const snap = row.sizeBreakdown
+  if (snap?.headers?.length) return getSnapshotTooltipHeaders(snap)
+  if (!row.orderId) return []
+  return colorSizeCache[row.orderId]?.headers ?? []
+}
+
+function getPreviewRows(row: FinishedStockRow) {
+  const targetQty = Math.max(0, Math.trunc(Number(row.quantity) || 0))
+  const snap = row.sizeBreakdown
+  if (snap?.headers?.length && snap.rows?.length) {
+    const headers = getSnapshotTooltipHeaders(snap)
+    const cacheLikeRows = snap.rows.map((r) => ({
+      colorName: r.colorName,
+      values: Array.isArray(r.values) ? [...r.values] : [],
+    }))
+    return scaleColorSizeRowsToQuantity(headers, cacheLikeRows, targetQty)
+  }
+  if (!row.orderId) return []
+  const cache = colorSizeCache[row.orderId]
+  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return []
+  return scaleColorSizeRowsToQuantity(cache.headers, cache.rows, targetQty)
 }
 
 async function loadDetail(stockId: number) {
@@ -1821,33 +1899,33 @@ async function submitInbound() {
   }
 }
 
+function mergeStockRowWithList(row: FinishedStockRow): FinishedStockRow {
+  const fresh = list.value.find((x) => x.id === row.id && x.type === row.type)
+  return fresh ? { ...row, ...fresh } : row
+}
+
 async function openOutboundDialog() {
   if (storedRows.value.length === 0) return
-  const rows = storedRows.value
+  const rows = storedRows.value.map((r) => mergeStockRowWithList(r))
   const customerNames = Array.from(new Set(rows.map((row) => row.customerName?.trim() || '__EMPTY__')))
   if (customerNames.length > 1) {
     ElMessage.warning('批量出库请只选择同一客户的记录')
     return
   }
   outboundForm.pickupUserId = null
-  await Promise.all(
-    rows
-      .map((row) => row.orderId)
-      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-      .map((orderId) => ensureColorSizeBreakdown(orderId)),
+  const orderIdsToPrefetch = Array.from(
+    new Set(
+      rows
+        .filter((r) => {
+          if (!r.orderId) return false
+          if (r.sizeBreakdown?.headers?.length && r.sizeBreakdown.rows?.length) return false
+          return true
+        })
+        .map((r) => r.orderId as number),
+    ),
   )
-  outboundDialog.items = rows.map((row) => {
-    const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-    const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-    return {
-      row,
-      headers,
-      rows: (breakdown?.rows ?? []).map((r) => ({
-        colorName: r.colorName,
-        quantities: headers.map(() => 0),
-      })),
-    }
-  })
+  await Promise.all(orderIdsToPrefetch.map((orderId) => ensureColorSizeBreakdown(orderId)))
+  outboundDialog.items = rows.map((row) => buildOutboundDialogItem(row))
   outboundDialog.visible = true
 }
 
@@ -1874,12 +1952,13 @@ async function submitOutbound() {
   })
   if (invalidItem) {
     const qty = getOutboundItemTotal(invalidItem)
+    const label = outboundRowLabel(invalidItem)
     if (invalidItem.headers.length === 0) {
-      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 暂无颜色尺码明细，无法出库`)
+      ElMessage.warning(`${label} 暂无颜色尺码明细，无法出库`)
     } else if (qty <= 0) {
-      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 请填写出库数量`)
+      ElMessage.warning(`${label} 请填写出库数量`)
     } else {
-      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 的出库数量不能大于当前库存`)
+      ElMessage.warning(`${label} 的出库数量不能大于当前库存`)
     }
     return
   }

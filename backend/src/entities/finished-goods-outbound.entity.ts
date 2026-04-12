@@ -46,11 +46,11 @@ export class FinishedGoodsOutbound {
   @Column({ name: 'inventory_type_id', type: 'int', nullable: true })
   inventoryTypeId: number | null;
 
-  /** 领走人用户 ID（业务员） */
+  /** 领取人 users.id（成品出库；业务员约束在业务层校验） */
   @Column({ name: 'pickup_user_id', type: 'int', nullable: true })
   pickupUserId: number | null;
 
-  /** 领走人姓名（冗余，避免后续改名影响历史） */
+  /** 领取人姓名快照（冗余展示用） */
   @Column({ name: 'pickup_user_name', length: 128, default: '' })
   pickupUserName: string;
 

@@ -71,6 +71,11 @@ export interface FinishedStockRow {
   imageUrl?: string
   createdAt: string
   type: 'pending' | 'stored'
+  /** 手动入库快照：列表数量悬停展示，结构与订单 color-size-breakdown 一致 */
+  sizeBreakdown?: {
+    headers: string[]
+    rows: Array<{ colorName: string; values: number[] }>
+  } | null
 }
 
 export function getFinishedStockList(params?: {

@@ -28,6 +28,11 @@ export interface FinishedStockRow {
   imageUrl: string;
   createdAt: string;
   type: 'pending' | 'stored';
+  /** 无订单手动入库：来自 color_size_snapshot，与订单 color-size-breakdown 结构一致（rows 用 values） */
+  sizeBreakdown?: {
+    headers: string[];
+    rows: Array<{ colorName: string; values: number[] }>;
+  } | null;
 }
 
 type FinishedOutboundItemInput = {
@@ -68,6 +73,23 @@ export class FinishedGoodsStockService {
     return msg.includes('Table') && msg.includes(tableName) && msg.includes("doesn't exist");
   }
 
+  /** 库表 order_id 仍为 NOT NULL 时，无订单入库会触发此类错误 */
+  private isOrderIdNullSchemaError(dbMessage: string): boolean {
+    const msg = String(dbMessage);
+    if (!msg.includes('order_id')) return false;
+    return (
+      msg.includes('cannot be null') ||
+      msg.includes("doesn't have a default value") ||
+      msg.includes('does not have a default value')
+    );
+  }
+
+  private orderIdNullableMigrationHint(): string {
+    return (
+      '数据库表 finished_goods_stock 的 order_id 不允许为空，无法在「不填订单号」时保存。请在库中执行 backend/scripts/allow-finished-goods-stock-null-order-id.sql（执行前备份），将 order_id 改为可 NULL 后再试。'
+    );
+  }
+
   private normalizeOrderUnitPrice(v: unknown): string {
     const n = Number(v);
     if (!Number.isFinite(n)) return '0';
@@ -102,6 +124,44 @@ export class FinishedGoodsStockService {
     }
     if (!rows.length) return { snapshot: null, imageRows: [] };
     return { snapshot: { headers, rows }, imageRows };
+  }
+
+  /**
+   * 列表数量悬停：将 color_size_snapshot 转为与订单接口一致的 { headers, rows[{ colorName, values }] }
+   */
+  private parseListSizeBreakdownFromSnapshot(raw: unknown): {
+    headers: string[];
+    rows: Array<{ colorName: string; values: number[] }>;
+  } | null {
+    if (raw == null || raw === '') return null;
+    let o: unknown = raw;
+    if (typeof raw === 'string') {
+      try {
+        o = JSON.parse(raw) as unknown;
+      } catch {
+        return null;
+      }
+    }
+    if (!o || typeof o !== 'object') return null;
+    const rec = o as Record<string, unknown>;
+    const headersRaw = Array.isArray(rec.headers) ? rec.headers : [];
+    const headers = headersRaw.map((h) => String(h ?? '').trim()).filter((h) => h.length > 0);
+    const rowsRaw = Array.isArray(rec.rows) ? rec.rows : [];
+    if (!headers.length || !rowsRaw.length) return null;
+    const rows: Array<{ colorName: string; values: number[] }> = [];
+    for (const item of rowsRaw) {
+      if (!item || typeof item !== 'object') continue;
+      const row = item as Record<string, unknown>;
+      const colorName = String(row.colorName ?? '').trim();
+      const qa = Array.isArray(row.quantities) ? row.quantities : [];
+      const values = headers.map((_, i) => {
+        const n = Number(qa[i]);
+        return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : 0;
+      });
+      rows.push({ colorName, values });
+    }
+    if (!rows.length) return null;
+    return { headers, rows };
   }
 
   /** 待入库列表：与列表筛选一致的总件数 */
@@ -214,10 +274,10 @@ export class FinishedGoodsStockService {
       where: { id: Number(pickupUserId), status: UserStatus.ACTIVE },
       select: ['id', 'username', 'displayName', 'roleId', 'status'],
     });
-    if (!pickupUser) throw new NotFoundException('领走人不存在或不是在职业务员');
+    if (!pickupUser) throw new NotFoundException('领取人不存在或不是在职业务员');
     const link = await this.userRoleRepo.findOne({ where: { userId: pickupUser.id, roleId: salespersonRole.id } });
     if (!(pickupUser.roleId === salespersonRole.id || !!link)) {
-      throw new NotFoundException('领走人不存在或不是在职业务员');
+      throw new NotFoundException('领取人不存在或不是在职业务员');
     }
     return {
       pickupId: pickupUser.id,
@@ -225,24 +285,24 @@ export class FinishedGoodsStockService {
     };
   }
 
-  /** 与「新增库存」合并维度一致：同 SKU + 同订单关联 + 同仓库 + 同库存类型 + 同部门 + 同存放地址 → 累加数量并记操作日志 */
+  /**
+   * 与「新增库存」合并维度一致：同 SKU + 同订单关联 + 同仓库 + 同库存类型 + 同部门 → 累加数量并记操作日志。
+   * 存放地址不参与合并键；不同仓或不同部门为不同行，同仓同部门合并为一条。
+   */
   private async findMergeableFinishedStock(params: {
     skuCode: string;
     orderId: number | null;
     warehouseId: number | null;
     inventoryTypeId: number | null;
     department: string;
-    location: string;
   }): Promise<FinishedGoodsStock | null> {
     const sku = params.skuCode.trim();
     const dep = params.department.trim();
-    const loc = params.location.trim();
     if (!sku) return null;
     const qb = this.stockRepo
       .createQueryBuilder('s')
       .where('s.skuCode = :sku', { sku })
-      .andWhere('s.department = :dep', { dep })
-      .andWhere('s.location = :loc', { loc });
+      .andWhere('s.department = :dep', { dep });
     if (params.orderId != null) qb.andWhere('s.orderId = :oid', { oid: params.orderId });
     else qb.andWhere('s.orderId IS NULL');
     if (params.warehouseId != null) qb.andWhere('s.warehouseId = :wid', { wid: params.warehouseId });
@@ -346,7 +406,6 @@ export class FinishedGoodsStockService {
       warehouseId,
       inventoryTypeId,
       department,
-      location,
     });
     if (existing) {
       const before = this.stockAdjustSnapshot(existing);
@@ -361,6 +420,7 @@ export class FinishedGoodsStockService {
         totalQty > 0 ? this.normalizeOrderUnitPrice((safeOldP * oldQty + safeNewP * newQty) / totalQty) : unitPriceStr;
       existing.quantity = totalQty;
       existing.unitPrice = mergedUnit;
+      if (location) existing.location = location;
       if (!existing.imageUrl && imageUrl) existing.imageUrl = imageUrl;
       if (snapshot) {
         existing.colorSizeSnapshot = snapshot;
@@ -379,8 +439,8 @@ export class FinishedGoodsStockService {
         return saved;
       } catch (e: any) {
         const msg = String(e?.message ?? '');
-        if (msg.includes("Column 'order_id' cannot be null")) {
-          throw new BadRequestException('当前环境要求关联订单，请选择订单号后再保存');
+        if (this.isOrderIdNullSchemaError(msg)) {
+          throw new BadRequestException(this.orderIdNullableMigrationHint());
         }
         throw e;
       }
@@ -406,8 +466,8 @@ export class FinishedGoodsStockService {
       return saved;
     } catch (e: any) {
       const msg = String(e?.message ?? '');
-      if (msg.includes("Column 'order_id' cannot be null")) {
-        throw new BadRequestException('当前环境要求关联订单，请选择订单号后再保存');
+      if (this.isOrderIdNullSchemaError(msg)) {
+        throw new BadRequestException(this.orderIdNullableMigrationHint());
       }
       throw e;
     }
@@ -570,6 +630,7 @@ export class FinishedGoodsStockService {
           's.location AS location',
           'COALESCE(NULLIF(s.image_url, \'\'), pr.image_url, \'\') AS imageUrl',
           's.created_at AS createdAt',
+          's.color_size_snapshot AS colorSizeSnapshot',
         ]);
       if (orderNo?.trim()) {
         stockQb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
@@ -605,6 +666,7 @@ export class FinishedGoodsStockService {
           location: string;
           imageUrl: string;
           createdAt: Date;
+          colorSizeSnapshot?: unknown;
         }>();
       const storedList: FinishedStockRow[] = storedRows.map((r) => ({
         id: r.id,
@@ -621,6 +683,7 @@ export class FinishedGoodsStockService {
         imageUrl: r.imageUrl ?? '',
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
         type: 'stored',
+        sizeBreakdown: this.parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot),
       }));
       if (tab === 'stored') {
         return {
@@ -1059,7 +1122,7 @@ export class FinishedGoodsStockService {
     }
   }
 
-  /** 领走人下拉：仅业务员角色的在职账号 */
+  /** 出库「领取人」下拉：仅业务员角色的在职账号 */
   async getPickupUserOptions(): Promise<Array<{ id: number; username: string; displayName: string }>> {
     const role = await this.roleRepo.findOne({ where: { code: 'salesperson' } });
     if (!role) return [];

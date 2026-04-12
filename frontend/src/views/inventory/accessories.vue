@@ -355,9 +355,9 @@
         <el-form-item label="辅料" prop="accessoryName">
           <el-input v-model="outboundForm.accessoryName" disabled />
         </el-form-item>
-        <el-form-item label="领取人" prop="receiverUserId">
+        <el-form-item label="领取人" prop="pickupUserId">
           <el-select
-            v-model="outboundForm.receiverUserId"
+            v-model="outboundForm.pickupUserId"
             placeholder="请选择领取人"
             filterable
             clearable
@@ -736,21 +736,21 @@ const outboundFormRef = ref<FormInstance>()
 const outboundForm = reactive<{
   accessoryId: number | null
   accessoryName: string
-  receiverUserId: number | null
+  pickupUserId: number | null
   quantity: number
   maxQuantity: number
   remark: string
 }>({
   accessoryId: null,
   accessoryName: '',
-  receiverUserId: null,
+  pickupUserId: null,
   quantity: 1,
   maxQuantity: 0,
   remark: '',
 })
 
 const outboundRules: FormRules = {
-  receiverUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
+  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
   quantity: [{ required: true, message: '请输入出库数量', trigger: 'blur' }],
 }
 
@@ -774,7 +774,7 @@ async function openOutboundDialog() {
   outboundForm.accessoryName = row.name
   outboundForm.maxQuantity = Number(row.quantity) || 0
   outboundForm.quantity = outboundForm.maxQuantity > 0 ? 1 : 0
-  outboundForm.receiverUserId = null
+  outboundForm.pickupUserId = null
   outboundForm.remark = ''
   await ensureOutboundUserOptionsLoaded()
   outboundDialog.visible = true
@@ -787,11 +787,11 @@ function resetOutboundDialog() {
 async function submitOutbound() {
   if (!outboundForm.accessoryId) return
   await outboundFormRef.value?.validate().catch(() => {})
-  if (!outboundForm.receiverUserId) return
-  const receiver = outboundUserOptions.value.find((u) => u.id === outboundForm.receiverUserId)
-  const receiverLabel = receiver ? (receiver.displayName || receiver.username) : ''
-  if (!receiverLabel) {
-    ElMessage.warning('领用人无效，请重新选择')
+  if (!outboundForm.pickupUserId) return
+  const pickupUser = outboundUserOptions.value.find((u) => u.id === outboundForm.pickupUserId)
+  const pickupUserLabel = pickupUser ? (pickupUser.displayName || pickupUser.username) : ''
+  if (!pickupUserLabel) {
+    ElMessage.warning('领取人无效，请重新选择')
     return
   }
   const qty = Number(outboundForm.quantity) || 0
@@ -805,7 +805,7 @@ async function submitOutbound() {
   }
   outboundDialog.submitting = true
   try {
-    const remark = [`领取人：${receiverLabel}`, (outboundForm.remark ?? '').trim()].filter(Boolean).join('；')
+    const remark = [`领取人：${pickupUserLabel}`, (outboundForm.remark ?? '').trim()].filter(Boolean).join('；')
     await manualAccessoryOutbound({
       accessoryId: outboundForm.accessoryId,
       quantity: qty,

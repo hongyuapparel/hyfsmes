@@ -206,7 +206,7 @@ export class InventoryAccessoriesService {
     });
   }
 
-  /** 出库弹窗「领用人」下拉：返回全公司可用用户 */
+  /** 出库弹窗「领取人」下拉：返回全公司可用用户 */
   async getUserOptions(): Promise<{ id: number; username: string; displayName: string }[]> {
     const list = await this.userRepo.find({
       where: { status: UserStatus.ACTIVE },

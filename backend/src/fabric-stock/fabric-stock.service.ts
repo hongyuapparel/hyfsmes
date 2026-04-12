@@ -92,15 +92,29 @@ export class FabricStockService {
     }));
   }
 
-  /** 面料库存页：面料类型供应商下拉（仅需面料库存权限） */
+  /**
+   * system_options 中「面料供应商」根节点 id（与供应商列表按 type 解析一致；value 按 trim 比对以兼容库内首尾空格）
+   */
+  private async resolveFabricSupplierTypeOptionIds(): Promise<number[]> {
+    const all = await this.systemOptionsService.findAllByType('supplier_types');
+    const target = FABRIC_SUPPLIER_TYPE_VALUE.trim();
+    return all
+      .filter(
+        (o) =>
+          o.parentId == null &&
+          (typeof o.value === 'string' ? o.value.trim() : String(o.value ?? '').trim()) === target,
+      )
+      .map((o) => o.id);
+  }
+
+  /** 面料库存页：仅 supplier_type_id 属于「面料供应商」根类型的供应商（不用 JOIN+getMany，避免 ORM 组合下结果异常） */
   async listFabricSupplierOptions(): Promise<{ id: number; name: string }[]> {
-    const typeId = await this.systemOptionsService.findRootIdByValue(
-      'supplier_types',
-      FABRIC_SUPPLIER_TYPE_VALUE,
-    );
-    const qb = this.supplierRepo.createQueryBuilder('s').orderBy('s.id', 'ASC');
-    if (typeId != null) qb.andWhere('s.supplier_type_id = :typeId', { typeId });
-    const rows = await qb.take(500).getMany();
+    const typeIds = await this.resolveFabricSupplierTypeOptionIds();
+    if (!typeIds.length) return [];
+    const rows = await this.supplierRepo.find({
+      where: { supplierTypeId: In(typeIds) },
+      order: { id: 'ASC' },
+    });
     return rows.map((r) => ({ id: r.id, name: r.name }));
   }
 
@@ -117,14 +131,17 @@ export class FabricStockService {
   }
 
   private async assertFabricSupplierId(supplierId: number): Promise<void> {
-    const typeId = await this.systemOptionsService.findRootIdByValue(
-      'supplier_types',
-      FABRIC_SUPPLIER_TYPE_VALUE,
-    );
-    const s = await this.supplierRepo.findOne({ where: { id: supplierId } });
-    if (!s) throw new BadRequestException('供应商不存在');
-    if (typeId != null && s.supplierTypeId !== typeId) {
-      throw new BadRequestException('请选择面料供应商');
+    const typeIds = await this.resolveFabricSupplierTypeOptionIds();
+    if (!typeIds.length) {
+      throw new BadRequestException('系统未配置「面料供应商」供应商类型');
+    }
+    const s = await this.supplierRepo.findOne({
+      where: { id: supplierId },
+      select: ['id', 'supplierTypeId'],
+    });
+    if (s == null) throw new BadRequestException('供应商不存在');
+    if (s.supplierTypeId == null || !typeIds.includes(s.supplierTypeId)) {
+      throw new BadRequestException('供应商不存在或类型不是面料供应商');
     }
   }
 

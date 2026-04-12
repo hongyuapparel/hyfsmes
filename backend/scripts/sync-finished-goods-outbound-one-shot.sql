@@ -70,7 +70,7 @@ BEGIN
       AND COLUMN_NAME = 'pickup_user_id'
   ) THEN
     ALTER TABLE finished_goods_outbound
-      ADD COLUMN pickup_user_id INT NULL COMMENT '领走人用户ID（业务员）' AFTER inventory_type_id;
+      ADD COLUMN pickup_user_id INT NULL COMMENT '领取人 users.id（业务员约束在业务层）' AFTER inventory_type_id;
   END IF;
 
   -- pickup_user_name
@@ -81,7 +81,7 @@ BEGIN
       AND COLUMN_NAME = 'pickup_user_name'
   ) THEN
     ALTER TABLE finished_goods_outbound
-      ADD COLUMN pickup_user_name VARCHAR(128) DEFAULT '' COMMENT '领走人姓名（冗余）' AFTER pickup_user_id;
+      ADD COLUMN pickup_user_name VARCHAR(128) DEFAULT '' COMMENT '领取人姓名快照（冗余展示）' AFTER pickup_user_id;
   END IF;
 
   -- size_breakdown

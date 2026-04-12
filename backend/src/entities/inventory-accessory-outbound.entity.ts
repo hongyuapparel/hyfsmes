@@ -49,7 +49,7 @@ export class InventoryAccessoryOutbound {
   @Column({ name: 'operator_username', length: 128, default: '' })
   operatorUsername: string;
 
-  /** 备注（如领用人、用途等） */
+  /** 备注（如领取人、用途等） */
   @Column({ type: 'varchar', length: 500, default: '' })
   remark: string;
 

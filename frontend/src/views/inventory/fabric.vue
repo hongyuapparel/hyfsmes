@@ -236,10 +236,12 @@
         </el-form-item>
         <el-form-item label="供应商">
           <el-select
+            :key="fabricSupplierSelectKey"
             v-model="form.supplierId"
-            placeholder="面料供应商（可选）"
+            placeholder="面料供应商（可选），按名称中的连续文字筛选"
             filterable
             clearable
+            :loading="fabricSupplierOptionsLoading"
           >
             <el-option
               v-for="opt in fabricSupplierOptions"
@@ -377,7 +379,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, type CustomerItem } from '@/api/customers'
@@ -422,6 +424,9 @@ const { tableHeight: fabricStockTableHeight } = useFlexShellTableHeight(fabricSt
 const { tableHeight: fabricOutboundTableHeight } = useFlexShellTableHeight(fabricOutboundShellRef)
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const fabricSupplierOptions = ref<FabricSupplierOption[]>([])
+/** 每次打开表单递增，重置下拉内部筛选关键字，避免从其它页返回后仍停留在旧关键字导致「无匹配」 */
+const fabricSupplierSelectKey = ref(0)
+const fabricSupplierOptionsLoading = ref(false)
 const warehouseOptions = ref<{ id: number; label: string }[]>([])
 const fabricPickupUserOptions = ref<FabricPickupUserOption[]>([])
 const loading = ref(false)
@@ -572,11 +577,15 @@ async function loadCustomerOptions() {
 }
 
 async function loadFabricSupplierOptions() {
+  fabricSupplierOptionsLoading.value = true
   try {
     const res = await getFabricSupplierOptions()
     fabricSupplierOptions.value = res.data ?? []
-  } catch {
+  } catch (e: unknown) {
     fabricSupplierOptions.value = []
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    fabricSupplierOptionsLoading.value = false
   }
 }
 
@@ -608,7 +617,7 @@ function onSelectionChange(rows: FabricItem[]) {
   selectedRows.value = rows ?? []
 }
 
-function openForm(row: FabricItem | null) {
+async function openForm(row: FabricItem | null) {
   formDialog.isEdit = !!row
   editId.value = row ? row.id : null
   if (row) {
@@ -632,7 +641,10 @@ function openForm(row: FabricItem | null) {
     form.imageUrl = ''
     form.remark = ''
   }
+  fabricSupplierSelectKey.value += 1
   formDialog.visible = true
+  await nextTick()
+  await loadFabricSupplierOptions()
 }
 
 function resetForm() {

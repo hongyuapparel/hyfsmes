@@ -21,7 +21,7 @@ import { InventoryAccessoriesService } from './inventory-accessories.service';
 export class InventoryAccessoriesController {
   constructor(private readonly service: InventoryAccessoriesService) {}
 
-  /** 出库弹窗「领用人」下拉（全公司用户） */
+  /** 出库弹窗「领取人」下拉（全公司用户） */
   @Get('user-options')
   getUserOptions() {
     return this.service.getUserOptions();

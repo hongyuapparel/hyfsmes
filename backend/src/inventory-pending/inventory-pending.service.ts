@@ -63,10 +63,10 @@ export class InventoryPendingService {
       where: { id: Number(pickupUserId), status: UserStatus.ACTIVE },
       select: ['id', 'username', 'displayName', 'roleId', 'status'],
     });
-    if (!pickupUser) throw new NotFoundException('领走人不存在或不是在职业务员');
+    if (!pickupUser) throw new NotFoundException('领取人不存在或不是在职业务员');
     const link = await this.userRoleRepo.findOne({ where: { userId: pickupUser.id, roleId: salespersonRole.id } });
     if (!(pickupUser.roleId === salespersonRole.id || !!link)) {
-      throw new NotFoundException('领走人不存在或不是在职业务员');
+      throw new NotFoundException('领取人不存在或不是在职业务员');
     }
     return {
       pickupId: pickupUser.id,

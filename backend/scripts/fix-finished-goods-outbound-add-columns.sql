@@ -10,9 +10,9 @@ ALTER TABLE finished_goods_outbound
 ALTER TABLE finished_goods_outbound
   ADD COLUMN inventory_type_id INT NULL COMMENT '库存类型 ID' AFTER warehouse_id;
 ALTER TABLE finished_goods_outbound
-  ADD COLUMN pickup_user_id INT NULL COMMENT '领走人用户ID（业务员）' AFTER inventory_type_id;
+  ADD COLUMN pickup_user_id INT NULL COMMENT '领取人 users.id（业务员约束在业务层）' AFTER inventory_type_id;
 ALTER TABLE finished_goods_outbound
-  ADD COLUMN pickup_user_name VARCHAR(128) DEFAULT '' COMMENT '领走人姓名（冗余）' AFTER pickup_user_id;
+  ADD COLUMN pickup_user_name VARCHAR(128) DEFAULT '' COMMENT '领取人姓名快照（冗余展示）' AFTER pickup_user_id;
 ALTER TABLE finished_goods_outbound
   ADD COLUMN size_breakdown JSON NULL COMMENT '颜色尺码明细快照' AFTER pickup_user_name;
 ALTER TABLE finished_goods_outbound
