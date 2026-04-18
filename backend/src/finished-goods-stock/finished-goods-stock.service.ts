@@ -1132,6 +1132,7 @@ export class FinishedGoodsStockService {
       inventoryTypeId?: number | null;
       warehouseId?: number | null;
       location?: string;
+      unitPrice?: string | number;
       imageUrl?: string;
       remark?: string;
     },
@@ -1145,12 +1146,14 @@ export class FinishedGoodsStockService {
       inventoryTypeId: stock.inventoryTypeId ?? null,
       warehouseId: stock.warehouseId ?? null,
       location: stock.location ?? '',
+      unitPrice: stock.unitPrice != null ? String(stock.unitPrice) : '0',
     };
 
     if (dto.department !== undefined) stock.department = (dto.department ?? '').trim();
     if (dto.inventoryTypeId !== undefined) stock.inventoryTypeId = dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null;
     if (dto.warehouseId !== undefined) stock.warehouseId = dto.warehouseId != null ? Number(dto.warehouseId) : null;
     if (dto.location !== undefined) stock.location = (dto.location ?? '').trim();
+    if (dto.unitPrice !== undefined) stock.unitPrice = this.normalizeOrderUnitPrice(dto.unitPrice);
     if (dto.imageUrl !== undefined) stock.imageUrl = (dto.imageUrl ?? '').trim();
 
     const saved = await this.stockRepo.save(stock);
@@ -1160,13 +1163,15 @@ export class FinishedGoodsStockService {
       inventoryTypeId: saved.inventoryTypeId ?? null,
       warehouseId: saved.warehouseId ?? null,
       location: saved.location ?? '',
+      unitPrice: saved.unitPrice != null ? String(saved.unitPrice) : '0',
     };
 
     const changed =
       before.department !== after.department ||
       before.inventoryTypeId !== after.inventoryTypeId ||
       before.warehouseId !== after.warehouseId ||
-      before.location !== after.location;
+      before.location !== after.location ||
+      before.unitPrice !== after.unitPrice;
 
     if (changed) {
       try {

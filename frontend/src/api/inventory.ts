@@ -78,6 +78,7 @@ export interface FinishedStockRow {
     headers: string[]
     rows: Array<{ colorName: string; values: number[] }>
   } | null
+  colorImages?: Array<{ colorName: string; imageUrl: string }>
 }
 
 function assignMainImageFromListRow(row: FinishedStockRow | undefined | null) {
