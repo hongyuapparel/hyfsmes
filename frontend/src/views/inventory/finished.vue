@@ -980,7 +980,14 @@
                 </el-table-column>
                 <el-table-column label="出厂价" width="88" align="center" header-align="center">
                   <template #default>
-                    {{ detailTableUnitPrice }}
+                    <el-input
+                      v-if="detailMetaEditing"
+                      v-model="detailEditForm.unitPrice"
+                      placeholder="请输入"
+                      clearable
+                      size="small"
+                    />
+                    <template v-else>{{ detailTableUnitPrice }}</template>
                   </template>
                 </el-table-column>
                 <el-table-column label="总价" width="120" align="center" header-align="center">
@@ -1145,12 +1152,14 @@ const detailEditForm = reactive<{
   inventoryTypeId: number | null
   warehouseId: number | null
   location: string
+  unitPrice: string
   remark: string
 }>({
   department: '',
   inventoryTypeId: null,
   warehouseId: null,
   location: '',
+  unitPrice: '',
   remark: '',
 })
 
@@ -1412,7 +1421,7 @@ const stockTableData = computed<StockTableRow[]>(() => {
 })
 
 function getTableImageUrl(row: StockTableRow): string {
-  if (isStockTableParentRow(row)) return row._effectiveImageUrl || ''
+  if (isStockTableParentRow(row)) return row._effectiveImageUrl || String(row.imageUrl ?? '').trim()
   return row._effectiveImageUrl || ''
 }
 
@@ -1621,14 +1630,18 @@ const detailTableTotalQty = computed(() =>
   detailDisplayColorSizeRows.value.reduce((sum, row) => sum + sumDetailRowQty(row.quantities), 0),
 )
 
-const detailTableUnitPrice = computed(() => formatPrice(detailDrawer.data?.stock?.unitPrice))
+const detailUnitPriceValue = computed(() =>
+  detailMetaEditing.value ? detailEditForm.unitPrice : String(detailDrawer.data?.stock?.unitPrice ?? ''),
+)
+
+const detailTableUnitPrice = computed(() => formatPrice(detailUnitPriceValue.value))
 
 const detailTableTotalPrice = computed(() =>
-  formatTotalPrice(detailTableTotalQty.value, detailDrawer.data?.stock?.unitPrice),
+  formatTotalPrice(detailTableTotalQty.value, detailUnitPriceValue.value),
 )
 
 function detailRowTotalPrice(quantities: unknown[]): string {
-  return formatTotalPrice(sumDetailRowQty(quantities), detailDrawer.data?.stock?.unitPrice)
+  return formatTotalPrice(sumDetailRowQty(quantities), detailUnitPriceValue.value)
 }
 
 function getDetailColorSizeSummary({ columns }: { columns: Array<{ label?: string }> }) {
@@ -1909,6 +1922,7 @@ async function loadDetail(stockId: number, options?: { colorName?: string; quant
     detailEditForm.inventoryTypeId = data?.stock?.inventoryTypeId ?? null
     detailEditForm.warehouseId = data?.stock?.warehouseId ?? null
     detailEditForm.location = data?.stock?.location ?? ''
+    detailEditForm.unitPrice = data?.stock?.unitPrice != null ? String(data.stock.unitPrice) : ''
     detailEditForm.remark = ''
     detailMetaEditing.value = false
     const map: Record<string, string> = {}
@@ -1929,6 +1943,7 @@ function toggleDetailEditMode() {
     detailEditForm.inventoryTypeId = detailDrawer.data.stock.inventoryTypeId ?? null
     detailEditForm.warehouseId = detailDrawer.data.stock.warehouseId ?? null
     detailEditForm.location = detailDrawer.data.stock.location ?? ''
+    detailEditForm.unitPrice = detailDrawer.data.stock.unitPrice != null ? String(detailDrawer.data.stock.unitPrice) : ''
     detailEditForm.remark = ''
   }
   detailMetaEditing.value = !detailMetaEditing.value
@@ -1951,6 +1966,7 @@ async function saveDetailMeta() {
       inventoryTypeId: detailEditForm.inventoryTypeId,
       warehouseId: detailEditForm.warehouseId,
       location: detailEditForm.location,
+      unitPrice: detailEditForm.unitPrice?.trim() || '0',
       remark: detailEditForm.remark || undefined,
     })
     ElMessage.success('保存成功')

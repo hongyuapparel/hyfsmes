@@ -62,8 +62,6 @@ export interface FinishedStockRow {
   orderNo: string
   customerName?: string
   skuCode: string
-  /** 统一主图字段：详情与主表聚合都只读它 */
-  mainImageUrl?: string
   quantity: number
   unitPrice?: string
   warehouseId: number | null
@@ -79,16 +77,6 @@ export interface FinishedStockRow {
     rows: Array<{ colorName: string; values: number[] }>
   } | null
   colorImages?: Array<{ colorName: string; imageUrl: string }>
-}
-
-function assignMainImageFromListRow(row: FinishedStockRow | undefined | null) {
-  if (!row) return
-  row.mainImageUrl = String((row as any).productImageUrl ?? '').trim()
-}
-
-function assignMainImageFromStockEntity(row: FinishedStockRow | undefined | null) {
-  if (!row) return
-  row.mainImageUrl = String(row.imageUrl ?? '').trim()
 }
 
 export function getFinishedStockList(params?: {
@@ -110,11 +98,7 @@ export function getFinishedStockList(params?: {
     pageSize: number
     /** 当前筛选条件下全部匹配记录的总件数（非仅本页） */
     totalQuantity: number
-  }>('/inventory/finished/items', { params }).then((res) => {
-    const rows = res.data?.list ?? []
-    rows.forEach((row) => assignMainImageFromListRow(row))
-    return res
-  })
+  }>('/inventory/finished/items', { params })
 }
 
 export function finishedOutbound(body: {
@@ -149,8 +133,6 @@ export interface FinishedStockDetailRes {
   stock: FinishedStockRow
   orderNo: string
   productImageUrl: string
-  /** true=明细来自手动快照；false=来自订单 */
-  colorSizeFromSnapshot: boolean
   colorImages: Array<{ colorName: string; imageUrl: string; updatedAt: string }>
   adjustLogs: Array<{
     id: number
@@ -168,10 +150,7 @@ export interface FinishedStockDetailRes {
 }
 
 export function getFinishedStockDetail(id: number) {
-  return request.get<FinishedStockDetailRes>(`/inventory/finished/items/${id}`).then((res) => {
-    assignMainImageFromStockEntity(res.data?.stock)
-    return res
-  })
+  return request.get<FinishedStockDetailRes>(`/inventory/finished/items/${id}`)
 }
 
 export function updateFinishedStockMeta(
@@ -181,15 +160,12 @@ export function updateFinishedStockMeta(
     inventoryTypeId?: number | null
     warehouseId?: number | null
     location?: string
-    unitPrice?: string | number
+    unitPrice?: string
     imageUrl?: string
     remark?: string
   }
 ) {
-  return request.patch<FinishedStockRow>(`/inventory/finished/items/${id}`, body).then((res) => {
-    assignMainImageFromStockEntity(res.data)
-    return res
-  })
+  return request.patch<FinishedStockRow>(`/inventory/finished/items/${id}`, body)
 }
 
 export function upsertFinishedStockColorImage(
