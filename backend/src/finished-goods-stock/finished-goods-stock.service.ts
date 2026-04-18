@@ -26,6 +26,7 @@ export interface FinishedStockRow {
   department: string;
   location: string;
   imageUrl: string;
+  productImageUrl?: string;
   createdAt: string;
   type: 'pending' | 'stored';
   /** 无订单手动入库：来自 color_size_snapshot，与订单 color-size-breakdown 结构一致（rows 用 values） */
@@ -682,7 +683,11 @@ export class FinishedGoodsStockService {
       const stockQb = this.stockRepo
         .createQueryBuilder('s')
         .leftJoin(Order, 'o', 'o.id = s.order_id')
-        .leftJoin(Product, 'pr', 'pr.sku_code = s.sku_code')
+        .leftJoin(
+          Product,
+          'pr',
+          'TRIM(pr.sku_code) COLLATE utf8mb4_general_ci = TRIM(s.sku_code) COLLATE utf8mb4_general_ci',
+        )
         .select([
           's.id AS id',
           's.order_id AS orderId',
@@ -699,6 +704,7 @@ export class FinishedGoodsStockService {
           's.inventory_type_id AS inventoryTypeId',
           's.department AS department',
           's.location AS location',
+          'COALESCE(pr.image_url, \'\') AS productImageUrl',
           'COALESCE(NULLIF(s.image_url, \'\'), pr.image_url, \'\') AS imageUrl',
           's.created_at AS createdAt',
           's.color_size_snapshot AS colorSizeSnapshot',
@@ -735,6 +741,7 @@ export class FinishedGoodsStockService {
           inventoryTypeId: number | null;
           department: string;
           location: string;
+          productImageUrl: string;
           imageUrl: string;
           createdAt: Date;
           colorSizeSnapshot?: unknown;
@@ -751,6 +758,7 @@ export class FinishedGoodsStockService {
         inventoryTypeId: r.inventoryTypeId ?? null,
         department: r.department ?? '',
         location: r.location ?? '',
+        productImageUrl: r.productImageUrl ?? '',
         imageUrl: r.imageUrl ?? '',
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
         type: 'stored',

@@ -1274,6 +1274,11 @@ function getRowColorImageUrl(row: FinishedStockRow, colorName: string): string {
   return match?.imageUrl || ''
 }
 
+function getProductImageUrl(row: FinishedStockRow | StockTableRow | null | undefined): string {
+  if (!row) return ''
+  return String(row.productImageUrl ?? '').trim() || String(row.imageUrl ?? '').trim()
+}
+
 function getGroupProductImageUrl(groupKey: string): string {
   const parentRow = stockTableData.value.find(
     (item): item is StockTableParentRow => item._groupKey === groupKey && isStockTableParentRow(item),
@@ -1282,12 +1287,12 @@ function getGroupProductImageUrl(groupKey: string): string {
   const leafRow = stockTableData.value.find(
     (item): item is StockTableLeafRow => item._groupKey === groupKey && isStockTableLeafRow(item),
   )
-  return String(leafRow?.imageUrl ?? '').trim()
+  return getProductImageUrl(leafRow)
 }
 
 function getSharedProductImageUrl(row: StockTableRow): string {
-  if (isStockTableParentRow(row)) return row._effectiveImageUrl || ''
-  return getGroupProductImageUrl(row._groupKey) || String(row.imageUrl ?? '').trim()
+  if (isStockTableParentRow(row)) return row._effectiveImageUrl || getProductImageUrl(row)
+  return getGroupProductImageUrl(row._groupKey) || getProductImageUrl(row)
 }
 
 function getSplitColorBreakdown(row: FinishedStockRow): {
@@ -1341,7 +1346,7 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
         _rowKind: 'leaf',
         _groupKey: groupKey,
         _displayColor: colorName || '-',
-        _effectiveImageUrl: getRowColorImageUrl(row, colorName),
+        _effectiveImageUrl: getRowColorImageUrl(row, colorName) || getProductImageUrl(row),
         _selectedColorName: colorName || undefined,
       }
     })
@@ -1364,7 +1369,7 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
       _rowKind: 'leaf',
       _groupKey: groupKey,
       _displayColor: colorName || '-',
-      _effectiveImageUrl: getRowColorImageUrl(row, colorName),
+      _effectiveImageUrl: getRowColorImageUrl(row, colorName) || getProductImageUrl(row),
       _selectedColorName: colorName || undefined,
     },
   ]
@@ -1373,7 +1378,7 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
 function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTableParentRow {
   const first = rows[0]
   const colorLabels = Array.from(new Set(rows.map((item) => item._displayColor).filter((item) => item && item !== '-')))
-  const productImages = Array.from(new Set(rows.map((item) => String(item.imageUrl ?? '').trim()).filter(Boolean)))
+  const productImages = Array.from(new Set(rows.map((item) => getProductImageUrl(item)).filter(Boolean)))
   const unitPrices = Array.from(new Set(rows.map((item) => String(item.unitPrice ?? '0'))))
   const departments = Array.from(new Set(rows.map((item) => String(item.department ?? '').trim()).filter(Boolean)))
   const locations = Array.from(new Set(rows.map((item) => String(item.location ?? '').trim()).filter(Boolean)))
@@ -1421,8 +1426,7 @@ const stockTableData = computed<StockTableRow[]>(() => {
 })
 
 function getTableImageUrl(row: StockTableRow): string {
-  if (isStockTableParentRow(row)) return row._effectiveImageUrl || String(row.imageUrl ?? '').trim()
-  return row._effectiveImageUrl || ''
+  return row._effectiveImageUrl || getProductImageUrl(row)
 }
 
 function getTableImagePlaceholder(row: StockTableRow): string {

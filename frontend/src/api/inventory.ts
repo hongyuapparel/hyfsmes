@@ -68,6 +68,7 @@ export interface FinishedStockRow {
   inventoryTypeId: number | null
   department: string
   location: string
+  productImageUrl?: string
   imageUrl?: string
   createdAt: string
   type: 'pending' | 'stored'
