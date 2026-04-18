@@ -204,6 +204,14 @@
       @close="resetForm"
     >
       <el-form ref="formRef" :model="form" :rules="formRules" label-width="88px">
+        <el-alert
+          v-if="quickAddSource"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 10px"
+          :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
+        />
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="面料名称/编号" clearable />
         </el-form-item>
@@ -465,6 +473,8 @@ const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boo
   submitting: false,
   isEdit: false,
 })
+const quickAddSource = ref<FabricItem | null>(null)
+const quickAddBaseQuantity = ref(0)
 const editId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const form = reactive({
@@ -618,18 +628,27 @@ function onSelectionChange(rows: FabricItem[]) {
 }
 
 async function openForm(row: FabricItem | null) {
+  quickAddSource.value = null
+  quickAddBaseQuantity.value = 0
   formDialog.isEdit = !!row
   editId.value = row ? row.id : null
-  if (row) {
-    form.name = row.name
-    form.quantity = parseFloat(String(row.quantity)) || 0
-    form.unit = row.unit ?? '米'
-    form.customerName = row.customerName ?? ''
-    form.supplierId = row.supplierId != null && row.supplierId > 0 ? row.supplierId : null
-    form.warehouseId = row.warehouseId != null && row.warehouseId > 0 ? row.warehouseId : null
-    form.storageLocation = row.storageLocation ?? ''
-    form.imageUrl = row.imageUrl ?? ''
-    form.remark = row.remark ?? ''
+  const seed = row ?? (selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
+  if (seed) {
+    form.name = seed.name
+    form.unit = seed.unit ?? '米'
+    form.customerName = seed.customerName ?? ''
+    form.supplierId = seed.supplierId != null && seed.supplierId > 0 ? seed.supplierId : null
+    form.warehouseId = seed.warehouseId != null && seed.warehouseId > 0 ? seed.warehouseId : null
+    form.storageLocation = seed.storageLocation ?? ''
+    form.imageUrl = seed.imageUrl ?? ''
+    form.remark = seed.remark ?? ''
+    if (row) {
+      form.quantity = parseFloat(String(seed.quantity)) || 0
+    } else {
+      quickAddSource.value = seed
+      quickAddBaseQuantity.value = parseFloat(String(seed.quantity)) || 0
+      form.quantity = 0
+    }
   } else {
     form.name = ''
     form.quantity = 0
@@ -669,18 +688,38 @@ async function submitForm() {
       })
       ElMessage.success('保存成功')
     } else {
-      await createFabric({
-        name: form.name,
-        quantity: form.quantity,
-        unit: form.unit,
-        customerName: form.customerName || undefined,
-        imageUrl: form.imageUrl || undefined,
-        remark: form.remark,
-        supplierId: form.supplierId,
-        warehouseId: form.warehouseId,
-        storageLocation: form.storageLocation,
-      })
-      ElMessage.success('新增成功')
+      const inputQty = Number(form.quantity) || 0
+      if (quickAddSource.value) {
+        if (inputQty <= 0) {
+          ElMessage.warning('请输入大于 0 的新增数量')
+          return
+        }
+        await updateFabric(quickAddSource.value.id, {
+          name: form.name,
+          quantity: quickAddBaseQuantity.value + inputQty,
+          unit: form.unit,
+          customerName: form.customerName || undefined,
+          imageUrl: form.imageUrl || undefined,
+          remark: form.remark,
+          supplierId: form.supplierId,
+          warehouseId: form.warehouseId,
+          storageLocation: form.storageLocation,
+        })
+        ElMessage.success('库存增加成功')
+      } else {
+        await createFabric({
+          name: form.name,
+          quantity: form.quantity,
+          unit: form.unit,
+          customerName: form.customerName || undefined,
+          imageUrl: form.imageUrl || undefined,
+          remark: form.remark,
+          supplierId: form.supplierId,
+          warehouseId: form.warehouseId,
+          storageLocation: form.storageLocation,
+        })
+        ElMessage.success('新增成功')
+      }
     }
     formDialog.visible = false
     load()

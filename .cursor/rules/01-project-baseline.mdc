@@ -1,0 +1,28 @@
+---
+description: 项目基线（技术栈、业务定位、任务前文档读取）
+alwaysApply: true
+---
+
+# 01 Project Baseline（全局上下文）
+
+## 项目定位
+
+- 本项目为服装工贸一体 B2B ERP，前后端分离。
+- 以内部业务流程为主（订单、客户、商品、仓储、权限等），非电商发货系统。
+
+## 技术栈（执行时默认假设）
+
+- 前端：Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus + Axios
+- 后端：NestJS + TypeORM + MySQL + JWT/Passport + class-validator
+
+## 任务开始前的文档读取规则
+
+- 涉及业务逻辑、字段配置、订单流程改动前，先读 `docs/PROJECT_CONTEXT.md`。
+- 涉及字段配置/列设置/显示顺序：再读 `docs/FIELD_CONFIG_DESIGN.md`。
+- 涉及订单状态、订单列表/编辑、生产流程：再读 `docs/ORDER_STATUS_FLOW_DESIGN.md`。
+- 用户在对话中 @ 指定文档时，按该文档优先实现。
+
+## 文档同步（仅需求级改动）
+
+- 若完成需求级变更（新增模块、规则调整、流程重构等），在 `docs/PROJECT_CONTEXT.md` 追加一句决策记录。
+- 样式微调或小 bug 修复可不更新文档。

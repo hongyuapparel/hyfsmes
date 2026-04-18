@@ -184,7 +184,14 @@
           @selection-change="onSelectionChange"
           @sort-change="onSortChange"
         >
-          <el-table-column type="selection" width="50" />
+          <el-table-column
+            type="selection"
+            width="50"
+            align="center"
+            header-align="center"
+            class-name="selection-column"
+            header-class-name="selection-column"
+          />
           <el-table-column
             v-for="f in tableFields"
             :key="f.code"
@@ -1224,6 +1231,14 @@ onBeforeUnmount(() => {
 
 .products-table :deep(.el-table__header .cell) {
   white-space: nowrap;
+}
+
+.products-table :deep(.selection-column .cell) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 .column-config-hint {
   margin: 0 0 var(--space-md);

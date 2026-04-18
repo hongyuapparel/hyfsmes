@@ -100,15 +100,23 @@
       stripe
       class="sewing-table"
       :height="tableHeight"
+      :row-style="compactRowStyle"
+      :cell-style="compactCellStyle"
+      :header-cell-style="compactHeaderCellStyle"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" width="72" align="center">
+      <el-table-column label="图片" :min-width="compactImageColumnMinWidth" align="center">
         <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
+          <AppImageThumb
+            v-if="row.imageUrl"
+            :raw-url="row.imageUrl"
+            :width="compactImageSize"
+            :height="compactImageSize"
+          />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -557,6 +565,7 @@ import {
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -614,6 +623,13 @@ function sewingBriefFromRow(row: SewingListItem): ProductionOrderBriefModel {
 const sewingTableRef = ref()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 const loading = ref(false)
 const exporting = ref(false)
 const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})

@@ -39,7 +39,14 @@
           <el-button link type="primary" size="small" @click="addMaterialRow">新增</el-button>
         </div>
       </template>
-      <el-table :data="materialRows" border size="small" class="cost-table" :span-method="materialSpanMethod">
+      <el-table
+        :data="materialRowsSorted"
+        border
+        size="small"
+        class="cost-table"
+        :span-method="materialSpanMethod"
+        :row-class-name="materialRowClassName"
+      >
         <el-table-column label="物料类型" min-width="90">
           <template #default="{ row }">
             <el-select
@@ -133,14 +140,24 @@
             {{ formatMoney(materialAmount(row)) }}
           </template>
         </el-table-column>
+        <el-table-column label="计入成本" width="86" align="center">
+          <template #default="{ row }">
+            <el-switch
+              v-model="row.includeInCost"
+              :active-value="true"
+              :inactive-value="false"
+              size="small"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="备注" min-width="120">
           <template #default="{ row }">
             <el-input v-model="row.remark" size="small" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="56" align="center">
-          <template #default="{ $index }">
-            <el-button link type="danger" size="small" @click="removeMaterialRow($index)">
+          <template #default="{ row }">
+            <el-button link type="danger" size="small" @click="removeMaterialRow(row)">
               <el-icon><Delete /></el-icon>
             </el-button>
           </template>
@@ -619,6 +636,8 @@ interface MaterialRow {
   cuttingQuantity?: number | null
   remark?: string
   unitPrice: number
+  /** 是否参与物料成本核算，默认 true */
+  includeInCost?: boolean
 }
 
 interface ProcessItemRow {
@@ -642,11 +661,16 @@ interface ProductionRow {
 }
 
 function materialAmount(row: MaterialRow): number {
+  if (!isMaterialIncluded(row)) return 0
   const usage = Number(row.usagePerPiece) || 0
   const lossPercent = Number(row.lossPercent) || 0
   const price = Number(row.unitPrice) || 0
   const lossRate = lossPercent / 100
   return usage * (1 + lossRate) * price
+}
+
+function isMaterialIncluded(row: MaterialRow): boolean {
+  return row.includeInCost !== false
 }
 
 function processItemAmount(row: ProcessItemRow): number {
@@ -686,8 +710,34 @@ function getMaterialTypeMergeKey(row: MaterialRow): string {
   return label ? `label:${label}` : ''
 }
 
+function normalizeSupplierName(v: unknown): string {
+  return String(v ?? '').trim()
+}
+
+const materialRowsSorted = computed(() => {
+  const rows = [...materialRows.value]
+  const getTypeText = (row: MaterialRow): string => {
+    if (typeof row.materialTypeId === 'number' && Number.isFinite(row.materialTypeId)) {
+      const found = materialTypeOptions.value.find((x) => x.id === row.materialTypeId)
+      if (found?.label) return found.label
+    }
+    return String(row.materialType ?? '').trim()
+  }
+  return rows.sort((a, b) => {
+    const typeA = getTypeText(a)
+    const typeB = getTypeText(b)
+    if (typeA !== typeB) return typeA.localeCompare(typeB)
+    const supplierA = normalizeSupplierName(a.supplierName)
+    const supplierB = normalizeSupplierName(b.supplierName)
+    if (supplierA !== supplierB) return supplierA.localeCompare(supplierB)
+    const nameA = String(a.materialName ?? '').trim()
+    const nameB = String(b.materialName ?? '').trim()
+    return nameA.localeCompare(nameB)
+  })
+})
+
 const materialSpanMeta = computed(() => {
-  const rows = materialRows.value
+  const rows = materialRowsSorted.value
   const typeRowspanByIndex = new Map<number, number>()
   const supplierRowspanByIndex = new Map<number, number>()
   const hiddenTypeIndexes = new Set<number>()
@@ -704,9 +754,9 @@ const materialSpanMeta = computed(() => {
 
     let p = i
     while (p < j) {
-      const supplier = String(rows[p].supplierName ?? '').trim()
+      const supplier = normalizeSupplierName(rows[p].supplierName)
       let q = p + 1
-      while (supplier && q < j && String(rows[q].supplierName ?? '').trim() === supplier) q += 1
+      while (supplier && q < j && normalizeSupplierName(rows[q].supplierName) === supplier) q += 1
       const supplierSpan = q - p
       supplierRowspanByIndex.set(p, supplierSpan)
       for (let k = p + 1; k < q; k += 1) hiddenSupplierIndexes.add(k)
@@ -741,6 +791,10 @@ function materialSpanMethod({
     return { rowspan: meta.supplierRowspanByIndex.get(rowIndex) ?? 1, colspan: 1 }
   }
   return { rowspan: 1, colspan: 1 }
+}
+
+function materialRowClassName({ row }: { row: MaterialRow }): string {
+  return isMaterialIncluded(row) ? '' : 'material-row-excluded'
 }
 
 function normalizeProfitMargin(v: unknown): number {
@@ -781,6 +835,7 @@ function buildSnapshotPayload() {
       cuttingQuantity: row.cuttingQuantity ?? null,
       remark: row.remark ?? '',
       unitPrice: row.unitPrice,
+      includeInCost: isMaterialIncluded(row),
     })),
     processItemRows: processItemRows.value.map((row) => ({
       processName: row.processName ?? '',
@@ -1079,11 +1134,12 @@ function addMaterialRow() {
     cuttingQuantity: null,
     remark: '',
     unitPrice: 0,
+    includeInCost: true,
   })
 }
 
-function removeMaterialRow(index: number) {
-  materialRows.value.splice(index, 1)
+function removeMaterialRow(row: MaterialRow) {
+  materialRows.value = materialRows.value.filter((r) => r !== row)
 }
 
 /** 工艺项目成本数量：与订单件数无关，默认 1，由跟单按工艺自行填写 */
@@ -1109,7 +1165,7 @@ function removeProcessItemRow(index: number) {
 /** 防止接口偶发失败时出现空表 No Data：保证基础行存在 */
 function ensureBaseCostRows() {
   if (!materialRows.value.length) {
-    materialRows.value = [{ unitPrice: 0 } as MaterialRow]
+    materialRows.value = [{ unitPrice: 0, includeInCost: true } as MaterialRow]
   }
   if (!processItemRows.value.length) {
     processItemRows.value = [{ unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY } as ProcessItemRow]
@@ -1131,8 +1187,9 @@ function syncFromOrder(d: OrderDetail) {
     cuttingQuantity: m.cuttingQuantity ?? null,
     remark: m.remark ?? '',
     unitPrice: 0,
+    includeInCost: true,
   })) as MaterialRow[]
-  materialRows.value = mats.length ? mats : [{ unitPrice: 0 } as MaterialRow]
+  materialRows.value = mats.length ? mats : [{ unitPrice: 0, includeInCost: true } as MaterialRow]
 
   const procs = (d.processItems ?? []).map((p) => ({
     ...p,
@@ -1160,7 +1217,12 @@ async function loadCostSnapshot() {
     const data = res.data
     if (data?.snapshot && typeof data.snapshot === 'object') {
       const s = data.snapshot
-      if (Array.isArray(s.materialRows) && s.materialRows.length) materialRows.value = s.materialRows as MaterialRow[]
+      if (Array.isArray(s.materialRows) && s.materialRows.length) {
+        materialRows.value = (s.materialRows as MaterialRow[]).map((r) => ({
+          ...r,
+          includeInCost: r.includeInCost !== false,
+        }))
+      }
       if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows as ProcessItemRow[]
       if (Array.isArray(s.productionRows) && s.productionRows.length) {
         productionRows.value = (s.productionRows as ProductionRow[]).map((r) => {
@@ -1646,6 +1708,14 @@ watch(
 
 .cost-table :deep(.el-input-number .el-input__inner) {
   text-align: right;
+}
+
+.cost-table :deep(.material-row-excluded) {
+  background: var(--el-fill-color-light);
+}
+
+.cost-table :deep(.material-row-excluded .cell) {
+  color: var(--el-text-color-secondary);
 }
 
 .production-cost-table :deep(.el-input__inner),

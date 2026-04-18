@@ -1,0 +1,23 @@
+---
+description: 旧系统迁移标准（TSV 导出、导入顺序、字段映射与校验）
+globs: backend/scripts/**/*.sql,docs/**/*.md,backend/src/**/*.ts
+alwaysApply: false
+---
+
+# 40 Migration & Import Standard
+
+## 导出标准（旧系统）
+
+- 默认使用 Linux shell + `mysql -N -B` 导出 TSV。
+- SQL 明确列顺序；日期统一格式化；文本列使用 `IFNULL` 防止空值干扰。
+- 导出前确认目录可写；导出后至少检查行数、头部、尾部样本。
+
+## 导入标准（本地）
+
+- 优先读取 `docs/migration-samples/**` 的样本文件。
+- 执行顺序固定：`--dry-run` -> 正式导入 -> 抽样核对数据库与页面。
+
+## 映射原则
+
+- 严格按当前迁移任务约定字段映射，不擅自扩大范围。
+- 配置型字段遵守“只存 ID”原则；旧值不存在时先补配置再导入。

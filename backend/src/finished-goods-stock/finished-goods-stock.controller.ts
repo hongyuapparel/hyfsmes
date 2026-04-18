@@ -118,13 +118,14 @@ export class FinishedGoodsStockController {
     @Body('inventoryTypeId') inventoryTypeId: number | null | undefined,
     @Body('warehouseId') warehouseId: number | null | undefined,
     @Body('location') location: string | undefined,
+    @Body('unitPrice') unitPrice: string | number | undefined,
     @Body('imageUrl') imageUrl: string | undefined,
     @Body('remark') remark: string | undefined,
     @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.service.updateMeta(
       Number(id),
-      { department, inventoryTypeId, warehouseId, location, imageUrl, remark },
+      { department, inventoryTypeId, warehouseId, location, unitPrice, imageUrl, remark },
       user?.username ?? '',
     );
   }

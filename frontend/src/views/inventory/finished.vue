@@ -120,19 +120,28 @@
         <el-table
           ref="finishedStockTableRef"
           v-loading="loading"
-          :data="list"
+          :data="stockTableData"
           border
           stripe
           class="finished-table"
+          :row-key="getStockTableRowKey"
+          :tree-props="{ children: '_children' }"
+          :indent="8"
+          :row-class-name="getFinishedStockRowClassName"
           @header-dragend="onFinishedStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
-          <el-table-column type="selection" width="48" align="center" />
+          <el-table-column type="selection" width="48" align="center" :selectable="isSelectableStockRow" />
           <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column label="颜色" min-width="92" align="center" header-align="center">
+            <template #default="{ row }">
+              {{ getTableColorText(row) }}
+            </template>
+          </el-table-column>
           <el-table-column label="图片" width="90" align="center" header-align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
-              <span v-else class="text-placeholder">-</span>
+              <AppImageThumb v-if="getTableImageUrl(row)" :raw-url="getTableImageUrl(row)" variant="table" />
+              <span v-else class="text-placeholder">{{ getTableImagePlaceholder(row) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="数量" width="90" align="center" header-align="center">
@@ -148,10 +157,10 @@
               >
                 <template #content>
                   <div class="qty-tooltip">
-                    <template v-if="row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.loading">
+                    <template v-if="isQtyTooltipLoading(row)">
                       <div class="qty-tooltip-loading">加载中...</div>
                     </template>
-                    <template v-else-if="row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.error">
+                    <template v-else-if="isQtyTooltipError(row)">
                       <div class="qty-tooltip-error">明细加载失败</div>
                     </template>
                     <template v-else>
@@ -193,12 +202,12 @@
           </el-table-column>
           <el-table-column label="出厂价" width="100" align="center" header-align="center">
             <template #default="{ row }">
-              {{ formatPrice(row.unitPrice) }}
+              {{ getTableUnitPriceText(row) }}
             </template>
           </el-table-column>
           <el-table-column label="总价" width="100" align="center" header-align="center">
             <template #default="{ row }">
-              {{ formatTotalPrice(row.quantity, row.unitPrice) }}
+              {{ getTableGrandTotalText(row) }}
             </template>
           </el-table-column>
           <el-table-column prop="department" label="部门" min-width="90" show-overflow-tooltip align="center" header-align="center" />
@@ -217,7 +226,7 @@
           <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="操作" width="88" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+              <el-button v-if="isStockTableLeafRow(row)" link type="primary" size="small" @click="openDetail(row)">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -466,10 +475,16 @@
               <div>当前库存：{{ formatDisplayNumber(item.row.quantity) }}</div>
             </div>
             <div v-if="item.headers.length" class="outbound-size-wrap">
-              <el-table :data="item.rows" border size="small">
-                <el-table-column label="颜色" min-width="100">
+              <el-table :data="item.rows" border size="small" class="outbound-size-table">
+                <el-table-column label="颜色" min-width="100" align="center" header-align="center">
                   <template #default="{ row }">
                     {{ row.colorName || '-' }}
+                  </template>
+                </el-table-column>
+                <el-table-column label="图片" width="90" align="center" header-align="center">
+                  <template #default="{ row }">
+                    <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
+                    <span v-else class="text-placeholder">-</span>
                   </template>
                 </el-table-column>
                 <el-table-column
@@ -477,7 +492,8 @@
                   :key="hIdx"
                   :label="h"
                   min-width="80"
-                  align="right"
+                  align="center"
+                  header-align="center"
                 >
                   <template #default="{ row }">
                     <el-input-number
@@ -486,6 +502,7 @@
                       :precision="0"
                       controls-position="right"
                       size="small"
+                      class="outbound-qty-input"
                       style="width: 100%"
                     />
                   </template>
@@ -911,7 +928,7 @@
           <div class="detail-section">
             <div class="detail-section-title">颜色图片与码数明细</div>
             <div
-              v-if="detailDrawer.data.colorSize.headers.length && detailDisplayColorSizeRows.length"
+              v-if="detailDisplaySizeHeaders.length && detailDisplayColorSizeRows.length"
               class="detail-color-size-table-wrap"
             >
               <el-table
@@ -945,7 +962,7 @@
                   </template>
                 </el-table-column>
                 <el-table-column
-                  v-for="(size, sizeIdx) in detailDrawer.data.colorSize.headers"
+                  v-for="(size, sizeIdx) in detailDisplaySizeHeaders"
                   :key="`size-${sizeIdx}`"
                   :label="size"
                   min-width="64"
@@ -978,17 +995,13 @@
 
           <div class="detail-section">
             <div class="detail-section-title">操作记录</div>
-            <div v-if="detailDrawer.data.adjustLogs.length" class="detail-logs">
-              <div v-for="log in detailDrawer.data.adjustLogs" :key="log.id" class="detail-log-item">
+            <div v-if="mergedDetailAdjustLogs.length" class="detail-logs">
+              <div v-for="log in mergedDetailAdjustLogs" :key="log.id" class="detail-log-item">
                 <div class="detail-log-head">
                   <span class="detail-log-user">{{ log.operatorUsername || '-' }}</span>
                   <span class="detail-log-time">{{ log.createdAt }}</span>
                 </div>
-                <div class="detail-log-body">
-                  <div class="detail-log-line">前：{{ formatMetaSnapshot(log.before) }}</div>
-                  <div class="detail-log-line">后：{{ formatMetaSnapshot(log.after) }}</div>
-                  <div v-if="log.remark" class="detail-log-remark">备注：{{ log.remark }}</div>
-                </div>
+                <div class="detail-log-body">{{ getAdjustLogSummary(log) }}</div>
               </div>
             </div>
             <div v-else class="detail-muted">暂无操作记录</div>
@@ -1063,7 +1076,31 @@ const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 /** 当前筛选下全量匹配的总件数（接口返回）；有表格勾选时底部改为已选行的件数合计 */
 const stockTotalQuantity = ref(0)
-const selectedRows = ref<FinishedStockRow[]>([])
+type StockTableLeafRow = FinishedStockRow & {
+  _uiKey: string
+  _rowKind: 'leaf'
+  _groupKey: string
+  _displayColor: string
+  _effectiveImageUrl: string
+  _selectedColorName?: string
+}
+
+type StockTableParentRow = FinishedStockRow & {
+  _uiKey: string
+  _rowKind: 'parent'
+  _groupKey: string
+  _displayColor: string
+  _effectiveImageUrl: string
+  _children: StockTableLeafRow[]
+  _mixedUnitPrice: boolean
+  _mixedDepartment: boolean
+  _mixedLocation: boolean
+  _mixedOrderNo: boolean
+}
+
+type StockTableRow = StockTableLeafRow | StockTableParentRow
+
+const selectedRows = ref<StockTableLeafRow[]>([])
 
 const stockListFooterQuantity = computed(() => {
   if (selectedRows.value.length > 0) {
@@ -1079,6 +1116,9 @@ const detailDrawer = reactive<{
   stockId: number | null
   data: any | null
   colorImageMap: Record<string, string>
+  groupProductImage: string
+  selectedColorName: string
+  selectedQuantity: number | null
 }>({
   visible: false,
   loading: false,
@@ -1086,6 +1126,9 @@ const detailDrawer = reactive<{
   stockId: null,
   data: null,
   colorImageMap: {},
+  groupProductImage: '',
+  selectedColorName: '',
+  selectedQuantity: null,
 })
 const DETAIL_DRAWER_MIN_WIDTH = 760
 const DETAIL_DRAWER_DEFAULT_WIDTH = 900
@@ -1111,23 +1154,307 @@ const detailEditForm = reactive<{
   remark: '',
 })
 
-function formatMetaSnapshot(v: any): string {
-  if (!v) return '-'
-  const dep = v.department ?? ''
-  const it = v.inventoryTypeId != null ? findInventoryTypeLabelById(v.inventoryTypeId) : ''
-  const wh = v.warehouseId != null ? findWarehouseLabelById(v.warehouseId) : ''
-  const loc = v.location ?? ''
-  const qty = v.quantity != null && v.quantity !== '' ? `数量 ${v.quantity}` : ''
-  const up = v.unitPrice != null && v.unitPrice !== '' ? `出厂价 ${formatPrice(String(v.unitPrice))}` : ''
-  return [dep, it, wh, loc, qty, up].filter((x) => x).join(' / ') || '-'
+function getAdjustLogSummary(log: any): string {
+  if (Array.isArray(log?.summaries) && log.summaries.length) {
+    return log.summaries.join('；')
+  }
+  const before = log?.before ?? {}
+  const after = log?.after ?? {}
+  const parts: string[] = []
+  const remark = String(log?.remark ?? '').trim()
+  if (remark) parts.push(remark)
+
+  const beforeUnitPrice = before?.unitPrice != null && before.unitPrice !== '' ? String(before.unitPrice) : ''
+  const afterUnitPrice = after?.unitPrice != null && after.unitPrice !== '' ? String(after.unitPrice) : ''
+  if (afterUnitPrice && beforeUnitPrice !== afterUnitPrice) {
+    parts.push(`出厂价改为${formatPrice(afterUnitPrice)}`)
+  }
+
+  const metaChanged =
+    (before?.department ?? '') !== (after?.department ?? '') ||
+    (before?.inventoryTypeId ?? null) !== (after?.inventoryTypeId ?? null) ||
+    (before?.warehouseId ?? null) !== (after?.warehouseId ?? null) ||
+    (before?.location ?? '') !== (after?.location ?? '')
+  if (metaChanged) {
+    parts.push(
+      `基础信息改为 ${[
+        after?.department || '-',
+        findInventoryTypeLabelById(after?.inventoryTypeId) || '-',
+        findWarehouseLabelById(after?.warehouseId) || '-',
+        after?.location || '-',
+      ].join(' / ')}`,
+    )
+  }
+
+  const beforeQty = Number(before?.quantity)
+  const afterQty = Number(after?.quantity)
+  if (Number.isFinite(beforeQty) && Number.isFinite(afterQty) && beforeQty !== afterQty && !remark) {
+    const delta = afterQty - beforeQty
+    parts.push(delta > 0 ? `新增库存 +${formatDisplayNumber(delta)} 件` : `库存数量改为${formatDisplayNumber(afterQty)}`)
+  }
+
+  return parts.join('，') || '更新库存信息'
 }
+
+function parseAdjustLogTimestamp(value: unknown): number {
+  const raw = String(value ?? '').trim()
+  if (!raw) return 0
+  const normalized = raw.replace(' ', 'T')
+  const time = new Date(normalized).getTime()
+  return Number.isFinite(time) ? time : 0
+}
+
+const mergedDetailAdjustLogs = computed(() => {
+  const logs = Array.isArray(detailDrawer.data?.adjustLogs) ? detailDrawer.data.adjustLogs : []
+  const result: Array<{
+    id: string
+    operatorUsername: string
+    createdAt: string
+    summaries: string[]
+  }> = []
+
+  logs.forEach((log) => {
+    const summary = getAdjustLogSummary(log)
+    const currentTs = parseAdjustLogTimestamp(log?.createdAt)
+    const last = result[result.length - 1]
+    const lastTs = parseAdjustLogTimestamp(last?.createdAt)
+    const withinOneHour = !!last && currentTs > 0 && lastTs > 0 && Math.abs(lastTs - currentTs) <= 60 * 60 * 1000
+    const sameOperator = !!last && String(last.operatorUsername ?? '') === String(log?.operatorUsername ?? '')
+
+    if (last && sameOperator && withinOneHour) {
+      if (summary && !last.summaries.includes(summary)) last.summaries.push(summary)
+      return
+    }
+
+    result.push({
+      id: String(log?.id ?? `${result.length}`),
+      operatorUsername: String(log?.operatorUsername ?? ''),
+      createdAt: String(log?.createdAt ?? ''),
+      summaries: summary ? [summary] : [],
+    })
+  })
+
+  return result
+})
 
 function getColorImageUrl(colorName: string): string {
   return detailDrawer.colorImageMap[colorName] || ''
 }
 
+function normalizeColorName(value: unknown): string {
+  return String(value ?? '').trim()
+}
+
+function isStockTableParentRow(row: StockTableRow | FinishedStockRow | null | undefined): row is StockTableParentRow {
+  return !!row && (row as StockTableParentRow)._rowKind === 'parent'
+}
+
+function isStockTableLeafRow(row: StockTableRow | FinishedStockRow | null | undefined): row is StockTableLeafRow {
+  return !!row && (row as StockTableLeafRow)._rowKind === 'leaf'
+}
+
+function normalizeBreakdownHeaders(headers: string[]): string[] {
+  if (!headers.length) return []
+  return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
+}
+
+function getRowColorImageUrl(row: FinishedStockRow, colorName: string): string {
+  const target = normalizeColorName(colorName)
+  if (!target) return ''
+  const match = row.colorImages?.find((item) => normalizeColorName(item.colorName) === target)
+  return match?.imageUrl || ''
+}
+
+function getGroupProductImageUrl(groupKey: string): string {
+  const parentRow = stockTableData.value.find(
+    (item): item is StockTableParentRow => item._groupKey === groupKey && isStockTableParentRow(item),
+  )
+  if (parentRow?._effectiveImageUrl) return parentRow._effectiveImageUrl
+  const leafRow = stockTableData.value.find(
+    (item): item is StockTableLeafRow => item._groupKey === groupKey && isStockTableLeafRow(item),
+  )
+  return String(leafRow?.imageUrl ?? '').trim()
+}
+
+function getSharedProductImageUrl(row: StockTableRow): string {
+  if (isStockTableParentRow(row)) return row._effectiveImageUrl || ''
+  return getGroupProductImageUrl(row._groupKey) || String(row.imageUrl ?? '').trim()
+}
+
+function getSplitColorBreakdown(row: FinishedStockRow): {
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+} | null {
+  if (row.type !== 'stored') return null
+  const snapshot = row.sizeBreakdown
+  if (snapshot?.headers?.length && snapshot.rows?.length) {
+    const headers = normalizeBreakdownHeaders(snapshot.headers)
+    if (!headers.length) return null
+    const scaled = scaleColorSizeRowsToQuantity(snapshot.headers, snapshot.rows, row.quantity)
+    return {
+      headers,
+      rows: scaled.map((item) => ({
+        colorName: normalizeColorName(item.colorName),
+        values: headers.map((_, index) => Number(item.values?.[index]) || 0),
+      })),
+    }
+  }
+  if (!row.orderId) return null
+  const cache = colorSizeCache[row.orderId]
+  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return null
+  const headers = normalizeBreakdownHeaders(cache.headers)
+  if (!headers.length) return null
+  const scaled = scaleColorSizeRowsToQuantity(cache.headers, cache.rows, row.quantity)
+  return {
+    headers,
+    rows: scaled.map((item) => ({
+      colorName: normalizeColorName(item.colorName),
+      values: headers.map((_, index) => Number(item.values?.[index]) || 0),
+    })),
+  }
+}
+
+function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
+  const groupKey = `${row.type}::${String(row.skuCode ?? '').trim().toLowerCase()}::${String(row.customerName ?? '').trim().toLowerCase()}`
+  const breakdown = getSplitColorBreakdown(row)
+  if (breakdown && breakdown.rows.length > 1) {
+    return breakdown.rows.map((item, index) => {
+      const colorName = normalizeColorName(item.colorName)
+      const quantity = sumDetailRowQty(item.values)
+      return {
+        ...row,
+        quantity,
+        sizeBreakdown: {
+          headers: [...breakdown.headers],
+          rows: [{ colorName, values: [...item.values] }],
+        },
+        _uiKey: `${groupKey}::${row.id}::${colorName || index}`,
+        _rowKind: 'leaf',
+        _groupKey: groupKey,
+        _displayColor: colorName || '-',
+        _effectiveImageUrl: getRowColorImageUrl(row, colorName),
+        _selectedColorName: colorName || undefined,
+      }
+    })
+  }
+
+  const colorName = normalizeColorName(breakdown?.rows?.[0]?.colorName)
+  return [
+    {
+      ...row,
+      sizeBreakdown: breakdown
+        ? {
+            headers: [...breakdown.headers],
+            rows: breakdown.rows.map((item) => ({
+              colorName: normalizeColorName(item.colorName),
+              values: [...item.values],
+            })),
+          }
+        : row.sizeBreakdown,
+      _uiKey: `${groupKey}::${row.id}`,
+      _rowKind: 'leaf',
+      _groupKey: groupKey,
+      _displayColor: colorName || '-',
+      _effectiveImageUrl: getRowColorImageUrl(row, colorName),
+      _selectedColorName: colorName || undefined,
+    },
+  ]
+}
+
+function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTableParentRow {
+  const first = rows[0]
+  const colorLabels = Array.from(new Set(rows.map((item) => item._displayColor).filter((item) => item && item !== '-')))
+  const productImages = Array.from(new Set(rows.map((item) => String(item.imageUrl ?? '').trim()).filter(Boolean)))
+  const unitPrices = Array.from(new Set(rows.map((item) => String(item.unitPrice ?? '0'))))
+  const departments = Array.from(new Set(rows.map((item) => String(item.department ?? '').trim()).filter(Boolean)))
+  const locations = Array.from(new Set(rows.map((item) => String(item.location ?? '').trim()).filter(Boolean)))
+  const orderNos = Array.from(new Set(rows.map((item) => String(item.orderNo ?? '').trim()).filter(Boolean)))
+  return {
+    ...first,
+    quantity: rows.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
+    unitPrice: unitPrices.length === 1 ? unitPrices[0] : '',
+    department: departments.length === 1 ? departments[0] : '',
+    location: locations.length === 1 ? locations[0] : '',
+    orderNo: orderNos.length === 1 ? orderNos[0] : '',
+    sizeBreakdown: null,
+    _uiKey: `${groupKey}::parent`,
+    _rowKind: 'parent',
+    _groupKey: groupKey,
+    _displayColor: colorLabels.length > 1 ? '多个' : colorLabels[0] || '-',
+    _effectiveImageUrl: productImages[0] || '',
+    _children: rows,
+    _mixedUnitPrice: unitPrices.length > 1,
+    _mixedDepartment: departments.length > 1,
+    _mixedLocation: locations.length > 1,
+    _mixedOrderNo: orderNos.length > 1,
+  }
+}
+
+const stockTableData = computed<StockTableRow[]>(() => {
+  const leafGroups = new Map<string, StockTableLeafRow[]>()
+  list.value.forEach((row) => {
+    buildLeafRowsForStock(row).forEach((leaf) => {
+      const group = leafGroups.get(leaf._groupKey)
+      if (group) group.push(leaf)
+      else leafGroups.set(leaf._groupKey, [leaf])
+    })
+  })
+
+  const result: StockTableRow[] = []
+  leafGroups.forEach((rows, groupKey) => {
+    if (rows.length <= 1) {
+      result.push(...rows)
+      return
+    }
+    result.push(buildParentRow(groupKey, rows))
+  })
+  return result
+})
+
+function getTableImageUrl(row: StockTableRow): string {
+  if (isStockTableParentRow(row)) return row._effectiveImageUrl || ''
+  return row._effectiveImageUrl || ''
+}
+
+function getTableImagePlaceholder(row: StockTableRow): string {
+  return '-'
+}
+
+function getTableColorText(row: StockTableRow): string {
+  return row._displayColor || '-'
+}
+
+function getTableUnitPriceText(row: StockTableRow): string {
+  if (isStockTableParentRow(row) && row._mixedUnitPrice) return '多个'
+  return formatPrice(row.unitPrice)
+}
+
+function getTableGrandTotalText(row: StockTableRow): string {
+  if (isStockTableParentRow(row)) {
+    const total = row._children.reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0
+      const price = Number(item.unitPrice) || 0
+      return sum + qty * price
+    }, 0)
+    return formatPrice(String(total))
+  }
+  return formatTotalPrice(row.quantity, row.unitPrice)
+}
+
+function getStockTableRowKey(row: StockTableRow): string {
+  return row._uiKey
+}
+
+function getFinishedStockRowClassName({ row }: { row: StockTableRow }): string {
+  return isStockTableParentRow(row) ? 'stock-parent-row' : 'stock-child-row'
+}
+
+function isSelectableStockRow(row: StockTableRow): boolean {
+  return isStockTableLeafRow(row)
+}
+
 function getDisplayProductImage(): string {
-  return detailDrawer.data?.stock?.imageUrl || detailDrawer.data?.productImageUrl || ''
+  return detailDrawer.groupProductImage || detailDrawer.data?.stock?.imageUrl || detailDrawer.data?.productImageUrl || ''
 }
 
 function getDetailDrawerMaxWidth() {
@@ -1207,8 +1534,10 @@ function startResizeDetailDrawer(e: MouseEvent) {
 async function saveProductImage(url: string) {
   if (!detailDrawer.stockId) return
   try {
-    await updateFinishedStockMeta(detailDrawer.stockId, { imageUrl: (url ?? '').trim() })
-    if (detailDrawer.data?.stock) detailDrawer.data.stock.imageUrl = (url ?? '').trim()
+    const imageUrl = (url ?? '').trim()
+    await updateFinishedStockMeta(detailDrawer.stockId, { imageUrl })
+    if (detailDrawer.data?.stock) detailDrawer.data.stock.imageUrl = imageUrl
+    detailDrawer.groupProductImage = imageUrl
     ElMessage.success('产品图已更新')
     await load()
   } catch (e: unknown) {
@@ -1221,30 +1550,56 @@ function sumDetailRowQty(quantities: unknown[]): number {
   return quantities.reduce<number>((sum, q) => sum + (Number(q) || 0), 0)
 }
 
-const detailDisplayColorSizeRows = computed(() => {
+function filterZeroQuantityColumns<T extends { quantities: unknown[] }>(
+  headers: string[],
+  rows: T[],
+): { headers: string[]; rows: Array<T & { quantities: number[] }> } {
+  const activeIndexes = headers
+    .map((_, index) => index)
+    .filter((index) => rows.some((row) => (Number(row.quantities?.[index]) || 0) > 0))
+  return {
+    headers: activeIndexes.map((index) => headers[index]),
+    rows: rows.map((row) => ({
+      ...row,
+      quantities: activeIndexes.map((index) => Number(row.quantities?.[index]) || 0),
+    })),
+  }
+}
+
+const detailDisplayColorSizeData = computed(() => {
   const data = detailDrawer.data as any
   const headers: string[] = Array.isArray(data?.colorSize?.headers) ? data.colorSize.headers : []
   const rows: Array<{ colorName: string; quantities: number[] }> = Array.isArray(data?.colorSize?.rows)
     ? data.colorSize.rows
     : []
-  const stockQty = Math.max(0, Math.trunc(Number(data?.stock?.quantity) || 0))
-  if (!headers.length || !rows.length) return []
+  const selectedColorName = normalizeColorName(detailDrawer.selectedColorName)
+  const filteredRows = selectedColorName
+    ? rows.filter((item) => normalizeColorName(item.colorName) === selectedColorName)
+    : rows
+  const stockQty = Math.max(
+    0,
+    Math.trunc(
+      detailDrawer.selectedQuantity != null ? Number(detailDrawer.selectedQuantity) : Number(data?.stock?.quantity) || 0,
+    ),
+  )
+  if (!headers.length || !rows.length) return { headers: [], rows: [] }
+  if (!filteredRows.length) return { headers: [], rows: [] }
 
-  const orderTotal = rows.reduce(
+  const orderTotal = filteredRows.reduce(
     (sum, r) => sum + (Array.isArray(r.quantities) ? r.quantities.reduce((s, q) => s + (Number(q) || 0), 0) : 0),
     0,
   )
-  if (orderTotal === stockQty) return rows
+  if (orderTotal === stockQty) return filterZeroQuantityColumns(headers, filteredRows)
 
   const weights: number[] = []
-  rows.forEach((r) => {
+  filteredRows.forEach((r) => {
     for (let i = 0; i < headers.length; i += 1) {
       weights.push(Math.max(0, Number(r.quantities?.[i]) || 0))
     }
   })
   const allocated = allocateByWeight(weights, stockQty)
   let cursor = 0
-  return rows.map((r) => {
+  const scaledRows = filteredRows.map((r) => {
     const quantities: number[] = []
     for (let i = 0; i < headers.length; i += 1) {
       quantities.push(allocated[cursor] ?? 0)
@@ -1255,7 +1610,12 @@ const detailDisplayColorSizeRows = computed(() => {
       quantities,
     }
   })
+  return filterZeroQuantityColumns(headers, scaledRows)
 })
+
+const detailDisplaySizeHeaders = computed(() => detailDisplayColorSizeData.value.headers)
+
+const detailDisplayColorSizeRows = computed(() => detailDisplayColorSizeData.value.rows)
 
 const detailTableTotalQty = computed(() =>
   detailDisplayColorSizeRows.value.reduce((sum, row) => sum + sumDetailRowQty(row.quantities), 0),
@@ -1272,7 +1632,7 @@ function detailRowTotalPrice(quantities: unknown[]): string {
 }
 
 function getDetailColorSizeSummary({ columns }: { columns: Array<{ label?: string }> }) {
-  const headersLen = Array.isArray(detailDrawer.data?.colorSize?.headers) ? detailDrawer.data.colorSize.headers.length : 0
+  const headersLen = detailDisplaySizeHeaders.value.length
   const sumQtyColIndex = 2 + headersLen
   const unitPriceColIndex = 3 + headersLen
   const totalPriceColIndex = 4 + headersLen
@@ -1285,13 +1645,37 @@ function getDetailColorSizeSummary({ columns }: { columns: Array<{ label?: strin
   })
 }
 
+function isQtyTooltipLoading(row: StockTableRow): boolean {
+  if (isStockTableParentRow(row)) return row._children.some((child) => isQtyTooltipLoading(child))
+  return !!(row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.loading)
+}
+
+function isQtyTooltipError(row: StockTableRow): boolean {
+  if (isStockTableParentRow(row)) return row._children.some((child) => isQtyTooltipError(child))
+  return !!(row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.error)
+}
+
 /** 有订单可走接口拉明细，或手动入库带了 sizeBreakdown（列表快照） */
-function qtyTooltipEnabled(row: FinishedStockRow): boolean {
+function qtyTooltipEnabled(row: StockTableRow): boolean {
+  if (isStockTableParentRow(row)) return row._children.some((child) => qtyTooltipEnabled(child))
   if (row.sizeBreakdown?.headers?.length && row.sizeBreakdown.rows?.length) return true
   return !!row.orderId
 }
 
-function onQtyTooltipShow(row: FinishedStockRow) {
+function onQtyTooltipShow(row: StockTableRow) {
+  if (isStockTableParentRow(row)) {
+    const orderIds = Array.from(
+      new Set(
+        row._children
+          .filter((child) => !child.sizeBreakdown?.headers?.length && child.orderId)
+          .map((child) => Number(child.orderId)),
+      ),
+    )
+    orderIds.forEach((orderId) => {
+      void ensureColorSizeBreakdown(orderId)
+    })
+    return
+  }
   if (row.sizeBreakdown?.headers?.length && row.sizeBreakdown.rows?.length) return
   if (row.orderId) void ensureColorSizeBreakdown(row.orderId)
 }
@@ -1379,12 +1763,16 @@ function initOutboundRowsFromStockSnapshot(
   return scaled.map((r) => ({ colorName: r.colorName, quantities: [...r.values] }))
 }
 
-function buildOutboundDialogItem(row: FinishedStockRow): FinishedOutboundDialogItem {
+function buildOutboundDialogItem(row: StockTableLeafRow): FinishedOutboundDialogItem {
   const snap = row.sizeBreakdown
   if (snap?.headers?.length && snap.rows?.length) {
     const headers = snap.headers.filter((h) => h !== '合计')
-    const rows = initOutboundRowsFromStockSnapshot(row, headers)
-    return { row, headers, rows }
+    const rows = initOutboundRowsFromStockSnapshot(row, headers).map((item) => ({
+      ...item,
+      imageUrl: getRowColorImageUrl(row, item.colorName) || row._effectiveImageUrl || '',
+    }))
+    const filtered = filterZeroQuantityColumns(headers, rows)
+    return { row, headers: filtered.headers, rows: filtered.rows }
   }
   const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
   const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
@@ -1393,6 +1781,7 @@ function buildOutboundDialogItem(row: FinishedStockRow): FinishedOutboundDialogI
     headers,
     rows: (breakdown?.rows ?? []).map((r) => ({
       colorName: r.colorName,
+      imageUrl: getRowColorImageUrl(row, r.colorName) || row._effectiveImageUrl || '',
       quantities: headers.map(() => 0),
     })),
   }
@@ -1411,40 +1800,111 @@ function getSnapshotTooltipHeaders(snap: NonNullable<FinishedStockRow['sizeBreak
   return [...h, '合计']
 }
 
-function getPreviewHeaders(row: FinishedStockRow): string[] {
-  const snap = row.sizeBreakdown
-  if (snap?.headers?.length) return getSnapshotTooltipHeaders(snap)
-  if (!row.orderId) return []
-  return colorSizeCache[row.orderId]?.headers ?? []
+function getPreviewBaseHeaders(headers: string[]): string[] {
+  return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
 }
 
-function getPreviewRows(row: FinishedStockRow) {
-  const targetQty = Math.max(0, Math.trunc(Number(row.quantity) || 0))
+type PreviewDataset = {
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+}
+
+function getLeafPreviewData(row: StockTableLeafRow): PreviewDataset | null {
   const snap = row.sizeBreakdown
   if (snap?.headers?.length && snap.rows?.length) {
     const headers = getSnapshotTooltipHeaders(snap)
-    const cacheLikeRows = snap.rows.map((r) => ({
-      colorName: r.colorName,
-      values: Array.isArray(r.values) ? [...r.values] : [],
+    const cacheLikeRows = snap.rows.map((item) => ({
+      colorName: item.colorName,
+      values: Array.isArray(item.values) ? [...item.values] : [],
     }))
-    return scaleColorSizeRowsToQuantity(headers, cacheLikeRows, targetQty)
+    return {
+      headers,
+      rows: scaleColorSizeRowsToQuantity(headers, cacheLikeRows, Math.max(0, Math.trunc(Number(row.quantity) || 0))),
+    }
   }
-  if (!row.orderId) return []
+  if (!row.orderId) return null
   const cache = colorSizeCache[row.orderId]
-  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return []
-  return scaleColorSizeRowsToQuantity(cache.headers, cache.rows, targetQty)
+  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return null
+  return {
+    headers: [...cache.headers],
+    rows: scaleColorSizeRowsToQuantity(cache.headers, cache.rows, Math.max(0, Math.trunc(Number(row.quantity) || 0))),
+  }
 }
 
-async function loadDetail(stockId: number) {
+function filterZeroValuePreviewDataset(dataset: PreviewDataset | null): PreviewDataset | null {
+  if (!dataset || !dataset.headers.length || !dataset.rows.length) return null
+  const baseHeaders = getPreviewBaseHeaders(dataset.headers)
+  const activeIndexes = baseHeaders
+    .map((_, index) => index)
+    .filter((index) => dataset.rows.some((row) => (Number(row.values?.[index]) || 0) > 0))
+  if (!activeIndexes.length) return null
+  return {
+    headers: [...activeIndexes.map((index) => baseHeaders[index]), '合计'],
+    rows: dataset.rows.map((row) => {
+      const values = activeIndexes.map((index) => Number(row.values?.[index]) || 0)
+      return {
+        colorName: row.colorName,
+        values: [...values, values.reduce((sum, item) => sum + item, 0)],
+      }
+    }),
+  }
+}
+
+function remapPreviewValues(sourceHeaders: string[], values: number[], targetHeaders: string[]): number[] {
+  const sourceBaseHeaders = getPreviewBaseHeaders(sourceHeaders)
+  const targetBaseHeaders = getPreviewBaseHeaders(targetHeaders)
+  const remapped = targetBaseHeaders.map((header) => {
+    const sourceIndex = sourceBaseHeaders.indexOf(header)
+    return sourceIndex >= 0 ? Number(values[sourceIndex]) || 0 : 0
+  })
+  return targetHeaders[targetHeaders.length - 1] === '合计'
+    ? [...remapped, remapped.reduce((sum, item) => sum + item, 0)]
+    : remapped
+}
+
+function buildPreviewData(row: StockTableRow): PreviewDataset | null {
+  if (!isStockTableParentRow(row)) return filterZeroValuePreviewDataset(getLeafPreviewData(row))
+  const baseHeaders: string[] = []
+  const childPreviews = row._children
+    .map((child) => getLeafPreviewData(child))
+    .filter((preview): preview is PreviewDataset => !!preview)
+  childPreviews.forEach((preview) => {
+    getPreviewBaseHeaders(preview.headers).forEach((header) => {
+      if (!baseHeaders.includes(header)) baseHeaders.push(header)
+    })
+  })
+  if (!baseHeaders.length) return null
+  const fullHeaders = [...baseHeaders, '合计']
+  const rows = childPreviews.flatMap((preview) =>
+    preview.rows.map((item) => ({
+      colorName: item.colorName,
+      values: remapPreviewValues(preview.headers, item.values, fullHeaders),
+    })),
+  )
+  return filterZeroValuePreviewDataset({ headers: fullHeaders, rows })
+}
+
+function getPreviewHeaders(row: StockTableRow): string[] {
+  return buildPreviewData(row)?.headers ?? []
+}
+
+function getPreviewRows(row: StockTableRow) {
+  return buildPreviewData(row)?.rows ?? []
+}
+
+async function loadDetail(stockId: number, options?: { colorName?: string; quantity?: number | null }) {
   detailDrawer.loading = true
   detailDrawer.saving = false
   detailDrawer.stockId = stockId
   detailDrawer.data = null
   detailDrawer.colorImageMap = {}
+  detailDrawer.selectedColorName = normalizeColorName(options?.colorName)
+  detailDrawer.selectedQuantity = options?.quantity != null ? Math.max(0, Math.trunc(Number(options.quantity) || 0)) : null
   try {
     const res = await getFinishedStockDetail(stockId)
     const data = res.data as any
     detailDrawer.data = data
+    syncStockColorImages(stockId, data?.colorImages)
     detailEditForm.department = data?.stock?.department ?? ''
     detailEditForm.inventoryTypeId = data?.stock?.inventoryTypeId ?? null
     detailEditForm.warehouseId = data?.stock?.warehouseId ?? null
@@ -1474,10 +1934,12 @@ function toggleDetailEditMode() {
   detailMetaEditing.value = !detailMetaEditing.value
 }
 
-async function openDetail(row: FinishedStockRow) {
+async function openDetail(row: StockTableRow) {
+  if (!isStockTableLeafRow(row)) return
   detailDrawerWidth.value = loadSavedDetailDrawerWidth()
+  detailDrawer.groupProductImage = getSharedProductImageUrl(row)
   detailDrawer.visible = true
-  await loadDetail(row.id)
+  await loadDetail(row.id, { colorName: row._selectedColorName, quantity: row.quantity })
 }
 
 async function saveDetailMeta() {
@@ -1492,7 +1954,10 @@ async function saveDetailMeta() {
       remark: detailEditForm.remark || undefined,
     })
     ElMessage.success('保存成功')
-    await loadDetail(detailDrawer.stockId)
+    await loadDetail(detailDrawer.stockId, {
+      colorName: detailDrawer.selectedColorName,
+      quantity: detailDrawer.selectedQuantity,
+    })
     await load()
     detailMetaEditing.value = false
   } catch (e: unknown) {
@@ -1509,14 +1974,58 @@ async function saveColorImage(colorName: string, url: string) {
     await upsertFinishedStockColorImage(detailDrawer.stockId, { colorName, imageUrl })
     if (imageUrl) {
       detailDrawer.colorImageMap[colorName] = imageUrl
+      syncStockColorImage(detailDrawer.stockId, colorName, imageUrl)
       ElMessage.success('已保存图片')
     } else {
       delete detailDrawer.colorImageMap[colorName]
+      syncStockColorImage(detailDrawer.stockId, colorName, '')
       ElMessage.success('已清除图片')
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   }
+}
+
+function syncStockColorImage(stockId: number, colorName: string, imageUrl: string) {
+  const targetColorName = normalizeColorName(colorName)
+  if (!targetColorName) return
+  list.value = list.value.map((item) => {
+    if (item.id !== stockId) return item
+    const colorImages = Array.isArray(item.colorImages) ? [...item.colorImages] : []
+    const index = colorImages.findIndex((entry) => normalizeColorName(entry.colorName) === targetColorName)
+    if (imageUrl) {
+      const nextEntry = { ...(index >= 0 ? colorImages[index] : {}), colorName: targetColorName, imageUrl }
+      if (index >= 0) colorImages[index] = nextEntry
+      else colorImages.push(nextEntry)
+    } else if (index >= 0) {
+      colorImages.splice(index, 1)
+    }
+    return { ...item, colorImages }
+  })
+  if (Array.isArray(detailDrawer.data?.colorImages)) {
+    const colorImages = [...detailDrawer.data.colorImages]
+    const index = colorImages.findIndex((entry: any) => normalizeColorName(entry?.colorName) === targetColorName)
+    if (imageUrl) {
+      const nextEntry = { ...(index >= 0 ? colorImages[index] : {}), colorName: targetColorName, imageUrl }
+      if (index >= 0) colorImages[index] = nextEntry
+      else colorImages.push(nextEntry)
+    } else if (index >= 0) {
+      colorImages.splice(index, 1)
+    }
+    detailDrawer.data.colorImages = colorImages
+  }
+}
+
+function syncStockColorImages(stockId: number, colorImages: Array<{ colorName?: string; imageUrl?: string }> | null | undefined) {
+  const normalized = Array.isArray(colorImages)
+    ? colorImages
+        .map((item) => ({
+          colorName: normalizeColorName(item?.colorName),
+          imageUrl: String(item?.imageUrl ?? '').trim(),
+        }))
+        .filter((item) => item.colorName && item.imageUrl)
+    : []
+  list.value = list.value.map((item) => (item.id === stockId ? { ...item, colorImages: normalized } : item))
 }
 
 const colorSizeCache = reactive<Record<
@@ -1546,6 +2055,18 @@ async function ensureColorSizeBreakdown(orderId: number) {
   } catch {
     colorSizeCache[orderId] = { loading: false, error: true, headers: [], rows: [] }
   }
+}
+
+async function prefetchStoredRowBreakdowns(rows: FinishedStockRow[]) {
+  const orderIds = Array.from(
+    new Set(
+      rows
+        .filter((item) => item.type === 'stored' && item.orderId && !(item.sizeBreakdown?.headers?.length && item.sizeBreakdown.rows?.length))
+        .map((item) => item.orderId as number),
+    ),
+  )
+  if (!orderIds.length) return
+  await Promise.all(orderIds.map((orderId) => ensureColorSizeBreakdown(orderId)))
 }
 
 const outboundFilter = reactive<{
@@ -1599,9 +2120,9 @@ const inboundRules: FormRules = {
 }
 
 type FinishedOutboundDialogItem = {
-  row: FinishedStockRow
+  row: StockTableLeafRow
   headers: string[]
-  rows: Array<{ colorName: string; quantities: number[] }>
+  rows: Array<{ colorName: string; imageUrl: string; quantities: number[] }>
 }
 
 const outboundDialog = reactive<{
@@ -1651,7 +2172,7 @@ const createRules: FormRules = {
 }
 
 const createSizeHeaders = ref<string[]>(['S'])
-const createSizeTableRows = ref<Array<{ colorName: string; imageUrl: string; quantities: number[] }>>([
+const createSizeTableRows = ref<Array<{ colorName: string; imageUrl: string; quantities: Array<number | null> }>>([
   { colorName: '默认', imageUrl: '', quantities: [0] },
 ])
 
@@ -1798,6 +2319,7 @@ async function load() {
       pagination.total = data.total ?? 0
       stockTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       restoreFinishedStockColumnWidths(finishedStockTableRef.value)
+      void prefetchStoredRowBreakdowns(list.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -1856,8 +2378,8 @@ function onPageSizeChange() {
   load()
 }
 
-function onSelectionChange(rows: FinishedStockRow[]) {
-  selectedRows.value = rows
+function onSelectionChange(rows: StockTableRow[]) {
+  selectedRows.value = rows.filter((row): row is StockTableLeafRow => isStockTableLeafRow(row))
 }
 
 function openInboundDialog() {
@@ -1899,14 +2421,9 @@ async function submitInbound() {
   }
 }
 
-function mergeStockRowWithList(row: FinishedStockRow): FinishedStockRow {
-  const fresh = list.value.find((x) => x.id === row.id && x.type === row.type)
-  return fresh ? { ...row, ...fresh } : row
-}
-
 async function openOutboundDialog() {
   if (storedRows.value.length === 0) return
-  const rows = storedRows.value.map((r) => mergeStockRowWithList(r))
+  const rows = storedRows.value.map((row) => ({ ...row }))
   const customerNames = Array.from(new Set(rows.map((row) => row.customerName?.trim() || '__EMPTY__')))
   if (customerNames.length > 1) {
     ElMessage.warning('批量出库请只选择同一客户的记录')
@@ -1942,6 +2459,55 @@ function getOutboundItemTotal(item: FinishedOutboundDialogItem) {
   )
 }
 
+function buildOutboundSubmitItems(items: FinishedOutboundDialogItem[]) {
+  const merged = new Map<
+    number,
+    {
+      headers: string[]
+      colors: Map<string, Record<string, number>>
+    }
+  >()
+
+  items.forEach((item) => {
+    let current = merged.get(item.row.id)
+    if (!current) {
+      current = { headers: [], colors: new Map() }
+      merged.set(item.row.id, current)
+    }
+
+    item.headers.forEach((header) => {
+      if (!current!.headers.includes(header)) current!.headers.push(header)
+    })
+
+    item.rows.forEach((row) => {
+      const colorName = normalizeColorName(row.colorName) || '-'
+      const sizeMap = current!.colors.get(colorName) ?? {}
+      item.headers.forEach((header, index) => {
+        sizeMap[header] = (Number(sizeMap[header]) || 0) + (Number(row.quantities?.[index]) || 0)
+      })
+      current!.colors.set(colorName, sizeMap)
+    })
+  })
+
+  return Array.from(merged.entries()).map(([id, item]) => {
+    const rows = Array.from(item.colors.entries()).map(([colorName, sizeMap]) => ({
+      colorName,
+      quantities: item.headers.map((header) => Number(sizeMap[header]) || 0),
+    }))
+    return {
+      id,
+      quantity: rows.reduce(
+        (sum, row) => sum + row.quantities.reduce((rowSum, qty) => rowSum + (Number(qty) || 0), 0),
+        0,
+      ),
+      sizeBreakdown: {
+        headers: item.headers,
+        rows,
+      },
+    }
+  })
+}
+
 async function submitOutbound() {
   if (!outboundDialog.items.length) return
   const valid = await outboundFormRef.value?.validate().catch(() => false)
@@ -1964,18 +2530,9 @@ async function submitOutbound() {
   }
   outboundDialog.submitting = true
   try {
+    const submitItems = buildOutboundSubmitItems(outboundDialog.items)
     await finishedOutbound({
-      items: outboundDialog.items.map((item) => ({
-        id: item.row.id,
-        quantity: getOutboundItemTotal(item),
-        sizeBreakdown: {
-          headers: item.headers,
-          rows: item.rows.map((row) => ({
-            colorName: row.colorName,
-            quantities: row.quantities.map((q) => Number(q) || 0),
-          })),
-        },
-      })),
+      items: submitItems,
       pickupUserId: outboundForm.pickupUserId,
     })
     ElMessage.success('出库成功')
@@ -1990,8 +2547,9 @@ async function submitOutbound() {
 }
 
 function openCreateDialog() {
-  createDialog.visible = true
   resetCreateForm()
+  if (selectedRows.value.length === 1) prefillCreateForm(selectedRows.value[0])
+  createDialog.visible = true
 }
 
 function resetCreateForm() {
@@ -2008,6 +2566,39 @@ function resetCreateForm() {
   createSizeHeaders.value = ['S']
   createSizeTableRows.value = [{ colorName: '默认', imageUrl: '', quantities: [0] }]
   createFormRef.value?.clearValidate()
+}
+
+function prefillCreateForm(row: StockTableLeafRow) {
+  createForm.orderNo = row.orderNo || ''
+  createForm.skuCode = row.skuCode || ''
+  createForm.quantity = 1
+  createForm.unitPrice = row.unitPrice ? String(row.unitPrice) : ''
+  createForm.warehouseId = row.warehouseId ?? null
+  createForm.inventoryTypeId = row.inventoryTypeId ?? null
+  createForm.department = row.department || ''
+  createForm.location = row.location || ''
+  createForm.imageUrl = getSharedProductImageUrl(row)
+  createForm.remark = ''
+
+  const headers = normalizeBreakdownHeaders(row.sizeBreakdown?.headers ?? [])
+  const breakdownRows = Array.isArray(row.sizeBreakdown?.rows) ? row.sizeBreakdown.rows : []
+  if (!headers.length || !breakdownRows.length) return
+
+  const visibleIndexes = headers
+    .map((_, index) => index)
+    .filter((index) => breakdownRows.some((item) => (Number(item.values?.[index]) || 0) > 0))
+  const activeIndexes = visibleIndexes.length ? visibleIndexes : headers.map((_, index) => index)
+
+  createSizeHeaders.value = activeIndexes.map((index) => headers[index])
+  createSizeTableRows.value = breakdownRows.map((item) => {
+    const colorName = normalizeColorName(item.colorName) || row._selectedColorName || ''
+    return {
+      colorName,
+      imageUrl: getRowColorImageUrl(row, colorName),
+      quantities: activeIndexes.map(() => null),
+    }
+  })
+  normalizeCreateSizeRows()
 }
 
 async function submitCreate() {
@@ -2036,7 +2627,7 @@ async function submitCreate() {
         rows: createSizeTableRows.value.map((r) => ({
           colorName: r.colorName,
           imageUrl: r.imageUrl,
-          quantities: [...r.quantities],
+          quantities: r.quantities.map((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0))),
         })),
       },
     })
@@ -2498,6 +3089,14 @@ function onOutboundPageSizeChange() {
   width: 100%;
 }
 
+.outbound-size-wrap :deep(.el-table .cell) {
+  text-align: center;
+}
+
+.outbound-size-wrap :deep(.outbound-qty-input .el-input__inner) {
+  text-align: center;
+}
+
 .outbound-size-footer {
   margin-top: 8px;
   text-align: right;
@@ -2698,5 +3297,9 @@ function onOutboundPageSizeChange() {
 
 .finished-qty-popper .qty-tooltip-color {
   min-width: 72px;
+}
+
+.finished-table .stock-parent-row {
+  --el-table-tr-bg-color: #f7f9fc;
 }
 </style>

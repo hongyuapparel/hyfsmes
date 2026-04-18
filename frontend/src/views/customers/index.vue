@@ -65,7 +65,14 @@
         @selection-change="onSelectionChange"
         @sort-change="onSortChange"
       >
-        <el-table-column type="selection" width="50" />
+        <el-table-column
+          type="selection"
+          width="50"
+          align="center"
+          header-align="center"
+          class-name="selection-column"
+          header-class-name="selection-column"
+        />
         <el-table-column
           v-for="f in CUSTOMER_TABLE_FIELDS"
         :key="f.code"
@@ -219,7 +226,14 @@
             max-height="320"
             @selection-change="onXiaomanSelectionChange"
           >
-            <el-table-column type="selection" width="50" />
+            <el-table-column
+              type="selection"
+              width="50"
+              align="center"
+              header-align="center"
+              class-name="selection-column"
+              header-class-name="selection-column"
+            />
             <el-table-column prop="serial_id" label="客户编号" min-width="120" show-overflow-tooltip />
             <el-table-column prop="name" label="公司名称" min-width="160" show-overflow-tooltip />
             <el-table-column prop="contactPerson" label="联系人" min-width="120" show-overflow-tooltip>
@@ -698,6 +712,14 @@ onMounted(() => {
   margin-top: var(--space-sm);
   display: flex;
   justify-content: flex-end;
+}
+
+:deep(.selection-column .cell) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
 }
 
 /* 新建/编辑表单：通过 size="default" 使用 Element Plus 官方 API 控制单行高度，无需 CSS 覆盖 */

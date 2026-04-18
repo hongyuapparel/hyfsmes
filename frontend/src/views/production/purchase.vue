@@ -135,15 +135,23 @@
       stripe
       class="purchase-table"
       :height="tableHeight"
+      :row-style="compactRowStyle"
+      :cell-style="compactCellStyle"
+      :header-cell-style="compactHeaderCellStyle"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" width="72" align="center">
+      <el-table-column label="图片" :min-width="compactImageColumnMinWidth" align="center">
         <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
+          <AppImageThumb
+            v-if="row.imageUrl"
+            :raw-url="row.imageUrl"
+            :width="compactImageSize"
+            :height="compactImageSize"
+          />
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
@@ -484,6 +492,7 @@ import ProductionOrderBriefPanel, {
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 
 const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
@@ -554,6 +563,13 @@ const list = ref<PurchaseItemRow[]>([])
 const purchaseTableRef = ref()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PurchaseItemRow[]>([])

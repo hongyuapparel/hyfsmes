@@ -770,6 +770,8 @@ export class OrderStatusConfigService {
       const processRows = Array.isArray(snapshot.processItemRows) ? (snapshot.processItemRows as Array<Record<string, unknown>>) : [];
       const productionRows = Array.isArray(snapshot.productionRows) ? (snapshot.productionRows as Array<Record<string, unknown>>) : [];
       const material = materialRows.reduce((sum, row) => {
+        const includeInCost = row?.includeInCost !== false;
+        if (!includeInCost) return sum;
         const usage = toNum(row?.usagePerPiece);
         const loss = toNum(row?.lossPercent);
         const unitPrice = toNum(row?.unitPrice);

@@ -1,0 +1,27 @@
+---
+description: 前端 UI 设计系统约定（字号变量、视觉统一、避免硬编码）
+globs: frontend/**/*.{vue,css,scss,ts}
+alwaysApply: false
+---
+
+# 20 Frontend UI Design System
+
+## 字号规范（仅允许变量）
+
+- 仅使用设计系统字号变量，不写死 `font-size` 数值。
+- 允许档位：
+  - `--font-size-title`（或兼容 `--font-size-h1`）
+  - `--font-size-subtitle`（或兼容 `--font-size-h3`）
+  - `--font-size-body`（或兼容 `--font-size-small`）
+  - `--font-size-caption`（或兼容 `--font-size-xsmall`）
+
+## 组件与样式规范
+
+- 同类组件优先复用，不为单页复制一套视觉实现。
+- 优先使用 Element Plus 官方属性与主题变量；非必要不使用深层强制覆盖。
+- 页面样式优先引用设计 token（颜色、间距、圆角、阴影），避免“页面私有视觉体系”。
+
+## 抽屉/弹窗统一要求
+
+- 抽屉、弹窗、表单页头/页脚操作区保持一致的布局结构、间距、按钮层级。
+- 新页面默认复用统一基础组件（如 `AppDrawer` / `AppDialog` 形态），特殊需求先说明原因。

@@ -1645,6 +1645,8 @@ export class OrdersService {
     const productionRows = Array.isArray(snapshot.productionRows) ? (snapshot.productionRows as any[]) : [];
 
     const materialTotal = materialRows.reduce((sum, row) => {
+      const includeInCost = row?.includeInCost !== false;
+      if (!includeInCost) return sum;
       const usage = Number(row?.usagePerPiece) || 0;
       const lossPercent = Number(row?.lossPercent) || 0;
       const unitPrice = Number(row?.unitPrice) || 0;

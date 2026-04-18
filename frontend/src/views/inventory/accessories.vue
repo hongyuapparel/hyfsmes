@@ -258,6 +258,14 @@
         :rules="formRules"
         label-width="80px"
       >
+        <el-alert
+          v-if="quickAddSource"
+          type="info"
+          :closable="false"
+          show-icon
+          style="margin-bottom: 10px"
+          :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
+        />
         <el-form-item label="名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入名称" clearable />
         </el-form-item>
@@ -503,6 +511,8 @@ const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boo
   submitting: false,
   isEdit: false,
 })
+const quickAddSource = ref<AccessoryItem | null>(null)
+const quickAddBaseQuantity = ref(0)
 const editId = ref<number | null>(null)
 const formRef = ref<FormInstance>()
 const form = reactive({
@@ -634,17 +644,26 @@ async function loadCategoryOptions() {
 }
 
 function openForm(row: AccessoryItem | null) {
+  quickAddSource.value = null
+  quickAddBaseQuantity.value = 0
   formDialog.isEdit = !!row
   editId.value = row ? row.id : null
-  if (row) {
-    form.name = row.name
-    form.category = row.category ?? ''
-    form.quantity = row.quantity ?? 0
-    form.unit = row.unit ?? '个'
-    form.customerName = row.customerName ?? ''
-    form.salesperson = row.salesperson ?? ''
-    form.imageUrl = row.imageUrl ?? ''
-    form.remark = row.remark ?? ''
+  const seed = row ?? (selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
+  if (seed) {
+    form.name = seed.name
+    form.category = seed.category ?? ''
+    form.unit = seed.unit ?? '个'
+    form.customerName = seed.customerName ?? ''
+    form.salesperson = seed.salesperson ?? ''
+    form.imageUrl = seed.imageUrl ?? ''
+    form.remark = seed.remark ?? ''
+    if (row) {
+      form.quantity = seed.quantity ?? 0
+    } else {
+      quickAddSource.value = seed
+      quickAddBaseQuantity.value = Number(seed.quantity) || 0
+      form.quantity = 0
+    }
   } else {
     form.name = ''
     form.category = ''
@@ -679,17 +698,36 @@ async function submitForm() {
       })
       ElMessage.success('保存成功')
     } else {
-      await createAccessory({
-        name: form.name,
-        category: form.category,
-        quantity: form.quantity,
-        unit: form.unit,
-        customerName: form.customerName || undefined,
-        salesperson: form.salesperson,
-        imageUrl: form.imageUrl || undefined,
-        remark: form.remark,
-      })
-      ElMessage.success('新增成功')
+      const inputQty = Number(form.quantity) || 0
+      if (quickAddSource.value) {
+        if (inputQty <= 0) {
+          ElMessage.warning('请输入大于 0 的新增数量')
+          return
+        }
+        await updateAccessory(quickAddSource.value.id, {
+          name: form.name,
+          category: form.category,
+          quantity: quickAddBaseQuantity.value + inputQty,
+          unit: form.unit,
+          customerName: form.customerName || undefined,
+          salesperson: form.salesperson,
+          imageUrl: form.imageUrl || undefined,
+          remark: form.remark,
+        })
+        ElMessage.success('库存增加成功')
+      } else {
+        await createAccessory({
+          name: form.name,
+          category: form.category,
+          quantity: form.quantity,
+          unit: form.unit,
+          customerName: form.customerName || undefined,
+          salesperson: form.salesperson,
+          imageUrl: form.imageUrl || undefined,
+          remark: form.remark,
+        })
+        ElMessage.success('新增成功')
+      }
     }
     formDialog.visible = false
     load()

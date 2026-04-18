@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
@@ -33,6 +33,7 @@ export interface FinishedStockRow {
     headers: string[];
     rows: Array<{ colorName: string; values: number[] }>;
   } | null;
+  colorImages?: Array<{ colorName: string; imageUrl: string }>;
 }
 
 type FinishedOutboundItemInput = {
@@ -283,6 +284,76 @@ export class FinishedGoodsStockService {
       pickupId: pickupUser.id,
       pickupUserName: (pickupUser.displayName?.trim() || pickupUser.username || '').trim(),
     };
+  }
+
+  private async insertFinishedGoodsOutboundRecord(
+    manager: EntityManager,
+    payload: {
+      finishedStockId: number;
+      orderId: number | null;
+      orderNo: string;
+      skuCode: string;
+      imageUrl: string;
+      customerName: string;
+      quantity: number;
+      department: string;
+      warehouseId: number | null;
+      inventoryTypeId: number | null;
+      pickupUserId: number | null;
+      pickupUserName: string;
+      sizeBreakdown: unknown;
+      operatorUsername: string;
+      remark: string;
+    },
+  ): Promise<void> {
+    const sizeBreakdown = payload.sizeBreakdown != null ? JSON.stringify(payload.sizeBreakdown) : null;
+    const sqlWithImage =
+      'INSERT INTO finished_goods_outbound (finished_stock_id, order_id, order_no, sku_code, image_url, customer_name, quantity, department, warehouse_id, inventory_type_id, pickup_user_id, pickup_user_name, size_breakdown, operator_username, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    const paramsWithImage = [
+      payload.finishedStockId,
+      payload.orderId,
+      payload.orderNo,
+      payload.skuCode,
+      payload.imageUrl,
+      payload.customerName,
+      payload.quantity,
+      payload.department,
+      payload.warehouseId,
+      payload.inventoryTypeId,
+      payload.pickupUserId,
+      payload.pickupUserName,
+      sizeBreakdown,
+      payload.operatorUsername,
+      payload.remark,
+    ];
+
+    try {
+      await manager.query(sqlWithImage, paramsWithImage);
+      return;
+    } catch (e: any) {
+      const msg = String(e?.message ?? '');
+      if (!(msg.includes('Unknown column') && msg.includes('image_url'))) throw e;
+    }
+
+    const sqlWithoutImage =
+      'INSERT INTO finished_goods_outbound (finished_stock_id, order_id, order_no, sku_code, customer_name, quantity, department, warehouse_id, inventory_type_id, pickup_user_id, pickup_user_name, size_breakdown, operator_username, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+    const paramsWithoutImage = [
+      payload.finishedStockId,
+      payload.orderId,
+      payload.orderNo,
+      payload.skuCode,
+      payload.customerName,
+      payload.quantity,
+      payload.department,
+      payload.warehouseId,
+      payload.inventoryTypeId,
+      payload.pickupUserId,
+      payload.pickupUserName,
+      sizeBreakdown,
+      payload.operatorUsername,
+      payload.remark,
+    ];
+    await manager.query(sqlWithoutImage, paramsWithoutImage);
   }
 
   /**
@@ -685,6 +756,36 @@ export class FinishedGoodsStockService {
         type: 'stored',
         sizeBreakdown: this.parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot),
       }));
+      if (storedList.length) {
+        try {
+          const colorImageRows = await this.colorImageRepo.find({
+            where: { finishedStockId: In(storedList.map((item) => item.id)) },
+            order: { updatedAt: 'DESC' },
+          });
+          const colorImageMap = new Map<number, Map<string, string>>();
+          colorImageRows.forEach((item) => {
+            const stockId = Number(item.finishedStockId);
+            if (!Number.isInteger(stockId) || stockId <= 0) return;
+            const colorName = String(item.colorName ?? '').trim();
+            const imageUrl = String(item.imageUrl ?? '').trim();
+            if (!colorName || !imageUrl) return;
+            let stockMap = colorImageMap.get(stockId);
+            if (!stockMap) {
+              stockMap = new Map<string, string>();
+              colorImageMap.set(stockId, stockMap);
+            }
+            if (!stockMap.has(colorName)) stockMap.set(colorName, imageUrl);
+          });
+          storedList.forEach((item) => {
+            const stockMap = colorImageMap.get(item.id);
+            item.colorImages = stockMap
+              ? Array.from(stockMap.entries()).map(([colorName, imageUrl]) => ({ colorName, imageUrl }))
+              : [];
+          });
+        } catch (e) {
+          if (!this.isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+        }
+      }
       if (tab === 'stored') {
         return {
           list: storedList,
@@ -779,7 +880,6 @@ export class FinishedGoodsStockService {
     try {
       await this.stockRepo.manager.transaction(async (manager) => {
         const txStockRepo = manager.getRepository(FinishedGoodsStock);
-        const txOutboundRepo = manager.getRepository(FinishedGoodsOutbound);
 
         for (const item of normalizedItems) {
           const txStock = await txStockRepo.findOne({ where: { id: item.id } });
@@ -798,7 +898,7 @@ export class FinishedGoodsStockService {
           const stock = stockMap.get(item.id) ?? txStock;
           const order = stock.orderId != null ? orderMap.get(stock.orderId) ?? null : null;
           const product = productMap.get(stock.skuCode?.trim() ?? '') ?? null;
-          const out = txOutboundRepo.create({
+          await this.insertFinishedGoodsOutboundRecord(manager, {
             finishedStockId: item.id,
             orderId: stock.orderId,
             orderNo: order?.orderNo ?? '',
@@ -815,7 +915,6 @@ export class FinishedGoodsStockService {
             operatorUsername: (operatorUsername ?? '').trim(),
             remark: (remark ?? '').trim(),
           });
-          await txOutboundRepo.save(out);
         }
       });
     } catch (e: any) {
