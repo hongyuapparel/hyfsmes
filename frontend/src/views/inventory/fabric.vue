@@ -80,13 +80,21 @@
           stripe
           class="fabric-table"
           :height="fabricStockTableHeight"
+          :row-style="compactRowStyle"
+          :cell-style="compactCellStyle"
+          :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onFabricStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="48" align="center" header-align="center" />
-          <el-table-column label="图片" width="90" align="center" header-align="center">
+          <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center" header-align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
+              <AppImageThumb
+                v-if="row.imageUrl"
+                :raw-url="row.imageUrl"
+                :width="compactImageSize"
+                :height="compactImageSize"
+              />
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
@@ -162,6 +170,9 @@
           stripe
           class="fabric-table"
           :height="fabricOutboundTableHeight"
+          :row-style="compactRowStyle"
+          :cell-style="compactCellStyle"
+          :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onFabricOutboundHeaderDragEnd"
         >
           <el-table-column prop="createdAt" label="时间" width="160" align="center" header-align="center" />
@@ -172,9 +183,14 @@
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }} {{ row.unit }}</template>
           </el-table-column>
           <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="照片" width="90" align="center" header-align="center">
+          <el-table-column label="照片" :width="compactImageColumnMinWidth" align="center" header-align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.photoUrl" :raw-url="row.photoUrl" variant="table" />
+              <AppImageThumb
+                v-if="row.photoUrl"
+                :raw-url="row.photoUrl"
+                :width="compactImageSize"
+                :height="compactImageSize"
+              />
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -410,6 +426,7 @@ import {
 import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -430,6 +447,13 @@ const fabricStockShellRef = ref<HTMLElement | null>(null)
 const fabricOutboundShellRef = ref<HTMLElement | null>(null)
 const { tableHeight: fabricStockTableHeight } = useFlexShellTableHeight(fabricStockShellRef)
 const { tableHeight: fabricOutboundTableHeight } = useFlexShellTableHeight(fabricOutboundShellRef)
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const fabricSupplierOptions = ref<FabricSupplierOption[]>([])
 /** 每次打开表单递增，重置下拉内部筛选关键字，避免从其它页返回后仍停留在旧关键字导致「无匹配」 */
@@ -866,6 +890,12 @@ function onOutboundPageSizeChange() {
 .inventory-fabric-page .fabric-table {
   flex: 1;
   min-height: 0;
+}
+
+.fabric-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+  line-height: 20px;
 }
 
 .detail-base {

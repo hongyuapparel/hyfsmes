@@ -109,7 +109,7 @@
       <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" :min-width="compactImageColumnMinWidth" align="center">
+      <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
         <template #default="{ row }">
           <AppImageThumb
             v-if="row.imageUrl"
@@ -1011,6 +1011,12 @@ onMounted(() => {
 .sewing-table {
   flex: 1;
   min-height: 0;
+}
+
+.sewing-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+  line-height: 20px;
 }
 
 .table-selection-count {

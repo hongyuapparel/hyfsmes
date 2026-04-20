@@ -111,13 +111,21 @@
           border
           stripe
           class="accessories-table"
+          :row-style="compactRowStyle"
+          :cell-style="compactCellStyle"
+          :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onAccessoriesStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
           <el-table-column type="selection" width="46" fixed />
-          <el-table-column label="图片" width="90" align="center">
+          <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
+              <AppImageThumb
+                v-if="row.imageUrl"
+                :raw-url="row.imageUrl"
+                :width="compactImageSize"
+                :height="compactImageSize"
+              />
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -201,6 +209,9 @@
           border
           stripe
           class="accessories-table"
+          :row-style="compactRowStyle"
+          :cell-style="compactCellStyle"
+          :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onAccessoriesOutboundHeaderDragEnd"
         >
           <el-table-column prop="createdAt" label="时间" width="160" align="center">
@@ -209,9 +220,14 @@
             </template>
           </el-table-column>
           <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="图片" width="90" align="center">
+          <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
+              <AppImageThumb
+                v-if="row.imageUrl"
+                :raw-url="row.imageUrl"
+                :width="compactImageSize"
+                :height="compactImageSize"
+              />
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -452,6 +468,7 @@ import {
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -468,6 +485,13 @@ const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
 const accessoriesStockTableRef = ref()
 const accessoriesOutboundTableRef = ref()
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const salespersonOptions = ref<string[]>([])
 const categoryOptions = ref<string[]>([])
@@ -912,6 +936,12 @@ function onOutboundPageSizeChange() {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+}
+
+.accessories-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+  line-height: 20px;
 }
 
 .category-empty-tip {

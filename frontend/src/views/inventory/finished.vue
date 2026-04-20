@@ -128,6 +128,9 @@
           :tree-props="{ children: '_children' }"
           :indent="8"
           :row-class-name="getFinishedStockRowClassName"
+          :row-style="compactRowStyle"
+          :cell-style="compactCellStyle"
+          :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onFinishedStockHeaderDragEnd"
           @selection-change="onSelectionChange"
         >
@@ -138,9 +141,14 @@
               {{ getTableColorText(row) }}
             </template>
           </el-table-column>
-          <el-table-column label="图片" width="90" align="center" header-align="center">
+          <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center" header-align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="getTableImageUrl(row)" :raw-url="getTableImageUrl(row)" variant="table" />
+              <AppImageThumb
+                v-if="getTableImageUrl(row)"
+                :raw-url="getTableImageUrl(row)"
+                :width="compactImageSize"
+                :height="compactImageSize"
+              />
               <span v-else class="text-placeholder">{{ getTableImagePlaceholder(row) }}</span>
             </template>
           </el-table-column>
@@ -279,15 +287,23 @@
           border
           stripe
           class="finished-table"
+          :row-style="compactRowStyle"
+          :cell-style="compactCellStyle"
+          :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onFinishedOutboundHeaderDragEnd"
         >
           <el-table-column prop="createdAt" label="出库时间" width="160" align="center">
             <template #default="{ row }">{{ row.createdAt }}</template>
           </el-table-column>
           <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
-          <el-table-column label="图片" width="90" align="center">
+          <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
+              <AppImageThumb
+                v-if="row.imageUrl"
+                :raw-url="row.imageUrl"
+                :width="compactImageSize"
+                :height="compactImageSize"
+              />
               <span v-else class="text-placeholder">-</span>
             </template>
           </el-table-column>
@@ -661,7 +677,7 @@
                 <el-table-column
                   v-for="(size, idx) in createSizeHeaders"
                   :key="`create-size-${idx}`"
-                  min-width="64"
+                  min-width="78"
                   align="center"
                   header-align="center"
                 >
@@ -673,16 +689,18 @@
                         class="b-header-input"
                         :input-style="{ textAlign: 'center' }"
                       />
-                      <el-button
-                        v-if="createSizeHeaders.length > 1"
-                        link
-                        type="danger"
-                        size="small"
-                        class="b-header-remove"
-                        @click.stop="removeCreateSizeColumn(idx)"
-                      >
-                        <el-icon><Close /></el-icon>
-                      </el-button>
+                      <div class="b-header-actions">
+                        <el-button
+                          v-if="createSizeHeaders.length > 1"
+                          link
+                          type="danger"
+                          size="small"
+                          class="b-header-remove"
+                          @click.stop="removeCreateSizeColumn(idx)"
+                        >
+                          <el-icon><Close /></el-icon>
+                        </el-button>
+                      </div>
                     </div>
                   </template>
                   <template #default="{ row }">
@@ -909,9 +927,8 @@
                   <div class="detail-image-label">产品图（可更换）</div>
                   <ImageUploadArea
                     v-if="detailMetaEditing"
+                    v-model="detailEditForm.imageUrl"
                     compact
-                    :model-value="getDisplayProductImage()"
-                    @update:model-value="saveProductImage"
                   />
                   <AppImageThumb
                     v-else-if="getDisplayProductImage()"
@@ -1002,13 +1019,13 @@
 
           <div class="detail-section">
             <div class="detail-section-title">操作记录</div>
-            <div v-if="mergedDetailAdjustLogs.length" class="detail-logs">
-              <div v-for="log in mergedDetailAdjustLogs" :key="log.id" class="detail-log-item">
+            <div v-if="detailAdjustLogs.length" class="detail-logs">
+              <div v-for="log in detailAdjustLogs" :key="log.id" class="detail-log-item">
                 <div class="detail-log-head">
                   <span class="detail-log-user">{{ log.operatorUsername || '-' }}</span>
                   <span class="detail-log-time">{{ log.createdAt }}</span>
                 </div>
-                <div class="detail-log-body">{{ getAdjustLogSummary(log) }}</div>
+                <div class="detail-log-body">{{ log.summary }}</div>
               </div>
             </div>
             <div v-else class="detail-muted">暂无操作记录</div>
@@ -1046,6 +1063,7 @@ import { getCustomers, type CustomerItem } from '@/api/customers'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -1070,6 +1088,13 @@ const inboundDateRange = ref<[string, string] | null>(null)
 const list = ref<FinishedStockRow[]>([])
 const finishedStockTableRef = ref()
 const finishedOutboundTableRef = ref()
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const createSkuDialogVisible = ref(false)
 const createSkuDialogLoading = ref(false)
@@ -1124,7 +1149,8 @@ const detailDrawer = reactive<{
   data: any | null
   colorImageMap: Record<string, string>
   groupProductImage: string
-  selectedColorName: string
+  groupSizeHeaders: string[]
+  selectedColorName: string | null
   selectedQuantity: number | null
 }>({
   visible: false,
@@ -1134,7 +1160,8 @@ const detailDrawer = reactive<{
   data: null,
   colorImageMap: {},
   groupProductImage: '',
-  selectedColorName: '',
+  groupSizeHeaders: [],
+  selectedColorName: null,
   selectedQuantity: null,
 })
 const DETAIL_DRAWER_MIN_WIDTH = 760
@@ -1153,6 +1180,7 @@ const detailEditForm = reactive<{
   warehouseId: number | null
   location: string
   unitPrice: string
+  imageUrl: string
   remark: string
 }>({
   department: '',
@@ -1160,8 +1188,92 @@ const detailEditForm = reactive<{
   warehouseId: null,
   location: '',
   unitPrice: '',
+  imageUrl: '',
   remark: '',
 })
+
+type AdjustColorSizeSnapshot = {
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+}
+
+function normalizeAdjustColorSizeSnapshot(raw: unknown): AdjustColorSizeSnapshot | null {
+  if (!raw || typeof raw !== 'object') return null
+  const snapshot = raw as Record<string, any>
+  const headers = (Array.isArray(snapshot.headers) ? snapshot.headers : [])
+    .map((header) => String(header ?? '').trim())
+    .filter((header) => header && header !== INTERNAL_UNASSIGNED_SIZE_HEADER && header !== '合计')
+  const rowsRaw = Array.isArray(snapshot.rows) ? snapshot.rows : []
+  if (!headers.length || !rowsRaw.length) return null
+
+  const rows = rowsRaw
+    .map((row) => {
+      const sourceValues = Array.isArray(row?.quantities)
+        ? row.quantities
+        : Array.isArray(row?.values)
+          ? row.values
+          : []
+      const values = headers.map((_, index) => Math.max(0, Math.trunc(Number(sourceValues[index]) || 0)))
+      return {
+        colorName: String(row?.colorName ?? '').trim(),
+        values,
+      }
+    })
+    .filter((row) => row.values.some((value) => value > 0))
+
+  return rows.length ? { headers, rows } : null
+}
+
+function remapAdjustValues(snapshot: AdjustColorSizeSnapshot | null, colorName: string, headers: string[]): number[] {
+  if (!snapshot) return headers.map(() => 0)
+  const row = snapshot.rows.find((item) => item.colorName === colorName)
+  const indexMap = new Map(snapshot.headers.map((header, index) => [header, index]))
+  return headers.map((header) => {
+    const index = indexMap.get(header)
+    return index == null ? 0 : Math.max(0, Math.trunc(Number(row?.values?.[index]) || 0))
+  })
+}
+
+function getAdjustSizeDeltaParts(before: any, after: any): string[] {
+  const beforeSnapshot = normalizeAdjustColorSizeSnapshot(before?.colorSizeSnapshot)
+  const afterSnapshot = normalizeAdjustColorSizeSnapshot(after?.colorSizeSnapshot)
+  if (!beforeSnapshot && !afterSnapshot) return []
+  const beforeQty = Number(before?.quantity)
+  const afterQty = Number(after?.quantity)
+  if (!beforeSnapshot && Number.isFinite(beforeQty) && beforeQty > 0) return []
+  if (!afterSnapshot && Number.isFinite(afterQty) && afterQty > 0) return []
+
+  const headers = mergeSizeHeaders(beforeSnapshot?.headers, afterSnapshot?.headers)
+  const colorNames = [
+    ...(beforeSnapshot?.rows.map((row) => row.colorName) ?? []),
+    ...(afterSnapshot?.rows.map((row) => row.colorName) ?? []),
+  ].filter((colorName, index, arr) => arr.indexOf(colorName) === index)
+
+  return colorNames
+    .map((colorName) => {
+      const beforeValues = remapAdjustValues(beforeSnapshot, colorName, headers)
+      const afterValues = remapAdjustValues(afterSnapshot, colorName, headers)
+      const deltas = headers
+        .map((header, index) => ({ header, delta: afterValues[index] - beforeValues[index] }))
+        .filter((item) => item.delta !== 0)
+        .map((item) => `${item.header} ${item.delta > 0 ? '+' : ''}${formatDisplayNumber(item.delta)}件`)
+      if (!deltas.length) return ''
+      const colorLabel = colorName && colorName !== INTERNAL_UNASSIGNED_COLOR_NAME ? `${colorName}：` : ''
+      return `${colorLabel}${deltas.join('、')}`
+    })
+    .filter(Boolean)
+}
+
+function getAdjustActionLabel(remark: string, before: any, after: any): string {
+  if (remark.includes('合并入库')) return '合并入库'
+  const beforeQty = Number(before?.quantity)
+  const afterQty = Number(after?.quantity)
+  if (Number.isFinite(beforeQty) && Number.isFinite(afterQty)) {
+    if (afterQty > beforeQty) return '入库调整'
+    if (afterQty < beforeQty) return '库存扣减'
+  }
+  return '尺码明细调整'
+}
 
 function getAdjustLogSummary(log: any): string {
   if (Array.isArray(log?.summaries) && log.summaries.length) {
@@ -1171,7 +1283,12 @@ function getAdjustLogSummary(log: any): string {
   const after = log?.after ?? {}
   const parts: string[] = []
   const remark = String(log?.remark ?? '').trim()
-  if (remark) parts.push(remark)
+  const sizeDeltaParts = getAdjustSizeDeltaParts(before, after)
+  if (sizeDeltaParts.length) {
+    parts.push(`${getAdjustActionLabel(remark, before, after)}：${sizeDeltaParts.join('；')}`)
+  } else if (remark) {
+    parts.push(remark)
+  }
 
   const beforeUnitPrice = before?.unitPrice != null && before.unitPrice !== '' ? String(before.unitPrice) : ''
   const afterUnitPrice = after?.unitPrice != null && after.unitPrice !== '' ? String(after.unitPrice) : ''
@@ -1197,7 +1314,7 @@ function getAdjustLogSummary(log: any): string {
 
   const beforeQty = Number(before?.quantity)
   const afterQty = Number(after?.quantity)
-  if (Number.isFinite(beforeQty) && Number.isFinite(afterQty) && beforeQty !== afterQty && !remark) {
+  if (Number.isFinite(beforeQty) && Number.isFinite(afterQty) && beforeQty !== afterQty && !remark && !sizeDeltaParts.length) {
     const delta = afterQty - beforeQty
     parts.push(delta > 0 ? `新增库存 +${formatDisplayNumber(delta)} 件` : `库存数量改为${formatDisplayNumber(afterQty)}`)
   }
@@ -1205,45 +1322,17 @@ function getAdjustLogSummary(log: any): string {
   return parts.join('，') || '更新库存信息'
 }
 
-function parseAdjustLogTimestamp(value: unknown): number {
-  const raw = String(value ?? '').trim()
-  if (!raw) return 0
-  const normalized = raw.replace(' ', 'T')
-  const time = new Date(normalized).getTime()
-  return Number.isFinite(time) ? time : 0
-}
-
-const mergedDetailAdjustLogs = computed(() => {
+const detailAdjustLogs = computed(() => {
   const logs = Array.isArray(detailDrawer.data?.adjustLogs) ? detailDrawer.data.adjustLogs : []
-  const result: Array<{
-    id: string
-    operatorUsername: string
-    createdAt: string
-    summaries: string[]
-  }> = []
-
-  logs.forEach((log) => {
+  return logs.map((log, index) => {
     const summary = getAdjustLogSummary(log)
-    const currentTs = parseAdjustLogTimestamp(log?.createdAt)
-    const last = result[result.length - 1]
-    const lastTs = parseAdjustLogTimestamp(last?.createdAt)
-    const withinOneHour = !!last && currentTs > 0 && lastTs > 0 && Math.abs(lastTs - currentTs) <= 60 * 60 * 1000
-    const sameOperator = !!last && String(last.operatorUsername ?? '') === String(log?.operatorUsername ?? '')
-
-    if (last && sameOperator && withinOneHour) {
-      if (summary && !last.summaries.includes(summary)) last.summaries.push(summary)
-      return
-    }
-
-    result.push({
-      id: String(log?.id ?? `${result.length}`),
+    return {
+      id: String(log?.id ?? `${index}`),
       operatorUsername: String(log?.operatorUsername ?? ''),
       createdAt: String(log?.createdAt ?? ''),
-      summaries: summary ? [summary] : [],
-    })
+      summary,
+    }
   })
-
-  return result
 })
 
 function getColorImageUrl(colorName: string): string {
@@ -1267,6 +1356,120 @@ function normalizeBreakdownHeaders(headers: string[]): string[] {
   return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
 }
 
+const INTERNAL_UNASSIGNED_SIZE_HEADER = '__UNASSIGNED__'
+const INTERNAL_UNASSIGNED_COLOR_NAME = '__UNASSIGNED__'
+
+type NormalizedStoredBreakdownSnapshot = {
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+}
+
+function isInternalUnassignedSizeHeader(value: unknown): boolean {
+  return String(value ?? '').trim() === INTERNAL_UNASSIGNED_SIZE_HEADER
+}
+
+function isInternalUnassignedColorName(value: unknown): boolean {
+  return String(value ?? '').trim() === INTERNAL_UNASSIGNED_COLOR_NAME
+}
+
+function mergeSizeHeaders(...sources: Array<string[] | null | undefined>): string[] {
+  const result: string[] = []
+  sources.forEach((source) => {
+    normalizeBreakdownHeaders(Array.isArray(source) ? source : []).forEach((header) => {
+      const normalized = String(header ?? '').trim()
+      if (!normalized || isInternalUnassignedSizeHeader(normalized)) return
+      if (!result.includes(normalized)) result.push(normalized)
+    })
+  })
+  return result
+}
+
+function remapValuesByHeaders(sourceHeaders: string[], values: unknown[], targetHeaders: string[]): number[] {
+  const sourceBaseHeaders = normalizeBreakdownHeaders(sourceHeaders)
+  const sourceIndex = new Map(sourceBaseHeaders.map((header, index) => [header, index]))
+  return targetHeaders.map((header) => {
+    const index = sourceIndex.get(header)
+    return index == null ? 0 : Math.max(0, Math.trunc(Number(values?.[index]) || 0))
+  })
+}
+
+function sameSnapshotValues(a: number[], b: number[]): boolean {
+  if (a.length !== b.length) return false
+  return a.every((value, index) => value === b[index])
+}
+
+function snapshotRowTotal(values: unknown[]): number {
+  return values.reduce<number>((sum, value) => sum + Math.max(0, Math.trunc(Number(value) || 0)), 0)
+}
+
+function normalizeStoredBreakdownSnapshot(
+  snapshot: NonNullable<FinishedStockRow['sizeBreakdown']> | null | undefined,
+): NormalizedStoredBreakdownSnapshot | null {
+  if (!snapshot?.headers?.length || !snapshot.rows?.length) return null
+  const normalizedHeaders = normalizeBreakdownHeaders(snapshot.headers)
+  const visibleHeaderIndexes = normalizedHeaders
+    .map((header, index) => ({ header: String(header ?? '').trim(), index }))
+    .filter((item) => item.header && !isInternalUnassignedSizeHeader(item.header))
+  const headers = visibleHeaderIndexes.map((item) => item.header)
+  const rowOrder: string[] = []
+  const rowMap = new Map<string, number[]>()
+  const blankRows: number[][] = []
+  const addRow = (colorName: string, values: number[]) => {
+    let existing = rowMap.get(colorName)
+    if (!existing) {
+      existing = Array(headers.length).fill(0)
+      rowMap.set(colorName, existing)
+      rowOrder.push(colorName)
+    }
+    values.forEach((value, index) => {
+      existing![index] += value
+    })
+  }
+  snapshot.rows.forEach((item) => {
+    const sourceValues = Array.isArray(item.values) ? item.values : []
+    if (isInternalUnassignedColorName(item.colorName)) {
+      blankRows.push(visibleHeaderIndexes.map(({ index }) => Math.max(0, Math.trunc(Number(sourceValues[index]) || 0))))
+      return
+    }
+    const values = visibleHeaderIndexes.map(({ index }) => Math.max(0, Math.trunc(Number(sourceValues[index]) || 0)))
+    if (snapshotRowTotal(values) <= 0) return
+    const colorName = normalizeColorName(item.colorName)
+    if (!colorName) blankRows.push(values)
+    else addRow(colorName, values)
+  })
+  blankRows.forEach((values) => {
+    if (snapshotRowTotal(values) <= 0) return
+    const exactMatches = rowOrder.filter((colorName) => sameSnapshotValues(rowMap.get(colorName) ?? [], values))
+    if (exactMatches.length === 1) addRow(exactMatches[0], values)
+    else if (rowOrder.length === 1) addRow(rowOrder[0], values)
+    else addRow('', values)
+  })
+  const rows = rowOrder
+    .map((colorName) => ({ colorName, values: [...(rowMap.get(colorName) ?? [])] }))
+    .filter((row) => snapshotRowTotal(row.values) > 0)
+  if (!headers.length || !rows.length) return null
+  return { headers, rows }
+}
+
+function buildStoredSnapshotDisplayData(
+  snapshot: NonNullable<FinishedStockRow['sizeBreakdown']> | null | undefined,
+  _stockQty: number,
+  _mergeIntoSingleRow = false,
+): {
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+} | null {
+  const normalized = normalizeStoredBreakdownSnapshot(snapshot)
+  if (!normalized) return null
+  return {
+    headers: [...normalized.headers],
+    rows: normalized.rows.map((row) => ({
+      colorName: row.colorName,
+      values: [...row.values],
+    })),
+  }
+}
+
 function getRowColorImageUrl(row: FinishedStockRow, colorName: string): string {
   const target = normalizeColorName(colorName)
   if (!target) return ''
@@ -1276,7 +1479,7 @@ function getRowColorImageUrl(row: FinishedStockRow, colorName: string): string {
 
 function getProductImageUrl(row: FinishedStockRow | StockTableRow | null | undefined): string {
   if (!row) return ''
-  return String(row.productImageUrl ?? '').trim() || String(row.imageUrl ?? '').trim()
+  return String(row.imageUrl ?? '').trim() || String(row.productImageUrl ?? '').trim()
 }
 
 function getGroupProductImageUrl(groupKey: string): string {
@@ -1287,12 +1490,27 @@ function getGroupProductImageUrl(groupKey: string): string {
   const leafRow = stockTableData.value.find(
     (item): item is StockTableLeafRow => item._groupKey === groupKey && isStockTableLeafRow(item),
   )
-  return getProductImageUrl(leafRow)
+  return leafRow?._effectiveImageUrl || getProductImageUrl(leafRow)
 }
 
 function getSharedProductImageUrl(row: StockTableRow): string {
   if (isStockTableParentRow(row)) return row._effectiveImageUrl || getProductImageUrl(row)
-  return getGroupProductImageUrl(row._groupKey) || getProductImageUrl(row)
+  return getGroupProductImageUrl(row._groupKey) || row._effectiveImageUrl || getProductImageUrl(row)
+}
+
+function getGroupLeafRows(row: StockTableRow): StockTableLeafRow[] {
+  if (isStockTableParentRow(row)) return row._children
+  const parentRow = stockTableData.value.find(
+    (item): item is StockTableParentRow => item._groupKey === row._groupKey && isStockTableParentRow(item),
+  )
+  return parentRow?._children?.length ? parentRow._children : [row]
+}
+
+function getGroupSizeHeaders(row: StockTableRow): string[] {
+  const headerSources = getGroupLeafRows(row)
+    .map((child) => getSplitColorBreakdown(child)?.headers ?? [])
+    .filter((headers) => headers.length > 0)
+  return mergeSizeHeaders(...headerSources)
 }
 
 function getSplitColorBreakdown(row: FinishedStockRow): {
@@ -1300,16 +1518,13 @@ function getSplitColorBreakdown(row: FinishedStockRow): {
   rows: Array<{ colorName: string; values: number[] }>
 } | null {
   if (row.type !== 'stored') return null
-  const snapshot = row.sizeBreakdown
-  if (snapshot?.headers?.length && snapshot.rows?.length) {
-    const headers = normalizeBreakdownHeaders(snapshot.headers)
-    if (!headers.length) return null
-    const scaled = scaleColorSizeRowsToQuantity(snapshot.headers, snapshot.rows, row.quantity)
+  const snapshot = normalizeStoredBreakdownSnapshot(row.sizeBreakdown)
+  if (snapshot?.headers.length && snapshot.rows.length) {
     return {
-      headers,
-      rows: scaled.map((item) => ({
+      headers: [...snapshot.headers],
+      rows: snapshot.rows.map((item) => ({
         colorName: normalizeColorName(item.colorName),
-        values: headers.map((_, index) => Number(item.values?.[index]) || 0),
+        values: [...item.values],
       })),
     }
   }
@@ -1347,7 +1562,7 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
         _groupKey: groupKey,
         _displayColor: colorName || '-',
         _effectiveImageUrl: getRowColorImageUrl(row, colorName) || getProductImageUrl(row),
-        _selectedColorName: colorName || undefined,
+        _selectedColorName: colorName,
       }
     })
   }
@@ -1370,7 +1585,7 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
       _groupKey: groupKey,
       _displayColor: colorName || '-',
       _effectiveImageUrl: getRowColorImageUrl(row, colorName) || getProductImageUrl(row),
-      _selectedColorName: colorName || undefined,
+      _selectedColorName: colorName,
     },
   ]
 }
@@ -1378,7 +1593,11 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
 function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTableParentRow {
   const first = rows[0]
   const colorLabels = Array.from(new Set(rows.map((item) => item._displayColor).filter((item) => item && item !== '-')))
-  const productImages = Array.from(new Set(rows.map((item) => getProductImageUrl(item)).filter(Boolean)))
+  const stockImages = Array.from(new Set(rows.map((item) => String(item.imageUrl ?? '').trim()).filter(Boolean)))
+  const productImages = Array.from(new Set(rows.map((item) => String(item.productImageUrl ?? '').trim()).filter(Boolean)))
+  const effectiveImages = Array.from(
+    new Set(rows.map((item) => item._effectiveImageUrl || getProductImageUrl(item)).filter(Boolean)),
+  )
   const unitPrices = Array.from(new Set(rows.map((item) => String(item.unitPrice ?? '0'))))
   const departments = Array.from(new Set(rows.map((item) => String(item.department ?? '').trim()).filter(Boolean)))
   const locations = Array.from(new Set(rows.map((item) => String(item.location ?? '').trim()).filter(Boolean)))
@@ -1395,7 +1614,7 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
     _rowKind: 'parent',
     _groupKey: groupKey,
     _displayColor: colorLabels.length > 1 ? '多个' : colorLabels[0] || '-',
-    _effectiveImageUrl: productImages[0] || '',
+    _effectiveImageUrl: stockImages[0] || effectiveImages[0] || productImages[0] || '',
     _children: rows,
     _mixedUnitPrice: unitPrices.length > 1,
     _mixedDepartment: departments.length > 1,
@@ -1467,7 +1686,7 @@ function isSelectableStockRow(row: StockTableRow): boolean {
 }
 
 function getDisplayProductImage(): string {
-  return detailDrawer.groupProductImage || detailDrawer.data?.stock?.imageUrl || detailDrawer.data?.productImageUrl || ''
+  return detailDrawer.data?.stock?.imageUrl || detailDrawer.groupProductImage || detailDrawer.data?.productImageUrl || ''
 }
 
 function getDetailDrawerMaxWidth() {
@@ -1544,39 +1763,9 @@ function startResizeDetailDrawer(e: MouseEvent) {
   window.addEventListener('mouseup', onMouseUp)
 }
 
-async function saveProductImage(url: string) {
-  if (!detailDrawer.stockId) return
-  try {
-    const imageUrl = (url ?? '').trim()
-    await updateFinishedStockMeta(detailDrawer.stockId, { imageUrl })
-    if (detailDrawer.data?.stock) detailDrawer.data.stock.imageUrl = imageUrl
-    detailDrawer.groupProductImage = imageUrl
-    ElMessage.success('产品图已更新')
-    await load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  }
-}
-
 function sumDetailRowQty(quantities: unknown[]): number {
   if (!Array.isArray(quantities)) return 0
   return quantities.reduce<number>((sum, q) => sum + (Number(q) || 0), 0)
-}
-
-function filterZeroQuantityColumns<T extends { quantities: unknown[] }>(
-  headers: string[],
-  rows: T[],
-): { headers: string[]; rows: Array<T & { quantities: number[] }> } {
-  const activeIndexes = headers
-    .map((_, index) => index)
-    .filter((index) => rows.some((row) => (Number(row.quantities?.[index]) || 0) > 0))
-  return {
-    headers: activeIndexes.map((index) => headers[index]),
-    rows: rows.map((row) => ({
-      ...row,
-      quantities: activeIndexes.map((index) => Number(row.quantities?.[index]) || 0),
-    })),
-  }
 }
 
 const detailDisplayColorSizeData = computed(() => {
@@ -1585,8 +1774,10 @@ const detailDisplayColorSizeData = computed(() => {
   const rows: Array<{ colorName: string; quantities: number[] }> = Array.isArray(data?.colorSize?.rows)
     ? data.colorSize.rows
     : []
-  const selectedColorName = normalizeColorName(detailDrawer.selectedColorName)
-  const filteredRows = selectedColorName
+  const targetHeaders = mergeSizeHeaders(detailDrawer.groupSizeHeaders, headers)
+  const hasSelectedColor = detailDrawer.selectedColorName !== null
+  const selectedColorName = hasSelectedColor ? normalizeColorName(detailDrawer.selectedColorName) : ''
+  const filteredRows = hasSelectedColor
     ? rows.filter((item) => normalizeColorName(item.colorName) === selectedColorName)
     : rows
   const stockQty = Math.max(
@@ -1595,14 +1786,60 @@ const detailDisplayColorSizeData = computed(() => {
       detailDrawer.selectedQuantity != null ? Number(detailDrawer.selectedQuantity) : Number(data?.stock?.quantity) || 0,
     ),
   )
-  if (!headers.length || !rows.length) return { headers: [], rows: [] }
-  if (!filteredRows.length) return { headers: [], rows: [] }
+  if (!targetHeaders.length || !rows.length) return { headers: [], rows: [] }
+  const rawSnapshot = data?.stock?.colorSizeSnapshot
+  const hasStoredSnapshot = !!(
+    rawSnapshot
+    && typeof rawSnapshot === 'object'
+    && Array.isArray(rawSnapshot.headers)
+    && Array.isArray(rawSnapshot.rows)
+    && rawSnapshot.headers.length
+    && rawSnapshot.rows.length
+  )
 
+  if (hasStoredSnapshot) {
+    const normalizedSnapshot = normalizeStoredBreakdownSnapshot({
+      headers,
+      rows: rows.map((row) => ({
+        colorName: row.colorName,
+        values: Array.isArray(row.quantities) ? [...row.quantities] : [],
+      })),
+    })
+    if (!normalizedSnapshot) return { headers: [], rows: [] }
+    const visibleRows = hasSelectedColor
+      ? normalizedSnapshot.rows.filter((item) => normalizeColorName(item.colorName) === selectedColorName)
+      : normalizedSnapshot.rows
+    if (!visibleRows.length) return { headers: [], rows: [] }
+    const displayHeaders = mergeSizeHeaders(targetHeaders, normalizedSnapshot.headers)
+    const displayRows = visibleRows
+      .map((row) => ({
+        colorName: row.colorName,
+        quantities: remapValuesByHeaders(normalizedSnapshot.headers, row.values, displayHeaders),
+      }))
+      .filter((row) => snapshotRowTotal(row.quantities) > 0)
+    if (!displayRows.length) return { headers: [], rows: [] }
+    return {
+      headers: displayHeaders,
+      rows: displayRows,
+    }
+  }
+
+  if (!filteredRows.length) return { headers: [], rows: [] }
   const orderTotal = filteredRows.reduce(
     (sum, r) => sum + (Array.isArray(r.quantities) ? r.quantities.reduce((s, q) => s + (Number(q) || 0), 0) : 0),
     0,
   )
-  if (orderTotal === stockQty) return filterZeroQuantityColumns(headers, filteredRows)
+  if (orderTotal === stockQty) {
+    return {
+      headers: [...targetHeaders],
+      rows: filteredRows
+        .map((row) => ({
+          ...row,
+          quantities: remapValuesByHeaders(headers, row.quantities, targetHeaders),
+        }))
+        .filter((row) => snapshotRowTotal(row.quantities) > 0),
+    }
+  }
 
   const weights: number[] = []
   filteredRows.forEach((r) => {
@@ -1623,7 +1860,15 @@ const detailDisplayColorSizeData = computed(() => {
       quantities,
     }
   })
-  return filterZeroQuantityColumns(headers, scaledRows)
+  return {
+    headers: [...targetHeaders],
+    rows: scaledRows
+      .map((row) => ({
+        ...row,
+        quantities: remapValuesByHeaders(headers, row.quantities, targetHeaders),
+      }))
+      .filter((row) => snapshotRowTotal(row.quantities) > 0),
+  }
 })
 
 const detailDisplaySizeHeaders = computed(() => detailDisplayColorSizeData.value.headers)
@@ -1770,29 +2015,30 @@ function initOutboundRowsFromStockSnapshot(
   row: FinishedStockRow,
   headers: string[],
 ): Array<{ colorName: string; quantities: number[] }> {
-  const snap = row.sizeBreakdown
-  if (!snap?.rows?.length || !headers.length) return []
-  const cacheLikeRows = snap.rows.map((r) => ({
-    colorName: r.colorName,
-    values: Array.isArray(r.values) ? [...r.values] : [],
+  const snap = normalizeStoredBreakdownSnapshot(row.sizeBreakdown)
+  if (!snap?.rows.length || !headers.length) return []
+  const headerIndex = new Map(snap.headers.map((header, index) => [header, index]))
+  return snap.rows.map((item) => ({
+    colorName: item.colorName,
+    quantities: headers.map((header) => {
+      const index = headerIndex.get(header)
+      return index == null ? 0 : Math.max(0, Math.trunc(Number(item.values?.[index]) || 0))
+    }),
   }))
-  const scaled = scaleColorSizeRowsToQuantity(headers, cacheLikeRows, row.quantity)
-  return scaled.map((r) => ({ colorName: r.colorName, quantities: [...r.values] }))
 }
 
 function buildOutboundDialogItem(row: StockTableLeafRow): FinishedOutboundDialogItem {
   const snap = row.sizeBreakdown
   if (snap?.headers?.length && snap.rows?.length) {
-    const headers = snap.headers.filter((h) => h !== '合计')
+    const headers = mergeSizeHeaders(getGroupSizeHeaders(row), snap.headers)
     const rows = initOutboundRowsFromStockSnapshot(row, headers).map((item) => ({
       ...item,
       imageUrl: getRowColorImageUrl(row, item.colorName) || row._effectiveImageUrl || '',
     }))
-    const filtered = filterZeroQuantityColumns(headers, rows)
-    return { row, headers: filtered.headers, rows: filtered.rows }
+    return { row, headers, rows }
   }
   const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-  const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+  const headers = mergeSizeHeaders(getGroupSizeHeaders(row), breakdown?.headers ?? [])
   return {
     row,
     headers,
@@ -1809,14 +2055,6 @@ function outboundRowLabel(item: FinishedOutboundDialogItem): string {
   return no ? `订单 ${no} / ${item.row.skuCode}` : `SKU ${item.row.skuCode}`
 }
 
-/** 列表悬停：手动快照表头常无「合计」列，与订单明细一致需在右侧补一列行小计 */
-function getSnapshotTooltipHeaders(snap: NonNullable<FinishedStockRow['sizeBreakdown']>): string[] {
-  const h = snap.headers
-  if (!h.length) return []
-  if (h[h.length - 1] === '合计') return [...h]
-  return [...h, '合计']
-}
-
 function getPreviewBaseHeaders(headers: string[]): string[] {
   return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
 }
@@ -1827,16 +2065,17 @@ type PreviewDataset = {
 }
 
 function getLeafPreviewData(row: StockTableLeafRow): PreviewDataset | null {
-  const snap = row.sizeBreakdown
-  if (snap?.headers?.length && snap.rows?.length) {
-    const headers = getSnapshotTooltipHeaders(snap)
-    const cacheLikeRows = snap.rows.map((item) => ({
-      colorName: item.colorName,
-      values: Array.isArray(item.values) ? [...item.values] : [],
-    }))
+  const snap = buildStoredSnapshotDisplayData(row.sizeBreakdown, row.quantity, true)
+  if (snap?.headers.length && snap.rows.length) {
     return {
-      headers,
-      rows: scaleColorSizeRowsToQuantity(headers, cacheLikeRows, Math.max(0, Math.trunc(Number(row.quantity) || 0))),
+      headers: [...snap.headers, '合计'],
+      rows: snap.rows.map((item) => {
+        const values = item.values.map((value) => Math.max(0, Math.trunc(Number(value) || 0)))
+        return {
+          colorName: item.colorName,
+          values: [...values, values.reduce((sum, value) => sum + value, 0)],
+        }
+      }),
     }
   }
   if (!row.orderId) return null
@@ -1848,20 +2087,22 @@ function getLeafPreviewData(row: StockTableLeafRow): PreviewDataset | null {
   }
 }
 
-function filterZeroValuePreviewDataset(dataset: PreviewDataset | null): PreviewDataset | null {
+function filterEmptyPreviewRows(dataset: PreviewDataset | null): PreviewDataset | null {
   if (!dataset || !dataset.headers.length || !dataset.rows.length) return null
   const baseHeaders = getPreviewBaseHeaders(dataset.headers)
-  const activeIndexes = baseHeaders
-    .map((_, index) => index)
-    .filter((index) => dataset.rows.some((row) => (Number(row.values?.[index]) || 0) > 0))
-  if (!activeIndexes.length) return null
+  const totalIndex = dataset.headers.length > baseHeaders.length ? dataset.headers.length - 1 : -1
+  const rows = dataset.rows.filter((row) =>
+    baseHeaders.some((_, index) => (Number(row.values?.[index]) || 0) > 0)
+  )
+  if (!rows.length) return null
   return {
-    headers: [...activeIndexes.map((index) => baseHeaders[index]), '合计'],
-    rows: dataset.rows.map((row) => {
-      const values = activeIndexes.map((index) => Number(row.values?.[index]) || 0)
+    headers: [...dataset.headers],
+    rows: rows.map((row) => {
+      const values = baseHeaders.map((_, index) => Number(row.values?.[index]) || 0)
+      const rowTotal = values.reduce((sum, item) => sum + item, 0)
       return {
         colorName: row.colorName,
-        values: [...values, values.reduce((sum, item) => sum + item, 0)],
+        values: totalIndex >= 0 ? [...values, rowTotal] : values,
       }
     }),
   }
@@ -1880,7 +2121,17 @@ function remapPreviewValues(sourceHeaders: string[], values: number[], targetHea
 }
 
 function buildPreviewData(row: StockTableRow): PreviewDataset | null {
-  if (!isStockTableParentRow(row)) return filterZeroValuePreviewDataset(getLeafPreviewData(row))
+  if (!isStockTableParentRow(row)) {
+    const preview = getLeafPreviewData(row)
+    if (!preview) return null
+    const baseHeaders = mergeSizeHeaders(getGroupSizeHeaders(row), getPreviewBaseHeaders(preview.headers))
+    const fullHeaders = [...baseHeaders, '合计']
+    const rows = preview.rows.map((item) => ({
+      colorName: item.colorName,
+      values: remapPreviewValues(preview.headers, item.values, fullHeaders),
+    }))
+    return filterEmptyPreviewRows({ headers: fullHeaders, rows })
+  }
   const baseHeaders: string[] = []
   const childPreviews = row._children
     .map((child) => getLeafPreviewData(child))
@@ -1892,13 +2143,28 @@ function buildPreviewData(row: StockTableRow): PreviewDataset | null {
   })
   if (!baseHeaders.length) return null
   const fullHeaders = [...baseHeaders, '合计']
-  const rows = childPreviews.flatMap((preview) =>
-    preview.rows.map((item) => ({
-      colorName: item.colorName,
-      values: remapPreviewValues(preview.headers, item.values, fullHeaders),
-    })),
-  )
-  return filterZeroValuePreviewDataset({ headers: fullHeaders, rows })
+  const rowOrder: string[] = []
+  const rowMap = new Map<string, number[]>()
+  childPreviews.forEach((preview) => {
+    preview.rows.forEach((item) => {
+      const colorName = normalizeColorName(item.colorName)
+      const values = remapPreviewValues(preview.headers, item.values, fullHeaders)
+      let target = rowMap.get(colorName)
+      if (!target) {
+        target = Array(fullHeaders.length).fill(0)
+        rowMap.set(colorName, target)
+        rowOrder.push(colorName)
+      }
+      values.forEach((value, index) => {
+        target![index] += Number(value) || 0
+      })
+    })
+  })
+  const rows = rowOrder.map((colorName) => ({
+    colorName,
+    values: [...(rowMap.get(colorName) ?? [])],
+  }))
+  return filterEmptyPreviewRows({ headers: fullHeaders, rows })
 }
 
 function getPreviewHeaders(row: StockTableRow): string[] {
@@ -1909,24 +2175,30 @@ function getPreviewRows(row: StockTableRow) {
   return buildPreviewData(row)?.rows ?? []
 }
 
-async function loadDetail(stockId: number, options?: { colorName?: string; quantity?: number | null }) {
+async function loadDetail(stockId: number, options?: { colorName?: string | null; quantity?: number | null }) {
   detailDrawer.loading = true
   detailDrawer.saving = false
   detailDrawer.stockId = stockId
   detailDrawer.data = null
   detailDrawer.colorImageMap = {}
-  detailDrawer.selectedColorName = normalizeColorName(options?.colorName)
+  detailDrawer.selectedColorName = options?.colorName == null ? null : normalizeColorName(options.colorName)
   detailDrawer.selectedQuantity = options?.quantity != null ? Math.max(0, Math.trunc(Number(options.quantity) || 0)) : null
   try {
     const res = await getFinishedStockDetail(stockId)
     const data = res.data as any
     detailDrawer.data = data
+    detailDrawer.groupSizeHeaders = mergeSizeHeaders(
+      detailDrawer.groupSizeHeaders,
+      Array.isArray(data?.groupSizeHeaders) ? data.groupSizeHeaders : [],
+      Array.isArray(data?.colorSize?.headers) ? data.colorSize.headers : [],
+    )
     syncStockColorImages(stockId, data?.colorImages)
     detailEditForm.department = data?.stock?.department ?? ''
     detailEditForm.inventoryTypeId = data?.stock?.inventoryTypeId ?? null
     detailEditForm.warehouseId = data?.stock?.warehouseId ?? null
     detailEditForm.location = data?.stock?.location ?? ''
     detailEditForm.unitPrice = data?.stock?.unitPrice != null ? String(data.stock.unitPrice) : ''
+    detailEditForm.imageUrl = data?.stock?.imageUrl ?? ''
     detailEditForm.remark = ''
     detailMetaEditing.value = false
     const map: Record<string, string> = {}
@@ -1948,6 +2220,7 @@ function toggleDetailEditMode() {
     detailEditForm.warehouseId = detailDrawer.data.stock.warehouseId ?? null
     detailEditForm.location = detailDrawer.data.stock.location ?? ''
     detailEditForm.unitPrice = detailDrawer.data.stock.unitPrice != null ? String(detailDrawer.data.stock.unitPrice) : ''
+    detailEditForm.imageUrl = detailDrawer.data.stock.imageUrl ?? ''
     detailEditForm.remark = ''
   }
   detailMetaEditing.value = !detailMetaEditing.value
@@ -1957,6 +2230,7 @@ async function openDetail(row: StockTableRow) {
   if (!isStockTableLeafRow(row)) return
   detailDrawerWidth.value = loadSavedDetailDrawerWidth()
   detailDrawer.groupProductImage = getSharedProductImageUrl(row)
+  detailDrawer.groupSizeHeaders = getGroupSizeHeaders(row)
   detailDrawer.visible = true
   await loadDetail(row.id, { colorName: row._selectedColorName, quantity: row.quantity })
 }
@@ -1971,6 +2245,7 @@ async function saveDetailMeta() {
       warehouseId: detailEditForm.warehouseId,
       location: detailEditForm.location,
       unitPrice: detailEditForm.unitPrice?.trim() || '0',
+      imageUrl: detailEditForm.imageUrl?.trim() || '',
       remark: detailEditForm.remark || undefined,
     })
     ElMessage.success('保存成功')
@@ -2566,9 +2841,14 @@ async function submitOutbound() {
   }
 }
 
-function openCreateDialog() {
+async function openCreateDialog() {
   resetCreateForm()
-  if (selectedRows.value.length === 1) prefillCreateForm(selectedRows.value[0])
+  if (selectedRows.value.length === 1) {
+    const ok = await prefillCreateForm(selectedRows.value[0])
+    if (!ok) return
+    createDialog.visible = true
+    return
+  }
   createDialog.visible = true
 }
 
@@ -2588,37 +2868,60 @@ function resetCreateForm() {
   createFormRef.value?.clearValidate()
 }
 
-function prefillCreateForm(row: StockTableLeafRow) {
-  createForm.orderNo = row.orderNo || ''
-  createForm.skuCode = row.skuCode || ''
+function findLatestLeafRow(row: StockTableLeafRow): StockTableLeafRow {
+  const targetColor = normalizeColorName(row._selectedColorName || row._displayColor)
+  const exact = stockTableData.value.find(
+    (item): item is StockTableLeafRow =>
+      isStockTableLeafRow(item) &&
+      item.id === row.id &&
+      normalizeColorName(item._selectedColorName || item._displayColor) === targetColor,
+  )
+  if (exact) return exact
+  return (
+    stockTableData.value.find(
+      (item): item is StockTableLeafRow => isStockTableLeafRow(item) && item.id === row.id,
+    ) ?? row
+  )
+}
+
+async function prefillCreateForm(row: StockTableLeafRow): Promise<boolean> {
+  let sourceRow = findLatestLeafRow(row)
+  let breakdown = getSplitColorBreakdown(sourceRow)
+  if ((!breakdown?.headers?.length || !breakdown.rows?.length) && sourceRow.orderId) {
+    await ensureColorSizeBreakdown(sourceRow.orderId)
+    sourceRow = findLatestLeafRow(sourceRow)
+    breakdown = getSplitColorBreakdown(sourceRow)
+  }
+
+  createForm.orderNo = sourceRow.orderNo || ''
+  createForm.skuCode = sourceRow.skuCode || ''
   createForm.quantity = 1
-  createForm.unitPrice = row.unitPrice ? String(row.unitPrice) : ''
-  createForm.warehouseId = row.warehouseId ?? null
-  createForm.inventoryTypeId = row.inventoryTypeId ?? null
-  createForm.department = row.department || ''
-  createForm.location = row.location || ''
-  createForm.imageUrl = getSharedProductImageUrl(row)
+  createForm.unitPrice = sourceRow.unitPrice ? String(sourceRow.unitPrice) : ''
+  createForm.warehouseId = sourceRow.warehouseId ?? null
+  createForm.inventoryTypeId = sourceRow.inventoryTypeId ?? null
+  createForm.department = sourceRow.department || ''
+  createForm.location = sourceRow.location || ''
+  createForm.imageUrl = getSharedProductImageUrl(sourceRow)
   createForm.remark = ''
 
-  const headers = normalizeBreakdownHeaders(row.sizeBreakdown?.headers ?? [])
-  const breakdownRows = Array.isArray(row.sizeBreakdown?.rows) ? row.sizeBreakdown.rows : []
-  if (!headers.length || !breakdownRows.length) return
+  const headers = mergeSizeHeaders(getGroupSizeHeaders(sourceRow), breakdown?.headers ?? [])
+  const breakdownRows = Array.isArray(breakdown?.rows) ? breakdown.rows : []
+  if (!headers.length || !breakdownRows.length) {
+    ElMessage.warning('未能读取当前库存的完整尺码明细，为了避免混合尺码，请刷新后重试')
+    return false
+  }
 
-  const visibleIndexes = headers
-    .map((_, index) => index)
-    .filter((index) => breakdownRows.some((item) => (Number(item.values?.[index]) || 0) > 0))
-  const activeIndexes = visibleIndexes.length ? visibleIndexes : headers.map((_, index) => index)
-
-  createSizeHeaders.value = activeIndexes.map((index) => headers[index])
+  createSizeHeaders.value = headers
   createSizeTableRows.value = breakdownRows.map((item) => {
-    const colorName = normalizeColorName(item.colorName) || row._selectedColorName || ''
+    const colorName = normalizeColorName(item.colorName) || sourceRow._selectedColorName || ''
     return {
       colorName,
-      imageUrl: getRowColorImageUrl(row, colorName),
-      quantities: activeIndexes.map(() => null),
+      imageUrl: getRowColorImageUrl(sourceRow, colorName) || getSharedProductImageUrl(sourceRow),
+      quantities: headers.map(() => null),
     }
   })
   normalizeCreateSizeRows()
+  return true
 }
 
 async function submitCreate() {
@@ -2799,6 +3102,12 @@ function onOutboundPageSizeChange() {
 
 .finished-table {
   margin-bottom: var(--space-md);
+}
+
+.finished-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+  line-height: 20px;
 }
 
 .table-selection-count {
@@ -3188,7 +3497,6 @@ function onOutboundPageSizeChange() {
   justify-content: center;
   width: 100%;
   box-sizing: border-box;
-  padding-right: 10px;
 }
 
 .b-header-input {
@@ -3199,29 +3507,36 @@ function onOutboundPageSizeChange() {
 }
 
 .b-header-input :deep(.el-input__wrapper) {
-  padding-left: 1px;
-  padding-right: 1px;
+  padding-left: 6px;
+  padding-right: 6px;
 }
 
 .b-header-input :deep(.el-input__inner) {
   text-align: center;
 }
 
-.b-header-remove {
+.b-header-actions {
   position: absolute;
   top: 50%;
-  right: 2px;
+  right: -2px;
   transform: translateY(-50%);
-  width: 10px;
-  height: 10px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.b-header-remove {
+  width: 14px;
+  height: 14px;
   padding: 0;
-  min-height: 10px;
-  min-width: 10px;
+  min-height: 14px;
+  min-width: 14px;
   display: flex;
   align-items: center;
   justify-content: center;
-  opacity: 0;
-  transition: opacity 0.15s;
+  font-size: 10px;
 }
 
 .b-header-remove :deep(.el-icon) {
@@ -3229,7 +3544,7 @@ function onOutboundPageSizeChange() {
   line-height: 8px;
 }
 
-.b-header-cell:hover .b-header-remove {
+.b-header-cell:hover .b-header-actions {
   opacity: 1;
 }
 

@@ -135,8 +135,9 @@ export class FinishedGoodsStockController {
     @Param('id') id: string,
     @Body('colorName') colorName: string,
     @Body('imageUrl') imageUrl: string,
+    @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.upsertColorImage(Number(id), { colorName, imageUrl });
+    return this.service.upsertColorImage(Number(id), { colorName, imageUrl }, user?.username ?? '');
   }
 
   @Get('outbounds')

@@ -81,6 +81,9 @@
       stripe
       class="pending-table"
       :height="tableHeight"
+      :row-style="compactRowStyle"
+      :cell-style="compactCellStyle"
+      :header-cell-style="compactHeaderCellStyle"
       @header-dragend="onPendingHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
@@ -88,9 +91,14 @@
       <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
       <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
-      <el-table-column label="图片" width="90" align="center">
+      <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
         <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
+          <AppImageThumb
+            v-if="row.imageUrl"
+            :raw-url="row.imageUrl"
+            :width="compactImageSize"
+            :height="compactImageSize"
+          />
           <span v-else class="text-placeholder">-</span>
         </template>
       </el-table-column>
@@ -408,6 +416,7 @@ import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/a
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -424,6 +433,13 @@ const list = ref<PendingListItem[]>([])
 const pendingTableRef = ref()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 const loading = ref(false)
 const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
@@ -1094,6 +1110,12 @@ onMounted(async () => {
 .inventory-pending-page .pending-table {
   flex: 1;
   min-height: 0;
+}
+
+.pending-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+  line-height: 20px;
 }
 
 .table-selection-count {

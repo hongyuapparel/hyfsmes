@@ -1,7 +1,6 @@
 const ABSOLUTE_URL_RE = /^(?:https?:)?\/\//i
 const SPECIAL_URL_RE = /^(?:data|blob):/i
 const LEGACY_ASSET_HOST_RE = /^https?:\/\/47\.112\.218\.75(?::\d+)?(?=\/|$)/i
-const LEGACY_ASSET_HOST_GLOBAL_RE = /https?:\/\/47\.112\.218\.75(?::\d+)?(?=\/|$)/gi
 
 function trimTrailingSlash(value: string): string {
   return value.replace(/\/+$/, '')
@@ -21,9 +20,12 @@ function normalizeLegacyAbsoluteAssetUrl(value: string): string {
   if (!LEGACY_ASSET_HOST_RE.test(url)) return url
   try {
     const parsed = new URL(url)
-    return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/'
+    const pathWithQuery = `${parsed.pathname}${parsed.search}${parsed.hash}` || '/'
+    // 旧站 /Public 资源仍挂在原域名，不能改写成当前站点相对路径。
+    if (/^\/(?:uploads|migration-old)(?:\/|$)/i.test(parsed.pathname)) return pathWithQuery
+    return url
   } catch {
-    return url.replace(LEGACY_ASSET_HOST_RE, '') || '/'
+    return url
   }
 }
 
@@ -66,8 +68,7 @@ export function normalizeUploadUrlsDeep<T>(input: T): T {
 
 function normalizeUploadUrlsDeepInternal<T>(input: T, seen: WeakSet<object>): T {
   if (typeof input === 'string') {
-    const normalizedText = input.replace(LEGACY_ASSET_HOST_GLOBAL_RE, '')
-    return (looksLikeAssetPath(normalizedText) ? resolveAssetUrl(normalizedText) : normalizedText) as T
+    return (looksLikeAssetPath(input) ? resolveAssetUrl(input) : input) as T
   }
   if (input == null || typeof input !== 'object') return input
   if (seen.has(input as object)) return input

@@ -178,7 +178,7 @@
           :fit="true"
           :height="tableHeight"
           scrollbar-always-on
-          :row-style="() => ({ minHeight: '58px' })"
+          :row-style="compactRowStyle"
           :cell-style="getCellStyle"
           :header-cell-style="getHeaderCellStyle"
           @selection-change="onSelectionChange"
@@ -198,13 +198,19 @@
             :column-key="f.code"
             :prop="productListColumnProp(f)"
             :label="f.label"
+            :width="f.type === 'image' ? compactImageColumnMinWidth : undefined"
             :min-width="getColumnMinWidth(f)"
             :sortable="f.sortable ? 'custom' : false"
             show-overflow-tooltip
           >
             <template #default="{ row }">
               <template v-if="f.type === 'image'">
-                <AppImageThumb v-if="row[f.code]" :raw-url="String(row[f.code])" variant="table" />
+                <AppImageThumb
+                  v-if="row[f.code]"
+                  :raw-url="String(row[f.code])"
+                  :width="compactImageSize"
+                  :height="compactImageSize"
+                />
                 <span v-else>-</span>
               </template>
               <span v-else-if="f.type === 'date'">{{ formatDate(row[f.code]) }}</span>
@@ -378,6 +384,7 @@ import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { checkSkuExists } from '@/api/products'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 
 function productListColumnProp(f: { code: string }) {
@@ -411,6 +418,13 @@ const imageUploading = ref(false)
 
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
+const {
+  compactHeaderCellStyle,
+  compactCellStyle,
+  compactRowStyle,
+  compactImageSize,
+  compactImageColumnMinWidth,
+} = useCompactTableStyle()
 let loadReqId = 0
 let listAbortController: AbortController | null = null
 const filter = reactive<{
@@ -910,20 +924,18 @@ function onSortChange({ prop, order }: { prop?: string; order?: string }) {
 }
 
 function getHeaderCellStyle() {
-  return {
-    whiteSpace: 'nowrap',
-  }
+  return compactHeaderCellStyle()
 }
 
 function getCellStyle() {
   return {
-    padding: '4px 10px',
+    ...compactCellStyle(),
     whiteSpace: 'nowrap',
   }
 }
 
 function getColumnMinWidth(f: { code: string; type: string }): number {
-  if (f.type === 'image') return 96
+  if (f.type === 'image') return compactImageColumnMinWidth
   if (f.type === 'date') return 120
   if (f.code === 'productName') return 180
   if (f.code === 'productGroup') return 160
@@ -1231,6 +1243,12 @@ onBeforeUnmount(() => {
 
 .products-table :deep(.el-table__header .cell) {
   white-space: nowrap;
+}
+
+.products-table :deep(.cell) {
+  padding-left: 6px;
+  padding-right: 6px;
+  line-height: 20px;
 }
 
 .products-table :deep(.selection-column .cell) {
