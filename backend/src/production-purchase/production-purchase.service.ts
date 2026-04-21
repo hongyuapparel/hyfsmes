@@ -106,6 +106,16 @@ export class ProductionPurchaseService {
     private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
+  private async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
+    const code = (statusCode ?? '').trim();
+    if (!code) return;
+    const status = await this.orderStatusRepo.findOne({ where: { code } });
+    if (!status) return;
+    await this.orderStatusHistoryRepo.save(
+      this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
+    );
+  }
+
   private materialSourceOptionsLoadedAt = 0;
   private materialSourceLabelById = new Map<number, string>();
   private materialTypeOptionsLoadedAt = 0;
@@ -241,6 +251,7 @@ export class ProductionPurchaseService {
       order.status = next;
       order.statusTime = this.getLatestMaterialFlowCompletedAt(materials) ?? new Date();
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 
@@ -507,6 +518,7 @@ export class ProductionPurchaseService {
           order.status = next;
           order.statusTime = new Date();
           await this.orderRepo.save(order);
+          await this.appendStatusHistory(order.id, next);
         }
       }
     }
@@ -629,6 +641,7 @@ export class ProductionPurchaseService {
           order.status = next;
           order.statusTime = new Date();
           await this.orderRepo.save(order);
+          await this.appendStatusHistory(order.id, next);
         }
       }
     }

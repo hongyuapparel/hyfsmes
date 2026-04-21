@@ -221,6 +221,7 @@ export class OrdersService {
       order.status = next;
       order.statusTime = craft?.completedAt ?? new Date();
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 
@@ -271,6 +272,7 @@ export class OrdersService {
       order.status = next;
       order.statusTime = sewing?.completedAt ?? new Date();
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 
@@ -310,6 +312,7 @@ export class OrdersService {
       order.status = next;
       order.statusTime = finishing?.completedAt ?? new Date();
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 

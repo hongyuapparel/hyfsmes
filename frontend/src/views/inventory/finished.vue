@@ -2466,9 +2466,11 @@ const createRules: FormRules = {
   location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
 }
 
-const createSizeHeaders = ref<string[]>(['S'])
+const DEFAULT_CREATE_SIZE_HEADERS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL'] as const
+
+const createSizeHeaders = ref<string[]>([...DEFAULT_CREATE_SIZE_HEADERS])
 const createSizeTableRows = ref<Array<{ colorName: string; imageUrl: string; quantities: Array<number | null> }>>([
-  { colorName: '默认', imageUrl: '', quantities: [0] },
+  { colorName: '默认', imageUrl: '', quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0) },
 ])
 
 const sizeTotalQuantity = computed(() =>
@@ -2863,8 +2865,10 @@ function resetCreateForm() {
   createForm.location = ''
   createForm.imageUrl = ''
   createForm.remark = ''
-  createSizeHeaders.value = ['S']
-  createSizeTableRows.value = [{ colorName: '默认', imageUrl: '', quantities: [0] }]
+  createSizeHeaders.value = [...DEFAULT_CREATE_SIZE_HEADERS]
+  createSizeTableRows.value = [
+    { colorName: '默认', imageUrl: '', quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0) },
+  ]
   createFormRef.value?.clearValidate()
 }
 

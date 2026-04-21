@@ -8,6 +8,8 @@ import { SystemOption } from '../entities/system-option.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
+import { OrderStatus } from '../entities/order-status.entity';
+import { OrderStatusHistory } from '../entities/order-status-history.entity';
 
 /** 与前端一致的异常损耗原因（固定选项） */
 export const CUTTING_ABNORMAL_REASONS = [
@@ -122,10 +124,24 @@ export class ProductionCuttingService {
     private readonly cuttingRepo: Repository<OrderCutting>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    @InjectRepository(OrderStatus)
+    private readonly orderStatusRepo: Repository<OrderStatus>,
+    @InjectRepository(OrderStatusHistory)
+    private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly systemOptionsService: SystemOptionsService,
     private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
+
+  private async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
+    const code = (statusCode ?? '').trim();
+    if (!code) return;
+    const status = await this.orderStatusRepo.findOne({ where: { code } });
+    if (!status) return;
+    await this.orderStatusHistoryRepo.save(
+      this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
+    );
+  }
 
   private async hasCuttingDepartmentAndCutter(): Promise<boolean> {
     try {
@@ -203,6 +219,7 @@ export class ProductionCuttingService {
       order.status = next;
       order.statusTime = cutting?.completedAt ?? new Date();
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 
@@ -1040,6 +1057,7 @@ export class ProductionCuttingService {
       order.status = next;
       order.statusTime = now;
       await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
     }
   }
 }
