@@ -1,6 +1,6 @@
 import { existsSync } from 'fs'
 import { basename, dirname, extname, join } from 'path'
-import sharp from 'sharp'
+import * as sharp from 'sharp'
 
 const MAX_THUMB_WIDTH = 400
 
