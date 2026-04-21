@@ -139,6 +139,9 @@ export class OrdersService {
   private finishingReconcileRunning = false;
   private finishingReconcileLastRunAt = 0;
   private readonly finishingReconcileIntervalMs = 5 * 60 * 1000;
+  private workflowReconcileRunning = false;
+  private workflowReconcileLastRunAt = 0;
+  private readonly workflowReconcileIntervalMs = 5 * 60 * 1000;
 
   constructor(
     @InjectRepository(Order)
@@ -517,15 +520,19 @@ export class OrdersService {
     return false;
   }
 
-  private canRebaseWorkflowStatus(status: string | null | undefined): boolean {
+  private hasWorkflowRelevantPayload(payload: OrderEditPayload): boolean {
     return [
-      'pending_pattern',
-      'pending_purchase',
-      'pending_craft',
-      'pending_cutting',
-      'pending_sewing',
-      'pending_finishing',
-    ].includes((status ?? '').trim());
+      'orderTypeId',
+      'collaborationTypeId',
+      'processItem',
+      'materials',
+      'processItems',
+    ].some((key) => Object.prototype.hasOwnProperty.call(payload, key));
+  }
+
+  private canRebaseWorkflowStatus(status: string | null | undefined): boolean {
+    const code = (status ?? '').trim();
+    return !!code && !['draft', 'pending_review', 'completed'].includes(code);
   }
 
   private resolveMaterialRouteBySourceLabel(sourceLabel: string): 'purchase' | 'picking' {
@@ -617,6 +624,80 @@ export class OrdersService {
     return null;
   }
 
+  private async getCompletedWorkflowTriggers(orderId: number): Promise<Array<{ triggerCode: string; completedAt: Date | null }>> {
+    const triggers: Array<{ triggerCode: string; completedAt: Date | null }> = [];
+
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const materials = Array.isArray(ext?.materials) ? ext.materials : [];
+    if (materials.length) {
+      const materialSourceLabelById = await this.getMaterialSourceLabelMap();
+      if (materials.every((material) => this.isMaterialFlowCompleted(material, materialSourceLabelById))) {
+        triggers.push({
+          triggerCode: 'purchase_all_completed',
+          completedAt: this.getLatestMaterialFlowCompletedAt(materials, materialSourceLabelById),
+        });
+      }
+    }
+
+    const pattern = await this.orderPatternRepo.findOne({ where: { orderId } });
+    if ((pattern?.status ?? '').toLowerCase() === 'completed') {
+      triggers.push({ triggerCode: 'pattern_completed', completedAt: pattern?.completedAt ?? null });
+    }
+
+    const craft = await this.orderCraftRepo.findOne({ where: { orderId } });
+    if ((craft?.status ?? '').toLowerCase() === 'completed') {
+      triggers.push({ triggerCode: 'craft_completed', completedAt: craft?.completedAt ?? null });
+    }
+
+    const cutting = await this.orderCuttingRepo.findOne({ where: { orderId } });
+    if ((cutting?.status ?? '').toLowerCase() === 'completed') {
+      triggers.push({ triggerCode: 'cutting_completed', completedAt: cutting?.completedAt ?? null });
+    }
+
+    const sewing = await this.orderSewingRepo.findOne({ where: { orderId } });
+    if ((sewing?.status ?? '').toLowerCase() === 'completed') {
+      triggers.push({ triggerCode: 'sewing_completed', completedAt: sewing?.completedAt ?? null });
+    }
+
+    const finishing = await this.orderFinishingRepo.findOne({ where: { orderId } });
+    if ((finishing?.status ?? '').toLowerCase() === 'inbound') {
+      triggers.push({ triggerCode: 'tailing_inbound_completed', completedAt: finishing?.completedAt ?? null });
+    }
+
+    return triggers;
+  }
+
+  private async resolveStatusAfterCompletedWorkflowSteps(
+    order: Order,
+    actorUserId: number,
+  ): Promise<{ status: string; statusTime: Date }> {
+    const now = new Date();
+    let status = order.status;
+    let statusTime = order.statusTime ?? now;
+    const triggers = await this.getCompletedWorkflowTriggers(order.id);
+    if (!triggers.length) return { status, statusTime };
+
+    for (let i = 0; i < 10; i++) {
+      let advanced = false;
+      for (const trigger of triggers) {
+        const stepOrder = this.orderRepo.create({ ...order, status });
+        const next = await this.orderWorkflowService.resolveNextStatus({
+          order: stepOrder,
+          triggerCode: trigger.triggerCode,
+          actorUserId,
+        });
+        if (!next || next === status) continue;
+        status = next;
+        statusTime = trigger.completedAt ?? now;
+        advanced = true;
+        break;
+      }
+      if (!advanced || status === 'completed') break;
+    }
+
+    return { status, statusTime };
+  }
+
   private async resolveWorkflowStatusFromCurrentOrder(order: Order, actorUserId: number): Promise<{
     status: string;
     statusTime: Date;
@@ -631,22 +712,10 @@ export class OrdersService {
       })) ?? 'pending_purchase';
     let statusTime = now;
 
-    for (let i = 0; i < 10; i++) {
-      const completedStep = await this.getCompletedWorkflowStep(order.id, status);
-      if (!completedStep) break;
-      const stepOrder = this.orderRepo.create({ ...order, status });
-      const next = await this.orderWorkflowService.resolveNextStatus({
-        order: stepOrder,
-        triggerCode: completedStep.triggerCode,
-        actorUserId,
-      });
-      if (!next || next === status) break;
-      status = next;
-      statusTime = completedStep.completedAt ?? now;
-      if (status === 'completed') break;
-    }
-
-    return { status, statusTime };
+    return this.resolveStatusAfterCompletedWorkflowSteps(
+      this.orderRepo.create({ ...order, status, statusTime }),
+      actorUserId,
+    );
   }
 
   private async rebaseWorkflowStatusAfterOrderEdit(orderId: number, actor: OrderActor): Promise<Order | null> {
@@ -663,6 +732,43 @@ export class OrdersService {
     await this.addLog(saved, actor, 'workflow_rebase', `流程参数变更重算状态: ${beforeStatus} -> ${saved.status}`);
     await this.appendStatusHistory(saved.id, saved.status);
     return saved;
+  }
+
+  private async reconcileCompletedWorkflowOrders(
+    actorUserId?: number,
+    options?: { force?: boolean; orderNo?: string },
+  ): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    if (this.workflowReconcileRunning) return;
+    const now = Date.now();
+    const force = options?.force ?? false;
+    if (!force && now - this.workflowReconcileLastRunAt < this.workflowReconcileIntervalMs) return;
+
+    this.workflowReconcileRunning = true;
+    this.workflowReconcileLastRunAt = now;
+    try {
+      const qb = this.orderRepo
+        .createQueryBuilder('o')
+        .where('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review', 'completed'] });
+      if (options?.orderNo?.trim()) {
+        qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${options.orderNo.trim()}%` });
+      }
+      const orders = await qb.getMany();
+      for (const order of orders) {
+        try {
+          const next = await this.resolveStatusAfterCompletedWorkflowSteps(order, actorUserId);
+          if (!next.status || next.status === order.status) continue;
+          order.status = next.status;
+          order.statusTime = next.statusTime;
+          await this.orderRepo.save(order);
+          await this.appendStatusHistory(order.id, next.status);
+        } catch {
+          // 单条旧单自愈失败不影响订单列表主查询。
+        }
+      }
+    } finally {
+      this.workflowReconcileRunning = false;
+    }
   }
 
   private buildUpdateChangesDescription(before: Order, payload: OrderEditPayload): string {
@@ -1011,7 +1117,9 @@ export class OrdersService {
   async updateDraft(id: number, payload: OrderEditPayload, actor: OrderActor): Promise<Order> {
     const order = await this.findOne(id);
     const before = { ...order };
-    const shouldRebaseWorkflow = this.hasWorkflowRelevantChanges(before, payload);
+    const shouldRebaseWorkflow =
+      this.hasWorkflowRelevantPayload(payload) &&
+      (this.hasWorkflowRelevantChanges(before, payload) || this.canRebaseWorkflowStatus(order.status));
     if (payload.skuCode !== undefined) order.skuCode = payload.skuCode.trim();
     if (payload.customerId !== undefined) order.customerId = payload.customerId;
     if (payload.customerName !== undefined) order.customerName = payload.customerName.trim();
@@ -1313,9 +1421,10 @@ export class OrdersService {
   }
 
   async findAll(query: OrderListQuery, actorUserId?: number) {
-    this.scheduleCraftReconcile(actorUserId);
-    this.scheduleSewingReconcile(actorUserId);
-    this.scheduleFinishingReconcile(actorUserId);
+    await this.reconcileCompletedWorkflowOrders(actorUserId, {
+      force: !!query.orderNo?.trim(),
+      orderNo: query.orderNo,
+    });
     const { page = 1, pageSize = 20 } = query;
 
     const qb = this.orderRepo.createQueryBuilder('o');
@@ -1653,9 +1762,10 @@ export class OrdersService {
   }
 
   async countByStatus(query: OrderListQuery, actorUserId?: number) {
-    this.scheduleCraftReconcile(actorUserId);
-    this.scheduleSewingReconcile(actorUserId);
-    this.scheduleFinishingReconcile(actorUserId);
+    await this.reconcileCompletedWorkflowOrders(actorUserId, {
+      force: !!query.orderNo?.trim(),
+      orderNo: query.orderNo,
+    });
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
 
     const groupQb = this.orderRepo.createQueryBuilder('o');
