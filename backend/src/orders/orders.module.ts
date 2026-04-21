@@ -7,6 +7,7 @@ import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { OrderRemark } from '../entities/order-remark.entity';
 import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
+import { OrderStatusTransition } from '../entities/order-status-transition.entity';
 import { User } from '../entities/user.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
@@ -45,6 +46,7 @@ import { OrdersService } from './orders.service';
       RoleOrderPolicy,
       OrderStatus,
       OrderStatusHistory,
+      OrderStatusTransition,
       Product,
       Role,
       UserRole,

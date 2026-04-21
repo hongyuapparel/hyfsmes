@@ -21,6 +21,7 @@ import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
+import { OrderStatusTransition } from '../entities/order-status-transition.entity';
 import { Product } from '../entities/product.entity';
 import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
 import { Role } from '../entities/role.entity';
@@ -172,6 +173,8 @@ export class OrdersService {
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
+    @InjectRepository(OrderStatusTransition)
+    private readonly orderStatusTransitionRepo: Repository<OrderStatusTransition>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
     @InjectRepository(RoleOrderPolicy)
@@ -667,6 +670,17 @@ export class OrdersService {
     return triggers;
   }
 
+  private async resolveSingleTargetWorkflowFallback(status: string, triggerCode: string): Promise<string | null> {
+    const rules = await this.orderStatusTransitionRepo.find({
+      where: { fromStatus: status, triggerCode: triggerCode.trim(), enabled: true },
+      order: { id: 'ASC' },
+    });
+    const targets = Array.from(
+      new Set(rules.map((rule) => (rule.toStatus ?? '').trim()).filter(Boolean)),
+    );
+    return targets.length === 1 ? targets[0] : null;
+  }
+
   private async resolveStatusAfterCompletedWorkflowSteps(
     order: Order,
     actorUserId: number,
@@ -685,7 +699,7 @@ export class OrdersService {
           order: stepOrder,
           triggerCode: trigger.triggerCode,
           actorUserId,
-        });
+        }) ?? await this.resolveSingleTargetWorkflowFallback(status, trigger.triggerCode);
         if (!next || next === status) continue;
         status = next;
         statusTime = trigger.completedAt ?? now;
