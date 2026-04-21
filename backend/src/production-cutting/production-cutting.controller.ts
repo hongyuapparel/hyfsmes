@@ -19,6 +19,7 @@ export class ProductionCuttingController {
     @Query('skuCode') skuCode?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const query: CuttingListQuery = {
       tab,
@@ -27,7 +28,7 @@ export class ProductionCuttingController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.cuttingService.getCuttingList(query);
+    return this.cuttingService.getCuttingList(query, user?.userId);
   }
 
   @Get('items/export')
@@ -35,6 +36,7 @@ export class ProductionCuttingController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @CurrentUser() user?: { userId: number; username: string },
     @Res() res?: Response,
   ) {
     const query: CuttingListQuery = {
@@ -42,7 +44,7 @@ export class ProductionCuttingController {
       orderNo,
       skuCode,
     };
-    const rows = await this.cuttingService.getCuttingExportRows(query);
+    const rows = await this.cuttingService.getCuttingExportRows(query, user?.userId);
     const header = [
       '订单号',
       'SKU',

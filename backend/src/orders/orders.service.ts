@@ -131,6 +131,9 @@ export class OrdersService {
   private craftReconcileRunning = false;
   private craftReconcileLastRunAt = 0;
   private readonly craftReconcileIntervalMs = 5 * 60 * 1000;
+  private sewingReconcileRunning = false;
+  private sewingReconcileLastRunAt = 0;
+  private readonly sewingReconcileIntervalMs = 5 * 60 * 1000;
   private finishingReconcileRunning = false;
   private finishingReconcileLastRunAt = 0;
   private readonly finishingReconcileIntervalMs = 5 * 60 * 1000;
@@ -246,6 +249,48 @@ export class OrdersService {
   /**
    * 自愈历史数据：尾部已完成（inbound）但订单状态仍停留在待尾部时，按 tailing_inbound_completed 规则补齐。
    */
+  /**
+   * 自愈历史数据：车缝已完成但订单状态仍停留在待车缝时，按 sewing_completed 规则补齐。
+   */
+  private async reconcileSewingCompletedOrders(actorUserId?: number): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    const sewings = await this.orderSewingRepo.find({ where: { status: 'completed' } });
+    if (!sewings.length) return;
+    const orderIds = sewings.map((s) => s.orderId);
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_sewing' } });
+    if (!orders.length) return;
+    const sewingMap = new Map(sewings.map((s) => [s.orderId, s]));
+    for (const order of orders) {
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'sewing_completed',
+        actorUserId,
+      });
+      if (!next || next === order.status) continue;
+      const sewing = sewingMap.get(order.id);
+      order.status = next;
+      order.statusTime = sewing?.completedAt ?? new Date();
+      await this.orderRepo.save(order);
+    }
+  }
+
+  private scheduleSewingReconcile(actorUserId?: number): void {
+    if (typeof actorUserId !== 'number') return;
+    if (this.sewingReconcileRunning) return;
+    const now = Date.now();
+    if (now - this.sewingReconcileLastRunAt < this.sewingReconcileIntervalMs) return;
+
+    this.sewingReconcileRunning = true;
+    this.sewingReconcileLastRunAt = now;
+    void this.reconcileSewingCompletedOrders(actorUserId)
+      .catch(() => {
+        // 自愈失败不影响主链路；下个时间窗继续尝试
+      })
+      .finally(() => {
+        this.sewingReconcileRunning = false;
+      });
+  }
+
   private async reconcileFinishingCompletedOrders(actorUserId?: number): Promise<void> {
     if (typeof actorUserId !== 'number') return;
     const finishings = await this.orderFinishingRepo.find({ where: { status: 'inbound' } });
@@ -1072,6 +1117,7 @@ export class OrdersService {
 
   async findAll(query: OrderListQuery, actorUserId?: number) {
     this.scheduleCraftReconcile(actorUserId);
+    this.scheduleSewingReconcile(actorUserId);
     this.scheduleFinishingReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
 
@@ -1411,6 +1457,7 @@ export class OrdersService {
 
   async countByStatus(query: OrderListQuery, actorUserId?: number) {
     this.scheduleCraftReconcile(actorUserId);
+    this.scheduleSewingReconcile(actorUserId);
     this.scheduleFinishingReconcile(actorUserId);
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
 

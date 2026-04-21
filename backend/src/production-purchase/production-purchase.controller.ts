@@ -25,6 +25,7 @@ export class ProductionPurchaseController {
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const query: PurchaseListQuery = {
@@ -38,7 +39,7 @@ export class ProductionPurchaseController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.purchaseService.getPurchaseItems(query);
+    return this.purchaseService.getPurchaseItems(query, user?.userId);
   }
 
   /**

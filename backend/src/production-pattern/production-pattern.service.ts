@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
@@ -65,6 +65,10 @@ export interface PatternMaterialRow {
 
 @Injectable()
 export class ProductionPatternService {
+  private patternReconcileRunning = false;
+  private patternReconcileLastRunAt = 0;
+  private readonly patternReconcileIntervalMs = 5 * 60 * 1000;
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
@@ -112,6 +116,49 @@ export class ProductionPatternService {
     await this.orderStatusHistoryRepo.save(
       this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
     );
+  }
+
+  /**
+   * 自愈历史数据：纸样已完成但订单状态仍停留在待纸样时，按 pattern_completed 规则补齐。
+   */
+  private async reconcilePatternCompletedOrders(actorUserId?: number): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    const patterns = await this.patternRepo.find({ where: { status: 'completed' } });
+    if (!patterns.length) return;
+    const orderIds = patterns.map((p) => p.orderId);
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_pattern' } });
+    if (!orders.length) return;
+    const patternMap = new Map(patterns.map((p) => [p.orderId, p]));
+    for (const order of orders) {
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'pattern_completed',
+        actorUserId,
+      });
+      if (!next || next === order.status) continue;
+      const pattern = patternMap.get(order.id);
+      order.status = next;
+      order.statusTime = pattern?.completedAt ?? new Date();
+      await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, next);
+    }
+  }
+
+  private schedulePatternReconcile(actorUserId?: number): void {
+    if (typeof actorUserId !== 'number') return;
+    if (this.patternReconcileRunning) return;
+    const now = Date.now();
+    if (now - this.patternReconcileLastRunAt < this.patternReconcileIntervalMs) return;
+
+    this.patternReconcileRunning = true;
+    this.patternReconcileLastRunAt = now;
+    void this.reconcilePatternCompletedOrders(actorUserId)
+      .catch(() => {
+        // 自愈失败不影响列表主链路；下个间隔继续尝试。
+      })
+      .finally(() => {
+        this.patternReconcileRunning = false;
+      });
   }
 
   private async getEnteredAtMap(orderIds: number[], statusCode: string): Promise<Map<number, string>> {
@@ -239,10 +286,16 @@ export class ProductionPatternService {
     // 纸样页视角：始终关心「待纸样」和「纸样已完成」的订单，
     // 不再限制纸样已完成订单必须仍处于 pending_purchase 阶段，
     // 否则订单后续流程推进后会在本页消失。
-    const qb = this.orderRepo.createQueryBuilder('o').where(
-      'o.status = :pendingPattern OR (o.id IN (:...completedIds))',
-      { pendingPattern: 'pending_pattern', completedIds: completedOrderIds.length ? completedOrderIds : [0] },
-    );
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where(
+        new Brackets((subQb) => {
+          subQb
+            .where('o.status = :pendingPattern')
+            .orWhere('o.id IN (:...completedIds)');
+        }),
+        { pendingPattern: 'pending_pattern', completedIds: completedOrderIds.length ? completedOrderIds : [0] },
+      );
 
     if (orderNo?.trim()) {
       qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
@@ -349,12 +402,13 @@ export class ProductionPatternService {
     return rows;
   }
 
-  async getPatternList(query: PatternListQuery): Promise<{
+  async getPatternList(query: PatternListQuery, actorUserId?: number): Promise<{
     list: PatternListItem[];
     total: number;
     page: number;
     pageSize: number;
   }> {
+    this.schedulePatternReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
     const rows = await this.buildPatternRows(query);
     const total = rows.length;
@@ -363,7 +417,8 @@ export class ProductionPatternService {
     return { list, total, page, pageSize };
   }
 
-  async getPatternExportRows(query: PatternListQuery): Promise<PatternListItem[]> {
+  async getPatternExportRows(query: PatternListQuery, actorUserId?: number): Promise<PatternListItem[]> {
+    this.schedulePatternReconcile(actorUserId);
     return this.buildPatternRows(query);
   }
 

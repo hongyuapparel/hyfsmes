@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
@@ -82,6 +82,10 @@ export interface PurchaseListQuery {
 
 @Injectable()
 export class ProductionPurchaseService {
+  private purchaseReconcileRunning = false;
+  private purchaseReconcileLastRunAt = 0;
+  private readonly purchaseReconcileIntervalMs = 5 * 60 * 1000;
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
@@ -189,6 +193,74 @@ export class ProductionPurchaseService {
     return (material.pickStatus ?? 'pending').toLowerCase() === 'completed';
   }
 
+  private getMaterialFlowCompletedAt(material: OrderMaterialRow): Date | null {
+    const sourceLabel = this.getMaterialSourceLabelById(material.materialSourceId ?? null);
+    const route = this.resolveMaterialRouteBySourceLabel(sourceLabel);
+    const raw = route === 'purchase' ? material.purchaseCompletedAt : material.pickCompletedAt;
+    if (raw == null || String(raw).trim() === '') return null;
+    const completedAt = new Date(raw);
+    return Number.isNaN(completedAt.getTime()) ? null : completedAt;
+  }
+
+  private getLatestMaterialFlowCompletedAt(materials: OrderMaterialRow[]): Date | null {
+    let latest: Date | null = null;
+    for (const material of materials) {
+      const completedAt = this.getMaterialFlowCompletedAt(material);
+      if (!completedAt) continue;
+      if (!latest || completedAt.getTime() > latest.getTime()) {
+        latest = completedAt;
+      }
+    }
+    return latest;
+  }
+
+  /**
+   * 自愈历史数据：采购/领料已完成但订单状态仍停留在待采购时，按 purchase_all_completed 规则补齐。
+   */
+  private async reconcilePurchaseCompletedOrders(actorUserId?: number): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    await this.ensureMaterialSourceOptionCache();
+    const orders = await this.orderRepo.find({ where: { status: 'pending_purchase' } });
+    if (!orders.length) return;
+    const orderIds = orders.map((order) => order.id);
+    const extList = await this.orderExtRepo.find({ where: { orderId: In(orderIds) } });
+    if (!extList.length) return;
+    const extMap = new Map(extList.map((ext) => [ext.orderId, ext]));
+    for (const order of orders) {
+      const ext = extMap.get(order.id);
+      const materials: OrderMaterialRow[] = Array.isArray(ext?.materials) ? ext.materials : [];
+      if (!materials.length) continue;
+      const allCompleted = materials.every((material) => this.isMaterialFlowCompleted(material));
+      if (!allCompleted) continue;
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'purchase_all_completed',
+        actorUserId,
+      });
+      if (!next || next === order.status) continue;
+      order.status = next;
+      order.statusTime = this.getLatestMaterialFlowCompletedAt(materials) ?? new Date();
+      await this.orderRepo.save(order);
+    }
+  }
+
+  private schedulePurchaseReconcile(actorUserId?: number): void {
+    if (typeof actorUserId !== 'number') return;
+    if (this.purchaseReconcileRunning) return;
+    const now = Date.now();
+    if (now - this.purchaseReconcileLastRunAt < this.purchaseReconcileIntervalMs) return;
+
+    this.purchaseReconcileRunning = true;
+    this.purchaseReconcileLastRunAt = now;
+    void this.reconcilePurchaseCompletedOrders(actorUserId)
+      .catch(() => {
+        // 自愈失败不影响列表主链路；下个间隔继续尝试。
+      })
+      .finally(() => {
+        this.purchaseReconcileRunning = false;
+      });
+  }
+
   private async resolveOperatorName(userId: number | undefined, fallback = ''): Promise<string> {
     const fb = (fallback ?? '').trim();
     if (!userId) return fb;
@@ -196,7 +268,7 @@ export class ProductionPurchaseService {
     return (user?.displayName ?? '').trim() || (user?.username ?? '').trim() || fb;
   }
 
-  async getPurchaseItems(query: PurchaseListQuery): Promise<{
+  async getPurchaseItems(query: PurchaseListQuery, actorUserId?: number): Promise<{
     list: PurchaseItemRow[];
     total: number;
     page: number;
@@ -213,6 +285,7 @@ export class ProductionPurchaseService {
       page = 1,
       pageSize = 20,
     } = query;
+    this.schedulePurchaseReconcile(actorUserId);
     await this.ensureMaterialSourceOptionCache();
     await this.ensureMaterialTypeOptionCache();
 

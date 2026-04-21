@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow, type CuttingMaterialUsageRow } from '../entities/order-cutting.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
@@ -111,6 +111,10 @@ export interface CuttingCompletedDetailResponse {
 
 @Injectable()
 export class ProductionCuttingService {
+  private cuttingReconcileRunning = false;
+  private cuttingReconcileLastRunAt = 0;
+  private readonly cuttingReconcileIntervalMs = 5 * 60 * 1000;
+
   constructor(
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
@@ -175,6 +179,48 @@ export class ProductionCuttingService {
        WHERE order_id = ?`,
       [unitStr, totalStr, jsonStr, orderId],
     );
+  }
+
+  /**
+   * 自愈历史数据：裁床已完成但订单状态仍停留在待裁床时，按 cutting_completed 规则补齐。
+   */
+  private async reconcileCuttingCompletedOrders(actorUserId?: number): Promise<void> {
+    if (typeof actorUserId !== 'number') return;
+    const cuttings = await this.cuttingRepo.find({ where: { status: 'completed' } });
+    if (!cuttings.length) return;
+    const orderIds = cuttings.map((c) => c.orderId);
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_cutting' } });
+    if (!orders.length) return;
+    const cuttingMap = new Map(cuttings.map((c) => [c.orderId, c]));
+    for (const order of orders) {
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'cutting_completed',
+        actorUserId,
+      });
+      if (!next || next === order.status) continue;
+      const cutting = cuttingMap.get(order.id);
+      order.status = next;
+      order.statusTime = cutting?.completedAt ?? new Date();
+      await this.orderRepo.save(order);
+    }
+  }
+
+  private scheduleCuttingReconcile(actorUserId?: number): void {
+    if (typeof actorUserId !== 'number') return;
+    if (this.cuttingReconcileRunning) return;
+    const now = Date.now();
+    if (now - this.cuttingReconcileLastRunAt < this.cuttingReconcileIntervalMs) return;
+
+    this.cuttingReconcileRunning = true;
+    this.cuttingReconcileLastRunAt = now;
+    void this.reconcileCuttingCompletedOrders(actorUserId)
+      .catch(() => {
+        // 自愈失败不影响列表主链路；下个间隔继续尝试。
+      })
+      .finally(() => {
+        this.cuttingReconcileRunning = false;
+      });
   }
 
   private async fetchActualFabricMetersMap(orderIds: number[]): Promise<Map<number, string>> {
@@ -693,12 +739,13 @@ export class ProductionCuttingService {
     return rows;
   }
 
-  async getCuttingList(query: CuttingListQuery): Promise<{
+  async getCuttingList(query: CuttingListQuery, actorUserId?: number): Promise<{
     list: CuttingListItem[];
     total: number;
     page: number;
     pageSize: number;
   }> {
+    this.scheduleCuttingReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
     const rows = await this.buildCuttingRows(query);
     const total = rows.length;
@@ -707,7 +754,8 @@ export class ProductionCuttingService {
     return { list, total, page, pageSize };
   }
 
-  async getCuttingExportRows(query: CuttingListQuery): Promise<CuttingListItem[]> {
+  async getCuttingExportRows(query: CuttingListQuery, actorUserId?: number): Promise<CuttingListItem[]> {
+    this.scheduleCuttingReconcile(actorUserId);
     return this.buildCuttingRows(query);
   }
 

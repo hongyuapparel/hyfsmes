@@ -24,6 +24,7 @@ export class ProductionPatternController {
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
@@ -41,7 +42,7 @@ export class ProductionPatternController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.patternService.getPatternList(query);
+    return this.patternService.getPatternList(query, user?.userId);
   }
 
   @Get('items/export')
@@ -54,6 +55,7 @@ export class ProductionPatternController {
     @Query('purchaseStatus') purchaseStatus?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
+    @CurrentUser() user?: { userId: number; username: string },
     @Res() res?: Response,
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
@@ -70,7 +72,7 @@ export class ProductionPatternController {
       orderDateStart,
       orderDateEnd,
     };
-    const rows = await this.patternService.getPatternExportRows(query);
+    const rows = await this.patternService.getPatternExportRows(query, user?.userId);
     const header = [
       '订单号',
       'SKU',
