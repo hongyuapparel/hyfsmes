@@ -13,6 +13,7 @@ import { OrderCutting } from '../entities/order-cutting.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
+import { OrderPattern } from '../entities/order-pattern.entity';
 import { Product } from '../entities/product.entity';
 import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
 import { Role } from '../entities/role.entity';
@@ -38,6 +39,7 @@ import { OrdersService } from './orders.service';
       OrderSewing,
       OrderFinishing,
       OrderCraft,
+      OrderPattern,
       User,
       RolePermission,
       RoleOrderPolicy,
@@ -58,4 +60,3 @@ import { OrdersService } from './orders.service';
   exports: [OrdersService],
 })
 export class OrdersModule {}
-

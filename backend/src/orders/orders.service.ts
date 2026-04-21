@@ -18,6 +18,7 @@ import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entit
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
+import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { Product } from '../entities/product.entity';
@@ -35,6 +36,7 @@ const ORDER_STATUS_LABEL_MAP: Record<string, string> = {
   pending_pattern: '待纸样',
   pending_purchase: '待采购',
   pending_cutting: '待裁床',
+  pending_craft: '待工艺',
   pending_sewing: '待车缝',
   pending_finishing: '待尾部',
   completed: '订单完成',
@@ -161,6 +163,8 @@ export class OrdersService {
     private readonly orderFinishingRepo: Repository<OrderFinishing>,
     @InjectRepository(OrderCraft)
     private readonly orderCraftRepo: Repository<OrderCraft>,
+    @InjectRepository(OrderPattern)
+    private readonly orderPatternRepo: Repository<OrderPattern>,
     @InjectRepository(OrderStatus)
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
@@ -474,6 +478,191 @@ export class OrdersService {
       detail: normalizedDetail,
     });
     await this.orderLogRepo.save(log);
+  }
+
+  private normalizeWorkflowMaterialRows(rows: unknown): OrderMaterialRow[] {
+    return Array.isArray(rows) ? this.normalizeMaterialRows(rows as OrderMaterialRow[]) : [];
+  }
+
+  private normalizeWorkflowPayloadValue(key: keyof OrderEditPayload, value: unknown): unknown {
+    if (key === 'materials') return this.normalizeWorkflowMaterialRows(value);
+    if (key === 'processItem') return typeof value === 'string' ? value.trim() : '';
+    return value ?? null;
+  }
+
+  private hasWorkflowRelevantChanges(before: Order & { materials?: OrderMaterialRow[]; processItems?: ProcessRow[] }, payload: OrderEditPayload): boolean {
+    const keys: Array<keyof OrderEditPayload> = [
+      'orderTypeId',
+      'collaborationTypeId',
+      'processItem',
+      'materials',
+      'processItems',
+    ];
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(payload, key)) continue;
+      const beforeValue =
+        key === 'materials'
+          ? before.materials ?? []
+          : key === 'processItems'
+            ? before.processItems ?? []
+            : (before as any)[key];
+      const nextValue = (payload as any)[key];
+      if (
+        JSON.stringify(this.normalizeWorkflowPayloadValue(key, beforeValue)) !==
+        JSON.stringify(this.normalizeWorkflowPayloadValue(key, nextValue))
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private canRebaseWorkflowStatus(status: string | null | undefined): boolean {
+    return [
+      'pending_pattern',
+      'pending_purchase',
+      'pending_craft',
+      'pending_cutting',
+      'pending_sewing',
+      'pending_finishing',
+    ].includes((status ?? '').trim());
+  }
+
+  private resolveMaterialRouteBySourceLabel(sourceLabel: string): 'purchase' | 'picking' {
+    const label = sourceLabel.trim();
+    if (label === '公司库存' || label === '客供面料') return 'picking';
+    return 'purchase';
+  }
+
+  private async getMaterialSourceLabelMap(): Promise<Map<number, string>> {
+    const list = await this.systemOptionsService.findAllByType('material_sources');
+    return new Map(list.map((item) => [item.id, item.value]));
+  }
+
+  private isMaterialFlowCompleted(material: OrderMaterialRow, materialSourceLabelById: Map<number, string>): boolean {
+    const sourceId = material.materialSourceId ?? null;
+    const sourceLabel = sourceId == null ? '' : materialSourceLabelById.get(Number(sourceId)) ?? '';
+    const route = this.resolveMaterialRouteBySourceLabel(sourceLabel);
+    if (route === 'purchase') {
+      return (material.purchaseStatus ?? 'pending').toLowerCase() === 'completed';
+    }
+    return (material.pickStatus ?? 'pending').toLowerCase() === 'completed';
+  }
+
+  private getMaterialFlowCompletedAt(material: OrderMaterialRow, materialSourceLabelById: Map<number, string>): Date | null {
+    const sourceId = material.materialSourceId ?? null;
+    const sourceLabel = sourceId == null ? '' : materialSourceLabelById.get(Number(sourceId)) ?? '';
+    const route = this.resolveMaterialRouteBySourceLabel(sourceLabel);
+    const raw = route === 'purchase' ? material.purchaseCompletedAt : material.pickCompletedAt;
+    if (raw == null || String(raw).trim() === '') return null;
+    const completedAt = new Date(raw);
+    return Number.isNaN(completedAt.getTime()) ? null : completedAt;
+  }
+
+  private getLatestMaterialFlowCompletedAt(
+    materials: OrderMaterialRow[],
+    materialSourceLabelById: Map<number, string>,
+  ): Date | null {
+    let latest: Date | null = null;
+    for (const material of materials) {
+      const completedAt = this.getMaterialFlowCompletedAt(material, materialSourceLabelById);
+      if (!completedAt) continue;
+      if (!latest || completedAt.getTime() > latest.getTime()) {
+        latest = completedAt;
+      }
+    }
+    return latest;
+  }
+
+  private async getCompletedWorkflowStep(
+    orderId: number,
+    status: string,
+  ): Promise<{ triggerCode: string; completedAt: Date | null } | null> {
+    if (status === 'pending_pattern') {
+      const pattern = await this.orderPatternRepo.findOne({ where: { orderId } });
+      if ((pattern?.status ?? '').toLowerCase() !== 'completed') return null;
+      return { triggerCode: 'pattern_completed', completedAt: pattern?.completedAt ?? null };
+    }
+    if (status === 'pending_purchase') {
+      const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+      const materials = Array.isArray(ext?.materials) ? ext.materials : [];
+      if (!materials.length) return null;
+      const materialSourceLabelById = await this.getMaterialSourceLabelMap();
+      if (!materials.every((material) => this.isMaterialFlowCompleted(material, materialSourceLabelById))) return null;
+      return {
+        triggerCode: 'purchase_all_completed',
+        completedAt: this.getLatestMaterialFlowCompletedAt(materials, materialSourceLabelById),
+      };
+    }
+    if (status === 'pending_craft') {
+      const craft = await this.orderCraftRepo.findOne({ where: { orderId } });
+      if ((craft?.status ?? '').toLowerCase() !== 'completed') return null;
+      return { triggerCode: 'craft_completed', completedAt: craft?.completedAt ?? null };
+    }
+    if (status === 'pending_cutting') {
+      const cutting = await this.orderCuttingRepo.findOne({ where: { orderId } });
+      if ((cutting?.status ?? '').toLowerCase() !== 'completed') return null;
+      return { triggerCode: 'cutting_completed', completedAt: cutting?.completedAt ?? null };
+    }
+    if (status === 'pending_sewing') {
+      const sewing = await this.orderSewingRepo.findOne({ where: { orderId } });
+      if ((sewing?.status ?? '').toLowerCase() !== 'completed') return null;
+      return { triggerCode: 'sewing_completed', completedAt: sewing?.completedAt ?? null };
+    }
+    if (status === 'pending_finishing') {
+      const finishing = await this.orderFinishingRepo.findOne({ where: { orderId } });
+      if ((finishing?.status ?? '').toLowerCase() !== 'inbound') return null;
+      return { triggerCode: 'tailing_inbound_completed', completedAt: finishing?.completedAt ?? null };
+    }
+    return null;
+  }
+
+  private async resolveWorkflowStatusFromCurrentOrder(order: Order, actorUserId: number): Promise<{
+    status: string;
+    statusTime: Date;
+  }> {
+    const now = new Date();
+    const reviewOrder = this.orderRepo.create({ ...order, status: 'pending_review' });
+    let status =
+      (await this.orderWorkflowService.resolveNextStatus({
+        order: reviewOrder,
+        triggerCode: 'review_approve',
+        actorUserId,
+      })) ?? 'pending_purchase';
+    let statusTime = now;
+
+    for (let i = 0; i < 10; i++) {
+      const completedStep = await this.getCompletedWorkflowStep(order.id, status);
+      if (!completedStep) break;
+      const stepOrder = this.orderRepo.create({ ...order, status });
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order: stepOrder,
+        triggerCode: completedStep.triggerCode,
+        actorUserId,
+      });
+      if (!next || next === status) break;
+      status = next;
+      statusTime = completedStep.completedAt ?? now;
+      if (status === 'completed') break;
+    }
+
+    return { status, statusTime };
+  }
+
+  private async rebaseWorkflowStatusAfterOrderEdit(orderId: number, actor: OrderActor): Promise<Order | null> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order || !this.canRebaseWorkflowStatus(order.status)) return order;
+
+    const next = await this.resolveWorkflowStatusFromCurrentOrder(order, actor.userId);
+    if (!next.status || next.status === order.status) return order;
+
+    const beforeStatus = order.status;
+    order.status = next.status;
+    order.statusTime = next.statusTime;
+    const saved = await this.orderRepo.save(order);
+    await this.addLog(saved, actor, 'workflow_rebase', `流程参数变更重算状态: ${beforeStatus} -> ${saved.status}`);
+    await this.appendStatusHistory(saved.id, saved.status);
+    return saved;
   }
 
   private buildUpdateChangesDescription(before: Order, payload: OrderEditPayload): string {
@@ -822,6 +1011,7 @@ export class OrdersService {
   async updateDraft(id: number, payload: OrderEditPayload, actor: OrderActor): Promise<Order> {
     const order = await this.findOne(id);
     const before = { ...order };
+    const shouldRebaseWorkflow = this.hasWorkflowRelevantChanges(before, payload);
     if (payload.skuCode !== undefined) order.skuCode = payload.skuCode.trim();
     if (payload.customerId !== undefined) order.customerId = payload.customerId;
     if (payload.customerName !== undefined) order.customerName = payload.customerName.trim();
@@ -847,7 +1037,7 @@ export class OrdersService {
     }
     if (payload.factoryName !== undefined) order.factoryName = payload.factoryName.trim();
     if (payload.imageUrl !== undefined) order.imageUrl = payload.imageUrl.trim();
-    const saved = await this.orderRepo.save(order);
+    let saved = await this.orderRepo.save(order);
     if (
       payload.materials !== undefined ||
       payload.colorSizeHeaders !== undefined ||
@@ -896,6 +1086,10 @@ export class OrdersService {
     // 若无关键字段变更，则不记录操作日志，避免产生冗余记录
     if (detail && detail !== '无关键字段变更') {
       await this.addLog(saved, actor, 'update', detail);
+    }
+
+    if (shouldRebaseWorkflow) {
+      saved = (await this.rebaseWorkflowStatusAfterOrderEdit(id, actor)) ?? saved;
     }
 
     // 编辑保存后：按订单最新物料/工艺同步成本快照（保留成本页人工维护的单价/利润率/工序等信息）
