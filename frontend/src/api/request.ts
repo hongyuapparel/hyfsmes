@@ -12,6 +12,9 @@ const request = axios.create({
   timeout: 15000,
 })
 
+const NETWORK_ERROR_MESSAGE_COOLDOWN_MS = 15000
+let lastNetworkErrorMessageAt = 0
+
 request.interceptors.request.use((config) => {
   const t = localStorage.getItem(TOKEN_KEY)
   if (t) config.headers.Authorization = `Bearer ${t}`
@@ -34,6 +37,19 @@ export function isErrorHandled(err: unknown): boolean {
   return !!(err && typeof err === 'object' && (err as { errorHandled?: boolean }).errorHandled)
 }
 
+export function isRequestCanceled(err: unknown): boolean {
+  const e = err as { code?: string; name?: string; message?: string } | null | undefined
+  return axios.isCancel(err) || e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError' || e?.message === 'canceled'
+}
+
+function shouldShowNetworkErrorMessage(): boolean {
+  const now = Date.now()
+  const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
+  if (!isOffline && now - lastNetworkErrorMessageAt < NETWORK_ERROR_MESSAGE_COOLDOWN_MS) return false
+  lastNetworkErrorMessageAt = now
+  return true
+}
+
 function extractErrorMessage(err: AxiosError): string {
   const data = err.response?.data as { message?: string | string[] } | undefined
   const msg = data?.message
@@ -54,6 +70,11 @@ request.interceptors.response.use(
     return res
   },
   (err: AxiosError) => {
+    if (isRequestCanceled(err)) {
+      ;(err as AxiosError & { errorHandled?: boolean }).errorHandled = true
+      return Promise.reject(err)
+    }
+
     const msg = extractErrorMessage(err)
     ;(err as AxiosError & { userMessage?: string }).userMessage = msg
 
@@ -69,7 +90,9 @@ request.interceptors.response.use(
       const skip = (err.config as { skipGlobalErrorHandler?: boolean })?.skipGlobalErrorHandler
       const shouldShow = !skip && (status === 400 || status === 403 || status === 404 || (status != null && status >= 500) || !err.response)
       if (shouldShow) {
-        ElMessage.error(msg)
+        if (err.response || shouldShowNetworkErrorMessage()) {
+          ElMessage.error(msg)
+        }
         ;(err as AxiosError & { errorHandled?: boolean }).errorHandled = true
       }
     }

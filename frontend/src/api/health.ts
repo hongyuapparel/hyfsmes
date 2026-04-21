@@ -5,5 +5,5 @@ export interface HealthRes {
 }
 
 export function getHealth() {
-  return request.get<HealthRes>('/health')
+  return request.get<HealthRes>('/health', { skipGlobalErrorHandler: true })
 }
