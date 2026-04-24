@@ -93,353 +93,23 @@
 
     <!-- 待尾部订单列表 -->
     <div ref="tableShellRef" class="list-page-table-shell">
-    <el-table
-      ref="finishingTableRef"
-      v-loading="loading"
-      :data="list"
-      border
-      stripe
-      class="finishing-table"
-      :height="tableHeight"
-      :row-style="compactRowStyle"
-      :cell-style="compactCellStyle"
-      :header-cell-style="compactHeaderCellStyle"
-      @header-dragend="onHeaderDragEnd"
-      @selection-change="onSelectionChange"
-    >
-      <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="orderNo" label="订单号" min-width="100" />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
-        <template #default="{ row }">
-          <AppImageThumb
-            v-if="row.imageUrl"
-            :raw-url="row.imageUrl"
-            :width="compactImageSize"
-            :height="compactImageSize"
-          />
-          <span v-else class="text-muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="factoryName" label="加工供应商" min-width="100" show-overflow-tooltip />
-      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
-      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
-      <el-table-column label="客户交期" width="110" align="center">
-        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
-      </el-table-column>
-      <el-table-column label="订单数量" width="88" align="right">
-        <template #default="{ row }">
-          <el-popover
-            placement="top-start"
-            trigger="hover"
-            :width="qtyPopoverWidth(row.orderId)"
-            :show-arrow="true"
-            @show="onShowQtyPopover(row)"
-          >
-            <template #reference>
-              <span class="qty-trigger">{{ formatDisplayNumber(row.quantity) }}</span>
-            </template>
-            <div class="qty-popover">
-              <div class="qty-popover-title">数量追踪</div>
-              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
-              <div v-else>
-                <template v-if="qtyPopoverBlocks(row.orderId).length">
-                  <div
-                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
-                    :key="`${row.orderId}-bc-${bIdx}`"
-                    class="qty-popover-block"
-                  >
-                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
-                    <table class="qty-popover-table">
-                      <thead>
-                        <tr>
-                          <th class="qty-header">尺码</th>
-                          <th
-                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
-                            :key="`${h}-${hIdx}`"
-                            class="qty-header"
-                          >
-                            {{ h }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="br in block.rows" :key="br.label">
-                          <td class="qty-label">{{ br.label }}</td>
-                          <td
-                            v-for="(v, vIdx) in br.values"
-                            :key="vIdx"
-                            class="qty-value"
-                          >
-                            {{ v != null ? formatDisplayNumber(v) : '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
-                <div v-else class="qty-popover-empty">暂无尺码明细</div>
-              </div>
-            </div>
-          </el-popover>
-        </template>
-      </el-table-column>
-      <el-table-column prop="arrivedAt" label="到尾部时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
-      </el-table-column>
-      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
-        <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
-      </el-table-column>
-      <el-table-column label="时效判定" width="96" align="center">
-        <template #default="{ row }">
-          <SlaJudgeTag :text="row.timeRating" />
-        </template>
-      </el-table-column>
-      <el-table-column label="裁床数量" width="96" align="right">
-        <template #default="{ row }">
-          <el-popover
-            placement="top-start"
-            trigger="hover"
-            :width="qtyPopoverWidth(row.orderId)"
-            :show-arrow="true"
-            @show="onShowQtyPopover(row)"
-          >
-            <template #reference>
-              <span class="qty-trigger">{{ row.cutTotal != null ? formatDisplayNumber(row.cutTotal) : '-' }}</span>
-            </template>
-            <div class="qty-popover">
-              <div class="qty-popover-title">数量追踪</div>
-              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
-              <div v-else>
-                <template v-if="qtyPopoverBlocks(row.orderId).length">
-                  <div
-                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
-                    :key="`${row.orderId}-bc-${bIdx}`"
-                    class="qty-popover-block"
-                  >
-                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
-                    <table class="qty-popover-table">
-                      <thead>
-                        <tr>
-                          <th class="qty-header">尺码</th>
-                          <th
-                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
-                            :key="`${h}-${hIdx}`"
-                            class="qty-header"
-                          >
-                            {{ h }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="br in block.rows" :key="br.label">
-                          <td class="qty-label">{{ br.label }}</td>
-                          <td
-                            v-for="(v, vIdx) in br.values"
-                            :key="vIdx"
-                            class="qty-value"
-                          >
-                            {{ v != null ? formatDisplayNumber(v) : '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
-                <div v-else class="qty-popover-empty">暂无尺码明细</div>
-              </div>
-            </div>
-          </el-popover>
-        </template>
-      </el-table-column>
-      <el-table-column label="车缝数量" width="96" align="right">
-        <template #default="{ row }">
-          <el-popover
-            placement="top-start"
-            trigger="hover"
-            :width="qtyPopoverWidth(row.orderId)"
-            :show-arrow="true"
-            @show="onShowQtyPopover(row)"
-          >
-            <template #reference>
-              <span class="qty-trigger">{{
-                row.sewingQuantity != null ? formatDisplayNumber(row.sewingQuantity) : '-'
-              }}</span>
-            </template>
-            <div class="qty-popover">
-              <div class="qty-popover-title">数量追踪</div>
-              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
-              <div v-else>
-                <template v-if="qtyPopoverBlocks(row.orderId).length">
-                  <div
-                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
-                    :key="`${row.orderId}-bc-${bIdx}`"
-                    class="qty-popover-block"
-                  >
-                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
-                    <table class="qty-popover-table">
-                      <thead>
-                        <tr>
-                          <th class="qty-header">尺码</th>
-                          <th
-                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
-                            :key="`${h}-${hIdx}`"
-                            class="qty-header"
-                          >
-                            {{ h }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="br in block.rows" :key="br.label">
-                          <td class="qty-label">{{ br.label }}</td>
-                          <td
-                            v-for="(v, vIdx) in br.values"
-                            :key="vIdx"
-                            class="qty-value"
-                          >
-                            {{ v != null ? formatDisplayNumber(v) : '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
-                <div v-else class="qty-popover-empty">暂无尺码明细</div>
-              </div>
-            </div>
-          </el-popover>
-        </template>
-      </el-table-column>
-      <el-table-column label="尾部收货数" width="100" align="right">
-        <template #default="{ row }">
-          <el-popover
-            placement="top-start"
-            trigger="hover"
-            :width="qtyPopoverWidth(row.orderId)"
-            :show-arrow="true"
-            @show="onShowQtyPopover(row)"
-          >
-            <template #reference>
-              <span class="qty-trigger">{{
-                row.tailReceivedQty != null ? formatDisplayNumber(row.tailReceivedQty) : '-'
-              }}</span>
-            </template>
-            <div class="qty-popover">
-              <div class="qty-popover-title">数量追踪</div>
-              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
-              <div v-else>
-                <template v-if="qtyPopoverBlocks(row.orderId).length">
-                  <div
-                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
-                    :key="`${row.orderId}-bc-${bIdx}`"
-                    class="qty-popover-block"
-                  >
-                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
-                    <table class="qty-popover-table">
-                      <thead>
-                        <tr>
-                          <th class="qty-header">尺码</th>
-                          <th
-                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
-                            :key="`${h}-${hIdx}`"
-                            class="qty-header"
-                          >
-                            {{ h }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="br in block.rows" :key="br.label">
-                          <td class="qty-label">{{ br.label }}</td>
-                          <td
-                            v-for="(v, vIdx) in br.values"
-                            :key="vIdx"
-                            class="qty-value"
-                          >
-                            {{ v != null ? formatDisplayNumber(v) : '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
-                <div v-else class="qty-popover-empty">暂无尺码明细</div>
-              </div>
-            </div>
-          </el-popover>
-        </template>
-      </el-table-column>
-      <el-table-column label="尾部入库数" width="100" align="right">
-        <template #default="{ row }">
-          <el-popover
-            placement="top-start"
-            trigger="hover"
-            :width="qtyPopoverWidth(row.orderId)"
-            :show-arrow="true"
-            @show="onShowQtyPopover(row)"
-          >
-            <template #reference>
-              <span class="qty-trigger">{{
-                row.tailInboundQty != null ? formatDisplayNumber(row.tailInboundQty) : '-'
-              }}</span>
-            </template>
-            <div class="qty-popover">
-              <div class="qty-popover-title">数量追踪</div>
-              <div v-if="sizePopoverLoadingId === row.orderId" class="qty-popover-loading">加载中...</div>
-              <div v-else>
-                <template v-if="qtyPopoverBlocks(row.orderId).length">
-                  <div
-                    v-for="(block, bIdx) in qtyPopoverBlocks(row.orderId)"
-                    :key="`${row.orderId}-bc-${bIdx}`"
-                    class="qty-popover-block"
-                  >
-                    <div class="qty-popover-subtitle">{{ block.colorName }}</div>
-                    <table class="qty-popover-table">
-                      <thead>
-                        <tr>
-                          <th class="qty-header">尺码</th>
-                          <th
-                            v-for="(h, hIdx) in sizeBreakdownCache[row.orderId]?.headers ?? []"
-                            :key="`${h}-${hIdx}`"
-                            class="qty-header"
-                          >
-                            {{ h }}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr v-for="br in block.rows" :key="br.label">
-                          <td class="qty-label">{{ br.label }}</td>
-                          <td
-                            v-for="(v, vIdx) in br.values"
-                            :key="vIdx"
-                            class="qty-value"
-                          >
-                            {{ v != null ? formatDisplayNumber(v) : '-' }}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </template>
-                <div v-else class="qty-popover-empty">暂无尺码明细</div>
-              </div>
-            </div>
-          </el-popover>
-        </template>
-      </el-table-column>
-      <el-table-column label="次品数" width="80" align="right">
-        <template #default="{ row }">{{
-          row.defectQuantity != null ? formatDisplayNumber(row.defectQuantity) : '-'
-        }}</template>
-      </el-table-column>
-      <el-table-column label="概要" width="64" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click.stop="openFinishingBriefDrawer(row)">查看</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
+      <FinishingTable
+        :loading="loading"
+        :list="list"
+        :table-height="tableHeight"
+        :compact-header-cell-style="compactHeaderCellStyle"
+        :compact-cell-style="compactCellStyle"
+        :compact-row-style="compactRowStyle"
+        :compact-image-size="compactImageSize"
+        :compact-image-column-min-width="compactImageColumnMinWidth"
+        :size-breakdown-cache="sizeBreakdownCache"
+        :size-popover-loading-id="sizePopoverLoadingId"
+        :qty-popover-width="qtyPopoverWidth"
+        :qty-popover-blocks="qtyPopoverBlocks"
+        @selection-change="onSelectionChange"
+        @show-qty-popover="onShowQtyPopover"
+        @open-brief="openFinishingBriefDrawer"
+      />
     </div>
 
     <div class="pagination-wrap">
@@ -688,24 +358,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import {
-  getFinishingItems,
-  getFinishingRegisterFormData,
-  registerFinishingReceive,
-  registerFinishingPackagingComplete,
-  exportFinishingItems,
-  type FinishingListItem,
-  type FinishingListQuery,
-} from '@/api/production-finishing'
-import { getOrderSizeBreakdown, type OrderSizeBreakdownRes } from '@/api/orders'
-import {
-  normalizeSizeBreakdown,
-  orderSizePopoverBlocks as qtyPopoverBlocksFromData,
-  orderSizePopoverWidth as qtyPopoverWidthFromData,
-} from '@/utils/order-size-popover-breakdown'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { type FinishingListItem } from '@/api/production-finishing'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
@@ -713,8 +366,12 @@ import {
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
-  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
+import { useFinishingListData } from '@/composables/useFinishingListData'
+import { useFinishingSelection } from '@/composables/useFinishingSelection'
+import { useFinishingSizePopover } from '@/composables/useFinishingSizePopover'
+import { useFinishingReceive } from '@/composables/useFinishingReceive'
+import { useFinishingPackaging } from '@/composables/useFinishingPackaging'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
@@ -723,6 +380,7 @@ import ProductionOrderBriefPanel, {
 } from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
+import FinishingTable from '@/components/production/FinishingTable.vue'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
@@ -733,14 +391,6 @@ const FINISHING_TABS = [
 
 type FinishingTabConfig = (typeof FINISHING_TABS)[number]
 
-const filter = reactive({ orderNo: '', skuCode: '' })
-const orderNoLabelVisible = ref(false)
-const skuCodeLabelVisible = ref(false)
-
-const currentTab = ref<string>('all')
-const tabCounts = ref<Record<string, number>>({})
-const tabTotal = ref(0)
-const list = ref<FinishingListItem[]>([])
 const finishingBriefDrawer = reactive<{ visible: boolean; row: FinishingListItem | null }>({
   visible: false,
   row: null,
@@ -763,7 +413,6 @@ function finishingBriefFromRow(row: FinishingListItem): ProductionOrderBriefMode
   }
 }
 
-const finishingTableRef = ref()
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const {
@@ -773,36 +422,45 @@ const {
   compactImageSize,
   compactImageColumnMinWidth,
 } = useCompactTableStyle()
-const loading = ref(false)
-const exporting = ref(false)
-const sizeBreakdownCache = ref<Record<number, OrderSizeBreakdownRes>>({})
-const sizePopoverLoadingId = ref<number | null>(null)
-
-function qtyPopoverBlocks(orderId: number) {
-  return qtyPopoverBlocksFromData(sizeBreakdownCache.value[orderId])
-}
-function qtyPopoverWidth(orderId: number) {
-  return qtyPopoverWidthFromData(sizeBreakdownCache.value[orderId])
-}
-const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
-const selectedRows = ref<FinishingListItem[]>([])
-const hasSelection = computed(() => selectedRows.value.length > 0)
-/** 待尾部 tab：可登记收货 */
-const canRegisterReceiveSelection = computed(() =>
-  selectedRows.value.length > 0 &&
-  selectedRows.value.every((r) => r.finishingStatus === 'pending_receive'),
-)
-/** 尾部 tab：可登记包装完成（发货数、入库数、次品数、备注） */
-const canPackagingCompleteSelection = computed(() =>
-  selectedRows.value.length > 0 &&
-  selectedRows.value.every((r) => r.finishingStatus === 'pending_assign'),
-)
-/** 尾部完成：待仓尚未处理时可改入库/次品（与后端校验一致） */
-const canAmendPackagingSelection = computed(() =>
-  selectedRows.value.length > 0 &&
-  selectedRows.value.every((r) => r.finishingStatus === 'inbound'),
-)
-const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-finishing-main')
+const {
+  selectedRows,
+  hasSelection,
+  canRegisterReceiveSelection,
+  canPackagingCompleteSelection,
+  canAmendPackagingSelection,
+  onSelectionChange,
+  clearSelection,
+} = useFinishingSelection()
+const {
+  filter,
+  orderNoLabelVisible,
+  skuCodeLabelVisible,
+  currentTab,
+  tabCounts,
+  tabTotal,
+  list,
+  loading,
+  exporting,
+  pagination,
+  loadTabCounts,
+  load,
+  onExport,
+  onSearch,
+  debouncedSearch,
+  onReset,
+  onTabChange,
+  onPageSizeChange,
+} = useFinishingListData({
+  tabs: FINISHING_TABS,
+  clearSelection,
+})
+const {
+  sizeBreakdownCache,
+  sizePopoverLoadingId,
+  qtyPopoverBlocks,
+  qtyPopoverWidth,
+  onShowQtyPopover,
+} = useFinishingSizePopover()
 
 function getTabLabel(tab: FinishingTabConfig): string {
   const counts = tabCounts.value
@@ -810,508 +468,36 @@ function getTabLabel(tab: FinishingTabConfig): string {
   return `${tab.label}(${count})`
 }
 
-const receiveDialog = reactive<{
-  visible: boolean
-  submitting: boolean
-  formLoading: boolean
-  row: FinishingListItem | null
-  headers: string[]
-  orderRow: (number | null)[]
-  cutRow: (number | null)[]
-  sewingRow: (number | null)[]
-  tailReceivedQuantities: number[]
-}>({
-  visible: false,
-  submitting: false,
-  formLoading: false,
-  row: null,
-  headers: [],
-  orderRow: [],
-  cutRow: [],
-  sewingRow: [],
-  tailReceivedQuantities: [],
+const {
+  receiveDialog,
+  receiveSizeTableRows,
+  receiveTailReceivedTotal,
+  resetReceiveForm,
+  openReceiveDialog,
+  submitReceive,
+} = useFinishingReceive({
+  selectedRows,
+  reloadList: load,
+  reloadTabCounts: loadTabCounts,
 })
-const receiveSizeTableRows = computed(() => {
-  const h = receiveDialog.headers
-  if (!h.length) return []
-  return [
-    { key: 'order', label: '订单数量', values: receiveDialog.orderRow },
-    { key: 'cut', label: '裁床数量', values: receiveDialog.cutRow },
-    { key: 'sewing', label: '车缝数量', values: receiveDialog.sewingRow },
-    { key: 'tail', label: '尾部收货数', values: receiveDialog.tailReceivedQuantities },
-  ]
+
+const {
+  packagingCompleteDialog,
+  resetPackagingCompleteDialog,
+  packagingSizeTableRows,
+  defectTotal,
+  packagingSetZero,
+  packagingSetInboundToReceived,
+  maxPackagingQtyForSize,
+  maxDefectQtyForSize,
+  openPackagingCompleteDialog,
+  openPackagingAmendDialog,
+  submitPackagingComplete,
+} = useFinishingPackaging({
+  selectedRows,
+  reloadList: load,
+  reloadTabCounts: loadTabCounts,
 })
-const receiveTailReceivedTotal = computed(() =>
-  receiveDialog.tailReceivedQuantities.reduce((a, b) => a + (Number(b) || 0), 0),
-)
-function resetReceiveForm() {
-  receiveDialog.row = null
-  receiveDialog.headers = []
-  receiveDialog.orderRow = []
-  receiveDialog.cutRow = []
-  receiveDialog.sewingRow = []
-  receiveDialog.tailReceivedQuantities = []
-}
-
-interface PackagingCompleteItem {
-  row: FinishingListItem
-  headers: string[]
-  orderRow: (number | null)[]
-  cutRow: (number | null)[]
-  sewingRow: (number | null)[]
-  tailReceivedRow: (number | null)[]
-  inboundQuantities: number[]
-  defectQuantities: number[]
-  remark: string
-}
-
-const packagingCompleteDialog = reactive<{
-  visible: boolean
-  mode: 'register' | 'amend'
-  submitting: boolean
-  formLoading: boolean
-  items: PackagingCompleteItem[]
-}>({ visible: false, mode: 'register', submitting: false, formLoading: false, items: [] })
-
-function resetPackagingCompleteDialog() {
-  packagingCompleteDialog.items = []
-  packagingCompleteDialog.mode = 'register'
-}
-
-function packagingSizeTableRows(item: PackagingCompleteItem) {
-  const received = item.row.tailReceivedQty ?? 0
-  const i = item.inboundQuantities
-  const sumI = i.reduce((a, b) => a + b, 0)
-  const sumD = defectTotal(item)
-  const valuesReceived =
-    Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
-      ? item.tailReceivedRow
-      : item.headers.length === 1
-        ? [received]
-        : [...Array(item.headers.length - 1).fill(null), received]
-  const valuesInbound = item.headers.length === 1 ? [...i] : [...i, sumI]
-  return [
-    { key: 'tail_received', label: '尾部收货数', values: valuesReceived },
-    { key: 'inbound', label: '入库数', values: valuesInbound },
-    { key: 'defect', label: '次品数', values: item.headers.length === 1 ? [...item.defectQuantities] : [...item.defectQuantities, sumD] },
-  ]
-}
-
-function defectTotal(item: PackagingCompleteItem): number {
-  return (item.defectQuantities ?? []).reduce((a, b) => a + (Number(b) || 0), 0)
-}
-
-function packagingSetZero(item: PackagingCompleteItem) {
-  item.inboundQuantities.fill(0)
-  item.defectQuantities.fill(0)
-}
-
-function packagingSetInboundToReceived(item: PackagingCompleteItem) {
-  const total = item.row.tailReceivedQty ?? 0
-  const len = item.inboundQuantities.length
-  if (len === 0) return
-  // 默认入库数按收货细数回填（仅尺码列，合计列在表格中自动计算）
-  const sizeValues = Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
-    ? item.tailReceivedRow.slice(0, len).map((v) => (v != null ? Number(v) : 0))
-    : null
-  if (sizeValues) {
-    for (let i = 0; i < len; i++) item.inboundQuantities[i] = Math.max(0, Number(sizeValues[i]) || 0)
-  } else {
-    item.inboundQuantities[0] = total
-    for (let i = 1; i < len; i++) item.inboundQuantities[i] = 0
-  }
-  item.defectQuantities.fill(0)
-}
-
-function maxPackagingQtyForSize(item: PackagingCompleteItem, hIdx: number): number {
-  const tr = item.tailReceivedRow
-  if (Array.isArray(tr) && tr.length > hIdx && tr[hIdx] != null && Number.isFinite(Number(tr[hIdx]))) {
-    return Number(tr[hIdx]) || 0
-  }
-  return item.row.tailReceivedQty ?? 0
-}
-
-function maxDefectQtyForSize(item: PackagingCompleteItem, hIdx: number): number {
-  return maxPackagingQtyForSize(item, hIdx)
-}
-
-/** 有按码收货明细时，校验每码入库+次品=该码收货 */
-function assertPackagingPerSize(item: PackagingCompleteItem): string | null {
-  const h = item.headers
-  if (h.length <= 1) return null
-  const tr = item.tailReceivedRow
-  if (!Array.isArray(tr) || tr.length !== h.length) return null
-  const sizeCount = h.length - 1
-  for (let i = 0; i < sizeCount; i++) {
-    if (tr[i] == null || !Number.isFinite(Number(tr[i]))) return null
-  }
-  for (let i = 0; i < sizeCount; i++) {
-    const a = Number(item.inboundQuantities[i]) || 0
-    const b = Number(item.defectQuantities[i]) || 0
-    const r = Number(tr[i]) || 0
-    if (a + b !== r) {
-      return `订单 ${item.row.orderNo}：尺码 ${h[i]} 入库数+次品数须等于该码尾部收货数(${r})`
-    }
-  }
-  return null
-}
-
-/** 修改弹窗：从接口返回的按码行回填各尺码（无明细时退化为总数落在首列） */
-function hydratePackagingQtyFromSaved(
-  item: PackagingCompleteItem,
-  inbRow: (number | null)[] | null | undefined,
-  defRow: (number | null)[] | null | undefined,
-  inbTotal: number,
-  defTotal: number,
-) {
-  const headers = item.headers
-  const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-  const takePerSize = (r: (number | null)[] | null | undefined): number[] | null => {
-    if (!r || r.length === 0) return null
-    if (r.length >= headers.length) return r.slice(0, sizeCount).map((v) => Number(v) || 0)
-    if (r.length === sizeCount) return r.map((v) => Number(v) || 0)
-    return null
-  }
-  const perIn = takePerSize(inbRow)
-  const perDef = takePerSize(defRow)
-  if (perIn && perDef && perIn.length === sizeCount && perDef.length === sizeCount) {
-    const sumI = perIn.reduce((a, b) => a + b, 0)
-    const sumD = perDef.reduce((a, b) => a + b, 0)
-    if (sumI === inbTotal && sumD === defTotal) {
-      for (let i = 0; i < sizeCount; i++) {
-        item.inboundQuantities[i] = perIn[i]
-        item.defectQuantities[i] = perDef[i]
-      }
-      return
-    }
-  }
-  item.inboundQuantities[0] = inbTotal
-  for (let i = 1; i < sizeCount; i++) item.inboundQuantities[i] = 0
-  item.defectQuantities[0] = defTotal
-  for (let i = 1; i < sizeCount; i++) item.defectQuantities[i] = 0
-}
-
-async function onShowQtyPopover(row: FinishingListItem) {
-  const id = row.orderId
-  if (sizeBreakdownCache.value[id] || sizePopoverLoadingId.value === id) return
-  sizePopoverLoadingId.value = id
-  try {
-    const res = await getOrderSizeBreakdown(id)
-    sizeBreakdownCache.value[id] = normalizeSizeBreakdown(res.data ?? { headers: [], rows: [] })
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '尺码明细加载失败'))
-  } finally {
-    if (sizePopoverLoadingId.value === id) sizePopoverLoadingId.value = null
-  }
-}
-
-function buildQuery(): FinishingListQuery {
-  return {
-    tab: currentTab.value,
-    orderNo: normalizeTextFilter(filter.orderNo),
-    skuCode: normalizeTextFilter(filter.skuCode),
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-  }
-}
-
-async function loadTabCounts() {
-  const base = buildQuery()
-  base.page = 1
-  base.pageSize = 1
-  const counts: Record<string, number> = {}
-  await Promise.all(
-    FINISHING_TABS.map(async (tab) => {
-      try {
-        const res = await getFinishingItems({ ...base, tab: tab.value })
-        const data = res.data
-        counts[tab.value] = data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
-    }),
-  )
-  tabCounts.value = counts
-  tabTotal.value = counts.all ?? 0
-}
-
-async function load() {
-  loading.value = true
-  try {
-    const res = await getFinishingItems(buildQuery())
-    const data = res.data
-    if (data) {
-      list.value = data.list ?? []
-      pagination.total = data.total ?? 0
-      restoreColumnWidths(finishingTableRef.value)
-    }
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function onExport() {
-  const query = buildQuery()
-  const { page, pageSize, ...rest } = query
-  exporting.value = true
-  try {
-    const res = await exportFinishingItems(rest)
-    const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `尾部管理_${new Date().toISOString().slice(0, 10)}.csv`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
-  } finally {
-    exporting.value = false
-  }
-}
-
-function onSearch(byUser = false) {
-  if (byUser) {
-    if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
-    if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
-  }
-  pagination.page = 1
-  load()
-  void loadTabCounts()
-}
-
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-function debouncedSearch() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    searchTimer = null
-    onSearch(false)
-  }, 400)
-}
-
-function onReset() {
-  orderNoLabelVisible.value = false
-  skuCodeLabelVisible.value = false
-  filter.orderNo = ''
-  filter.skuCode = ''
-  currentTab.value = 'all'
-  pagination.page = 1
-  selectedRows.value = []
-  load()
-  void loadTabCounts()
-}
-
-function onTabChange() {
-  pagination.page = 1
-  selectedRows.value = []
-  load()
-  void loadTabCounts()
-}
-
-function onPageSizeChange() {
-  pagination.page = 1
-  load()
-}
-
-function onSelectionChange(rows: FinishingListItem[]) {
-  selectedRows.value = rows
-}
-
-async function openReceiveDialog() {
-  const rows = selectedRows.value.filter((r) => r.finishingStatus === 'pending_receive')
-  if (rows.length === 0) return
-  const row = rows[0]
-  receiveDialog.row = row
-  receiveDialog.headers = []
-  receiveDialog.orderRow = []
-  receiveDialog.cutRow = []
-  receiveDialog.sewingRow = []
-  receiveDialog.tailReceivedQuantities = []
-  receiveDialog.visible = true
-  receiveDialog.formLoading = true
-  try {
-    const res = await getFinishingRegisterFormData(row.orderId)
-    const data = res.data
-    const headers = data?.headers ?? []
-    const orderRow = data?.orderRow ?? []
-    const cutRow = data?.cutRow ?? []
-    const sewingRow = data?.sewingRow ?? []
-    receiveDialog.headers = headers
-    receiveDialog.orderRow = orderRow
-    receiveDialog.cutRow = cutRow
-    receiveDialog.sewingRow = sewingRow
-    const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-    receiveDialog.tailReceivedQuantities = sewingRow
-      .slice(0, sizeCount)
-      .map((v) => (v != null ? Number(v) : 0))
-    while (receiveDialog.tailReceivedQuantities.length < sizeCount) {
-      receiveDialog.tailReceivedQuantities.push(0)
-    }
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
-    receiveDialog.visible = false
-  } finally {
-    receiveDialog.formLoading = false
-  }
-}
-
-async function submitReceive() {
-  if (!receiveDialog.row) return
-  const total = receiveTailReceivedTotal.value
-  if (!total || total < 1) {
-    ElMessage.warning('请填写尾部收货数（可按尺码填写）')
-    return
-  }
-  receiveDialog.submitting = true
-  try {
-    await registerFinishingReceive({
-      orderId: receiveDialog.row.orderId,
-      tailReceivedQty: total,
-      tailReceivedQuantities: receiveDialog.tailReceivedQuantities,
-    })
-    ElMessage.success('登记收货成功，订单已进入「尾部中」')
-    receiveDialog.visible = false
-    await load()
-    void loadTabCounts()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记收货失败'))
-  } finally {
-    receiveDialog.submitting = false
-  }
-}
-
-async function openPackagingCompleteDialog() {
-  const rows = selectedRows.value.filter((r) => r.finishingStatus === 'pending_assign')
-  if (rows.length === 0) return
-  packagingCompleteDialog.mode = 'register'
-  packagingCompleteDialog.visible = true
-  packagingCompleteDialog.formLoading = true
-  packagingCompleteDialog.items = []
-  try {
-    for (const row of rows) {
-      const res = await getFinishingRegisterFormData(row.orderId)
-      const data = res.data
-      const headers = data?.headers ?? ['合计']
-      const orderRow = data?.orderRow ?? []
-      const cutRow = data?.cutRow ?? []
-      const sewingRow = data?.sewingRow ?? []
-      const tailReceivedRow = data?.tailReceivedRow ?? []
-      const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-      const item: PackagingCompleteItem = {
-        row,
-        headers,
-        orderRow,
-        cutRow,
-        sewingRow,
-        tailReceivedRow,
-        inboundQuantities: Array(sizeCount).fill(0),
-        defectQuantities: Array(sizeCount).fill(0),
-        remark: '',
-      }
-      // 默认全部入库：把收货总数放在第一个尺码列，其他列为 0（合计列由表格计算展示）
-      packagingSetInboundToReceived(item)
-      packagingCompleteDialog.items.push(item)
-    }
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
-    packagingCompleteDialog.visible = false
-  } finally {
-    packagingCompleteDialog.formLoading = false
-  }
-}
-
-async function openPackagingAmendDialog() {
-  const rows = selectedRows.value.filter((r) => r.finishingStatus === 'inbound')
-  if (rows.length === 0) return
-  packagingCompleteDialog.mode = 'amend'
-  packagingCompleteDialog.visible = true
-  packagingCompleteDialog.formLoading = true
-  packagingCompleteDialog.items = []
-  try {
-    for (const row of rows) {
-      const res = await getFinishingRegisterFormData(row.orderId)
-      const data = res.data
-      const headers = data?.headers ?? ['合计']
-      const orderRow = data?.orderRow ?? []
-      const cutRow = data?.cutRow ?? []
-      const sewingRow = data?.sewingRow ?? []
-      const tailReceivedRow = data?.tailReceivedRow ?? []
-      const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-      const item: PackagingCompleteItem = {
-        row,
-        headers,
-        orderRow,
-        cutRow,
-        sewingRow,
-        tailReceivedRow,
-        inboundQuantities: Array(sizeCount).fill(0),
-        defectQuantities: Array(sizeCount).fill(0),
-        remark: row.remark?.trim() ?? '',
-      }
-      const inb = row.tailInboundQty ?? 0
-      const def = row.defectQuantity ?? 0
-      hydratePackagingQtyFromSaved(item, data?.tailInboundRow, data?.defectRow, inb, def)
-      packagingCompleteDialog.items.push(item)
-    }
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
-    packagingCompleteDialog.visible = false
-  } finally {
-    packagingCompleteDialog.formLoading = false
-  }
-}
-
-async function submitPackagingComplete() {
-  if (packagingCompleteDialog.items.length === 0) return
-  for (const item of packagingCompleteDialog.items) {
-    const perMsg = assertPackagingPerSize(item)
-    if (perMsg) {
-      ElMessage.warning(perMsg)
-      return
-    }
-    const received = item.row.tailReceivedQty ?? 0
-    const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
-    const defect = defectTotal(item)
-    if (sumInbound + defect !== received) {
-      ElMessage.warning(`订单 ${item.row.orderNo}：入库数合计(${sumInbound})+次品数(${defect}) 须等于尾部收货数(${received})`)
-      return
-    }
-  }
-  packagingCompleteDialog.submitting = true
-  try {
-    for (const item of packagingCompleteDialog.items) {
-      const received = item.row.tailReceivedQty ?? 0
-      const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
-      const defect = defectTotal(item)
-      await registerFinishingPackagingComplete({
-        orderId: item.row.orderId,
-        tailShippedQty: 0,
-        tailInboundQty: sumInbound,
-        defectQuantity: defect,
-        remark: item.remark?.trim() || undefined,
-        tailInboundQuantities: [...item.inboundQuantities],
-        defectQuantities: [...item.defectQuantities],
-      })
-    }
-    ElMessage.success(
-      packagingCompleteDialog.mode === 'amend'
-        ? '已更新入库/次品登记，待仓处理记录已按新数量重建'
-        : '登记包装完成：已生成待仓处理记录，订单已完成',
-    )
-    packagingCompleteDialog.visible = false
-    resetPackagingCompleteDialog()
-    await load()
-    void loadTabCounts()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记包装完成失败'))
-  } finally {
-    packagingCompleteDialog.submitting = false
-  }
-}
 
 onMounted(() => {
   load()
@@ -1341,35 +527,13 @@ onMounted(() => {
 .dialog-tip {
   margin: 0 0 var(--space-md);
   color: var(--el-text-color-secondary);
-  font-size: var(--font-size-body);
-}
-
-.finishing-table {
-  flex: 1;
-  min-height: 0;
-}
-
-.finishing-table :deep(.cell) {
-  padding-left: 6px;
-  padding-right: 6px;
-  line-height: 20px;
+  font-size: 13px;
 }
 
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: var(--font-size-body);
-}
-
-.table-thumb {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius);
-  display: block;
-}
-
-.text-muted {
-  color: var(--el-text-color-secondary);
+  font-size: 13px;
 }
 
 .register-brief {
@@ -1387,13 +551,13 @@ onMounted(() => {
 .register-loading {
   padding: var(--space-md);
   color: var(--el-text-color-secondary);
-  font-size: var(--font-size-body);
+  font-size: 13px;
 }
 
 .register-qty-title {
   font-weight: 600;
   margin-bottom: 8px;
-  font-size: var(--font-size-body);
+  font-size: 13px;
 }
 
 .register-qty-table {
@@ -1429,7 +593,7 @@ onMounted(() => {
 
 .register-qty-sum {
   margin: 0 0 var(--space-sm);
-  font-size: var(--font-size-body);
+  font-size: 13px;
   color: var(--el-text-color-regular);
 }
 
@@ -1437,61 +601,4 @@ onMounted(() => {
   margin-top: var(--space-sm);
 }
 
-.qty-trigger {
-  cursor: pointer;
-  text-decoration: underline dotted;
-  text-underline-offset: 2px;
-}
-
-.qty-popover {
-  font-size: var(--font-size-caption);
-}
-
-.qty-popover-title {
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.qty-popover-subtitle {
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.qty-popover-block:not(:first-child) {
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--color-border);
-}
-
-.qty-popover-table {
-  width: 100%;
-  border-collapse: collapse;
-  table-layout: fixed;
-}
-
-.qty-popover-table .qty-label {
-  padding: 2px 4px;
-  color: var(--color-text-muted, #909399);
-  white-space: nowrap;
-  text-align: left;
-}
-
-.qty-popover-table .qty-value {
-  padding: 2px 4px;
-  text-align: center;
-  white-space: nowrap;
-}
-
-.qty-header {
-  padding: 2px 4px;
-  font-weight: 500;
-  white-space: nowrap;
-  text-align: center;
-}
-
-.qty-popover-loading,
-.qty-popover-empty {
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted, #909399);
-}
 </style>

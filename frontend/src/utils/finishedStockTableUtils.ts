@@ -43,7 +43,7 @@ export function isStockTableLeafRow(row: StockTableRow | FinishedStockRow | null
 
 export function normalizeBreakdownHeaders(headers: string[]): string[] {
   if (!headers.length) return []
-  return headers[headers.length - 1] === '\u935A\u5823\uE178' ? headers.slice(0, -1) : [...headers]
+  return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
 }
 
 export const INTERNAL_UNASSIGNED_SIZE_HEADER = '__UNASSIGNED__'

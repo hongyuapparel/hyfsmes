@@ -1,14 +1,9 @@
 <template>
-  <el-dialog
-    :model-value="modelValue"
-    title="选择辅料"
-    width="720px"
-    @update:model-value="$emit('update:modelValue', $event)"
-  >
+  <el-dialog v-model="visible" title="选择辅料" width="720px">
     <div class="accessory-dialog-filter">
       <el-input
         v-model="keyword"
-        placeholder="输入名称 / 类别 / 客户名进行模糊搜索"
+        placeholder="输入名称进行模糊搜索"
         clearable
         size="small"
       />
@@ -30,12 +25,12 @@
       <el-table-column prop="customerName" label="客户" min-width="140" />
       <el-table-column label="操作" width="90" align="center">
         <template #default="{ row }">
-          <el-button type="primary" link size="small" @click="$emit('select', row)">选择</el-button>
+          <el-button type="primary" link size="small" @click="emit('select', row)">选择</el-button>
         </template>
       </el-table-column>
     </el-table>
     <template #footer>
-      <el-button @click="$emit('update:modelValue', false)">关闭</el-button>
+      <el-button @click="visible = false">关闭</el-button>
     </template>
   </el-dialog>
 </template>
@@ -44,27 +39,34 @@
 import { computed, ref } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 
+interface AccessoryDialogItem {
+  id: number
+  name: string
+  unit?: string
+  [key: string]: any
+}
+
 const props = defineProps<{
   modelValue: boolean
   loading: boolean
-  items: any[]
+  items: AccessoryDialogItem[]
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', v: boolean): void
-  (e: 'select', row: any): void
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'select', item: AccessoryDialogItem): void
 }>()
 
 const keyword = ref('')
 
+const visible = computed({
+  get: () => props.modelValue,
+  set: (value: boolean) => emit('update:modelValue', value),
+})
+
 const filteredItems = computed(() => {
   const kw = keyword.value.trim().toLowerCase()
   if (!kw) return props.items
-  return props.items.filter((item) => {
-    const name = item.name?.toLowerCase?.() ?? ''
-    const category = item.category?.toLowerCase?.() ?? ''
-    const customer = item.customerName?.toLowerCase?.() ?? ''
-    return name.includes(kw) || category.includes(kw) || customer.includes(kw)
-  })
+  return props.items.filter((item) => String(item.name ?? '').toLowerCase().includes(kw))
 })
 </script>

@@ -48,3 +48,23 @@ export function getFilterRangeStyle(v: [string, string] | [] | null | undefined)
   const base = { width, minWidth: width, flex: `0 0 ${width}` }
   return hasValue ? { ...base, ...ACTIVE_SELECT_STYLE } : base
 }
+
+export function getFilterSelectStyle(v: unknown) {
+  return v ? ACTIVE_SELECT_STYLE : undefined
+}
+
+/**
+ * 筛选项下拉宽度随内容调节。
+ * @param extraPadding 右侧预留（箭头/清空图标等），默认 60；客户项用 42 以减少尾部空白
+ */
+export function getFilterSelectAutoWidthStyle(v: unknown, extraPadding = 60) {
+  if (!v) return undefined
+  const text = String(v)
+  const estimated = text.length * FILTER_CHAR_PX + extraPadding
+  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
+  return {
+    ...ACTIVE_SELECT_STYLE,
+    width: `${width}px`,
+    flex: `0 0 ${width}px`,
+  }
+}

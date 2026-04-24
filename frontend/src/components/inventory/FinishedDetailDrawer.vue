@@ -783,10 +783,25 @@ watch(
   width: 170px;
   min-width: 170px;
 }
+.detail-images { display: flex; gap: 12px; flex-wrap: wrap; }
+.detail-image-card { display: flex; flex-direction: column; gap: 6px; }
 .detail-image-label { font-size: 12px; color: var(--el-text-color-secondary); }
 .detail-image-empty,
 .detail-muted { font-size: 12px; color: var(--el-text-color-secondary); }
+.detail-color-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .detail-color-size-table-wrap { width: 100%; }
+.detail-color-size-footer {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  text-align: right;
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+.detail-color-name { font-size: 12px; color: var(--el-text-color-regular); margin-bottom: 6px; }
+.detail-edit-actions { display: flex; justify-content: flex-end; margin-top: 4px; }
 .detail-logs { display: flex; flex-direction: column; gap: 10px; }
 .detail-log-item {
   padding: 10px 12px;
@@ -842,5 +857,62 @@ watch(
 :global(body.detail-drawer-resizing) {
   cursor: ew-resize !important;
   user-select: none !important;
+}
+
+/* tooltip 弹层在 body 下，需用全局样式；通过 popper-class 精确作用范围 */
+.finished-qty-popper {
+  padding: 0;
+}
+
+.finished-qty-popper .el-popper__arrow::before {
+  border: 1px solid var(--el-border-color-lighter);
+}
+
+.finished-qty-popper .qty-tooltip {
+  max-width: 520px;
+  padding: 10px 12px;
+}
+
+.finished-qty-popper .qty-tooltip-loading,
+.finished-qty-popper .qty-tooltip-error,
+.finished-qty-popper .qty-tooltip-empty {
+  padding: 6px 8px;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.finished-qty-popper .qty-tooltip-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.finished-qty-popper .qty-tooltip-row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(44px, auto);
+  align-items: center;
+  gap: 2px;
+}
+
+.finished-qty-popper .qty-tooltip-cell {
+  padding: 4px 6px;
+  border-radius: 4px;
+  background: #f5f6f8;
+  color: var(--el-text-color-regular);
+  border: 1px solid var(--el-border-color-lighter);
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.finished-qty-popper .qty-tooltip-head .qty-tooltip-cell {
+  background: #eef1f6;
+  font-weight: 600;
+}
+
+.finished-qty-popper .qty-tooltip-color {
+  min-width: 72px;
 }
 </style>

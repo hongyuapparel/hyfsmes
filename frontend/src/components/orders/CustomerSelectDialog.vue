@@ -1,10 +1,5 @@
 <template>
-  <el-dialog
-    :model-value="modelValue"
-    title="选择客户"
-    width="860px"
-    @update:model-value="$emit('update:modelValue', $event)"
-  >
+  <el-dialog v-model="visible" title="选择客户" width="860px">
     <div class="customer-dialog-filter">
       <el-input
         v-model="keyword"
@@ -43,7 +38,7 @@
       </el-table-column>
       <el-table-column label="操作" width="90" align="center">
         <template #default="{ row }">
-          <el-button type="primary" link size="small" @click="$emit('select', row)">选择</el-button>
+          <el-button type="primary" link size="small" @click="emit('select', row)">选择</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -56,18 +51,18 @@
         layout="total, sizes, prev, pager, next"
         :total="total"
         :page-sizes="[20, 50, 100]"
-        @current-change="$emit('page-change', $event)"
-        @size-change="$emit('page-size-change', $event)"
+        @current-change="(value) => emit('page-change', value)"
+        @size-change="(value) => emit('page-size-change', value)"
       />
     </div>
     <template #footer>
-      <el-button @click="$emit('update:modelValue', false)">关闭</el-button>
+      <el-button @click="visible = false">关闭</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 const props = defineProps<{
   modelValue: boolean
@@ -79,16 +74,21 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', v: boolean): void
-  (e: 'select', row: any): void
-  (e: 'page-change', page: number): void
-  (e: 'page-size-change', pageSize: number): void
+  (e: 'update:modelValue', value: boolean): void
+  (e: 'select', item: any): void
   (e: 'keyword-change', keyword: string): void
+  (e: 'page-change', page: number): void
+  (e: 'page-size-change', size: number): void
 }>()
 
 const keyword = ref('')
 
-watch(keyword, (val) => {
-  emit('keyword-change', val)
+const visible = computed({
+  get: () => props.modelValue,
+  set: (value: boolean) => emit('update:modelValue', value),
+})
+
+watch(keyword, (value) => {
+  emit('keyword-change', value)
 })
 </script>
