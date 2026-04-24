@@ -1,7 +1,0 @@
-erp_auth_rule	name
-erp_financial_work	work_type
-erp_order_production_work	work_type
-erp_sku_production_work	work_type
-erp_sys_param	name
-erp_sys_wxconfig	name
-erp_user	work_type

@@ -286,7 +286,7 @@ function onThumbClickCapture(e: MouseEvent) {
 
 <style scoped>
 .app-image-thumb-empty {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-placeholder);
   user-select: none;
 }
@@ -324,7 +324,7 @@ function onThumbClickCapture(e: MouseEvent) {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-placeholder);
   background: var(--el-fill-color-light);
 }
@@ -391,7 +391,7 @@ function onThumbClickCapture(e: MouseEvent) {
   justify-content: center;
   width: 100%;
   height: 100%;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-placeholder);
 }
 </style>

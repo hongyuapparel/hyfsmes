@@ -138,7 +138,7 @@ watch(
 .app-tabs :deep(.el-tabs__item) {
   height: 36px;
   line-height: 36px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   padding: 0 14px;
   border-radius: 4px;
   margin-right: 6px;

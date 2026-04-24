@@ -39,7 +39,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -54,14 +54,47 @@ const formRef = ref<FormInstance | null>(null)
 const form = reactive({ username: '', password: '' })
 const loading = ref(false)
 const backendStatus = ref<'ok' | 'fail' | ''>('')
+const HEALTH_RETRY_INTERVAL_MS = 2000
+const HEALTH_RETRY_MAX_ATTEMPTS = 15
+let backendHealthRetryTimer: number | null = null
+let backendHealthRetryAttempts = 0
 
-onMounted(async () => {
+function stopBackendHealthRetry() {
+  if (backendHealthRetryTimer != null) {
+    window.clearTimeout(backendHealthRetryTimer)
+    backendHealthRetryTimer = null
+  }
+}
+
+function scheduleBackendHealthRetry() {
+  stopBackendHealthRetry()
+  backendHealthRetryTimer = window.setTimeout(() => {
+    void checkBackendHealth()
+  }, HEALTH_RETRY_INTERVAL_MS)
+}
+
+async function checkBackendHealth() {
   try {
     const res = await getHealth()
     backendStatus.value = res.data?.status === 'ok' ? 'ok' : 'fail'
+    stopBackendHealthRetry()
   } catch {
+    backendHealthRetryAttempts += 1
+    if (backendHealthRetryAttempts < HEALTH_RETRY_MAX_ATTEMPTS) {
+      backendStatus.value = ''
+      scheduleBackendHealthRetry()
+      return
+    }
     backendStatus.value = 'fail'
+    stopBackendHealthRetry()
   }
+}
+
+onMounted(async () => {
+  void checkBackendHealth()
+})
+onBeforeUnmount(() => {
+  stopBackendHealthRetry()
 })
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],

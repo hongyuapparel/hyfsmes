@@ -51,3 +51,11 @@ export function updateProductionProcess(
 export function deleteProductionProcess(id: number) {
   return request.delete<void>(`/production-processes/${id}`)
 }
+
+export function batchMoveProductionProcesses(body: {
+  ids: number[]
+  department: string
+  jobType: string
+}) {
+  return request.patch<{ moved: number }>('/production-processes/batch/move', body)
+}

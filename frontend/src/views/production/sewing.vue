@@ -1022,7 +1022,7 @@ onMounted(() => {
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .table-thumb {
@@ -1051,13 +1051,13 @@ onMounted(() => {
 .register-loading {
   padding: var(--space-md);
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .register-qty-title {
   font-weight: 600;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .register-qty-table {
@@ -1066,7 +1066,7 @@ onMounted(() => {
 
 .register-qty-sum {
   margin: 0 0 var(--space-sm);
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-regular);
 }
 
@@ -1081,7 +1081,7 @@ onMounted(() => {
 }
 
 .qty-popover {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .qty-popover-title {
@@ -1128,7 +1128,7 @@ onMounted(() => {
 
 .qty-popover-loading,
 .qty-popover-empty {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--color-text-muted, #909399);
 }
 

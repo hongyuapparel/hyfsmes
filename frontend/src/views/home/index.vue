@@ -651,7 +651,7 @@ onMounted(() => {
 
 .home-greeting {
   margin: 0 0 var(--space-sm);
-  font-size: 1.125rem;
+  font-size: var(--font-size-title);
   font-weight: 600;
   color: var(--el-text-color-primary);
 }
@@ -666,7 +666,7 @@ onMounted(() => {
 }
 
 .home-encourage-icon {
-  font-size: 1.25rem;
+  font-size: var(--font-size-title);
   color: #d97706;
   background: #fff4db;
   border: 1px solid #f6d79a;
@@ -677,7 +677,7 @@ onMounted(() => {
 }
 
 .home-encourage-text {
-  font-size: 0.9375rem;
+  font-size: var(--font-size-body);
   font-weight: 500;
   color: var(--el-color-primary);
   line-height: 1.5;
@@ -693,13 +693,13 @@ onMounted(() => {
 
 .home-section-title {
   margin: 0;
-  font-size: 1.125rem;
+  font-size: var(--font-size-title);
   font-weight: 600;
 }
 
 .todo-rules-popover p {
   margin: 0 0 var(--space-sm);
-  font-size: 0.8125rem;
+  font-size: var(--font-size-body);
   line-height: 1.5;
 }
 
@@ -759,17 +759,17 @@ onMounted(() => {
 }
 
 .todo-section-icon {
-  font-size: 1rem;
+  font-size: var(--font-size-subtitle);
   color: var(--el-color-warning);
 }
 
 .todo-section-title {
-  font-size: 0.9375rem;
+  font-size: var(--font-size-body);
   font-weight: 600;
 }
 
 .todo-section-count {
-  font-size: 1.25rem;
+  font-size: var(--font-size-title);
   font-weight: 600;
   color: var(--el-color-primary);
 }
@@ -791,7 +791,7 @@ onMounted(() => {
 .todo-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8125rem;
+  font-size: var(--font-size-body);
 }
 
 .todo-table th,
@@ -825,6 +825,6 @@ onMounted(() => {
   padding: var(--space-lg);
   text-align: center;
   color: var(--color-text-secondary, #606266);
-  font-size: 0.875rem;
+  font-size: var(--font-size-body);
 }
 </style>

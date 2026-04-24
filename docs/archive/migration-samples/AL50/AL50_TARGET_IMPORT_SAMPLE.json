@@ -1,0 +1,568 @@
+{
+  "sampleKey": "AL50",
+  "generatedAt": "2026-03-25T02:07:41.999Z",
+  "product": {
+    "source": {
+      "oldDb": "hyfsmes",
+      "oldSkuId": 10640
+    },
+    "target": {
+      "sku_code": "AL50",
+      "product_name": "AL50",
+      "image_url": "/Public/images/2025-05-08/681c9e5cecb81.png",
+      "customer_id": 2129,
+      "customer_name_note": "Alex- Turki alharbi",
+      "salesperson_source_id": 1124,
+      "created_at": "2025-04-02 13:06:29"
+    }
+  },
+  "order": {
+    "source": {
+      "oldDb": "hyfsmes",
+      "oldOrderId": 19182
+    },
+    "target": {
+      "order_no": "AL50",
+      "sku_code": "AL50",
+      "customer_id": 2129,
+      "customer_name": "Alex- Turki alharbi",
+      "quantity": 1,
+      "sale_price": 35.35,
+      "ex_factory_price": 0,
+      "process_item": null,
+      "image_url": "/Public/images/2025-05-08/681c9e5cecb81.png",
+      "created_at": "2025-05-12 14:15:02",
+      "order_time": "2025-05-12 14:15:02",
+      "delivery_date_candidate": "2025-05-27",
+      "order_type_source_text": "样板",
+      "order_status_source": "100",
+      "salesperson_source_name": null,
+      "merchandiser_source_name": null
+    }
+  },
+  "order_cost_snapshot": {
+    "sourceMeta": {
+      "sku_id": 10640,
+      "latest_material_category_id": 22398,
+      "latest_material_row_count": 23,
+      "process_item_row_count": 1,
+      "production_row_count": 19,
+      "notes": [
+        "erp_sku_cost_detail contains historical BOM versions.",
+        "For AL50 first pass, only the latest category_id is used.",
+        "erp_sku_work_processes rows have processes_id=0 and production_class=0, so name-based mapping is required.",
+        "06_work_process_dict.tsv is empty for this sample."
+      ]
+    },
+    "materialRows": [
+      {
+        "sourceDetailId": 109300,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-黄红小点（涤）",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.15,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109301,
+        "sourceCategoryId": 22398,
+        "materialName": "9088 棉里布",
+        "materialMeter": 0.3,
+        "unitPrice": 9,
+        "usagePerPiece": 0.03,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109302,
+        "sourceCategoryId": 22398,
+        "materialName": "3号隐形拉链22寸",
+        "materialMeter": 3.3,
+        "unitPrice": 3,
+        "usagePerPiece": 1,
+        "simpleUse": null,
+        "lossPercent": 0.03,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109303,
+        "sourceCategoryId": 22398,
+        "materialName": "1/4宽橡筋",
+        "materialMeter": 0.29,
+        "unitPrice": 0.4,
+        "usagePerPiece": 0.65,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109304,
+        "sourceCategoryId": 22398,
+        "materialName": "SHENBOLEN主唛",
+        "materialMeter": 0.33,
+        "unitPrice": 0.3,
+        "usagePerPiece": 1,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109305,
+        "sourceCategoryId": 22398,
+        "materialName": "洗水唛",
+        "materialMeter": 0.22,
+        "unitPrice": 0.2,
+        "usagePerPiece": 1,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109306,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-新蓝圆（涤）",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.15,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109307,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-紫色肯特",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.15,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109308,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-紫色肯特（涤）",
+        "materialMeter": 11.24,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109309,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-紫色肯特（涤",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.15,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109310,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布",
+        "materialMeter": 11.24,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109311,
+        "sourceCategoryId": 22398,
+        "materialName": "9088 棉里布（包拉链）",
+        "materialMeter": 0.3,
+        "unitPrice": 9,
+        "usagePerPiece": 0.03,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109312,
+        "sourceCategoryId": 22398,
+        "materialName": "5号金属闭尾拉链",
+        "materialMeter": 3.3,
+        "unitPrice": 3,
+        "usagePerPiece": 1,
+        "simpleUse": null,
+        "lossPercent": 0.03,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109313,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布印花",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109314,
+        "sourceCategoryId": 22398,
+        "materialName": "隐形拉链",
+        "materialMeter": 2.06,
+        "unitPrice": 2,
+        "usagePerPiece": 1,
+        "simpleUse": null,
+        "lossPercent": 0.03,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109315,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-绿色圆（涤）",
+        "materialMeter": 11.03,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.08,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109316,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-白底迷彩圆（涤）",
+        "materialMeter": 11.03,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.08,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109317,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-黄底红圆",
+        "materialMeter": 8.24,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109318,
+        "sourceCategoryId": 22398,
+        "materialName": "涤蜡布-图形印花",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109319,
+        "sourceCategoryId": 22398,
+        "materialName": "蜡布-杂色",
+        "materialMeter": 11.24,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109320,
+        "sourceCategoryId": 22398,
+        "materialName": "3号隐形拉链",
+        "materialMeter": 2.06,
+        "unitPrice": 2,
+        "usagePerPiece": 1,
+        "simpleUse": null,
+        "lossPercent": 0.03,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109321,
+        "sourceCategoryId": 22398,
+        "materialName": "橡筋",
+        "materialMeter": 0.29,
+        "unitPrice": 0.4,
+        "usagePerPiece": 0.65,
+        "simpleUse": null,
+        "lossPercent": 0.1,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      },
+      {
+        "sourceDetailId": 109322,
+        "sourceCategoryId": 22398,
+        "materialName": "随机色蜡布",
+        "materialMeter": 11.75,
+        "unitPrice": 4.5,
+        "usagePerPiece": 2.27,
+        "simpleUse": null,
+        "lossPercent": 0.15,
+        "raw": {
+          "price": null,
+          "supplier_profit": null
+        }
+      }
+    ],
+    "processItemRows": [
+      {
+        "sourceProcessId": 15412,
+        "processName": "绣花",
+        "supplierName": "冠鑫绣花厂",
+        "unitPrice": 5,
+        "quantity": 1,
+        "amount": 5,
+        "unit": "件",
+        "processClass": "成衣",
+        "remark": "裁片绣花"
+      }
+    ],
+    "productionRows": [
+      {
+        "sourceGroupId": 1,
+        "sourceProcessesId": 0,
+        "processName": "长裤/口袋",
+        "unitPrice": 0.8,
+        "sort": 100,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 9,
+        "sourceProcessesId": 0,
+        "processName": "四线埋前后浪",
+        "unitPrice": 0.55,
+        "sort": 280,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 9,
+        "sourceProcessesId": 0,
+        "processName": "四线内浪*2",
+        "unitPrice": 0.5,
+        "sort": 300,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 9,
+        "sourceProcessesId": 0,
+        "processName": "四线埋侧缝落洗水唛",
+        "unitPrice": 0.6,
+        "sort": 320,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 9,
+        "sourceProcessesId": 0,
+        "processName": "四线上腰头",
+        "unitPrice": 0.6,
+        "sort": 340,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 6,
+        "sourceProcessesId": 0,
+        "processName": "烫上针织长裤",
+        "unitPrice": 0.5,
+        "sort": 360,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 7,
+        "sourceProcessesId": 0,
+        "processName": "长袖、长裤、连体装、半身装",
+        "unitPrice": 0.6,
+        "sort": 380,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 16,
+        "sourceProcessesId": 0,
+        "processName": "T恤、泳衣、背心、短袖、短裤",
+        "unitPrice": 0.3,
+        "sort": 400,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 18,
+        "sourceProcessesId": 0,
+        "processName": "鸡眼*2",
+        "unitPrice": 0.3,
+        "sort": 420,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 19,
+        "sourceProcessesId": 0,
+        "processName": "穿脚口橡筋绳+锁扣*2",
+        "unitPrice": 0.4,
+        "sort": 440,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 21,
+        "sourceProcessesId": 0,
+        "processName": "包装",
+        "unitPrice": 0.25,
+        "sort": 460,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 2,
+        "sourceProcessesId": 0,
+        "processName": "驳接下脚橡筋剪量*2",
+        "unitPrice": 0.2,
+        "sort": 520,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 2,
+        "sourceProcessesId": 0,
+        "processName": "平车驳、量腰橡筋包车腰橡筋*1",
+        "unitPrice": 0.9,
+        "sort": 540,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 13,
+        "sourceProcessesId": 0,
+        "processName": "平车运反袋布间袋1/4线落袋布间袋口线定袋口位*2",
+        "unitPrice": 1.3,
+        "sort": 580,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 13,
+        "sourceProcessesId": 0,
+        "processName": "平车落前袋贴*2",
+        "unitPrice": 0.3,
+        "sort": 600,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 2,
+        "sourceProcessesId": 0,
+        "processName": "平车折车脚口*2",
+        "unitPrice": 0.4,
+        "sort": 620,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 2,
+        "sourceProcessesId": 0,
+        "processName": "定主唛两头暗线",
+        "unitPrice": 0.3,
+        "sort": 640,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 2,
+        "sourceProcessesId": 0,
+        "processName": "平车间腰头橡筋线*2",
+        "unitPrice": 0.8,
+        "sort": 680,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      },
+      {
+        "sourceGroupId": 4,
+        "sourceProcessesId": 0,
+        "processName": "冚脚口*2",
+        "unitPrice": 0.48,
+        "sort": 700,
+        "unresolvedDepartmentSource": 0,
+        "mappingStatus": "needs_name_based_mapping"
+      }
+    ]
+  }
+}

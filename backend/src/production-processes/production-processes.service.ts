@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { ProductionProcess } from '../entities/production-process.entity';
 
 @Injectable()
@@ -85,6 +85,50 @@ export class ProductionProcessesService {
   async remove(id: number): Promise<void> {
     const row = await this.findOne(id);
     await this.repo.remove(row);
+  }
+
+  async batchMove(ids: number[], department: string, jobType: string): Promise<{ moved: number }> {
+    const cleanIds = [...new Set((ids ?? []).map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0))]
+    const targetDepartment = (department ?? '').trim()
+    const targetJobType = (jobType ?? '').trim()
+    if (!cleanIds.length) {
+      throw new BadRequestException('请选择要移动的工序')
+    }
+    if (!targetDepartment || !targetJobType) {
+      throw new BadRequestException('请选择目标部门和工种')
+    }
+
+    return this.repo.manager.transaction(async (manager) => {
+      const repo = manager.getRepository(ProductionProcess)
+      const items = await repo.find({
+        where: { id: In(cleanIds) },
+        order: { sortOrder: 'ASC', id: 'ASC' },
+      })
+      if (items.length !== cleanIds.length) {
+        throw new BadRequestException('部分工序不存在或已被删除')
+      }
+
+      const targetRows = await repo
+        .createQueryBuilder('p')
+        .where('p.department = :department', { department: targetDepartment })
+        .andWhere('p.job_type = :jobType', { jobType: targetJobType })
+        .andWhere('p.id NOT IN (:...ids)', { ids: cleanIds })
+        .orderBy('p.sort_order', 'ASC')
+        .addOrderBy('p.id', 'ASC')
+        .getMany()
+      const nextSortOrder = targetRows.length
+        ? Math.max(...targetRows.map((row) => Number(row.sortOrder) || 0)) + 1
+        : 0
+
+      items.forEach((row, index) => {
+        row.department = targetDepartment
+        row.jobType = targetJobType
+        row.sortOrder = nextSortOrder + index
+      })
+
+      await repo.save(items)
+      return { moved: items.length }
+    })
   }
 
   private normalizeDecimal(v: string | number): string {

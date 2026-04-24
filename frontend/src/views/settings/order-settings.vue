@@ -127,6 +127,9 @@
 
           <div class="process-actions">
             <el-button type="primary" size="small" @click="openAddDepartment()">新增部门</el-button>
+            <el-button size="small" :disabled="!selectedProcessIds.length" @click="openBatchMoveDialog">批量移动</el-button>
+            <el-button size="small" :disabled="!selectedProcessIds.length" @click="clearProcessSelection">清空选择</el-button>
+            <span v-if="selectedProcessIds.length" class="selection-hint">已选 {{ selectedProcessIds.length }} 条工序</span>
     </div>
           <el-table
             ref="processTreeTableRef"
@@ -140,7 +143,15 @@
             :load="loadProcessTreeNode"
             :tree-props="{ hasChildren: 'hasChildren', children: 'children' }"
             @expand-change="onProcessTreeExpandChange"
+            @selection-change="onProcessSelectionChange"
           >
+            <el-table-column
+              type="selection"
+              width="44"
+              align="center"
+              reserve-selection
+              :selectable="canSelectProcessRow"
+            />
             <el-table-column label="部门" min-width="100" align="center">
               <template #default="{ row }">
                 <template v-if="row.rowType === 'department'">{{ row.department || '-' }}</template>
@@ -257,6 +268,44 @@
             <template #footer>
               <el-button @click="processDialog.visible = false">取消</el-button>
               <el-button type="primary" @click="submitProcess">确定</el-button>
+            </template>
+          </el-dialog>
+          <el-dialog
+            v-model="batchMoveDialog.visible"
+            title="批量移动工序"
+            width="520px"
+            @close="resetBatchMoveDialog"
+          >
+            <el-form :model="batchMoveForm" label-width="90px" size="default">
+              <el-form-item label="已选工序">
+                <el-input :model-value="selectedProcessIds.length ? `${selectedProcessIds.length} 条` : ''" disabled />
+              </el-form-item>
+              <el-form-item label="目标部门">
+                <el-select
+                  v-model="batchMoveForm.department"
+                  placeholder="请选择目标部门"
+                  style="width: 100%"
+                  @change="onBatchMoveDepartmentChange"
+                >
+                  <el-option v-for="d in processDepartments" :key="d" :label="d" :value="d" />
+                </el-select>
+              </el-form-item>
+              <el-form-item label="目标工种">
+                <el-select
+                  v-model="batchMoveForm.jobType"
+                  placeholder="先选部门后选择工种"
+                  clearable
+                  filterable
+                  style="width: 100%"
+                  :disabled="!batchMoveForm.department"
+                >
+                  <el-option v-for="j in batchMoveJobTypeOptions" :key="j" :label="j" :value="j" />
+                </el-select>
+              </el-form-item>
+            </el-form>
+            <template #footer>
+              <el-button @click="batchMoveDialog.visible = false">取消</el-button>
+              <el-button type="primary" :loading="batchMoveSubmitting" @click="submitBatchMove">确定移动</el-button>
             </template>
           </el-dialog>
 
@@ -714,6 +763,7 @@ import {
   createProductionProcess,
   updateProductionProcess,
   deleteProductionProcess,
+  batchMoveProductionProcesses,
   type ProductionProcessItem,
 } from '@/api/production-processes'
 import {
@@ -791,6 +841,7 @@ const activeTab = ref<
 >('orderStatusConfig')
 const processTreeTableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const processTreeData = ref<ProcessTreeRow[]>([])
+const selectedProcessIds = ref<number[]>([])
 const processJobTypeListRef = ref<SystemOptionItem[]>([])
 const processJobTypeChildrenMapRef = ref<Map<number, SystemOptionItem[]>>(new Map())
 const processRowsCacheRef = ref<Map<string, ProductionProcessItem[]>>(new Map())
@@ -808,6 +859,13 @@ const processForm = ref({
   sortOrder: 0,
 })
 const processJobTypeOptions = ref<string[]>([])
+const batchMoveDialog = ref<{ visible: boolean }>({ visible: false })
+const batchMoveForm = ref({
+  department: '',
+  jobType: '',
+})
+const batchMoveJobTypeOptions = ref<string[]>([])
+const batchMoveSubmitting = ref(false)
 
 const jobTypeDialog = ref<{
   visible: boolean
@@ -1098,6 +1156,7 @@ async function refreshJobTypeChildrenByMeta(parentId: number, department: string
   if (!cached) processRowsCacheRef.value.set(cacheKey, list)
   const rows = buildProcessRowsWithLoadMore(parentId, department, jobTypePath, list, pageRes?.total ?? list.length)
   ;(processTreeTableRef.value as unknown as { updateKeyChildren?: (key: string | number, rows: ProcessTreeRow[]) => void })?.updateKeyChildren?.(`job-${parentId}`, rows)
+  return rows
 }
 
 function buildJobTypePathsFromList(list: SystemOptionItem[], rootId: number, rootValue: string): string[] {
@@ -1809,6 +1868,8 @@ async function loadProcessTreeRoots() {
       nodeId: n.id,
       parentId: null,
     }))
+    await nextTick()
+    syncVisibleProcessSelection(processTreeData.value)
   } catch {
     processTreeData.value = []
   }
@@ -1824,13 +1885,17 @@ async function loadProcessTreeNode(
     saveExpandedRowKey(row)
     const localChildren = getChildrenFromLocalCache(row.nodeId)
     if (localChildren) {
-      resolve(mapJobTypeRowsFromChildren(localChildren, row))
+      const rows = mapJobTypeRowsFromChildren(localChildren, row)
+      resolve(rows)
+      syncVisibleProcessSelection(rows)
       return
     }
     try {
       const res = await getSystemOptionsChildren('process_job_types', row.nodeId)
       const children = res.data ?? []
-      resolve(mapJobTypeRowsFromChildren(children, row))
+      const rows = mapJobTypeRowsFromChildren(children, row)
+      resolve(rows)
+      syncVisibleProcessSelection(rows)
     } catch {
       resolve([])
     }
@@ -1840,14 +1905,18 @@ async function loadProcessTreeNode(
     saveExpandedRowKey(row)
     const localChildren = getChildrenFromLocalCache(row.nodeId)
     if (localChildren && localChildren.length > 0) {
-      resolve(mapJobTypeRowsFromChildren(localChildren, row))
+      const rows = mapJobTypeRowsFromChildren(localChildren, row)
+      resolve(rows)
+      syncVisibleProcessSelection(rows)
       return
     }
     try {
       const childrenRes = await getSystemOptionsChildren('process_job_types', row.nodeId)
       const children = childrenRes.data ?? []
       if (children.length > 0) {
-        resolve(mapJobTypeRowsFromChildren(children, row))
+        const rows = mapJobTypeRowsFromChildren(children, row)
+        resolve(rows)
+        syncVisibleProcessSelection(rows)
         return
       }
 
@@ -1872,6 +1941,7 @@ async function loadProcessTreeNode(
         pageRes?.total ?? list.length,
       )
       resolve(rows)
+      syncVisibleProcessSelection(rows)
     } catch {
       resolve([])
     }
@@ -1889,7 +1959,8 @@ async function loadMoreProcesses(row: ProcessTreeRow) {
       processRowsCacheRef.value.delete(key)
     }
   }
-  await refreshJobTypeChildrenByMeta(row.parentId, row.department, row.jobTypePath)
+  const rows = await refreshJobTypeChildrenByMeta(row.parentId, row.department, row.jobTypePath)
+  syncVisibleProcessSelection(rows)
   await nextTick()
   restoreScrollTop()
 }
@@ -2072,28 +2143,119 @@ async function moveJobTypeRow(row: ProcessTreeRow, delta: number) {
   }
 }
 
-async function loadProcessJobTypeOptions(department: string) {
-  if (!department) {
-    processJobTypeOptions.value = []
-    return
-  }
+async function resolveProcessJobTypeOptions(department: string): Promise<string[]> {
+  if (!department) return []
   try {
     if (!processJobTypeListRef.value.length) await refreshProcessJobTypeList()
     const all = processJobTypeListRef.value
     const root = all.find((n) => n.parentId == null && n.value === department)
-    if (!root) {
-      processJobTypeOptions.value = []
-      return
-    }
-    processJobTypeOptions.value = buildJobTypePathsFromList(all, root.id, department)
+    if (!root) return []
+    return buildJobTypePathsFromList(all, root.id, department)
   } catch {
-    processJobTypeOptions.value = []
+    return []
   }
+}
+
+async function loadProcessJobTypeOptions(department: string) {
+  processJobTypeOptions.value = await resolveProcessJobTypeOptions(department)
 }
 
 function onProcessDepartmentChange() {
   processForm.value.jobType = ''
   loadProcessJobTypeOptions(processForm.value.department)
+}
+
+function canSelectProcessRow(row: ProcessTreeRow): boolean {
+  return row.rowType === 'process'
+}
+
+function onProcessSelectionChange(rows: ProcessTreeRow[]) {
+  selectedProcessIds.value = [...new Set(rows.filter((row) => row.rowType === 'process' && row.processRow).map((row) => row.processRow!.id))].sort((a, b) => a - b)
+}
+
+function clearProcessSelection() {
+  const table = processTreeTableRef.value as unknown as { clearSelection?: () => void }
+  table?.clearSelection?.()
+  selectedProcessIds.value = []
+}
+
+function syncVisibleProcessSelection(rows: ProcessTreeRow[]) {
+  const table = processTreeTableRef.value as unknown as {
+    toggleRowSelection?: (row: ProcessTreeRow, selected?: boolean) => void
+  }
+  if (!table?.toggleRowSelection || !selectedProcessIds.value.length) return
+  const selected = new Set(selectedProcessIds.value)
+  nextTick(() => {
+    rows.forEach((row) => {
+      if (row.rowType !== 'process' || !row.processRow) return
+      if (selected.has(row.processRow.id)) {
+        table.toggleRowSelection?.(row, true)
+      }
+    })
+  })
+}
+
+async function loadBatchMoveJobTypeOptions(department: string) {
+  batchMoveJobTypeOptions.value = await resolveProcessJobTypeOptions(department)
+}
+
+function onBatchMoveDepartmentChange() {
+  batchMoveForm.value.jobType = ''
+  loadBatchMoveJobTypeOptions(batchMoveForm.value.department)
+}
+
+function resetBatchMoveDialog() {
+  batchMoveForm.value = { department: '', jobType: '' }
+  batchMoveJobTypeOptions.value = []
+  batchMoveSubmitting.value = false
+}
+
+async function openBatchMoveDialog() {
+  if (!selectedProcessIds.value.length) {
+    ElMessage.warning('请先勾选要移动的工序')
+    return
+  }
+  batchMoveDialog.value.visible = true
+  batchMoveForm.value = { department: '', jobType: '' }
+  batchMoveJobTypeOptions.value = []
+}
+
+async function submitBatchMove() {
+  const ids = [...new Set(selectedProcessIds.value)]
+  if (!ids.length) {
+    ElMessage.warning('请先勾选要移动的工序')
+    return
+  }
+  if (!batchMoveForm.value.department) {
+    ElMessage.warning('请选择目标部门')
+    return
+  }
+  if (!batchMoveForm.value.jobType) {
+    ElMessage.warning('请选择目标工种')
+    return
+  }
+
+  batchMoveSubmitting.value = true
+  try {
+    const res = await batchMoveProductionProcesses({
+      ids,
+      department: batchMoveForm.value.department,
+      jobType: batchMoveForm.value.jobType,
+    })
+    ElMessage.success(`已批量移动 ${res.data?.moved ?? ids.length} 条工序`)
+    batchMoveDialog.value.visible = false
+    clearProcessSelection()
+    processRowsCacheRef.value.clear()
+    await refreshProcessJobTypeList()
+    await reloadProcessTreeKeepExpanded()
+    await resyncLazyChildrenForExpandedRows()
+    await nextTick()
+    restoreScrollTop()
+  } catch (e: unknown) {
+    ElMessage.error((e as { message?: string })?.message ?? '批量移动失败')
+  } finally {
+    batchMoveSubmitting.value = false
+  }
 }
 
 /** 确保 process_job_types 下存在三个根节点：裁床、车缝、尾部 */
@@ -2205,6 +2367,7 @@ async function removeProcess(row: ProductionProcessItem) {
     captureScrollTop()
     processRowsCacheRef.value.clear()
     removeProcessRowLocal(row.id)
+    selectedProcessIds.value = selectedProcessIds.value.filter((id) => id !== row.id)
     await refreshExpandedJobTypeRows()
     await nextTick()
     restoreScrollTop()
@@ -2289,7 +2452,8 @@ async function refreshExpandedJobTypeRows() {
     if (Number.isNaN(nodeId)) continue
     const meta = processJobMetaByNodeIdRef.value.get(nodeId)
     if (!meta) continue
-    await refreshJobTypeChildrenByMeta(nodeId, meta.department, meta.jobTypePath)
+    const rows = await refreshJobTypeChildrenByMeta(nodeId, meta.department, meta.jobTypePath)
+    syncVisibleProcessSelection(rows)
   }
 }
 
@@ -2497,7 +2661,16 @@ async function submitQuoteTemplateItems() {
 
 .process-actions,
 .sla-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
   margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.selection-hint {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
 }
 
 .quote-template-items-actions {
@@ -2686,4 +2859,3 @@ async function submitQuoteTemplateItems() {
   }
 }
 </style>
-

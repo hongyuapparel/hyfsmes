@@ -167,32 +167,32 @@ onMounted(load)
 /* 统计卡片 */
 .stat-cards { display: flex; flex-wrap: wrap; gap: var(--space-md); margin-bottom: var(--space-lg); }
 .stat-card { flex: 1 1 180px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-md) var(--space-lg); min-width: 160px; }
-.stat-label { font-size: 13px; color: var(--color-text-muted); margin-bottom: 6px; }
-.stat-value { font-size: 22px; font-weight: 700; letter-spacing: -0.5px; }
-.stat-hint { font-size: 11px; color: var(--color-text-muted); margin-top: 4px; }
+.stat-label { font-size: var(--font-size-body); color: var(--color-text-muted); margin-bottom: 6px; }
+.stat-value { font-size: var(--font-size-title); font-weight: 700; letter-spacing: -0.5px; }
+.stat-hint { font-size: var(--font-size-caption); color: var(--color-text-muted); margin-top: 4px; }
 
 /* 账户余额 */
 .account-balance-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
 .account-card { background: var(--color-bg-subtle, #f5f6f8); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 10px 16px; min-width: 130px; }
-.account-name { font-size: 12px; color: var(--color-text-muted); }
-.account-balance { font-size: 16px; font-weight: 600; margin-top: 2px; }
+.account-name { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+.account-balance { font-size: var(--font-size-subtitle); font-weight: 600; margin-top: 2px; }
 
 /* 内容区网格 */
 .content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
 @media (max-width: 900px) { .content-grid { grid-template-columns: 1fr; } }
 
 .section { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-md); }
-.section-title { font-size: 14px; font-weight: 600; color: var(--color-text-primary); margin-bottom: var(--space-sm); }
+.section-title { font-size: var(--font-size-body); font-weight: 600; color: var(--color-text-primary); margin-bottom: var(--space-sm); }
 .section-more { margin-top: var(--space-sm); text-align: right; }
-.more-link { font-size: 12px; color: var(--color-primary); text-decoration: none; }
+.more-link { font-size: var(--font-size-caption); color: var(--color-primary); text-decoration: none; }
 .more-link:hover { text-decoration: underline; }
-.mini-table { font-size: 13px; }
+.mini-table { font-size: var(--font-size-body); }
 
 /* TOP5 */
-.empty-tip { font-size: 13px; color: var(--color-text-muted); padding: var(--space-md) 0; text-align: center; }
+.empty-tip { font-size: var(--font-size-body); color: var(--color-text-muted); padding: var(--space-md) 0; text-align: center; }
 .top5-list { display: flex; flex-direction: column; gap: 10px; }
-.top5-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.top5-rank { width: 20px; height: 20px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600; flex-shrink: 0; }
+.top5-row { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-body); }
+.top5-rank { width: 20px; height: 20px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-caption); font-weight: 600; flex-shrink: 0; }
 .top5-name { width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
 .top5-bar-wrap { flex: 1; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
 .top5-bar { height: 100%; background: #f97316; border-radius: 4px; transition: width .3s; }

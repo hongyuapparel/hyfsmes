@@ -13,10 +13,27 @@ if (-not (Test-Path (Join-Path $BackendDir ".env"))) {
 
 $BackendPort = 3000
 $FrontendPort = 5173
+$NpmCmd = (Get-Command npm.cmd).Source
 
 function Test-PortFree {
     param ([int]$Port)
     $null -eq (Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue)
+}
+
+function Start-DetachedNpm {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$WorkingDirectory,
+        [Parameter(Mandatory = $true)]
+        [string]$Arguments
+    )
+
+    $psi = New-Object System.Diagnostics.ProcessStartInfo
+    $psi.FileName = $NpmCmd
+    $psi.Arguments = $Arguments
+    $psi.WorkingDirectory = $WorkingDirectory
+    $psi.UseShellExecute = $true
+    [void][System.Diagnostics.Process]::Start($psi)
 }
 
 # If port in use, run stop.ps1 once and wait, then re-check
@@ -39,8 +56,8 @@ if ($frontendInUse) {
 }
 
 Write-Host ("Starting backend (port " + $BackendPort + ") and frontend (port " + $FrontendPort + ")...") -ForegroundColor Green
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$BackendDir'; npm run start:dev"
+Start-DetachedNpm -WorkingDirectory $BackendDir -Arguments 'run start:dev'
 Start-Sleep -Seconds 2
-Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$FrontendDir'; npm run dev"
+Start-DetachedNpm -WorkingDirectory $FrontendDir -Arguments 'run dev'
 Write-Host "Done. Two windows opened. Run scripts\check.ps1 to verify." -ForegroundColor Green
 Write-Host "Tip: Code changes auto-reload; only restart when changing .env or deps. Use scripts\restart.ps1 to restart." -ForegroundColor Gray

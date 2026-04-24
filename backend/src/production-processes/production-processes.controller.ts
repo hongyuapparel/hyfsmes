@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -80,5 +80,18 @@ export class ProductionProcessesController {
   @RequirePermission('/orders/list')
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
+  }
+
+  @Patch('batch/move')
+  @RequirePermission('/orders/list')
+  batchMove(
+    @Body()
+    body: {
+      ids: number[];
+      department: string;
+      jobType: string;
+    },
+  ) {
+    return this.service.batchMove(body.ids ?? [], body.department ?? '', body.jobType ?? '');
   }
 }

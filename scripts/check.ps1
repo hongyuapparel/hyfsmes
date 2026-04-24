@@ -19,8 +19,7 @@ if (-not (Test-Path (Join-Path $BackendDir ".env"))) {
 
 $backendConn = Get-NetTCPConnection -LocalPort $BackendPort -ErrorAction SilentlyContinue
 if (-not $backendConn) {
-    Write-Host ("FAIL: Backend not running (port " + $BackendPort + "). Run scripts\start.ps1.") -ForegroundColor Red
-    $allOk = $false
+    Write-Host ("WARN: Backend port " + $BackendPort + " not visible from this shell. Will verify via /health instead.") -ForegroundColor Yellow
 } else {
     Write-Host ("OK: Port " + $BackendPort + " in use (backend)") -ForegroundColor Green
 }
@@ -54,8 +53,7 @@ try {
 
 $frontendConn = Get-NetTCPConnection -LocalPort $FrontendPort -ErrorAction SilentlyContinue
 if (-not $frontendConn) {
-    Write-Host ("FAIL: Frontend not running (port " + $FrontendPort + "). Run scripts\start.ps1.") -ForegroundColor Red
-    $allOk = $false
+    Write-Host ("WARN: Frontend port " + $FrontendPort + " not visible from this shell. Will verify via HTTP page check instead.") -ForegroundColor Yellow
 } else {
     Write-Host ("OK: Port " + $FrontendPort + " in use (frontend)") -ForegroundColor Green
 }
