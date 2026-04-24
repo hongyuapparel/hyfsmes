@@ -32,7 +32,7 @@ const remarkInputRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null
 const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
 const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
 const sizeInfoRows = ref<SizeInfoRow[]>([])
-const sizeInfoTableRef = ref<any>()
+const sizeInfoTableRef = ref<{ $el?: HTMLElement } | null>(null)
 let sizeInfoSortable: Sortable | null = null
 let sizeInfoRowKeySeed = 0
 const sizeGridRefs = ref<InputComponentInstance[][]>([])
@@ -82,11 +82,11 @@ function setColorCellRef(el: unknown, rowIndex: number, colIndex: number) {
   if (!colorCellRefs.value[rowIndex]) colorCellRefs.value[rowIndex] = []
   let target: InputComponentInstance = null
   if (el && typeof el === 'object') {
-    const anyEl = el as any
-    if (anyEl.$el) {
-      target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+    const maybeEl = el as { $el?: HTMLElement; focus?: () => void }
+    if (maybeEl.$el) {
+      target = (maybeEl.$el.querySelector('input') as HTMLElement | null) ?? maybeEl.$el
     } else {
-      target = anyEl as InputComponentInstance
+      target = maybeEl as InputComponentInstance
     }
   }
   colorCellRefs.value[rowIndex][colIndex] = target
@@ -116,7 +116,7 @@ function startEditBCell(rowIndex: number, col: BEditCol) {
   } else {
     nextTick(() => {
       const ref = col === 'color' ? colorNameInputRef.value : remarkInputRef.value
-      const input = ref?.$el?.querySelector?.('input') ?? (ref as any)?.$el
+      const input = ref?.$el?.querySelector?.('input') ?? ref?.$el
       if (input?.focus) input.focus()
       else if (typeof ref?.focus === 'function') ref.focus()
     })
@@ -125,9 +125,13 @@ function startEditBCell(rowIndex: number, col: BEditCol) {
 
 function onBCellBlur() {
   setTimeout(() => {
-    const root = (bTableRef.value as any)?.$el ?? (bTableRef.value as any)
+    const root = bTableRef.value?.$el ?? bTableRef.value
     const container =
-      root instanceof HTMLElement ? root : root?.$el instanceof HTMLElement ? root.$el : null
+      root instanceof HTMLElement
+        ? root
+        : root && typeof root === 'object' && '$el' in root && root.$el instanceof HTMLElement
+          ? root.$el
+          : null
     const active = document.activeElement as HTMLElement | null
     if (!container || !active || !container.contains(active)) {
       editingCell.value = null
@@ -273,11 +277,11 @@ function setSizeGridCellRef(el: unknown, rowIndex: number, colIndex: number) {
   if (!sizeGridRefs.value[rowIndex]) sizeGridRefs.value[rowIndex] = []
   let target: InputComponentInstance = null
   if (el && typeof el === 'object') {
-    const anyEl = el as any
-    if (anyEl.$el) {
-      target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+    const maybeEl = el as { $el?: HTMLElement; focus?: () => void }
+    if (maybeEl.$el) {
+      target = (maybeEl.$el.querySelector('input') as HTMLElement | null) ?? maybeEl.$el
     } else {
-      target = anyEl as InputComponentInstance
+      target = maybeEl as InputComponentInstance
     }
   }
   sizeGridRefs.value[rowIndex][colIndex] = target
@@ -440,7 +444,7 @@ async function copySizeInfoToClipboard() {
   })
   const lines = [headers, ...rows].map((r) => r.join('\t')).join('\n')
   try {
-    const nav: any = navigator
+    const nav = navigator as { clipboard?: { writeText?: (text: string) => Promise<void> } }
     if (nav?.clipboard?.writeText) {
       await nav.clipboard.writeText(lines)
       ElMessage.success('已复制到剪贴板，可直接粘贴到 Excel')

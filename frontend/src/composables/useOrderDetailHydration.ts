@@ -1,5 +1,22 @@
 import type { Ref } from 'vue'
-import type { OrderFormPayload } from '@/api/orders'
+import type { OrderDetail, OrderFormPayload } from '@/api/orders'
+import type { ColorRow } from '@/composables/useOrderColorSizeMatrix'
+import type { MaterialRow } from '@/composables/useOrderMaterials'
+import type { SizeInfoRow } from '@/composables/useOrderSizeInfo'
+
+interface ProcessItemInputRow {
+  processName?: string
+  supplierName?: string
+  part?: string
+  remark?: string
+}
+
+interface PackagingCellInputRow {
+  imageUrl?: string
+  accessoryId?: number | null
+  accessoryName?: string
+  description?: string
+}
 
 interface UseOrderDetailHydrationParams {
   form: OrderFormPayload
@@ -10,29 +27,32 @@ interface UseOrderDetailHydrationParams {
   ensureCustomerById: (customerId: number | null | undefined) => Promise<void>
   defaultSizeHeaders: string[]
   sizeHeaders: Ref<string[]>
-  colorRows: Ref<any[]>
+  colorRows: Ref<ColorRow[]>
   normalizeColorRows: () => void
   ensureAtLeastOneColorRow: () => void
-  materials: Ref<any[]>
+  materials: Ref<MaterialRow[]>
   roundMaterialQty2: (n: number) => number
-  recalcPurchaseQuantity: (row: any) => void
+  recalcPurchaseQuantity: (row: MaterialRow) => void
   defaultSizeMetaHeaders: string[]
   sizeMetaHeaders: Ref<string[]>
-  sizeInfoRows: Ref<any[]>
+  sizeInfoRows: Ref<SizeInfoRow[]>
   nextSizeInfoRowKey: () => string
   normalizeSizeInfoRows: () => void
-  processItems: Ref<any[]>
+  processItems: Ref<ProcessItemInputRow[]>
   productionRequirement: Ref<string>
   defaultPackagingHeaders: string[]
   packagingHeaders: Ref<string[]>
-  packagingCells: Ref<any[]>
+  packagingCells: Ref<PackagingCellInputRow[]>
   normalizePackagingCells: () => void
   packagingMethod: Ref<string>
   attachments: Ref<string[]>
 }
 
 export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
-  async function hydrateOrderDetail(d: any) {
+  type ColorSizeRowPayload = NonNullable<OrderDetail['colorSizeRows']>[number]
+  type MaterialPayload = NonNullable<OrderDetail['materials']>[number]
+  type SizeInfoRowPayload = NonNullable<OrderDetail['sizeInfoRows']>[number]
+  async function hydrateOrderDetail(d: OrderDetail) {
     params.orderNo.value = d.orderNo
     params.orderStatus.value = d.status ?? 'draft'
     params.form.skuCode = d.skuCode
@@ -44,8 +64,8 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     params.form.salesperson = d.salesperson ?? ''
     params.form.merchandiser = d.merchandiser ?? ''
     params.form.merchandiserPhone = d.merchandiserPhone ?? ''
-    ;(params.form as any).collaborationTypeId = d.collaborationTypeId ?? null
-    ;(params.form as any).orderTypeId = d.orderTypeId ?? null
+    params.form.collaborationTypeId = d.collaborationTypeId ?? null
+    params.form.orderTypeId = d.orderTypeId ?? null
     await params.ensureCustomerById(params.form.customerId)
     params.form.secondaryProcess = d.processItem ?? ''
     params.form.quantity = d.quantity ?? 0
@@ -58,7 +78,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     params.sizeHeaders.value = d.colorSizeHeaders && Array.isArray(d.colorSizeHeaders)
       ? [...d.colorSizeHeaders]
       : [...params.defaultSizeHeaders]
-    params.colorRows.value = (d.colorSizeRows ?? []).map((row: any) => ({
+    params.colorRows.value = (d.colorSizeRows ?? []).map((row: ColorSizeRowPayload) => ({
       colorName: row.colorName ?? '',
       quantities: Array.isArray(row.quantities) ? [...row.quantities] : Array(params.sizeHeaders.value.length).fill(0),
       remark: row.remark ?? '',
@@ -66,7 +86,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     params.normalizeColorRows()
     params.ensureAtLeastOneColorRow()
 
-    params.materials.value = (d.materials ?? []).map((m: any) => ({
+    params.materials.value = (d.materials ?? []).map((m: MaterialPayload) => ({
       materialSourceId: m.materialSourceId ?? null,
       materialSource: m.materialSource ?? '',
       materialTypeId: m.materialTypeId ?? null,
@@ -75,16 +95,11 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
       materialName: m.materialName ?? '',
       color: m.color ?? '',
       fabricWidth: m.fabricWidth ?? '',
-      usagePerPiece:
-        m.usagePerPiece != null && m.usagePerPiece !== ''
-          ? params.roundMaterialQty2(Number(m.usagePerPiece))
-          : null,
+      usagePerPiece: m.usagePerPiece != null ? params.roundMaterialQty2(Number(m.usagePerPiece)) : null,
       lossPercent: m.lossPercent ?? null,
       orderPieces: m.orderPieces ?? null,
       purchaseQuantity:
-        m.purchaseQuantity != null && m.purchaseQuantity !== ''
-          ? params.roundMaterialQty2(Number(m.purchaseQuantity))
-          : null,
+        m.purchaseQuantity != null ? params.roundMaterialQty2(Number(m.purchaseQuantity)) : null,
       cuttingQuantity: m.cuttingQuantity ?? null,
       remark: m.remark ?? '',
     }))
@@ -93,7 +108,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     params.sizeMetaHeaders.value = d.sizeInfoMetaHeaders && Array.isArray(d.sizeInfoMetaHeaders)
       ? [...d.sizeInfoMetaHeaders]
       : [...params.defaultSizeMetaHeaders]
-    params.sizeInfoRows.value = (d.sizeInfoRows ?? []).map((r: any) => ({
+    params.sizeInfoRows.value = (d.sizeInfoRows ?? []).map((r: SizeInfoRowPayload) => ({
       __rowKey: params.nextSizeInfoRowKey(),
       metaValues: Array.isArray(r.metaValues) ? [...r.metaValues] : Array(params.sizeMetaHeaders.value.length).fill(''),
       sizeValues: Array.isArray(r.sizeValues)
@@ -102,17 +117,17 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     }))
     params.normalizeSizeInfoRows()
 
-    params.processItems.value = (d.processItems ?? []).map((p: any) => ({
+    params.processItems.value = (d.processItems ?? []).map((p) => ({
       processName: p.processName ?? '',
       supplierName: p.supplierName ?? '',
-      part: p.part ?? '',
+      part: '',
       remark: p.remark ?? '',
     }))
     params.productionRequirement.value = d.productionRequirement ?? ''
     params.packagingHeaders.value = d.packagingHeaders && Array.isArray(d.packagingHeaders)
       ? [...d.packagingHeaders]
       : [...params.defaultPackagingHeaders]
-    params.packagingCells.value = (d.packagingCells ?? []).map((c: any) => ({
+    params.packagingCells.value = (d.packagingCells ?? []).map((c) => ({
       imageUrl: c.imageUrl ?? '',
       accessoryId: c.accessoryId ?? null,
       accessoryName: c.accessoryName ?? '',

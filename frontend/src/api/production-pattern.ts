@@ -61,7 +61,7 @@ export function exportPatternItems(params?: Omit<PatternListQuery, 'page' | 'pag
     responseType: 'blob',
     // 导出失败时由调用方自行提示
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }
 
 export function assignPattern(payload: {

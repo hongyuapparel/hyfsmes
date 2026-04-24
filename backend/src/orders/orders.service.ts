@@ -12,7 +12,7 @@ import {
 } from '../entities/order-ext.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { OrderRemark } from '../entities/order-remark.entity';
-import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
+import { OrderCostSnapshot, type CostMaterialRow, type CostProcessItemRow, type CostSnapshotContent } from '../entities/order-cost-snapshot.entity';
 import { User } from '../entities/user.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
@@ -384,7 +384,7 @@ export class OrdersService {
     order: Order & { packagingCells?: PackagingCell[] },
     actor: OrderActor,
   ): Promise<void> {
-    const cells = Array.isArray((order as any).packagingCells) ? ((order as any).packagingCells as PackagingCell[]) : [];
+    const cells = Array.isArray(order.packagingCells) ? order.packagingCells : [];
     if (!cells.length) return;
     const orderQty = Number(order.quantity) || 0;
     if (orderQty <= 0) return;
@@ -392,7 +392,7 @@ export class OrdersService {
     // 每个包装项默认按“1 个/件”出库；若同一辅料被选择多次，则按次数累计
     const countById = new Map<number, number>();
     cells.forEach((c) => {
-      const id = Number((c as any).accessoryId);
+      const id = Number(c.accessoryId);
       if (!id || Number.isNaN(id)) return;
       countById.set(id, (countById.get(id) ?? 0) + 1);
     });
@@ -511,8 +511,8 @@ export class OrdersService {
           ? before.materials ?? []
           : key === 'processItems'
             ? before.processItems ?? []
-            : (before as any)[key];
-      const nextValue = (payload as any)[key];
+            : (before as unknown as Record<string, unknown>)[key];
+      const nextValue = (payload as unknown as Record<string, unknown>)[key];
       if (
         JSON.stringify(this.normalizeWorkflowPayloadValue(key, beforeValue)) !==
         JSON.stringify(this.normalizeWorkflowPayloadValue(key, nextValue))
@@ -1390,7 +1390,7 @@ export class OrdersService {
       const srcCost = await this.orderCostSnapshotRepo.findOne({ where: { orderId: src.id } });
       if (srcCost?.snapshot != null) {
         const srcSnapshot =
-          srcCost.snapshot && typeof srcCost.snapshot === 'object' ? ({ ...(srcCost.snapshot as any) } as any) : null;
+          srcCost.snapshot && typeof srcCost.snapshot === 'object' ? ({ ...srcCost.snapshot } as CostSnapshotContent) : null;
         if (srcSnapshot && Object.prototype.hasOwnProperty.call(srcSnapshot, 'profitMargin')) {
           srcSnapshot.profitMargin = this.normalizeProfitMargin(srcSnapshot.profitMargin);
         }
@@ -1598,9 +1598,9 @@ export class OrdersService {
       if (!rows || rows.length === 0 || headers.length <= 1) return null;
       const sizeLen = headers.length - 1;
       const sums = Array(sizeLen).fill(0) as number[];
-      rows.forEach((row: any) => {
+      rows.forEach((row) => {
         if (Array.isArray(row.quantities)) {
-          row.quantities.forEach((q: any, idx: number) => {
+          (row.quantities as (number | null | undefined)[]).forEach((q, idx) => {
             if (idx < sizeLen) {
               const n = Number(q);
               if (!Number.isNaN(n)) sums[idx] += n;
@@ -1613,7 +1613,7 @@ export class OrdersService {
     };
 
     // 1）订单下单件数：来自 order_ext.colorSizeRows
-    const orderPerSize = buildPerSizeFromRows((ext as any)?.colorSizeRows ?? null);
+    const orderPerSize = buildPerSizeFromRows(ext?.colorSizeRows ?? null);
 
     // 2）裁床数量：来自 order_cutting.actualCutRows
     const cutPerSize = buildPerSizeFromRows(cutting?.actualCutRows ?? null);
@@ -1650,11 +1650,11 @@ export class OrdersService {
           'SELECT tail_received_qty_row AS tailReceivedQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
           [orderId],
         );
-        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as any).tailReceivedQtyRow : null;
+        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { tailReceivedQtyRow?: unknown }).tailReceivedQtyRow : null;
         if (raw != null) {
           const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
           if (Array.isArray(parsed)) {
-            receivedQtyRow = parsed.map((n: any) => Number(n) || 0);
+            receivedQtyRow = (parsed as unknown[]).map((n) => Number(n) || 0);
           }
         }
       } catch {
@@ -1703,7 +1703,7 @@ export class OrdersService {
       rows.push({ label: '尾部入库数', values: inboundRow });
     }
 
-    const colorSizeRowsList = Array.isArray((ext as any)?.colorSizeRows) ? ((ext as any).colorSizeRows as ColorSizeRow[]) : [];
+    const colorSizeRowsList = Array.isArray(ext?.colorSizeRows) ? (ext.colorSizeRows as ColorSizeRow[]) : [];
 
     let orderAllNumeric: number[] = [];
     if (orderPerSize && orderPerSize.length === headers.length) {
@@ -1867,8 +1867,8 @@ export class OrdersService {
     ]);
     if (!order) return;
 
-    const sourceMaterials = Array.isArray((ext as any)?.materials) ? ((ext as any).materials as any[]) : [];
-    const sourceProcessItems = Array.isArray((ext as any)?.processItems) ? ((ext as any).processItems as any[]) : [];
+    const sourceMaterials = Array.isArray(ext?.materials) ? (ext.materials as OrderMaterialRow[]) : [];
+    const sourceProcessItems = Array.isArray(ext?.processItems) ? (ext.processItems as ProcessRow[]) : [];
 
     const nextMaterialRows = sourceMaterials.map((m) => ({
       materialTypeId: m?.materialTypeId ?? null,
@@ -1897,10 +1897,10 @@ export class OrdersService {
     }));
 
     const existing = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    const existingSnapshot =
-      existing?.snapshot && typeof existing.snapshot === 'object' ? (existing.snapshot as any) : null;
+    const existingSnapshot: CostSnapshotContent | null =
+      existing?.snapshot && typeof existing.snapshot === 'object' ? existing.snapshot : null;
 
-    const existingMaterialRows = Array.isArray(existingSnapshot?.materialRows) ? (existingSnapshot.materialRows as any[]) : [];
+    const existingMaterialRows: CostMaterialRow[] = Array.isArray(existingSnapshot?.materialRows) ? existingSnapshot.materialRows : [];
     const mergedMaterialRows = keepPricing
       ? nextMaterialRows.map((row, index) => {
           const found = this.findBestMaterialCostRow(existingMaterialRows, row, index);
@@ -1908,8 +1908,8 @@ export class OrdersService {
         })
       : nextMaterialRows;
 
-    const existingProcessItemRows = Array.isArray(existingSnapshot?.processItemRows)
-      ? (existingSnapshot.processItemRows as any[])
+    const existingProcessItemRows: CostProcessItemRow[] = Array.isArray(existingSnapshot?.processItemRows)
+      ? existingSnapshot.processItemRows
       : [];
     const mergedProcessItemRows = keepPricing
       ? nextProcessItemRows.map((row, index) => {
@@ -1926,11 +1926,11 @@ export class OrdersService {
         })
       : nextProcessItemRows;
 
-    const nextSnapshot: Record<string, unknown> = {
-      materialRows: mergedMaterialRows.length ? mergedMaterialRows : [{ unitPrice: 0 } as any],
+    const nextSnapshot: CostSnapshotContent = {
+      materialRows: mergedMaterialRows.length ? mergedMaterialRows : [{ unitPrice: 0 }],
       processItemRows: mergedProcessItemRows.length
         ? mergedProcessItemRows
-        : [{ unitPrice: 0, quantity: defaultProcessItemQty } as any],
+        : [{ unitPrice: 0, quantity: defaultProcessItemQty }],
       productionRows: Array.isArray(existingSnapshot?.productionRows) ? existingSnapshot.productionRows : [],
       productionCostMultiplier: this.normalizeProductionCostMultiplier(existingSnapshot?.productionCostMultiplier),
       profitMargin: this.normalizeProfitMargin(existingSnapshot?.profitMargin),
@@ -1944,8 +1944,8 @@ export class OrdersService {
     }
   }
 
-  private isSameMaterialCostRow(a: any, b: any): boolean {
-    const key = (r: any) =>
+  private isSameMaterialCostRow(a: CostMaterialRow, b: CostMaterialRow): boolean {
+    const key = (r: CostMaterialRow) =>
       [
         String(r?.materialTypeId ?? ''),
         String(r?.supplierName ?? ''),
@@ -1956,7 +1956,7 @@ export class OrdersService {
     return key(a) === key(b);
   }
 
-  private findBestMaterialCostRow(existingRows: any[], row: any, index: number): any | null {
+  private findBestMaterialCostRow(existingRows: CostMaterialRow[], row: CostMaterialRow, index: number): CostMaterialRow | null {
     if (!existingRows.length) return null;
     const exact = existingRows.find((r) => this.isSameMaterialCostRow(r, row));
     if (exact) return exact;
@@ -1973,12 +1973,12 @@ export class OrdersService {
     return byIndex ?? null;
   }
 
-  private isSameProcessItemCostRow(a: any, b: any): boolean {
-    const key = (r: any) => [String(r?.processName ?? ''), String(r?.supplierName ?? ''), String(r?.part ?? '')].join('|');
+  private isSameProcessItemCostRow(a: CostProcessItemRow, b: CostProcessItemRow): boolean {
+    const key = (r: CostProcessItemRow) => [String(r?.processName ?? ''), String(r?.supplierName ?? ''), String(r?.part ?? '')].join('|');
     return key(a) === key(b);
   }
 
-  private findBestProcessItemCostRow(existingRows: any[], row: any, index: number): any | null {
+  private findBestProcessItemCostRow(existingRows: CostProcessItemRow[], row: CostProcessItemRow, index: number): CostProcessItemRow | null {
     if (!existingRows.length) return null;
     const exact = existingRows.find((r) => this.isSameProcessItemCostRow(r, row));
     if (exact) return exact;
@@ -2006,11 +2006,11 @@ export class OrdersService {
     return n;
   }
 
-  private calculateExFactoryPriceFromSnapshot(snapshot: Record<string, unknown> | null | undefined): number {
+  private calculateExFactoryPriceFromSnapshot(snapshot: CostSnapshotContent | null | undefined): number {
     if (!snapshot || typeof snapshot !== 'object') return 0;
-    const materialRows = Array.isArray(snapshot.materialRows) ? (snapshot.materialRows as any[]) : [];
-    const processItemRows = Array.isArray(snapshot.processItemRows) ? (snapshot.processItemRows as any[]) : [];
-    const productionRows = Array.isArray(snapshot.productionRows) ? (snapshot.productionRows as any[]) : [];
+    const materialRows: CostMaterialRow[] = Array.isArray(snapshot.materialRows) ? snapshot.materialRows : [];
+    const processItemRows: CostProcessItemRow[] = Array.isArray(snapshot.processItemRows) ? snapshot.processItemRows : [];
+    const productionRows = Array.isArray(snapshot.productionRows) ? snapshot.productionRows : [];
 
     const materialTotal = materialRows.reduce((sum, row) => {
       const includeInCost = row?.includeInCost !== false;

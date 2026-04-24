@@ -6,6 +6,20 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { FinanceExpenseService } from './finance-expense.service';
 
+interface FinanceExpenseBody {
+  occurDate: string;
+  amount: number | string;
+  expenseTypeId?: number | string | null;
+  fundAccountId?: number | string | null;
+  objectType?: string;
+  payeeName?: string;
+  orderNo?: string;
+  departmentId?: number | string | null;
+  operator?: string;
+  remark?: string;
+  attachments?: string[] | null;
+}
+
 @Controller('finance/expense')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/finance/expense')
@@ -43,7 +57,7 @@ export class FinanceExpenseController {
   }
 
   @Post()
-  create(@Body() body: any) {
+  create(@Body() body: FinanceExpenseBody) {
     return this.service.create({
       occurDate: body.occurDate,
       amount: body.amount,
@@ -60,7 +74,7 @@ export class FinanceExpenseController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: Partial<FinanceExpenseBody>) {
     return this.service.update(id, {
       occurDate: body.occurDate,
       amount: body.amount,

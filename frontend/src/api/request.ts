@@ -87,7 +87,7 @@ request.interceptors.response.use(
       }
     } else {
       const status = err.response?.status
-      const skip = (err.config as { skipGlobalErrorHandler?: boolean })?.skipGlobalErrorHandler
+      const skip = err.config?.skipGlobalErrorHandler
       const shouldShow = !skip && (status === 400 || status === 403 || status === 404 || (status != null && status >= 500) || !err.response)
       if (shouldShow) {
         if (err.response || shouldShowNetworkErrorMessage()) {

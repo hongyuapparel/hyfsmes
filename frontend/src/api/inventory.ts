@@ -1,5 +1,11 @@
 import request from './request'
 
+/** 成品库存快照结构（调整日志 before/after 字段） */
+export interface FinishedStockSnapshot {
+  headers: string[]
+  rows: Array<{ colorName: string; values: number[] }>
+}
+
 /** 待入库 */
 export interface PendingListItem {
   id: number
@@ -138,8 +144,8 @@ export interface FinishedStockDetailRes {
   adjustLogs: Array<{
     id: number
     operatorUsername: string
-    before: any
-    after: any
+    before: FinishedStockSnapshot | null
+    after: FinishedStockSnapshot | null
     remark: string
     createdAt: string
   }>
@@ -341,8 +347,8 @@ export interface AccessoryOperationLog {
   accessoryId: number
   operatorUsername: string
   action: string
-  beforeSnapshot: Record<string, any> | null
-  afterSnapshot: Record<string, any> | null
+  beforeSnapshot: Record<string, unknown> | null
+  afterSnapshot: Record<string, unknown> | null
   remark: string
   createdAt: string
 }
@@ -486,8 +492,8 @@ export interface FabricOperationLog {
   fabricStockId: number
   operatorUsername: string
   action: string
-  beforeSnapshot: Record<string, any> | null
-  afterSnapshot: Record<string, any> | null
+  beforeSnapshot: Record<string, unknown> | null
+  afterSnapshot: Record<string, unknown> | null
   remark: string
   createdAt: string
 }

@@ -85,6 +85,7 @@ export interface OrderMaterialRow {
   supplierName?: string;
   materialName?: string;
   color?: string;
+  fabricWidth?: string;
   usagePerPiece?: number | null;
   lossPercent?: number | null;
   orderPieces?: number | null;

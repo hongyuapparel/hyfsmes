@@ -8,7 +8,7 @@ import {
   type SupplierBusinessScopeTreeNode,
 } from '@/api/suppliers'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { type SystemOptionTreeNode } from '@/api/system-options'
+import { type SystemOptionItem, type SystemOptionTreeNode } from '@/api/system-options'
 
 const DEFAULT_STATUS_TABS: Array<{ label: string; value: string }> = [
   { label: '全部', value: 'all' },
@@ -37,6 +37,18 @@ interface ProcessOptionNode {
   label: string
   value: string
   children?: ProcessOptionNode[]
+}
+
+interface OrderTypeTreeSelectNode {
+  label: string
+  value: number
+  children?: OrderTypeTreeSelectNode[]
+  disabled?: boolean
+}
+
+interface DictItemLike {
+  id: number
+  value: string
 }
 
 export function useOrderListOptions() {
@@ -84,7 +96,7 @@ export function useOrderListOptions() {
 
   function toOrderTypeTreeSelect(
     nodes: SystemOptionTreeNode[],
-  ): { label: string; value: number; children?: any[]; disabled?: boolean }[] {
+  ): OrderTypeTreeSelectNode[] {
     return nodes.map((n) => {
       const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
       return {
@@ -133,7 +145,9 @@ export function useOrderListOptions() {
     const collabRes = await getDictItems('collaboration')
     const collabVals = collabRes.data ?? []
     collaborationItems.value = Array.isArray(collabVals)
-      ? collabVals.map((item: any) => ({ id: item.id, value: item.value }))
+      ? collabVals
+          .filter((item): item is SystemOptionItem => !!item && typeof item === 'object' && 'id' in item && 'value' in item)
+          .map((item) => ({ id: item.id, value: item.value }))
       : []
   }
 

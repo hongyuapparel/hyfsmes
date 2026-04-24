@@ -204,6 +204,22 @@ export interface OrderFormPayload {
 
 export type OrderDetail = OrderListItem & OrderFormPayload
 
+/** 表单内部工艺行（含 part 字段；与 payload processItems 略有差异） */
+export interface ProcessItemFormRow {
+  processName: string
+  supplierName: string
+  part: string
+  remark: string
+}
+
+/** 表单内部包装格（不含 header；header 在序列化时从 packagingHeaders 注入） */
+export interface PackagingCellFormRow {
+  imageUrl: string
+  accessoryId: number | null
+  accessoryName: string
+  description: string
+}
+
 /** 获取订单详情（编辑回显） */
 export function getOrderDetail(id: number) {
   return request.get<OrderDetail>(`/orders/${id}`)

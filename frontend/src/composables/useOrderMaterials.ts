@@ -1,5 +1,6 @@
 import { nextTick, ref } from 'vue'
 import { getDictItems } from '@/api/dicts'
+import type { SystemOptionItem } from '@/api/system-options'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
@@ -33,11 +34,11 @@ export function useOrderMaterials() {
     if (!materialCellRefs.value[rowIndex]) materialCellRefs.value[rowIndex] = []
     let target: InputComponentInstance = null
     if (el && typeof el === 'object') {
-      const anyEl = el as any
-      if (anyEl.$el) {
-        target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+      const vueEl = el as { $el?: HTMLElement }
+      if (vueEl.$el) {
+        target = (vueEl.$el.querySelector('input') as HTMLElement | null) ?? vueEl.$el
       } else {
-        target = anyEl as InputComponentInstance
+        target = el as InputComponentInstance
       }
     }
     materialCellRefs.value[rowIndex][colIndex] = target
@@ -101,7 +102,7 @@ export function useOrderMaterials() {
     try {
       const res = await getDictItems('material_types')
       const list = res.data ?? []
-      materialTypeOptions.value = list.map((item: any) => ({
+      materialTypeOptions.value = list.map((item: SystemOptionItem) => ({
         id: item.id,
         label: item.value,
       }))
@@ -114,7 +115,7 @@ export function useOrderMaterials() {
     try {
       const res = await getDictItems('material_sources')
       const list = res.data ?? []
-      materialSourceOptions.value = list.map((item: any) => ({
+      materialSourceOptions.value = list.map((item: SystemOptionItem) => ({
         id: item.id,
         label: item.value,
       }))
@@ -130,7 +131,7 @@ export function useOrderMaterials() {
       if (opt.label) map.set(String(opt.label), opt.id)
     })
     materials.value.forEach((row) => {
-      if ((row.materialTypeId == null || Number.isNaN(row.materialTypeId as any)) && row.materialType) {
+      if (row.materialTypeId == null && row.materialType) {
         const id = map.get(String(row.materialType))
         if (id) {
           row.materialTypeId = id
@@ -146,7 +147,7 @@ export function useOrderMaterials() {
       if (opt.label) map.set(String(opt.label), opt.id)
     })
     materials.value.forEach((row) => {
-      if ((row.materialSourceId == null || Number.isNaN(row.materialSourceId as any)) && row.materialSource) {
+      if (row.materialSourceId == null && row.materialSource) {
         const id = map.get(String(row.materialSource))
         if (id) row.materialSourceId = id
       }

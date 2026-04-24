@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems } from '@/api/dicts'
-import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getSystemOptionsTree, type SystemOptionItem, type SystemOptionTreeNode } from '@/api/system-options'
 import {
   getSupplierBusinessScopeOptions,
   getSupplierBusinessScopeTreeOptions,
@@ -42,7 +42,7 @@ const customerOptions = ref<{ label: string; value: string }[]>([])
 
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
-): { label: string; value: number; children?: any[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: Array<{ label: string; value: number; children?: unknown[]; disabled?: boolean }>; disabled?: boolean }[] {
   return nodes.map((n) => {
     const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
     const hasChildren = children.length > 0
@@ -108,10 +108,11 @@ async function loadCollaborationOptions() {
   try {
     const res = await getDictItems('collaboration')
     const items = res.data ?? []
-    collaborationItems.value = items.map((item: any) => ({
-      id: item.id,
-      value: item.value,
-    }))
+    collaborationItems.value = Array.isArray(items)
+      ? items
+          .filter((item): item is SystemOptionItem => !!item && typeof item === 'object' && 'id' in item && 'value' in item)
+          .map((item) => ({ id: item.id, value: item.value }))
+      : []
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('Failed to load collaboration options', getErrorMessage(e))
   }

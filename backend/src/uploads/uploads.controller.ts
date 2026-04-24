@@ -19,12 +19,21 @@ import { generateSmallThumbnailBeside } from './thumbnail.util';
 
 const UPLOAD_DIR = join(process.cwd(), 'uploads');
 
+interface UploadStorageFile {
+  originalname: string;
+  mimetype: string;
+}
+
+interface UploadedFileResult {
+  filename: string;
+}
+
 export const uploadStorage = diskStorage({
-  destination: (_req: any, _file: any, cb: (error: Error | null, destination: string) => void) => {
+  destination: (_req: unknown, _file: UploadStorageFile, cb: (error: Error | null, destination: string) => void) => {
     if (!existsSync(UPLOAD_DIR)) mkdirSync(UPLOAD_DIR, { recursive: true });
     cb(null, UPLOAD_DIR);
   },
-  filename: (_req: any, file: any, cb: (error: Error | null, filename: string) => void) => {
+  filename: (_req: unknown, file: UploadStorageFile, cb: (error: Error | null, filename: string) => void) => {
     const ext = extname(file.originalname) || '.jpg';
     const name = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}${ext}`;
     cb(null, name);
@@ -34,7 +43,7 @@ export const uploadStorage = diskStorage({
 const imageInterceptor = FileInterceptor('file', {
   storage: uploadStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (_req: any, file: any, cb: (error: Error | null, acceptFile: boolean) => void) => {
+  fileFilter: (_req: unknown, file: UploadStorageFile, cb: (error: Error | null, acceptFile: boolean) => void) => {
     const allowed = /^image\/(jpeg|png|gif|webp)$/i.test(file.mimetype);
     cb(null, allowed);
   },
@@ -50,7 +59,7 @@ export class UploadsController {
   @Post('image')
   @RequirePermission('/orders/products')
   @UseInterceptors(imageInterceptor)
-  async uploadImage(@UploadedFile() file: any) {
+  async uploadImage(@UploadedFile() file: UploadedFileResult | undefined) {
     if (!file) throw new BadRequestException('请选择图片文件');
     const absPath = join(UPLOAD_DIR, file.filename);
     try {
@@ -65,7 +74,7 @@ export class UploadsController {
   @Post('outbound-image')
   @RequirePermission('/inventory/fabric')
   @UseInterceptors(imageInterceptor)
-  async uploadOutboundImage(@UploadedFile() file: any) {
+  async uploadOutboundImage(@UploadedFile() file: UploadedFileResult | undefined) {
     if (!file) throw new BadRequestException('请选择图片文件');
     const absPath = join(UPLOAD_DIR, file.filename);
     try {
@@ -80,7 +89,7 @@ export class UploadsController {
   @Post('finance-image')
   @RequirePermission('/finance/income')
   @UseInterceptors(imageInterceptor)
-  async uploadFinanceImage(@UploadedFile() file: any) {
+  async uploadFinanceImage(@UploadedFile() file: UploadedFileResult | undefined) {
     if (!file) throw new BadRequestException('请选择图片文件');
     const absPath = join(UPLOAD_DIR, file.filename);
     try {

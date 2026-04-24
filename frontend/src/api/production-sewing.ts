@@ -46,7 +46,7 @@ export function exportSewingItems(params?: Omit<SewingListQuery, 'page' | 'pageS
     params,
     responseType: 'blob',
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }
 
 export function assignSewing(payload: {

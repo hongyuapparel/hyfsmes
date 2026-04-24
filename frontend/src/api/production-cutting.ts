@@ -47,7 +47,7 @@ export function exportCuttingItems(params?: Omit<CuttingListQuery, 'page' | 'pag
     params,
     responseType: 'blob',
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }
 
 export interface ColorSizeRow {

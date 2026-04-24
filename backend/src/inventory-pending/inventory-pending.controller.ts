@@ -4,6 +4,7 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { InventoryPendingService } from './inventory-pending.service';
+import { errMsg } from '../common/http-exception.filter';
 
 @Controller('inventory/pending')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -83,10 +84,11 @@ export class InventoryPendingController {
         user?.username ?? '',
         pickupUserId != null ? Number(pickupUserId) : null,
       );
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { stack?: unknown } | null;
       this.logger.error('[doOutbound] route=POST /inventory/pending/outbound failed');
-      this.logger.error(`[doOutbound] message=${String(e?.message || '')}`);
-      this.logger.error(`[doOutbound] stack=${String(e?.stack || '')}`);
+      this.logger.error(`[doOutbound] message=${errMsg(e)}`);
+      this.logger.error(`[doOutbound] stack=${String(err?.stack || '')}`);
       throw e;
     }
   }

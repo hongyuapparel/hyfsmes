@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, InternalServerErrorException, NotFoundException } from '@nestjs/common';
+import { errMsg } from '../common/http-exception.filter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
@@ -84,7 +85,7 @@ export class FinishedGoodsStockService {
   }
 
   private isTableMissingError(e: unknown, tableName: string): boolean {
-    const msg = String((e as any)?.message || '');
+    const msg = errMsg(e);
     return msg.includes('Table') && msg.includes(tableName) && msg.includes("doesn't exist");
   }
 
@@ -732,8 +733,8 @@ export class FinishedGoodsStockService {
     try {
       await manager.query(sqlWithImage, paramsWithImage);
       return;
-    } catch (e: any) {
-      const msg = String(e?.message ?? '');
+    } catch (e: unknown) {
+      const msg = errMsg(e);
       if (!(msg.includes('Unknown column') && msg.includes('image_url'))) throw e;
     }
 
@@ -1103,8 +1104,8 @@ export class FinishedGoodsStockService {
           `合并入库 +${newQty} 件`,
         );
         return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
-      } catch (e: any) {
-        const msg = String(e?.message ?? '');
+      } catch (e: unknown) {
+        const msg = errMsg(e);
         if (this.isOrderIdNullSchemaError(msg)) {
           throw new BadRequestException(this.orderIdNullableMigrationHint());
         }
@@ -1130,8 +1131,8 @@ export class FinishedGoodsStockService {
       const saved = await this.stockRepo.save(stock);
       await this.persistColorImagesForStock(saved.id, imageRows);
       return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
-    } catch (e: any) {
-      const msg = String(e?.message ?? '');
+    } catch (e: unknown) {
+      const msg = errMsg(e);
       if (this.isOrderIdNullSchemaError(msg)) {
         throw new BadRequestException(this.orderIdNullableMigrationHint());
       }
@@ -1533,8 +1534,8 @@ export class FinishedGoodsStockService {
           });
         }
       });
-    } catch (e: any) {
-      const msg = String(e?.message ?? '');
+    } catch (e: unknown) {
+      const msg = errMsg(e);
       if (msg.includes("Table") && msg.includes("finished_goods_outbound") && msg.includes("doesn't exist")) {
         throw new InternalServerErrorException(
           "出库记录表不存在，请先执行 backend/scripts/create-finished-goods-outbound.sql",
@@ -1610,8 +1611,8 @@ export class FinishedGoodsStockService {
         .skip((page - 1) * pageSize)
         .take(pageSize)
         .getRawMany<any>();
-    } catch (e: any) {
-      const msg = String(e?.message || '');
+    } catch (e: unknown) {
+      const msg = errMsg(e);
       if (!(msg.includes("Unknown column") && msg.includes('o.image_url'))) throw e;
       const qb = buildQb(false);
       total = await qb.getCount();

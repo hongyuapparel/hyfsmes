@@ -64,10 +64,19 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 
+interface CustomerSelectItem {
+  id: number
+  customerId: string
+  country: string
+  companyName: string
+  contactPerson: string
+  salesperson: string
+}
+
 const props = defineProps<{
   modelValue: boolean
   loading: boolean
-  items: any[]
+  items: CustomerSelectItem[]
   total: number
   page: number
   pageSize: number
@@ -75,7 +84,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'select', item: any): void
+  (e: 'select', item: CustomerSelectItem): void
   (e: 'keyword-change', keyword: string): void
   (e: 'page-change', page: number): void
   (e: 'page-size-change', size: number): void

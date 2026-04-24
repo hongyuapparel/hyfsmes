@@ -6,6 +6,18 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { FinanceIncomeService } from './finance-income.service';
 
+interface FinanceIncomeBody {
+  occurDate: string;
+  amount: number | string;
+  incomeTypeId?: number | string | null;
+  fundAccountId?: number | string | null;
+  sourceName?: string;
+  orderNo?: string;
+  operator?: string;
+  remark?: string;
+  attachments?: string[] | null;
+}
+
 @Controller('finance/income')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/finance/income')
@@ -43,7 +55,7 @@ export class FinanceIncomeController {
   }
 
   @Post()
-  create(@Body() body: any) {
+  create(@Body() body: FinanceIncomeBody) {
     return this.service.create({
       occurDate: body.occurDate,
       amount: body.amount,
@@ -58,7 +70,7 @@ export class FinanceIncomeController {
   }
 
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: Partial<FinanceIncomeBody>) {
     return this.service.update(id, {
       occurDate: body.occurDate,
       amount: body.amount,

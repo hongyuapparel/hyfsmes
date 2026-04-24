@@ -127,7 +127,7 @@ export class FinanceIncomeService {
     const amount = String(entity.amount ?? '').trim();
     const orderNo = (entity.orderNo ?? '').trim();
     if (!amount || !orderNo) return;
-    const occur = entity.occurDate instanceof Date ? entity.occurDate : new Date(entity.occurDate as any);
+    const occur = entity.occurDate instanceof Date ? entity.occurDate : new Date(entity.occurDate);
     const from = new Date(occur); from.setDate(from.getDate() - 30);
     const to = new Date(occur); to.setDate(to.getDate() + 30);
     const qb = this.repo.createQueryBuilder('r')

@@ -1,7 +1,7 @@
 import { reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getOrders, type OrderListItem, type OrderListQuery } from '@/api/orders'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getErrorMessage, isErrorHandled, isRequestCanceled } from '@/api/request'
 
 const filter = reactive({
   orderNo: '',
@@ -71,7 +71,7 @@ async function loadList(totalQuantity?: { value: number }) {
       if (totalQuantity) totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
     }
   } catch (e: unknown) {
-    if ((e as any)?.code === 'ERR_CANCELED' || (e as any)?.name === 'CanceledError') return
+    if (isRequestCanceled(e)) return
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
     if (currentReqId === listReqId) loading.value = false

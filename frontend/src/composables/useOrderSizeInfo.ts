@@ -21,7 +21,7 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
   const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
   const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
   const sizeInfoRows = ref<SizeInfoRow[]>([])
-  const sizeInfoTableRef = ref<any>()
+  const sizeInfoTableRef = ref<{ $el?: HTMLElement } | undefined>(undefined)
   const sizeGridRefs = ref<InputComponentInstance[][]>([])
   let sizeInfoSortable: Sortable | null = null
   let sizeInfoRowKeySeed = 0
@@ -35,11 +35,11 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     if (!sizeGridRefs.value[rowIndex]) sizeGridRefs.value[rowIndex] = []
     let target: InputComponentInstance = null
     if (el && typeof el === 'object') {
-      const anyEl = el as any
-      if (anyEl.$el) {
-        target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+      const maybeEl = el as { $el?: HTMLElement; focus?: () => void }
+      if (maybeEl.$el) {
+        target = (maybeEl.$el.querySelector('input') as HTMLElement | null) ?? maybeEl.$el
       } else {
-        target = anyEl as InputComponentInstance
+        target = maybeEl as InputComponentInstance
       }
     }
     sizeGridRefs.value[rowIndex][colIndex] = target
@@ -243,7 +243,7 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     })
     const lines = [headers, ...rows].map((r) => r.join('\t')).join('\n')
     try {
-      const nav: any = navigator
+      const nav = navigator as { clipboard?: { writeText?: (text: string) => Promise<void> } }
       if (nav?.clipboard?.writeText) {
         await nav.clipboard.writeText(lines)
         ElMessage.success('已复制到剪贴板，可直接粘贴到 Excel')

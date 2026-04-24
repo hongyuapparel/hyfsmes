@@ -4,7 +4,16 @@ import {
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
+import type { FundAccountType } from '../entities/finance-fund-account.entity';
 import { FinanceSettingsService } from './finance-settings.service';
+
+interface FinanceSettingsBody {
+  name?: string;
+  accountType?: FundAccountType;
+  owner?: string;
+  isEnabled?: boolean;
+  sortOrder?: number;
+}
 
 @Controller('finance-settings')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -24,7 +33,7 @@ export class FinanceSettingsController {
   listFundAccounts() { return this.svc.getAllFundAccounts(); }
 
   @Post('fund-accounts')
-  createFundAccount(@Body() body: any) {
+  createFundAccount(@Body() body: FinanceSettingsBody) {
     return this.svc.createFundAccount({
       name: body.name?.trim(),
       accountType: body.accountType,
@@ -35,8 +44,8 @@ export class FinanceSettingsController {
   }
 
   @Patch('fund-accounts/:id')
-  updateFundAccount(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
-    const dto: any = {};
+  updateFundAccount(@Param('id', ParseIntPipe) id: number, @Body() body: FinanceSettingsBody) {
+    const dto: FinanceSettingsBody = {};
     if (body.name !== undefined) dto.name = body.name?.trim();
     if (body.accountType !== undefined) dto.accountType = body.accountType;
     if (body.owner !== undefined) dto.owner = body.owner?.trim() ?? '';
@@ -55,7 +64,7 @@ export class FinanceSettingsController {
   listIncomeTypes() { return this.svc.getAllIncomeTypes(); }
 
   @Post('income-types')
-  createIncomeType(@Body() body: any) {
+  createIncomeType(@Body() body: FinanceSettingsBody) {
     return this.svc.createIncomeType({
       name: body.name?.trim(),
       isEnabled: body.isEnabled ?? true,
@@ -64,8 +73,8 @@ export class FinanceSettingsController {
   }
 
   @Patch('income-types/:id')
-  updateIncomeType(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
-    const dto: any = {};
+  updateIncomeType(@Param('id', ParseIntPipe) id: number, @Body() body: FinanceSettingsBody) {
+    const dto: FinanceSettingsBody = {};
     if (body.name !== undefined) dto.name = body.name?.trim();
     if (body.isEnabled !== undefined) dto.isEnabled = body.isEnabled;
     if (body.sortOrder !== undefined) dto.sortOrder = body.sortOrder;
@@ -82,7 +91,7 @@ export class FinanceSettingsController {
   listExpenseTypes() { return this.svc.getAllExpenseTypes(); }
 
   @Post('expense-types')
-  createExpenseType(@Body() body: any) {
+  createExpenseType(@Body() body: FinanceSettingsBody) {
     return this.svc.createExpenseType({
       name: body.name?.trim(),
       isEnabled: body.isEnabled ?? true,
@@ -91,8 +100,8 @@ export class FinanceSettingsController {
   }
 
   @Patch('expense-types/:id')
-  updateExpenseType(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
-    const dto: any = {};
+  updateExpenseType(@Param('id', ParseIntPipe) id: number, @Body() body: FinanceSettingsBody) {
+    const dto: FinanceSettingsBody = {};
     if (body.name !== undefined) dto.name = body.name?.trim();
     if (body.isEnabled !== undefined) dto.isEnabled = body.isEnabled;
     if (body.sortOrder !== undefined) dto.sortOrder = body.sortOrder;

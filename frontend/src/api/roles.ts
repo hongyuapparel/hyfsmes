@@ -32,14 +32,14 @@ export function moveRole(id: number, direction: 'up' | 'down') {
     { direction },
     {
       skipGlobalErrorHandler: true,
-    } as any,
+    },
   )
 }
 
 export function reorderRoles(data: { orderedIds: number[] }) {
   return request.put('/roles/reorder', data, {
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }
 
 export function deleteRole(id: number) {
@@ -63,11 +63,11 @@ export interface RoleOrderPolicies {
 export function getRoleOrderPolicies(roleId: number) {
   return request.get<RoleOrderPolicies>(`/roles/${roleId}/order-policies`, {
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }
 
 export function setRoleOrderPolicies(roleId: number, data: Partial<RoleOrderPolicies>) {
   return request.put(`/roles/${roleId}/order-policies`, data, {
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }

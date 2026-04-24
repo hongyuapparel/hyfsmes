@@ -28,11 +28,11 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
     if (!colorCellRefs.value[rowIndex]) colorCellRefs.value[rowIndex] = []
     let target: InputComponentInstance = null
     if (el && typeof el === 'object') {
-      const anyEl = el as any
-      if (anyEl.$el) {
-        target = (anyEl.$el.querySelector('input') as HTMLElement | null) ?? (anyEl.$el as HTMLElement)
+      const maybeEl = el as { $el?: HTMLElement; focus?: () => void }
+      if (maybeEl.$el) {
+        target = (maybeEl.$el.querySelector('input') as HTMLElement | null) ?? maybeEl.$el
       } else {
-        target = anyEl as InputComponentInstance
+        target = maybeEl as InputComponentInstance
       }
     }
     colorCellRefs.value[rowIndex][colIndex] = target
@@ -49,7 +49,7 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
     } else {
       nextTick(() => {
         const inputRef = col === 'color' ? colorNameInputRef.value : remarkInputRef.value
-        const input = inputRef?.$el?.querySelector?.('input') ?? (inputRef as any)?.$el
+        const input = inputRef?.$el?.querySelector?.('input') ?? inputRef?.$el
         if (input?.focus) input.focus()
         else if (typeof inputRef?.focus === 'function') inputRef.focus()
       })
@@ -58,11 +58,13 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
 
   function onBCellBlur() {
     setTimeout(() => {
-      const root = (bTableRef.value as any)?.$el ?? (bTableRef.value as any)
+      const root = bTableRef.value?.$el ?? bTableRef.value
       const container =
         root instanceof HTMLElement
           ? root
-          : (root?.$el instanceof HTMLElement ? root.$el : null)
+          : root && typeof root === 'object' && '$el' in root && root.$el instanceof HTMLElement
+            ? root.$el
+            : null
       const active = document.activeElement as HTMLElement | null
       if (!container || !active || !container.contains(active)) {
         editingCell.value = null

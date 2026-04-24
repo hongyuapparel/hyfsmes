@@ -21,7 +21,7 @@ export class FinanceSettingsService {
     return this.fundAccountRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
   }
   getEnabledFundAccounts() {
-    return this.fundAccountRepo.find({ where: { isEnabled: true as any }, order: { sortOrder: 'ASC', id: 'ASC' } });
+    return this.fundAccountRepo.find({ where: { isEnabled: true }, order: { sortOrder: 'ASC', id: 'ASC' } });
   }
   async createFundAccount(dto: Partial<FinanceFundAccount>) {
     const e = this.fundAccountRepo.create(dto);
@@ -44,7 +44,7 @@ export class FinanceSettingsService {
     return this.incomeTypeRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
   }
   getEnabledIncomeTypes() {
-    return this.incomeTypeRepo.find({ where: { isEnabled: true as any }, order: { sortOrder: 'ASC', id: 'ASC' } });
+    return this.incomeTypeRepo.find({ where: { isEnabled: true }, order: { sortOrder: 'ASC', id: 'ASC' } });
   }
   async createIncomeType(dto: Partial<FinanceIncomeType>) {
     const e = this.incomeTypeRepo.create(dto);
@@ -67,7 +67,7 @@ export class FinanceSettingsService {
     return this.expenseTypeRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
   }
   getEnabledExpenseTypes() {
-    return this.expenseTypeRepo.find({ where: { isEnabled: true as any }, order: { sortOrder: 'ASC', id: 'ASC' } });
+    return this.expenseTypeRepo.find({ where: { isEnabled: true }, order: { sortOrder: 'ASC', id: 'ASC' } });
   }
   async createExpenseType(dto: Partial<FinanceExpenseType>) {
     const e = this.expenseTypeRepo.create(dto);

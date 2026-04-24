@@ -2,20 +2,37 @@ import type { Ref } from 'vue'
 import type { FormInstance } from 'element-plus'
 import { ElMessage } from 'element-plus'
 import type { OrderFormPayload } from '@/api/orders'
+import type { ColorRow } from '@/composables/useOrderColorSizeMatrix'
+import type { MaterialRow } from '@/composables/useOrderMaterials'
+import type { SizeInfoRow } from '@/composables/useOrderSizeInfo'
+
+interface ProcessItemInputRow {
+  processName?: string
+  supplierName?: string
+  part?: string
+  remark?: string
+}
+
+interface PackagingCellInputRow {
+  imageUrl?: string
+  accessoryId?: number | null
+  accessoryName?: string
+  description?: string
+}
 
 interface UseOrderEditPayloadParams {
   form: OrderFormPayload
   formRef: Ref<FormInstance | undefined>
   grandTotal: Ref<number>
-  colorRows: Ref<any[]>
+  colorRows: Ref<ColorRow[]>
   sizeHeaders: Ref<string[]>
-  materials: Ref<any[]>
+  materials: Ref<MaterialRow[]>
   sizeMetaHeaders: Ref<string[]>
-  sizeInfoRows: Ref<any[]>
-  processItems: Ref<any[]>
+  sizeInfoRows: Ref<SizeInfoRow[]>
+  processItems: Ref<ProcessItemInputRow[]>
   productionRequirement: Ref<string>
   packagingHeaders: Ref<string[]>
-  packagingCells: Ref<any[]>
+  packagingCells: Ref<PackagingCellInputRow[]>
   packagingMethod: Ref<string>
   attachments: Ref<string[]>
 }
@@ -43,7 +60,7 @@ export function useOrderEditPayload(params: UseOrderEditPayloadParams) {
     if (!form.skuCode || !String(form.skuCode).trim()) missing.push('SKU')
     if (form.customerId == null || form.customerId === undefined) missing.push('客户')
     if (form.collaborationTypeId == null || form.collaborationTypeId === undefined) missing.push('合作方式')
-    if ((form as any).orderTypeId == null || (form as any).orderTypeId === undefined) missing.push('订单类型')
+    if (form.orderTypeId == null || form.orderTypeId === undefined) missing.push('订单类型')
     if (!form.customerDueDate) missing.push('客户交期')
     if (!String(form.merchandiser ?? '').trim()) missing.push('跟单员')
     {
@@ -73,8 +90,8 @@ export function useOrderEditPayload(params: UseOrderEditPayloadParams) {
     return {
       ...form,
       customerName: selectedCustomerName,
-      orderTypeId: (form as any).orderTypeId ?? null,
-      collaborationTypeId: (form as any).collaborationTypeId ?? null,
+      orderTypeId: form.orderTypeId ?? null,
+      collaborationTypeId: form.collaborationTypeId ?? null,
       quantity: grandTotal.value,
       processItem: processItemSummary,
       colorSizeRows: colorRows.value.map((row) => ({

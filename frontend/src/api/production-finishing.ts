@@ -69,7 +69,7 @@ export function exportFinishingItems(params?: Omit<FinishingListQuery, 'page' | 
     params,
     responseType: 'blob',
     skipGlobalErrorHandler: true,
-  } as any)
+  })
 }
 
 /** 待尾部：登记收货（仅收货数量） */

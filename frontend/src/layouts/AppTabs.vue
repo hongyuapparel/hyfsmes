@@ -84,8 +84,8 @@ function closeByKey(key: string) {
   }
 }
 
-function onTabClick(pane: any) {
-  const key = pane.paneName as string
+function onTabClick(pane: { paneName?: string | number }) {
+  const key = String(pane.paneName ?? '')
   if (!key || key === activeKey.value) return
   const tab = tabs.value.find((t) => t.key === key)
   if (tab) router.push(tab.fullPath)

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { errMsg } from '../common/http-exception.filter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { InboundPending } from '../entities/inbound-pending.entity';
@@ -452,15 +453,16 @@ export class InventoryPendingService {
           }
         }
       });
-    } catch (e: any) {
+    } catch (e: unknown) {
+      const err = e as { table?: unknown; query?: unknown; parameters?: unknown; stack?: unknown } | null;
       this.logger.error(
         `[doOutbound] controller=InventoryPendingController service=InventoryPendingService method=doOutbound failed`,
       );
-      this.logger.error(`[doOutbound] table=${String(e?.table || '')} query=${String(e?.query || '')}`);
+      this.logger.error(`[doOutbound] table=${String(err?.table || '')} query=${String(err?.query || '')}`);
       this.logger.error(
-        `[doOutbound] parameters=${JSON.stringify(e?.parameters ?? [])} message=${String(e?.message || '')}`,
+        `[doOutbound] parameters=${JSON.stringify(err?.parameters ?? [])} message=${errMsg(e)}`,
       );
-      this.logger.error(`[doOutbound] stack=${String(e?.stack || '')}`);
+      this.logger.error(`[doOutbound] stack=${String(err?.stack || '')}`);
       throw e;
     }
   }

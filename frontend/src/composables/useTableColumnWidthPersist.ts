@@ -33,8 +33,7 @@ export function useTableColumnWidthPersist(tableId: string) {
   const authStore = useAuthStore()
 
   const getStorageKey = () => {
-    const user = authStore.user as any
-    const userPart = String(user?.id ?? user?.username ?? 'anonymous').trim() || 'anonymous'
+    const userPart = String(authStore.user?.id ?? authStore.user?.username ?? 'anonymous').trim() || 'anonymous'
     const routePart = String(route.path ?? '').trim() || 'unknown-route'
     const tablePart = String(tableId ?? '').trim() || 'unknown-table'
     return `hyf:table-width:v1:${userPart}:${routePart}:${tablePart}`
@@ -73,7 +72,12 @@ export function useTableColumnWidthPersist(tableId: string) {
     writeMap(map)
   }
 
-  const applyToTable = (tableRef: any) => {
+  type TableLike = {
+    columns?: ColumnLike[]
+    doLayout?: () => void
+  } | null | undefined
+
+  const applyToTable = (tableRef: TableLike) => {
     if (!tableRef || !Array.isArray(tableRef.columns)) return
     const map = readMap()
     if (!Object.keys(map).length) return
@@ -88,7 +92,7 @@ export function useTableColumnWidthPersist(tableId: string) {
     tableRef.doLayout?.()
   }
 
-  const restoreColumnWidths = (tableRef: any) => {
+  const restoreColumnWidths = (tableRef: TableLike) => {
     nextTick(() => {
       applyToTable(tableRef)
     })

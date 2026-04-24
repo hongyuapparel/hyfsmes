@@ -7,6 +7,18 @@ import { Order } from '../entities/order.entity';
 import { UserRole } from '../entities/user-role.entity';
 import { Role } from '../entities/role.entity';
 
+export interface SafeRoleDto {
+  id: number;
+  code: string;
+  name: string;
+}
+
+export type SafeUserDto = Omit<User, 'passwordHash' | 'role' | 'userRoles'> & {
+  roles: SafeRoleDto[];
+  roleIds: number[];
+  roleNames: string[];
+};
+
 @Injectable()
 export class UsersService {
   constructor(
@@ -20,7 +32,7 @@ export class UsersService {
     private roleRepo: Repository<Role>,
   ) {}
 
-  async findAll() {
+  async findAll(): Promise<SafeUserDto[]> {
     const list = await this.userRepo.find({
       relations: ['role', 'userRoles', 'userRoles.role'],
       order: { id: 'ASC' },
@@ -31,7 +43,7 @@ export class UsersService {
   /**
    * 订单编辑页用户下拉搜索（支持按关键字与角色过滤）
    */
-  async search(keyword?: string, roleCode?: string) {
+  async search(keyword?: string, roleCode?: string): Promise<SafeUserDto[]> {
     const qb = this.userRepo
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.role', 'r')
@@ -54,7 +66,7 @@ export class UsersService {
   /**
    * 用户管理页筛选：允许查询全部状态（active/disabled），可按关键字与角色过滤。
    */
-  async searchForManagement(keyword?: string, roleCode?: string, status?: UserStatus) {
+  async searchForManagement(keyword?: string, roleCode?: string, status?: UserStatus): Promise<SafeUserDto[]> {
     const qb = this.userRepo
       .createQueryBuilder('u')
       .leftJoinAndSelect('u.role', 'r')
@@ -98,13 +110,13 @@ export class UsersService {
       where: { id: saved.id },
       relations: ['role', 'userRoles', 'userRoles.role'],
     });
-    return full ? this.toSafeUser(full) : saved;
+    return full ? this.toSafeUser(full) : this.toSafeUser(saved);
   }
 
   async update(
     id: number,
     dto: { username?: string; displayName?: string; roleId?: number; roleIds?: number[]; status?: UserStatus },
-  ): Promise<any> {
+  ): Promise<SafeUserDto> {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('用户不存在');
     const patch: Partial<User> = {};
@@ -148,7 +160,7 @@ export class UsersService {
       where: { id: user.id },
       relations: ['role', 'userRoles', 'userRoles.role'],
     });
-    return full ? this.toSafeUser(full) : user;
+    return full ? this.toSafeUser(full) : this.toSafeUser(user);
   }
 
   async resetPassword(id: number, newPassword: string): Promise<void> {
@@ -186,8 +198,8 @@ export class UsersService {
       .execute();
   }
 
-  private toSafeUser(u: User): any {
-    const { passwordHash: _, ...rest } = u as any;
+  private toSafeUser(u: User): SafeUserDto {
+    const { passwordHash: _passwordHash, role: _role, userRoles: _userRoles, ...rest } = u;
     const roles = (u.userRoles ?? [])
       .map((ur) => ur.role)
       .filter(Boolean);

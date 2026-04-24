@@ -9,6 +9,15 @@ import {
 import { Response } from 'express';
 import { Request } from 'express';
 
+/** 从 unknown 类型的 catch 变量中安全提取错误消息字符串 */
+export function errMsg(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (e !== null && typeof e === 'object' && 'message' in e) {
+    return String((e as { message?: unknown }).message ?? '');
+  }
+  return '';
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);

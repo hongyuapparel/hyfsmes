@@ -71,10 +71,9 @@
         </header>
         <main class="layout-main">
           <router-view v-slot="{ Component, route }">
-            <keep-alive v-if="shouldUseOuterKeepAlive(route)">
+            <keep-alive>
               <component :is="Component" :key="getRouteCacheKey(route)" />
             </keep-alive>
-            <component v-else :is="Component" :key="getRouteCacheKey(route)" />
           </router-view>
         </main>
       </div>
