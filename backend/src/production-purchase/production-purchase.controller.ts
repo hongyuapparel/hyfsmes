@@ -3,13 +3,18 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { ProductionPurchaseService, PurchaseListQuery } from './production-purchase.service';
+import { ProductionPurchaseService } from './production-purchase.service';
+import { ProductionPurchaseQueryService } from './production-purchase-query.service';
+import { type PurchaseListQuery } from './production-purchase.types';
 
 @Controller('production/purchase')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/production/purchase')
 export class ProductionPurchaseController {
-  constructor(private readonly purchaseService: ProductionPurchaseService) {}
+  constructor(
+    private readonly purchaseService: ProductionPurchaseService,
+    private readonly purchaseQueryService: ProductionPurchaseQueryService,
+  ) {}
 
   /**
    * 采购物料列表（已审单订单的物料，支持 tab 与筛选）
@@ -39,7 +44,7 @@ export class ProductionPurchaseController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.purchaseService.getPurchaseItems(query, user?.userId);
+    return this.purchaseQueryService.getPurchaseItems(query, user?.userId);
   }
 
   /**

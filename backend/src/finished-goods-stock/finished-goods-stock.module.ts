@@ -16,8 +16,10 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { FinishedGoodsStockController } from './finished-goods-stock.controller';
 import { FinishedGoodsStockService } from './finished-goods-stock.service';
+import { FinishedGoodsStockListQueryService } from './finished-goods-stock-list-query.service';
 import { FinishedGoodsStockQueryService } from './finished-goods-stock-query.service';
 import { FinishedGoodsStockInboundService } from './finished-goods-stock-inbound.service';
+import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import { FinishedGoodsStockOutboundService } from './finished-goods-stock-outbound.service';
 import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
 import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
@@ -44,7 +46,9 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
   controllers: [FinishedGoodsStockController],
   providers: [
     FinishedGoodsStockService,
+    FinishedGoodsStockListQueryService,
     FinishedGoodsStockQueryService,
+    FinishedGoodsStockInboundQueryService,
     FinishedGoodsStockInboundService,
     FinishedGoodsStockOutboundService,
     FinishedGoodsStockOperationService,
@@ -52,7 +56,9 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
   ],
   exports: [
     FinishedGoodsStockService,
+    FinishedGoodsStockListQueryService,
     FinishedGoodsStockQueryService,
+    FinishedGoodsStockInboundQueryService,
     FinishedGoodsStockInboundService,
     FinishedGoodsStockOutboundService,
     FinishedGoodsStockOperationService,

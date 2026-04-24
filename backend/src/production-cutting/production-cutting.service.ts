@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { ActualCutRow, CuttingMaterialUsageRow } from '../entities/order-cutting.entity';
+import { ProductionCuttingListService } from './production-cutting-list.service';
 import { ProductionCuttingQueryService } from './production-cutting-query.service';
 import { ProductionCuttingMutationService } from './production-cutting-mutation.service';
 
@@ -21,6 +22,7 @@ import type {
 @Injectable()
 export class ProductionCuttingService {
   constructor(
+    private readonly listService: ProductionCuttingListService,
     private readonly queryService: ProductionCuttingQueryService,
     private readonly mutationService: ProductionCuttingMutationService,
   ) {}
@@ -31,11 +33,11 @@ export class ProductionCuttingService {
     page: number;
     pageSize: number;
   }> {
-    return this.queryService.getCuttingList(query, actorUserId);
+    return this.listService.getCuttingList(query, actorUserId);
   }
 
   getCuttingExportRows(query: CuttingListQuery, actorUserId?: number): Promise<CuttingListItem[]> {
-    return this.queryService.getCuttingExportRows(query, actorUserId);
+    return this.listService.getCuttingExportRows(query, actorUserId);
   }
 
   getQuantityBreakdown(orderId: number): Promise<{

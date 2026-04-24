@@ -83,8 +83,8 @@ import CustomerToolbar from '@/components/customers/CustomerToolbar.vue'
 import CustomerListTable from '@/components/customers/CustomerListTable.vue'
 import CustomerFormDialog from '@/components/customers/CustomerFormDialog.vue'
 import CustomerXiaomanImportDialog from '@/components/customers/CustomerXiaomanImportDialog.vue'
-import { useCustomerPage } from '@/components/customers/useCustomerPage'
-import { useCustomerXiaomanImport } from '@/components/customers/useCustomerXiaomanImport'
+import { useCustomerPage } from '@/composables/useCustomerPage'
+import { useCustomerXiaomanImport } from '@/composables/useCustomerXiaomanImport'
 
 const {
   list,

@@ -88,7 +88,7 @@
 import { computed, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { FieldDefinition } from '@/fields'
-import type { ProductGroupTreeSelectNode } from './useCustomerPage'
+import type { ProductGroupTreeSelectNode } from '@/composables/useCustomerPage'
 
 const props = defineProps<{
   visible: boolean

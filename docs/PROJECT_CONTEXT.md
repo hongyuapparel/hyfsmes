@@ -67,7 +67,10 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2026-04-24`：前端完成订单编辑主 composable 拆分：`useOrderEditPage.ts` 收敛为组装入口，数据加载初始化与草稿/提交流程分别下沉到 `useOrderEditLoad.ts`、`useOrderEditSubmit.ts`，降低编辑页耦合复杂度。
+- `2026-04-24`：后端完成采购服务职责拆分：`production-purchase.service.ts` 收敛为操作写入入口，采购列表查询与待采购状态自愈下沉到 `production-purchase-query.service.ts`，并更新模块注入保持原有接口行为。
 - `2026-04-24`：后端完成订单状态配置服务实迁移：`order-status-config.service.ts` 收敛为代理入口，状态定义/流转链路/SLA与利润报表逻辑分别下沉到 Definition/Transition/Report 服务，降低后续改动冲突面。
+- `2026-04-24`：后端完成成品库存入库服务职责拆分：`finished-goods-stock-inbound.service.ts` 聚焦写入/操作流程，查询与尺码快照读取逻辑下沉到 `finished-goods-stock-inbound-query.service.ts`，并在模块中注册新服务以降低入库维护复杂度。
 - `2026-04-24`：前端完成成品库存详情抽屉结构化拆分：`FinishedDetailDrawer` 收敛为组装层，基础信息/颜色尺码/操作记录区块下沉子组件，数据与尺寸映射逻辑下沉到 `useFinishedDetail*` composable，保持现有业务行为不变。
 - `2026-04-24`：后端完成成品库存操作服务拆分：`finished-goods-stock-operation.service.ts` 收敛为代理入口，入库/库存调整逻辑下沉到 Inbound 服务，出库逻辑下沉到 Outbound 服务，保持接口签名兼容。
 - `2026-04-24`：后端完成裁床服务实迁移：`production-cutting.service.ts` 收敛为代理入口，查询聚合与登记写入分别下沉到 Query/Mutation 服务，并保留原接口与导出类型兼容。

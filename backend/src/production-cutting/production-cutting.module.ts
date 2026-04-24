@@ -13,6 +13,7 @@ import { SystemOptionsModule } from '../system-options/system-options.module';
 import { OrderStatusConfigModule } from '../order-status-config/order-status-config.module';
 import { ProductionCuttingController } from './production-cutting.controller';
 import { ProductionCuttingService } from './production-cutting.service';
+import { ProductionCuttingListService } from './production-cutting-list.service';
 import { ProductionCuttingQueryService } from './production-cutting-query.service';
 import { ProductionCuttingMutationService } from './production-cutting-mutation.service';
 
@@ -25,6 +26,11 @@ import { ProductionCuttingMutationService } from './production-cutting-mutation.
     OrderStatusConfigModule,
   ],
   controllers: [ProductionCuttingController],
-  providers: [ProductionCuttingService, ProductionCuttingQueryService, ProductionCuttingMutationService],
+  providers: [
+    ProductionCuttingService,
+    ProductionCuttingListService,
+    ProductionCuttingQueryService,
+    ProductionCuttingMutationService,
+  ],
 })
 export class ProductionCuttingModule {}

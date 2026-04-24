@@ -16,6 +16,7 @@ import { FinishedGoodsStockModule } from '../finished-goods-stock/finished-goods
 import { OrderStatusConfigModule } from '../order-status-config/order-status-config.module';
 import { ProductionPurchaseController } from './production-purchase.controller';
 import { ProductionPurchaseService } from './production-purchase.service';
+import { ProductionPurchaseQueryService } from './production-purchase-query.service';
 
 @Module({
   imports: [
@@ -30,6 +31,6 @@ import { ProductionPurchaseService } from './production-purchase.service';
     OrderStatusConfigModule,
   ],
   controllers: [ProductionPurchaseController],
-  providers: [ProductionPurchaseService],
+  providers: [ProductionPurchaseService, ProductionPurchaseQueryService],
 })
 export class ProductionPurchaseModule {}
