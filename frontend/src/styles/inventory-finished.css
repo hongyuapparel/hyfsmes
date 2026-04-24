@@ -1,0 +1,38 @@
+.inventory-finished-page {
+  background: var(--color-card);
+  padding: var(--space-md);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+}
+
+.finished-table {
+  margin-bottom: var(--space-md);
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+}
+
+.pagination-wrap--with-summary {
+  margin-top: var(--space-md);
+  justify-content: space-between;
+  align-items: center;
+}
+
+.pagination-summary {
+  font-size: var(--font-size-caption, 12px);
+  color: var(--color-text-secondary, #606266);
+}
+
+.qty-hover {
+  cursor: help;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 3px;
+}
+
+.finished-table .stock-parent-row {
+  --el-table-tr-bg-color: #f7f9fc;
+}

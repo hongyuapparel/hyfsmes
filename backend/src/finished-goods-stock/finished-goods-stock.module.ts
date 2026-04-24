@@ -17,6 +17,8 @@ import { AuthModule } from '../auth/auth.module';
 import { FinishedGoodsStockController } from './finished-goods-stock.controller';
 import { FinishedGoodsStockService } from './finished-goods-stock.service';
 import { FinishedGoodsStockQueryService } from './finished-goods-stock-query.service';
+import { FinishedGoodsStockInboundService } from './finished-goods-stock-inbound.service';
+import { FinishedGoodsStockOutboundService } from './finished-goods-stock-outbound.service';
 import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
 import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
 
@@ -43,12 +45,16 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
   providers: [
     FinishedGoodsStockService,
     FinishedGoodsStockQueryService,
+    FinishedGoodsStockInboundService,
+    FinishedGoodsStockOutboundService,
     FinishedGoodsStockOperationService,
     FinishedGoodsStockReportService,
   ],
   exports: [
     FinishedGoodsStockService,
     FinishedGoodsStockQueryService,
+    FinishedGoodsStockInboundService,
+    FinishedGoodsStockOutboundService,
     FinishedGoodsStockOperationService,
     FinishedGoodsStockReportService,
   ],
