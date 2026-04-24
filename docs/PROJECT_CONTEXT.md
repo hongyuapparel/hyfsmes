@@ -67,6 +67,9 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2026-04-24`：后端完成订单状态配置服务实迁移：`order-status-config.service.ts` 收敛为代理入口，状态定义/流转链路/SLA与利润报表逻辑分别下沉到 Definition/Transition/Report 服务，降低后续改动冲突面。
+- `2026-04-24`：后端完成裁床服务实迁移：`production-cutting.service.ts` 收敛为代理入口，查询聚合与登记写入分别下沉到 Query/Mutation 服务，并保留原接口与导出类型兼容。
+- `2026-04-24`：后端完成尾部服务实迁移：`production-finishing.service.ts` 收敛为代理入口，列表/导出/登记弹窗查询与收货/包装/发货/入库写入分别下沉到 Query/Mutation 服务，降低单点改动风险。
 - `2026-04-24`：后端完成大体量服务职责拆分第一步：订单、成品库存、裁床、订单状态配置模块新增 Query/Mutation(or Operation)/Status(or Report) 职责服务，并由控制器按职责注入调用，降低单 Service 变更耦合面。
 - `2025-03`：财务管理新增「收入流水」「支出流水」：收入按部门+银行账号手动录入（不关联订单），支出可关联订单/供应商或仅填明细；系统设置中新增「财务设置」维护支出类型、银行账号（system_options 只存 ID，改名历史同步）。
 - `2025-xx-xx`：完成「订单列表卡片信息重构」，下单时间、合作方式、工艺标签等展示规则见 `docs/ORDER_STATUS_FLOW_DESIGN.md` 第 X 节。  
