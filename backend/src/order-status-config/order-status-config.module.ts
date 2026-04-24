@@ -10,6 +10,9 @@ import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { SystemOptionsModule } from '../system-options/system-options.module';
 import { OrderStatusConfigService } from './order-status-config.service';
 import { OrderStatusConfigController } from './order-status-config.controller';
+import { OrderStatusDefinitionService } from './order-status-definition.service';
+import { OrderStatusTransitionService } from './order-status-transition.service';
+import { OrderStatusReportService } from './order-status-report.service';
 
 @Module({
   imports: [
@@ -24,9 +27,19 @@ import { OrderStatusConfigController } from './order-status-config.controller';
     ]),
     SystemOptionsModule,
   ],
-  providers: [OrderStatusConfigService],
+  providers: [
+    OrderStatusConfigService,
+    OrderStatusDefinitionService,
+    OrderStatusTransitionService,
+    OrderStatusReportService,
+  ],
   controllers: [OrderStatusConfigController],
-  exports: [OrderStatusConfigService],
+  exports: [
+    OrderStatusConfigService,
+    OrderStatusDefinitionService,
+    OrderStatusTransitionService,
+    OrderStatusReportService,
+  ],
 })
 export class OrderStatusConfigModule {}
 

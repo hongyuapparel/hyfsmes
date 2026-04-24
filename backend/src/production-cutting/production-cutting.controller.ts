@@ -3,14 +3,19 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { ProductionCuttingService, CuttingListQuery } from './production-cutting.service';
+import { type CuttingListQuery } from './production-cutting.service';
+import { ProductionCuttingQueryService } from './production-cutting-query.service';
+import { ProductionCuttingMutationService } from './production-cutting-mutation.service';
 import type { Response } from 'express';
 
 @Controller('production/cutting')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/production/cutting')
 export class ProductionCuttingController {
-  constructor(private readonly cuttingService: ProductionCuttingService) {}
+  constructor(
+    private readonly cuttingQueryService: ProductionCuttingQueryService,
+    private readonly cuttingMutationService: ProductionCuttingMutationService,
+  ) {}
 
   @Get('items')
   getItems(
@@ -28,7 +33,7 @@ export class ProductionCuttingController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.cuttingService.getCuttingList(query, user?.userId);
+    return this.cuttingQueryService.getCuttingList(query, user?.userId);
   }
 
   @Get('items/export')
@@ -44,7 +49,7 @@ export class ProductionCuttingController {
       orderNo,
       skuCode,
     };
-    const rows = await this.cuttingService.getCuttingExportRows(query, user?.userId);
+    const rows = await this.cuttingQueryService.getCuttingExportRows(query, user?.userId);
     const header = [
       '订单号',
       'SKU',
@@ -96,22 +101,22 @@ export class ProductionCuttingController {
 
   @Get('items/:orderId/color-size')
   getOrderColorSize(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingService.getOrderColorSize(orderId);
+    return this.cuttingQueryService.getOrderColorSize(orderId);
   }
 
   @Get('items/:orderId/register-form')
   getRegisterForm(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingService.getRegisterForm(orderId);
+    return this.cuttingQueryService.getRegisterForm(orderId);
   }
 
   @Get('items/:orderId/quantity-breakdown')
   getQuantityBreakdown(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingService.getQuantityBreakdown(orderId);
+    return this.cuttingQueryService.getQuantityBreakdown(orderId);
   }
 
   @Get('items/:orderId/completed-detail')
   getCompletedCuttingDetail(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingService.getCompletedCuttingDetail(orderId);
+    return this.cuttingQueryService.getCompletedCuttingDetail(orderId);
   }
 
   @Post('items/complete')
@@ -126,7 +131,7 @@ export class ProductionCuttingController {
     @Body('materialUsage') materialUsage?: unknown,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.cuttingService.completeCutting(
+    return this.cuttingMutationService.completeCutting(
       Number(orderId),
       Array.isArray(actualCutRows) ? actualCutRows : [],
       cuttingDepartment ?? null,

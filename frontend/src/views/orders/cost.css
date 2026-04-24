@@ -1,0 +1,206 @@
+.order-cost-page {
+  padding: var(--space-md);
+  font-size: var(--font-size-body);
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-md);
+}
+
+.page-header .title {
+  font-size: var(--font-size-title);
+  font-weight: 600;
+}
+
+.page-header .sub-title {
+  font-size: var(--font-size-body);
+  color: var(--el-text-color-secondary);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.block-card {
+  margin-bottom: var(--space-md);
+}
+
+.block-card .el-card__header {
+  padding: var(--space-sm) var(--space-md);
+  font-size: var(--font-size-subtitle);
+}
+
+.block-card .el-card__body {
+  padding: var(--space-sm) var(--space-md);
+}
+
+.block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.block-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.block-title {
+  font-weight: 600;
+}
+
+.import-template-hint {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
+  margin: 0 0 var(--space-sm);
+  line-height: 1.5;
+}
+
+.summary-card .order-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-lg);
+  font-size: var(--font-size-body);
+}
+
+.summary-card .cost-notice {
+  font-size: var(--font-size-caption);
+  color: var(--el-color-warning);
+  margin-left: auto;
+}
+
+.cost-table {
+  font-size: var(--font-size-caption);
+}
+
+.cost-table .el-table__header-wrapper th,
+.cost-table .el-table__header-wrapper th .cell,
+.cost-table .el-table__body-wrapper td,
+.cost-table .el-table__body-wrapper td .cell {
+  font-size: inherit;
+}
+
+.cost-table .el-input__inner,
+.cost-table .el-input__wrapper,
+.cost-table .el-select__wrapper,
+.cost-table .el-select__selected-item,
+.cost-table .el-select__placeholder,
+.cost-table .el-select-v2__wrapper,
+.cost-table .el-select-v2__placeholder,
+.cost-table .el-input-number .el-input__inner {
+  font-size: inherit;
+}
+
+.production-process-select {
+  width: 100%;
+}
+
+.cost-table .el-input-number {
+  width: 100%;
+}
+
+.cost-table .el-input-number .el-input__inner {
+  text-align: right;
+}
+
+.cost-table .material-row-excluded {
+  background: var(--el-fill-color-light);
+}
+
+.cost-table .material-row-excluded .cell {
+  color: var(--el-text-color-secondary);
+}
+
+.production-cost-table .el-input__inner,
+.production-cost-table .el-select__placeholder,
+.production-cost-table .el-select__selected-item,
+.production-cost-table .el-input-number .el-input__inner {
+  text-align: center;
+}
+
+.price-input {
+  width: 88px;
+}
+
+.subtotal {
+  margin-top: var(--space-sm);
+  text-align: right;
+  font-size: var(--font-size-body);
+}
+
+.production-subtotal {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.production-selected-count {
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.production-multiplier-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.production-multiplier-input {
+  width: 88px;
+}
+
+.empty-hint {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
+  margin: 0;
+}
+
+.result-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-md);
+}
+
+.result-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: var(--font-size-body);
+}
+
+.result-row.total-cost {
+  font-weight: 600;
+  padding-top: var(--space-xs);
+  border-top: 1px solid var(--el-border-color-lighter);
+}
+
+.result-row.profit-row {
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.profit-input {
+  width: 120px;
+}
+
+.result-row.ex-factory .ex-factory-value {
+  font-size: var(--font-size-subtitle);
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+
+.result-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}

@@ -27,6 +27,9 @@ import { SuppliersModule } from '../suppliers/suppliers.module';
 import { OrdersController } from './orders.controller';
 import { OrderCostController } from './order-cost.controller';
 import { OrdersService } from './orders.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderMutationService } from './order-mutation.service';
+import { OrderStatusService } from './order-status.service';
 
 @Module({
   imports: [
@@ -58,7 +61,7 @@ import { OrdersService } from './orders.service';
     SuppliersModule,
   ],
   controllers: [OrdersController, OrderCostController],
-  providers: [OrdersService],
-  exports: [OrdersService],
+  providers: [OrdersService, OrderQueryService, OrderMutationService, OrderStatusService],
+  exports: [OrdersService, OrderQueryService, OrderMutationService, OrderStatusService],
 })
 export class OrdersModule {}
