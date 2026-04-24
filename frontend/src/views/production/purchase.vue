@@ -1,6 +1,5 @@
 <template>
   <div class="page-card page-card--fill purchase-page">
-    <!-- Tab：全部 / 等待采购 / 采购完成 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
         <el-radio-group v-model="currentTab" size="large" @change="onTabChange">
@@ -15,7 +14,6 @@
       </div>
     </div>
 
-    <!-- 筛选区：与订单列表同一设计（下单时间、订单号、SKU、供应商、订单类型） -->
     <div class="filter-bar">
       <el-input
         v-model="filter.orderNo"
@@ -118,80 +116,22 @@
           size="large"
           @click="onBatchHandle"
         >
-          {{ currentTab === 'picking' ? '领料' : '登记实际采购' }}
+          {{ batchButtonLabel }}
         </el-button>
       </div>
     </div>
 
     <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
-    <!-- 物料列表表格 -->
-    <div ref="tableShellRef" class="list-page-table-shell">
-    <el-table
-      ref="purchaseTableRef"
-      v-loading="loading"
-      :data="list"
-      border
-      stripe
-      class="purchase-table"
-      :height="tableHeight"
-      :row-style="compactRowStyle"
-      :cell-style="compactCellStyle"
-      :header-cell-style="compactHeaderCellStyle"
+    <PurchaseTable
+      ref="purchaseTableHostRef"
+      :loading="loading"
+      :list="list"
+      :material-progress-column-label="materialProgressColumnLabel"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
-    >
-      <el-table-column type="selection" width="48" align="center" />
-      <el-table-column prop="orderNo" label="订单号" min-width="100" />
-      <el-table-column prop="skuCode" label="SKU" min-width="100" />
-      <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
-        <template #default="{ row }">
-          <AppImageThumb
-            v-if="row.imageUrl"
-            :raw-url="row.imageUrl"
-            :width="compactImageSize"
-            :height="compactImageSize"
-          />
-          <span v-else class="text-muted">-</span>
-        </template>
-      </el-table-column>
-      <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
-      <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
-      <el-table-column label="客户交期" width="110" align="center">
-        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
-      </el-table-column>
-      <el-table-column label="订单件数" width="88" align="right">
-        <template #default="{ row }">{{ formatDisplayNumber(row.orderQuantity) }}</template>
-      </el-table-column>
-      <el-table-column prop="pendingPurchaseAt" label="到采购时间" width="155" align="center">
-        <template #default="{ row }">
-          {{ formatDateTime(row.pendingPurchaseAt) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="purchaseCompletedAt" label="完成时间" width="155" align="center">
-        <template #default="{ row }">
-          {{ formatDateTime(row.processRoute === 'picking' ? row.pickCompletedAt : row.purchaseCompletedAt) }}
-        </template>
-      </el-table-column>
-      <el-table-column label="时效判定" width="96" align="center">
-        <template #default="{ row }">
-          <SlaJudgeTag :text="row.timeRating" />
-        </template>
-      </el-table-column>
-      <el-table-column prop="purchaseStatus" :label="materialProgressColumnLabel" width="100" align="center">
-        <template #default="{ row }">
-          <el-tag :type="displayStatus(row) === 'completed' ? 'success' : 'warning'" size="small">
-            {{ displayStatusLabel(row) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="概要" width="64" align="center" fixed="right">
-        <template #default="{ row }">
-          <el-button link type="primary" @click.stop="openPurchaseBriefDrawer(row)">查看</el-button>
-        </template>
-      </el-table-column>
-    </el-table>
-    </div>
+      @open-brief="openPurchaseBriefDrawer"
+    />
 
     <div class="pagination-wrap">
       <el-pagination
@@ -314,7 +254,6 @@
       </template>
     </ProductionDetailDrawerShell>
 
-    <!-- 登记实际采购弹窗 -->
     <el-dialog
       v-model="registerDialog.visible"
       title="登记实际采购"
@@ -465,520 +404,91 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, watch } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { onMounted } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { getPurchaseItems, registerPick, registerPurchase, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getDictTree } from '@/api/dicts'
-import type { SystemOptionTreeNode } from '@/api/system-options'
-import ImageUploadArea from '@/components/ImageUploadArea.vue'
-import { getAccessoriesList, getFabricList, getFinishedStockList } from '@/api/inventory'
-import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { formatDateTime } from '@/utils/date-format'
+import { formatDisplayNumber } from '@/utils/display-number'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
   getFilterRangeStyle,
-  normalizeTextFilter,
 } from '@/composables/useFilterBarHelpers'
-import { formatDate, formatDateTime } from '@/utils/date-format'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { PURCHASE_TABS, usePurchaseList } from '@/composables/usePurchaseList'
+import { usePurchaseDialogs } from '@/composables/usePurchaseDialogs'
+import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
-import ProductionOrderBriefPanel, {
-  type ProductionOrderBriefModel,
-} from '@/components/production/ProductionOrderBriefPanel.vue'
+import PurchaseTable from '@/components/production/PurchaseTable.vue'
+import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
-import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
-import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 
-const PURCHASE_TABS = [
-  { label: '全部', value: 'all' },
-  { label: '等待采购', value: 'pending' },
-  { label: '待领料', value: 'picking' },
-  { label: '采购完成', value: 'completed' },
-] as const
-
-type PurchaseTabConfig = (typeof PURCHASE_TABS)[number]
-
-const orderTypeTree = ref<SystemOptionTreeNode[]>([])
-function toOrderTypeTreeSelect(
-  nodes: SystemOptionTreeNode[],
-): { label: string; value: number; children?: unknown[]; disabled?: boolean }[] {
-  return nodes.map((n) => {
-    const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
-    const hasChildren = children.length > 0
-    return {
-      label: n.value,
-      value: n.id,
-      children: hasChildren ? children : undefined,
-      disabled: hasChildren,
-    }
-  })
-}
-const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
-
-function findOrderTypeLabelById(id: number | null | undefined): string {
-  if (!id) return ''
-  const stack: SystemOptionTreeNode[] = [...orderTypeTree.value]
-  while (stack.length) {
-    const node = stack.pop()!
-    if (node.id === id) return node.value
-    if (node.children?.length) stack.push(...node.children)
-  }
-  return ''
-}
-
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR as string }
-function getFilterSelectAutoWidthStyle(v: unknown) {
-  if (!v) return undefined
-  const text = String(v)
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { ...activeSelectStyle, width: `${width}px`, flex: `0 0 ${width}px` }
-}
-
-const filter = reactive({
-  orderNo: '',
-  skuCode: '',
-  supplier: '',
-  orderTypeId: null as number | null,
-})
-const orderDateRange = ref<[string, string] | null>(null)
-const orderNoLabelVisible = ref(false)
-const skuCodeLabelVisible = ref(false)
-
-const currentTab = ref<string>('all')
-const materialProgressColumnLabel = computed(() =>
-  currentTab.value === 'picking' ? '领料状态' : '采购状态',
-)
-const tabCounts = ref<Record<string, number>>({})
-const tabTotal = ref(0)
-const list = ref<PurchaseItemRow[]>([])
-const purchaseTableRef = ref()
-const tableShellRef = ref<HTMLElement | null>(null)
-const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const {
-  compactHeaderCellStyle,
-  compactCellStyle,
-  compactRowStyle,
-  compactImageSize,
-  compactImageColumnMinWidth,
-} = useCompactTableStyle()
-const loading = ref(false)
-const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
-const selectedRows = ref<PurchaseItemRow[]>([])
-const hasSelection = computed(() => selectedRows.value.length > 0)
-const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-purchase-main')
+  filter,
+  orderDateRange,
+  orderNoLabelVisible,
+  skuCodeLabelVisible,
+  currentTab,
+  list,
+  loading,
+  pagination,
+  selectedRows,
+  hasSelection,
+  orderTypeTreeSelectData,
+  materialProgressColumnLabel,
+  purchaseTableHostRef,
+  purchaseBriefDrawer,
+  getTabLabel,
+  getFilterSelectAutoWidthStyle,
+  findOrderTypeLabelById,
+  load,
+  loadTabCounts,
+  onSearch,
+  debouncedSearch,
+  onReset,
+  onTabChange,
+  onPageSizeChange,
+  onSelectionChange,
+  onHeaderDragEnd,
+  loadOptions,
+  orderTypeDisplay,
+  openPurchaseBriefDrawer,
+  purchaseBriefFromRow,
+  displayMaterialType,
+} = usePurchaseList()
 
-function getTabLabel(tab: PurchaseTabConfig): string {
-  const counts = tabCounts.value
-  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
-  return `${tab.label}(${count})`
-}
-
-const registerDialog = reactive<{
-  visible: boolean
-  submitting: boolean
-  row: PurchaseItemRow | null
-}>({ visible: false, submitting: false, row: null })
-const registerFormRef = ref<FormInstance>()
-const registerForm = reactive({
-  actualPurchaseQuantity: 0,
-  unitPrice: '',
-  otherCost: '',
-  purchaseAmount: '',
-  remark: '',
-  imageUrl: '',
-})
-const registerRules: FormRules = {
-  actualPurchaseQuantity: [{ required: true, message: '请输入实际采购数量', trigger: 'blur' }],
-}
-
-type PickInventorySourceType = 'fabric' | 'accessory' | 'finished'
-const pickDialog = reactive<{ visible: boolean; submitting: boolean; row: PurchaseItemRow | null; index: number; total: number }>({
-  visible: false,
-  submitting: false,
-  row: null,
-  index: 0,
-  total: 0,
-})
-const pickFormRef = ref<FormInstance>()
-const pickForm = reactive<{
-  inventorySourceType: PickInventorySourceType | null
-  inventoryId: number | null
-  quantity: number | null
-  remark: string
-}>({
-  inventorySourceType: null,
-  inventoryId: null,
-  quantity: null,
-  remark: '',
-})
-const pickInventoryOptions = ref<Array<{ id: number; label: string; availableQuantity: number; imageUrl: string }>>([])
-const pickRules: FormRules = {
-  quantity: [
-    {
-      validator: (_rule, value, callback) => {
-        const hasStock = !!(pickForm.inventorySourceType && pickForm.inventoryId)
-        if (!hasStock) return callback()
-        const qty = Number(value ?? 0)
-        if (!Number.isFinite(qty) || qty <= 0) return callback(new Error('选择库存后，调取数量必须大于 0'))
-        const selected = pickInventoryOptions.value.find((x) => x.id === pickForm.inventoryId)
-        if (selected && qty > selected.availableQuantity) return callback(new Error('调取数量不能大于可用库存'))
-        callback()
-      },
-      trigger: 'blur',
-    },
-  ],
-  remark: [
-    {
-      validator: (_rule, value, callback) => {
-        const hasStock = !!(pickForm.inventorySourceType && pickForm.inventoryId && Number(pickForm.quantity) > 0)
-        if (hasStock) return callback()
-        if (String(value ?? '').trim()) return callback()
-        callback(new Error('未选择库存时请至少填写备注说明'))
-      },
-      trigger: 'blur',
-    },
-  ],
-}
-
-watch(
-  () => [registerForm.actualPurchaseQuantity, registerForm.unitPrice, registerForm.otherCost] as const,
-  ([qty, unit, other]) => {
-    const q = Number(qty) || 0
-    const parseNumber = (v: string) => {
-      const cleaned = (v ?? '').replace(/[^\d.-]/g, '')
-      const n = Number(cleaned)
-      return Number.isNaN(n) ? 0 : n
-    }
-    const u = parseNumber(unit)
-    const o = parseNumber(other)
-    const total = q * u + o
-    registerForm.purchaseAmount = Number.isFinite(total) ? formatDisplayNumber(total) : formatDisplayNumber(0)
-  },
-  { immediate: true },
-)
-
-function buildQuery(): PurchaseListQuery {
-  const q: PurchaseListQuery = {
-    tab: currentTab.value,
-    orderNo: normalizeTextFilter(filter.orderNo),
-    skuCode: normalizeTextFilter(filter.skuCode),
-    supplier: normalizeTextFilter(filter.supplier),
-    orderTypeId: filter.orderTypeId ?? undefined,
-    page: pagination.page,
-    pageSize: pagination.pageSize,
-  }
-  if (orderDateRange.value && orderDateRange.value.length === 2) {
-    q.orderDateStart = orderDateRange.value[0]
-    q.orderDateEnd = orderDateRange.value[1]
-  }
-  return q
-}
-
-async function loadTabCounts() {
-  const base = buildQuery()
-  base.page = 1
-  base.pageSize = 1
-  const counts: Record<string, number> = {}
-  await Promise.all(
-    PURCHASE_TABS.map(async (tab) => {
-      try {
-        const res = await getPurchaseItems({ ...base, tab: tab.value })
-        const data = res.data
-        counts[tab.value] = data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
-    }),
-  )
-  tabCounts.value = counts
-  tabTotal.value = counts.all ?? 0
-}
-
-async function load() {
-  loading.value = true
-  try {
-    const res = await getPurchaseItems(buildQuery())
-    const data = res.data
-    if (data) {
-      list.value = data.list ?? []
-      pagination.total = data.total ?? 0
-      restoreColumnWidths(purchaseTableRef.value)
-    }
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    loading.value = false
-  }
-}
-
-function onSearch(byUser = false) {
-  if (byUser) {
-    if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
-    if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
-  }
-  pagination.page = 1
-  load()
-  void loadTabCounts()
-}
-
-let searchTimer: ReturnType<typeof setTimeout> | null = null
-function debouncedSearch() {
-  if (searchTimer) clearTimeout(searchTimer)
-  searchTimer = setTimeout(() => {
-    searchTimer = null
-    onSearch(false)
-  }, 400)
-}
-
-function onReset() {
-  orderNoLabelVisible.value = false
-  skuCodeLabelVisible.value = false
-  filter.orderNo = ''
-  filter.skuCode = ''
-  filter.supplier = ''
-  filter.orderTypeId = null
-  orderDateRange.value = null
-  currentTab.value = 'all'
-  pagination.page = 1
-  selectedRows.value = []
-  load()
-  void loadTabCounts()
-}
-
-function onTabChange() {
-  pagination.page = 1
-  selectedRows.value = []
-  load()
-  void loadTabCounts()
-}
-
-function onPageSizeChange() {
-  pagination.page = 1
-  load()
-}
-
-function onSelectionChange(rows: PurchaseItemRow[]) {
-  selectedRows.value = rows
-}
-
-function displayStatus(row: PurchaseItemRow): 'pending' | 'completed' {
-  if (row.processRoute === 'picking') {
-    return row.pickStatus === 'completed' ? 'completed' : 'pending'
-  }
-  return row.purchaseStatus === 'completed' ? 'completed' : 'pending'
-}
-
-function displayStatusLabel(row: PurchaseItemRow): string {
-  if (row.processRoute === 'picking') return displayStatus(row) === 'completed' ? '领料完成' : '待领料'
-  return displayStatus(row) === 'completed' ? '采购完成' : '等待采购'
-}
-
-function openRegisterDialog() {
-  if (selectedRows.value.length === 0) return
-  const row = selectedRows.value[0]
-  registerDialog.row = row
-  registerForm.actualPurchaseQuantity = row.actualPurchaseQuantity ?? row.planQuantity ?? 0
-  registerForm.unitPrice = row.purchaseUnitPrice ?? ''
-  registerForm.otherCost = row.purchaseOtherCost ?? ''
-  registerForm.purchaseAmount = row.purchaseAmount ?? ''
-  registerForm.remark = row.purchaseRemark ?? ''
-  registerForm.imageUrl = row.purchaseImageUrl ?? ''
-  registerDialog.visible = true
-}
-
-function onBatchHandle() {
-  if (!hasSelection.value) return
-  if (currentTab.value === 'picking') {
-    openPickDialog()
-    return
-  }
-  openRegisterDialog()
-}
-
-async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
-  pickForm.inventoryId = null
-  pickInventoryOptions.value = []
-  if (!val) return
-  try {
-    if (val === 'fabric') {
-      const res = await getFabricList({ page: 1, pageSize: 200 })
-      pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
-        id: item.id,
-        label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
-        availableQuantity: Number(item.quantity) || 0,
-        imageUrl: item.imageUrl ?? '',
-      }))
-      return
-    }
-    if (val === 'accessory') {
-      const res = await getAccessoriesList({ page: 1, pageSize: 200 })
-      pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
-        id: item.id,
-        label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
-        availableQuantity: Number(item.quantity) || 0,
-        imageUrl: item.imageUrl ?? '',
-      }))
-      return
-    }
-    const res = await getFinishedStockList({ tab: 'stored', page: 1, pageSize: 200 })
-    pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
-      id: item.id,
-      label: `${item.skuCode}（可用:${item.quantity}）`,
-      availableQuantity: Number(item.quantity) || 0,
-      imageUrl: item.imageUrl ?? '',
-    }))
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '库存列表加载失败'))
-  }
-}
-
-function openPickDialog() {
-  const row = selectedRows.value[0]
-  if (!row) return
-  pickDialog.row = row
-  pickDialog.index = 0
-  pickDialog.total = selectedRows.value.length
-  pickDialog.visible = true
-}
-
-function resetPickForm() {
-  pickDialog.row = null
-  pickDialog.index = 0
-  pickDialog.total = 0
-  pickForm.inventorySourceType = null
-  pickForm.inventoryId = null
-  pickForm.quantity = null
-  pickForm.remark = ''
-  pickInventoryOptions.value = []
-  pickFormRef.value?.clearValidate()
-}
-
-async function submitPick() {
-  if (!pickDialog.row) return
-  const rows = selectedRows.value.slice()
-  if (!rows.length) return
-  pickDialog.submitting = true
-  try {
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i]
-      pickDialog.row = row
-      pickDialog.index = i
-      pickDialog.total = rows.length
-      await pickFormRef.value?.validate()
-      await registerPick({
-        orderId: row.orderId,
-        materialIndex: row.materialIndex,
-        inventorySourceType: pickForm.inventorySourceType,
-        inventoryId: pickForm.inventoryId,
-        quantity: pickForm.quantity,
-        remark: pickForm.remark.trim() || null,
-      })
-    }
-    ElMessage.success('领料处理成功')
-    pickDialog.visible = false
-    await load()
-    void loadTabCounts()
+const {
+  registerDialog,
+  registerFormRef,
+  registerForm,
+  registerRules,
+  pickDialog,
+  pickFormRef,
+  pickForm,
+  pickInventoryOptions,
+  pickRules,
+  batchButtonLabel,
+  onBatchHandle,
+  onPickSourceTypeChange,
+  resetPickForm,
+  submitPick,
+  resetRegisterForm,
+  submitRegister,
+} = usePurchaseDialogs({
+  currentTab,
+  hasSelection,
+  selectedRows,
+  reload: load,
+  reloadTabCounts: loadTabCounts,
+  clearSelection: () => {
     selectedRows.value = []
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '领料处理失败'))
-  } finally {
-    pickDialog.submitting = false
-  }
-}
-
-function resetRegisterForm() {
-  registerDialog.row = null
-  registerForm.actualPurchaseQuantity = 0
-  registerForm.purchaseAmount = ''
-  registerForm.unitPrice = ''
-  registerForm.otherCost = ''
-  registerForm.remark = ''
-  registerForm.imageUrl = ''
-  registerFormRef.value?.clearValidate()
-}
-
-async function submitRegister() {
-  if (!registerDialog.row) return
-  await registerFormRef.value?.validate().catch(() => {})
-  registerDialog.submitting = true
-  try {
-    await registerPurchase({
-      orderId: registerDialog.row.orderId,
-      materialIndex: registerDialog.row.materialIndex,
-      actualPurchaseQuantity: registerForm.actualPurchaseQuantity,
-      unitPrice: registerForm.unitPrice.trim() || '0',
-      otherCost: registerForm.otherCost.trim() || '0',
-      remark: registerForm.remark.trim(),
-      imageUrl: registerForm.imageUrl.trim(),
-    })
-    ElMessage.success('登记成功')
-    registerDialog.visible = false
-    await load()
-    void loadTabCounts()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记失败'))
-  } finally {
-    registerDialog.submitting = false
-  }
-}
-
-async function loadOptions() {
-  try {
-    const res = await getDictTree('order_types')
-    orderTypeTree.value = Array.isArray(res.data) ? res.data : []
-  } catch {
-    orderTypeTree.value = []
-  }
-}
-
-function orderTypeDisplay(row: PurchaseItemRow): string {
-  if (typeof row.orderTypeId === 'number') {
-    const label = findOrderTypeLabelById(row.orderTypeId)
-    if (label && label.trim()) return label.trim()
-  }
-  return ''
-}
-
-const purchaseBriefDrawer = reactive<{ visible: boolean; row: PurchaseItemRow | null }>({
-  visible: false,
-  row: null,
+  },
 })
-
-function openPurchaseBriefDrawer(row: PurchaseItemRow) {
-  purchaseBriefDrawer.row = row
-  purchaseBriefDrawer.visible = true
-}
-
-function purchaseBriefFromRow(row: PurchaseItemRow): ProductionOrderBriefModel {
-  return {
-    orderNo: row.orderNo,
-    skuCode: row.skuCode,
-    imageUrl: row.imageUrl,
-    customerName: row.customerName,
-    merchandiser: row.merchandiser,
-    customerDueDate: row.customerDueDate,
-    orderQuantity: row.orderQuantity,
-    orderDate: row.orderDate,
-    orderTypeLabel: orderTypeDisplay(row),
-  }
-}
-
-function displayMaterialType(row: PurchaseItemRow): string {
-  return (row.materialType ?? '').trim() || '-'
-}
 
 onMounted(() => {
-  loadOptions()
-  load()
+  void loadOptions()
+  void load()
   void loadTabCounts()
 })
 </script>
@@ -1003,32 +513,10 @@ onMounted(() => {
   flex-shrink: 0;
 }
 
-.purchase-table {
-  flex: 1;
-  min-height: 0;
-}
-
-.purchase-table :deep(.cell) {
-  padding-left: 6px;
-  padding-right: 6px;
-  line-height: 20px;
-}
-
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
-}
-
-.table-thumb {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius);
-  display: block;
-}
-
-.text-muted {
-  color: var(--el-text-color-secondary);
 }
 
 .register-brief {
@@ -1062,14 +550,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.pick-stock-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  border: 1px solid var(--el-border-color-lighter);
-  flex: 0 0 auto;
 }
 
 .pick-stock-thumb-empty {

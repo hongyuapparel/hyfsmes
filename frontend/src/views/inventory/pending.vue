@@ -184,234 +184,50 @@
       />
     </div>
 
-    <el-dialog
-      v-model="inboundDialog.visible"
-      title="入库"
-      width="440"
-      destroy-on-close
+    <PendingInboundDialog
+      v-model:visible="inboundDialog.visible"
+      :submitting="inboundDialog.submitting"
+      :preview-items="inboundPreviewItems"
+      :form-ref="inboundFormRef"
+      :form="inboundForm"
+      :rules="inboundRules"
+      :department-options="departmentOptions"
+      :inventory-type-options="inventoryTypeOptions"
+      :warehouse-options="warehouseOptions"
+      :format-display-number="formatDisplayNumber"
+      :to-preview-table-rows="toInboundPreviewTableRows"
+      :get-preview-row-total="getInboundPreviewRowTotal"
       @close="resetInboundForm"
-    >
-      <div v-if="inboundPreviewItems.length" class="inbound-preview">
-        <div class="inbound-preview-title">待处理数量明细</div>
-        <div
-          v-for="item in inboundPreviewItems"
-          :key="item.id"
-          class="inbound-preview-item"
-        >
-          <div class="inbound-preview-meta">
-            <span>订单号：{{ item.orderNo }}</span>
-            <span>SKU：{{ item.skuCode }}</span>
-            <span>待处理：{{ formatDisplayNumber(item.quantity) }}</span>
-          </div>
-          <div v-if="item.headers.length && item.rows.length" class="inbound-preview-breakdown">
-            <el-table :data="toInboundPreviewTableRows(item)" border size="small" class="inbound-preview-table">
-              <el-table-column label="颜色" min-width="90" align="center">
-                <template #default="{ row }">
-                  {{ row.colorName || '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column
-                v-for="(h, hIdx) in item.headers"
-                :key="`${item.id}-${hIdx}`"
-                :label="h"
-                min-width="72"
-                align="center"
-              >
-                <template #default="{ row }">
-                  {{ formatDisplayNumber(row.values[hIdx] ?? 0) }}
-                </template>
-              </el-table-column>
-              <el-table-column label="总数" min-width="80" align="center">
-                <template #default="{ row }">
-                  {{ formatDisplayNumber(getInboundPreviewRowTotal(row.values)) }}
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </div>
-      </div>
-      <el-form
-        ref="inboundFormRef"
-        :model="inboundForm"
-        :rules="inboundRules"
-        label-width="100px"
-      >
-        <el-form-item label="部门" prop="department">
-          <el-select
-            v-model="inboundForm.department"
-            placeholder="请选择部门"
-            filterable
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in departmentOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="库存类型" prop="inventoryTypeId">
-          <el-select
-            v-model="inboundForm.inventoryTypeId"
-            placeholder="请选择库存类型"
-            filterable
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in inventoryTypeOptions"
-              :key="opt.id"
-              :label="opt.label"
-              :value="opt.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="仓库" prop="warehouseId">
-          <el-select
-            v-model="inboundForm.warehouseId"
-            placeholder="请选择仓库"
-            filterable
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in warehouseOptions"
-              :key="opt.id"
-              :label="opt.label"
-              :value="opt.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="存放地址" prop="location">
-          <el-input v-model="inboundForm.location" placeholder="请输入具体存放地址" clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="inboundDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="inboundDialog.submitting" @click="submitInbound">
-          确定入库
-        </el-button>
-      </template>
-    </el-dialog>
+      @submit="submitInbound"
+    />
 
-    <el-dialog
-      v-model="outboundDialog.visible"
-      title="发货"
-      width="860"
-      class="outbound-dialog-centered"
-      destroy-on-close
+    <PendingOutboundDialog
+      v-model:visible="outboundDialog.visible"
+      :submitting="outboundDialog.submitting"
+      :items="outboundDialog.items"
+      :form-ref="outboundFormRef"
+      :form="outboundForm"
+      :rules="outboundRules"
+      :pickup-user-options="pickupUserOptions"
+      :outbound-selected-customer="outboundSelectedCustomer"
+      :outbound-grand-total="outboundGrandTotal"
+      :format-display-number="formatDisplayNumber"
+      :get-outbound-row-total="getOutboundRowTotal"
+      :get-outbound-item-total="getOutboundItemTotal"
+      :get-outbound-table-summaries="getOutboundTableSummaries"
       @close="resetOutboundForm"
-    >
-      <el-form
-        ref="outboundFormRef"
-        :model="outboundForm"
-        :rules="outboundRules"
-        label-width="80px"
-      >
-        <el-form-item label="领取人" prop="pickupUserId">
-          <el-select
-            v-model="outboundForm.pickupUserId"
-            placeholder="请选择业务员"
-            filterable
-            clearable
-            style="width: 260px"
-          >
-            <el-option
-              v-for="opt in pickupUserOptions"
-              :key="opt.id"
-              :label="opt.displayName || opt.username"
-              :value="opt.id"
-            />
-          </el-select>
-        </el-form-item>
-        <div class="outbound-batch-head">
-          <span>客户：{{ outboundSelectedCustomer }}</span>
-          <span>选中记录：{{ outboundDialog.items.length }}</span>
-          <span>发货总数：{{ outboundGrandTotal }}</span>
-        </div>
-        <div class="outbound-batch-list">
-          <div
-            v-for="item in outboundDialog.items"
-            :key="item.row.id"
-            class="outbound-batch-card"
-          >
-            <div class="outbound-card-meta">
-              <div>订单号：{{ item.row.orderNo }}</div>
-              <div>SKU：{{ item.row.skuCode }}</div>
-              <div>客户：{{ item.row.customerName || '-' }}</div>
-              <div>当前待处理：{{ item.row.quantity }}</div>
-            </div>
-            <div v-if="item.headers.length" class="outbound-size-wrap">
-              <el-table
-                :data="item.rows"
-                border
-                size="small"
-                show-summary
-                :summary-method="(p) => getOutboundTableSummaries(item, p)"
-              >
-                <el-table-column label="颜色" min-width="100">
-                  <template #default="{ row }">
-                    {{ row.colorName || '-' }}
-                  </template>
-                </el-table-column>
-                <el-table-column
-                  v-for="(h, hIdx) in item.headers"
-                  :key="hIdx"
-                  :label="h"
-                  min-width="80"
-                  align="center"
-                >
-                  <template #default="{ row }">
-                    <el-input-number
-                      v-model="row.quantities[hIdx]"
-                      :min="0"
-                      :precision="0"
-                      controls-position="right"
-                      size="small"
-                      style="width: 100%"
-                    />
-                  </template>
-                </el-table-column>
-                <el-table-column label="行计" min-width="80" align="center">
-                  <template #default="{ row }">
-                    {{ formatDisplayNumber(getOutboundRowTotal(row)) }}
-                  </template>
-                </el-table-column>
-              </el-table>
-              <div class="outbound-size-footer">
-                待处理数量：{{ formatDisplayNumber(item.row.quantity) }}，当前填写合计：{{
-                  formatDisplayNumber(getOutboundItemTotal(item))
-                }}
-              </div>
-            </div>
-            <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法发货。</div>
-          </div>
-        </div>
-      </el-form>
-      <template #footer>
-        <el-button @click="outboundDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="outboundDialog.submitting" @click="submitOutbound">
-          确定发货
-        </el-button>
-      </template>
-    </el-dialog>
+      @submit="submitOutbound"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import {
   getPendingList,
-  doPendingInbound,
-  doPendingOutbound,
-  getPendingPickupUserOptions,
   type PendingListItem,
-  type FinishedPickupUserOption,
 } from '@/api/inventory'
-import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
@@ -424,6 +240,9 @@ import {
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDisplayNumber } from '@/utils/display-number'
+import PendingInboundDialog from '@/components/inventory/pending/PendingInboundDialog.vue'
+import PendingOutboundDialog from '@/components/inventory/pending/PendingOutboundDialog.vue'
+import { useInventoryPendingDialogs } from '@/composables/useInventoryPendingDialogs'
 
 const filter = reactive({ orderNo: '', skuCode: '' })
 const pageTab = ref<'pending' | 'shipped'>('pending')
@@ -451,79 +270,6 @@ const canOutboundSelection = computed(
 const { onHeaderDragEnd: onPendingHeaderDragEnd, restoreColumnWidths: restorePendingColumnWidths } =
   useTableColumnWidthPersist('inventory-pending-main')
 
-const inboundDialog = reactive<{ visible: boolean; submitting: boolean }>({
-  visible: false,
-  submitting: false,
-})
-const inboundFormRef = ref<FormInstance>()
-const inboundForm = reactive({
-  warehouseId: null as number | null,
-  inventoryTypeId: null as number | null,
-  department: '',
-  location: '',
-})
-const inboundRules: FormRules = {
-  warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
-  department: [{ required: true, message: '请选择部门', trigger: 'change' }],
-  location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
-}
-
-type PendingOutboundDialogItem = {
-  row: PendingListItem
-  headers: string[]
-  rows: Array<{ colorName: string; quantities: number[] }>
-}
-
-type InboundPreviewItem = {
-  id: number
-  orderId: number
-  orderNo: string
-  skuCode: string
-  quantity: number
-  headers: string[]
-  rows: Array<{ colorName: string; values: number[] }>
-}
-
-const outboundDialog = reactive<{
-  visible: boolean
-  submitting: boolean
-  items: PendingOutboundDialogItem[]
-}>({ visible: false, submitting: false, items: [] })
-const outboundFormRef = ref<FormInstance>()
-const outboundForm = reactive({
-  pickupUserId: null as number | null,
-})
-const outboundRules: FormRules = {
-  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
-}
-const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
-const outboundSelectedCustomer = computed(() => {
-  const first = outboundDialog.items[0]?.row?.customerName?.trim()
-  return first || '-'
-})
-const outboundGrandTotal = computed(() =>
-  outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
-)
-const inboundPreviewItems = computed<InboundPreviewItem[]>(() =>
-  selectedRows.value.map((row) => {
-    const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-    const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-    return {
-      id: row.id,
-      orderId: row.orderId,
-      orderNo: row.orderNo,
-      skuCode: row.skuCode,
-      quantity: row.quantity,
-      headers,
-      rows: breakdown?.rows ?? [],
-    }
-  }),
-)
-
-const warehouseOptions = ref<{ id: number; label: string }[]>([])
-const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
-const departmentOptions = ref<{ value: string; label: string }[]>([])
-
 const colorSizeCache = reactive<Record<
   number,
   {
@@ -533,6 +279,42 @@ const colorSizeCache = reactive<Record<
     rows: Array<{ colorName: string; values: number[] }>
   }
 >>({})
+
+const {
+  inboundDialog,
+  inboundFormRef,
+  inboundForm,
+  inboundRules,
+  inboundPreviewItems,
+  warehouseOptions,
+  inventoryTypeOptions,
+  departmentOptions,
+  outboundDialog,
+  outboundFormRef,
+  outboundForm,
+  outboundRules,
+  pickupUserOptions,
+  outboundSelectedCustomer,
+  outboundGrandTotal,
+  openInboundDialog,
+  resetInboundForm,
+  submitInbound,
+  openOutboundDialog,
+  resetOutboundForm,
+  submitOutbound,
+  getOutboundItemTotal,
+  getOutboundRowTotal,
+  getOutboundTableSummaries,
+  toInboundPreviewTableRows,
+  getInboundPreviewRowTotal,
+  loadDialogOptions,
+} = useInventoryPendingDialogs({
+  selectedRows,
+  pageTab,
+  load,
+  ensureColorSizeBreakdown,
+  colorSizeCache,
+})
 
 async function ensureColorSizeBreakdown(orderId: number) {
   if (!orderId) return
@@ -620,282 +402,8 @@ function onPageTabChange() {
   load()
 }
 
-async function openInboundDialog() {
-  if (!selectedRows.value.length) return
-  await Promise.all(
-    selectedRows.value
-      .map((row) => row.orderId)
-      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-      .map((orderId) => ensureColorSizeBreakdown(orderId)),
-  )
-  inboundDialog.visible = true
-}
-
-function resetInboundForm() {
-  inboundForm.warehouseId = null
-  inboundForm.inventoryTypeId = null
-  inboundForm.department = ''
-  inboundForm.location = ''
-  inboundFormRef.value?.clearValidate()
-}
-
-async function submitInbound() {
-  await inboundFormRef.value?.validate().catch(() => {})
-  const ids = selectedRows.value.map((r) => r.id)
-  if (!ids.length) return
-  inboundDialog.submitting = true
-  try {
-    await doPendingInbound({
-      ids,
-      warehouseId: inboundForm.warehouseId,
-      inventoryTypeId: inboundForm.inventoryTypeId ?? undefined,
-      department: inboundForm.department,
-      location: inboundForm.location,
-    })
-    ElMessage.success('入库成功')
-    inboundDialog.visible = false
-    selectedRows.value = []
-    load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    inboundDialog.submitting = false
-  }
-}
-
-async function loadWarehouseOptions() {
-  try {
-    const res = await getSystemOptionsList('warehouses')
-    const list = (res.data ?? []) as SystemOptionItem[]
-    warehouseOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
-  } catch {
-    warehouseOptions.value = []
-  }
-}
-
-async function loadDepartmentOptions() {
-  try {
-    const res = await getSystemOptionsList('org_departments')
-    const list = (res.data ?? []) as SystemOptionItem[]
-    departmentOptions.value = list.map((o) => ({ value: o.value, label: o.value }))
-  } catch {
-    departmentOptions.value = []
-  }
-}
-
-async function loadInventoryTypeOptions() {
-  try {
-    const res = await getSystemOptionsList('inventory_types')
-    const list = (res.data ?? []) as SystemOptionItem[]
-    inventoryTypeOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
-  } catch {
-    inventoryTypeOptions.value = []
-  }
-}
-
-async function loadPickupUserOptions() {
-  try {
-    const res = await getPendingPickupUserOptions()
-    pickupUserOptions.value = res.data ?? []
-  } catch {
-    pickupUserOptions.value = []
-  }
-}
-
-async function openOutboundDialog() {
-  if (pageTab.value !== 'pending') return
-  if (!selectedRows.value.length) return
-  const rows = selectedRows.value
-  if (rows.some((row) => row.sourceType === 'defect')) {
-    ElMessage.warning('次品记录不支持直接发货')
-    return
-  }
-  const customerNames = Array.from(new Set(rows.map((row) => row.customerName?.trim() || '__EMPTY__')))
-  if (customerNames.length > 1) {
-    ElMessage.warning('批量发货请只选择同一客户的记录')
-    return
-  }
-  outboundForm.pickupUserId = null
-  await Promise.all(
-    rows
-      .map((row) => row.orderId)
-      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-      .map((orderId) => ensureColorSizeBreakdown(orderId)),
-  )
-  outboundDialog.items = rows.map((row) => {
-    const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-    const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-    const br = breakdown?.rows ?? []
-    const dialogRows = br.map((r) => ({
-      colorName: r.colorName,
-      quantities: headers.map(() => 0),
-    }))
-    distributePendingToColorSizeGrid(dialogRows, br, headers.length, Number(row.quantity) || 0)
-    return {
-      row,
-      headers,
-      rows: dialogRows,
-    }
-  })
-  outboundDialog.visible = true
-}
-
-function resetOutboundForm() {
-  outboundDialog.items = []
-  outboundForm.pickupUserId = null
-  outboundFormRef.value?.clearValidate()
-}
-
-function getOutboundItemTotal(item: PendingOutboundDialogItem) {
-  return item.rows.reduce(
-    (sum, row) => sum + row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0),
-    0,
-  )
-}
-
-function getOutboundRowTotal(row: { quantities: number[] }) {
-  return row.quantities.reduce((rowSum, q) => rowSum + (Number(q) || 0), 0)
-}
-
-/**
- * 按订单颜色×尺码比例，将「待处理数量」预填到各格（合计等于 targetTotal，可直接改）。
- * baseRows 来自接口，values 末尾可能含「合计」列，仅取前 headersLen 格参与比例。
- */
-function distributePendingToColorSizeGrid(
-  dialogRows: Array<{ quantities: number[] }>,
-  baseRows: Array<{ colorName?: string; values: number[] }>,
-  headersLen: number,
-  targetTotal: number,
-) {
-  if (!headersLen || !dialogRows.length) return
-  const flatBase: number[] = []
-  const rowCount = Math.min(dialogRows.length, baseRows.length)
-  for (let ri = 0; ri < rowCount; ri++) {
-    const vals = baseRows[ri]?.values ?? []
-    for (let ci = 0; ci < headersLen; ci++) {
-      flatBase.push(Math.max(0, Number(vals[ci]) || 0))
-    }
-  }
-  const n = flatBase.length
-  const baseSum = flatBase.reduce((a, b) => a + b, 0)
-  let flatOut: number[]
-  if (targetTotal <= 0 || n === 0) {
-    flatOut = new Array(n).fill(0)
-  } else if (baseSum === 0) {
-    flatOut = new Array(n).fill(0)
-    flatOut[0] = targetTotal
-  } else {
-    const scaled = flatBase.map((v) => (v / baseSum) * targetTotal)
-    const floors = scaled.map((x) => Math.floor(x))
-    let rem = targetTotal - floors.reduce((a, b) => a + b, 0)
-    const order = scaled
-      .map((x, i) => ({ i, f: x - floors[i] }))
-      .sort((a, b) => b.f - a.f || a.i - b.i)
-    for (let k = 0; k < rem; k++) {
-      floors[order[k].i]++
-    }
-    flatOut = floors
-  }
-  let idx = 0
-  for (let ri = 0; ri < dialogRows.length; ri++) {
-    for (let ci = 0; ci < headersLen; ci++) {
-      dialogRows[ri].quantities[ci] = idx < flatOut.length ? flatOut[idx] : 0
-      idx++
-    }
-  }
-}
-
-function getOutboundTableSummaries(
-  item: PendingOutboundDialogItem,
-  param: { columns: unknown[]; data: Array<{ quantities: number[] }> },
-) {
-  const { columns, data } = param
-  const sums: string[] = []
-  const lastCol = columns.length - 1
-  columns.forEach((_, index) => {
-    if (index === 0) {
-      sums[index] = '合计'
-      return
-    }
-    if (index === lastCol) {
-      sums[index] = formatDisplayNumber(getOutboundItemTotal(item))
-      return
-    }
-    const colIdx = index - 1
-    if (colIdx < 0 || colIdx >= item.headers.length) {
-      sums[index] = ''
-      return
-    }
-    const total = data.reduce((sum, row) => sum + (Number(row.quantities[colIdx]) || 0), 0)
-    sums[index] = formatDisplayNumber(total)
-  })
-  return sums
-}
-
-function toInboundPreviewTableRows(item: InboundPreviewItem) {
-  return item.rows.map((row) => ({
-    colorName: row.colorName,
-    values: item.headers.map((_, idx) => Number(row.values?.[idx] ?? 0)),
-  }))
-}
-
-function getInboundPreviewRowTotal(values: number[]) {
-  return values.reduce((sum, v) => sum + (Number(v) || 0), 0)
-}
-
-async function submitOutbound() {
-  if (!outboundDialog.items.length) return
-  const valid = await outboundFormRef.value?.validate().catch(() => false)
-  if (!valid) return
-  const invalidItem = outboundDialog.items.find((item) => {
-    const qty = getOutboundItemTotal(item)
-    return item.headers.length === 0 || qty <= 0 || qty > item.row.quantity
-  })
-  if (invalidItem) {
-    const qty = getOutboundItemTotal(invalidItem)
-    if (invalidItem.headers.length === 0) {
-      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 暂无颜色尺码明细，无法发货`)
-    } else if (qty <= 0) {
-      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 请填写发货数量`)
-    } else {
-      ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 的发货数量不能大于当前待处理数量`)
-    }
-    return
-  }
-  outboundDialog.submitting = true
-  try {
-    await doPendingOutbound({
-      items: outboundDialog.items.map((item) => ({
-        id: item.row.id,
-        quantity: getOutboundItemTotal(item),
-        sizeBreakdown: {
-          headers: item.headers,
-          rows: item.rows.map((row) => ({
-            colorName: row.colorName,
-            quantities: row.quantities.map((q) => Number(q) || 0),
-          })),
-        },
-      })),
-      pickupUserId: outboundForm.pickupUserId,
-    })
-    ElMessage.success('发货成功')
-    outboundDialog.visible = false
-    selectedRows.value = []
-    load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    outboundDialog.submitting = false
-  }
-}
-
 onMounted(async () => {
-  await Promise.all([
-    loadWarehouseOptions(),
-    loadInventoryTypeOptions(),
-    loadDepartmentOptions(),
-    loadPickupUserOptions(),
-  ])
+  await loadDialogOptions()
   await load()
 })
 </script>
@@ -968,86 +476,6 @@ onMounted(async () => {
   text-align: center;
 }
 
-.outbound-size-wrap {
-  width: 100%;
-}
-
-.outbound-size-footer {
-  margin-top: 8px;
-  text-align: center;
-  color: var(--el-text-color-secondary);
-}
-
-.outbound-batch-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 20px;
-  margin-bottom: 12px;
-  color: var(--el-text-color-secondary);
-  justify-content: center;
-  text-align: center;
-}
-
-.outbound-batch-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  max-height: 55vh;
-  overflow: auto;
-  padding-right: 4px;
-}
-
-.outbound-batch-card {
-  padding: 12px;
-  border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
-  background: var(--el-fill-color-blank);
-}
-
-.outbound-card-meta {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 8px 12px;
-  margin-bottom: 10px;
-  color: var(--el-text-color-regular);
-  text-align: center;
-}
-
-.inbound-preview {
-  margin-bottom: 12px;
-  padding: 10px;
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
-  background: var(--el-fill-color-light);
-}
-
-.inbound-preview-title {
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: var(--el-text-color-regular);
-}
-
-.inbound-preview-item + .inbound-preview-item {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--el-border-color-lighter);
-}
-
-.inbound-preview-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 12px;
-  color: var(--el-text-color-regular);
-}
-
-.inbound-preview-breakdown {
-  margin-top: 6px;
-}
-
-.inbound-preview-table :deep(th),
-.inbound-preview-table :deep(td) {
-  text-align: center;
-}
 </style>
 
 <style>
@@ -1076,26 +504,6 @@ onMounted(async () => {
   font-weight: 600;
 }
 
-.outbound-dialog-centered .outbound-batch-card .el-table th.is-leaf,
-.outbound-dialog-centered .outbound-batch-card .el-table td {
-  text-align: center;
-}
-
-.outbound-dialog-centered .outbound-batch-card .cell {
-  justify-content: center;
-}
-
-.outbound-dialog-centered .el-form-item__label {
-  text-align: center;
-}
-
-.outbound-dialog-centered .el-input-number .el-input__inner {
-  text-align: center;
-}
-
-.outbound-dialog-centered .outbound-batch-card .el-table__footer .cell {
-  text-align: center;
-}
 </style>
 
 <style scoped>
@@ -1124,7 +532,4 @@ onMounted(async () => {
   font-size: 13px;
 }
 
-.detail-muted {
-  color: var(--el-text-color-secondary);
-}
 </style>
