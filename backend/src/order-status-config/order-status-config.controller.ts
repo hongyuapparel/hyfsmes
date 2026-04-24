@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
-import { OrderStatusConfigService } from './order-status-config.service';
+import { OrderStatusDefinitionService } from './order-status-definition.service';
+import { OrderStatusTransitionService } from './order-status-transition.service';
+import { OrderStatusReportService } from './order-status-report.service';
 import {
   CreateOrderStatusDto,
   UpdateOrderStatusDto,
@@ -12,34 +14,38 @@ import {
 
 @Controller('order-status-config')
 export class OrderStatusConfigController {
-  constructor(private readonly service: OrderStatusConfigService) {}
+  constructor(
+    private readonly definitionService: OrderStatusDefinitionService,
+    private readonly transitionService: OrderStatusTransitionService,
+    private readonly reportService: OrderStatusReportService,
+  ) {}
 
   // --- 状态定义 ---
 
   @Get('statuses')
   async getStatuses() {
-    return this.service.getAllStatuses();
+    return this.definitionService.getAllStatuses();
   }
 
   @Post('statuses')
   async createStatus(@Body() dto: CreateOrderStatusDto) {
-    return this.service.createStatus(dto);
+    return this.definitionService.createStatus(dto);
   }
 
   @Patch('statuses/:id')
   async updateStatus(@Param('id') id: number, @Body() dto: UpdateOrderStatusDto) {
-    return this.service.updateStatus(Number(id), dto);
+    return this.definitionService.updateStatus(Number(id), dto);
   }
 
   /** 仅切换启用状态，供列表里的开关按钮使用 */
   @Patch('statuses/:id/enabled')
   async toggleStatusEnabled(@Param('id') id: number) {
-    return this.service.toggleStatusEnabled(Number(id));
+    return this.definitionService.toggleStatusEnabled(Number(id));
   }
 
   @Delete('statuses/:id')
   async deleteStatus(@Param('id') id: number) {
-    await this.service.deleteStatus(Number(id));
+    await this.definitionService.deleteStatus(Number(id));
     return { success: true };
   }
 
@@ -47,29 +53,29 @@ export class OrderStatusConfigController {
 
   @Get('transitions')
   async getTransitions(@Query('from_status') fromStatus?: string) {
-    return this.service.getTransitions(fromStatus);
+    return this.transitionService.getTransitions(fromStatus);
   }
 
   @Post('transitions')
   async createTransition(@Body() dto: CreateOrderStatusTransitionDto) {
-    return this.service.createTransition(dto);
+    return this.transitionService.createTransition(dto);
   }
 
   @Post('transitions/batch')
   async createTransitionsBatch(@Body() dto: BatchCreateTransitionsDto) {
-    return this.service.createTransitionsBatch(dto.steps, dto.conditionsJson, dto.name);
+    return this.transitionService.createTransitionsBatch(dto.steps, dto.conditionsJson, dto.name);
   }
 
   // --- 流程链路（整条链路配置） ---
 
   @Get('chains')
   async getChains() {
-    return this.service.getChains();
+    return this.transitionService.getChains();
   }
 
   @Patch('chains/reorder')
   async reorderChains(@Body() body: { orderedIds: number[] }) {
-    return this.service.reorderChains(body?.orderedIds ?? []);
+    return this.transitionService.reorderChains(body?.orderedIds ?? []);
   }
 
   @Patch('chains/:id')
@@ -83,23 +89,23 @@ export class OrderStatusConfigController {
       steps?: CreateOrderStatusTransitionDto[];
     },
   ) {
-    return this.service.updateChain(Number(id), body);
+    return this.transitionService.updateChain(Number(id), body);
   }
 
   @Delete('chains/:id')
   async deleteChain(@Param('id') id: number) {
-    await this.service.deleteChain(Number(id));
+    await this.transitionService.deleteChain(Number(id));
     return { success: true };
   }
 
   @Patch('transitions/:id')
   async updateTransition(@Param('id') id: number, @Body() dto: UpdateOrderStatusTransitionDto) {
-    return this.service.updateTransition(Number(id), dto);
+    return this.transitionService.updateTransition(Number(id), dto);
   }
 
   @Delete('transitions/:id')
   async deleteTransition(@Param('id') id: number) {
-    await this.service.deleteTransition(Number(id));
+    await this.transitionService.deleteTransition(Number(id));
     return { success: true };
   }
 
@@ -107,22 +113,22 @@ export class OrderStatusConfigController {
 
   @Get('sla')
   async getSlaList() {
-    return this.service.getSlaList();
+    return this.definitionService.getSlaList();
   }
 
   @Post('sla')
   async createSla(@Body() dto: CreateOrderStatusSlaDto) {
-    return this.service.createSla(dto);
+    return this.definitionService.createSla(dto);
   }
 
   @Patch('sla/:id')
   async updateSla(@Param('id') id: number, @Body() dto: UpdateOrderStatusSlaDto) {
-    return this.service.updateSla(Number(id), dto);
+    return this.definitionService.updateSla(Number(id), dto);
   }
 
   @Delete('sla/:id')
   async deleteSla(@Param('id') id: number) {
-    await this.service.deleteSla(Number(id));
+    await this.definitionService.deleteSla(Number(id));
     return { success: true };
   }
 
@@ -140,7 +146,7 @@ export class OrderStatusConfigController {
     @Query('page') page?: string,
     @Query('page_size') pageSize?: string,
   ) {
-    return this.service.getSlaReport({
+    return this.reportService.getSlaReport({
       startDate,
       endDate,
       statusId: statusId != null ? Number(statusId) : undefined,
@@ -167,7 +173,7 @@ export class OrderStatusConfigController {
     @Query('page') page?: string,
     @Query('page_size') pageSize?: string,
   ) {
-    return this.service.getProfitReport({
+    return this.reportService.getProfitReport({
       statusId: statusId != null ? Number(statusId) : undefined,
       orderDateFrom,
       orderDateTo,

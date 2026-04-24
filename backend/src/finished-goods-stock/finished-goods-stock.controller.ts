@@ -3,13 +3,19 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { FinishedGoodsStockService } from './finished-goods-stock.service';
+import { FinishedGoodsStockQueryService } from './finished-goods-stock-query.service';
+import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
+import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
 
 @Controller('inventory/finished')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/inventory/finished')
 export class FinishedGoodsStockController {
-  constructor(private readonly service: FinishedGoodsStockService) {}
+  constructor(
+    private readonly queryService: FinishedGoodsStockQueryService,
+    private readonly operationService: FinishedGoodsStockOperationService,
+    private readonly reportService: FinishedGoodsStockReportService,
+  ) {}
 
   @Get('items')
   getList(
@@ -27,7 +33,7 @@ export class FinishedGoodsStockController {
       inventoryTypeIdStr != null && inventoryTypeIdStr !== ''
         ? Number(inventoryTypeIdStr)
         : undefined;
-    return this.service.getList({
+    return this.queryService.getList({
       tab: tab ?? 'all',
       orderNo,
       skuCode,
@@ -54,7 +60,7 @@ export class FinishedGoodsStockController {
     @Body('imageUrl') imageUrl?: string,
     @Body('colorSize') colorSize?: unknown,
   ) {
-    return this.service.createManual(
+    return this.operationService.createManual(
       {
         orderNo,
         skuCode,
@@ -81,7 +87,7 @@ export class FinishedGoodsStockController {
     @Body('remark') remark: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.outbound(
+    return this.operationService.outbound(
       Array.isArray(items) && items.length
         ? items.map((item) => ({
             id: Number(item?.id),
@@ -103,12 +109,12 @@ export class FinishedGoodsStockController {
 
   @Get('pickup-users')
   getPickupUsers() {
-    return this.service.getPickupUserOptions();
+    return this.queryService.getPickupUserOptions();
   }
 
   @Get('items/:id')
   getDetail(@Param('id') id: string) {
-    return this.service.getDetail(Number(id));
+    return this.queryService.getDetail(Number(id));
   }
 
   @Patch('items/:id')
@@ -123,7 +129,7 @@ export class FinishedGoodsStockController {
     @Body('remark') remark: string | undefined,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.updateMeta(
+    return this.operationService.updateMeta(
       Number(id),
       { department, inventoryTypeId, warehouseId, location, unitPrice, imageUrl, remark },
       user?.username ?? '',
@@ -137,7 +143,7 @@ export class FinishedGoodsStockController {
     @Body('imageUrl') imageUrl: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.upsertColorImage(Number(id), { colorName, imageUrl }, user?.username ?? '');
+    return this.operationService.upsertColorImage(Number(id), { colorName, imageUrl }, user?.username ?? '');
   }
 
   @Get('outbounds')
@@ -150,7 +156,7 @@ export class FinishedGoodsStockController {
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    return this.service.getOutboundRecords({
+    return this.reportService.getOutboundRecords({
       orderNo,
       skuCode,
       customerName,

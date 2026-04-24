@@ -3,14 +3,19 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { ProductionFinishingService, FinishingListQuery } from './production-finishing.service';
+import { type FinishingListQuery } from './production-finishing.service';
+import { ProductionFinishingQueryService } from './production-finishing-query.service';
+import { ProductionFinishingMutationService } from './production-finishing-mutation.service';
 import type { Response } from 'express';
 
 @Controller('production/finishing')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/production/finishing')
 export class ProductionFinishingController {
-  constructor(private readonly finishingService: ProductionFinishingService) {}
+  constructor(
+    private readonly finishingQueryService: ProductionFinishingQueryService,
+    private readonly finishingMutationService: ProductionFinishingMutationService,
+  ) {}
 
   @Get('items')
   getItems(
@@ -27,7 +32,7 @@ export class ProductionFinishingController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.finishingService.getFinishingList(query);
+    return this.finishingQueryService.getFinishingList(query);
   }
 
   @Get('items/export')
@@ -42,7 +47,7 @@ export class ProductionFinishingController {
       orderNo,
       skuCode,
     };
-    const rows = await this.finishingService.getFinishingExportRows(query);
+    const rows = await this.finishingQueryService.getFinishingExportRows(query);
     const header = [
       '订单号',
       'SKU',
@@ -98,7 +103,7 @@ export class ProductionFinishingController {
 
   @Get('items/:orderId/register-form-data')
   getRegisterFormData(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.finishingService.getRegisterFormData(orderId);
+    return this.finishingQueryService.getRegisterFormData(orderId);
   }
 
   @Post('items/register-receive')
@@ -107,7 +112,7 @@ export class ProductionFinishingController {
     @Body('tailReceivedQty') tailReceivedQty: number,
     @Body('tailReceivedQuantities') tailReceivedQuantities?: number[],
   ) {
-    return this.finishingService.registerReceive(
+    return this.finishingMutationService.registerReceive(
       Number(orderId),
       Number(tailReceivedQty),
       Array.isArray(tailReceivedQuantities) ? tailReceivedQuantities : null,
@@ -125,7 +130,7 @@ export class ProductionFinishingController {
     @Body('defectQuantities') defectQuantities?: number[],
     @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.finishingService.registerPackagingComplete(
+    return this.finishingMutationService.registerPackagingComplete(
       Number(orderId),
       Number(tailShippedQty ?? 0),
       Number(tailInboundQty ?? 0),
@@ -143,7 +148,7 @@ export class ProductionFinishingController {
     @Body('tailReceivedQty') tailReceivedQty: number,
     @Body('defectQuantity') defectQuantity: number,
   ) {
-    return this.finishingService.registerPackaging(
+    return this.finishingMutationService.registerPackaging(
       Number(orderId),
       Number(tailReceivedQty),
       Number(defectQuantity ?? 0),
@@ -155,7 +160,7 @@ export class ProductionFinishingController {
     @Body('orderId') orderId: number,
     @Body('quantity') quantity: number,
   ) {
-    return this.finishingService.ship(Number(orderId), Number(quantity ?? 0));
+    return this.finishingMutationService.ship(Number(orderId), Number(quantity ?? 0));
   }
 
   @Post('items/inbound')
@@ -164,7 +169,7 @@ export class ProductionFinishingController {
     @Body('quantity') quantity: number,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.finishingService.inbound(Number(orderId), Number(quantity ?? 0), user?.userId);
+    return this.finishingMutationService.inbound(Number(orderId), Number(quantity ?? 0), user?.userId);
   }
 
   @Post('items/:orderId/finance-approve')
@@ -172,6 +177,6 @@ export class ProductionFinishingController {
     @Param('orderId', ParseIntPipe) orderId: number,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.finishingService.financeApproveFinishing(orderId, user?.userId);
+    return this.finishingMutationService.financeApproveFinishing(orderId, user?.userId);
   }
 }

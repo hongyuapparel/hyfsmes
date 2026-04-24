@@ -15,12 +15,7 @@
             @keyup.enter="onSearch(true)"
           >
             <template #prefix>
-              <span
-                v-if="filter.name && nameLabelVisible"
-                :style="{ color: ACTIVE_FILTER_COLOR }"
-              >
-                名称：
-              </span>
+              <span v-if="filter.name && nameLabelVisible" :style="{ color: ACTIVE_FILTER_COLOR }">名称：</span>
             </template>
           </el-input>
           <el-select
@@ -32,12 +27,7 @@
             class="filter-bar-item"
             @change="onSearch(true)"
           >
-            <el-option
-              v-for="opt in categoryOptions"
-              :key="opt"
-              :label="opt"
-              :value="opt"
-            />
+            <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
           <el-select
             v-model="filter.customerName"
@@ -48,12 +38,7 @@
             class="filter-bar-item"
             @change="onSearch(true)"
           >
-            <el-option
-              v-for="opt in customerOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
+            <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
           <el-select
             v-model="filter.salesperson"
@@ -64,12 +49,7 @@
             class="filter-bar-item"
             @change="onSearch(true)"
           >
-            <el-option
-              v-for="s in salespersonOptions"
-              :key="s"
-              :label="s"
-              :value="s"
-            />
+            <el-option v-for="s in salespersonOptions" :key="s" :label="s" :value="s" />
           </el-select>
           <el-date-picker
             v-model="inboundDateRange"
@@ -120,12 +100,7 @@
           <el-table-column type="selection" width="46" fixed />
           <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
             <template #default="{ row }">
-              <AppImageThumb
-                v-if="row.imageUrl"
-                :raw-url="row.imageUrl"
-                :width="compactImageSize"
-                :height="compactImageSize"
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" :width="compactImageSize" :height="compactImageSize" />
               <span v-else>-</span>
             </template>
           </el-table-column>
@@ -215,28 +190,19 @@
           @header-dragend="onAccessoriesOutboundHeaderDragEnd"
         >
           <el-table-column prop="createdAt" label="时间" width="160" align="center">
-            <template #default="{ row }">
-              {{ row.createdAt }}
-            </template>
+            <template #default="{ row }">{{ row.createdAt }}</template>
           </el-table-column>
           <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
             <template #default="{ row }">
-              <AppImageThumb
-                v-if="row.imageUrl"
-                :raw-url="row.imageUrl"
-                :width="compactImageSize"
-                :height="compactImageSize"
-              />
+              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" :width="compactImageSize" :height="compactImageSize" />
               <span v-else>-</span>
             </template>
           </el-table-column>
           <el-table-column prop="customerName" label="客户" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="category" label="类别" width="100" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="出库类型" width="110" align="center" header-align="center">
-            <template #default="{ row }">
-              {{ row.outboundType === 'order_auto' ? '订单自动出库' : '手动出库' }}
-            </template>
+            <template #default="{ row }">{{ row.outboundType === 'order_auto' ? '订单自动出库' : '手动出库' }}</template>
           </el-table-column>
           <el-table-column label="出库数量" width="100" align="center" header-align="center">
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
@@ -261,220 +227,64 @@
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog
-      v-model="formDialog.visible"
-      :title="formDialog.isEdit ? '编辑辅料' : '新增辅料'"
-      width="480"
-      destroy-on-close
+    <AccessoriesFormDialog
+      ref="accessoriesFormDialogRef"
+      v-model:visible="formDialog.visible"
+      :submitting="formDialog.submitting"
+      :is-edit="formDialog.isEdit"
+      :quick-add-source="quickAddSource"
+      :form="form"
+      :form-rules="formRules"
+      :category-options="categoryOptions"
+      :customer-options="customerOptions"
+      :salesperson-options="salespersonOptions"
       @close="resetForm"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="formRules"
-        label-width="80px"
-      >
-        <el-alert
-          v-if="quickAddSource"
-          type="info"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 10px"
-          :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
-        />
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="请输入名称" clearable />
-        </el-form-item>
-        <el-form-item label="类别" prop="category">
-          <el-select
-            v-model="form.category"
-            placeholder="请选择类别（来自供应商设置）"
-            filterable
-            clearable
-            style="width: 100%"
-            :disabled="categoryOptions.length === 0"
-          >
-            <el-option
-              v-for="opt in categoryOptions"
-              :key="opt"
-              :label="opt"
-              :value="opt"
-            />
-          </el-select>
-          <div v-if="categoryOptions.length === 0" class="category-empty-tip">
-            暂无可选类别，请先在「系统设置 → 供应商设置 → 辅料供应商」中配置经营范围
-          </div>
-        </el-form-item>
-        <el-form-item label="客户" prop="customerName">
-          <el-select
-            v-model="form.customerName"
-            placeholder="请选择客户"
-            filterable
-            clearable
-          >
-            <el-option
-              v-for="opt in customerOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="业务员" prop="salesperson" required>
-          <el-select
-            v-model="form.salesperson"
-            placeholder="请选择业务员"
-            filterable
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="s in salespersonOptions"
-              :key="s"
-              :label="s"
-              :value="s"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="数量" prop="quantity">
-          <div class="qty-unit-row">
-            <el-input-number
-              v-model="form.quantity"
-              :min="0"
-              :precision="0"
-              controls-position="right"
-              class="qty-input"
-            />
-            <el-input
-              v-model="form.unit"
-              placeholder="单位（如个、卷）"
-              clearable
-              class="unit-input"
-            />
-          </div>
-        </el-form-item>
-        <el-form-item label="图片" prop="imageUrl">
-          <ImageUploadArea v-model="form.imageUrl" />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="备注" clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="formDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="formDialog.submitting" @click="submitForm">
-          确定
-        </el-button>
-      </template>
-    </el-dialog>
+      @confirm="submitForm"
+    />
 
-    <el-dialog
-      v-model="outboundDialog.visible"
-      title="辅料出库"
-      width="480"
-      destroy-on-close
+    <AccessoriesOutboundDialog
+      ref="accessoriesOutboundDialogRef"
+      v-model:visible="outboundDialog.visible"
+      :submitting="outboundDialog.submitting"
+      :form="outboundForm"
+      :outbound-rules="outboundRules"
+      :outbound-user-options="outboundUserOptions"
       @close="resetOutboundDialog"
-    >
-      <el-form :model="outboundForm" :rules="outboundRules" ref="outboundFormRef" label-width="90px">
-        <el-form-item label="辅料" prop="accessoryName">
-          <el-input v-model="outboundForm.accessoryName" disabled />
-        </el-form-item>
-        <el-form-item label="领取人" prop="pickupUserId">
-          <el-select
-            v-model="outboundForm.pickupUserId"
-            placeholder="请选择领取人"
-            filterable
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="u in outboundUserOptions"
-              :key="u.id"
-              :label="u.displayName || u.username"
-              :value="u.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="出库数量" prop="quantity">
-          <el-input-number
-            v-model="outboundForm.quantity"
-            :min="1"
-            :max="outboundForm.maxQuantity"
-            :precision="0"
-            controls-position="right"
-            style="width: 100%"
-          />
-          <div class="outbound-qty-tip">当前库存：{{ outboundForm.maxQuantity }}</div>
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="outboundForm.remark" type="textarea" :rows="2" placeholder="备注（可选）" clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="outboundDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="outboundDialog.submitting" @click="submitOutbound">
-          确定出库
-        </el-button>
-      </template>
-    </el-dialog>
+      @confirm="submitOutbound"
+    />
 
-    <el-drawer
-      v-model="detailDrawer.visible"
-      title="辅料详情"
-      size="560px"
-      destroy-on-close
-    >
-      <div v-if="detailDrawer.row" class="detail-base">
-        <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
-        <div><span class="detail-label">类别：</span>{{ detailDrawer.row.category || '-' }}</div>
-        <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
-        <div><span class="detail-label">当前库存：</span>{{ formatDisplayNumber(detailDrawer.row.quantity) }} {{ detailDrawer.row.unit || '' }}</div>
-        <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
-      </div>
-      <div class="detail-log-title">操作记录</div>
-      <el-timeline v-loading="detailDrawer.loading">
-        <el-timeline-item
-          v-for="log in detailDrawer.logs"
-          :key="log.id"
-          :timestamp="formatDate(log.createdAt)"
-          placement="top"
-        >
-          {{ formatLogAction(log.action) }}｜操作人：{{ log.operatorUsername || '-' }}{{ log.remark ? `｜备注：${log.remark}` : '' }}
-        </el-timeline-item>
-      </el-timeline>
-    </el-drawer>
+    <AccessoriesDetailDrawer
+      v-model:visible="detailDrawer.visible"
+      :row="detailDrawer.row"
+      :loading="detailDrawer.loading"
+      :logs="detailDrawer.logs"
+      :format-log-action="formatLogAction"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { onMounted, reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, getSalespeople, type CustomerItem } from '@/api/customers'
-import ImageUploadArea from '@/components/ImageUploadArea.vue'
-import {
-  getAccessoriesList,
-  createAccessory,
-  updateAccessory,
-  getAccessoryOutboundUserOptions,
-  manualAccessoryOutbound,
-  getAccessoryOutboundRecords,
-  getAccessoryOperationLogs,
-  type AccessoryOutboundUserOption,
-  type AccessoryOutboundRecord,
-  type AccessoryOperationLog,
-  type AccessoryItem,
-} from '@/api/inventory'
+import { getAccessoriesList, getAccessoryOutboundRecords, type AccessoryItem, type AccessoryOutboundRecord } from '@/api/inventory'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
-  getTextFilterStyle,
   getFilterRangeStyle,
+  getTextFilterStyle,
 } from '@/composables/useFilterBarHelpers'
+import { useAccessoriesDetailDrawer } from '@/composables/useAccessoriesDetailDrawer'
+import { useAccessoriesFormDialog, type AccessoriesFormDialogExpose } from '@/composables/useAccessoriesFormDialog'
+import { useAccessoriesOutboundDialog, type AccessoriesOutboundDialogExpose } from '@/composables/useAccessoriesOutboundDialog'
+import AccessoriesDetailDrawer from '@/components/inventory/AccessoriesDetailDrawer.vue'
+import AccessoriesFormDialog from '@/components/inventory/AccessoriesFormDialog.vue'
+import AccessoriesOutboundDialog from '@/components/inventory/AccessoriesOutboundDialog.vue'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 
@@ -485,73 +295,45 @@ const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
 const accessoriesStockTableRef = ref()
 const accessoriesOutboundTableRef = ref()
-const {
-  compactHeaderCellStyle,
-  compactCellStyle,
-  compactRowStyle,
-  compactImageSize,
-  compactImageColumnMinWidth,
-} = useCompactTableStyle()
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const salespersonOptions = ref<string[]>([])
 const categoryOptions = ref<string[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
-
 const selectedRows = ref<AccessoryItem[]>([])
-const detailDrawer = reactive<{
-  visible: boolean
-  row: AccessoryItem | null
-  loading: boolean
-  logs: AccessoryOperationLog[]
-}>({ visible: false, row: null, loading: false, logs: [] })
-
-const outboundFilter = reactive<{
-  orderNo: string
-  outboundType: string
-  dateRange: [string, string] | []
-}>({ orderNo: '', outboundType: '', dateRange: [] })
+const outboundFilter = reactive<{ orderNo: string; outboundType: string; dateRange: [string, string] | [] }>({
+  orderNo: '',
+  outboundType: '',
+  dateRange: [],
+})
 const outboundList = ref<AccessoryOutboundRecord[]>([])
 const outboundLoading2 = ref(false)
 const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
-const {
-  onHeaderDragEnd: onAccessoriesStockHeaderDragEnd,
-  restoreColumnWidths: restoreAccessoriesStockColumnWidths,
-} = useTableColumnWidthPersist('inventory-accessories-stock')
+const accessoriesFormDialogRef = ref<AccessoriesFormDialogExpose>()
+const accessoriesOutboundDialogRef = ref<AccessoriesOutboundDialogExpose>()
+
+const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
+const { onHeaderDragEnd: onAccessoriesStockHeaderDragEnd, restoreColumnWidths: restoreAccessoriesStockColumnWidths } =
+  useTableColumnWidthPersist('inventory-accessories-stock')
 const {
   onHeaderDragEnd: onAccessoriesOutboundHeaderDragEnd,
   restoreColumnWidths: restoreAccessoriesOutboundColumnWidths,
 } = useTableColumnWidthPersist('inventory-accessories-outbounds')
+const { detailDrawer, formatLogAction, openDetail } = useAccessoriesDetailDrawer()
+
+const { formDialog, quickAddSource, form, formRules, openForm, resetForm, submitForm } = useAccessoriesFormDialog(
+  selectedRows,
+  load,
+  accessoriesFormDialogRef,
+)
+const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
+  useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
 
 function getInventoryOutboundRangeStyle(v: [string, string] | []) {
   const hasValue = Array.isArray(v) && v.length === 2
   if (!hasValue) return getFilterRangeStyle(v)
-  const w = '240px'
-  return { ...getFilterRangeStyle(v), width: w, minWidth: w, flex: `0 0 ${w}` }
-}
-
-const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
-  visible: false,
-  submitting: false,
-  isEdit: false,
-})
-const quickAddSource = ref<AccessoryItem | null>(null)
-const quickAddBaseQuantity = ref(0)
-const editId = ref<number | null>(null)
-const formRef = ref<FormInstance>()
-const form = reactive({
-  name: '',
-  category: '',
-  quantity: 0,
-  unit: '个',
-  customerName: '',
-  salesperson: '',
-  imageUrl: '',
-  remark: '',
-})
-const formRules: FormRules = {
-  name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
-  salesperson: [{ required: true, message: '请选择业务员', trigger: 'change' }],
+  const width = '240px'
+  return { ...getFilterRangeStyle(v), width, minWidth: width, flex: `0 0 ${width}` }
 }
 
 async function load() {
@@ -592,12 +374,9 @@ function onPageTabChange() {
 async function loadCustomerOptions() {
   try {
     const res = await getCustomers({ page: 1, pageSize: 200, sortBy: 'companyName', sortOrder: 'asc' })
-    const list = (res.data?.list ?? []) as CustomerItem[]
-    customerOptions.value = list.map((c) => ({
-      label: c.companyName,
-      value: c.companyName,
-    }))
-  } catch (e: unknown) {
+    const customers = (res.data?.list ?? []) as CustomerItem[]
+    customerOptions.value = customers.map((item) => ({ label: item.companyName, value: item.companyName }))
+  } catch {
     console.warn('客户选项加载失败')
   }
 }
@@ -612,9 +391,7 @@ async function loadSalespersonOptions() {
 }
 
 function onSearch(byUser = false) {
-  if (byUser) {
-    if (filter.name && String(filter.name).trim()) nameLabelVisible.value = true
-  }
+  if (byUser && filter.name && String(filter.name).trim()) nameLabelVisible.value = true
   pagination.page = 1
   load()
 }
@@ -644,11 +421,15 @@ function onPageSizeChange() {
   load()
 }
 
+function onSelectionChange(rows: AccessoryItem[]) {
+  selectedRows.value = rows ?? []
+}
+
 function findNodeByValue(nodes: SystemOptionTreeNode[], value: string): SystemOptionTreeNode | null {
-  for (const n of nodes) {
-    if (n.value === value) return n
-    if (n.children?.length) {
-      const found = findNodeByValue(n.children, value)
+  for (const node of nodes) {
+    if (node.value === value) return node
+    if (node.children?.length) {
+      const found = findNodeByValue(node.children, value)
       if (found) return found
     }
   }
@@ -660,236 +441,11 @@ async function loadCategoryOptions() {
     const res = await getSystemOptionsTree('supplier_types')
     const tree = res.data ?? []
     const accessoryRoot = findNodeByValue(tree, '辅料供应商')
-    const scopes = (accessoryRoot?.children ?? []).map((c) => c.value).filter(Boolean)
-    categoryOptions.value = scopes
-  } catch (e: unknown) {
+    categoryOptions.value = (accessoryRoot?.children ?? []).map((child) => child.value).filter(Boolean)
+  } catch {
     categoryOptions.value = []
   }
 }
-
-function openForm(row: AccessoryItem | null) {
-  quickAddSource.value = null
-  quickAddBaseQuantity.value = 0
-  formDialog.isEdit = !!row
-  editId.value = row ? row.id : null
-  const seed = row ?? (selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
-  if (seed) {
-    form.name = seed.name
-    form.category = seed.category ?? ''
-    form.unit = seed.unit ?? '个'
-    form.customerName = seed.customerName ?? ''
-    form.salesperson = seed.salesperson ?? ''
-    form.imageUrl = seed.imageUrl ?? ''
-    form.remark = seed.remark ?? ''
-    if (row) {
-      form.quantity = seed.quantity ?? 0
-    } else {
-      quickAddSource.value = seed
-      quickAddBaseQuantity.value = Number(seed.quantity) || 0
-      form.quantity = 0
-    }
-  } else {
-    form.name = ''
-    form.category = ''
-    form.quantity = 0
-    form.unit = '个'
-    form.customerName = ''
-    form.salesperson = ''
-    form.imageUrl = ''
-    form.remark = ''
-  }
-  formDialog.visible = true
-}
-
-function resetForm() {
-  formRef.value?.clearValidate()
-}
-
-async function submitForm() {
-  await formRef.value?.validate().catch(() => {})
-  formDialog.submitting = true
-  try {
-    if (formDialog.isEdit && editId.value != null) {
-      await updateAccessory(editId.value, {
-        name: form.name,
-        category: form.category,
-        quantity: form.quantity,
-        unit: form.unit,
-        customerName: form.customerName || undefined,
-        salesperson: form.salesperson,
-        imageUrl: form.imageUrl || undefined,
-        remark: form.remark,
-      })
-      ElMessage.success('保存成功')
-    } else {
-      const inputQty = Number(form.quantity) || 0
-      if (quickAddSource.value) {
-        if (inputQty <= 0) {
-          ElMessage.warning('请输入大于 0 的新增数量')
-          return
-        }
-        await updateAccessory(quickAddSource.value.id, {
-          name: form.name,
-          category: form.category,
-          quantity: quickAddBaseQuantity.value + inputQty,
-          unit: form.unit,
-          customerName: form.customerName || undefined,
-          salesperson: form.salesperson,
-          imageUrl: form.imageUrl || undefined,
-          remark: form.remark,
-        })
-        ElMessage.success('库存增加成功')
-      } else {
-        await createAccessory({
-          name: form.name,
-          category: form.category,
-          quantity: form.quantity,
-          unit: form.unit,
-          customerName: form.customerName || undefined,
-          salesperson: form.salesperson,
-          imageUrl: form.imageUrl || undefined,
-          remark: form.remark,
-        })
-        ElMessage.success('新增成功')
-      }
-    }
-    formDialog.visible = false
-    load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    formDialog.submitting = false
-  }
-}
-
-function onSelectionChange(rows: AccessoryItem[]) {
-  selectedRows.value = rows ?? []
-}
-
-function formatLogAction(action: string) {
-  if (action === 'create') return '新建'
-  if (action === 'update') return '编辑'
-  if (action === 'outbound') return '出库'
-  if (action === 'delete') return '删除'
-  return action || '操作'
-}
-
-async function openDetail(row: AccessoryItem) {
-  detailDrawer.row = row
-  detailDrawer.visible = true
-  detailDrawer.loading = true
-  try {
-    const res = await getAccessoryOperationLogs(row.id)
-    detailDrawer.logs = res.data ?? []
-  } catch (e: unknown) {
-    detailDrawer.logs = []
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    detailDrawer.loading = false
-  }
-}
-
-const outboundDialog = reactive<{ visible: boolean; submitting: boolean }>({
-  visible: false,
-  submitting: false,
-})
-const outboundUserOptions = ref<AccessoryOutboundUserOption[]>([])
-const outboundFormRef = ref<FormInstance>()
-const outboundForm = reactive<{
-  accessoryId: number | null
-  accessoryName: string
-  pickupUserId: number | null
-  quantity: number
-  maxQuantity: number
-  remark: string
-}>({
-  accessoryId: null,
-  accessoryName: '',
-  pickupUserId: null,
-  quantity: 1,
-  maxQuantity: 0,
-  remark: '',
-})
-
-const outboundRules: FormRules = {
-  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
-  quantity: [{ required: true, message: '请输入出库数量', trigger: 'blur' }],
-}
-
-async function ensureOutboundUserOptionsLoaded() {
-  if (outboundUserOptions.value.length) return
-  try {
-    const res = await getAccessoryOutboundUserOptions()
-    outboundUserOptions.value = res.data ?? []
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  }
-}
-
-async function openOutboundDialog() {
-  if (selectedRows.value.length !== 1) {
-    ElMessage.warning('请先选中 1 条辅料记录')
-    return
-  }
-  const row = selectedRows.value[0]
-  outboundForm.accessoryId = row.id
-  outboundForm.accessoryName = row.name
-  outboundForm.maxQuantity = Number(row.quantity) || 0
-  outboundForm.quantity = outboundForm.maxQuantity > 0 ? 1 : 0
-  outboundForm.pickupUserId = null
-  outboundForm.remark = ''
-  await ensureOutboundUserOptionsLoaded()
-  outboundDialog.visible = true
-}
-
-function resetOutboundDialog() {
-  outboundFormRef.value?.clearValidate()
-}
-
-async function submitOutbound() {
-  if (!outboundForm.accessoryId) return
-  await outboundFormRef.value?.validate().catch(() => {})
-  if (!outboundForm.pickupUserId) return
-  const pickupUser = outboundUserOptions.value.find((u) => u.id === outboundForm.pickupUserId)
-  const pickupUserLabel = pickupUser ? (pickupUser.displayName || pickupUser.username) : ''
-  if (!pickupUserLabel) {
-    ElMessage.warning('领取人无效，请重新选择')
-    return
-  }
-  const qty = Number(outboundForm.quantity) || 0
-  if (qty <= 0) {
-    ElMessage.warning('出库数量不合法')
-    return
-  }
-  if (qty > (Number(outboundForm.maxQuantity) || 0)) {
-    ElMessage.warning('出库数量不能大于当前库存')
-    return
-  }
-  outboundDialog.submitting = true
-  try {
-    const remark = [`领取人：${pickupUserLabel}`, (outboundForm.remark ?? '').trim()].filter(Boolean).join('；')
-    await manualAccessoryOutbound({
-      accessoryId: outboundForm.accessoryId,
-      quantity: qty,
-      remark,
-    })
-    ElMessage.success('出库成功')
-    outboundDialog.visible = false
-    selectedRows.value = []
-    load()
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    outboundDialog.submitting = false
-  }
-}
-
-onMounted(() => {
-  loadCustomerOptions()
-  loadSalespersonOptions()
-  loadCategoryOptions()
-  load()
-})
 
 async function loadOutbounds() {
   outboundLoading2.value = true
@@ -928,6 +484,13 @@ function onOutboundPageSizeChange() {
   outboundPagination.page = 1
   loadOutbounds()
 }
+
+onMounted(() => {
+  loadCustomerOptions()
+  loadSalespersonOptions()
+  loadCategoryOptions()
+  load()
+})
 </script>
 
 <style scoped>
@@ -944,53 +507,9 @@ function onOutboundPageSizeChange() {
   line-height: 20px;
 }
 
-.category-empty-tip {
-  margin-top: 6px;
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
-  line-height: 1.4;
-}
-
-.qty-unit-row {
-  display: flex;
-  gap: var(--space-sm);
-  width: 100%;
-}
-
-.qty-input {
-  flex: 1.2;
-}
-
-.unit-input {
-  flex: 1;
-}
-
-.outbound-qty-tip {
-  margin-top: 6px;
-  font-size: var(--font-size-caption);
-  color: var(--color-text-muted);
-  line-height: 1.2;
-}
-
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
 }
-
-.detail-base {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.detail-label {
-  color: var(--color-text-muted);
-}
-
-.detail-log-title {
-  margin: 8px 0 12px;
-  font-weight: 600;
-}
-
 </style>

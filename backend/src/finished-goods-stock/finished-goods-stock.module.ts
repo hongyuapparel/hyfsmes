@@ -16,6 +16,9 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { FinishedGoodsStockController } from './finished-goods-stock.controller';
 import { FinishedGoodsStockService } from './finished-goods-stock.service';
+import { FinishedGoodsStockQueryService } from './finished-goods-stock-query.service';
+import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
+import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
 
 @Module({
   imports: [
@@ -37,7 +40,17 @@ import { FinishedGoodsStockService } from './finished-goods-stock.service';
     AuthModule,
   ],
   controllers: [FinishedGoodsStockController],
-  providers: [FinishedGoodsStockService],
-  exports: [FinishedGoodsStockService],
+  providers: [
+    FinishedGoodsStockService,
+    FinishedGoodsStockQueryService,
+    FinishedGoodsStockOperationService,
+    FinishedGoodsStockReportService,
+  ],
+  exports: [
+    FinishedGoodsStockService,
+    FinishedGoodsStockQueryService,
+    FinishedGoodsStockOperationService,
+    FinishedGoodsStockReportService,
+  ],
 })
 export class FinishedGoodsStockModule {}

@@ -13,6 +13,8 @@ import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
 import { OrderStatusConfigModule } from '../order-status-config/order-status-config.module';
 import { ProductionFinishingController } from './production-finishing.controller';
 import { ProductionFinishingService } from './production-finishing.service';
+import { ProductionFinishingQueryService } from './production-finishing-query.service';
+import { ProductionFinishingMutationService } from './production-finishing-mutation.service';
 
 @Module({
   imports: [
@@ -22,6 +24,10 @@ import { ProductionFinishingService } from './production-finishing.service';
     OrderStatusConfigModule,
   ],
   controllers: [ProductionFinishingController],
-  providers: [ProductionFinishingService],
+  providers: [
+    ProductionFinishingService,
+    ProductionFinishingQueryService,
+    ProductionFinishingMutationService,
+  ],
 })
 export class ProductionFinishingModule {}

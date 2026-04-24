@@ -3,13 +3,20 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { OrdersService, OrderListQuery, OrderEditPayload, OrderActor } from './orders.service';
+import { type OrderListQuery, type OrderEditPayload, type OrderActor } from './orders.service';
+import { OrderQueryService } from './order-query.service';
+import { OrderMutationService } from './order-mutation.service';
+import { OrderStatusService } from './order-status.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/orders/list')
 export class OrdersController {
-  constructor(private readonly ordersService: OrdersService) {}
+  constructor(
+    private readonly orderQueryService: OrderQueryService,
+    private readonly orderMutationService: OrderMutationService,
+    private readonly orderStatusService: OrderStatusService,
+  ) {}
 
   /**
    * 订单列表
@@ -63,7 +70,7 @@ export class OrdersController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.ordersService.findAll(query, user?.userId);
+    return this.orderQueryService.findAll(query, user?.userId);
   }
 
   /**
@@ -114,7 +121,7 @@ export class OrdersController {
       customerDueEnd,
       factory,
     };
-    return this.ordersService.countByStatus(query, user?.userId);
+    return this.orderQueryService.countByStatus(query, user?.userId);
   }
 
   /**
@@ -126,7 +133,7 @@ export class OrdersController {
   async findOne(
     @Param('id', ParseIntPipe) id: number,
   ) {
-    return this.ordersService.findOne(id);
+    return this.orderQueryService.findOne(id);
   }
 
   /**
@@ -135,7 +142,7 @@ export class OrdersController {
    */
   @Get(':id/size-breakdown')
   getSizeBreakdown(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.getSizeBreakdown(id);
+    return this.orderQueryService.getSizeBreakdown(id);
   }
 
   /**
@@ -144,7 +151,7 @@ export class OrdersController {
    */
   @Get(':id/color-size-breakdown')
   getColorSizeBreakdown(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.getColorSizeBreakdown(id);
+    return this.orderQueryService.getColorSizeBreakdown(id);
   }
 
   /**
@@ -155,7 +162,7 @@ export class OrdersController {
   @RequirePermission('orders_edit')
   createDraft(@Body() body: OrderEditPayload, @CurrentUser() user: { userId: number; username: string }) {
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.createDraft(body, actor);
+    return this.orderMutationService.createDraft(body, actor);
   }
 
   /**
@@ -169,9 +176,9 @@ export class OrdersController {
     @Body() body: OrderEditPayload,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    await this.ordersService.assertOrderActionById(id, user.userId, 'edit');
+    await this.orderStatusService.assertOrderActionById(id, user.userId, 'edit');
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.updateDraft(id, body, actor);
+    return this.orderMutationService.updateDraft(id, body, actor);
   }
 
   /**
@@ -181,9 +188,9 @@ export class OrdersController {
   @Post(':id/submit')
   @RequirePermission('orders_edit')
   async submit(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
-    await this.ordersService.assertOrderActionById(id, user.userId, 'edit');
+    await this.orderStatusService.assertOrderActionById(id, user.userId, 'edit');
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.submit(id, actor);
+    return this.orderMutationService.submit(id, actor);
   }
 
   /**
@@ -197,9 +204,9 @@ export class OrdersController {
     @Body('ids') ids: number[],
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    await this.ordersService.assertOrderActionByIds(ids ?? [], user.userId, 'delete');
+    await this.orderStatusService.assertOrderActionByIds(ids ?? [], user.userId, 'delete');
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.deleteMany(ids ?? [], actor);
+    return this.orderMutationService.deleteMany(ids ?? [], actor);
   }
 
   /**
@@ -213,9 +220,9 @@ export class OrdersController {
     @Body('ids') ids: number[],
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    await this.ordersService.assertOrderActionByIds(ids ?? [], user.userId, 'review');
+    await this.orderStatusService.assertOrderActionByIds(ids ?? [], user.userId, 'review');
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.reviewMany(ids ?? [], actor);
+    return this.orderMutationService.reviewMany(ids ?? [], actor);
   }
 
   /**
@@ -230,9 +237,9 @@ export class OrdersController {
     @Body('reason') reason: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    await this.ordersService.assertOrderActionByIds(ids ?? [], user.userId, 'review');
+    await this.orderStatusService.assertOrderActionByIds(ids ?? [], user.userId, 'review');
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.reviewRejectMany(ids ?? [], reason, actor);
+    return this.orderMutationService.reviewRejectMany(ids ?? [], reason, actor);
   }
 
   /**
@@ -247,7 +254,7 @@ export class OrdersController {
     @CurrentUser() user: { userId: number; username: string },
   ) {
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.copyManyToDraft(ids ?? [], actor);
+    return this.orderMutationService.copyManyToDraft(ids ?? [], actor);
   }
 
   /**
@@ -256,7 +263,7 @@ export class OrdersController {
    */
   @Get(':id/logs')
   getLogs(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.getLogs(id);
+    return this.orderQueryService.getLogs(id);
   }
 
   /**
@@ -265,7 +272,7 @@ export class OrdersController {
    */
   @Get(':id/remarks')
   getRemarks(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.getRemarks(id);
+    return this.orderQueryService.getRemarks(id);
   }
 
   /**
@@ -280,7 +287,7 @@ export class OrdersController {
     @CurrentUser() user: { userId: number; username: string },
   ) {
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.ordersService.addRemark(id, actor, content);
+    return this.orderMutationService.addRemark(id, actor, content);
   }
 }
 
