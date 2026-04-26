@@ -6,7 +6,7 @@ import {
   getRoleOrderPolicies,
   setRoleOrderPolicies,
 } from '@/api/roles'
-import { getPermissions, type PermissionItem } from '@/api/permissions'
+import { getPermissions, resyncAdminPermissions, type PermissionItem } from '@/api/permissions'
 import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
@@ -24,10 +24,11 @@ export interface MenuTreeBridge {
 
 interface UseRolesPermissionConfigOptions {
   selectedRoleId: Ref<number | null>
+  selectedRoleCode?: Ref<string | null>
 }
 
 export function useRolesPermissionConfig(options: UseRolesPermissionConfigOptions) {
-  const { selectedRoleId } = options
+  const { selectedRoleId, selectedRoleCode } = options
 
   const menuTreeBridge = ref<MenuTreeBridge | null>(null)
   const permissions = ref<PermissionItem[]>([])
@@ -317,6 +318,9 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
     saving.value = true
     try {
       await setRolePermissions(selectedRoleId.value, ids)
+      if (selectedRoleCode?.value === 'admin') {
+        await resyncAdminPermissions()
+      }
       try {
         await setRoleOrderPolicies(selectedRoleId.value, roleOrderPolicies.value)
       } catch (e: unknown) {

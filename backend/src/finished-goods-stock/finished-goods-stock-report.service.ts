@@ -103,7 +103,7 @@ export class FinishedGoodsStockReportService {
     return Array.from(colorImages.values()).find((imageUrl) => !!imageUrl) ?? '';
   }
 
-  getOutboundRecords(params: {
+  async getOutboundRecords(params: {
     orderNo?: string;
     skuCode?: string;
     customerName?: string;

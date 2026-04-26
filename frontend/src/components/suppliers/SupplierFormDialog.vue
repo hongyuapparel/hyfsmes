@@ -82,7 +82,6 @@
 </template>
 
 <script setup lang="ts">
-import type { Ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { SupplierFormModel } from '@/composables/useSupplierForm'
 import type { BusinessScopeTreeNode } from '@/composables/useSupplierOptions'
@@ -91,7 +90,7 @@ const props = defineProps<{
   visible: boolean
   isEdit: boolean
   submitting: boolean
-  formRef: Ref<FormInstance | undefined>
+  formRef: { value: FormInstance | undefined }
   form: SupplierFormModel
   formRules: FormRules
   supplierTypeOptions: { id: number; label: string }[]

@@ -7,6 +7,7 @@ export interface SystemOptionItem {
   value: string
   sortOrder: number
   parentId?: number | null
+  remark?: string
 }
 
 export interface SystemOptionTreeNode extends SystemOptionItem {
@@ -49,13 +50,14 @@ export function createSystemOption(data: {
   value: string
   sort_order?: number
   parent_id?: number | null
+  remark?: string
 }) {
   return request.post<SystemOptionItem>('/system-options', data)
 }
 
 export function updateSystemOption(
   id: number,
-  data: { value?: string; sort_order?: number; parent_id?: number | null },
+  data: { value?: string; sort_order?: number; parent_id?: number | null; remark?: string },
 ) {
   return request.patch<SystemOptionItem>(`/system-options/${id}`, data)
 }

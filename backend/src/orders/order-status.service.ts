@@ -1,4 +1,4 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -22,6 +22,7 @@ import { ORDER_STATUS_LABEL_MAP, type OrderActor, type OrderEditPayload } from '
 
 @Injectable()
 export class OrderStatusService {
+  private readonly logger = new Logger(OrderStatusService.name);
   private craftReconcileRunning = false;
   private craftReconcileLastRunAt = 0;
   private readonly craftReconcileIntervalMs = 5 * 60 * 1000;
@@ -362,8 +363,9 @@ export class OrderStatusService {
           order.statusTime = next.statusTime;
           await this.orderRepo.save(order);
           await this.appendStatusHistory(order.id, next.status);
-        } catch {
-          // ignore per-order failure
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.logger.warn(`[reconcile] 订单 ${order.id} 状态调和失败: ${msg}`);
         }
       }
     } finally {

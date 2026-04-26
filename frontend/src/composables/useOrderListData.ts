@@ -57,6 +57,9 @@ function buildQuery(): OrderListQuery {
 }
 
 async function loadList(totalQuantity?: { value: number }) {
+  if (loading.value) {
+    listAbortController?.abort()
+  }
   listAbortController?.abort()
   const controller = new AbortController()
   listAbortController = controller

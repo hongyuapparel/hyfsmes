@@ -179,8 +179,6 @@ export function createFinishedStock(body: {
 }) {
   return request.post<FinishedStockRow>('/inventory/finished/items', body)
 }
-import request from './request'
-
 export interface FinishedGoodsItem {
   id: number
   orderId: number

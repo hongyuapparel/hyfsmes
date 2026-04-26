@@ -111,12 +111,13 @@ import { useRolesManagement } from '@/composables/useRolesManagement'
 import { useRolesPermissionConfig } from '@/composables/useRolesPermissionConfig'
 
 const selectedRoleId = ref<number | null>(null)
+const selectedRoleCode = ref<string | null>(null)
 type PermissionTreeSectionExpose = {
   getCheckedKeys: () => Array<number | string>
   setCheckedKeys: (keys: number[]) => void
 }
 
-const permissionConfig = useRolesPermissionConfig({ selectedRoleId })
+const permissionConfig = useRolesPermissionConfig({ selectedRoleId, selectedRoleCode })
 const {
   saving,
   menuTreeData,
@@ -174,6 +175,14 @@ const {
 } = roleState
 
 const permissionTreeSectionRef = ref<PermissionTreeSectionExpose>()
+
+watch(
+  [list, selectedRoleId],
+  () => {
+    selectedRoleCode.value = list.value.find((role) => role.id === selectedRoleId.value)?.code ?? null
+  },
+  { immediate: true },
+)
 
 watch(
   () => permissionTreeSectionRef.value,

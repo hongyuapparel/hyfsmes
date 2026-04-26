@@ -24,6 +24,7 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
 
   const statusCounts = ref<Record<string, number>>({})
   const statusTotal = ref<number>(0)
+  const loading = ref(false)
 
   let countsReqId = 0
   let countsAbortController: AbortController | null = null
@@ -51,10 +52,14 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
   }
 
   async function refreshStatusCounts() {
+    if (loading.value) {
+      countsAbortController?.abort()
+    }
     countsAbortController?.abort()
     const controller = new AbortController()
     countsAbortController = controller
     const currentReqId = ++countsReqId
+    loading.value = true
     try {
       const countsRes = await getOrderStatusCounts(buildCountQuery(), { signal: controller.signal })
       const countsData = countsRes.data
@@ -67,6 +72,8 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
       if (!isErrorHandled(e)) {
         console.warn('订单状态统计加载失败：', getErrorMessage(e, '状态统计加载失败'))
       }
+    } finally {
+      if (currentReqId === countsReqId) loading.value = false
     }
   }
 

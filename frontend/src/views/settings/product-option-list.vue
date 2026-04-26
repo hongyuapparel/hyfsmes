@@ -88,6 +88,7 @@ let optionSortable: Sortable | null = null
 async function load() {
   try {
     const res = await getSystemOptionsTree(props.type)
+    await nextTick()
     treeData.value = res.data ?? []
     await nextTick()
     initDragSort()

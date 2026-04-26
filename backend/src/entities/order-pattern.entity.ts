@@ -1,6 +1,15 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { Order } from './order.entity';
 
+interface MaterialJsonItem {
+  materialId?: number
+  materialName?: string
+  quantity?: number
+  unit?: string
+  remark?: string
+  [key: string]: unknown
+}
+
 /** 订单纸样进度：纸样师、车板师、完成时间、样品图等 */
 @Entity('order_pattern')
 export class OrderPattern {
@@ -36,7 +45,7 @@ export class OrderPattern {
 
   /** 纸样物料/裁片清单：默认从订单物料同步，可在纸样管理中增删改 */
   @Column({ name: 'materials_json', type: 'json', nullable: true, select: false })
-  materialsJson: any[] | null;
+  materialsJson: MaterialJsonItem[] | null;
 
   /** 纸样物料备注（可选） */
   @Column({ name: 'materials_remark', type: 'varchar', length: 500, nullable: true, select: false })

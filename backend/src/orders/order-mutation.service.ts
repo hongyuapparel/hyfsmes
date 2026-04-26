@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow, type PackagingCell } from '../entities/order-ext.entity';
 import { OrderRemark } from '../entities/order-remark.entity';
@@ -11,6 +11,7 @@ import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';
+import { OrderLifecycleService } from './order-lifecycle.service';
 import { type OrderActor, type OrderEditPayload } from './order.types';
 
 @Injectable()
@@ -31,6 +32,7 @@ export class OrderMutationService {
     private readonly suppliersService: SuppliersService,
     private readonly orderQueryService: OrderQueryService,
     private readonly orderStatusService: OrderStatusService,
+    private readonly orderLifecycleService: OrderLifecycleService,
   ) {}
 
   private normalizeMaterialRows(rows: OrderMaterialRow[]): OrderMaterialRow[] {
@@ -314,58 +316,15 @@ export class OrderMutationService {
   }
 
   async deleteMany(ids: number[], actor: OrderActor): Promise<void> {
-    if (!ids?.length) return;
-    const orders = await this.orderRepo.findByIds(ids);
-    if (!orders.length) return;
-    for (const o of orders) await this.orderStatusService.addLog(o, actor, 'delete', '删除订单');
-    await this.orderRepo.delete(ids);
+    return this.orderLifecycleService.deleteMany(ids, actor);
   }
 
   async reviewMany(ids: number[], actor: OrderActor): Promise<void> {
-    if (!ids?.length) return;
-    const orders = await this.orderRepo.findByIds(ids);
-    for (const o of orders) {
-      if (o.status !== 'pending_review') continue;
-      const before = o.status;
-      const next = await this.orderWorkflowService.resolveNextStatus({
-        order: o as Order,
-        triggerCode: 'review_approve',
-        actorUserId: actor.userId,
-      });
-      const to = next ?? 'pending_purchase';
-      o.status = to;
-      o.statusTime = new Date();
-      await this.orderRepo.save(o as any);
-      if (before !== to) {
-        await this.orderStatusService.addLog(o as any, actor, 'review', `审核订单：${before} -> ${to}`);
-        await this.orderStatusService.appendStatusHistory(o.id, to);
-      }
-    }
+    return this.orderLifecycleService.reviewMany(ids, actor);
   }
 
   async reviewRejectMany(ids: number[], reason: string, actor: OrderActor): Promise<void> {
-    if (!ids?.length) return;
-    const trimmedReason = (reason ?? '').trim();
-    if (!trimmedReason) throw new Error('退回原因不能为空');
-    const orders = await this.orderRepo.findByIds(ids);
-    for (const o of orders) {
-      if (o.status !== 'pending_review') continue;
-      const before = o.status;
-      const next = await this.orderWorkflowService.resolveNextStatus({
-        order: o as Order,
-        triggerCode: 'review_reject',
-        actorUserId: actor.userId,
-      });
-      const to = next ?? 'draft';
-      o.status = to;
-      o.statusTime = new Date();
-      await this.orderRepo.save(o as any);
-      await this.addRemark(o.id, actor, `审核退回原因：${trimmedReason}`);
-      if (before !== to) {
-        await this.orderStatusService.addLog(o as any, actor, 'review', `审核退回：${before} -> ${to}；原因：${trimmedReason}`);
-        await this.orderStatusService.appendStatusHistory(o.id, to);
-      }
-    }
+    return this.orderLifecycleService.reviewRejectMany(ids, reason, actor);
   }
 
   private normalizeProfitMargin(v: unknown): number {
@@ -378,7 +337,12 @@ export class OrderMutationService {
   async copyManyToDraft(ids: number[], actor: OrderActor): Promise<Order[]> {
     if (!ids?.length) return [];
     const now = new Date();
-    const sourceOrders = await this.orderRepo.findByIds(ids);
+    const sourceOrders = await this.orderRepo.find({ where: { id: In(ids) } });
+    const sourceIds = sourceOrders.map((o) => o.id);
+    const extList = await this.orderExtRepo.find({ where: { orderId: In(sourceIds) } });
+    const extMap = new Map(extList.map((e) => [e.orderId, e]));
+    const costList = await this.orderCostSnapshotRepo.find({ where: { orderId: In(sourceIds) } });
+    const costMap = new Map(costList.map((c) => [c.orderId, c]));
     const created: Order[] = [];
     for (const src of sourceOrders) {
       const draft = this.orderRepo.create({
@@ -403,7 +367,7 @@ export class OrderMutationService {
       });
       const saved = await this.orderRepo.save(draft);
       await this.orderStatusService.appendStatusHistory(saved.id, 'draft');
-      const srcExt = await this.orderExtRepo.findOne({ where: { orderId: src.id } });
+      const srcExt = extMap.get(src.id) ?? null;
       if (srcExt) {
         const newExt = this.orderExtRepo.create({
           orderId: saved.id,
@@ -421,7 +385,7 @@ export class OrderMutationService {
         });
         await this.orderExtRepo.save(newExt);
       }
-      const srcCost = await this.orderCostSnapshotRepo.findOne({ where: { orderId: src.id } });
+      const srcCost = costMap.get(src.id) ?? null;
       if (srcCost?.snapshot != null) {
         const srcSnapshot = srcCost.snapshot && typeof srcCost.snapshot === 'object' ? ({ ...(srcCost.snapshot as any) } as any) : null;
         if (srcSnapshot && Object.prototype.hasOwnProperty.call(srcSnapshot, 'profitMargin')) {

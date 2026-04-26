@@ -11,3 +11,7 @@ export interface PermissionItem {
 export function getPermissions() {
   return request.get<PermissionItem[]>('/permissions')
 }
+
+export function resyncAdminPermissions() {
+  return request.post<{ success: boolean; message: string }>('/permissions/resync-admin')
+}

@@ -25,7 +25,7 @@ type StockListQueryParams = {
   orderNo?: string;
   skuCode?: string;
   customerName?: string;
-  inventoryTypeId?: number;
+  inventoryTypeId?: number | null;
   startDate?: string;
   endDate?: string;
   page?: number;

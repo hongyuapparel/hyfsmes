@@ -11,7 +11,7 @@
       :row-style="compactRowStyle"
       :cell-style="compactCellStyle"
       :header-cell-style="compactHeaderCellStyle"
-      @header-dragend="emit('header-dragend', $event)"
+      @header-dragend="(newWidth, oldWidth, column) => emit('header-dragend', newWidth, oldWidth, column)"
       @selection-change="emit('selection-change', $event)"
     >
       <el-table-column type="selection" width="48" align="center" />
@@ -83,7 +83,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'header-dragend', event: unknown): void
+  (e: 'header-dragend', newWidth: number, oldWidth: number, column: unknown): void
   (e: 'selection-change', rows: PurchaseItemRow[]): void
   (e: 'open-brief', row: PurchaseItemRow): void
 }>()

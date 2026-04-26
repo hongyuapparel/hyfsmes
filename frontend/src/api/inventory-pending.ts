@@ -59,8 +59,6 @@ export function doPendingOutbound(body: {
 export function getPendingPickupUserOptions() {
   return request.get<FinishedPickupUserOption[]>('/inventory/pending/pickup-users')
 }
-import request from './request'
-
 export interface PendingInboundItem {
   orderId: number
   orderNo: string

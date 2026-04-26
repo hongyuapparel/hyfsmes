@@ -2,6 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestj
 import { OrderStatusDefinitionService } from './order-status-definition.service';
 import { OrderStatusTransitionService } from './order-status-transition.service';
 import { OrderStatusReportService } from './order-status-report.service';
+import { RequirePermission } from '../auth/require-permission.decorator';
 import {
   CreateOrderStatusDto,
   UpdateOrderStatusDto,
@@ -28,22 +29,26 @@ export class OrderStatusConfigController {
   }
 
   @Post('statuses')
+  @RequirePermission('/settings/orders')
   async createStatus(@Body() dto: CreateOrderStatusDto) {
     return this.definitionService.createStatus(dto);
   }
 
   @Patch('statuses/:id')
+  @RequirePermission('/settings/orders')
   async updateStatus(@Param('id') id: number, @Body() dto: UpdateOrderStatusDto) {
     return this.definitionService.updateStatus(Number(id), dto);
   }
 
   /** 仅切换启用状态，供列表里的开关按钮使用 */
   @Patch('statuses/:id/enabled')
+  @RequirePermission('/settings/orders')
   async toggleStatusEnabled(@Param('id') id: number) {
     return this.definitionService.toggleStatusEnabled(Number(id));
   }
 
   @Delete('statuses/:id')
+  @RequirePermission('/settings/orders')
   async deleteStatus(@Param('id') id: number) {
     await this.definitionService.deleteStatus(Number(id));
     return { success: true };
@@ -57,11 +62,13 @@ export class OrderStatusConfigController {
   }
 
   @Post('transitions')
+  @RequirePermission('/settings/orders')
   async createTransition(@Body() dto: CreateOrderStatusTransitionDto) {
     return this.transitionService.createTransition(dto);
   }
 
   @Post('transitions/batch')
+  @RequirePermission('/settings/orders')
   async createTransitionsBatch(@Body() dto: BatchCreateTransitionsDto) {
     return this.transitionService.createTransitionsBatch(dto.steps, dto.conditionsJson, dto.name);
   }
@@ -74,11 +81,13 @@ export class OrderStatusConfigController {
   }
 
   @Patch('chains/reorder')
+  @RequirePermission('/settings/orders')
   async reorderChains(@Body() body: { orderedIds: number[] }) {
     return this.transitionService.reorderChains(body?.orderedIds ?? []);
   }
 
   @Patch('chains/:id')
+  @RequirePermission('/settings/orders')
   async updateChain(
     @Param('id') id: number,
     @Body()
@@ -93,17 +102,20 @@ export class OrderStatusConfigController {
   }
 
   @Delete('chains/:id')
+  @RequirePermission('/settings/orders')
   async deleteChain(@Param('id') id: number) {
     await this.transitionService.deleteChain(Number(id));
     return { success: true };
   }
 
   @Patch('transitions/:id')
+  @RequirePermission('/settings/orders')
   async updateTransition(@Param('id') id: number, @Body() dto: UpdateOrderStatusTransitionDto) {
     return this.transitionService.updateTransition(Number(id), dto);
   }
 
   @Delete('transitions/:id')
+  @RequirePermission('/settings/orders')
   async deleteTransition(@Param('id') id: number) {
     await this.transitionService.deleteTransition(Number(id));
     return { success: true };
@@ -117,16 +129,19 @@ export class OrderStatusConfigController {
   }
 
   @Post('sla')
+  @RequirePermission('/settings/orders')
   async createSla(@Body() dto: CreateOrderStatusSlaDto) {
     return this.definitionService.createSla(dto);
   }
 
   @Patch('sla/:id')
+  @RequirePermission('/settings/orders')
   async updateSla(@Param('id') id: number, @Body() dto: UpdateOrderStatusSlaDto) {
     return this.definitionService.updateSla(Number(id), dto);
   }
 
   @Delete('sla/:id')
+  @RequirePermission('/settings/orders')
   async deleteSla(@Param('id') id: number) {
     await this.definitionService.deleteSla(Number(id));
     return { success: true };

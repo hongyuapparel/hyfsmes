@@ -1,14 +1,15 @@
 import { onBeforeUnmount, reactive, ref } from 'vue'
+import type { Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteSupplier, getSupplierList, type SupplierItem } from '@/api/suppliers'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 interface UseSuppliersListResult {
   filter: { name: string; supplierTypeId: number | null }
-  nameLabelVisible: { value: boolean }
-  list: { value: SupplierItem[] }
-  selectedIds: { value: number[] }
-  loading: { value: boolean }
+  nameLabelVisible: Ref<boolean>
+  list: Ref<SupplierItem[]>
+  selectedIds: Ref<number[]>
+  loading: Ref<boolean>
   pagination: { page: number; pageSize: number; total: number }
   load: () => Promise<void>
   onSearch: (byUser?: boolean) => void

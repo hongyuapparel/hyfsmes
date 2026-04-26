@@ -29,7 +29,7 @@ export class FinishedGoodsStockListQueryService {
   ) {}
 
   private applyInboundTimeRange(
-    qb: SelectQueryBuilder<unknown>,
+    qb: SelectQueryBuilder<any>,
     columnSql: string,
     startDate?: string,
     endDate?: string,
@@ -98,7 +98,7 @@ export class FinishedGoodsStockListQueryService {
     orderNo?: string;
     skuCode?: string;
     customerName?: string;
-    inventoryTypeId?: number;
+    inventoryTypeId?: number | null;
     startDate?: string;
     endDate?: string;
     page?: number;
@@ -118,7 +118,7 @@ export class FinishedGoodsStockListQueryService {
     orderNo?: string;
     skuCode?: string;
     customerName?: string;
-    inventoryTypeId?: number;
+    inventoryTypeId?: number | null;
     startDate?: string;
     endDate?: string;
     page?: number;

@@ -163,14 +163,20 @@
 import { Delete, CircleClose, Plus } from '@element-plus/icons-vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 
+interface ColorRow {
+  colorName: string
+  quantities: number[]
+  remark: string
+}
+
 const props = defineProps<{
-  bTableRef: any
-  colorRows: any[]
+  bTableRef: { $el?: HTMLElement } | null
+  colorRows: ColorRow[]
   sizeHeaders: string[]
   editingCell: { rowIndex: number; col: number | 'color' | 'remark' } | null
-  colorNameInputRef: any
-  remarkInputRef: any
-  bSummaryMethod: (...args: any[]) => any
+  colorNameInputRef: { focus: () => void; $el?: HTMLElement } | null
+  remarkInputRef: { focus: () => void; $el?: HTMLElement } | null
+  bSummaryMethod: (...args: unknown[]) => unknown[]
   addSizeColumn: () => void
   addColorRow: () => void
   startEditBCell: (rowIndex: number, col: number | 'color' | 'remark') => void
@@ -181,7 +187,7 @@ const props = defineProps<{
   setActiveColorCell: (rowIndex: number, colIndex: number) => void
   onColorCellKeydown: (event: KeyboardEvent, rowIndex: number, colIndex: number) => void
   onColorCellPaste: (event: ClipboardEvent, rowIndex: number, colIndex: number) => void
-  calcRowTotal: (row: any) => number
+  calcRowTotal: (row: ColorRow) => number
   removeColorRow: (index: number) => void
   setEditingCellNull: () => void
 }>()

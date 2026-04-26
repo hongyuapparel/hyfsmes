@@ -260,7 +260,7 @@ export class ProductionPatternService {
     if (!pattern) {
       pattern = this.patternRepo.create({ orderId, status: 'pending_assign' });
     }
-    pattern.materialsJson = Array.isArray(materials) ? materials : [];
+    pattern.materialsJson = Array.isArray(materials) ? (materials as unknown as typeof pattern.materialsJson) : [];
     pattern.materialsRemark = remark?.trim() || null;
     await this.patternRepo.save(pattern);
   }

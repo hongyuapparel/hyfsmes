@@ -18,38 +18,46 @@
       </el-tabs>
 
       <div class="settings-content">
-        <div v-show="activeTab === 'orderTypes'">
+        <div v-if="activeTab === 'orderTypes'">
           <h3 class="section-title">订单类型</h3>
           <OptionList type="order_types" label="订单类型" />
         </div>
-        <div v-show="activeTab === 'collaboration'">
+        <div v-if="activeTab === 'collaboration'">
           <h3 class="section-title">合作方式</h3>
           <OptionList type="collaboration" label="合作方式" />
         </div>
-        <div v-show="activeTab === 'productGroups'">
+        <div v-if="activeTab === 'productGroups'">
           <h3 class="section-title">产品分组</h3>
           <OptionList type="product_groups" label="产品分组" />
         </div>
-        <div v-show="activeTab === 'applicablePeople'">
+        <div v-if="activeTab === 'applicablePeople'">
           <h3 class="section-title">适用人群</h3>
           <OptionList type="applicable_people" label="适用人群" />
         </div>
-        <div v-show="activeTab === 'materialTypes'">
+        <div v-if="activeTab === 'materialTypes'">
           <h3 class="section-title">物料类型</h3>
           <OptionList type="material_types" label="物料类型" />
         </div>
-        <div v-show="activeTab === 'materialSources'">
+        <div v-if="activeTab === 'materialSources'">
           <h3 class="section-title">物料来源</h3>
           <OptionList type="material_sources" label="物料来源" />
         </div>
 
-        <OrderProductionProcessesCard :active="activeTab === 'productionProcesses'" />
+        <OrderProductionProcessesCard
+          v-show="activeTab === 'productionProcesses'"
+          :active="activeTab === 'productionProcesses'"
+        />
         <OrderSlaSettingsCard
+          v-show="activeTab === 'orderSla'"
           :active="activeTab === 'orderSla'"
           :status-list="statusState.statusList.value"
           :ensure-statuses="ensureStatusesLoaded"
         />
-        <OrderStatusConfigCard :active="activeTab === 'orderStatusConfig'" :state="statusState" />
+        <OrderStatusConfigCard
+          v-show="activeTab === 'orderStatusConfig'"
+          :active="activeTab === 'orderStatusConfig'"
+          :state="statusState"
+        />
       </div>
     </div>
   </div>
@@ -73,7 +81,7 @@ const activeTab = ref<
   | 'productionProcesses'
   | 'orderSla'
   | 'orderStatusConfig'
->('orderStatusConfig')
+>('orderTypes')
 
 const statusState = useOrderSettingsStatus()
 

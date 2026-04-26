@@ -18,247 +18,34 @@
       </div>
     </div>
 
-    <!-- 筛选区：与客户管理 / 产品列表保持同一设计 -->
-    <div class="filter-bar">
-      <el-input
-        v-model="filter.orderNo"
-        placeholder="订单号"
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
-        :input-style="getFilterInputStyle(filter.orderNo)"
-        @input="debouncedSearch"
-        @keyup.enter="onSearch(true)"
-      >
-        <template #prefix>
-          <span
-            v-if="filter.orderNo && orderNoLabelVisible"
-            :style="{ color: ACTIVE_FILTER_COLOR }"
-          >
-            订单号：
-          </span>
-        </template>
-      </el-input>
-      <el-input
-        v-model="filter.skuCode"
-        placeholder="SKU编号"
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
-        :input-style="getFilterInputStyle(filter.skuCode)"
-        @input="debouncedSearch"
-        @keyup.enter="onSearch(true)"
-      >
-        <template #prefix>
-          <span
-            v-if="filter.skuCode && skuCodeLabelVisible"
-            :style="{ color: ACTIVE_FILTER_COLOR }"
-          >
-            SKU编号：
-          </span>
-        </template>
-      </el-input>
-      <el-select
-        v-model="filter.customer"
-        placeholder="客户"
-        filterable
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.customer, 42)"
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.customer">客户：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option
-          v-for="opt in customerOptions"
-          :key="opt.value"
-          :label="opt.label"
-          :value="opt.value"
-        />
-      </el-select>
-      <el-tree-select
-        v-model="filter.orderTypeId"
-        :data="orderTypeTreeSelectData"
-        placeholder="订单类型"
-        filterable
-        clearable
-        check-strictly
-        default-expand-all
-        :render-after-expand="false"
-        node-key="value"
-        :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
-        size="large"
-        class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`,
-          )
-        "
-        @change="onSearch"
-      >
-        <template #prefix>
-          <span
-            v-if="filter.orderTypeId"
-            :style="{ color: 'var(--el-color-primary)' }"
-          >
-            订单类型：
-          </span>
-        </template>
-      </el-tree-select>
-      <el-tree-select
-        v-model="filter.processItem"
-        :data="processOptions"
-        placeholder="工艺项目"
-        filterable
-        clearable
-        check-strictly
-        :props="{ label: 'label', value: 'value', children: 'children' }"
-        size="large"
-        class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.processItem && `工艺项目：${getProcessItemDisplayLabel(filter.processItem)}`,
-          )
-        "
-        @change="onSearch"
-      >
-        <template #prefix>
-          <span
-            v-if="filter.processItem"
-            :style="{ color: 'var(--el-color-primary)' }"
-          >
-            工艺项目：
-          </span>
-        </template>
-      </el-tree-select>
-      <el-select
-        v-model="filter.salesperson"
-        placeholder="业务员"
-        filterable
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.salesperson)"
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.salesperson">业务员：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option
-          v-for="name in salespersonOptions"
-          :key="name"
-          :label="name"
-          :value="name"
-        />
-      </el-select>
-      <el-select
-        v-model="filter.merchandiser"
-        placeholder="跟单员"
-        filterable
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.merchandiser)"
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.merchandiser">跟单员：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option
-          v-for="name in merchandiserOptions"
-          :key="name"
-          :label="name"
-          :value="name"
-        />
-      </el-select>
-      <el-date-picker
-        v-model="orderDateRange"
-        type="daterange"
-        range-separator=""
-        start-placeholder="下单时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !orderDateRange }]"
-        :style="getFilterRangeStyle(orderDateRange)"
-        @change="onSearch"
-      />
-      <el-date-picker
-        v-model="completedRange"
-        type="daterange"
-        range-separator=""
-        start-placeholder="完成时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
-        :style="getFilterRangeStyle(completedRange)"
-        @change="onSearch"
-      />
-      <el-select
-        v-model="filter.factory"
-        placeholder="加工供应商"
-        filterable
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.factory && `加工供应商：${filter.factory}`)"
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.factory">加工供应商：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option
-          v-for="opt in factoryOptions"
-          :key="opt.value"
-          :label="opt.label"
-          :value="opt.value"
-        />
-      </el-select>
-
-      <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button
-          v-if="canDeleteOrders && hasSelection && canDeleteSelectedByStatus"
-          type="danger"
-          size="large"
-          @click="onBatchDelete"
-        >
-          删除
-        </el-button>
-        <el-button
-          v-if="canEditOrders && hasSelection"
-          type="warning"
-          size="large"
-          @click="onBatchCopyToDraft"
-        >
-          复制为草稿
-        </el-button>
-        <el-button
-          v-if="canReviewOrders && isPendingReviewTab && hasSelection && canReviewSelectedByStatus"
-          type="success"
-          size="large"
-          @click="openReviewDialog"
-        >
-          审单
-        </el-button>
-      </div>
-    </div>
+    <OrderListFilterBar
+      v-model:filters="filters"
+      v-model:order-date-range="orderDateRange"
+      v-model:completed-range="completedRange"
+      v-model:order-no-label-visible="orderNoLabelVisible"
+      v-model:sku-code-label-visible="skuCodeLabelVisible"
+      :customer-options="customerOptions"
+      :order-type-tree-select-data="orderTypeTreeSelectData"
+      :process-options="processOptions"
+      :salesperson-options="salespersonOptions"
+      :merchandiser-options="merchandiserOptions"
+      :factory-options="factoryOptions"
+      :can-delete-orders="canDeleteOrders"
+      :has-selection="hasSelection"
+      :can-delete-selected-by-status="canDeleteSelectedByStatus"
+      :can-edit-orders="canEditOrders"
+      :can-review-orders="canReviewOrders"
+      :is-pending-review-tab="isPendingReviewTab"
+      :can-review-selected-by-status="canReviewSelectedByStatus"
+      :find-order-type-label-by-id="findOrderTypeLabelById"
+      :get-process-item-display-label="getProcessItemDisplayLabel"
+      :on-search="onSearch"
+      :on-reset="onReset"
+      :debounced-search="debouncedSearch"
+      :on-batch-delete="onBatchDelete"
+      :on-batch-copy-to-draft="onBatchCopyToDraft"
+      :open-review-dialog="openReviewDialog"
+    />
 
     <!-- 订单卡片宫格 -->
     <OrderCardGrid
@@ -333,7 +120,6 @@ import { ref, reactive, watchEffect, onMounted, onBeforeUnmount, onDeactivated, 
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { type OrderListItem } from '@/api/orders'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderListOptions } from '@/composables/useOrderListOptions'
@@ -344,20 +130,12 @@ import { useOrderListStatusCounts } from '@/composables/useOrderListStatusCounts
 import { useOrderListFilterState } from '@/composables/useOrderListFilterState'
 import { useOrderSizePopover } from '@/composables/useOrderSizePopover'
 import { useOrderListActions } from '@/composables/useOrderListActions'
-import {
-  ACTIVE_FILTER_COLOR,
-  getFilterInputStyle,
-  getOrderNoFilterStyle,
-  getSkuCodeFilterStyle,
-  getFilterRangeStyle,
-  getFilterSelectStyle,
-  getFilterSelectAutoWidthStyle,
-} from '@/composables/useFilterBarHelpers'
 import OrderViewDialog from '@/components/orders/OrderViewDialog.vue'
 import OrderLogDialog from '@/components/orders/OrderLogDialog.vue'
 import OrderRemarkDialog from '@/components/orders/OrderRemarkDialog.vue'
 import OrderReviewDialog from '@/components/orders/OrderReviewDialog.vue'
 import OrderCardGrid from '@/components/orders/OrderCardGrid.vue'
+import OrderListFilterBar from '@/views/orders/components/OrderListFilterBar.vue'
 
 const router = useRouter()
 const route = useRoute()
@@ -405,6 +183,7 @@ const {
   onPageSizeChange: baseOnPageSizeChange,
   abortListRequest,
 } = useOrderListData()
+const filters = filter
 const totalQuantity = ref<number>(0)
 
 const {

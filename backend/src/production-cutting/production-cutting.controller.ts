@@ -4,7 +4,7 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { type CuttingListQuery } from './production-cutting.service';
-import { ProductionCuttingQueryService } from './production-cutting-query.service';
+import { ProductionCuttingService } from './production-cutting.service';
 import { ProductionCuttingMutationService } from './production-cutting-mutation.service';
 import type { Response } from 'express';
 
@@ -13,7 +13,7 @@ import type { Response } from 'express';
 @RequirePermission('/production/cutting')
 export class ProductionCuttingController {
   constructor(
-    private readonly cuttingQueryService: ProductionCuttingQueryService,
+    private readonly cuttingService: ProductionCuttingService,
     private readonly cuttingMutationService: ProductionCuttingMutationService,
   ) {}
 
@@ -33,7 +33,7 @@ export class ProductionCuttingController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
-    return this.cuttingQueryService.getCuttingList(query, user?.userId);
+    return this.cuttingService.getCuttingList(query, user?.userId);
   }
 
   @Get('items/export')
@@ -49,7 +49,7 @@ export class ProductionCuttingController {
       orderNo,
       skuCode,
     };
-    const rows = await this.cuttingQueryService.getCuttingExportRows(query, user?.userId);
+    const rows = await this.cuttingService.getCuttingExportRows(query, user?.userId);
     const header = [
       '订单号',
       'SKU',
@@ -101,22 +101,22 @@ export class ProductionCuttingController {
 
   @Get('items/:orderId/color-size')
   getOrderColorSize(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingQueryService.getOrderColorSize(orderId);
+    return this.cuttingService.getOrderColorSize(orderId);
   }
 
   @Get('items/:orderId/register-form')
   getRegisterForm(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingQueryService.getRegisterForm(orderId);
+    return this.cuttingService.getRegisterForm(orderId);
   }
 
   @Get('items/:orderId/quantity-breakdown')
   getQuantityBreakdown(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingQueryService.getQuantityBreakdown(orderId);
+    return this.cuttingService.getQuantityBreakdown(orderId);
   }
 
   @Get('items/:orderId/completed-detail')
   getCompletedCuttingDetail(@Param('orderId', ParseIntPipe) orderId: number) {
-    return this.cuttingQueryService.getCompletedCuttingDetail(orderId);
+    return this.cuttingService.getCompletedCuttingDetail(orderId);
   }
 
   @Post('items/complete')

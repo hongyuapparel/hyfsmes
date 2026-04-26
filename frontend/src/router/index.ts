@@ -291,7 +291,15 @@ router.beforeEach(async (to, _from, next) => {
   const leaf = to.matched[to.matched.length - 1]
   if (leaf?.meta?.skipRoutePermissionCheck) return next()
   const permissionPath = (leaf?.meta?.permissionPath as string) || (to.meta?.permissionPath as string)
-  if (permissionPath && !auth.hasRoutePermission(permissionPath)) return next('/no-permission')
+  if (permissionPath && !auth.hasRoutePermission(permissionPath)) {
+    // 权限不存在时重新拉取一次用户信息，兜底"后端权限已更新但前端缓存旧"的场景
+    try {
+      await auth.fetchUser()
+    } catch {
+      return next('/login')
+    }
+    if (!auth.hasRoutePermission(permissionPath)) return next('/no-permission')
+  }
   next()
 })
 

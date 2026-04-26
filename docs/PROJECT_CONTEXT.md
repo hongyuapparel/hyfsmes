@@ -67,7 +67,10 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2026-04-25`：权限模块增加 admin 角色权限保全与 `/permissions/resync-admin` 重同步接口，角色权限页面保存 admin 权限后会触发重同步，避免订单设置等权限被误删。
 - `2026-04-24`：前端完成订单编辑主 composable 拆分：`useOrderEditPage.ts` 收敛为组装入口，数据加载初始化与草稿/提交流程分别下沉到 `useOrderEditLoad.ts`、`useOrderEditSubmit.ts`，降低编辑页耦合复杂度。
+- `2026-04-26`：订单模块完成第二批性能修复：`orders` 表补充 `sku/customer/status/factory` 查询索引，批量复制订单改为扩展与成本快照批量预加载（消除复制流程 N+1 查询），并在列表与状态统计请求中补充加载中取消守卫以降低瞬时重复请求。
+- `2026-04-25`：订单状态 `reconcileCompletedWorkflowOrders` 从订单列表查询链路移出，改为 `OrdersModule` 内每 2 分钟执行一次的后台定时任务，并补充单订单调和失败告警日志以提升可观测性与列表性能。
 - `2026-04-24`：后端完成采购服务职责拆分：`production-purchase.service.ts` 收敛为操作写入入口，采购列表查询与待采购状态自愈下沉到 `production-purchase-query.service.ts`，并更新模块注入保持原有接口行为。
 - `2026-04-24`：后端完成订单状态配置服务实迁移：`order-status-config.service.ts` 收敛为代理入口，状态定义/流转链路/SLA与利润报表逻辑分别下沉到 Definition/Transition/Report 服务，降低后续改动冲突面。
 - `2026-04-24`：后端完成成品库存入库服务职责拆分：`finished-goods-stock-inbound.service.ts` 聚焦写入/操作流程，查询与尺码快照读取逻辑下沉到 `finished-goods-stock-inbound-query.service.ts`，并在模块中注册新服务以降低入库维护复杂度。

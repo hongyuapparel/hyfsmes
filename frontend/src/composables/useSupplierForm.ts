@@ -28,7 +28,7 @@ export function useSupplierForm(options: UseSupplierFormOptions) {
     isEdit: false,
   })
   const editId = ref<number | null>(null)
-  const formRef = ref<FormInstance>()
+  const formRef = reactive<{ value: FormInstance | undefined }>({ value: undefined })
   const businessScopeOptions = ref<BusinessScopeTreeNode[]>([])
   const form = reactive<SupplierFormModel>({
     name: '',

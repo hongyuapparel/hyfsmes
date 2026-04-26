@@ -207,10 +207,7 @@ export class OrderQueryService {
   }
 
   async findAll(query: OrderListQuery, actorUserId?: number) {
-    await this.orderStatusService.reconcileCompletedWorkflowOrders(actorUserId, {
-      force: !!query.orderNo?.trim(),
-      orderNo: query.orderNo,
-    });
+    void actorUserId;
     const { page = 1, pageSize = 20 } = query;
     const qb = this.orderRepo.createQueryBuilder('o');
     await this.applyListFilters(qb, query, { includeStatus: true });
@@ -274,10 +271,7 @@ export class OrderQueryService {
   }
 
   async countByStatus(query: OrderListQuery, actorUserId?: number) {
-    await this.orderStatusService.reconcileCompletedWorkflowOrders(actorUserId, {
-      force: !!query.orderNo?.trim(),
-      orderNo: query.orderNo,
-    });
+    void actorUserId;
     const baseQuery = { ...query, page: undefined, pageSize: undefined };
     const groupQb = this.orderRepo.createQueryBuilder('o');
     await this.applyListFilters(groupQb, baseQuery, { includeStatus: false });

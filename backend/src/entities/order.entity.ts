@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 /**
  * 订单实体
@@ -14,6 +14,7 @@ export class Order {
   orderNo: string;
 
   /** SKU 编号 */
+  @Index()
   @Column({ name: 'sku_code', length: 64, default: '' })
   skuCode: string;
 
@@ -22,6 +23,7 @@ export class Order {
   customerId: number | null;
 
   /** 客户名称（冗余字段，方便列表展示与导出） */
+  @Index()
   @Column({ name: 'customer_name', length: 255, default: '' })
   customerName: string;
 
@@ -68,6 +70,7 @@ export class Order {
    * draft / pending_review / pending_pattern / pending_purchase / pending_cutting /
    * pending_sewing / pending_finishing / completed 等
    */
+  @Index()
   @Column({ name: 'status', length: 64, default: 'draft' })
   status: string;
 
@@ -84,6 +87,7 @@ export class Order {
   customerDueDate: Date | null;
 
   /** 加工厂名称 */
+  @Index()
   @Column({ name: 'factory_name', length: 255, default: '' })
   factoryName: string;
 

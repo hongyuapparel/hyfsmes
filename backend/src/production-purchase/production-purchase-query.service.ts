@@ -104,8 +104,8 @@ export class ProductionPurchaseQueryService {
           .getRawMany<{ orderId: number; enteredAt: string }>();
         const map = new Map<number, string>();
         for (const r of historyRows) {
-          const orderId = Number((r as Record<string, unknown>)?.orderId);
-          const enteredAt = (r as Record<string, string | undefined>)?.enteredAt;
+          const orderId = Number(r.orderId);
+          const enteredAt = r.enteredAt;
           if (!Number.isFinite(orderId) || !enteredAt) continue;
           const formatted = this.toDateTimeLocalString(enteredAt);
           if (!formatted) continue;

@@ -16,11 +16,11 @@ export class FinishedGoodsStockAdjustLog {
 
   /** 变更前 */
   @Column({ name: 'before', type: 'json', nullable: true })
-  before: any;
+  before: Record<string, unknown> | null;
 
   /** 变更后 */
   @Column({ name: 'after', type: 'json', nullable: true })
-  after: any;
+  after: Record<string, unknown> | null;
 
   /** 备注（可选） */
   @Column({ name: 'remark', type: 'varchar', length: 500, default: '' })

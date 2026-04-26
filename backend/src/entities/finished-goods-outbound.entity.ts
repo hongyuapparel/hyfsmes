@@ -56,7 +56,7 @@ export class FinishedGoodsOutbound {
 
   /** 出库颜色尺码明细快照（可选） */
   @Column({ name: 'size_breakdown', type: 'json', nullable: true })
-  sizeBreakdown: any;
+  sizeBreakdown: Record<string, number> | null;
 
   /** 操作人（中文名或用户名） */
   @Column({ name: 'operator_username', length: 128, default: '' })
