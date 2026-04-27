@@ -1,0 +1,288 @@
+import request from './request'
+
+export interface OrderStatusItem {
+  id: number
+  code: string
+  label: string
+  sortOrder: number
+  isFinal: boolean
+  enabled: boolean
+}
+
+export interface OrderStatusTransitionItem {
+  id: number
+  chainId?: number | null
+  stepOrder?: number | null
+  fromStatus: string
+  toStatus: string
+  triggerType: string
+  triggerCode: string
+  conditionsJson: unknown | null
+  nextDepartment: string | null
+  allowRoles: string | null
+  enabled: boolean
+}
+
+export interface OrderWorkflowChainItem {
+  id: number
+  name: string
+  conditionsJson: unknown | null
+  enabled: boolean
+  createdAt: string
+}
+
+export interface OrderWorkflowChainWithSteps {
+  chain: OrderWorkflowChainItem
+  steps: OrderStatusTransitionItem[]
+}
+
+export function getOrderStatuses() {
+  return request.get<OrderStatusItem[]>('/order-status-config/statuses')
+}
+
+export function createOrderStatus(data: {
+  code?: string
+  label: string
+  sortOrder?: number
+  isFinal?: boolean
+  enabled?: boolean
+}) {
+  return request.post<OrderStatusItem>('/order-status-config/statuses', data)
+}
+
+export function updateOrderStatus(
+  id: number,
+  data: Partial<{ code: string; label: string; sortOrder: number; isFinal: boolean; enabled: boolean }>,
+) {
+  return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}`, data)
+}
+
+/** 仅切换启用状态（列表开关使用） */
+export function toggleOrderStatusEnabled(id: number) {
+  return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}/enabled`, {})
+}
+
+export function deleteOrderStatus(id: number) {
+  return request.delete(`/order-status-config/statuses/${id}`)
+}
+
+export function getOrderStatusTransitions(fromStatus?: string) {
+  return request.get<OrderStatusTransitionItem[]>('/order-status-config/transitions', {
+    params: fromStatus ? { from_status: fromStatus } : undefined,
+  })
+}
+
+export function createOrderStatusTransition(data: {
+  fromStatus: string
+  toStatus: string
+  triggerType: string
+  triggerCode: string
+  conditionsJson?: unknown
+  nextDepartment?: string
+  allowRoles?: string
+  enabled?: boolean
+}) {
+  return request.post<OrderStatusTransitionItem>('/order-status-config/transitions', data)
+}
+
+/** 批量创建流转规则（一条链路多步） */
+export function createOrderStatusTransitionsBatch(data: {
+  name?: string
+  conditionsJson?: unknown
+  steps: Array<{
+    fromStatus: string
+    toStatus: string
+    triggerType: string
+    triggerCode: string
+    nextDepartment?: string
+    allowRoles?: string
+    enabled?: boolean
+    conditionsJson?: unknown
+  }>
+}) {
+  return request.post<{ chain: OrderWorkflowChainItem; steps: OrderStatusTransitionItem[] }>('/order-status-config/transitions/batch', data)
+}
+
+export function getOrderWorkflowChains() {
+  return request.get<OrderWorkflowChainWithSteps[]>('/order-status-config/chains')
+}
+
+export function reorderOrderWorkflowChains(data: { orderedIds: number[] }) {
+  return request.patch<{ success: true }>('/order-status-config/chains/reorder', data)
+}
+
+export function updateOrderWorkflowChain(
+  id: number,
+  data: Partial<{
+    name: string
+    conditionsJson: unknown
+    enabled: boolean
+    steps: Array<{
+      fromStatus: string
+      toStatus: string
+      triggerType: string
+      triggerCode: string
+      allowRoles?: string
+      enabled?: boolean
+      conditionsJson?: unknown
+    }>
+  }>,
+) {
+  return request.patch<OrderWorkflowChainWithSteps>(`/order-status-config/chains/${id}`, data)
+}
+
+export function deleteOrderWorkflowChain(id: number) {
+  return request.delete(`/order-status-config/chains/${id}`)
+}
+
+export function updateOrderStatusTransition(
+  id: number,
+  data: Partial<{
+    fromStatus: string
+    toStatus: string
+    triggerType: string
+    triggerCode: string
+    conditionsJson: unknown
+    nextDepartment: string | null
+    allowRoles: string | null
+    enabled: boolean
+  }>,
+) {
+  return request.patch<OrderStatusTransitionItem>(`/order-status-config/transitions/${id}`, data)
+}
+
+export function deleteOrderStatusTransition(id: number) {
+  return request.delete(`/order-status-config/transitions/${id}`)
+}
+
+// --- 订单状态时效配置（SLA）---
+
+export interface OrderStatusSlaItem {
+  id: number
+  orderStatusId: number
+  limitHours: string
+  enabled: boolean
+  orderStatus?: { id: number; code: string; label: string }
+}
+
+export function getOrderStatusSlaList() {
+  return request.get<OrderStatusSlaItem[]>('/order-status-config/sla')
+}
+
+export function createOrderStatusSla(data: { orderStatusId: number; limitHours: number; enabled?: boolean }) {
+  return request.post<OrderStatusSlaItem>('/order-status-config/sla', data)
+}
+
+export function updateOrderStatusSla(
+  id: number,
+  data: Partial<{ orderStatusId: number; limitHours: number; enabled: boolean }>,
+) {
+  return request.patch<OrderStatusSlaItem>(`/order-status-config/sla/${id}`, data)
+}
+
+export function deleteOrderStatusSla(id: number) {
+  return request.delete(`/order-status-config/sla/${id}`)
+}
+
+export interface OrderSlaReportRow {
+  orderId: number
+  orderNo: string
+  skuCode: string
+  collaborationTypeId: number | null
+  collaborationTypeLabel: string
+  orderTypeId: number | null
+  orderTypeLabel: string
+  quantity: number
+  merchandiser: string
+  salesperson: string
+  customerName: string
+  orderDate: string | null
+  customerDueDate: string | null
+  reviewAt: string | null
+  reviewDurationHours: number | null
+  reviewJudge: string
+  purchaseArrivedAt: string | null
+  purchaseCompletedAt: string | null
+  purchaseJudge: string
+  patternArrivedAt: string | null
+  patternCompletedAt: string | null
+  patternJudge: string
+  cuttingArrivedAt: string | null
+  cuttingCompletedAt: string | null
+  cuttingJudge: string
+  craftArrivedAt: string | null
+  craftCompletedAt: string | null
+  craftJudge: string
+  sewingArrivedAt: string | null
+  sewingCompletedAt: string | null
+  sewingJudge: string
+  finishingArrivedAt: string | null
+  finishingCompletedAt: string | null
+  finishingJudge: string
+  completedAt: string | null
+  statusId: number
+  statusLabel: string
+  enteredAt: string
+  leftAt: string | null
+  durationHours: number
+  limitHours: number | null
+  isOverdue: boolean
+}
+
+export function getOrderSlaReport(params?: {
+  start_date?: string
+  end_date?: string
+  status_id?: number
+  collaboration_type_id?: number
+  order_type_id?: number
+  order_date_from?: string
+  order_date_to?: string
+  completed_from?: string
+  completed_to?: string
+  page?: number
+  page_size?: number
+}) {
+  return request.get<{ list: OrderSlaReportRow[]; summary: { total: number; overdue: number } }>(
+    '/order-status-config/sla-report',
+    { params },
+  )
+}
+
+export interface OrderProfitReportRow {
+  orderId: number
+  orderNo: string
+  skuCode: string
+  collaborationTypeId: number | null
+  collaborationTypeLabel: string
+  orderTypeId: number | null
+  orderTypeLabel: string
+  shipmentQty: number
+  merchandiser: string
+  salesperson: string
+  customerName: string
+  salePrice: number
+  factoryPrice: number
+  materialCost: number
+  processCost: number
+  productionCost: number
+  unitProfit: number
+  factoryTotalProfit: number
+}
+
+export function getOrderProfitReport(params?: {
+  status_id?: number
+  collaboration_type_id?: number
+  order_type_id?: number
+  order_date_from?: string
+  order_date_to?: string
+  completed_from?: string
+  completed_to?: string
+  page?: number
+  page_size?: number
+}) {
+  return request.get<{ list: OrderProfitReportRow[]; summary: { total: number } }>(
+    '/order-status-config/profit-report',
+    { params },
+  )
+}
+

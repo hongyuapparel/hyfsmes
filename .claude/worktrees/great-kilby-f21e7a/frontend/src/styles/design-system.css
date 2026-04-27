@@ -1,0 +1,756 @@
+/* ================================
+   服装生产管理系统 - 全站设计系统
+   基于 DESIGN_SYSTEM.md / EXAMPLE_PAGES.md / VISUAL_DESIGN_GUIDE.md
+   配色 · 字体 · 间距 · 组件 · Element Plus 映射 · 响应式
+=================================== */
+
+/* ========== 1. 色彩系统 ========== */
+:root {
+  /* 核心色彩 - 沉稳蓝灰系（参考配色方案） */
+  --color-primary: #1f4a8f;
+  --color-secondary: #3d5c7f;
+  --color-accent: #475e7f;
+
+  /* 背景与容器 */
+  --color-bg: #f9f9fb;
+  --color-card: #ffffff;
+  --color-sidebar: #f5f6f8;
+
+  /* 文字 */
+  --color-text: #2d3d50;
+  --color-text-muted: #7f8b99;
+
+  /* 边框与分割 */
+  --color-border: #e8eaed;
+
+  /* 状态色 */
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-danger: #ff5c5c;
+  --color-white: #ffffff;
+  --color-disabled: #c0c4cc;
+
+  /* 兼容旧变量名 */
+  --color-foreground: var(--color-text);
+  --color-muted: var(--color-border);
+
+  /* ========== 2. 字体系统（4 档，禁止硬编码其他字号）========== */
+  --font-family-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    system-ui, sans-serif;
+
+  /* 标题 20px | 副标题 16px | 正文 14px | 辅助 12px */
+  --font-size-title: 20px;
+  --font-size-subtitle: 16px;
+  --font-size-body: 14px;
+  --font-size-caption: 12px;
+
+  /* 兼容旧变量名 */
+  --font-size-h1: var(--font-size-title);
+  --font-size-h2: var(--font-size-title);
+  --font-size-h3: var(--font-size-subtitle);
+  --font-size-small: var(--font-size-body);
+  --font-size-xsmall: var(--font-size-caption);
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-heading: 1.3;
+  --line-height-body: 1.5;
+  --line-height-xsmall: 1.2;
+
+  /* ========== 3. 间距系统（基准 4px）========== */
+  --space-xs: 8px;   /* 0.5rem */
+  --space-sm: 16px;  /* 1rem - 标准间距 */
+  --space-md: 24px;  /* 1.5rem - 卡片内边距 */
+  --space-lg: 32px;  /* 2rem - 大块间距 */
+  --space-xl: 48px;  /* 3rem - 超大间距 */
+
+  /* ========== 4. 圆角 ========== */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+
+  /* ========== 5. Element Plus 变量映射 ========== */
+  --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: #3d5c7f;
+  --el-color-primary-light-5: #5a7a9e;
+  --el-color-primary-light-7: #8a9fb8;
+  --el-color-primary-light-9: #c5d1e0;
+  --el-color-primary-dark-2: #1a3d78;
+
+  --el-bg-color: var(--color-bg);
+  --el-bg-color-page: var(--color-bg);
+  --el-bg-color-overlay: var(--color-card);
+
+  --el-text-color-primary: var(--color-text);
+  --el-text-color-regular: var(--color-text);
+  --el-text-color-secondary: var(--color-text-muted);
+
+  --el-border-color: var(--color-border);
+  --el-border-color-light: #e8eaed;
+
+  --el-border-radius-base: var(--radius-md);
+  --el-border-radius-small: var(--radius-sm);
+  --el-border-radius-round: 999px;
+
+  --el-font-family: var(--font-family-ui);
+  --el-font-size-base: var(--font-size-body);
+  --el-font-size-small: var(--font-size-small);
+
+  --el-box-shadow: 0 1px 3px rgba(45, 61, 80, 0.08),
+    0 1px 2px rgba(45, 61, 80, 0.04);
+}
+
+/* ========== 6. 全局基础排版 ========== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-body);
+  font-weight: var(--font-weight-regular);
+  line-height: var(--line-height-body);
+  color: var(--color-text);
+  background-color: var(--color-bg);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  margin: 0;
+  font-family: var(--font-family-ui);
+  line-height: var(--line-height-heading);
+  color: var(--color-text);
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-bold);
+}
+
+h3 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-semibold);
+}
+
+p {
+  margin: 0;
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+}
+
+.small-text {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-body);
+}
+
+.xsmall-text {
+  font-size: var(--font-size-xsmall);
+  line-height: var(--line-height-xsmall);
+}
+
+a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+/* ========== 7. 页面布局 ========== */
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  background-color: var(--color-bg);
+}
+
+.app-sider {
+  width: 220px;
+  background: var(--color-sidebar);
+  color: var(--color-text);
+}
+
+.app-content {
+  flex: 1;
+  padding: var(--space-md) var(--space-lg);
+  overflow: auto;
+}
+
+.page-header {
+  margin-bottom: var(--space-lg);
+}
+
+.page-header-title {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text);
+}
+
+.page-header-subtitle {
+  margin-top: var(--space-xs);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+/* 表格默认对齐：未显式设置 align 的单元格默认居中（新建表格自动生效） */
+.el-table .el-table__cell.is-left {
+  text-align: center;
+}
+
+.el-table .el-table__cell.is-left .cell {
+  text-align: center;
+}
+
+/* ========== 7.0 列表页主卡片：填满主内容高度，表格在内部滚动（表头固定）========== */
+.page-card.page-card--fill {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+.page-card.page-card--fill .pagination-wrap {
+  flex-shrink: 0;
+}
+
+.list-page-table-shell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.list-page-table-shell > .el-table {
+  width: 100%;
+}
+
+/**
+ * 带 el-tabs 的列表页：tab 内容区参与纵向 flex，子级用 .tab-pane-scroll 包一层
+ * （filter + list-page-table-shell + pagination）
+ */
+.page-card.page-card--fill .list-page-tabs {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-card.page-card--fill .list-page-tabs :deep(.el-tabs__header) {
+  flex-shrink: 0;
+}
+
+.page-card.page-card--fill .list-page-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.page-card.page-card--fill .list-page-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.tab-pane-scroll {
+  height: 100%;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* ========== 7.1 表格内滚动条（全站与产品列表一致：细、浅灰、圆角；仅作用于表格滚动容器）========== */
+:root {
+  --app-table-scrollbar-size: 6px;
+  --app-table-scrollbar-thumb: var(--el-border-color-darker, #c0c4cc);
+  --app-table-scrollbar-thumb-hover: var(--el-text-color-secondary, #909399);
+  --app-table-scrollbar-track: transparent;
+  --app-table-scrollbar-radius: 3px;
+  /**
+   * 悬浮横向辅助条轨道总高度（viewport fixed 条），
+   * 须与 utils/floatingHorizontalScrollbar.ts 内 FLOATING_BAR_HEIGHT 保持一致。
+   */
+  --app-table-floating-x-track-height: 10px;
+}
+
+.el-table .el-table__body-wrapper,
+.el-table .el-table__header-wrapper,
+.el-table .el-table__footer-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-table-scrollbar-thumb) var(--app-table-scrollbar-track);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar,
+.el-table .el-table__header-wrapper::-webkit-scrollbar,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size);
+  height: var(--app-table-scrollbar-size);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-thumb,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-thumb,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-thumb {
+  background-color: var(--app-table-scrollbar-thumb);
+  border-radius: var(--app-table-scrollbar-radius);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-thumb:hover,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-thumb:hover,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-table-scrollbar-thumb-hover);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-track,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-track,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-track {
+  background: var(--app-table-scrollbar-track);
+}
+
+.el-table .el-table__body-wrapper::-webkit-scrollbar-corner,
+.el-table .el-table__header-wrapper::-webkit-scrollbar-corner,
+.el-table .el-table__footer-wrapper::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ElScrollbar 默认隐藏原生条；勿对 hidden-default 的 wrap 设 thin/::-webkit，否则会挤压表体、fixed 右列错位。native-scrollbar 时无该 class，仍可细条样式。 */
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default) {
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-table-scrollbar-thumb) var(--app-table-scrollbar-track);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size);
+  height: var(--app-table-scrollbar-size);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-thumb {
+  background-color: var(--app-table-scrollbar-thumb);
+  border-radius: var(--app-table-scrollbar-radius);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-thumb:hover {
+  background-color: var(--app-table-scrollbar-thumb-hover);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-track {
+  background: var(--app-table-scrollbar-track);
+}
+
+.el-table .el-scrollbar__wrap:not(.el-scrollbar__wrap--hidden-default)::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* ========== 8. 按钮样式（圆角参考「新增用户」按钮）========== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 var(--space-sm);
+  height: 40px;
+  border-radius: 6px;
+  border: none;
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-small);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  white-space: nowrap;
+}
+
+.btn:disabled,
+.btn.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn-primary {
+  background-color: var(--color-primary);
+  color: var(--color-white);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background-color: var(--color-accent);
+  color: var(--color-white);
+}
+
+.btn-secondary {
+  background-color: var(--color-secondary);
+  color: var(--color-white);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background-color: var(--color-accent);
+  color: var(--color-white);
+}
+
+.btn-outline {
+  background-color: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.btn-outline:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* ========== 9. 树形下拉（订单类型 / 产品分组等）========== */
+.order-type-tree-dropdown,
+.product-group-tree-dropdown {
+  min-width: 220px;
+}
+
+.order-type-tree-dropdown .el-tree-node__label,
+.product-group-tree-dropdown .el-tree-node__label {
+  max-width: none;
+}
+
+/* ========== 10. 顶部筛选输入框：选中后显示「字段名：值」 ========== */
+.filter-input.has-value {
+  position: relative;
+}
+
+.filter-input.has-value .el-input__wrapper {
+  padding-left: 88px;
+}
+
+.filter-input-order-no.has-value::before,
+.filter-input-sku-code.has-value::before,
+.filter-input-product-customer.has-value::before,
+.filter-input-product-sku-code.has-value::before,
+.filter-input-customer-company.has-value::before {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+  font-size: 12px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.filter-input-order-no.has-value::before {
+  content: '订单号：';
+}
+
+.filter-input-sku-code.has-value::before {
+  content: 'SKU编号：';
+}
+
+.filter-input-product-customer.has-value::before {
+  content: '客户：';
+}
+
+.filter-input-product-sku-code.has-value::before {
+  content: 'SKU编号：';
+}
+
+.filter-input-customer-company.has-value::before {
+  content: '公司名称：';
+}
+
+/* Element Plus 按钮：圆角参考「新增用户」按钮，所有尺寸统一 */
+.el-button,
+.el-button--small,
+.el-button--large {
+  border-radius: 6px !important;
+}
+.el-button {
+  padding: 0 var(--space-sm);
+  height: 40px;
+  font-weight: var(--font-weight-medium);
+  font-family: var(--font-family-ui);
+  transition: all 0.2s ease-in-out;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--color-primary);
+  --el-button-text-color: var(--color-white);
+  --el-button-border-color: var(--color-primary);
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background-color: var(--color-accent) !important;
+  border-color: var(--color-accent) !important;
+  color: var(--color-white) !important;
+}
+
+.el-button--success {
+  --el-button-bg-color: var(--color-secondary);
+  --el-button-text-color: var(--color-white);
+}
+
+.el-button--success:hover,
+.el-button--success:focus {
+  --el-button-bg-color: var(--color-accent);
+  --el-button-text-color: var(--color-white);
+}
+
+/* ========== 9. 输入框样式 ========== */
+.input {
+  width: 100%;
+  box-sizing: border-box;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-small);
+  color: var(--color-text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input::placeholder {
+  color: var(--color-text-muted);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(31, 74, 143, 0.25);
+}
+
+.input:hover {
+  border-color: var(--color-accent);
+}
+
+.input:disabled {
+  background-color: var(--color-muted);
+  color: var(--color-text-muted);
+}
+
+/* Element Plus 输入框：仅覆盖视觉样式，不覆盖 padding，避免破坏 size 控制的 32/40px 高度 */
+.el-input__wrapper {
+  background-color: var(--color-bg);
+  border-radius: var(--radius-md);
+  box-shadow: 0 0 0 1px var(--color-border);
+  transition: all 0.2s ease-in-out;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 2px rgba(31, 74, 143, 0.25);
+}
+
+.el-input__inner,
+.el-textarea__inner {
+  font-family: var(--font-family-ui);
+  font-size: var(--font-size-small);
+  color: var(--color-text);
+}
+
+.el-textarea__inner {
+  background-color: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-sm);
+}
+
+/* ========== 10. 卡片样式 ========== */
+.card {
+  background-color: var(--color-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md);
+  box-shadow: var(--el-box-shadow);
+}
+
+.card-title {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-semibold);
+  margin-bottom: var(--space-sm);
+  color: var(--color-text);
+}
+
+.card-content {
+  font-size: var(--font-size-body);
+  color: var(--color-text);
+}
+
+.el-card {
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--el-box-shadow);
+}
+
+/* ========== 10.1 筛选栏统一规范 ========== */
+/* 使用 Element Plus 的 size="large" 统一高度，宽度统一为 120px（含输入、选择、日期未选状态） */
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  margin-bottom: var(--space-md);
+  border-radius: var(--radius-lg);
+  background-color: var(--color-bg-subtle, #f5f6f8);
+}
+.filter-bar > .el-input,
+.filter-bar > .el-select,
+.filter-bar > .el-date-editor,
+.filter-bar .filter-bar-item {
+  width: 120px;
+  min-width: 120px;
+}
+.filter-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-left: auto;
+}
+
+.pagination-wrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.range-single.el-date-editor--daterange .el-range-separator {
+  width: 0;
+}
+.range-single.el-date-editor--daterange .el-range-input:last-child {
+  display: none;
+}
+.range-single.el-date-editor--daterange .el-range-input:first-child {
+  width: 100%;
+}
+.range-single.el-date-editor--daterange .el-range__close-icon {
+  display: none;
+}
+
+/* ========== 11. 响应式断点 ========== */
+/* sm: 640px, md: 768px, lg: 1024px, xl: 1280px */
+@media (max-width: 1024px) {
+  .app-content {
+    padding: var(--space-sm) var(--space-md);
+  }
+}
+
+@media (max-width: 768px) {
+  .app-content {
+    padding: var(--space-xs) var(--space-sm);
+  }
+
+  .page-header-title {
+    font-size: var(--font-size-h2);
+  }
+}
+
+@media (max-width: 640px) {
+  .app-content {
+    padding: var(--space-xs);
+  }
+}
+
+/* ========== 12. 通用响应式工具类 ========== */
+@media (min-width: 640px) {
+  .responsive-grid-1 { grid-template-columns: 1fr; }
+}
+
+@media (min-width: 768px) {
+  .responsive-grid-2 { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (min-width: 1024px) {
+  .responsive-grid-4 { grid-template-columns: repeat(4, 1fr); }
+}
+
+.responsive-gap {
+  gap: var(--space-sm);
+}
+
+@media (min-width: 768px) {
+  .responsive-gap {
+    gap: var(--space-md);
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-gap {
+    gap: var(--space-lg);
+  }
+}
+
+/* ========== 13. 侧边栏收起时的子菜单弹层（与主菜单一体，尺寸协调）========== */
+.sidebar-submenu-popper {
+  background: #071327 !important;
+  border-radius: 0 6px 6px 0 !important;
+  padding: 8px 12px 8px 0 !important;
+  box-shadow: none !important;
+  border: none !important;
+  min-width: 140px !important;
+}
+
+.sidebar-submenu-popper.el-tooltip__popper,
+.sidebar-submenu-popper[role="tooltip"],
+.sidebar-submenu-popper.el-popper.is-light {
+  background: #071327 !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+.sidebar-submenu-popper .el-popper__arrow {
+  display: none !important;
+}
+
+.sidebar-submenu-popper .el-menu,
+.sidebar-submenu-popper .el-menu--popup {
+  background: transparent !important;
+  border: none !important;
+  min-width: 140px !important;
+  padding: 0 !important;
+}
+
+.sidebar-submenu-popper .el-menu-item {
+  min-height: 40px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+  padding: 0 16px !important;
+  margin: 2px 0 !important;
+  border-radius: 6px !important;
+  font-size: var(--font-size-small) !important;
+  font-family: var(--font-family-ui) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+  background: transparent !important;
+  text-align: center !important;
+  justify-content: center !important;
+}
+
+.sidebar-submenu-popper .el-menu-item:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+  color: #fff !important;
+}
+
+/* 子菜单弹层（收起时）：禁用慢速摊开动画，改为即时显示/隐藏 */
+.sidebar-submenu-popper.el-zoom-in-left-enter-active,
+.sidebar-submenu-popper.el-zoom-in-left-leave-active,
+.sidebar-submenu-popper.el-zoom-in-left-enter-from,
+.sidebar-submenu-popper.el-zoom-in-left-leave-to,
+[class*="sidebar-submenu-popper"] .el-zoom-in-left-enter-active,
+[class*="sidebar-submenu-popper"] .el-zoom-in-left-leave-active {
+  transition: none !important;
+}
+
+/* 子菜单内联展开（展开时）：禁用 ElCollapseTransition 动画 */
+.sidebar-menu .el-collapse-transition-enter-active,
+.sidebar-menu .el-collapse-transition-leave-active {
+  transition: none !important;
+}
+
+/* 子菜单下拉箭头：禁用旋转过渡 */
+.sidebar-menu .el-sub-menu__icon-arrow {
+  transition: none !important;
+}

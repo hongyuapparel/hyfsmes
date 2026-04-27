@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(awk '$1 > 300 {print}')",
+      "Bash(npx --yes tsc --noEmit --project frontend/tsconfig.app.json)",
+      "Bash(node_modules/.bin/tsc --noEmit)",
+      "mcp__Claude_Preview__preview_start"
+    ]
+  }
+}

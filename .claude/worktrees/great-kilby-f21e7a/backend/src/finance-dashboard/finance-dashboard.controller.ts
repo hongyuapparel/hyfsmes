@@ -1,0 +1,17 @@
+import { Controller, Get, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../auth/permission.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
+import { FinanceDashboardService } from './finance-dashboard.service';
+
+@Controller('finance/dashboard')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('/finance/dashboard')
+export class FinanceDashboardController {
+  constructor(private readonly svc: FinanceDashboardService) {}
+
+  @Get()
+  getSummary() {
+    return this.svc.getSummary();
+  }
+}

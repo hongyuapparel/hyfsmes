@@ -120,17 +120,16 @@
       />
     </el-table>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        :current-page="outboundPagination.page"
-        :page-size="outboundPagination.pageSize"
-        :total="outboundPagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="emit('current-change', $event)"
-        @size-change="emit('page-size-change', $event)"
-      />
-    </div>
+    <InventoryPaginationBar
+      :current-page="outboundPagination.page"
+      :page-size="outboundPagination.pageSize"
+      :total="outboundPagination.total"
+      :total-quantity="outboundPageTotalQuantity"
+      summary-label="出库数量"
+      unit="件"
+      @current-change="emit('current-change', $event)"
+      @size-change="emit('page-size-change', $event)"
+    />
   </div>
 </template>
 
@@ -140,6 +139,7 @@ import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import type { FinishedOutboundRecord } from '@/api/inventory'
+import InventoryPaginationBar from '@/components/inventory/InventoryPaginationBar.vue'
 
 type OutboundFilter = {
   orderNo: string
@@ -179,6 +179,10 @@ const dateRangeModel = computed({
   get: () => props.outboundFilter.dateRange,
   set: (value: [string, string] | []) => emit('update:dateRange', value),
 })
+
+const outboundPageTotalQuantity = computed(() =>
+  props.outboundList.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0),
+)
 
 function handleHeaderDragEnd(...args: unknown[]) {
   emit('header-dragend', ...args)

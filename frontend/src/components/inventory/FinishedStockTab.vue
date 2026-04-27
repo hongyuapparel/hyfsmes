@@ -206,18 +206,17 @@
       </el-table-column>
     </el-table>
 
-    <div class="pagination-wrap pagination-wrap--with-summary">
-      <div class="pagination-summary">总件数：{{ stockListFooterQuantity }} 件</div>
-      <el-pagination
-        :current-page="pagination.page"
-        :page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="emit('current-change', $event)"
-        @size-change="emit('page-size-change', $event)"
-      />
-    </div>
+    <InventoryPaginationBar
+      :current-page="pagination.page"
+      :page-size="pagination.pageSize"
+      :total="pagination.total"
+      :total-quantity="stockListFooterQuantity"
+      :total-amount="stockListFooterAmount"
+      unit="件"
+      summary-label="总件数"
+      @current-change="emit('current-change', $event)"
+      @size-change="emit('page-size-change', $event)"
+    />
   </div>
 </template>
 
@@ -228,6 +227,7 @@ import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import { getFilterInputStyle, getOrderNoFilterStyle, getSkuCodeFilterStyle, getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableLeafRow, isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
+import InventoryPaginationBar from '@/components/inventory/InventoryPaginationBar.vue'
 
 type FinishedStockFilter = {
   orderNo: string
@@ -256,6 +256,7 @@ const props = defineProps<{
   compactImageSize: number
   compactImageColumnMinWidth: number
   stockListFooterQuantity: number
+  stockListFooterAmount: number
   pagination: { page: number; pageSize: number; total: number }
   findInventoryTypeLabelById: (id: number | null | undefined) => string
   findWarehouseLabelById: (id: number | null | undefined) => string

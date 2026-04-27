@@ -1,5 +1,10 @@
 <template>
-  <el-drawer v-model="drawerVisible" title="辅料详情" size="560px" destroy-on-close>
+  <AppDrawer
+    :model-value="visible"
+    title="辅料详情"
+    :size="560"
+    @update:model-value="emit('update:visible', $event)"
+  >
     <div v-if="row" class="detail-base">
       <div><span class="detail-label">名称：</span>{{ row.name || '-' }}</div>
       <div><span class="detail-label">类别：</span>{{ row.category || '-' }}</div>
@@ -18,16 +23,16 @@
         {{ formatLogAction(log.action) }}｜操作人：{{ log.operatorUsername || '-' }}{{ log.remark ? `｜备注：${log.remark}` : '' }}
       </el-timeline-item>
     </el-timeline>
-  </el-drawer>
+  </AppDrawer>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import AppDrawer from '@/components/AppDrawer.vue'
 import type { AccessoryItem, AccessoryOperationLog } from '@/api/inventory'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 
-const props = defineProps<{
+defineProps<{
   visible: boolean
   row: AccessoryItem | null
   loading: boolean
@@ -38,11 +43,6 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
-
-const drawerVisible = computed({
-  get: () => props.visible,
-  set: (value: boolean) => emit('update:visible', value),
-})
 </script>
 
 <style scoped>

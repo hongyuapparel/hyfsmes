@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"C:\\\\Program Files\\\\MySQL\\\\MySQL Server 8.0\\\\bin\\\\mysql.exe\" -h 127.0.0.1 -P 3306 -u root \"-pqiyafang1993\" erp -e \"SHOW INDEX FROM orders WHERE Key_name != 'PRIMARY';\" 2>&1)"
+    ]
+  }
+}

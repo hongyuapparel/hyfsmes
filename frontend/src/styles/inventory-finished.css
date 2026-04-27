@@ -18,7 +18,6 @@
 .pagination-wrap--with-summary {
   margin-top: var(--space-md);
   justify-content: space-between;
-  align-items: center;
 }
 
 .pagination-summary {
