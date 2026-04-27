@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  getProductionProcesses,
+  getProductionProcessesPage,
   type ProductionProcessItem,
 } from '@/api/production-processes'
 import {
@@ -26,6 +26,9 @@ export function useOrderSettingsQuoteTemplates() {
   const activeQuoteTemplateIds = ref<string[]>([])
   const quoteTemplateItemsMap = ref<Record<number, ProcessQuoteTemplateItem[]>>({})
   const quoteTemplateItemsLoadingMap = ref<Record<number, boolean>>({})
+  const quoteTemplateItemsDialogOpening = ref(false)
+  const quoteTemplateItemsDialogLoading = ref(false)
+  const processSearchLoading = ref(false)
 
   async function loadQuoteTemplates() {
     try {
@@ -107,11 +110,32 @@ export function useOrderSettingsQuoteTemplates() {
     }
   }
 
+  async function searchProcessOptions(keyword: string) {
+    if (!keyword?.trim()) {
+      quoteTemplateProcessOptions.value = []
+      return
+    }
+    processSearchLoading.value = true
+    try {
+      const res = await getProductionProcessesPage({ keyword: keyword.trim(), page: 1, pageSize: 50 })
+      quoteTemplateProcessOptions.value = res.data?.items ?? []
+    } catch {
+      quoteTemplateProcessOptions.value = []
+    } finally {
+      processSearchLoading.value = false
+    }
+  }
+
   async function openQuoteTemplateItemsDialog(row: ProcessQuoteTemplate) {
+    if (quoteTemplateItemsDialogOpening.value) return
+    quoteTemplateItemsDialogOpening.value = true
     quoteTemplateItemsDialog.value = { visible: true, templateId: row.id, name: row.name }
     quoteTemplateItemToAdd.value = []
+    quoteTemplateProcessOptions.value = []
+    quoteTemplateItemsEdit.value = []
+    quoteTemplateItemsDialogLoading.value = true
     try {
-      const [itemsRes, processesRes] = await Promise.all([getProcessQuoteTemplateItems(row.id), getProductionProcesses()])
+      const itemsRes = await getProcessQuoteTemplateItems(row.id)
       const items = (itemsRes.data ?? []) as ProcessQuoteTemplateItem[]
       quoteTemplateItemsEdit.value = items.map((item) => ({
         processId: item.processId,
@@ -120,10 +144,11 @@ export function useOrderSettingsQuoteTemplates() {
         processName: item.processName,
         unitPrice: item.unitPrice,
       }))
-      quoteTemplateProcessOptions.value = processesRes.data ?? []
     } catch {
       quoteTemplateItemsEdit.value = []
-      quoteTemplateProcessOptions.value = []
+    } finally {
+      quoteTemplateItemsDialogOpening.value = false
+      quoteTemplateItemsDialogLoading.value = false
     }
   }
 
@@ -194,6 +219,9 @@ export function useOrderSettingsQuoteTemplates() {
     submitQuoteTemplate,
     removeQuoteTemplate,
     openQuoteTemplateItemsDialog,
+    quoteTemplateItemsDialogLoading,
+    searchProcessOptions,
+    processSearchLoading,
     addQuoteTemplateItem,
     removeQuoteTemplateItem,
     submitQuoteTemplateItems,

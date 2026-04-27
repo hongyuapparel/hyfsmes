@@ -25,6 +25,7 @@ export interface ProductionProcessPageRes {
 export function getProductionProcessesPage(params: {
   department?: string
   jobType?: string
+  keyword?: string
   page?: number
   pageSize?: number
 }) {

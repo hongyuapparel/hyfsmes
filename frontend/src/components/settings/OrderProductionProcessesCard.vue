@@ -97,8 +97,22 @@
     </el-dialog>
 
     <el-dialog v-model="quoteTemplateItemsDialog.visible" :title="`编辑工序：${quoteTemplateItemsDialog.name ?? ''}`" width="560px" @close="quoteTemplateItemsDialog.templateId = undefined">
+      <div v-loading="quoteTemplateItemsDialogLoading" class="quote-template-items-body">
       <div class="quote-template-items-actions">
-        <el-select v-model="quoteTemplateItemToAdd" placeholder="可多选工序后批量添加入模板" filterable clearable multiple collapse-tags collapse-tags-tooltip size="small" class="quote-template-process-select">
+        <el-select
+          v-model="quoteTemplateItemToAdd"
+          placeholder="输入工序名称关键词搜索后添加"
+          remote
+          filterable
+          clearable
+          multiple
+          collapse-tags
+          collapse-tags-tooltip
+          :remote-method="searchProcessOptions"
+          :loading="processSearchLoading"
+          size="small"
+          class="quote-template-process-select"
+        >
           <el-option v-for="p in quoteTemplateProcessOptions" :key="p.id" :label="`${p.department} · ${p.jobType} · ${p.name}（${formatDisplayNumber(p.unitPrice)} 元）`" :value="p.id" :disabled="quoteTemplateItemsEdit.some((x) => x.processId === p.id)" />
         </el-select>
         <el-button type="primary" size="small" @click="addQuoteTemplateItem">批量添加工序</el-button>
@@ -110,6 +124,7 @@
         <el-table-column label="单价(元)" width="90" align="right"><template #default="{ row: item }">{{ formatDisplayNumber(item.unitPrice) }}</template></el-table-column>
         <el-table-column label="操作" width="70" align="center"><template #default="{ row: item }"><el-button link type="danger" size="small" @click="removeQuoteTemplateItem(item)">删除</el-button></template></el-table-column>
       </el-table>
+      </div>
       <template #footer><el-button @click="quoteTemplateItemsDialog.visible = false">取消</el-button><el-button type="primary" @click="submitQuoteTemplateItems">保存</el-button></template>
     </el-dialog>
   </div>
@@ -138,6 +153,7 @@ const {
   quoteTemplateProcessOptions, quoteTemplateItemToAdd, activeQuoteTemplateIds, quoteTemplateItemsMap,
   quoteTemplateItemsLoadingMap, loadQuoteTemplates, onQuoteTemplateCollapseChange, isQuoteTemplateExpanded,
   openQuoteTemplateDialog, submitQuoteTemplate, removeQuoteTemplate, openQuoteTemplateItemsDialog,
+  quoteTemplateItemsDialogLoading, searchProcessOptions, processSearchLoading,
   addQuoteTemplateItem, removeQuoteTemplateItem, submitQuoteTemplateItems,
 } = useOrderSettingsQuoteTemplates()
 
@@ -162,6 +178,7 @@ watch(
 .process-table { font-size: var(--font-size-body); }
 .process-tree-single .el-table__row .el-table__cell:first-child { font-weight: inherit; }
 .process-row-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.quote-template-items-body { min-height: 120px; }
 .quote-template-items-actions { display: flex; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); }
 .quote-template-process-select { flex: 1; min-width: 280px; }
 .template-expand-wrap { padding: 8px 0; }

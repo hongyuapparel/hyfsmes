@@ -5,7 +5,7 @@
     </p>
 
     <div class="settings-body">
-      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs">
+      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs" :class="{ 'no-bar-transition': suppressTabTransition }">
         <el-tab-pane label="订单类型" name="orderTypes" />
         <el-tab-pane label="合作方式" name="collaboration" />
         <el-tab-pane label="产品分组" name="productGroups" />
@@ -50,7 +50,7 @@
         <OrderSlaSettingsCard
           v-show="activeTab === 'orderSla'"
           :active="activeTab === 'orderSla'"
-          :status-list="statusState.statusList.value"
+          :status-list="statusState.statusList"
           :ensure-statuses="ensureStatusesLoaded"
         />
         <OrderStatusConfigCard
@@ -64,12 +64,21 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, reactive, onActivated } from 'vue'
 import OptionList from './product-option-list.vue'
 import OrderProductionProcessesCard from '@/components/settings/OrderProductionProcessesCard.vue'
 import OrderSlaSettingsCard from '@/components/settings/OrderSlaSettingsCard.vue'
 import OrderStatusConfigCard from '@/components/settings/OrderStatusConfigCard.vue'
 import { useOrderSettingsStatus } from '@/composables/useOrderSettingsStatus'
+
+const suppressTabTransition = ref(false)
+
+onActivated(() => {
+  suppressTabTransition.value = true
+  requestAnimationFrame(() => {
+    suppressTabTransition.value = false
+  })
+})
 
 const activeTab = ref<
   | 'orderTypes'
@@ -83,10 +92,10 @@ const activeTab = ref<
   | 'orderStatusConfig'
 >('orderTypes')
 
-const statusState = useOrderSettingsStatus()
+const statusState = reactive(useOrderSettingsStatus())
 
 async function ensureStatusesLoaded() {
-  if (!statusState.statusList.value.length) {
+  if (!statusState.statusList.length) {
     await statusState.loadStatuses()
   }
 }
@@ -119,5 +128,9 @@ async function ensureStatusesLoaded() {
   margin: 0 0 var(--space-sm);
   font-size: var(--font-size-body);
   font-weight: 600;
+}
+
+.no-bar-transition :deep(.el-tabs__active-bar) {
+  transition: none !important;
 }
 </style>

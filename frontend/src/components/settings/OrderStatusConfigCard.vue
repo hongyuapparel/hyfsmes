@@ -141,12 +141,12 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, toRaw } from 'vue'
 import { TRIGGER_ACTION_OPTIONS } from '@/composables/useOrderSettingsStatus'
 
 const props = defineProps<{ active: boolean; state: any }>()
 const state = props.state
-const chainTableRef = state.chainTableRef
+const chainTableRef = toRaw(state).chainTableRef
 
 watch(
   () => props.active,

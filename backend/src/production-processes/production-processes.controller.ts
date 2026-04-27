@@ -25,6 +25,7 @@ export class ProductionProcessesController {
   findPage(
     @Query('department') department?: string,
     @Query('jobType') jobType?: string,
+    @Query('keyword') keyword?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -33,6 +34,7 @@ export class ProductionProcessesController {
     return this.service.findPage({
       department,
       jobType,
+      keyword,
       page: Number.isNaN(p) ? 1 : p,
       pageSize: Number.isNaN(ps) ? 50 : ps,
     });

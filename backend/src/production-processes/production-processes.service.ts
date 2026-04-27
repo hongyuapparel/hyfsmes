@@ -23,10 +23,10 @@ export class ProductionProcessesService {
   }
 
   async findPage(
-    filters?: { department?: string; jobType?: string; page?: number; pageSize?: number },
+    filters?: { department?: string; jobType?: string; keyword?: string; page?: number; pageSize?: number },
   ): Promise<{ items: ProductionProcess[]; total: number; page: number; pageSize: number }> {
     const page = Math.max(1, Number(filters?.page ?? 1) || 1);
-    const pageSize = Math.min(500, Math.max(1, Number(filters?.pageSize ?? 50) || 50));
+    const pageSize = Math.min(2000, Math.max(1, Number(filters?.pageSize ?? 50) || 50));
     const qb = this.repo
       .createQueryBuilder('p')
       .orderBy('p.sort_order', 'ASC')
@@ -36,6 +36,9 @@ export class ProductionProcessesService {
     }
     if (filters?.jobType?.trim()) {
       qb.andWhere('p.job_type = :jobType', { jobType: filters.jobType.trim() });
+    }
+    if (filters?.keyword?.trim()) {
+      qb.andWhere('p.name LIKE :keyword', { keyword: `%${filters.keyword.trim()}%` });
     }
     const total = await qb.getCount();
     const items = await qb
