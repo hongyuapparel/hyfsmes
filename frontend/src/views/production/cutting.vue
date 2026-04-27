@@ -62,7 +62,7 @@
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
-          v-if="hasSelection && canRegisterSelection"
+          v-if="hasSelection && canRegisterSelection && canCompleteCuttingAction"
           type="primary"
           size="large"
           @click="openRegisterDialog"
@@ -304,6 +304,10 @@ import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBr
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import CuttingTable from '@/components/production/CuttingTable.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canCompleteCuttingAction = computed(() => authStore.hasPermission('production_cutting_complete'))
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },

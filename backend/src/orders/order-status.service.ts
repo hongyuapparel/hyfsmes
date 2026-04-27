@@ -283,7 +283,7 @@ export class OrderStatusService {
 
   async resolveStatusAfterCompletedWorkflowSteps(
     order: Order,
-    actorUserId: number,
+    actorUserId = 0,
   ): Promise<{ status: string; statusTime: Date }> {
     const now = new Date();
     let status = order.status;
@@ -338,8 +338,7 @@ export class OrderStatusService {
     return saved;
   }
 
-  async reconcileCompletedWorkflowOrders(actorUserId?: number, options?: { force?: boolean; orderNo?: string }): Promise<void> {
-    if (typeof actorUserId !== 'number') return;
+  async reconcileCompletedWorkflowOrders(actorUserId = 0, options?: { force?: boolean; orderNo?: string }): Promise<void> {
     if (this.workflowReconcileRunning) return;
     const now = Date.now();
     const force = options?.force ?? false;

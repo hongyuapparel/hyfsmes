@@ -40,7 +40,7 @@ export class OrderStatusTransition {
   @Column({ name: 'next_department', type: 'varchar', length: 64, nullable: true })
   nextDepartment: string | null;
 
-  /** 允许触发该流转的角色编码列表，逗号分隔 */
+  /** 旧字段：不再用于权限判断，动作权限由 role_permissions 控制 */
   @Column({ name: 'allow_roles', type: 'varchar', length: 255, nullable: true })
   allowRoles: string | null;
 

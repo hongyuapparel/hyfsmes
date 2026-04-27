@@ -19,7 +19,6 @@ export interface OrderStatusTransitionItem {
   triggerCode: string
   conditionsJson: unknown | null
   nextDepartment: string | null
-  allowRoles: string | null
   enabled: boolean
 }
 
@@ -79,7 +78,6 @@ export function createOrderStatusTransition(data: {
   triggerCode: string
   conditionsJson?: unknown
   nextDepartment?: string
-  allowRoles?: string
   enabled?: boolean
 }) {
   return request.post<OrderStatusTransitionItem>('/order-status-config/transitions', data)
@@ -95,7 +93,6 @@ export function createOrderStatusTransitionsBatch(data: {
     triggerType: string
     triggerCode: string
     nextDepartment?: string
-    allowRoles?: string
     enabled?: boolean
     conditionsJson?: unknown
   }>
@@ -122,7 +119,6 @@ export function updateOrderWorkflowChain(
       toStatus: string
       triggerType: string
       triggerCode: string
-      allowRoles?: string
       enabled?: boolean
       conditionsJson?: unknown
     }>
@@ -144,7 +140,6 @@ export function updateOrderStatusTransition(
     triggerCode: string
     conditionsJson: unknown
     nextDepartment: string | null
-    allowRoles: string | null
     enabled: boolean
   }>,
 ) {

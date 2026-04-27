@@ -49,18 +49,18 @@
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
-        <el-button v-if="hasSelection && canAssignSelection" type="primary" size="large" @click="openAssignDialog">
+        <el-button v-if="hasSelection && canAssignSelection && canAssignSewingAction" type="primary" size="large" @click="openAssignDialog">
           分单
         </el-button>
         <el-button
-          v-if="hasSelection && canAssignCompletedSelection"
+          v-if="hasSelection && canAssignCompletedSelection && canAssignSewingAction"
           type="primary"
           size="large"
           @click="openAssignDialog"
         >
           补录分单
         </el-button>
-        <el-button v-if="hasSelection && canRegisterSelection" type="primary" size="large" @click="openRegisterDialog">
+        <el-button v-if="hasSelection && canRegisterSelection && canCompleteSewingAction" type="primary" size="large" @click="openRegisterDialog">
           登记车缝完成
         </el-button>
       </div>
@@ -273,7 +273,7 @@
 </template>
 
 <script setup lang="ts">
-import { reactive, onMounted } from 'vue'
+import { computed, reactive, onMounted } from 'vue'
 import { type SewingListItem } from '@/api/production-sewing'
 import {
   ACTIVE_FILTER_COLOR,
@@ -292,6 +292,11 @@ import ProductionOrderBriefPanel, {
 } from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canAssignSewingAction = computed(() => authStore.hasPermission('production_sewing_assign'))
+const canCompleteSewingAction = computed(() => authStore.hasPermission('production_sewing_complete'))
 
 const {
   SEWING_TABS,

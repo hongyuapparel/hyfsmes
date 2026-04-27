@@ -31,7 +31,6 @@ export function useOrderSettingsStatus() {
     triggerType: 'button',
     triggerCode: '',
     nextDepartment: '',
-    allowRoles: '',
     enabled: true,
   })
 
@@ -156,7 +155,6 @@ export function useOrderSettingsStatus() {
       triggerType: row.triggerType,
       triggerCode: normalizeTriggerCode(row.triggerCode),
       nextDepartment: row.nextDepartment ?? '',
-      allowRoles: row.allowRoles ?? '',
       enabled: row.enabled,
     }
   }
@@ -168,7 +166,6 @@ export function useOrderSettingsStatus() {
       triggerType: transitionForm.value.triggerType,
       triggerCode: normalizeTriggerCode(transitionForm.value.triggerCode),
       nextDepartment: transitionForm.value.nextDepartment.trim() || undefined,
-      allowRoles: transitionForm.value.allowRoles.trim() || undefined,
       enabled: transitionForm.value.enabled,
     }
     if (!payload.toStatus || !payload.triggerCode) return ElMessage.warning('请填写目标状态和触发动作')
@@ -179,7 +176,6 @@ export function useOrderSettingsStatus() {
           triggerType: payload.triggerType,
           triggerCode: payload.triggerCode,
           nextDepartment: payload.nextDepartment ?? null,
-          allowRoles: payload.allowRoles ?? null,
           enabled: payload.enabled,
         })
       } else {

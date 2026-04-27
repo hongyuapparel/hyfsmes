@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderExt } from '../entities/order-ext.entity';
@@ -162,17 +162,9 @@ export class ProductionSewingService {
       select: ['orderId'],
     });
     const completedOrderIds = completedSewing.map((s) => s.orderId);
-    const pendingFinishingWithSewIds =
-      completedOrderIds.length > 0
-        ? (await this.orderRepo.find({
-            where: { status: 'pending_finishing', id: In(completedOrderIds) },
-            select: ['id'],
-          })).map((o) => o.id)
-        : [];
-
     const qb = this.orderRepo.createQueryBuilder('o').where(
       '(o.status = :pendingSewing OR o.id IN (:...completedIds))',
-      { pendingSewing: 'pending_sewing', completedIds: pendingFinishingWithSewIds.length ? pendingFinishingWithSewIds : [0] },
+      { pendingSewing: 'pending_sewing', completedIds: completedOrderIds.length ? completedOrderIds : [0] },
     );
 
     if (orderNo?.trim()) {
@@ -337,6 +329,15 @@ export class ProductionSewingService {
     const sewingQuantityRow =
       Array.isArray(sewingQuantities) && sewingQuantities.length > 0 ? sewingQuantities : null;
 
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'sewing_completed',
+      actorUserId: actorUserId ?? 0,
+    });
+    if (!next) {
+      throw new BadRequestException('未匹配到“车缝完成”流转规则，请先在订单设置中检查流程链路配置');
+    }
+
     let sewing = await this.sewingRepo.findOne({ where: { orderId } });
     if (!sewing) {
       sewing = this.sewingRepo.create({
@@ -360,11 +361,6 @@ export class ProductionSewingService {
     }
     await this.sewingRepo.save(sewing);
 
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'sewing_completed',
-      actorUserId: actorUserId ?? 0,
-    });
     if (next && next !== order.status) {
       order.status = next;
       order.statusTime = now;

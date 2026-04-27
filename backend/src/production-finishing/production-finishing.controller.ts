@@ -107,6 +107,7 @@ export class ProductionFinishingController {
   }
 
   @Post('items/register-receive')
+  @RequirePermission('production_finishing_receive')
   registerReceive(
     @Body('orderId') orderId: number,
     @Body('tailReceivedQty') tailReceivedQty: number,
@@ -120,6 +121,7 @@ export class ProductionFinishingController {
   }
 
   @Post('items/register-packaging-complete')
+  @RequirePermission('production_finishing_packaging')
   registerPackagingComplete(
     @Body('orderId') orderId: number,
     @Body('tailShippedQty') tailShippedQty: number,
@@ -143,6 +145,7 @@ export class ProductionFinishingController {
   }
 
   @Post('items/register')
+  @RequirePermission('production_finishing_packaging')
   registerPackaging(
     @Body('orderId') orderId: number,
     @Body('tailReceivedQty') tailReceivedQty: number,
@@ -156,6 +159,7 @@ export class ProductionFinishingController {
   }
 
   @Post('items/ship')
+  @RequirePermission('production_finishing_ship')
   ship(
     @Body('orderId') orderId: number,
     @Body('quantity') quantity: number,
@@ -164,6 +168,7 @@ export class ProductionFinishingController {
   }
 
   @Post('items/inbound')
+  @RequirePermission('production_finishing_inbound')
   inbound(
     @Body('orderId') orderId: number,
     @Body('quantity') quantity: number,
@@ -173,6 +178,7 @@ export class ProductionFinishingController {
   }
 
   @Post('items/:orderId/finance-approve')
+  @RequirePermission('production_finishing_finance_approve')
   financeApprove(
     @Param('orderId', ParseIntPipe) orderId: number,
     @CurrentUser() user?: { userId: number; username: string },

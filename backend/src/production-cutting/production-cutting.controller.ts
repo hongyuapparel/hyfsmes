@@ -120,6 +120,7 @@ export class ProductionCuttingController {
   }
 
   @Post('items/complete')
+  @RequirePermission('production_cutting_complete')
   complete(
     @Body('orderId') orderId: number,
     @Body('actualCutRows') actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[],

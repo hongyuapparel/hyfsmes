@@ -123,9 +123,6 @@
               <el-select v-model="step.triggerCode" placeholder="触发动作" size="small" style="width: 140px">
                 <el-option v-for="opt in TRIGGER_ACTION_OPTIONS" :key="opt.code" :label="opt.label" :value="opt.code" />
               </el-select>
-              <el-select v-model="step.allowRoles" multiple collapse-tags collapse-tags-tooltip filterable clearable placeholder="允许角色（可选）" size="small" style="width: 240px">
-                <el-option v-for="role in state.roleOptions" :key="role.code" :label="role.name" :value="role.code" />
-              </el-select>
               <el-button type="danger" link size="small" :disabled="state.chainForm.steps.length <= 1" @click="state.removeChainStep(index)">删除</el-button>
             </div>
           </div>
@@ -154,7 +151,6 @@ watch(
     if (!active) return
     await state.loadStatuses()
     await state.loadChains()
-    await state.loadRolesForSelect()
     await state.loadOrderTypesForChain()
     await state.loadCollaborationOptionsForChain()
   },

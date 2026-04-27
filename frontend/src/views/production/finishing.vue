@@ -62,7 +62,7 @@
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
-          v-if="hasSelection && canRegisterReceiveSelection"
+          v-if="hasSelection && canRegisterReceiveSelection && canRegisterReceiveAction"
           type="primary"
           size="large"
           @click="openReceiveDialog"
@@ -70,7 +70,7 @@
           登记收货
         </el-button>
         <el-button
-          v-if="hasSelection && canPackagingCompleteSelection"
+          v-if="hasSelection && canPackagingCompleteSelection && canPackagingAction"
           type="primary"
           size="large"
           @click="openPackagingCompleteDialog"
@@ -78,7 +78,7 @@
           登记包装完成
         </el-button>
         <el-button
-          v-if="hasSelection && canAmendPackagingSelection"
+          v-if="hasSelection && canAmendPackagingSelection && canPackagingAction"
           type="primary"
           size="large"
           @click="openPackagingAmendDialog"
@@ -381,6 +381,11 @@ import ProductionOrderBriefPanel, {
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import FinishingTable from '@/components/production/FinishingTable.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canRegisterReceiveAction = computed(() => authStore.hasPermission('production_finishing_receive'))
+const canPackagingAction = computed(() => authStore.hasPermission('production_finishing_packaging'))
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },

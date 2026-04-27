@@ -309,7 +309,7 @@
     <OrderEditPackagingCard
       :packaging-headers="packagingHeaders"
       :packaging-cells="packagingCells"
-      :packaging-method="packagingMethod"
+      v-model:packaging-method="packagingMethod"
       :packaging-file-input-ref="packagingFileInputRef"
       :add-packaging-header="addPackagingHeader"
       :remove-packaging-header="removePackagingHeader"

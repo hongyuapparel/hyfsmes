@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -151,26 +151,32 @@ export class ProductionPurchaseService {
       purchaseRemark: (remark ?? '').trim() || null,
       purchaseImageUrl: (imageUrl ?? '').trim() || null,
     };
+
+    let nextStatus: string | null = null;
+    if (order.status === 'pending_purchase') {
+      const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
+      if (allCompleted) {
+        nextStatus = await this.orderWorkflowService.resolveNextStatus({
+          order,
+          triggerCode: 'purchase_all_completed',
+          actorUserId: actorUserId ?? 0,
+        });
+        if (!nextStatus) {
+          throw new BadRequestException('未匹配到“采购完成”流转规则，请先在订单设置中检查流程链路配置');
+        }
+      }
+    }
+
     ext.materials = materials;
     await this.orderExtRepo.save(ext);
     await this.suppliersService.touchLastActiveByNames([row?.supplierName ?? '']);
 
     // 若该订单全部物料采购完成，则按配置规则流转
-    if (order.status === 'pending_purchase') {
-      const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
-      if (allCompleted) {
-        let next: string | null = await this.orderWorkflowService.resolveNextStatus({
-          order,
-          triggerCode: 'purchase_all_completed',
-          actorUserId: actorUserId ?? 0,
-        });
-        if (next && next !== order.status) {
-          order.status = next;
-          order.statusTime = new Date();
-          await this.orderRepo.save(order);
-          await this.appendStatusHistory(order.id, next);
-        }
-      }
+    if (nextStatus && nextStatus !== order.status) {
+      order.status = nextStatus;
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, nextStatus);
     }
   }
 
@@ -199,6 +205,27 @@ export class ProductionPurchaseService {
     const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
     if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'picking') {
       throw new NotFoundException('该物料来源不在待领料流程，请使用采购登记');
+    }
+
+    const statusCheckedMaterials = [...materials];
+    statusCheckedMaterials[params.materialIndex] = {
+      ...row,
+      pickStatus: 'completed',
+    };
+    let nextStatus: string | null = null;
+    if (order.status === 'pending_purchase') {
+      const allCompleted =
+        statusCheckedMaterials.length > 0 && statusCheckedMaterials.every((m) => this.isMaterialFlowCompleted(m));
+      if (allCompleted) {
+        nextStatus = await this.orderWorkflowService.resolveNextStatus({
+          order,
+          triggerCode: 'purchase_all_completed',
+          actorUserId: params.actorUserId ?? 0,
+        });
+        if (!nextStatus) {
+          throw new BadRequestException('未匹配到“采购完成”流转规则，请先在订单设置中检查流程链路配置');
+        }
+      }
     }
 
     const operatorName = await this.resolveOperatorName(params.actorUserId, params.actorUsername ?? '');
@@ -279,21 +306,11 @@ export class ProductionPurchaseService {
     ext.materials = materials;
     await this.orderExtRepo.save(ext);
 
-    if (order.status === 'pending_purchase') {
-      const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
-      if (allCompleted) {
-        const next = await this.orderWorkflowService.resolveNextStatus({
-          order,
-          triggerCode: 'purchase_all_completed',
-          actorUserId: params.actorUserId ?? 0,
-        });
-        if (next && next !== order.status) {
-          order.status = next;
-          order.statusTime = new Date();
-          await this.orderRepo.save(order);
-          await this.appendStatusHistory(order.id, next);
-        }
-      }
+    if (nextStatus && nextStatus !== order.status) {
+      order.status = nextStatus;
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+      await this.appendStatusHistory(order.id, nextStatus);
     }
   }
 }

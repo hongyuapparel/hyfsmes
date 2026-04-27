@@ -111,7 +111,7 @@
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button
-          v-if="hasSelection"
+          v-if="hasSelection && canRegisterPurchase"
           type="primary"
           size="large"
           @click="onBatchHandle"
@@ -404,7 +404,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -423,6 +423,10 @@ import PurchaseTable from '@/components/production/PurchaseTable.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canRegisterPurchase = computed(() => authStore.hasPermission('production_purchase_register'))
 
 const {
   filter,

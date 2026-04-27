@@ -121,6 +121,7 @@ export class ProductionPatternController {
   }
 
   @Post('items/assign')
+  @RequirePermission('production_pattern_assign')
   assign(
     @Body('orderId') orderId: number,
     @Body('patternMaster') patternMaster: string,
@@ -134,6 +135,7 @@ export class ProductionPatternController {
   }
 
   @Post('items/complete')
+  @RequirePermission('production_pattern_complete')
   complete(
     @Body('orderId') orderId: number,
     @Body('sampleImageUrl') sampleImageUrl: string,
@@ -148,6 +150,7 @@ export class ProductionPatternController {
   }
 
   @Post('items/:orderId/materials')
+  @RequirePermission('production_pattern_materials')
   saveMaterials(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body('materials') materials: any[],

@@ -101,7 +101,7 @@
         <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button
-          v-if="hasSelection && canCompleteSelection"
+          v-if="hasSelection && canCompleteSelection && canCompleteProcessAction"
           type="primary"
           size="large"
           :loading="completing"
@@ -239,7 +239,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect } from 'vue'
+import { computed, ref, watchEffect } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
@@ -256,6 +256,10 @@ import ProductionDetailDrawerShell from '@/components/production/ProductionDetai
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import { useProductionProcessPage } from '@/composables/useProductionProcessPage'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canCompleteProcessAction = computed(() => authStore.hasPermission('production_process_complete'))
 
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320

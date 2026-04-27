@@ -31,12 +31,7 @@ export function usePatternDialogs(
   labelFinders: LabelFinders,
 ) {
   const authStore = useAuthStore()
-  const canEditPatternMaterials = computed(() => {
-    const roleName = (authStore.user?.roleName ?? '').trim()
-    if (!roleName) return false
-    if (roleName === '超级管理员' || roleName === '管理员') return true
-    return roleName.includes('纸样')
-  })
+  const canEditPatternMaterials = computed(() => authStore.hasPermission('production_pattern_materials'))
 
   const detailDrawer = reactive<{ visible: boolean; loading: boolean; saving: boolean; row: PatternListItem | null }>({
     visible: false,

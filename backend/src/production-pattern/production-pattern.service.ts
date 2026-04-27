@@ -456,6 +456,15 @@ export class ProductionPatternService {
       throw new NotFoundException('仅待纸样订单可确认完成');
     }
 
+    const next = await this.orderWorkflowService.resolveNextStatus({
+      order,
+      triggerCode: 'pattern_completed',
+      actorUserId: actorUserId ?? 0,
+    });
+    if (!next) {
+      throw new BadRequestException('未匹配到“纸样完成”流转规则，请先在订单设置中检查流程链路配置');
+    }
+
     let pattern = await this.patternRepo.findOne({ where: { orderId } });
     if (!pattern) {
       pattern = this.patternRepo.create({
@@ -473,11 +482,6 @@ export class ProductionPatternService {
     }
     await this.patternRepo.save(pattern);
 
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'pattern_completed',
-      actorUserId: actorUserId ?? 0,
-    });
     if (next && next !== order.status) {
       order.status = next;
       order.statusTime = new Date();

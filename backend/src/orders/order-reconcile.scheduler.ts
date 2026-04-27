@@ -8,6 +8,6 @@ export class OrderReconcileScheduler {
 
   @Cron('*/2 * * * *')
   async reconcile() {
-    await this.orderStatusService.reconcileCompletedWorkflowOrders(undefined, { force: false });
+    await this.orderStatusService.reconcileCompletedWorkflowOrders(0, { force: false });
   }
 }

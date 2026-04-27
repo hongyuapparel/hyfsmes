@@ -51,6 +51,7 @@ export class ProductionPurchaseController {
    * 登记实际采购（完成后状态为采购完成）
    */
   @Post('items/register')
+  @RequirePermission('production_purchase_register')
   register(
     @Body('orderId') orderId: number,
     @Body('materialIndex') materialIndex: number,
@@ -77,6 +78,7 @@ export class ProductionPurchaseController {
    * 登记领料（可选择库存扣减或仅备注处理）
    */
   @Post('items/pick')
+  @RequirePermission('production_purchase_register')
   registerPick(
     @Body('orderId') orderId: number,
     @Body('materialIndex') materialIndex: number,
