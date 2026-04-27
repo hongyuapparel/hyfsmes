@@ -94,6 +94,7 @@ export class ProductionSewingController {
   }
 
   @Post('items/assign')
+  @RequirePermission('production_sewing_assign')
   assign(
     @Body('orderId') orderId: number,
     @Body('distributedAt') distributedAt: string,
@@ -113,6 +114,7 @@ export class ProductionSewingController {
   }
 
   @Post('items/complete')
+  @RequirePermission('production_sewing_complete')
   complete(
     @Body('orderId') orderId: number,
     @Body('sewingQuantity') sewingQuantity: number,

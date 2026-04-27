@@ -362,14 +362,18 @@ export class ProductionCuttingMutationService {
       if (hasFabricCol) (cutting as { actualFabricMeters?: string | null }).actualFabricMeters = depNorm === SELF ? fabricNorm : null;
     }
 
-    await this.cuttingRepo.save(cutting);
-    await this.persistCuttingRegisterV2Columns(hasV2Columns, orderId, unitStr, totalStr, materialNorm);
-
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
       triggerCode: 'cutting_completed',
       actorUserId: actorUserId ?? 0,
     });
+    if (!next) {
+      throw new BadRequestException('未匹配到“裁床完成”流转规则，请先在订单设置中检查流程链路配置');
+    }
+
+    await this.cuttingRepo.save(cutting);
+    await this.persistCuttingRegisterV2Columns(hasV2Columns, orderId, unitStr, totalStr, materialNorm);
+
     if (next && next !== order.status) {
       order.status = next;
       order.statusTime = now;

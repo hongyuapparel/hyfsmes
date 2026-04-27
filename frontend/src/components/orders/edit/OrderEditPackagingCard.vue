@@ -34,7 +34,11 @@
     </div>
     <div class="packaging-method">
       <span>包装方式：</span>
-      <el-input v-model="packagingMethod" placeholder="如：每件单独装袋，每箱 20 件等" />
+      <el-input
+        :model-value="packagingMethod"
+        placeholder="如：每件单独装袋，每箱 20 件等"
+        @update:model-value="emit('update:packagingMethod', String($event ?? ''))"
+      />
     </div>
     <input
       ref="packagingFileInputRef"
@@ -59,5 +63,9 @@ defineProps<{
   triggerPackagingUpload: (index: number) => void
   onPackagingFileChange: (event: Event) => void
   openAccessoryDialog: (index: number) => void
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:packagingMethod', value: string): void
 }>()
 </script>

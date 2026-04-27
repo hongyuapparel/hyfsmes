@@ -90,11 +90,6 @@ export class CreateOrderStatusTransitionDto {
   nextDepartment?: string | null;
 
   @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  allowRoles?: string | null;
-
-  @IsOptional()
   @IsBoolean()
   enabled?: boolean;
 }
@@ -176,11 +171,6 @@ export class UpdateOrderStatusTransitionDto {
   @IsString()
   @MaxLength(64)
   nextDepartment?: string | null;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(255)
-  allowRoles?: string | null;
 
   @IsOptional()
   @IsBoolean()

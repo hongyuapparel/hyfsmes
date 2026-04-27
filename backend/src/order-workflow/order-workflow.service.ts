@@ -1,12 +1,10 @@
-import { ForbiddenException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderStatusTransition } from '../entities/order-status-transition.entity';
 import { SystemOption } from '../entities/system-option.entity';
-import { User } from '../entities/user.entity';
-import { Role } from '../entities/role.entity';
 
 type RuleConditions = {
   /** 旧版：样品/大货 粗分类（仍兼容） */
@@ -30,33 +28,7 @@ export class OrderWorkflowService {
     private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(SystemOption)
     private readonly optionRepo: Repository<SystemOption>,
-    @InjectRepository(User)
-    private readonly userRepo: Repository<User>,
-    @InjectRepository(Role)
-    private readonly roleRepo: Repository<Role>,
   ) {}
-
-  private parseAllowRoles(v: string | null | undefined): string[] {
-    if (!v) return [];
-    return v
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-  }
-
-  /**
-   * 获取当前操作者的角色信息。
-   * 兼容历史数据：后续 allowRoles 里既可能存角色 code（如 admin），也可能存中文名（如 管理员）。
-   */
-  private async getActorRole(userId: number): Promise<{ code: string; name: string }> {
-    const u = await this.userRepo.findOne({ where: { id: userId } });
-    if (!u) return { code: '', name: '' };
-    const r = await this.roleRepo.findOne({ where: { id: u.roleId } });
-    return {
-      code: (r?.code ?? '').trim(),
-      name: (r?.name ?? '').trim(),
-    };
-  }
 
   private async getOptionValueById(id: number | null): Promise<string> {
     if (id == null) return '';
@@ -163,10 +135,10 @@ export class OrderWorkflowService {
 
   /**
    * 根据当前状态+触发动作，从配置中匹配下一状态。未匹配到返回 null。
-   * 会校验 allowRoles（若配置了）。
+   * 操作权限由 PermissionGuard + role_permissions 控制；流程规则只负责匹配下一状态。
    */
   async resolveNextStatus(params: { order: Order; triggerCode: string; actorUserId: number }): Promise<string | null> {
-    const { order, triggerCode, actorUserId } = params;
+    const { order, triggerCode } = params;
     const rules = await this.transitionRepo.find({
       where: { fromStatus: order.status, triggerCode: triggerCode.trim(), enabled: true },
       order: { id: 'ASC' },
@@ -174,31 +146,15 @@ export class OrderWorkflowService {
     if (!rules.length) return null;
 
     const tags = await this.resolveOrderTags(order);
-    const actorRole = await this.getActorRole(actorUserId);
-    const actorTokens = [actorRole.code, actorRole.name].filter((v) => !!v);
-    const isAdmin = actorRole.code === 'admin';
-
-    const conditionMatched: OrderStatusTransition[] = [];
     const candidates: Array<{ rule: OrderStatusTransition; score: number }> = [];
     for (const r of rules) {
       const m = this.matchConditions(r.conditionsJson, tags);
       if (!m.ok) continue;
-      conditionMatched.push(r);
-
-      const allow = this.parseAllowRoles(r.allowRoles);
-      if (allow.length > 0 && !isAdmin && (!actorTokens.length || !actorTokens.some((t) => allow.includes(t)))) {
-        // 条件匹配但角色不在允许列表中，先跳过，后面统一判断是否仅因角色限制导致失败
-        continue;
-      }
-
       candidates.push({ rule: r, score: m.score });
     }
 
     if (!candidates.length) {
-      // 若存在至少一条“条件匹配、但有限制角色”的规则，则说明仅因角色不满足而失败
-      const anyRoleLimited = conditionMatched.some((r) => this.parseAllowRoles(r.allowRoles).length > 0);
-      if (anyRoleLimited) throw new ForbiddenException('无权限执行该操作');
-      // 否则视为没有任何规则适用，返回 null 交给调用方走默认分支
+      // 没有任何规则适用，返回 null 交给调用方走默认分支。
       return null;
     }
 

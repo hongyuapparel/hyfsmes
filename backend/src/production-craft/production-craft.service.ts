@@ -225,7 +225,7 @@ export class ProductionCraftService {
     const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     // 对历史“已工艺完成但订单未流转”的数据进行一次按规则补流转（无硬编码状态）。
-    // 只在可识别当前操作人时执行，以遵守 allowRoles 角色限制。
+    // 只在可识别当前操作人时执行；动作权限由 PermissionGuard + role_permissions 控制。
     if (typeof actorUserId === 'number') {
       for (const order of orders) {
         const craft = craftMap.get(order.id);
@@ -265,7 +265,7 @@ export class ProductionCraftService {
           });
           if (!nextByFlow) continue;
         } catch {
-          // 角色无权限或规则不匹配时，不在工艺管理列表展示该单
+          // 规则不匹配时，不在工艺管理列表展示该单
           continue;
         }
       }

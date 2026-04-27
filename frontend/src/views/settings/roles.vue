@@ -33,10 +33,13 @@
       :menu-tree-data="menuTreeData"
       :menu-expanded-keys="menuExpandedKeys"
       :menu-checked-keys="menuCheckedKeys"
+      :action-checked-ids="checkedIds"
+      :has-any-action-perms="hasAnyActionPerms"
       :has-action-perms="hasActionPerms"
       @role-change="onRoleChange"
       @save-permissions="savePermissions"
       @open-action-dialog="openActionDialog"
+      @action-check-change="setActionCheckedIds"
     />
 
     <!-- 操作权限弹窗：仅展示当前页面的操作权限勾选 -->
@@ -123,6 +126,8 @@ const {
   menuTreeData,
   menuExpandedKeys,
   menuCheckedKeys,
+  checkedIds,
+  hasAnyActionPerms,
   orderStatuses,
   roleOrderPolicies,
   actionDialogVisible,
@@ -132,6 +137,7 @@ const {
   actionStatusDraft,
   registerMenuTreeBridge,
   hasActionPerms,
+  setActionCheckedIds,
   getOrderActionKey,
   isOrderListAction,
   isOrderReviewAction,

@@ -43,6 +43,7 @@ export class ProductionCraftController {
   }
 
   @Post('items/complete')
+  @RequirePermission('production_process_complete')
   complete(
     @Body('orderId') orderId: number,
     @CurrentUser() user: { userId: number; username: string },

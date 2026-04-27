@@ -217,6 +217,18 @@ export class ProductionFinishingMutationService {
       }
     }
 
+    let nextStatus: string | null = null;
+    if (isFirstRegister) {
+      nextStatus = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'tailing_inbound_completed',
+        actorUserId: actorUserId ?? 0,
+      });
+      if (!nextStatus) {
+        throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
+      }
+    }
+
     finishing.tailShippedQty = ship;
     finishing.tailInboundQty = inbound;
     finishing.defectQuantity = defect;
@@ -225,13 +237,8 @@ export class ProductionFinishingMutationService {
       finishing.completedAt = new Date();
       finishing.status = 'inbound';
       await this.finishingRepo.save(finishing);
-      const next = await this.orderWorkflowService.resolveNextStatus({
-        order,
-        triggerCode: 'tailing_inbound_completed',
-        actorUserId: actorUserId ?? 0,
-      });
-      if (next && next !== order.status) {
-        order.status = next;
+      if (nextStatus && nextStatus !== order.status) {
+        order.status = nextStatus;
         order.statusTime = new Date();
         await this.orderRepo.save(order);
       }
@@ -279,13 +286,16 @@ export class ProductionFinishingMutationService {
     if (shipped + inbound + defect !== received) {
       throw new NotFoundException(`出货数(${shipped})+入库数(${inbound})+次品数(${defect}) 须等于尾部收货数(${received})后才能审批完成`);
     }
-    finishing.status = 'inbound';
-    await this.finishingRepo.save(finishing);
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
       triggerCode: 'tailing_inbound_completed',
       actorUserId: actorUserId ?? 0,
     });
+    if (!next) {
+      throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
+    }
+    finishing.status = 'inbound';
+    await this.finishingRepo.save(finishing);
     if (next && next !== order.status) {
       order.status = next;
       order.statusTime = new Date();
@@ -390,13 +400,16 @@ export class ProductionFinishingMutationService {
     finishing.tailInboundQty = newInbound;
     const total = shipped + newInbound + defect;
     if (total === received) {
-      finishing.status = 'inbound';
-      await this.finishingRepo.save(finishing);
       const next = await this.orderWorkflowService.resolveNextStatus({
         order,
         triggerCode: 'tailing_inbound_completed',
         actorUserId: actorUserId ?? 0,
       });
+      if (!next) {
+        throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
+      }
+      finishing.status = 'inbound';
+      await this.finishingRepo.save(finishing);
       if (next && next !== order.status) {
         order.status = next;
         order.statusTime = new Date();

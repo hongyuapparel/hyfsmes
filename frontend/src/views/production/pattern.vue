@@ -127,11 +127,11 @@
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
-        <el-button v-if="hasSelection" type="primary" size="large" @click="openAssignDialog">
+        <el-button v-if="hasSelection && canAssignPattern" type="primary" size="large" @click="openAssignDialog">
           分配纸样师和车版师
         </el-button>
         <el-button
-          v-if="hasSelection && canCompleteSelection"
+          v-if="hasSelection && canCompleteSelection && canCompletePattern"
           type="primary"
           size="large"
           @click="openCompleteDialog"
@@ -409,7 +409,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
 import {
@@ -429,6 +429,11 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
+import { useAuthStore } from '@/stores/auth'
+
+const authStore = useAuthStore()
+const canAssignPattern = computed(() => authStore.hasPermission('production_pattern_assign'))
+const canCompletePattern = computed(() => authStore.hasPermission('production_pattern_complete'))
 
 const patternTableRef = ref<{ getTableRef?: () => unknown } | null>(null)
 const tableShellRef = ref<HTMLElement | null>(null)

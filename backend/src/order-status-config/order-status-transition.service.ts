@@ -48,7 +48,7 @@ export class OrderStatusTransitionService {
       triggerCode: payload.triggerCode?.trim() ?? '',
       conditionsJson: payload.conditionsJson ?? null,
       nextDepartment: payload.nextDepartment?.trim() || null,
-      allowRoles: payload.allowRoles?.trim() || null,
+      allowRoles: null,
       enabled: payload.enabled ?? true,
     });
     return this.transitionRepo.save(entity);
@@ -63,7 +63,7 @@ export class OrderStatusTransitionService {
     if (payload.triggerCode !== undefined) rule.triggerCode = payload.triggerCode.trim();
     if (payload.conditionsJson !== undefined) rule.conditionsJson = payload.conditionsJson;
     if (payload.nextDepartment !== undefined) rule.nextDepartment = payload.nextDepartment?.trim() || null;
-    if (payload.allowRoles !== undefined) rule.allowRoles = payload.allowRoles?.trim() || null;
+    rule.allowRoles = null;
     if (payload.enabled !== undefined) rule.enabled = Boolean(payload.enabled);
     return this.transitionRepo.save(rule);
   }
@@ -107,7 +107,7 @@ export class OrderStatusTransitionService {
         triggerCode: step.triggerCode?.trim() ?? '',
         conditionsJson: conditionsJson ?? step.conditionsJson ?? null,
         nextDepartment: step.nextDepartment?.trim() || null,
-        allowRoles: step.allowRoles?.trim() || null,
+        allowRoles: null,
         enabled: step.enabled ?? true,
       });
       created.push(await this.transitionRepo.save(entity));
@@ -173,7 +173,7 @@ export class OrderStatusTransitionService {
           triggerCode: step.triggerCode?.trim() ?? '',
           conditionsJson: chain.conditionsJson ?? step.conditionsJson ?? null,
           nextDepartment: step.nextDepartment?.trim() || null,
-          allowRoles: step.allowRoles?.trim() || null,
+          allowRoles: null,
           enabled: step.enabled ?? true,
         });
         created.push(await this.transitionRepo.save(entity));

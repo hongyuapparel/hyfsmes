@@ -15,6 +15,19 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_production_cutting', name: '裁床管理', routePath: '/production/cutting', type: 'menu' },
   { code: 'menu_production_sewing', name: '车缝管理', routePath: '/production/sewing', type: 'menu' },
   { code: 'menu_production_finishing', name: '尾部管理', routePath: '/production/finishing', type: 'menu' },
+  { code: 'production_purchase_register', name: '采购管理-登记采购/领料', routePath: '/production/purchase', type: 'action' },
+  { code: 'production_pattern_assign', name: '纸样管理-分配纸样', routePath: '/production/pattern', type: 'action' },
+  { code: 'production_pattern_complete', name: '纸样管理-纸样完成', routePath: '/production/pattern', type: 'action' },
+  { code: 'production_pattern_materials', name: '纸样管理-维护纸样物料', routePath: '/production/pattern', type: 'action' },
+  { code: 'production_process_complete', name: '工艺管理-工艺完成', routePath: '/production/process', type: 'action' },
+  { code: 'production_cutting_complete', name: '裁床管理-裁床登记', routePath: '/production/cutting', type: 'action' },
+  { code: 'production_sewing_assign', name: '车缝管理-分单', routePath: '/production/sewing', type: 'action' },
+  { code: 'production_sewing_complete', name: '车缝管理-登记车缝完成', routePath: '/production/sewing', type: 'action' },
+  { code: 'production_finishing_receive', name: '尾部管理-登记收货', routePath: '/production/finishing', type: 'action' },
+  { code: 'production_finishing_packaging', name: '尾部管理-登记包装完成', routePath: '/production/finishing', type: 'action' },
+  { code: 'production_finishing_ship', name: '尾部管理-发货', routePath: '/production/finishing', type: 'action' },
+  { code: 'production_finishing_inbound', name: '尾部管理-入库', routePath: '/production/finishing', type: 'action' },
+  { code: 'production_finishing_finance_approve', name: '尾部管理-财务审批发货', routePath: '/production/finishing', type: 'action' },
   { code: 'menu_inventory', name: '库存管理', routePath: '/inventory', type: 'menu' },
   { code: 'menu_inventory_pending', name: '待仓处理', routePath: '/inventory/pending', type: 'menu' },
   { code: 'menu_inventory_finished', name: '成品库存', routePath: '/inventory/finished', type: 'menu' },
@@ -41,18 +54,12 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'orders_delete', name: '订单列表-删除订单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_review', name: '订单列表-审核待审单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_cost_submit', name: '订单列表-订单成本可提交', routePath: '/orders/list', type: 'action' },
-  {
-    code: 'orders_cost_save_process_quote_template',
-    name: '订单列表-订单成本可保存工序报价模板',
-    routePath: '/orders/list',
-    type: 'action',
-  },
 ];
 
 export async function seedPermissions(dataSource: DataSource): Promise<void> {
   const repo = dataSource.getRepository(Permission);
   const rolePermRepo = dataSource.getRepository(RolePermission);
-  const deprecatedCodes = ['menu_settings_permissions', 'menu_settings_products'];
+  const deprecatedCodes = ['menu_settings_permissions', 'menu_settings_products', 'orders_cost_save_process_quote_template'];
   const deprecatedRoutes = ['/settings/permissions', '/settings/products'];
 
   for (const p of PERMISSIONS) {

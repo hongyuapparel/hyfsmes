@@ -2,7 +2,6 @@ import { ref, nextTick, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import Sortable from 'sortablejs'
 import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
-import { getRoles, type RoleItem } from '@/api/roles'
 import {
   createOrderStatusTransitionsBatch,
   getOrderWorkflowChains,
@@ -18,7 +17,6 @@ interface ChainStepRow {
   toStatusCode: string
   triggerType: string
   triggerCode: string
-  allowRoles: string[]
 }
 
 export function useOrderSettingsWorkflowChains(
@@ -33,7 +31,6 @@ export function useOrderSettingsWorkflowChains(
 ) {
   const chainDialog = ref({ visible: false })
   const chainEdit = ref<{ id: number | null }>({ id: null })
-  const roleOptions = ref<RoleItem[]>([])
   const chainOrderTypeOptions = ref<Array<{ id: number; label: string }>>([])
   const chainCollaborationOptions = ref<Array<{ id: number; label: string }>>([])
   const chainForm = ref<{
@@ -47,7 +44,7 @@ export function useOrderSettingsWorkflowChains(
     orderTypeIds: [],
     collaborationTypeIds: [],
     hasProcessItem: '',
-    steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '', allowRoles: [] }],
+    steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '' }],
   })
   const chainList = ref<OrderWorkflowChainWithSteps[]>([])
   const chainTableRef = ref()
@@ -59,7 +56,7 @@ export function useOrderSettingsWorkflowChains(
       orderTypeIds: [],
       collaborationTypeIds: [],
       hasProcessItem: '',
-      steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '', allowRoles: [] }],
+      steps: [{ fromStatusCode: '', toStatusCode: '', triggerType: 'button', triggerCode: '' }],
     }
   }
 
@@ -76,7 +73,6 @@ export function useOrderSettingsWorkflowChains(
       toStatusCode: '',
       triggerType: 'button',
       triggerCode: '',
-      allowRoles: [],
     })
   }
 
@@ -137,15 +133,6 @@ export function useOrderSettingsWorkflowChains(
 
   onBeforeUnmount(() => chainSortable?.destroy())
 
-  async function loadRolesForSelect() {
-    try {
-      const res = await getRoles()
-      roleOptions.value = (res.data ?? []).filter((role) => (role.status ?? '').toLowerCase() === 'active')
-    } catch {
-      roleOptions.value = []
-    }
-  }
-
   async function loadOrderTypesForChain() {
     chainOrderTypeOptions.value = await loadSystemOptionFlat('order_types')
   }
@@ -194,7 +181,6 @@ export function useOrderSettingsWorkflowChains(
         toStatus: step.toStatusCode,
         triggerType: step.triggerType,
         triggerCode: step.triggerCode,
-        allowRoles: step.allowRoles.filter(Boolean).join(',') || undefined,
         enabled: true,
         conditionsJson: Object.keys(conditions).length ? { ...conditions } : undefined,
       })),
@@ -222,7 +208,6 @@ export function useOrderSettingsWorkflowChains(
         toStatusCode: helpers.normalizeStatusCode(step.toStatus),
         triggerType: step.triggerType,
         triggerCode: helpers.normalizeTriggerCode(step.triggerCode),
-        allowRoles: (step.allowRoles ?? '').split(',').map((x) => x.trim()).filter(Boolean),
       })),
     }
     chainEdit.value.id = row.chain.id
@@ -250,7 +235,6 @@ export function useOrderSettingsWorkflowChains(
   return {
     chainDialog,
     chainEdit,
-    roleOptions,
     chainOrderTypeOptions,
     chainCollaborationOptions,
     chainForm,
@@ -261,7 +245,6 @@ export function useOrderSettingsWorkflowChains(
     removeChainStep,
     buildChainSummary,
     loadChains,
-    loadRolesForSelect,
     loadOrderTypesForChain,
     loadCollaborationOptionsForChain,
     submitChain,

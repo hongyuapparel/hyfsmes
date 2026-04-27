@@ -15,6 +15,7 @@ export interface RolePermissionTreeNode {
   name: string
   children?: RolePermissionTreeNode[]
   routePath?: string
+  actions?: Array<Pick<PermissionItem, 'id' | 'code' | 'name' | 'routePath'>>
 }
 
 export interface MenuTreeBridge {
@@ -61,6 +62,7 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
   const actionPermissionIds = computed(() =>
     permissions.value.filter((p) => p.type === 'action').map((p) => p.id),
   )
+  const hasAnyActionPerms = computed(() => actionPermissionIds.value.length > 0)
   const menuCheckedKeys = computed(() =>
     checkedIds.value.filter((id) => menuPermissionIds.value.includes(id)),
   )
@@ -100,7 +102,7 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
       const path = p.routePath || '/'
       let node = nodeByPath.get(path)
       if (!node) {
-        node = { id: p.id, name: `${p.name} (${path || '/'})`, children: [], routePath: path }
+        node = { id: p.id, name: `${p.name} (${path || '/'})`, children: [], routePath: path, actions: [] }
         nodeByPath.set(path, node)
       } else {
         node.id = p.id
@@ -111,6 +113,16 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
     }
 
     for (const p of menuPerms) getNode(p)
+    for (const node of nodeByPath.values()) {
+      node.actions = node.routePath
+        ? actionsForRoute(node.routePath).map((item) => ({
+            id: item.id,
+            code: item.code,
+            name: item.name,
+            routePath: item.routePath,
+          }))
+        : []
+    }
 
     const roots: RolePermissionTreeNode[] = []
     const allNodes = Array.from(nodeByPath.entries())
@@ -219,6 +231,47 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
     actionStatusDraft.value = { edit: [], review: [], delete: [] }
   }
 
+  function setActionCheckedIds(nextIds: number[]) {
+    const actionSet = new Set(actionPermissionIds.value)
+    const normalized = [...new Set(nextIds)].filter((id) => actionSet.has(id))
+    checkedIds.value = [
+      ...checkedIds.value.filter((id) => !actionSet.has(id)),
+      ...normalized,
+    ]
+  }
+
+  function getMenuIdByRoute(routePath: string | null | undefined): number | null {
+    const path = routePath || '/'
+    return permissions.value.find((p) => p.type === 'menu' && (p.routePath || '/') === path)?.id ?? null
+  }
+
+  function normalizePoliciesForActions(actionIds: number[]) {
+    const actionCodes = new Set(
+      permissions.value
+        .filter((p) => actionIds.includes(p.id))
+        .map((p) => p.code),
+    )
+    return {
+      edit: actionCodes.has('orders_edit') ? roleOrderPolicies.value.edit : [],
+      review: actionCodes.has('orders_review') ? ['pending_review'] : [],
+      delete: actionCodes.has('orders_delete') ? roleOrderPolicies.value.delete : [],
+    }
+  }
+
+  function collectSelectedPermissionIds(): { ids: number[]; actionIds: number[] } {
+    const fullMenu = menuTreeBridge.value?.getCheckedKeys() ?? []
+    const menuIds = new Set(
+      fullMenu.filter((id): id is number => typeof id === 'number' && menuPermissionIds.value.includes(id)),
+    )
+    const actionIds = checkedIds.value.filter((id) => actionPermissionIds.value.includes(id))
+    for (const action of permissions.value.filter((p) => actionIds.includes(p.id))) {
+      const menuId = getMenuIdByRoute(action.routePath)
+      if (menuId != null) menuIds.add(menuId)
+    }
+    const ids = [...new Set([...menuIds, ...actionIds])]
+    return { ids, actionIds }
+  }
+
   async function loadPermissionsBaseData() {
     const res = await getPermissions()
     permissions.value = res.data ?? []
@@ -267,17 +320,16 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
   }
 
   function buildPermissionSnapshot(): string {
-    const fullMenu = menuTreeBridge.value?.getCheckedKeys() ?? []
-    const menuIds = [...new Set(fullMenu)].filter((id): id is number => typeof id === 'number')
-    const actionIds = checkedIds.value.filter((id) => actionPermissionIds.value.includes(id))
-    const ids = [...new Set([...menuIds, ...actionIds])].sort((a, b) => a - b)
+    const { ids, actionIds } = collectSelectedPermissionIds()
+    ids.sort((a, b) => a - b)
     const norm = (arr: string[]) => [...new Set((arr ?? []).map((x) => (x ?? '').trim()).filter(Boolean))].sort()
+    const normalizedPolicies = normalizePoliciesForActions(actionIds)
     const payload = {
       ids,
       policies: {
-        edit: norm(roleOrderPolicies.value.edit),
-        review: norm(roleOrderPolicies.value.review),
-        delete: norm(roleOrderPolicies.value.delete),
+        edit: norm(normalizedPolicies.edit),
+        review: norm(normalizedPolicies.review),
+        delete: norm(normalizedPolicies.delete),
       },
     }
     return JSON.stringify(payload)
@@ -311,10 +363,8 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
 
   async function savePermissions() {
     if (!selectedRoleId.value) return
-    const fullMenu = menuTreeBridge.value?.getCheckedKeys() ?? []
-    const menuIds = [...new Set(fullMenu)].filter((id): id is number => typeof id === 'number')
-    const actionIds = checkedIds.value.filter((id) => actionPermissionIds.value.includes(id))
-    const ids = [...new Set([...menuIds, ...actionIds])]
+    const { ids, actionIds } = collectSelectedPermissionIds()
+    const normalizedPolicies = normalizePoliciesForActions(actionIds)
     saving.value = true
     try {
       await setRolePermissions(selectedRoleId.value, ids)
@@ -322,7 +372,8 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
         await resyncAdminPermissions()
       }
       try {
-        await setRoleOrderPolicies(selectedRoleId.value, roleOrderPolicies.value)
+        await setRoleOrderPolicies(selectedRoleId.value, normalizedPolicies)
+        roleOrderPolicies.value = normalizedPolicies
       } catch (e: unknown) {
         const status = (e as { response?: { status?: number } })?.response?.status
         if (status !== 404) {
@@ -357,6 +408,7 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
     menuTreeData,
     menuExpandedKeys,
     menuCheckedKeys,
+    hasAnyActionPerms,
     roleOrderPolicies,
     actionDialogVisible,
     actionDialogTitle,
@@ -365,6 +417,7 @@ export function useRolesPermissionConfig(options: UseRolesPermissionConfigOption
     actionStatusDraft,
     registerMenuTreeBridge,
     hasActionPerms,
+    setActionCheckedIds,
     getOrderActionKey,
     isOrderListAction,
     isOrderReviewAction,
