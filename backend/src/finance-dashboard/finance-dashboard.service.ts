@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, type ObjectLiteral, type SelectQueryBuilder } from 'typeorm';
 import { IncomeRecord } from '../entities/income-record.entity';
 import { ExpenseRecord } from '../entities/expense-record.entity';
 import { FinanceFundAccount } from '../entities/finance-fund-account.entity';
@@ -24,47 +24,85 @@ export class FinanceDashboardService {
     private readonly systemOptionsService: SystemOptionsService,
   ) {}
 
-  async getSummary() {
+  private formatDate(date: Date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  }
+
+  private getDefaultRange() {
     const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    const monthEnd = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}-01`;
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return {
+      dateFrom: this.formatDate(start),
+      dateTo: this.formatDate(end),
+    };
+  }
 
-    // 本月收入汇总
-    const incomeSumRaw = await this.incomeRepo
-      .createQueryBuilder('r')
+  private normalizeDateRange(dateFrom?: string, dateTo?: string) {
+    const fallback = this.getDefaultRange();
+    const from = (dateFrom || dateTo || fallback.dateFrom).trim();
+    const to = (dateTo || dateFrom || fallback.dateTo).trim();
+    return from <= to
+      ? { dateFrom: from, dateTo: to }
+      : { dateFrom: to, dateTo: from };
+  }
+
+  private applyOccurDateRange<T extends ObjectLiteral>(
+    qb: SelectQueryBuilder<T>,
+    alias: string,
+    range: { dateFrom: string; dateTo: string },
+  ) {
+    return qb.where(`${alias}.occur_date >= :dateFrom AND ${alias}.occur_date <= :dateTo`, range);
+  }
+
+  async getSummary(params?: { dateFrom?: string; dateTo?: string }) {
+    const range = this.normalizeDateRange(params?.dateFrom, params?.dateTo);
+
+    // 区间收入汇总
+    const incomeSumRaw = await this.applyOccurDateRange(
+      this.incomeRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .getRawOne<{ total: string | null }>();
 
-    // 本月支出汇总
-    const expenseSumRaw = await this.expenseRepo
-      .createQueryBuilder('r')
+    // 区间支出汇总
+    const expenseSumRaw = await this.applyOccurDateRange(
+      this.expenseRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .getRawOne<{ total: string | null }>();
 
-    // 本月订单相关支出（order_no 不为空）
-    const orderExpenseRaw = await this.expenseRepo
-      .createQueryBuilder('r')
+    // 区间订单相关支出（order_no 不为空）
+    const orderExpenseRaw = await this.applyOccurDateRange(
+      this.expenseRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .andWhere("r.order_no != ''")
       .getRawOne<{ total: string | null }>();
 
-    // 本月公司费用（order_no 为空）
-    const companyExpenseRaw = await this.expenseRepo
-      .createQueryBuilder('r')
+    // 区间公司费用（order_no 为空）
+    const companyExpenseRaw = await this.applyOccurDateRange(
+      this.expenseRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .andWhere("(r.order_no IS NULL OR r.order_no = '')")
       .getRawOne<{ total: string | null }>();
 
-    // 本月关联订单的收入
-    const orderIncomeRaw = await this.incomeRepo
-      .createQueryBuilder('r')
+    // 区间关联订单的收入
+    const orderIncomeRaw = await this.applyOccurDateRange(
+      this.incomeRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .andWhere("r.order_no != ''")
       .getRawOne<{ total: string | null }>();
 
@@ -92,22 +130,34 @@ export class FinanceDashboardService {
       }),
     );
 
-    // 最近流水
-    const recentIncome = await this.incomeRepo.find({
-      order: { occurDate: 'DESC', id: 'DESC' },
-      take: 8,
-    });
-    const recentExpense = await this.expenseRepo.find({
-      order: { occurDate: 'DESC', id: 'DESC' },
-      take: 8,
-    });
+    // 区间最近流水
+    const recentIncome = await this.applyOccurDateRange(
+      this.incomeRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
+      .orderBy('r.occur_date', 'DESC')
+      .addOrderBy('r.id', 'DESC')
+      .limit(8)
+      .getMany();
+    const recentExpense = await this.applyOccurDateRange(
+      this.expenseRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
+      .orderBy('r.occur_date', 'DESC')
+      .addOrderBy('r.id', 'DESC')
+      .limit(8)
+      .getMany();
 
-    // 本月支出类型TOP5
-    const expenseTypeTop5Raw = await this.expenseRepo
-      .createQueryBuilder('r')
+    // 区间支出类型TOP5
+    const expenseTypeTop5Raw = await this.applyOccurDateRange(
+      this.expenseRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('r.expense_type_id', 'expenseTypeId')
       .addSelect('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .andWhere('r.expense_type_id IS NOT NULL')
       .groupBy('r.expense_type_id')
       .orderBy('total', 'DESC')
@@ -124,12 +174,14 @@ export class FinanceDashboardService {
       totalAmount: parseFloat(r.total).toFixed(2),
     }));
 
-    // 本月部门支出TOP5
-    const deptTop5Raw = await this.expenseRepo
-      .createQueryBuilder('r')
+    // 区间部门支出TOP5
+    const deptTop5Raw = await this.applyOccurDateRange(
+      this.expenseRepo.createQueryBuilder('r'),
+      'r',
+      range,
+    )
       .select('r.department_id', 'departmentId')
       .addSelect('SUM(r.amount)', 'total')
-      .where('r.occur_date >= :s AND r.occur_date < :e', { s: monthStart, e: monthEnd })
       .andWhere('r.department_id IS NOT NULL')
       .groupBy('r.department_id')
       .orderBy('total', 'DESC')
@@ -145,17 +197,73 @@ export class FinanceDashboardService {
       totalAmount: parseFloat(r.total).toFixed(2),
     }));
 
+    // 区间部门利润率
+    const [incomeDeptRaw, expenseDeptRaw] = await Promise.all([
+      this.applyOccurDateRange(
+        this.incomeRepo.createQueryBuilder('r'),
+        'r',
+        range,
+      )
+        .select('r.department_id', 'departmentId')
+        .addSelect('SUM(r.amount)', 'total')
+        .andWhere('r.department_id IS NOT NULL')
+        .groupBy('r.department_id')
+        .getRawMany<{ departmentId: string; total: string }>(),
+      this.applyOccurDateRange(
+        this.expenseRepo.createQueryBuilder('r'),
+        'r',
+        range,
+      )
+        .select('r.department_id', 'departmentId')
+        .addSelect('SUM(r.amount)', 'total')
+        .andWhere('r.department_id IS NOT NULL')
+        .groupBy('r.department_id')
+        .getRawMany<{ departmentId: string; total: string }>(),
+    ]);
+    const profitabilityDeptIds = [
+      ...new Set(
+        [...incomeDeptRaw, ...expenseDeptRaw]
+          .map((r) => Number(r.departmentId))
+          .filter((id) => Number.isFinite(id)),
+      ),
+    ];
+    const profitabilityLabels = profitabilityDeptIds.length
+      ? await this.systemOptionsService.getOptionLabelsByIds('org_departments', profitabilityDeptIds)
+      : ({} as Record<number, string>);
+    const incomeDeptMap = Object.fromEntries(incomeDeptRaw.map((r) => [Number(r.departmentId), toNum(r.total)]));
+    const expenseDeptMap = Object.fromEntries(expenseDeptRaw.map((r) => [Number(r.departmentId), toNum(r.total)]));
+    const departmentProfitability = profitabilityDeptIds
+      .map((departmentId) => {
+        const totalIncome = incomeDeptMap[departmentId] ?? 0;
+        const totalExpense = expenseDeptMap[departmentId] ?? 0;
+        const profit = totalIncome - totalExpense;
+        return {
+          departmentId,
+          departmentName: profitabilityLabels[departmentId] ?? '未知部门',
+          totalIncome: totalIncome.toFixed(2),
+          totalExpense: totalExpense.toFixed(2),
+          profit: profit.toFixed(2),
+          profitRate: totalIncome > 0 ? ((profit / totalIncome) * 100).toFixed(2) : '',
+        };
+      })
+      .sort((a, b) => Number(b.totalIncome) - Number(a.totalIncome) || Number(b.profit) - Number(a.profit));
+
     // 解析收入/支出类型名称供最近流水用
     const inTypeIds = [...new Set(recentIncome.map((r) => r.incomeTypeId).filter((v) => v != null) as number[])];
     const inTypes = inTypeIds.length ? await this.incomeTypeRepo.findByIds(inTypeIds) : [];
     const inTypeMap = Object.fromEntries(inTypes.map((t) => [t.id, t.name]));
+    const inDeptIds = [...new Set(recentIncome.map((r) => r.departmentId).filter((v) => v != null) as number[])];
+    const inDeptLabels = inDeptIds.length
+      ? await this.systemOptionsService.getOptionLabelsByIds('org_departments', inDeptIds)
+      : ({} as Record<number, string>);
 
     const exTypeIds = [...new Set(recentExpense.map((r) => r.expenseTypeId).filter((v) => v != null) as number[])];
     const exTypes = exTypeIds.length ? await this.expenseTypeRepo.findByIds(exTypeIds) : [];
     const exTypeMap = Object.fromEntries(exTypes.map((t) => [t.id, t.name]));
 
     return {
-      currentMonth: {
+      period: range,
+      periodSummary: {
         totalIncome: toNum(incomeSumRaw?.total).toFixed(2),
         totalExpense: toNum(expenseSumRaw?.total).toFixed(2),
         orderExpense: toNum(orderExpenseRaw?.total).toFixed(2),
@@ -166,6 +274,7 @@ export class FinanceDashboardService {
       recentIncome: recentIncome.map((r) => ({
         ...r,
         incomeTypeName: r.incomeTypeId != null ? (inTypeMap[r.incomeTypeId] ?? '') : '',
+        departmentName: r.departmentId != null ? (inDeptLabels[r.departmentId] ?? '') : '',
       })),
       recentExpense: recentExpense.map((r) => ({
         ...r,
@@ -173,6 +282,7 @@ export class FinanceDashboardService {
       })),
       expenseTypeTop5,
       departmentExpenseTop5: deptTop5,
+      departmentProfitability,
     };
   }
 }

@@ -11,6 +11,7 @@ interface FinanceIncomeBody {
   amount: number | string;
   incomeTypeId?: number | string | null;
   fundAccountId?: number | string | null;
+  departmentId?: number | string | null;
   sourceName?: string;
   orderNo?: string;
   operator?: string;
@@ -30,6 +31,7 @@ export class FinanceIncomeController {
     @Query('dateTo') dateTo?: string,
     @Query('incomeTypeId') incomeTypeIdStr?: string,
     @Query('fundAccountId') fundAccountIdStr?: string,
+    @Query('departmentId') departmentIdStr?: string,
     @Query('sourceNameKeyword') sourceNameKeyword?: string,
     @Query('orderNo') orderNo?: string,
     @Query('page') page?: string,
@@ -37,11 +39,13 @@ export class FinanceIncomeController {
   ) {
     const incomeTypeId = incomeTypeIdStr ? parseInt(incomeTypeIdStr, 10) : undefined;
     const fundAccountId = fundAccountIdStr ? parseInt(fundAccountIdStr, 10) : undefined;
+    const departmentId = departmentIdStr ? parseInt(departmentIdStr, 10) : undefined;
     return this.service.getList({
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       incomeTypeId: Number.isNaN(incomeTypeId!) ? undefined : incomeTypeId,
       fundAccountId: Number.isNaN(fundAccountId!) ? undefined : fundAccountId,
+      departmentId: Number.isNaN(departmentId!) ? undefined : departmentId,
       sourceNameKeyword: sourceNameKeyword || undefined,
       orderNo: orderNo || undefined,
       page: page ? parseInt(page, 10) : 1,
@@ -61,6 +65,7 @@ export class FinanceIncomeController {
       amount: body.amount,
       incomeTypeId: body.incomeTypeId != null ? Number(body.incomeTypeId) : null,
       fundAccountId: body.fundAccountId != null ? Number(body.fundAccountId) : null,
+      departmentId: body.departmentId != null ? Number(body.departmentId) : null,
       sourceName: body.sourceName,
       orderNo: body.orderNo,
       operator: body.operator,
@@ -76,6 +81,7 @@ export class FinanceIncomeController {
       amount: body.amount,
       incomeTypeId: body.incomeTypeId !== undefined ? (body.incomeTypeId != null ? Number(body.incomeTypeId) : null) : undefined,
       fundAccountId: body.fundAccountId !== undefined ? (body.fundAccountId != null ? Number(body.fundAccountId) : null) : undefined,
+      departmentId: body.departmentId !== undefined ? (body.departmentId != null ? Number(body.departmentId) : null) : undefined,
       sourceName: body.sourceName,
       orderNo: body.orderNo,
       operator: body.operator,

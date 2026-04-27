@@ -42,6 +42,17 @@ function endOfMonth(d: Date) {
   return endOfDay(x)
 }
 
+function startOfLastMonth(d: Date) {
+  const x = startOfDay(d)
+  x.setDate(1)
+  x.setMonth(x.getMonth() - 1)
+  return x
+}
+
+function endOfLastMonth(d: Date) {
+  return endOfMonth(startOfLastMonth(d))
+}
+
 function startOfQuarter(d: Date) {
   const x = startOfDay(d)
   const m = x.getMonth() // 0-11
@@ -52,6 +63,19 @@ function startOfQuarter(d: Date) {
 
 function endOfQuarter(d: Date) {
   const s = startOfQuarter(d)
+  const x = new Date(s)
+  x.setMonth(s.getMonth() + 3, 0)
+  return endOfDay(x)
+}
+
+function startOfLastQuarter(d: Date) {
+  const currentQuarterStart = startOfQuarter(d)
+  currentQuarterStart.setMonth(currentQuarterStart.getMonth() - 3)
+  return currentQuarterStart
+}
+
+function endOfLastQuarter(d: Date) {
+  const s = startOfLastQuarter(d)
   const x = new Date(s)
   x.setMonth(s.getMonth() + 3, 0)
   return endOfDay(x)
@@ -90,6 +114,20 @@ export const rangeShortcuts: DateRangeShortcut[] = [
     value: () => {
       const now = new Date()
       return [startOfQuarter(now), endOfQuarter(now)]
+    },
+  },
+  {
+    text: '上月',
+    value: () => {
+      const now = new Date()
+      return [startOfLastMonth(now), endOfLastMonth(now)]
+    },
+  },
+  {
+    text: '上季度',
+    value: () => {
+      const now = new Date()
+      return [startOfLastQuarter(now), endOfLastQuarter(now)]
     },
   },
   {

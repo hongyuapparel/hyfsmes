@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { IncomeRecord } from '../entities/income-record.entity';
 import { FinanceIncomeType } from '../entities/finance-income-type.entity';
 import { FinanceFundAccount } from '../entities/finance-fund-account.entity';
+import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Injectable()
 export class FinanceIncomeService {
@@ -14,6 +15,7 @@ export class FinanceIncomeService {
     private incomeTypeRepo: Repository<FinanceIncomeType>,
     @InjectRepository(FinanceFundAccount)
     private fundAccountRepo: Repository<FinanceFundAccount>,
+    private readonly systemOptionsService: SystemOptionsService,
   ) {}
 
   async getList(params: {
@@ -21,17 +23,29 @@ export class FinanceIncomeService {
     dateTo?: string;
     incomeTypeId?: number | null;
     fundAccountId?: number | null;
+    departmentId?: number | null;
     sourceNameKeyword?: string;
     orderNo?: string;
     page?: number;
     pageSize?: number;
   }) {
-    const { dateFrom, dateTo, incomeTypeId, fundAccountId, sourceNameKeyword, orderNo, page = 1, pageSize = 20 } = params;
+    const {
+      dateFrom,
+      dateTo,
+      incomeTypeId,
+      fundAccountId,
+      departmentId,
+      sourceNameKeyword,
+      orderNo,
+      page = 1,
+      pageSize = 20,
+    } = params;
     const qb = this.repo.createQueryBuilder('r');
     if (dateFrom) qb.andWhere('r.occur_date >= :dateFrom', { dateFrom });
     if (dateTo) qb.andWhere('r.occur_date <= :dateTo', { dateTo });
     if (incomeTypeId != null) qb.andWhere('r.income_type_id = :incomeTypeId', { incomeTypeId });
     if (fundAccountId != null) qb.andWhere('r.fund_account_id = :fundAccountId', { fundAccountId });
+    if (departmentId != null) qb.andWhere('r.department_id = :departmentId', { departmentId });
     if (sourceNameKeyword) qb.andWhere('r.source_name LIKE :kw', { kw: `%${sourceNameKeyword}%` });
     if (orderNo) qb.andWhere('r.order_no LIKE :orderNo', { orderNo: `%${orderNo}%` });
     qb.orderBy('r.occur_date', 'DESC').addOrderBy('r.id', 'DESC');
@@ -51,6 +65,7 @@ export class FinanceIncomeService {
     amount: number | string;
     incomeTypeId?: number | null;
     fundAccountId?: number | null;
+    departmentId?: number | null;
     sourceName?: string;
     orderNo?: string;
     operator?: string;
@@ -62,6 +77,7 @@ export class FinanceIncomeService {
       amount: String(dto.amount),
       incomeTypeId: dto.incomeTypeId != null ? Number(dto.incomeTypeId) : null,
       fundAccountId: dto.fundAccountId != null ? Number(dto.fundAccountId) : null,
+      departmentId: dto.departmentId != null ? Number(dto.departmentId) : null,
       sourceName: dto.sourceName?.trim() ?? '',
       orderNo: dto.orderNo?.trim() ?? '',
       operator: dto.operator?.trim() ?? '',
@@ -77,6 +93,7 @@ export class FinanceIncomeService {
     amount?: number | string;
     incomeTypeId?: number | null;
     fundAccountId?: number | null;
+    departmentId?: number | null;
     sourceName?: string;
     orderNo?: string;
     operator?: string;
@@ -89,6 +106,7 @@ export class FinanceIncomeService {
     if (dto.amount != null) r.amount = String(dto.amount);
     if (dto.incomeTypeId !== undefined) r.incomeTypeId = dto.incomeTypeId != null ? Number(dto.incomeTypeId) : null;
     if (dto.fundAccountId !== undefined) r.fundAccountId = dto.fundAccountId != null ? Number(dto.fundAccountId) : null;
+    if (dto.departmentId !== undefined) r.departmentId = dto.departmentId != null ? Number(dto.departmentId) : null;
     if (dto.sourceName !== undefined) r.sourceName = dto.sourceName?.trim() ?? '';
     if (dto.orderNo !== undefined) r.orderNo = dto.orderNo?.trim() ?? '';
     if (dto.operator !== undefined) r.operator = dto.operator?.trim() ?? '';
@@ -109,9 +127,13 @@ export class FinanceIncomeService {
   private async enrichList(list: IncomeRecord[]) {
     const typeIds = [...new Set(list.map((r) => r.incomeTypeId).filter((v) => v != null) as number[])];
     const accountIds = [...new Set(list.map((r) => r.fundAccountId).filter((v) => v != null) as number[])];
-    const [types, accounts] = await Promise.all([
+    const deptIds = [...new Set(list.map((r) => r.departmentId).filter((v) => v != null) as number[])];
+    const [types, accounts, deptLabels] = await Promise.all([
       typeIds.length ? this.incomeTypeRepo.findByIds(typeIds) : Promise.resolve([]),
       accountIds.length ? this.fundAccountRepo.findByIds(accountIds) : Promise.resolve([]),
+      deptIds.length
+        ? this.systemOptionsService.getOptionLabelsByIds('org_departments', deptIds)
+        : Promise.resolve({} as Record<number, string>),
     ]);
     const typeMap = Object.fromEntries(types.map((t) => [t.id, t.name]));
     const accountMap = Object.fromEntries(accounts.map((a) => [a.id, a.name]));
@@ -119,6 +141,7 @@ export class FinanceIncomeService {
       ...r,
       incomeTypeName: r.incomeTypeId != null ? (typeMap[r.incomeTypeId] ?? '') : '',
       fundAccountName: r.fundAccountId != null ? (accountMap[r.fundAccountId] ?? '') : '',
+      departmentName: r.departmentId != null ? (deptLabels[r.departmentId] ?? '') : '',
     }));
   }
 

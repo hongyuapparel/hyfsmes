@@ -20,6 +20,10 @@ export class IncomeRecord {
   @Column({ name: 'fund_account_id', type: 'int', nullable: true })
   fundAccountId: number | null;
 
+  /** 部门 ID（system_options.id，option_type='org_departments'） */
+  @Column({ name: 'department_id', type: 'int', nullable: true })
+  departmentId: number | null;
+
   /** 来源方/客户名称（自由文本） */
   @Column({ name: 'source_name', length: 200, default: '' })
   sourceName: string;

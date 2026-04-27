@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS finance_income_records (
   amount DECIMAL(12,2) NOT NULL COMMENT '收入金额',
   income_type_id INT NULL COMMENT '收入类型 ID',
   fund_account_id INT NULL COMMENT '收款账户 ID',
+  department_id INT NULL COMMENT '部门 ID（system_options.id, org_departments）',
   source_name VARCHAR(200) DEFAULT '' COMMENT '来源方/客户名称',
   order_no VARCHAR(100) DEFAULT '' COMMENT '关联订单号（文本，兼容系统外订单）',
   operator VARCHAR(100) DEFAULT '' COMMENT '经办人',

@@ -1,4 +1,4 @@
-import { Controller, Get, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -11,7 +11,10 @@ export class FinanceDashboardController {
   constructor(private readonly svc: FinanceDashboardService) {}
 
   @Get()
-  getSummary() {
-    return this.svc.getSummary();
+  getSummary(
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+  ) {
+    return this.svc.getSummary({ dateFrom, dateTo });
   }
 }

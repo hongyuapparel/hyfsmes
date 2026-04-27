@@ -1,6 +1,5 @@
 import request from './request'
 
-// ─── 配置类型 ──────────────────────────────────────────────────────────────
 export interface FinanceFundAccount {
   id: number
   name: string
@@ -24,23 +23,30 @@ export interface FinanceExpenseType {
   sortOrder: number
 }
 
+export interface FinanceDepartmentOption {
+  id: number
+  value: string
+  parentId: number | null
+}
+
 export interface FinanceDropdownOptions {
   fundAccounts: FinanceFundAccount[]
   incomeTypes: FinanceIncomeType[]
   expenseTypes: FinanceExpenseType[]
+  departments: FinanceDepartmentOption[]
 }
 
 export function getFinanceDropdownOptions() {
   return request.get<FinanceDropdownOptions>('/finance-settings/options')
 }
 
-// ─── 收入流水 ────────────────────────────────────────────────────────────────
 export interface IncomeRecordItem {
   id: number
   occurDate: string
   amount: string
   incomeTypeId: number | null
   fundAccountId: number | null
+  departmentId: number | null
   sourceName: string
   orderNo: string
   operator: string
@@ -48,6 +54,7 @@ export interface IncomeRecordItem {
   attachments: string[] | null
   incomeTypeName: string
   fundAccountName: string
+  departmentName: string
   createdAt: string
   updatedAt: string
 }
@@ -57,6 +64,7 @@ export function getIncomeList(params?: {
   dateTo?: string
   incomeTypeId?: number | null
   fundAccountId?: number | null
+  departmentId?: number | null
   sourceNameKeyword?: string
   orderNo?: string
   page?: number
@@ -77,6 +85,7 @@ export function createIncome(body: {
   amount: number | string
   incomeTypeId?: number | null
   fundAccountId?: number | null
+  departmentId?: number | null
   sourceName?: string
   orderNo?: string
   operator?: string
@@ -94,7 +103,6 @@ export function deleteIncome(id: number) {
   return request.delete(`/finance/income/${id}`)
 }
 
-// ─── 支出流水 ────────────────────────────────────────────────────────────────
 export const OBJECT_TYPE_OPTIONS = [
   { value: 'supplier', label: '供应商' },
   { value: 'employee', label: '员工' },
@@ -169,36 +177,57 @@ export function deleteExpense(id: number) {
   return request.delete(`/finance/expense/${id}`)
 }
 
-// ─── 财务看板 ────────────────────────────────────────────────────────────────
+export interface DashboardPeriodSummary {
+  totalIncome: string
+  totalExpense: string
+  orderExpense: string
+  companyExpense: string
+  orderProfit: string
+}
+
+export interface DashboardDepartmentProfitabilityItem {
+  departmentId: number
+  departmentName: string
+  totalIncome: string
+  totalExpense: string
+  profit: string
+  profitRate: string
+}
+
 export interface DashboardSummary {
-  currentMonth: {
-    totalIncome: string
-    totalExpense: string
-    orderExpense: string
-    companyExpense: string
-    orderProfit: string
+  period?: {
+    dateFrom: string
+    dateTo: string
   }
+  periodSummary?: DashboardPeriodSummary
+  currentMonth?: DashboardPeriodSummary
   accountBalances: Array<{ fundAccountId: number; fundAccountName: string; balance: string }>
   recentIncome: (IncomeRecordItem & { incomeTypeName: string })[]
   recentExpense: (ExpenseRecordItem & { expenseTypeName: string })[]
   expenseTypeTop5: Array<{ expenseTypeName: string; totalAmount: string }>
   departmentExpenseTop5: Array<{ departmentName: string; totalAmount: string }>
+  departmentProfitability?: DashboardDepartmentProfitabilityItem[]
 }
 
-export function getDashboardSummary() {
-  return request.get<DashboardSummary>('/finance/dashboard')
+export function getDashboardSummary(params?: {
+  dateFrom?: string
+  dateTo?: string
+}) {
+  return request.get<DashboardSummary>('/finance/dashboard', { params })
 }
 
-// ─── 财务设置 CRUD ───────────────────────────────────────────────────────────
 export function getFundAccounts() {
   return request.get<FinanceFundAccount[]>('/finance-settings/fund-accounts')
 }
+
 export function createFundAccount(body: Omit<FinanceFundAccount, 'id'>) {
   return request.post<FinanceFundAccount>('/finance-settings/fund-accounts', body)
 }
+
 export function updateFundAccount(id: number, body: Partial<Omit<FinanceFundAccount, 'id'>>) {
   return request.patch<FinanceFundAccount>(`/finance-settings/fund-accounts/${id}`, body)
 }
+
 export function deleteFundAccount(id: number) {
   return request.delete(`/finance-settings/fund-accounts/${id}`)
 }
@@ -206,12 +235,15 @@ export function deleteFundAccount(id: number) {
 export function getIncomeTypes() {
   return request.get<FinanceIncomeType[]>('/finance-settings/income-types')
 }
+
 export function createIncomeType(body: Omit<FinanceIncomeType, 'id'>) {
   return request.post<FinanceIncomeType>('/finance-settings/income-types', body)
 }
+
 export function updateIncomeType(id: number, body: Partial<Omit<FinanceIncomeType, 'id'>>) {
   return request.patch<FinanceIncomeType>(`/finance-settings/income-types/${id}`, body)
 }
+
 export function deleteIncomeType(id: number) {
   return request.delete(`/finance-settings/income-types/${id}`)
 }
@@ -219,12 +251,15 @@ export function deleteIncomeType(id: number) {
 export function getExpenseTypes() {
   return request.get<FinanceExpenseType[]>('/finance-settings/expense-types')
 }
+
 export function createExpenseType(body: Omit<FinanceExpenseType, 'id'>) {
   return request.post<FinanceExpenseType>('/finance-settings/expense-types', body)
 }
+
 export function updateExpenseType(id: number, body: Partial<Omit<FinanceExpenseType, 'id'>>) {
   return request.patch<FinanceExpenseType>(`/finance-settings/expense-types/${id}`, body)
 }
+
 export function deleteExpenseType(id: number) {
   return request.delete(`/finance-settings/expense-types/${id}`)
 }

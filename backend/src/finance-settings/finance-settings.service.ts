@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { FinanceFundAccount } from '../entities/finance-fund-account.entity';
 import { FinanceIncomeType } from '../entities/finance-income-type.entity';
 import { FinanceExpenseType } from '../entities/finance-expense-type.entity';
+import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Injectable()
 export class FinanceSettingsService {
@@ -14,6 +15,7 @@ export class FinanceSettingsService {
     private incomeTypeRepo: Repository<FinanceIncomeType>,
     @InjectRepository(FinanceExpenseType)
     private expenseTypeRepo: Repository<FinanceExpenseType>,
+    private readonly systemOptionsService: SystemOptionsService,
   ) {}
 
   // ─── 资金账户 ───────────────────────────────────────────
@@ -87,11 +89,17 @@ export class FinanceSettingsService {
 
   /** 一次性获取所有启用的下拉选项（供流水页面用） */
   async getDropdownOptions() {
-    const [fundAccounts, incomeTypes, expenseTypes] = await Promise.all([
+    const [fundAccounts, incomeTypes, expenseTypes, departments] = await Promise.all([
       this.getEnabledFundAccounts(),
       this.getEnabledIncomeTypes(),
       this.getEnabledExpenseTypes(),
+      this.systemOptionsService.findAllByType('org_departments'),
     ]);
-    return { fundAccounts, incomeTypes, expenseTypes };
+    return {
+      fundAccounts,
+      incomeTypes,
+      expenseTypes,
+      departments: departments.filter((item) => item.parentId == null),
+    };
   }
 }
