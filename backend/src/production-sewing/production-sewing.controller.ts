@@ -17,6 +17,8 @@ export class ProductionSewingController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -24,6 +26,8 @@ export class ProductionSewingController {
       tab,
       orderNo,
       skuCode,
+      completedStart,
+      completedEnd,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
@@ -35,12 +39,16 @@ export class ProductionSewingController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
     @Res() res?: Response,
   ) {
     const query: SewingListQuery = {
       tab,
       orderNo,
       skuCode,
+      completedStart,
+      completedEnd,
     };
     const rows = await this.sewingService.getSewingExportRows(query);
     const header = [

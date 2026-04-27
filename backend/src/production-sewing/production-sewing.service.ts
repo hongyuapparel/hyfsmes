@@ -43,6 +43,8 @@ export interface SewingListQuery {
   tab?: string;
   orderNo?: string;
   skuCode?: string;
+  completedStart?: string;
+  completedEnd?: string;
   page?: number;
   pageSize?: number;
 }
@@ -105,6 +107,18 @@ export class ProductionSewingService {
     return null;
   }
 
+  private isDateTimeInRange(
+    v: Date | string | null | undefined,
+    start?: string,
+    end?: string,
+  ): boolean {
+    const text = this.toDateTimeString(v);
+    if (!text) return false;
+    if (start && text < `${start} 00:00:00`) return false;
+    if (end && text > `${end} 23:59:59`) return false;
+    return true;
+  }
+
   /** 登记车缝完成弹窗用：订单数量/裁床数量按尺码（只读）、车缝数量由前端按尺码填写 */
   async getCompleteFormData(orderId: number): Promise<{
     headers: string[];
@@ -155,7 +169,7 @@ export class ProductionSewingService {
   }
 
   private async buildSewingRows(baseQuery: SewingListQuery): Promise<SewingListItem[]> {
-    const { tab = 'all', orderNo, skuCode } = baseQuery;
+    const { tab = 'all', orderNo, skuCode, completedStart, completedEnd } = baseQuery;
 
     const completedSewing = await this.sewingRepo.find({
       where: { status: 'completed' },
@@ -197,6 +211,9 @@ export class ProductionSewingService {
       const sewingStatus = (sewing?.status ?? 'pending').toLowerCase();
       if (tab === 'pending' && sewingStatus === 'completed') continue;
       if (tab === 'completed' && sewingStatus !== 'completed') continue;
+      if ((completedStart || completedEnd) && !this.isDateTimeInRange(sewing?.completedAt, completedStart, completedEnd)) {
+        continue;
+      }
 
       const arrivedAt =
         this.toDateTimeString(sewing?.arrivedAt) ??

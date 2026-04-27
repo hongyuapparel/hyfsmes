@@ -47,6 +47,8 @@ export interface PatternListQuery {
   purchaseStatus?: string
   orderDateStart?: string
   orderDateEnd?: string
+  completedStart?: string
+  completedEnd?: string
   page?: number
   pageSize?: number
 }

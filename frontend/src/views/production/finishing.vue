@@ -57,6 +57,21 @@
           </span>
         </template>
       </el-input>
+      <el-date-picker
+        v-model="completedRange"
+        type="daterange"
+        range-separator=""
+        start-placeholder="完成时间"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
+        :style="getFilterRangeStyle(completedRange)"
+        @change="onSearch"
+      />
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
@@ -365,6 +380,7 @@ import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getOrderNoFilterStyle,
+  getFilterRangeStyle,
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useFinishingListData } from '@/composables/useFinishingListData'
@@ -373,6 +389,7 @@ import { useFinishingSizePopover } from '@/composables/useFinishingSizePopover'
 import { useFinishingReceive } from '@/composables/useFinishingReceive'
 import { useFinishingPackaging } from '@/composables/useFinishingPackaging'
 import { formatDate, formatDateTime } from '@/utils/date-format'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel, {
@@ -438,6 +455,7 @@ const {
 } = useFinishingSelection()
 const {
   filter,
+  completedRange,
   orderNoLabelVisible,
   skuCodeLabelVisible,
   currentTab,

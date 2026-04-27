@@ -1,6 +1,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getCraftItems, completeCraft, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
+import { getCraftItems, completeCraft, exportCraftItems, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -60,12 +60,14 @@ export function useProductionProcessPage() {
     collaborationTypeId: null as number | null,
   })
   const orderDateRange = ref<[string, string] | null>(null)
+  const completedRange = ref<[string, string] | null>(null)
 
   const currentTab = ref<string>('all')
   const tabCounts = ref<Record<string, number>>({})
   const tabTotal = ref(0)
   const list = ref<CraftListItem[]>([])
   const loading = ref(false)
+  const exporting = ref(false)
   const completing = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
   const selectedRows = ref<CraftListItem[]>([])
@@ -93,6 +95,10 @@ export function useProductionProcessPage() {
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
       q.orderDateEnd = orderDateRange.value[1]
+    }
+    if (completedRange.value && completedRange.value.length === 2) {
+      q.completedStart = completedRange.value[0]
+      q.completedEnd = completedRange.value[1]
     }
     return q
   }
@@ -133,6 +139,30 @@ export function useProductionProcessPage() {
     }
   }
 
+  async function onExport() {
+    const query = buildQuery()
+    const { page, pageSize, ...rest } = query
+    void page
+    void pageSize
+    exporting.value = true
+    try {
+      const res = await exportCraftItems(rest)
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `工艺管理_${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (e: unknown) {
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
+    } finally {
+      exporting.value = false
+    }
+  }
+
   function onSearch() {
     pagination.page = 1
     void load()
@@ -154,6 +184,7 @@ export function useProductionProcessPage() {
     filter.orderTypeId = null
     filter.collaborationTypeId = null
     orderDateRange.value = null
+    completedRange.value = null
     currentTab.value = 'all'
     pagination.page = 1
     selectedRows.value = []
@@ -270,9 +301,11 @@ export function useProductionProcessPage() {
     collaborationOptions,
     filter,
     orderDateRange,
+    completedRange,
     currentTab,
     list,
     loading,
+    exporting,
     completing,
     pagination,
     selectedRows,
@@ -282,6 +315,7 @@ export function useProductionProcessPage() {
     findOrderTypeLabelById,
     findCollaborationLabelById,
     debouncedSearch,
+    onExport,
     onSearch,
     onReset,
     onTabChange,

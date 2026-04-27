@@ -53,6 +53,8 @@ export class ProductionPurchaseQueryService {
       orderTypeId,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
       page = 1,
       pageSize = 20,
     } = query;
@@ -166,6 +168,9 @@ export class ProductionPurchaseQueryService {
         const phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(pendingPurchaseAt);
         const materialDone = routeStatus === 'completed';
         const endRaw = processRoute === 'purchase' ? m.purchaseCompletedAt : m.pickCompletedAt;
+        if ((completedStart || completedEnd) && !this.isDateTimeInRange(endRaw, completedStart, completedEnd)) {
+          continue;
+        }
         const phaseEnd = materialDone ? this.orderStatusConfigService.parseProductionPhaseInstant(endRaw) : null;
         const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
           'pending_purchase',
@@ -217,6 +222,11 @@ export class ProductionPurchaseQueryService {
     const list = rows.slice(start, start + pageSize);
 
     return { list, total, page, pageSize };
+  }
+
+  async getPurchaseExportRows(query: PurchaseListQuery, actorUserId?: number): Promise<PurchaseItemRow[]> {
+    const res = await this.getPurchaseItems({ ...query, page: 1, pageSize: Number.MAX_SAFE_INTEGER }, actorUserId);
+    return res.list;
   }
 
   private async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
@@ -335,6 +345,18 @@ export class ProductionPurchaseQueryService {
       }
     }
     return latest;
+  }
+
+  private isDateTimeInRange(
+    v: Date | string | null | undefined,
+    start?: string,
+    end?: string,
+  ): boolean {
+    const text = this.toDateTimeLocalString(v);
+    if (!text) return false;
+    if (start && text < `${start} 00:00:00`) return false;
+    if (end && text > `${end} 23:59:59`) return false;
+    return true;
   }
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {

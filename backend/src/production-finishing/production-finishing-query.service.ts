@@ -51,6 +51,18 @@ export class ProductionFinishingQueryService {
     return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
   }
 
+  private isDateTimeInRange(
+    v: Date | string | null | undefined,
+    start?: string,
+    end?: string,
+  ): boolean {
+    const text = this.toDateTimeLocalString(v);
+    if (!text) return false;
+    if (start && text < `${start} 00:00:00`) return false;
+    if (end && text > `${end} 23:59:59`) return false;
+    return true;
+  }
+
   private normalizeFinishingQtyRowToHeaders(stored: number[] | null, headers: string[]): (number | null)[] | null {
     if (!stored || stored.length === 0) return null;
     const hLen = headers.length;
@@ -166,7 +178,7 @@ export class ProductionFinishingQueryService {
   }
 
   private async buildFinishingRows(baseQuery: FinishingListQuery): Promise<FinishingListItem[]> {
-    const { tab = 'all', orderNo, skuCode } = baseQuery;
+    const { tab = 'all', orderNo, skuCode, completedStart, completedEnd } = baseQuery;
     const inboundFinishing = await this.finishingRepo.find({ where: { status: 'inbound' }, select: ['orderId'] });
     const inboundOrderIds = inboundFinishing.map((f) => f.orderId);
     const completedWithInbound =
@@ -211,6 +223,9 @@ export class ProductionFinishingQueryService {
       if (tab === 'pending_receive' && fStatus !== 'pending_receive') continue;
       if (tab === 'pending_assign' && fStatus !== 'pending_assign') continue;
       if (tab === 'inbound' && fStatus !== 'inbound') continue;
+      if ((completedStart || completedEnd) && !this.isDateTimeInRange(finishing?.completedAt, completedStart, completedEnd)) {
+        continue;
+      }
 
       const arrivedAt =
         this.toDateTimeLocalString(finishing?.arrivedAt) ??

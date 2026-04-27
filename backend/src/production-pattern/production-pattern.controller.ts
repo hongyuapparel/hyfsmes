@@ -22,6 +22,8 @@ export class ProductionPatternController {
     @Query('purchaseStatus') purchaseStatus?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @CurrentUser() user?: { userId: number; username: string },
@@ -39,6 +41,8 @@ export class ProductionPatternController {
       purchaseStatus,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
@@ -55,6 +59,8 @@ export class ProductionPatternController {
     @Query('purchaseStatus') purchaseStatus?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
     @CurrentUser() user?: { userId: number; username: string },
     @Res() res?: Response,
   ) {
@@ -71,6 +77,8 @@ export class ProductionPatternController {
       purchaseStatus,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
     };
     const rows = await this.patternService.getPatternExportRows(query, user?.userId);
     const header = [

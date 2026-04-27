@@ -97,9 +97,25 @@
         :style="getFilterRangeStyle(orderDateRange)"
         @change="onSearch"
       />
+      <el-date-picker
+        v-model="completedRange"
+        type="daterange"
+        range-separator=""
+        start-placeholder="完成时间"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
+        :style="getFilterRangeStyle(completedRange)"
+        @change="onSearch"
+      />
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
           v-if="hasSelection && canCompleteSelection && canCompleteProcessAction"
           type="primary"
@@ -291,9 +307,11 @@ const {
   collaborationOptions,
   filter,
   orderDateRange,
+  completedRange,
   currentTab,
   list,
   loading,
+  exporting,
   completing,
   pagination,
   selectedRows,
@@ -303,6 +321,7 @@ const {
   findOrderTypeLabelById,
   findCollaborationLabelById,
   debouncedSearch,
+  onExport,
   onSearch,
   onReset,
   onTabChange,

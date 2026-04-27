@@ -54,12 +54,22 @@ export interface PurchaseListQuery {
   orderTypeId?: number
   orderDateStart?: string
   orderDateEnd?: string
+  completedStart?: string
+  completedEnd?: string
   page?: number
   pageSize?: number
 }
 
 export function getPurchaseItems(params?: PurchaseListQuery) {
   return request.get<PurchaseListRes>('/production/purchase/items', { params })
+}
+
+export function exportPurchaseItems(params?: Omit<PurchaseListQuery, 'page' | 'pageSize'>) {
+  return request.get<Blob>('/production/purchase/items/export', {
+    params,
+    responseType: 'blob',
+    skipGlobalErrorHandler: true,
+  })
 }
 
 export function registerPurchase(payload: {

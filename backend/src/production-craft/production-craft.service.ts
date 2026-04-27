@@ -47,6 +47,8 @@ export interface CraftListQuery {
   collaborationTypeId?: number;
   orderDateStart?: string;
   orderDateEnd?: string;
+  completedStart?: string;
+  completedEnd?: string;
   page?: number;
   pageSize?: number;
 }
@@ -85,6 +87,18 @@ export class ProductionCraftService {
     const mm = String(v.getMinutes()).padStart(2, '0');
     const ss = String(v.getSeconds()).padStart(2, '0');
     return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
+  }
+
+  private isDateTimeInRange(
+    v: Date | string | null | undefined,
+    start?: string,
+    end?: string,
+  ): boolean {
+    const text = this.toDateTimeLocalString(v);
+    if (!text) return false;
+    if (start && text < `${start} 00:00:00`) return false;
+    if (end && text > `${end} 23:59:59`) return false;
+    return true;
   }
 
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
@@ -180,6 +194,8 @@ export class ProductionCraftService {
       collaborationTypeId,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
       page = 1,
       pageSize = 20,
     } = query;
@@ -272,6 +288,9 @@ export class ProductionCraftService {
 
       if (tab === 'pending' && craftStatus === 'completed') continue;
       if (tab === 'completed' && craftStatus !== 'completed') continue;
+      if ((completedStart || completedEnd) && !this.isDateTimeInRange(craft?.completedAt, completedStart, completedEnd)) {
+        continue;
+      }
 
       const purchaseCompleted = this.isPurchaseCompleted(materials);
       const arrivedAtCraft =
@@ -337,6 +356,11 @@ export class ProductionCraftService {
     const list = rows.slice(start, start + pageSize);
 
     return { list, total, page, pageSize };
+  }
+
+  async getCraftExportRows(query: CraftListQuery, actorUserId?: number): Promise<CraftListItem[]> {
+    const res = await this.getCraftList({ ...query, page: 1, pageSize: Number.MAX_SAFE_INTEGER }, actorUserId);
+    return res.list;
   }
 
   async completeCraft(orderId: number, actorUserId: number): Promise<void> {

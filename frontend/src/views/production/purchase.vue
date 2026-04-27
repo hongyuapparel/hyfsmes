@@ -107,9 +107,25 @@
         :style="getFilterRangeStyle(orderDateRange)"
         @change="onSearch"
       />
+      <el-date-picker
+        v-model="completedRange"
+        type="daterange"
+        range-separator=""
+        start-placeholder="完成时间"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
+        :style="getFilterRangeStyle(completedRange)"
+        @change="onSearch"
+      />
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
           v-if="hasSelection && canRegisterPurchase"
           type="primary"
@@ -431,11 +447,13 @@ const canRegisterPurchase = computed(() => authStore.hasPermission('production_p
 const {
   filter,
   orderDateRange,
+  completedRange,
   orderNoLabelVisible,
   skuCodeLabelVisible,
   currentTab,
   list,
   loading,
+  exporting,
   pagination,
   selectedRows,
   hasSelection,
@@ -448,6 +466,7 @@ const {
   findOrderTypeLabelById,
   load,
   loadTabCounts,
+  onExport,
   onSearch,
   debouncedSearch,
   onReset,

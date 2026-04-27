@@ -27,6 +27,7 @@ export function usePatternList() {
     purchaseStatus: '',
   })
   const orderDateRange = ref<[string, string] | null>(null)
+  const completedRange = ref<[string, string] | null>(null)
   const orderNoLabelVisible = ref(false)
   const skuCodeLabelVisible = ref(false)
   const currentTab = ref<string>('all')
@@ -118,6 +119,10 @@ export function usePatternList() {
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
       q.orderDateEnd = orderDateRange.value[1]
+    }
+    if (completedRange.value && completedRange.value.length === 2) {
+      q.completedStart = completedRange.value[0]
+      q.completedEnd = completedRange.value[1]
     }
     return q
   }
@@ -227,6 +232,7 @@ export function usePatternList() {
     filter.collaborationTypeId = null
     filter.purchaseStatus = ''
     orderDateRange.value = null
+    completedRange.value = null
     currentTab.value = 'all'
     pagination.page = 1
     selectedRows.value = []
@@ -268,6 +274,7 @@ export function usePatternList() {
     PATTERN_TABS,
     filter,
     orderDateRange,
+    completedRange,
     orderNoLabelVisible,
     skuCodeLabelVisible,
     currentTab,

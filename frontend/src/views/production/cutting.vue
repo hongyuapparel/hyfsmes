@@ -57,6 +57,21 @@
           </span>
         </template>
       </el-input>
+      <el-date-picker
+        v-model="completedRange"
+        type="daterange"
+        range-separator=""
+        start-placeholder="完成时间"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
+        :style="getFilterRangeStyle(completedRange)"
+        @change="onSearch"
+      />
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
@@ -290,6 +305,7 @@ import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getOrderNoFilterStyle,
+  getFilterRangeStyle,
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useCuttingListData } from '@/composables/useCuttingListData'
@@ -298,6 +314,7 @@ import { useCuttingSizePopover } from '@/composables/useCuttingSizePopover'
 import { useCuttingDetail } from '@/composables/useCuttingDetail'
 import { useCuttingRegister } from '@/composables/useCuttingRegister'
 import { formatDate, formatDateTime } from '@/utils/date-format'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
@@ -335,6 +352,7 @@ const {
 } = useCuttingSelection()
 const {
   filter,
+  completedRange,
   orderNoLabelVisible,
   skuCodeLabelVisible,
   currentTab,

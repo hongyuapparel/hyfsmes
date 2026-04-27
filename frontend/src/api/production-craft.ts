@@ -51,12 +51,22 @@ export interface CraftListQuery {
   collaborationTypeId?: number
   orderDateStart?: string
   orderDateEnd?: string
+  completedStart?: string
+  completedEnd?: string
   page?: number
   pageSize?: number
 }
 
 export function getCraftItems(params?: CraftListQuery) {
   return request.get<CraftListRes>('/production/process/items', { params })
+}
+
+export function exportCraftItems(params?: Omit<CraftListQuery, 'page' | 'pageSize'>) {
+  return request.get<Blob>('/production/process/items/export', {
+    params,
+    responseType: 'blob',
+    skipGlobalErrorHandler: true,
+  })
 }
 
 export function completeCraft(orderId: number) {

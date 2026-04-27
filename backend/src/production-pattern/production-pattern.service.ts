@@ -50,6 +50,8 @@ export interface PatternListQuery {
   purchaseStatus?: string;
   orderDateStart?: string;
   orderDateEnd?: string;
+  completedStart?: string;
+  completedEnd?: string;
   page?: number;
   pageSize?: number;
 }
@@ -208,6 +210,18 @@ export class ProductionPatternService {
     return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
   }
 
+  private isDateTimeInRange(
+    v: Date | string | null | undefined,
+    start?: string,
+    end?: string,
+  ): boolean {
+    const text = this.toDateTimeLocalString(v);
+    if (!text) return false;
+    if (start && text < `${start} 00:00:00`) return false;
+    if (end && text > `${end} 23:59:59`) return false;
+    return true;
+  }
+
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
     if (!materials || materials.length === 0) return false;
     return materials.every((m) => {
@@ -275,6 +289,8 @@ export class ProductionPatternService {
       purchaseStatus,
       orderDateStart,
       orderDateEnd,
+      completedStart,
+      completedEnd,
     } = baseQuery;
 
     const completedPatterns = await this.patternRepo.find({
@@ -349,6 +365,9 @@ export class ProductionPatternService {
       if (tab === 'pending_assign' && pStatus !== 'pending_assign') continue;
       if (tab === 'in_progress' && pStatus !== 'in_progress') continue;
       if (tab === 'completed' && pStatus !== 'completed') continue;
+      if ((completedStart || completedEnd) && !this.isDateTimeInRange(pattern?.completedAt, completedStart, completedEnd)) {
+        continue;
+      }
 
       const arrivedAtPattern =
         arrivedAtPatternMap.get(order.id) ??

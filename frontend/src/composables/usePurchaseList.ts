@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getPurchaseItems, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
+import { exportPurchaseItems, getPurchaseItems, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -67,6 +67,7 @@ export function usePurchaseList() {
     orderTypeId: null as number | null,
   })
   const orderDateRange = ref<[string, string] | null>(null)
+  const completedRange = ref<[string, string] | null>(null)
   const orderNoLabelVisible = ref(false)
   const skuCodeLabelVisible = ref(false)
   const currentTab = ref<string>('all')
@@ -77,6 +78,7 @@ export function usePurchaseList() {
   const tabTotal = ref(0)
   const list = ref<PurchaseItemRow[]>([])
   const loading = ref(false)
+  const exporting = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
   const selectedRows = ref<PurchaseItemRow[]>([])
   const hasSelection = computed(() => selectedRows.value.length > 0)
@@ -102,6 +104,10 @@ export function usePurchaseList() {
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
       q.orderDateEnd = orderDateRange.value[1]
+    }
+    if (completedRange.value && completedRange.value.length === 2) {
+      q.completedStart = completedRange.value[0]
+      q.completedEnd = completedRange.value[1]
     }
     return q
   }
@@ -143,6 +149,30 @@ export function usePurchaseList() {
     }
   }
 
+  async function onExport() {
+    const query = buildQuery()
+    const { page, pageSize, ...rest } = query
+    void page
+    void pageSize
+    exporting.value = true
+    try {
+      const res = await exportPurchaseItems(rest)
+      const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8;' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `采购管理_${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      document.body.removeChild(a)
+      window.URL.revokeObjectURL(url)
+    } catch (e: unknown) {
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
+    } finally {
+      exporting.value = false
+    }
+  }
+
   function onSearch(byUser = false) {
     if (byUser) {
       if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
@@ -170,6 +200,7 @@ export function usePurchaseList() {
     filter.supplier = ''
     filter.orderTypeId = null
     orderDateRange.value = null
+    completedRange.value = null
     currentTab.value = 'all'
     pagination.page = 1
     selectedRows.value = []
@@ -241,6 +272,7 @@ export function usePurchaseList() {
   return {
     filter,
     orderDateRange,
+    completedRange,
     orderNoLabelVisible,
     skuCodeLabelVisible,
     currentTab,
@@ -248,6 +280,7 @@ export function usePurchaseList() {
     tabTotal,
     list,
     loading,
+    exporting,
     pagination,
     selectedRows,
     hasSelection,
@@ -260,6 +293,7 @@ export function usePurchaseList() {
     findOrderTypeLabelById,
     load,
     loadTabCounts,
+    onExport,
     onSearch,
     debouncedSearch,
     onReset,

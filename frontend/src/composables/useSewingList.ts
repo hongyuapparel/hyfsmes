@@ -28,6 +28,7 @@ type SewingTabConfig = (typeof SEWING_TABS)[number]
 
 export function useSewingList() {
   const filter = reactive({ orderNo: '', skuCode: '' })
+  const completedRange = ref<[string, string] | null>(null)
   const orderNoLabelVisible = ref(false)
   const skuCodeLabelVisible = ref(false)
 
@@ -88,13 +89,18 @@ export function useSewingList() {
   }
 
   function buildQuery(): SewingListQuery {
-    return {
+    const q: SewingListQuery = {
       tab: currentTab.value,
       orderNo: normalizeTextFilter(filter.orderNo),
       skuCode: normalizeTextFilter(filter.skuCode),
       page: pagination.page,
       pageSize: pagination.pageSize,
     }
+    if (completedRange.value && completedRange.value.length === 2) {
+      q.completedStart = completedRange.value[0]
+      q.completedEnd = completedRange.value[1]
+    }
+    return q
   }
 
   async function loadTabCounts() {
@@ -197,6 +203,7 @@ export function useSewingList() {
     skuCodeLabelVisible.value = false
     filter.orderNo = ''
     filter.skuCode = ''
+    completedRange.value = null
     currentTab.value = 'all'
     pagination.page = 1
     selectedRows.value = []
@@ -227,6 +234,7 @@ export function useSewingList() {
   return {
     SEWING_TABS,
     filter,
+    completedRange,
     orderNoLabelVisible,
     skuCodeLabelVisible,
     currentTab,

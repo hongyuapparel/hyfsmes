@@ -26,6 +26,8 @@ export interface FinishingListQuery {
   tab?: string;
   orderNo?: string;
   skuCode?: string;
+  completedStart?: string;
+  completedEnd?: string;
   page?: number;
   pageSize?: number;
 }

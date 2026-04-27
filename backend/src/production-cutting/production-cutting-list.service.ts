@@ -158,6 +158,18 @@ export class ProductionCuttingListService {
     return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
   }
 
+  private isDateTimeInRange(
+    v: Date | string | null | undefined,
+    start?: string,
+    end?: string,
+  ): boolean {
+    const text = this.toDateTimeLocalString(v);
+    if (!text) return false;
+    if (start && text < `${start} 00:00:00`) return false;
+    if (end && text > `${end} 23:59:59`) return false;
+    return true;
+  }
+
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
     if (v == null) return null;
     if (typeof v === 'string') {
@@ -184,7 +196,7 @@ export class ProductionCuttingListService {
   }
 
   private async buildCuttingRows(baseQuery: CuttingListQuery): Promise<CuttingListItem[]> {
-    const { tab = 'all', orderNo, skuCode } = baseQuery;
+    const { tab = 'all', orderNo, skuCode, completedStart, completedEnd } = baseQuery;
     const completedCutting = await this.cuttingRepo.find({ where: { status: 'completed' }, select: ['orderId'] });
     const completedOrderIds = completedCutting.map((c) => c.orderId);
     const completedIds = completedOrderIds.length > 0 ? completedOrderIds : [0];
@@ -213,6 +225,9 @@ export class ProductionCuttingListService {
       const cuttingStatus = (cutting?.status ?? 'pending').toLowerCase();
       if (tab === 'pending' && cuttingStatus === 'completed') continue;
       if (tab === 'completed' && cuttingStatus !== 'completed') continue;
+      if ((completedStart || completedEnd) && !this.isDateTimeInRange(cutting?.completedAt, completedStart, completedEnd)) {
+        continue;
+      }
       const arrivedAt =
         this.toDateTimeLocalString(cutting?.arrivedAt) ??
         this.toDateTimeLocalString(cutting?.completedAt) ??

@@ -123,6 +123,21 @@
         :style="getFilterRangeStyle(orderDateRange)"
         @change="onSearch"
       />
+      <el-date-picker
+        v-model="completedRange"
+        type="daterange"
+        range-separator=""
+        start-placeholder="完成时间"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
+        :style="getFilterRangeStyle(completedRange)"
+        @change="onSearch"
+      />
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
@@ -450,6 +465,7 @@ const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('pro
 const {
   filter,
   orderDateRange,
+  completedRange,
   orderNoLabelVisible,
   skuCodeLabelVisible,
   currentTab,
