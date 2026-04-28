@@ -360,7 +360,7 @@ export class OrderMutationService {
         processItem: src.processItem?.trim() || '',
         orderDate: src.orderDate ?? now,
         customerDueDate: src.customerDueDate ?? null,
-        factoryName: src.factoryName?.trim() || '',
+        factoryName: '',
         imageUrl: src.imageUrl?.trim() || '',
         status: 'draft',
         statusTime: now,
