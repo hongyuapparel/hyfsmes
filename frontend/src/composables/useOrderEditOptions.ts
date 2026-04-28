@@ -7,12 +7,17 @@ import {
   getSupplierBusinessScopeTreeOptions,
   type SupplierBusinessScopeTreeNode,
 } from '@/api/suppliers'
-import { getCustomers, type CustomerItem } from '@/api/customers'
+import {
+  getCustomers,
+  getMerchandisers,
+  getSalespeople,
+  type CustomerItem,
+} from '@/api/customers'
 
 interface SimpleUser {
   id: number
   username: string
-  displayName?: string
+  displayName: string
   mobile?: string
 }
 
@@ -74,14 +79,25 @@ function findCollaborationLabelById(id: number | null | undefined): string {
   return found?.value ?? ''
 }
 
+function normalizeUserNames(names: string[] | null | undefined): SimpleUser[] {
+  return (names ?? [])
+    .map((name, index) => {
+      const value = String(name ?? '').trim()
+      if (!value) return null
+      return {
+        id: index + 1,
+        username: value,
+        displayName: value,
+      }
+    })
+    .filter((item): item is SimpleUser => !!item)
+}
+
 async function loadSalespersonOptions() {
   userLoadingCount.value += 1
   try {
-    const res = await request.get<SimpleUser[]>('/users', {
-      params: { role: 'salesperson' },
-      skipGlobalErrorHandler: true,
-    })
-    salespersonOptions.value = res.data ?? []
+    const res = await getSalespeople()
+    salespersonOptions.value = normalizeUserNames(res.data)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('Failed to load salesperson options', getErrorMessage(e))
   } finally {
@@ -92,11 +108,8 @@ async function loadSalespersonOptions() {
 async function loadMerchandiserOptions() {
   userLoadingCount.value += 1
   try {
-    const res = await request.get<SimpleUser[]>('/users', {
-      params: { role: 'merchandiser' },
-      skipGlobalErrorHandler: true,
-    })
-    merchandiserOptions.value = res.data ?? []
+    const res = await getMerchandisers()
+    merchandiserOptions.value = normalizeUserNames(res.data)
   } catch (e: unknown) {
     if (!isErrorHandled(e)) console.warn('Failed to load merchandiser options', getErrorMessage(e))
   } finally {

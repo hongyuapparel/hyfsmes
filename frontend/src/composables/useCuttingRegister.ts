@@ -262,11 +262,13 @@ export function useCuttingRegister(params: UseCuttingRegisterParams) {
           const dept = (e.departmentName ?? '').trim()
           const job = (e.jobTitleName ?? '').trim()
           const status = (e.status ?? '').toLowerCase()
-          return dept === '裁床' && job === '电剪' && status === 'active'
+          const isCuttingDepartment = dept.includes('裁床')
+          const isElectricCutter = job.includes('电剪')
+          return isCuttingDepartment && isElectricCutter && status === 'active'
         })
         .map((e) => (e.name ?? '').trim())
         .filter((v) => !!v)
-      const uniq = Array.from(new Set(names))
+      const uniq = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, 'zh-CN'))
       cutterOptions.value = uniq.length ? uniq : ['电剪刀']
     } catch {
       cutterOptions.value = ['电剪刀']
