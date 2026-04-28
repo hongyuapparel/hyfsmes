@@ -3,7 +3,7 @@
     <template #header>
       <div class="block-header">
         <span class="block-title">H 图片附件</span>
-        <el-button link type="primary" @click="triggerAttachmentUpload">选择多图</el-button>
+        <el-button link type="primary" @click="chooseAttachments">选择多图</el-button>
       </div>
     </template>
     <div class="attachments">
@@ -55,15 +55,14 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 
 defineProps<{
   attachments: string[]
-  attachmentFileInputRef: any
   draggingAttachmentIndex: number | null
   dragOverAttachmentIndex: number | null
-  triggerAttachmentUpload: () => void
   onAttachmentFileChange: (event: Event) => void
   removeAttachment: (index: number) => void
   onAttachmentDragStart: (index: number, event: DragEvent) => void
@@ -71,4 +70,13 @@ defineProps<{
   onAttachmentDrop: (index: number, event: DragEvent) => void
   onAttachmentDragEnd: () => void
 }>()
+
+const attachmentFileInputRef = ref<HTMLInputElement | null>(null)
+
+function chooseAttachments() {
+  attachmentFileInputRef.value?.click()
+}
 </script>
+
+<style scoped src="./order-edit-card.css"></style>
+<style scoped src="./order-edit-attachments.css"></style>

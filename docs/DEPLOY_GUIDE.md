@@ -2,6 +2,21 @@
 
 这份文档用于说明本项目在“已经上线后，后续修改如何再次同步上线”。
 
+部署相关命令必须以本文件为准，不要凭记忆写路径。
+
+固定服务器路径只保留一个根目录：
+
+- 宝塔项目根目录 / Git 仓库 / 部署脚本目录 / 前端发布目录：`/www/wwwroot/erp.hyfsmes.com`
+- 前端源码目录：`/www/wwwroot/erp.hyfsmes.com/frontend`
+- 后端源码目录：`/www/wwwroot/erp.hyfsmes.com/backend`
+- PM2 后端服务名：`erp-backend`
+
+执行 `sh scripts/deploy-frontend.sh`、`sh scripts/deploy-backend.sh`、`sh scripts/deploy-full.sh` 前，统一先进入：
+
+```bash
+cd /www/wwwroot/erp.hyfsmes.com
+```
+
 适用目标：
 
 - 你不需要自己判断到底改了前端、后端还是数据库
@@ -79,9 +94,9 @@
 
 默认使用的服务器目录：
 
-- 项目根目录：`/www/wwwroot/erp.hyfsmes.com/hyfsmes`
-- 前端目录：`/www/wwwroot/erp.hyfsmes.com/hyfsmes/frontend`
-- 后端目录：`/www/wwwroot/erp.hyfsmes.com/hyfsmes/backend`
+- 项目根目录：`/www/wwwroot/erp.hyfsmes.com`
+- 前端目录：`/www/wwwroot/erp.hyfsmes.com/frontend`
+- 后端目录：`/www/wwwroot/erp.hyfsmes.com/backend`
 - 前端发布目录：`/www/wwwroot/erp.hyfsmes.com`
 - PM2 服务名：`erp-backend`
 
@@ -210,4 +225,3 @@ sh scripts/deploy-full.sh
 - 不能只凭感觉判断“是不是只改了页面”
 - 上线前最好先跑一次 `.\scripts\deploy-plan.ps1`
 - 如果脚本提示 `db = YES`，先不要直接部署，先让我检查数据库部分
-

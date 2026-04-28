@@ -7,7 +7,8 @@ import {
   type FinishedPickupUserOption,
   type PendingListItem,
 } from '@/api/inventory'
-import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
+import { getDictItems } from '@/api/dicts'
+import type { SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import {
   distributePendingToColorSizeGrid,
@@ -164,7 +165,7 @@ export function useInventoryPendingDialogs({
 
   async function loadWarehouseOptions() {
     try {
-      const res = await getSystemOptionsList('warehouses')
+      const res = await getDictItems('warehouses')
       const list = (res.data ?? []) as SystemOptionItem[]
       warehouseOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
     } catch {
@@ -174,7 +175,7 @@ export function useInventoryPendingDialogs({
 
   async function loadDepartmentOptions() {
     try {
-      const res = await getSystemOptionsList('org_departments')
+      const res = await getDictItems('org_departments')
       const list = (res.data ?? []) as SystemOptionItem[]
       departmentOptions.value = list.map((o) => ({ value: o.value, label: o.value }))
     } catch {
@@ -184,7 +185,7 @@ export function useInventoryPendingDialogs({
 
   async function loadInventoryTypeOptions() {
     try {
-      const res = await getSystemOptionsList('inventory_types')
+      const res = await getDictItems('inventory_types')
       const list = (res.data ?? []) as SystemOptionItem[]
       inventoryTypeOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
     } catch {

@@ -25,10 +25,10 @@ export class ProductsController {
    * SKU 下拉（供订单编辑页 remote 下拉使用）
    * GET /products/skus?keyword=&pageSize=
    *
-   * 注意：订单编辑页属于订单模块场景，因此只要求 /orders/list 权限
+   * 注意：订单编辑页属于订单模块场景；产品列表页也会复用 SKU 数据。
    */
   @Get('skus')
-  @RequirePermission('/orders/list')
+  @RequirePermission(['/orders/list', '/orders/products'])
   async findSkus(
     @Query('keyword') keyword?: string,
     @Query('page') page?: string,

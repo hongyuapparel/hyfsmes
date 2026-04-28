@@ -1,0 +1,19 @@
+.materials-table :deep(.el-table__cell) {
+  padding: 4px 6px;
+}
+
+.materials-table :deep(.el-input),
+.materials-table :deep(.el-select),
+.materials-table :deep(.el-input-number) {
+  width: 100%;
+}
+
+.materials-table :deep(.el-input__inner),
+.materials-table :deep(.el-input-number__inner),
+.materials-table :deep(.el-select .el-select__selected-item) {
+  text-align: center;
+}
+
+.materials-table :deep(.el-select .el-select__wrapper) {
+  justify-content: center;
+}

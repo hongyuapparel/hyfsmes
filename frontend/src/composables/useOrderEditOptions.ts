@@ -1,7 +1,7 @@
 import { computed, ref } from 'vue'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getDictItems } from '@/api/dicts'
-import { getSystemOptionsTree, type SystemOptionItem, type SystemOptionTreeNode } from '@/api/system-options'
+import { getDictItems, getDictTree } from '@/api/dicts'
+import type { SystemOptionItem, SystemOptionTreeNode } from '@/api/system-options'
 import {
   getSupplierBusinessScopeOptions,
   getSupplierBusinessScopeTreeOptions,
@@ -120,7 +120,7 @@ async function loadCollaborationOptions() {
 
 async function loadOrderTypeTree() {
   try {
-    const res = await getSystemOptionsTree('order_types')
+    const res = await getDictTree('order_types')
     const tree = res.data ?? []
     orderTypeTree.value = Array.isArray(tree) ? tree : []
   } catch (e: unknown) {

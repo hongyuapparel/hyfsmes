@@ -2,9 +2,13 @@
 # Usage: .\scripts\start.ps1
 
 $ErrorActionPreference = "Stop"
-$ProjectRoot = $PSScriptRoot + "\.."
+$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BackendDir = $ProjectRoot + "\backend"
 $FrontendDir = $ProjectRoot + "\frontend"
+$BackendLog = Join-Path $ProjectRoot ".codex-backend-3000.log"
+$BackendErrLog = Join-Path $ProjectRoot ".codex-backend-3000.err.log"
+$FrontendLog = Join-Path $ProjectRoot ".codex-frontend-5173.log"
+$FrontendErrLog = Join-Path $ProjectRoot ".codex-frontend-5173.err.log"
 
 if (-not (Test-Path (Join-Path $BackendDir ".env"))) {
     Write-Host "ERROR: backend\.env not found. Copy backend\.env.example to backend\.env and configure." -ForegroundColor Red
@@ -13,7 +17,6 @@ if (-not (Test-Path (Join-Path $BackendDir ".env"))) {
 
 $BackendPort = 3000
 $FrontendPort = 5173
-$NpmCmd = (Get-Command npm.cmd).Source
 
 function Test-PortFree {
     param ([int]$Port)
@@ -25,15 +28,23 @@ function Start-DetachedNpm {
         [Parameter(Mandatory = $true)]
         [string]$WorkingDirectory,
         [Parameter(Mandatory = $true)]
-        [string]$Arguments
+        [string]$Arguments,
+        [Parameter(Mandatory = $true)]
+        [string]$StdoutLog,
+        [Parameter(Mandatory = $true)]
+        [string]$StderrLog
     )
 
-    $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = $NpmCmd
-    $psi.Arguments = $Arguments
-    $psi.WorkingDirectory = $WorkingDirectory
-    $psi.UseShellExecute = $true
-    [void][System.Diagnostics.Process]::Start($psi)
+    if (-not (Test-Path $StdoutLog)) {
+        New-Item -ItemType File -Path $StdoutLog -Force | Out-Null
+    }
+    if (-not (Test-Path $StderrLog)) {
+        New-Item -ItemType File -Path $StderrLog -Force | Out-Null
+    }
+
+    $command = "npm.cmd $Arguments >> `"$StdoutLog`" 2>> `"$StderrLog`""
+    $cmdArgs = "/d /s /c `"$command`""
+    Start-Process -FilePath $env:ComSpec -ArgumentList $cmdArgs -WorkingDirectory $WorkingDirectory -WindowStyle Hidden | Out-Null
 }
 
 # If port in use, run stop.ps1 once and wait, then re-check
@@ -56,8 +67,9 @@ if ($frontendInUse) {
 }
 
 Write-Host ("Starting backend (port " + $BackendPort + ") and frontend (port " + $FrontendPort + ")...") -ForegroundColor Green
-Start-DetachedNpm -WorkingDirectory $BackendDir -Arguments 'run start:dev'
+Start-DetachedNpm -WorkingDirectory $BackendDir -Arguments 'run start:dev' -StdoutLog $BackendLog -StderrLog $BackendErrLog
 Start-Sleep -Seconds 2
-Start-DetachedNpm -WorkingDirectory $FrontendDir -Arguments 'run dev'
-Write-Host "Done. Two windows opened. Run scripts\check.ps1 to verify." -ForegroundColor Green
+Start-DetachedNpm -WorkingDirectory $FrontendDir -Arguments 'run dev' -StdoutLog $FrontendLog -StderrLog $FrontendErrLog
+Write-Host "Done. Services started with hidden windows. Run scripts\check.ps1 to verify." -ForegroundColor Green
+Write-Host ("Logs: " + $BackendLog + ", " + $FrontendLog) -ForegroundColor Gray
 Write-Host "Tip: Code changes auto-reload; only restart when changing .env or deps. Use scripts\restart.ps1 to restart." -ForegroundColor Gray

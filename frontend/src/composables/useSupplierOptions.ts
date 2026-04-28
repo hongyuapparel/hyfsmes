@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
+import { getDictItems } from '@/api/dicts'
+import type { SystemOptionItem } from '@/api/system-options'
 
 export interface BusinessScopeTreeNode {
   id: number
@@ -48,7 +49,7 @@ export function useSupplierOptions() {
 
   async function loadSupplierOptions() {
     try {
-      const response = await getSystemOptionsList('supplier_types')
+      const response = await getDictItems('supplier_types')
       const optionList = response.data ?? []
       const roots = optionList.filter((item) => item.parentId == null)
       supplierTypeOptions.value = roots.map((root) => ({ id: root.id, label: root.value }))

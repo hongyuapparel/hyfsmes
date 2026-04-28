@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-PROJECT_ROOT="${PROJECT_ROOT:-/www/wwwroot/erp.hyfsmes.com/hyfsmes}"
+PROJECT_ROOT="${PROJECT_ROOT:-/www/wwwroot/erp.hyfsmes.com}"
 FRONTEND_DIR="${FRONTEND_DIR:-$PROJECT_ROOT/frontend}"
 FRONTEND_DIST="${FRONTEND_DIST:-$FRONTEND_DIR/dist}"
 WEB_ROOT="${WEB_ROOT:-/www/wwwroot/erp.hyfsmes.com}"
@@ -36,4 +36,3 @@ fi
 cp -r "$FRONTEND_DIST"/. "$WEB_ROOT"/
 echo "[deploy-frontend] published to $WEB_ROOT"
 echo "[deploy-frontend] done"
-

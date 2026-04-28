@@ -1,0 +1,32 @@
+.size-info-table :deep(.el-table__cell) {
+  padding: 4px 6px;
+  min-width: 0;
+}
+
+.size-info-table :deep(.el-input),
+.size-info-table :deep(.el-input-number) {
+  width: 100%;
+  min-width: 0;
+}
+
+.size-info-table :deep(.el-input__wrapper),
+.size-info-table :deep(.el-input-number .el-input__wrapper) {
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.size-info-table :deep(.el-input__inner),
+.size-info-table :deep(.el-input-number .el-input__inner) {
+  text-align: center;
+}
+
+.size-row-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  margin-right: 4px;
+  color: var(--el-text-color-secondary);
+  cursor: move;
+  user-select: none;
+}

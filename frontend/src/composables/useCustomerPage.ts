@@ -10,7 +10,8 @@ import {
   updateCustomer,
   type CustomerItem,
 } from '@/api/customers'
-import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getDictTree } from '@/api/dicts'
+import type { SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 export interface ProductGroupTreeSelectNode {
@@ -95,7 +96,7 @@ export function useCustomerPage() {
     try {
       const [salesRes, groupTreeRes] = await Promise.all([
         getSalespeople(),
-        getSystemOptionsTree('product_groups'),
+        getDictTree('product_groups'),
       ])
       salespeople.value = salesRes.data ?? []
       productGroupsTree.value = groupTreeRes.data ?? []

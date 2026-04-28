@@ -29,6 +29,9 @@
           >
             <div class="image-preview-wrap" v-if="form.imageUrl">
               <el-image :src="form.imageUrl" fit="contain" :preview-src-list="[form.imageUrl]" />
+              <el-button text type="primary" size="small" class="image-reupload" @click.stop="triggerOrderImageUpload">
+                重新上传
+              </el-button>
               <el-button text type="danger" size="small" class="image-remove" @click.stop="form.imageUrl = ''">
                 移除
               </el-button>
@@ -310,10 +313,9 @@
       :packaging-headers="packagingHeaders"
       :packaging-cells="packagingCells"
       v-model:packaging-method="packagingMethod"
-      :packaging-file-input-ref="packagingFileInputRef"
       :add-packaging-header="addPackagingHeader"
       :remove-packaging-header="removePackagingHeader"
-      :trigger-packaging-upload="triggerPackagingUpload"
+      :prepare-packaging-upload="preparePackagingUpload"
       :on-packaging-file-change="onPackagingFileChange"
       :open-accessory-dialog="openAccessoryDialog"
     />
@@ -353,10 +355,8 @@
 
     <OrderEditAttachmentsCard
       :attachments="attachments"
-      :attachment-file-input-ref="attachmentFileInputRef"
       :dragging-attachment-index="draggingAttachmentIndex"
       :drag-over-attachment-index="dragOverAttachmentIndex"
-      :trigger-attachment-upload="triggerAttachmentUpload"
       :on-attachment-file-change="onAttachmentFileChange"
       :remove-attachment="removeAttachment"
       :on-attachment-drag-start="onAttachmentDragStart"
@@ -380,7 +380,7 @@ import OrderEditAttachmentsCard from '@/components/orders/edit/OrderEditAttachme
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useOrderEditPage } from '@/composables/useOrderEditPage'
 
-const { pageLoading, goBack, orderNo, orderStatus, saving, submitting, onSaveDraft, onSaveAndSubmit, form, rules, openSkuDialog, orderImageFileInputRef, triggerOrderImageUpload, onOrderImageFileChange, selectedSkuMeta, collaborationOptions, orderTypeTreeSelectData, orderTypeTreeSelectProps, customerDisplayText, customerLoading, clearSelectedCustomer, openCustomerDialog, userLoading, merchandiserOptions, salespersonOptions, onMerchandiserChange, bTableRef, colorRows, sizeHeaders, editingCell, colorNameInputRef, remarkInputRef, bSummaryMethod, addSizeColumn, addColorRow, startEditBCell, onBCellBlur, insertSizeColumnBefore, removeSizeColumn, setColorCellRef, setActiveColorCell, onColorCellKeydown, onColorCellPaste, calcRowTotal, removeColorRow, setEditingCellNull, materials, materialSourceOptions, materialTypeOptions, supplierOptions, supplierLoading, setMaterialCellRef, onMaterialCellKeydown, addMaterialRow, removeMaterialRow, recalcPurchaseQuantity, onSupplierChange, onMaterialTypeChange, onMaterialSupplierVisibleChange, searchMaterialSuppliers, sizeInfoTableRef, sizeInfoRows, sizeMetaHeaders, setSizeGridCellRef, onSizeGridKeydown, onSizeGridPaste, addSizeMetaColumn, removeSizeMetaColumn, addSizeInfoRow, removeSizeInfoRow, copySizeInfoToClipboard, processItems, processOptions, addProcessRow, removeProcessRow, searchProcessSuppliers, productionRequirement, packagingHeaders, packagingCells, packagingMethod, packagingFileInputRef, addPackagingHeader, removePackagingHeader, triggerPackagingUpload, onPackagingFileChange, openAccessoryDialog, accessoryDialogVisible, accessoryDialogLoading, accessoryItems, onSelectAccessory, skuDialogVisible, skuDialogLoading, skuProducts, skuTotal, skuPage, skuPageSize, onSelectSku, onSkuPageChange, onSkuPageSizeChange, onSkuKeywordChange, customerDialogVisible, customerDialogLoading, customerDialogList, customerTotal, customerPage, customerPageSize, onSelectCustomer, onCustomerPageChange, onCustomerPageSizeChange, onCustomerKeywordChange, attachments, attachmentFileInputRef, draggingAttachmentIndex, dragOverAttachmentIndex, triggerAttachmentUpload, onAttachmentFileChange, removeAttachment, onAttachmentDragStart, onAttachmentDragOver, onAttachmentDrop, onAttachmentDragEnd } = useOrderEditPage()
+const { pageLoading, goBack, orderNo, orderStatus, saving, submitting, onSaveDraft, onSaveAndSubmit, form, rules, openSkuDialog, orderImageFileInputRef, triggerOrderImageUpload, onOrderImageFileChange, selectedSkuMeta, collaborationOptions, orderTypeTreeSelectData, orderTypeTreeSelectProps, customerDisplayText, customerLoading, clearSelectedCustomer, openCustomerDialog, userLoading, merchandiserOptions, salespersonOptions, onMerchandiserChange, bTableRef, colorRows, sizeHeaders, editingCell, colorNameInputRef, remarkInputRef, bSummaryMethod, addSizeColumn, addColorRow, startEditBCell, onBCellBlur, insertSizeColumnBefore, removeSizeColumn, setColorCellRef, setActiveColorCell, onColorCellKeydown, onColorCellPaste, calcRowTotal, removeColorRow, setEditingCellNull, materials, materialSourceOptions, materialTypeOptions, supplierOptions, supplierLoading, setMaterialCellRef, onMaterialCellKeydown, addMaterialRow, removeMaterialRow, recalcPurchaseQuantity, onSupplierChange, onMaterialTypeChange, onMaterialSupplierVisibleChange, searchMaterialSuppliers, sizeInfoTableRef, sizeInfoRows, sizeMetaHeaders, setSizeGridCellRef, onSizeGridKeydown, onSizeGridPaste, addSizeMetaColumn, removeSizeMetaColumn, addSizeInfoRow, removeSizeInfoRow, copySizeInfoToClipboard, processItems, processOptions, addProcessRow, removeProcessRow, searchProcessSuppliers, productionRequirement, packagingHeaders, packagingCells, packagingMethod, addPackagingHeader, removePackagingHeader, preparePackagingUpload, onPackagingFileChange, openAccessoryDialog, accessoryDialogVisible, accessoryDialogLoading, accessoryItems, onSelectAccessory, skuDialogVisible, skuDialogLoading, skuProducts, skuTotal, skuPage, skuPageSize, onSelectSku, onSkuPageChange, onSkuPageSizeChange, onSkuKeywordChange, customerDialogVisible, customerDialogLoading, customerDialogList, customerTotal, customerPage, customerPageSize, onSelectCustomer, onCustomerPageChange, onCustomerPageSizeChange, onCustomerKeywordChange, attachments, draggingAttachmentIndex, dragOverAttachmentIndex, onAttachmentFileChange, removeAttachment, onAttachmentDragStart, onAttachmentDragOver, onAttachmentDrop, onAttachmentDragEnd } = useOrderEditPage()
 </script>
 
 <style scoped src="./edit.css"></style>

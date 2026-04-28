@@ -1,0 +1,37 @@
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
+.attachment-item {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  border-radius: var(--radius);
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  cursor: grab;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.attachment-item.is-dragging {
+  opacity: 0.65;
+  cursor: grabbing;
+}
+
+.attachment-item.is-drag-over {
+  border-color: var(--color-primary, #409eff);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.22);
+}
+
+.attachment-remove {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+}
+
+.attachments-empty {
+  font-size: var(--font-size-caption, 12px);
+  color: var(--color-text-muted, #909399);
+}

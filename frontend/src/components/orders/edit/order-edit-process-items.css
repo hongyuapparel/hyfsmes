@@ -1,0 +1,3 @@
+.process-items-table :deep(.el-table__cell) {
+  vertical-align: top;
+}

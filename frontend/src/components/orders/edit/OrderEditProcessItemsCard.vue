@@ -84,3 +84,6 @@ defineProps<{
   searchProcessSuppliers: (keyword: string) => void
 }>()
 </script>
+
+<style scoped src="./order-edit-card.css"></style>
+<style scoped src="./order-edit-process-items.css"></style>

@@ -12,7 +12,7 @@
           <el-input v-model="packagingHeaders[idx]" size="small" />
         </div>
         <div class="packaging-body">
-          <div class="packaging-image" @click="triggerPackagingUpload(idx)">
+          <div class="packaging-image" @click="choosePackagingImage(idx)">
             <img v-if="packagingCells[idx]?.imageUrl" :src="packagingCells[idx].imageUrl" alt="" />
             <span v-else>点击上传图片</span>
           </div>
@@ -51,16 +51,16 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
 
-defineProps<{
+const props = defineProps<{
   packagingHeaders: string[]
   packagingCells: any[]
   packagingMethod: string
-  packagingFileInputRef: any
   addPackagingHeader: () => void
   removePackagingHeader: (index: number) => void
-  triggerPackagingUpload: (index: number) => void
+  preparePackagingUpload: (index: number) => void
   onPackagingFileChange: (event: Event) => void
   openAccessoryDialog: (index: number) => void
 }>()
@@ -68,4 +68,14 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'update:packagingMethod', value: string): void
 }>()
+
+const packagingFileInputRef = ref<HTMLInputElement | null>(null)
+
+function choosePackagingImage(index: number) {
+  props.preparePackagingUpload(index)
+  packagingFileInputRef.value?.click()
+}
 </script>
+
+<style scoped src="./order-edit-card.css"></style>
+<style scoped src="./order-edit-packaging.css"></style>

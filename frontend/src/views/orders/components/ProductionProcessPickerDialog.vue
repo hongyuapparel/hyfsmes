@@ -70,7 +70,8 @@ import { ElCheckbox, ElTableV2 } from 'element-plus'
 import { computed, h, markRaw, nextTick, onBeforeUnmount, ref, shallowRef, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { ProductionProcessItem } from '@/api/production-processes'
-import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
+import { getDictItems } from '@/api/dicts'
+import type { SystemOptionItem } from '@/api/system-options'
 import { formatDisplayNumber } from '@/utils/display-number'
 import type { Column } from 'element-plus/es/components/table-v2/src/types'
 
@@ -391,7 +392,7 @@ async function ensureJobTypesLoaded() {
   jobTypesController = controller
   jobTypesLoading.value = true
   try {
-    const res = await getSystemOptionsList('process_job_types', { signal: controller.signal })
+    const res = await getDictItems('process_job_types', { signal: controller.signal })
     if (token !== loadToken) return
     jobTypeCache = res.data ?? []
     jobTypeOptionsFlat.value = jobTypeCache

@@ -11,6 +11,7 @@
     <el-table
       v-loading="loading"
       :data="filteredItems"
+      class="dialog-select-table"
       height="360px"
       border
     >
@@ -70,3 +71,5 @@ const filteredItems = computed(() => {
   return props.items.filter((item) => String(item.name ?? '').toLowerCase().includes(kw))
 })
 </script>
+
+<style scoped src="./dialog-select.css"></style>

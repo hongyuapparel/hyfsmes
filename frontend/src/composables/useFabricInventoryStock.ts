@@ -11,7 +11,8 @@ import {
   type FabricSupplierOption,
   updateFabric,
 } from '@/api/inventory'
-import { getSystemOptionsList, type SystemOptionItem } from '@/api/system-options'
+import { getDictItems } from '@/api/dicts'
+import type { SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
@@ -157,7 +158,7 @@ export function useFabricInventoryStock() {
 
   async function loadWarehouseOptions() {
     try {
-      const res = await getSystemOptionsList('warehouses')
+      const res = await getDictItems('warehouses')
       const list = (res.data ?? []) as SystemOptionItem[]
       warehouseOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
     } catch {

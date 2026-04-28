@@ -1,0 +1,21 @@
+.accessory-dialog-filter,
+.sku-dialog-filter,
+.customer-dialog-filter {
+  margin-bottom: var(--space-sm);
+}
+
+.dialog-pagination {
+  margin-top: var(--space-sm);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.dialog-select-table :deep(.el-table__row) {
+  height: 44px;
+}
+
+.dialog-select-table :deep(.el-table__cell) {
+  height: 44px;
+  padding-top: 0;
+  padding-bottom: 0;
+}

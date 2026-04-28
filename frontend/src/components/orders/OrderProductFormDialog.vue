@@ -55,6 +55,7 @@
                   :preview-teleported="true"
                   :preview-src-list="[String(form[f.code] || '')]"
                 />
+                <el-button type="primary" link size="small" class="image-reupload" @click.stop="imageUploadAreaClick">重新上传</el-button>
                 <el-button type="danger" link size="small" class="image-clear" @click.stop="form[f.code] = ''">移除</el-button>
               </template>
               <template v-else>
@@ -336,5 +337,11 @@ defineExpose({
   position: absolute;
   top: var(--space-xs);
   right: var(--space-xs);
+}
+
+.image-reupload {
+  position: absolute;
+  right: var(--space-xs);
+  bottom: var(--space-xs);
 }
 </style>

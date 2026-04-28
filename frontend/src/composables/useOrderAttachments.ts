@@ -5,13 +5,8 @@ import { uploadImage } from '@/api/uploads'
 
 export function useOrderAttachments() {
   const attachments = ref<string[]>([])
-  const attachmentFileInputRef = ref<HTMLInputElement | null>(null)
   const draggingAttachmentIndex = ref<number | null>(null)
   const dragOverAttachmentIndex = ref<number | null>(null)
-
-  function triggerAttachmentUpload() {
-    attachmentFileInputRef.value?.click()
-  }
 
   async function onAttachmentFileChange(e: Event) {
     const input = e.target as HTMLInputElement
@@ -79,10 +74,8 @@ export function useOrderAttachments() {
 
   return {
     attachments,
-    attachmentFileInputRef,
     draggingAttachmentIndex,
     dragOverAttachmentIndex,
-    triggerAttachmentUpload,
     onAttachmentFileChange,
     removeAttachment,
     moveAttachment,

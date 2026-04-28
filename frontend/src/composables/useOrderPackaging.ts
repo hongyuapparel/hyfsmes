@@ -17,7 +17,6 @@ export function useOrderPackaging() {
   const packagingHeaders = ref<string[]>([...defaultPackagingHeaders])
   const packagingCells = ref<PackagingCell[]>([])
   const packagingMethod = ref('')
-  const packagingFileInputRef = ref<HTMLInputElement | null>(null)
   const activePackagingIndex = ref<number | null>(null)
 
   const accessoryDialogVisible = ref(false)
@@ -54,9 +53,8 @@ export function useOrderPackaging() {
     packagingCells.value.splice(index, 1)
   }
 
-  function triggerPackagingUpload(index: number) {
+  function preparePackagingUpload(index: number) {
     activePackagingIndex.value = index
-    packagingFileInputRef.value?.click()
   }
 
   async function onPackagingFileChange(e: Event) {
@@ -111,7 +109,6 @@ export function useOrderPackaging() {
     packagingHeaders,
     packagingCells,
     packagingMethod,
-    packagingFileInputRef,
     activePackagingIndex,
     accessoryDialogVisible,
     accessoryDialogLoading,
@@ -121,7 +118,7 @@ export function useOrderPackaging() {
     getNextPackagingHeader,
     addPackagingHeader,
     removePackagingHeader,
-    triggerPackagingUpload,
+    preparePackagingUpload,
     onPackagingFileChange,
     loadAccessoryItems,
     openAccessoryDialog,

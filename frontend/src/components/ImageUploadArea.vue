@@ -2,7 +2,7 @@
   <div
     class="image-upload-area"
     :class="{ 'is-dragover': isDragover, 'has-image': displayUrl }"
-    @click="!displayUrl && fileInputRef?.click()"
+    @click="fileInputRef?.click()"
     @dragover.prevent="isDragover = true"
     @dragleave.prevent="isDragover = false"
     @drop.prevent="onDrop"
@@ -181,12 +181,12 @@ onBeforeUnmount(() => {
 }
 
 .image-upload-area.has-image {
-  cursor: default;
+  cursor: pointer;
 }
 
 .image-upload-area.has-image:hover {
-  border-color: var(--el-border-color);
-  background-color: transparent;
+  border-color: var(--el-color-primary);
+  background-color: var(--el-color-primary-light-9);
 }
 
 .hidden-input {

@@ -269,7 +269,8 @@ import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, getSalespeople, type CustomerItem } from '@/api/customers'
 import { getAccessoriesList, getAccessoryOutboundRecords, type AccessoryItem, type AccessoryOutboundRecord } from '@/api/inventory'
-import { getSystemOptionsTree, type SystemOptionTreeNode } from '@/api/system-options'
+import { getDictTree } from '@/api/dicts'
+import type { SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
@@ -438,7 +439,7 @@ function findNodeByValue(nodes: SystemOptionTreeNode[], value: string): SystemOp
 
 async function loadCategoryOptions() {
   try {
-    const res = await getSystemOptionsTree('supplier_types')
+    const res = await getDictTree('supplier_types')
     const tree = res.data ?? []
     const accessoryRoot = findNodeByValue(tree, '辅料供应商')
     categoryOptions.value = (accessoryRoot?.children ?? []).map((child) => child.value).filter(Boolean)

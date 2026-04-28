@@ -67,7 +67,7 @@
       :save-dialog-name="saveTemplateDialog.name"
       :save-dialog-submitting="saveTemplateDialog.submitting"
       :department-options="departmentOptions"
-      :span-method="productionSpanMethod"
+        :span-method="productionSpanMethod"
       :get-job-type-options="getJobTypeOptions"
       :get-process-options="getProductionProcessSelectOptions"
       :get-job-type-amount-by-index="getJobTypeGroupAmountByRowIndex"

@@ -176,3 +176,6 @@ defineProps<{
   searchMaterialSuppliers: (keyword: string, row: any) => void
 }>()
 </script>
+
+<style scoped src="./order-edit-card.css"></style>
+<style scoped src="./order-edit-materials.css"></style>

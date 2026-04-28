@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-PROJECT_ROOT="${PROJECT_ROOT:-/www/wwwroot/erp.hyfsmes.com/hyfsmes}"
+PROJECT_ROOT="${PROJECT_ROOT:-/www/wwwroot/erp.hyfsmes.com}"
 BACKEND_DIR="${BACKEND_DIR:-$PROJECT_ROOT/backend}"
 PM2_APP_NAME="${PM2_APP_NAME:-erp-backend}"
 ENABLE_GIT_PULL="${ENABLE_GIT_PULL:-1}"
@@ -35,4 +35,3 @@ pm2 save
 pm2 status "$PM2_APP_NAME"
 pm2 logs "$PM2_APP_NAME" --lines 50 --nostream
 echo "[deploy-backend] done"
-

@@ -11,7 +11,7 @@
       </div>
     </template>
     <el-table
-      ref="sizeInfoTableRef"
+      :ref="sizeInfoTableRef"
       :data="sizeInfoRows"
       row-key="__rowKey"
       border
@@ -109,3 +109,7 @@ defineProps<{
   copySizeInfoToClipboard: () => void
 }>()
 </script>
+
+<style scoped src="./order-edit-card.css"></style>
+<style scoped src="./order-edit-matrix.css"></style>
+<style scoped src="./order-edit-size-info.css"></style>

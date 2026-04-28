@@ -2,12 +2,8 @@ import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import * as XLSX from 'xlsx'
 import { getEmployeeList, deleteEmployee, getHrUserOptions, type EmployeeItem, type HrUserOption } from '@/api/hr'
-import {
-  getSystemOptionsTree,
-  getSystemOptionsList,
-  type SystemOptionTreeNode,
-  type SystemOptionItem,
-} from '@/api/system-options'
+import { getDictItems, getDictTree } from '@/api/dicts'
+import type { SystemOptionTreeNode, SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { ACTIVE_FILTER_COLOR } from '@/composables/useFilterBarHelpers'
 import { formatDate } from '@/utils/date-format'
@@ -75,7 +71,7 @@ export function useHrEmployeeList() {
 
   async function loadDepartments() {
     try {
-      const tree = ((await getSystemOptionsTree('org_departments')).data ?? []) as SystemOptionTreeNode[]
+      const tree = ((await getDictTree('org_departments')).data ?? []) as SystemOptionTreeNode[]
       const toTree = (nodes: SystemOptionTreeNode[]): DeptTreeOption[] =>
         nodes.map((n) => ({ id: n.id, label: n.value, children: n.children?.length ? toTree(n.children) : undefined }))
       departmentTreeOptions.value = toTree(tree)
@@ -90,7 +86,7 @@ export function useHrEmployeeList() {
 
   async function loadJobs() {
     try {
-      allJobs.value = (((await getSystemOptionsList('org_jobs')).data ?? []) as SystemOptionItem[])
+      allJobs.value = (((await getDictItems('org_jobs')).data ?? []) as SystemOptionItem[])
         .map((j) => ({ id: j.id, label: j.value, parentId: j.parentId ?? null }))
     } catch { allJobs.value = [] }
   }

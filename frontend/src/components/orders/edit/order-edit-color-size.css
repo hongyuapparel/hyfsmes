@@ -1,0 +1,29 @@
+.qty-input {
+  width: 100%;
+}
+
+.b-cell-text {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: text;
+  outline: none;
+  padding: 0 8px;
+}
+
+.b-cell-text:focus {
+  outline: none;
+}
+
+.b-cell-edit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+}
+
+.b-cell-edit .el-input,
+.b-cell-edit .el-input-number {
+  width: 100%;
+}

@@ -6,8 +6,38 @@ import { SystemOptionsService } from '../system-options/system-options.service';
 
 @Controller('dicts')
 @UseGuards(JwtAuthGuard, PermissionGuard)
-// 复用订单列表菜单权限，确保有「订单管理」权限的用户即可加载下拉字典
-@RequirePermission('/orders/list')
+// 只读字典供业务页展示下拉使用：有任一相关业务模块权限即可读取，管理仍走 system-options。
+@RequirePermission([
+  '/customers',
+  '/orders',
+  '/orders/products',
+  '/orders/list',
+  '/production',
+  '/production/purchase',
+  '/production/pattern',
+  '/production/process',
+  '/production/cutting',
+  '/production/sewing',
+  '/production/finishing',
+  '/inventory',
+  '/inventory/pending',
+  '/inventory/finished',
+  '/inventory/accessories',
+  '/inventory/fabric',
+  '/finance',
+  '/finance/income',
+  '/finance/expense',
+  '/finance/dashboard',
+  '/finance/order-sla-report',
+  '/suppliers',
+  '/hr',
+  '/settings/orders',
+  '/settings',
+  '/settings/suppliers',
+  '/settings/inventory',
+  '/settings/finance',
+  '/settings/hr',
+])
 export class DictsController {
   constructor(private readonly systemOptionsService: SystemOptionsService) {}
 
@@ -39,4 +69,3 @@ export class DictsController {
     return this.systemOptionsService.findAllByType(type || '');
   }
 }
-

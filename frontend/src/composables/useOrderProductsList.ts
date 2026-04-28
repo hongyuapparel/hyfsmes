@@ -16,7 +16,8 @@ import {
   type ProductItem,
 } from '@/api/products'
 import { getCustomers, type CustomerItem } from '@/api/customers'
-import { getSystemOptionsList, getSystemOptionsTree, type SystemOptionItem, type SystemOptionTreeNode } from '@/api/system-options'
+import { getDictItems, getDictTree } from '@/api/dicts'
+import type { SystemOptionItem, SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import {
   buildFormFields,
@@ -128,9 +129,9 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
         getProductGroups(),
         getProductSalespeople(),
         getCustomers({ pageSize: 200 }),
-        getSystemOptionsTree('product_groups'),
+        getDictTree('product_groups'),
         getProductGroupCounts(),
-        getSystemOptionsList('applicable_people'),
+        getDictItems('applicable_people'),
       ])
       productGroupOptions.value = ct.data ?? []
       productGroupsTree.value = treeRes.data ?? []

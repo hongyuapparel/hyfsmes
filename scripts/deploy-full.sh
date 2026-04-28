@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-PROJECT_ROOT="${PROJECT_ROOT:-/www/wwwroot/erp.hyfsmes.com/hyfsmes}"
+PROJECT_ROOT="${PROJECT_ROOT:-/www/wwwroot/erp.hyfsmes.com}"
 FRONTEND_DIR="${FRONTEND_DIR:-$PROJECT_ROOT/frontend}"
 BACKEND_DIR="${BACKEND_DIR:-$PROJECT_ROOT/backend}"
 FRONTEND_DIST="${FRONTEND_DIST:-$FRONTEND_DIR/dist}"

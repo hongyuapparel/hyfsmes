@@ -1,0 +1,62 @@
+.b-header-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding-left: 10px;
+  padding-right: 10px;
+}
+
+.b-header-input {
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+
+.b-header-input :deep(.el-input__wrapper) {
+  padding-left: 1px;
+  padding-right: 1px;
+}
+
+.b-header-input :deep(.el-input__inner) {
+  text-align: center;
+}
+
+.b-header-remove,
+.b-header-insert {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 6px;
+  height: 10px;
+  padding: 0;
+  min-height: 10px;
+  min-width: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.b-header-remove {
+  right: 2px;
+}
+
+.b-header-insert {
+  left: 2px;
+}
+
+.b-header-insert :deep(.el-icon),
+.b-header-remove :deep(.el-icon) {
+  font-size: 8px;
+  line-height: 8px;
+}
+
+.b-header-cell:hover .b-header-insert,
+.b-header-cell:hover .b-header-remove {
+  opacity: 1;
+}

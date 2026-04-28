@@ -101,3 +101,5 @@ watch(keyword, (value) => {
   emit('keyword-change', value)
 })
 </script>
+
+<style scoped src="./dialog-select.css"></style>

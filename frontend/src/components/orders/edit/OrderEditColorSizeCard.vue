@@ -1,5 +1,5 @@
 <template>
-  <el-card ref="bTableRef" class="block-card">
+  <el-card :ref="bTableRef" class="block-card">
     <template #header>
       <div class="block-header">
         <span class="block-title">B 颜色 / 数量</span>
@@ -25,7 +25,7 @@
             @blur="onBCellBlur"
           >
             <el-input
-              ref="colorNameInputRef"
+              :ref="colorNameInputRef"
               v-model="row.colorName"
               placeholder="颜色名称"
               size="small"
@@ -127,7 +127,7 @@
             @blur="onBCellBlur"
           >
             <el-input
-              ref="remarkInputRef"
+              :ref="remarkInputRef"
               v-model="row.remark"
               placeholder="备注"
               size="small"
@@ -194,3 +194,7 @@ const props = defineProps<{
 
 void props
 </script>
+
+<style scoped src="./order-edit-card.css"></style>
+<style scoped src="./order-edit-matrix.css"></style>
+<style scoped src="./order-edit-color-size.css"></style>
