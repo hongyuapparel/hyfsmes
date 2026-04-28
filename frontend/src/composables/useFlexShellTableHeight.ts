@@ -1,12 +1,32 @@
-import { type Ref, ref } from 'vue'
+import { type Ref, ref, onMounted, onUnmounted, nextTick } from 'vue'
 
-/**
- * 列表页表格高度：与 flex 布局壳配合。可选传入 tableRef 供后续扩展（测量/resize）。
- */
 export function useFlexShellTableHeight(
-  _shellRef: Ref<HTMLElement | null>,
+  shellRef: Ref<HTMLElement | null>,
   _options?: { tableRef?: Ref<unknown> },
 ) {
   const tableHeight = ref<number | undefined>(undefined)
+  let observer: ResizeObserver | null = null
+
+  function update() {
+    if (shellRef.value) {
+      tableHeight.value = shellRef.value.clientHeight
+    }
+  }
+
+  onMounted(() => {
+    nextTick(() => {
+      update()
+      if (shellRef.value) {
+        observer = new ResizeObserver(update)
+        observer.observe(shellRef.value)
+      }
+    })
+  })
+
+  onUnmounted(() => {
+    observer?.disconnect()
+    observer = null
+  })
+
   return { tableHeight }
 }

@@ -17,13 +17,6 @@
 
 .pagination-wrap--with-summary {
   margin-top: var(--space-md);
-  justify-content: space-between;
-  align-items: center;
-}
-
-.pagination-summary {
-  font-size: var(--font-size-caption, 12px);
-  color: var(--color-text-secondary, #606266);
 }
 
 .qty-hover {

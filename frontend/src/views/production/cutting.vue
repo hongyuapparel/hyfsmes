@@ -96,17 +96,14 @@
       />
     </div>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar
+      v-model:current-page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      :total="pagination.total"
+      :page-sizes="[20, 50, 100]"
+      @current-change="load"
+      @size-change="onPageSizeChange"
+    />
 
     <!-- 裁床登记弹窗 -->
     <el-dialog
@@ -304,6 +301,7 @@ import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBr
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import CuttingTable from '@/components/production/CuttingTable.vue'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },

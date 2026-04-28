@@ -178,17 +178,14 @@
       </el-table>
     </div>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar
+      v-model:current-page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      :total="pagination.total"
+      :page-sizes="[20, 50, 100]"
+      @current-change="load"
+      @size-change="onPageSizeChange"
+    />
 
     <ProductionDetailDrawerShell
       v-model="craftDetailDrawer.visible"
@@ -256,6 +253,7 @@ import ProductionDetailDrawerShell from '@/components/production/ProductionDetai
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import { useProductionProcessPage } from '@/composables/useProductionProcessPage'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320

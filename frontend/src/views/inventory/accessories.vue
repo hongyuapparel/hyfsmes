@@ -1,8 +1,9 @@
 <template>
-  <div class="page-card inventory-accessories-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
+  <div class="page-card page-card--fill inventory-accessories-page">
+    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="库存" name="stock">
-        <div class="filter-bar">
+        <div class="tab-pane-scroll">
+        <el-form class="filter-bar" @submit.prevent>
           <el-input
             v-model="filter.name"
             placeholder="名称"
@@ -80,10 +81,11 @@
               出库
             </el-button>
           </div>
-        </div>
+        </el-form>
 
         <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
+        <div ref="accessoriesStockShellRef" class="list-page-table-shell">
         <el-table
           ref="accessoriesStockTableRef"
           v-loading="loading"
@@ -91,6 +93,7 @@
           border
           stripe
           class="accessories-table"
+          :height="accessoriesStockTableHeight"
           :row-style="compactRowStyle"
           :cell-style="compactCellStyle"
           :header-cell-style="compactHeaderCellStyle"
@@ -122,22 +125,23 @@
             </template>
           </el-table-column>
         </el-table>
+        </div>
 
-        <div class="pagination-wrap">
-          <el-pagination
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.pageSize"
-            :total="pagination.total"
-            :page-sizes="[20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="load"
-            @size-change="onPageSizeChange"
-          />
+        <AppPaginationBar
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :total-quantity="stockTotalQuantity"
+          summary-label="总数量"
+          @current-change="load"
+          @size-change="onPageSizeChange"
+        />
         </div>
       </el-tab-pane>
 
       <el-tab-pane label="出库记录" name="outbounds">
-        <div class="filter-bar">
+        <div class="tab-pane-scroll">
+        <el-form class="filter-bar" @submit.prevent>
           <el-input
             v-model="outboundFilter.orderNo"
             placeholder="订单号（自动出库）"
@@ -175,8 +179,9 @@
             <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
             <el-button size="large" @click="onOutboundReset">清空</el-button>
           </div>
-        </div>
+        </el-form>
 
+        <div ref="accessoriesOutboundShellRef" class="list-page-table-shell">
         <el-table
           ref="accessoriesOutboundTableRef"
           v-loading="outboundLoading2"
@@ -184,6 +189,7 @@
           border
           stripe
           class="accessories-table"
+          :height="accessoriesOutboundTableHeight"
           :row-style="compactRowStyle"
           :cell-style="compactCellStyle"
           :header-cell-style="compactHeaderCellStyle"
@@ -213,16 +219,17 @@
           <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip align="center" header-align="center" />
         </el-table>
 
-        <div class="pagination-wrap">
-          <el-pagination
-            v-model:current-page="outboundPagination.page"
-            v-model:page-size="outboundPagination.pageSize"
-            :total="outboundPagination.total"
-            :page-sizes="[20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="loadOutbounds"
-            @size-change="onOutboundPageSizeChange"
-          />
+        </div>
+
+        <AppPaginationBar
+          v-model:current-page="outboundPagination.page"
+          v-model:page-size="outboundPagination.pageSize"
+          :total="outboundPagination.total"
+          :total-quantity="outboundTotalQuantity"
+          summary-label="出库数量"
+          @current-change="loadOutbounds"
+          @size-change="onOutboundPageSizeChange"
+        />
         </div>
       </el-tab-pane>
     </el-tabs>
@@ -264,7 +271,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getCustomers, getSalespeople, type CustomerItem } from '@/api/customers'
@@ -287,6 +294,8 @@ import AccessoriesFormDialog from '@/components/inventory/AccessoriesFormDialog.
 import AccessoriesOutboundDialog from '@/components/inventory/AccessoriesOutboundDialog.vue'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const filter = reactive({ name: '', category: '', customerName: '', salesperson: '' })
@@ -295,6 +304,8 @@ const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
 const accessoriesStockTableRef = ref()
 const accessoriesOutboundTableRef = ref()
+const accessoriesStockShellRef = ref<HTMLElement | null>(null)
+const accessoriesOutboundShellRef = ref<HTMLElement | null>(null)
 const customerOptions = ref<{ label: string; value: string }[]>([])
 const salespersonOptions = ref<string[]>([])
 const categoryOptions = ref<string[]>([])
@@ -313,6 +324,8 @@ const accessoriesFormDialogRef = ref<AccessoriesFormDialogExpose>()
 const accessoriesOutboundDialogRef = ref<AccessoriesOutboundDialogExpose>()
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
+const { tableHeight: accessoriesStockTableHeight } = useFlexShellTableHeight(accessoriesStockShellRef)
+const { tableHeight: accessoriesOutboundTableHeight } = useFlexShellTableHeight(accessoriesOutboundShellRef)
 const { onHeaderDragEnd: onAccessoriesStockHeaderDragEnd, restoreColumnWidths: restoreAccessoriesStockColumnWidths } =
   useTableColumnWidthPersist('inventory-accessories-stock')
 const {
@@ -328,6 +341,9 @@ const { formDialog, quickAddSource, form, formRules, openForm, resetForm, submit
 )
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
+
+const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 
 function getInventoryOutboundRangeStyle(v: [string, string] | []) {
   const hasValue = Array.isArray(v) && v.length === 2
@@ -499,6 +515,7 @@ onMounted(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  min-height: 0;
 }
 
 .accessories-table :deep(.cell) {

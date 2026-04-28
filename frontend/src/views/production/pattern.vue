@@ -163,17 +163,14 @@
       />
     </div>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar
+      v-model:current-page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      :total="pagination.total"
+      :page-sizes="[20, 50, 100]"
+      @current-change="load"
+      @size-change="onPageSizeChange"
+    />
 
     <ProductionDetailDrawerShell
       v-model="detailDrawer.visible"
@@ -429,6 +426,7 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const patternTableRef = ref<{ getTableRef?: () => unknown } | null>(null)
 const tableShellRef = ref<HTMLElement | null>(null)

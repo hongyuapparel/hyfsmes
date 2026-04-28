@@ -1,10 +1,8 @@
 <template>
-  <el-drawer
+  <AppDrawer
     :model-value="modelValue"
     title="库存详情"
-    :size="`${drawerWidth}px`"
-    destroy-on-close
-    :with-header="true"
+    :size="drawerWidth"
     class="finished-detail-drawer"
     @update:model-value="emit('update:modelValue', $event)"
   >
@@ -47,11 +45,12 @@
       </div>
       <div v-else class="detail-muted">暂无数据</div>
     </div>
-  </el-drawer>
+  </AppDrawer>
 </template>
 
 <script setup lang="ts">
 import { computed, watch } from 'vue'
+import AppDrawer from '@/components/AppDrawer.vue'
 import { formatDateTime } from '@/utils/date-format'
 import { sumRowQty } from '@/composables/useFinishedDetailHelpers'
 import type { FinishedDetailEditForm } from '@/composables/useFinishedDetailData'

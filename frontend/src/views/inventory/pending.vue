@@ -5,7 +5,7 @@
       <el-tab-pane label="已发货" name="shipped" />
     </el-tabs>
 
-    <div class="filter-bar">
+    <el-form class="filter-bar" @submit.prevent>
       <el-input
         v-model="filter.orderNo"
         placeholder="订单号"
@@ -68,7 +68,7 @@
           发货
         </el-button>
       </div>
-    </div>
+    </el-form>
 
     <div v-if="pageTab === 'pending' && hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
@@ -172,17 +172,16 @@
     </el-table>
     </div>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar
+      v-model:current-page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      :total="pagination.total"
+      :total-quantity="totalPageQuantity"
+      unit="件"
+      summary-label="总件数"
+      @current-change="load"
+      @size-change="onPageSizeChange"
+    />
 
     <PendingInboundDialog
       v-model:visible="inboundDialog.visible"
@@ -242,6 +241,7 @@ import {
 import { formatDisplayNumber } from '@/utils/display-number'
 import PendingInboundDialog from '@/components/inventory/pending/PendingInboundDialog.vue'
 import PendingOutboundDialog from '@/components/inventory/pending/PendingOutboundDialog.vue'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useInventoryPendingDialogs } from '@/composables/useInventoryPendingDialogs'
 
 const filter = reactive({ orderNo: '', skuCode: '' })
@@ -264,6 +264,7 @@ const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PendingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+const totalPageQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 const canOutboundSelection = computed(
   () => pageTab.value === 'pending' && selectedRows.value.length > 0 && selectedRows.value.every((r) => r.sourceType !== 'defect'),
 )

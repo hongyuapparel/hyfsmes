@@ -112,17 +112,14 @@
       />
     </div>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar
+      v-model:current-page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      :total="pagination.total"
+      :page-sizes="[20, 50, 100]"
+      @current-change="load"
+      @size-change="onPageSizeChange"
+    />
 
     <ProductionDetailDrawerShell
       v-model="finishingBriefDrawer.visible"
@@ -381,6 +378,7 @@ import ProductionOrderBriefPanel, {
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import FinishingTable from '@/components/production/FinishingTable.vue'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
