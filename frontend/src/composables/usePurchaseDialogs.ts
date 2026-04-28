@@ -63,6 +63,8 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
   const pickInventoryOptions = ref<
     Array<{ id: number; label: string; availableQuantity: number; imageUrl: string }>
   >([])
+  const pickInventoryLoading = ref(false)
+  let currentSourceType: PickInventorySourceType | null = null
   const pickRules: FormRules = {
     quantity: [
       {
@@ -139,13 +141,12 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
     openRegisterDialog()
   }
 
-  async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
-    pickForm.inventoryId = null
-    pickInventoryOptions.value = []
-    if (!val) return
+  async function loadPickInventory(sourceType: PickInventorySourceType | null, name?: string) {
+    if (!sourceType) return
+    pickInventoryLoading.value = true
     try {
-      if (val === 'fabric') {
-        const res = await getFabricList({ page: 1, pageSize: 200 })
+      if (sourceType === 'fabric') {
+        const res = await getFabricList({ name: name || undefined, page: 1, pageSize: 100 })
         pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
           id: item.id,
           label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
@@ -154,8 +155,8 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
         }))
         return
       }
-      if (val === 'accessory') {
-        const res = await getAccessoriesList({ page: 1, pageSize: 200 })
+      if (sourceType === 'accessory') {
+        const res = await getAccessoriesList({ name: name || undefined, page: 1, pageSize: 100 })
         pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
           id: item.id,
           label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
@@ -164,7 +165,7 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
         }))
         return
       }
-      const res = await getFinishedStockList({ tab: 'stored', page: 1, pageSize: 200 })
+      const res = await getFinishedStockList({ tab: 'stored', page: 1, pageSize: 100 })
       pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
         id: item.id,
         label: `${item.skuCode}（可用:${item.quantity}）`,
@@ -173,7 +174,20 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
       }))
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '库存列表加载失败'))
+    } finally {
+      pickInventoryLoading.value = false
     }
+  }
+
+  async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
+    pickForm.inventoryId = null
+    pickInventoryOptions.value = []
+    currentSourceType = val
+    await loadPickInventory(val)
+  }
+
+  async function onPickInventorySearch(query: string) {
+    await loadPickInventory(currentSourceType, query.trim() || undefined)
   }
 
   function resetPickForm() {
@@ -270,10 +284,12 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
     pickFormRef,
     pickForm,
     pickInventoryOptions,
+    pickInventoryLoading,
     pickRules,
     batchButtonLabel,
     onBatchHandle,
     onPickSourceTypeChange,
+    onPickInventorySearch,
     resetPickForm,
     submitPick,
     resetRegisterForm,

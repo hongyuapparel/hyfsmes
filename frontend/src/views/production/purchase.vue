@@ -385,7 +385,16 @@
             </el-select>
           </el-form-item>
           <el-form-item label="具体库存">
-            <el-select v-model="pickForm.inventoryId" clearable filterable placeholder="先选择库存来源类型" :disabled="!pickForm.inventorySourceType">
+            <el-select
+              v-model="pickForm.inventoryId"
+              clearable
+              filterable
+              remote
+              :remote-method="onPickInventorySearch"
+              :loading="pickInventoryLoading"
+              placeholder="先选择库存来源类型，再输入关键字搜索"
+              :disabled="!pickForm.inventorySourceType"
+            >
               <el-option v-for="opt in pickInventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
                 <div class="pick-stock-option">
                   <AppImageThumb
@@ -490,10 +499,12 @@ const {
   pickFormRef,
   pickForm,
   pickInventoryOptions,
+  pickInventoryLoading,
   pickRules,
   batchButtonLabel,
   onBatchHandle,
   onPickSourceTypeChange,
+  onPickInventorySearch,
   resetPickForm,
   submitPick,
   resetRegisterForm,
