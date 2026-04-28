@@ -11,7 +11,7 @@ import {
 import { CUTTING_ABNORMAL_REASONS } from '@/constants/cutting-register'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSupplierList, type SupplierItem } from '@/api/suppliers'
-import { getEmployeeList, type EmployeeItem } from '@/api/hr'
+import { getStaffOptions } from '@/api/hr'
 import { formatDisplayNumber } from '@/utils/display-number'
 
 interface UseCuttingRegisterParams {
@@ -255,8 +255,8 @@ export function useCuttingRegister(params: UseCuttingRegisterParams) {
 
   async function loadCutterOptions() {
     try {
-      const res = await getEmployeeList({ page: 1, pageSize: 500 })
-      const list: EmployeeItem[] = res.data?.list ?? []
+      const res = await getStaffOptions()
+      const list = res.data ?? []
       const names = list
         .filter((e) => {
           const dept = (e.departmentName ?? '').trim()

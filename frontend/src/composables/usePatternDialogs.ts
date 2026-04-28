@@ -8,7 +8,7 @@ import {
   type PatternListItem,
   type PatternMaterialRow,
 } from '@/api/production-pattern'
-import { getEmployeeList, type EmployeeItem } from '@/api/hr'
+import { getStaffOptions, type StaffOptionItem } from '@/api/hr'
 import { getDictItems } from '@/api/dicts'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -49,8 +49,8 @@ export function usePatternDialogs(
     patternMaster: [{ required: true, message: '请选择纸样师', trigger: 'change' }],
     sampleMaker: [{ required: true, message: '请选择车版师', trigger: 'change' }],
   }
-  const patternMasterOptions = ref<EmployeeItem[]>([])
-  const sampleMakerOptions = ref<EmployeeItem[]>([])
+  const patternMasterOptions = ref<StaffOptionItem[]>([])
+  const sampleMakerOptions = ref<StaffOptionItem[]>([])
 
   const completeDialog = reactive<{ visible: boolean; submitting: boolean; row: PatternListItem | null }>({
     visible: false,
@@ -248,9 +248,8 @@ export function usePatternDialogs(
 
   async function loadPatternStaffOptions() {
     try {
-      const res = await getEmployeeList({ page: 1, pageSize: 200 })
-      const employees = res.data?.list ?? []
-      const active = employees.filter((e) => (e.status ?? '').toLowerCase() !== 'left')
+      const res = await getStaffOptions()
+      const active = (res.data ?? []).filter((e) => (e.status ?? '').toLowerCase() !== 'left')
       patternMasterOptions.value = active.filter((e) => (e.jobTitleName ?? '').includes('纸样师'))
       sampleMakerOptions.value = active.filter((e) => (e.jobTitleName ?? '').includes('车版师'))
     } catch {

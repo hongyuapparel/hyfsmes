@@ -30,6 +30,18 @@ export interface EmployeeItem {
   updatedAt: string
 }
 
+export interface StaffOptionItem {
+  id: number
+  name: string
+  departmentName: string
+  jobTitleName: string
+  status: string
+}
+
+export function getStaffOptions() {
+  return request.get<StaffOptionItem[]>('/hr/staff-options')
+}
+
 export function getEmployeeList(params?: {
   name?: string
   departmentId?: number

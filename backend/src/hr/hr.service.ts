@@ -109,6 +109,23 @@ export class HrService {
     return { list: withLabels, total, page, pageSize };
   }
 
+  async getStaffOptions(): Promise<{ id: number; name: string; departmentName: string; jobTitleName: string; status: string }[]> {
+    const list = await this.repo.find({ select: ['id', 'name', 'departmentId', 'jobTitleId', 'department', 'jobTitle', 'status'] });
+    const departmentIds = Array.from(new Set(list.map((e) => e.departmentId).filter((v) => v != null) as number[]));
+    const jobTitleIds = Array.from(new Set(list.map((e) => e.jobTitleId).filter((v) => v != null) as number[]));
+    const [departmentLabels, jobTitleLabels] = await Promise.all([
+      this.systemOptionsService.getOptionLabelsByIds('org_departments', departmentIds),
+      this.systemOptionsService.getOptionLabelsByIds('org_jobs', jobTitleIds),
+    ]);
+    return list.map((e) => ({
+      id: e.id,
+      name: e.name ?? '',
+      departmentName: (e.departmentId != null ? departmentLabels[e.departmentId] : '') || e.department || '',
+      jobTitleName: (e.jobTitleId != null ? jobTitleLabels[e.jobTitleId] : '') || e.jobTitle || '',
+      status: e.status ?? '',
+    }));
+  }
+
   async getOne(id: number): Promise<Employee> {
     const item = await this.repo.findOne({
       where: { id },

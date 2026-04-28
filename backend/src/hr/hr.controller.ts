@@ -60,6 +60,13 @@ export class HrController {
     return this.hrService.getUserOptions();
   }
 
+  /** 员工基础选项（仅姓名/部门/岗位/状态），供生产各模块下拉使用，无需人事权限 */
+  @Get('staff-options')
+  @RequirePermission(['/hr', '/production/cutting', '/production/pattern', '/production/sewing', '/production/finishing', '/production/purchase'])
+  getStaffOptions() {
+    return this.hrService.getStaffOptions();
+  }
+
   @Get('items/:id')
   getOne(@Param('id') id: string) {
     return this.hrService.getOne(Number(id));
