@@ -248,11 +248,11 @@ export function usePatternDialogs(
 
   async function loadPatternStaffOptions() {
     try {
-      const res = await getEmployeeList({ status: 'active', page: 1, pageSize: 200 })
-      const data = res.data
-      const employees = data?.list ?? []
-      patternMasterOptions.value = employees.filter((e) => e.jobTitleName === '纸样师')
-      sampleMakerOptions.value = employees.filter((e) => e.jobTitleName === '车版师')
+      const res = await getEmployeeList({ page: 1, pageSize: 200 })
+      const employees = res.data?.list ?? []
+      const active = employees.filter((e) => (e.status ?? '').toLowerCase() !== 'left')
+      patternMasterOptions.value = active.filter((e) => (e.jobTitleName ?? '').includes('纸样师'))
+      sampleMakerOptions.value = active.filter((e) => (e.jobTitleName ?? '').includes('车版师'))
     } catch {
       patternMasterOptions.value = []
       sampleMakerOptions.value = []

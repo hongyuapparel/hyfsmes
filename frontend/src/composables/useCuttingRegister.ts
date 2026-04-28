@@ -255,23 +255,21 @@ export function useCuttingRegister(params: UseCuttingRegisterParams) {
 
   async function loadCutterOptions() {
     try {
-      const res = await getEmployeeList({ status: 'active', page: 1, pageSize: 500 })
+      const res = await getEmployeeList({ page: 1, pageSize: 500 })
       const list: EmployeeItem[] = res.data?.list ?? []
       const names = list
         .filter((e) => {
           const dept = (e.departmentName ?? '').trim()
           const job = (e.jobTitleName ?? '').trim()
           const status = (e.status ?? '').toLowerCase()
-          const isCuttingDepartment = dept.includes('裁床')
-          const isElectricCutter = job.includes('电剪')
-          return isCuttingDepartment && isElectricCutter && status === 'active'
+          return dept.includes('裁床') && job.includes('电剪') && status !== 'left'
         })
         .map((e) => (e.name ?? '').trim())
         .filter((v) => !!v)
       const uniq = Array.from(new Set(names)).sort((a, b) => a.localeCompare(b, 'zh-CN'))
-      cutterOptions.value = uniq.length ? uniq : ['电剪刀']
+      cutterOptions.value = uniq
     } catch {
-      cutterOptions.value = ['电剪刀']
+      cutterOptions.value = []
     }
   }
 
