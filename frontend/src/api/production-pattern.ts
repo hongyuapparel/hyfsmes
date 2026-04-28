@@ -40,6 +40,10 @@ export interface PatternListQuery {
   tab?: string
   orderNo?: string
   skuCode?: string
+  /** 纸样师（姓名） */
+  patternMaster?: string
+  /** 车版师（姓名） */
+  sampleMaker?: string
   /** 订单类型 ID */
   orderTypeId?: number
   /** 合作方式 ID */

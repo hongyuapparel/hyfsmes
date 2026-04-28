@@ -1,11 +1,13 @@
-import { computed, reactive, ref, watch, type Ref } from 'vue'
+import { computed, onBeforeUnmount, reactive, ref, watch, type Ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { registerPick, registerPurchase, type PurchaseItemRow } from '@/api/production-purchase'
 import { getAccessoriesList, getFabricList, getFinishedStockList } from '@/api/inventory'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getErrorMessage, isErrorHandled, isRequestCanceled } from '@/api/request'
 import { formatDisplayNumber } from '@/utils/display-number'
 
 type PickInventorySourceType = 'fabric' | 'accessory' | 'finished'
+const PICK_INVENTORY_PAGE_SIZE = 20
+const PICK_INVENTORY_SEARCH_DELAY_MS = 300
 
 type UsePurchaseDialogsOptions = {
   currentTab: Ref<string>
@@ -65,6 +67,9 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
   >([])
   const pickInventoryLoading = ref(false)
   let currentSourceType: PickInventorySourceType | null = null
+  let pickInventorySearchTimer: ReturnType<typeof setTimeout> | null = null
+  let pickInventoryReqId = 0
+  let pickInventoryAbortController: AbortController | null = null
   const pickRules: FormRules = {
     quantity: [
       {
@@ -141,53 +146,96 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
     openRegisterDialog()
   }
 
+  function clearPickInventorySearchTimer() {
+    if (!pickInventorySearchTimer) return
+    clearTimeout(pickInventorySearchTimer)
+    pickInventorySearchTimer = null
+  }
+
+  function cancelPickInventoryLoad() {
+    clearPickInventorySearchTimer()
+    pickInventoryReqId += 1
+    pickInventoryAbortController?.abort()
+    pickInventoryAbortController = null
+    pickInventoryLoading.value = false
+  }
+
   async function loadPickInventory(sourceType: PickInventorySourceType | null, name?: string) {
-    if (!sourceType) return
+    if (!sourceType) {
+      cancelPickInventoryLoad()
+      pickInventoryOptions.value = []
+      return
+    }
+    const reqId = pickInventoryReqId + 1
+    pickInventoryReqId = reqId
+    pickInventoryAbortController?.abort()
+    const controller = new AbortController()
+    pickInventoryAbortController = controller
+    const keyword = name?.trim() || undefined
     pickInventoryLoading.value = true
     try {
+      let nextOptions: Array<{ id: number; label: string; availableQuantity: number; imageUrl: string }> = []
       if (sourceType === 'fabric') {
-        const res = await getFabricList({ name: name || undefined, page: 1, pageSize: 100 })
-        pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
+        const res = await getFabricList(
+          { name: keyword, skipTotal: true, page: 1, pageSize: PICK_INVENTORY_PAGE_SIZE },
+          { signal: controller.signal },
+        )
+        nextOptions = (res.data?.list ?? []).map((item) => ({
           id: item.id,
           label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
           availableQuantity: Number(item.quantity) || 0,
           imageUrl: item.imageUrl ?? '',
         }))
-        return
-      }
-      if (sourceType === 'accessory') {
-        const res = await getAccessoriesList({ name: name || undefined, page: 1, pageSize: 100 })
-        pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
+      } else if (sourceType === 'accessory') {
+        const res = await getAccessoriesList(
+          { name: keyword, skipTotal: true, page: 1, pageSize: PICK_INVENTORY_PAGE_SIZE },
+          { signal: controller.signal },
+        )
+        nextOptions = (res.data?.list ?? []).map((item) => ({
           id: item.id,
           label: `${item.name}（可用:${item.quantity}${item.unit ?? ''}）`,
           availableQuantity: Number(item.quantity) || 0,
           imageUrl: item.imageUrl ?? '',
         }))
-        return
+      } else {
+        const res = await getFinishedStockList(
+          { tab: 'stored', skuCode: keyword, page: 1, pageSize: PICK_INVENTORY_PAGE_SIZE },
+          { signal: controller.signal },
+        )
+        nextOptions = (res.data?.list ?? []).map((item) => ({
+          id: item.id,
+          label: `${item.skuCode}（可用:${item.quantity}）`,
+          availableQuantity: Number(item.quantity) || 0,
+          imageUrl: item.imageUrl ?? '',
+        }))
       }
-      const res = await getFinishedStockList({ tab: 'stored', page: 1, pageSize: 100 })
-      pickInventoryOptions.value = (res.data?.list ?? []).map((item) => ({
-        id: item.id,
-        label: `${item.skuCode}（可用:${item.quantity}）`,
-        availableQuantity: Number(item.quantity) || 0,
-        imageUrl: item.imageUrl ?? '',
-      }))
+      if (reqId === pickInventoryReqId) pickInventoryOptions.value = nextOptions
     } catch (e: unknown) {
+      if (isRequestCanceled(e) || reqId !== pickInventoryReqId) return
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '库存列表加载失败'))
     } finally {
-      pickInventoryLoading.value = false
+      if (reqId === pickInventoryReqId) {
+        pickInventoryLoading.value = false
+        if (pickInventoryAbortController === controller) pickInventoryAbortController = null
+      }
     }
   }
 
   async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
+    clearPickInventorySearchTimer()
     pickForm.inventoryId = null
     pickInventoryOptions.value = []
     currentSourceType = val
     await loadPickInventory(val)
   }
 
-  async function onPickInventorySearch(query: string) {
-    await loadPickInventory(currentSourceType, query.trim() || undefined)
+  function onPickInventorySearch(query: string) {
+    clearPickInventorySearchTimer()
+    const keyword = query.trim()
+    pickInventorySearchTimer = setTimeout(() => {
+      pickInventorySearchTimer = null
+      void loadPickInventory(currentSourceType, keyword || undefined)
+    }, PICK_INVENTORY_SEARCH_DELAY_MS)
   }
 
   function resetPickForm() {
@@ -198,6 +246,8 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
     pickForm.inventoryId = null
     pickForm.quantity = null
     pickForm.remark = ''
+    currentSourceType = null
+    cancelPickInventoryLoad()
     pickInventoryOptions.value = []
     pickFormRef.value?.clearValidate()
   }
@@ -274,6 +324,10 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
   const batchButtonLabel = computed(() =>
     options.currentTab.value === 'picking' ? '领料' : '登记实际采购',
   )
+
+  onBeforeUnmount(() => {
+    cancelPickInventoryLoad()
+  })
 
   return {
     registerDialog,

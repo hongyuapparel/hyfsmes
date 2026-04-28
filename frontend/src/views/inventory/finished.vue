@@ -15,7 +15,7 @@
           :has-stored-selection="hasStoredSelection"
           :selected-rows="selectedRows"
           :loading="loading"
-          :stock-table-data="stockTableData"
+          :stock-table-data="displayStockTableData"
           :table-ref="finishedStockTableRef"
           :compact-header-cell-style="compactHeaderCellStyle"
           :compact-cell-style="compactCellStyle"
@@ -192,6 +192,7 @@ const {
 })
 const { currentTab, filter, orderNoLabelVisible, skuCodeLabelVisible, inboundDateRange, pagination, onSearch, debouncedSearch, onReset, onPageSizeChange, onCurrentPageChange } =
   useFinishedViewStockFilter(load, clearSelection)
+const displayStockTableData = computed(() => stockTableData.value.slice(0, pagination.pageSize))
 
 const stockListFooterQuantity = computed(() => {
   if (selectedRows.value.length > 0) {

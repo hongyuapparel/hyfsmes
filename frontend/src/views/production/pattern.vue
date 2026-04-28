@@ -45,6 +45,38 @@
           </span>
         </template>
       </el-input>
+      <el-select
+        v-model="filter.patternMaster"
+        placeholder="纸样师"
+        clearable
+        filterable
+        size="large"
+        class="filter-bar-item"
+        :style="getFilterSelectAutoWidthStyle(filter.patternMaster ? `纸样师：${filter.patternMaster}` : undefined)"
+        @change="onSearch"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.patternMaster">纸样师：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option v-for="e in patternMasterOptions" :key="e.id" :label="e.name" :value="e.name" />
+      </el-select>
+      <el-select
+        v-model="filter.sampleMaker"
+        placeholder="车版师"
+        clearable
+        filterable
+        size="large"
+        class="filter-bar-item"
+        :style="getFilterSelectAutoWidthStyle(filter.sampleMaker ? `车版师：${filter.sampleMaker}` : undefined)"
+        @change="onSearch"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.sampleMaker">车版师：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option v-for="e in sampleMakerOptions" :key="e.id" :label="e.name" :value="e.name" />
+      </el-select>
       <el-tree-select
         v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"

@@ -22,6 +22,8 @@ export function usePatternList() {
   const filter = reactive({
     orderNo: '',
     skuCode: '',
+    patternMaster: '',
+    sampleMaker: '',
     orderTypeId: null as number | null,
     collaborationTypeId: null as number | null,
     purchaseStatus: '',
@@ -110,6 +112,8 @@ export function usePatternList() {
       tab: currentTab.value,
       orderNo: normalizeTextFilter(filter.orderNo),
       skuCode: normalizeTextFilter(filter.skuCode),
+      patternMaster: normalizeTextFilter(filter.patternMaster),
+      sampleMaker: normalizeTextFilter(filter.sampleMaker),
       orderTypeId: filter.orderTypeId ?? undefined,
       collaborationTypeId: filter.collaborationTypeId ?? undefined,
       purchaseStatus: filter.purchaseStatus || undefined,
@@ -228,6 +232,8 @@ export function usePatternList() {
     skuCodeLabelVisible.value = false
     filter.orderNo = ''
     filter.skuCode = ''
+    filter.patternMaster = ''
+    filter.sampleMaker = ''
     filter.orderTypeId = null
     filter.collaborationTypeId = null
     filter.purchaseStatus = ''

@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 /** 面料 */
 export interface FabricItem {
@@ -43,12 +44,13 @@ export function getFabricList(params?: {
   customerName?: string
   startDate?: string
   endDate?: string
+  skipTotal?: boolean
   page?: number
   pageSize?: number
-}) {
+}, config?: AxiosRequestConfig) {
   return request.get<{ list: FabricItem[]; total: number; page: number; pageSize: number }>(
     '/inventory/fabric/items',
-    { params }
+    { params, ...(config ?? {}) }
   )
 }
 

@@ -75,10 +75,11 @@ export class InventoryAccessoriesService {
     salesperson?: string;
     startDate?: string;
     endDate?: string;
+    skipTotal?: boolean;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: InventoryAccessory[]; total: number; page: number; pageSize: number }> {
-    const { name, category, customerName, salesperson, startDate, endDate, page = 1, pageSize = 20 } = params;
+    const { name, category, customerName, salesperson, startDate, endDate, skipTotal = false, page = 1, pageSize = 20 } = params;
     const qb = this.repo.createQueryBuilder('a');
 
     if (name?.trim()) {
@@ -103,7 +104,7 @@ export class InventoryAccessoriesService {
     }
     qb.orderBy('a.created_at', 'DESC');
 
-    const total = await qb.getCount();
+    const total = skipTotal ? 0 : await qb.getCount();
     const list = await qb
       .skip((page - 1) * pageSize)
       .take(pageSize)

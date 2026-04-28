@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 /** 辅料 */
 export interface AccessoryItem {
@@ -22,12 +23,13 @@ export function getAccessoriesList(params?: {
   /** 入库时间：created_at，YYYY-MM-DD */
   startDate?: string
   endDate?: string
+  skipTotal?: boolean
   page?: number
   pageSize?: number
-}) {
+}, config?: AxiosRequestConfig) {
   return request.get<{ list: AccessoryItem[]; total: number; page: number; pageSize: number }>(
     '/inventory/accessories/items',
-    { params }
+    { params, ...(config ?? {}) }
   )
 }
 

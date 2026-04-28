@@ -137,6 +137,84 @@ function getDayOfYear(): number {
   return Math.floor(diff / 86400000)
 }
 
+const CONTEXT_SPECIFIC_TEXT_REGEX =
+  /(阳光|有风|下雨|天晴|阴天|入秋|夏天|冬天|保暖|带伞|天气)/
+
+const WEEKEND_ENCOURAGE_TEXTS = new Set<string>(['周末愉快鸭！'])
+const HOLIDAY_TODAY_ENCOURAGE_TEXTS = new Set<string>(['今天过节，尽量早点收工哟'])
+const HOLIDAY_EVE_ENCOURAGE_TEXTS = new Set<string>(['假期快到了，撑住~', '小长假前事多，别忘了喘口气~'])
+const HOLIDAY_AFTER_ENCOURAGE_TEXTS = new Set<string>(['节后第一天，慢慢来！'])
+
+const LUNAR_FORMATTER = new Intl.DateTimeFormat('zh-CN-u-ca-chinese', {
+  month: 'numeric',
+  day: 'numeric',
+})
+
+function addDays(date: Date, days: number): Date {
+  const result = new Date(date)
+  result.setDate(result.getDate() + days)
+  return result
+}
+
+function getLunarMonthDay(date: Date): { month: number; day: number } | null {
+  const parts = LUNAR_FORMATTER.formatToParts(date)
+  const monthPart = parts.find((part) => part.type === 'month')
+  const dayPart = parts.find((part) => part.type === 'day')
+  if (!monthPart || !dayPart) return null
+
+  const month = Number(monthPart.value)
+  const day = Number(dayPart.value)
+  if (Number.isNaN(month) || Number.isNaN(day)) return null
+
+  return { month, day }
+}
+
+function isWeekend(date: Date): boolean {
+  const day = date.getDay()
+  return day === 0 || day === 6
+}
+
+function isSolarHoliday(date: Date): boolean {
+  const month = date.getMonth() + 1
+  const day = date.getDate()
+  if (month === 1 && day === 1) return true
+  if (month === 5 && day >= 1 && day <= 5) return true
+  if (month === 10 && day >= 1 && day <= 7) return true
+  if (month === 4 && day >= 4 && day <= 6) return true
+  return false
+}
+
+function isLunarHoliday(date: Date): boolean {
+  const lunar = getLunarMonthDay(date)
+  if (!lunar) return false
+  if (lunar.month === 1 && lunar.day >= 1 && lunar.day <= 7) return true
+  if (lunar.month === 5 && lunar.day === 5) return true
+  if (lunar.month === 8 && lunar.day === 15) return true
+  return false
+}
+
+function isHoliday(date: Date): boolean {
+  return isSolarHoliday(date) || isLunarHoliday(date)
+}
+
+function getHolidayContext(date: Date): {
+  isHolidayToday: boolean
+  isDayBeforeHoliday: boolean
+  isDayAfterHoliday: boolean
+} {
+  const yesterday = addDays(date, -1)
+  const tomorrow = addDays(date, 1)
+  return {
+    isHolidayToday: isHoliday(date),
+    isDayBeforeHoliday: isHoliday(tomorrow),
+    isDayAfterHoliday: isHoliday(yesterday) && !isHoliday(date),
+  }
+}
+
+function isContextSpecificEncourageText(text: string): boolean {
+  return CONTEXT_SPECIFIC_TEXT_REGEX.test(text)
+}
+
 export function useHomeWelcome(permissionChecker: PermissionChecker) {
   const greetingText = computed(() => {
     const hour = new Date().getHours()
@@ -150,7 +228,16 @@ export function useHomeWelcome(permissionChecker: PermissionChecker) {
   })
 
   const filteredEncourageItems = computed(() => {
+    const now = new Date()
+    const weekend = isWeekend(now)
+    const holidayContext = getHolidayContext(now)
+
     return ENCOURAGE_ITEMS.filter((item) => {
+      if (isContextSpecificEncourageText(item.text)) return false
+      if (WEEKEND_ENCOURAGE_TEXTS.has(item.text) && !weekend) return false
+      if (HOLIDAY_TODAY_ENCOURAGE_TEXTS.has(item.text) && !holidayContext.isHolidayToday) return false
+      if (HOLIDAY_EVE_ENCOURAGE_TEXTS.has(item.text) && !holidayContext.isDayBeforeHoliday) return false
+      if (HOLIDAY_AFTER_ENCOURAGE_TEXTS.has(item.text) && !holidayContext.isDayAfterHoliday) return false
       if (!item.forRoutePath && !item.forPermissionCode) return true
       if (item.forRoutePath && permissionChecker.hasRoutePermission(item.forRoutePath)) return true
       if (item.forPermissionCode && permissionChecker.hasPermission(item.forPermissionCode)) return true

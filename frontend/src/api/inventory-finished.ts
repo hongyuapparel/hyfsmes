@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 /** 成品库存快照结构（调整日志 before/after 字段） */
 export interface FinishedStockSnapshot {
@@ -42,7 +43,7 @@ export function getFinishedStockList(params?: {
   endDate?: string
   page?: number
   pageSize?: number
-}) {
+}, config?: AxiosRequestConfig) {
   return request.get<{
     list: FinishedStockRow[]
     total: number
@@ -50,7 +51,7 @@ export function getFinishedStockList(params?: {
     pageSize: number
     /** 当前筛选条件下全部匹配记录的总件数（非仅本页） */
     totalQuantity: number
-  }>('/inventory/finished/items', { params })
+  }>('/inventory/finished/items', { params, ...(config ?? {}) })
 }
 
 export function finishedOutbound(body: {

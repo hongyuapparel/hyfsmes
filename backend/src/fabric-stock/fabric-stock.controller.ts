@@ -38,6 +38,7 @@ export class FabricStockController {
     @Query('customerName') customerName?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('skipTotal') skipTotal?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -46,6 +47,7 @@ export class FabricStockController {
       customerName,
       startDate,
       endDate,
+      skipTotal: skipTotal === 'true' || skipTotal === '1',
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });

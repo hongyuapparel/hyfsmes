@@ -197,10 +197,11 @@ export class FabricStockService {
     customerName?: string;
     startDate?: string;
     endDate?: string;
+    skipTotal?: boolean;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: FabricStockListRow[]; total: number; page: number; pageSize: number }> {
-    const { name, customerName, startDate, endDate, page = 1, pageSize = 20 } = params;
+    const { name, customerName, startDate, endDate, skipTotal = false, page = 1, pageSize = 20 } = params;
     const qb = this.stockRepo.createQueryBuilder('s');
     if (name?.trim()) {
       qb.andWhere('s.name LIKE :name', { name: `%${name.trim()}%` });
@@ -217,7 +218,7 @@ export class FabricStockService {
       qb.andWhere('s.created_at <= :inboundEnd', { inboundEnd: `${endDate.trim()} 23:59:59` });
     }
     qb.orderBy('s.created_at', 'DESC');
-    const total = await qb.getCount();
+    const total = skipTotal ? 0 : await qb.getCount();
     const rawList = await qb
       .skip((page - 1) * pageSize)
       .take(pageSize)

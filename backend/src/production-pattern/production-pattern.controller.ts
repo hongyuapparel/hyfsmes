@@ -17,6 +17,8 @@ export class ProductionPatternController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('patternMaster') patternMaster?: string,
+    @Query('sampleMaker') sampleMaker?: string,
     @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('collaborationTypeId') collaborationTypeIdStr?: string,
     @Query('purchaseStatus') purchaseStatus?: string,
@@ -34,6 +36,8 @@ export class ProductionPatternController {
       tab,
       orderNo,
       skuCode,
+      patternMaster,
+      sampleMaker,
       orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
       collaborationTypeId: Number.isNaN(collaborationTypeId as number)
         ? undefined
@@ -54,6 +58,8 @@ export class ProductionPatternController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('patternMaster') patternMaster?: string,
+    @Query('sampleMaker') sampleMaker?: string,
     @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('collaborationTypeId') collaborationTypeIdStr?: string,
     @Query('purchaseStatus') purchaseStatus?: string,
@@ -70,6 +76,8 @@ export class ProductionPatternController {
       tab,
       orderNo,
       skuCode,
+      patternMaster,
+      sampleMaker,
       orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
       collaborationTypeId: Number.isNaN(collaborationTypeId as number)
         ? undefined

@@ -43,6 +43,8 @@ export interface PatternListQuery {
   tab?: string;
   orderNo?: string;
   skuCode?: string;
+  patternMaster?: string;
+  sampleMaker?: string;
   /** 订单类型 ID */
   orderTypeId?: number;
   /** 合作方式 ID */
@@ -222,6 +224,14 @@ export class ProductionPatternService {
     return true;
   }
 
+  private matchesNameFilter(source: string | null | undefined, keyword: string | null | undefined): boolean {
+    const text = (source ?? '').trim();
+    const search = (keyword ?? '').trim();
+    if (!search) return true;
+    if (!text) return false;
+    return text.includes(search);
+  }
+
   private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
     if (!materials || materials.length === 0) return false;
     return materials.every((m) => {
@@ -284,6 +294,8 @@ export class ProductionPatternService {
       tab = 'all',
       orderNo,
       skuCode,
+      patternMaster,
+      sampleMaker,
       orderTypeId,
       collaborationTypeId,
       purchaseStatus,
@@ -362,6 +374,10 @@ export class ProductionPatternService {
       if (purchaseStatus === 'pending' && purchaseStatusStr === 'completed') continue;
 
       const pStatus = pattern?.status ?? 'pending_assign';
+      const patternMasterName = pattern?.patternMaster ?? '';
+      const sampleMakerName = pattern?.sampleMaker ?? '';
+      if (!this.matchesNameFilter(patternMasterName, patternMaster)) continue;
+      if (!this.matchesNameFilter(sampleMakerName, sampleMaker)) continue;
       if (tab === 'pending_assign' && pStatus !== 'pending_assign') continue;
       if (tab === 'in_progress' && pStatus !== 'in_progress') continue;
       if (tab === 'completed' && pStatus !== 'completed') continue;
@@ -411,8 +427,8 @@ export class ProductionPatternService {
         collaborationTypeId: order.collaborationTypeId ?? null,
         purchaseStatus: purchaseStatusStr,
         patternStatus: pStatus,
-        patternMaster: pattern?.patternMaster ?? '',
-        sampleMaker: pattern?.sampleMaker ?? '',
+        patternMaster: patternMasterName,
+        sampleMaker: sampleMakerName,
         sampleImageUrl: pattern?.sampleImageUrl ?? '',
         timeRating,
       });

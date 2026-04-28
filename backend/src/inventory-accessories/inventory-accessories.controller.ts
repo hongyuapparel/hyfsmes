@@ -35,6 +35,7 @@ export class InventoryAccessoriesController {
     @Query('salesperson') salesperson?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('skipTotal') skipTotal?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -45,6 +46,7 @@ export class InventoryAccessoriesController {
       salesperson,
       startDate,
       endDate,
+      skipTotal: skipTotal === 'true' || skipTotal === '1',
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
