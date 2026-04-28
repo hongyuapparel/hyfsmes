@@ -149,17 +149,14 @@
       @open-brief="openPurchaseBriefDrawer"
     />
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar
+      v-model:current-page="pagination.page"
+      v-model:page-size="pagination.pageSize"
+      :total="pagination.total"
+      :page-sizes="[20, 50, 100]"
+      @current-change="load"
+      @size-change="onPageSizeChange"
+    />
 
     <ProductionDetailDrawerShell
       v-model="purchaseBriefDrawer.visible"
@@ -449,6 +446,7 @@ import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBr
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import { useAuthStore } from '@/stores/auth'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const authStore = useAuthStore()
 const canRegisterPurchase = computed(() => authStore.hasPermission('production_purchase_register'))

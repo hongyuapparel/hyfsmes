@@ -22,6 +22,7 @@
           :compact-image-size="compactImageSize"
           :compact-image-column-min-width="compactImageColumnMinWidth"
           :stock-list-footer-quantity="stockListFooterQuantity"
+          :stock-list-footer-amount="stockListFooterAmount"
           :pagination="pagination"
           :find-inventory-type-label-by-id="findInventoryTypeLabelById"
           :find-warehouse-label-by-id="findWarehouseLabelById"
@@ -193,6 +194,11 @@ const stockListFooterQuantity = computed(() => {
     return selectedRows.value.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0)
   }
   return stockTotalQuantity.value
+})
+
+const stockListFooterAmount = computed(() => {
+  const rows = selectedRows.value.length > 0 ? selectedRows.value : list.value
+  return rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0), 0)
 })
 
 function getTableImageUrl(row: StockTableRow): string {

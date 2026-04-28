@@ -226,6 +226,18 @@ a:hover {
   flex-shrink: 0;
 }
 
+.pagination-wrap--with-summary {
+  justify-content: space-between;
+}
+
+.pagination-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
+}
+
 .list-page-table-shell {
   flex: 1;
   min-height: 0;
@@ -248,17 +260,17 @@ a:hover {
   flex-direction: column;
 }
 
-.page-card.page-card--fill .list-page-tabs :deep(.el-tabs__header) {
+.page-card.page-card--fill .list-page-tabs .el-tabs__header {
   flex-shrink: 0;
 }
 
-.page-card.page-card--fill .list-page-tabs :deep(.el-tabs__content) {
+.page-card.page-card--fill .list-page-tabs .el-tabs__content {
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
-.page-card.page-card--fill .list-page-tabs :deep(.el-tab-pane) {
+.page-card.page-card--fill .list-page-tabs .el-tab-pane {
   height: 100%;
 }
 
@@ -616,6 +628,9 @@ a:hover {
 .pagination-wrap {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
+  margin-top: var(--space-sm);
+  flex-shrink: 0;
 }
 
 .range-single.el-date-editor--daterange .el-range-separator {

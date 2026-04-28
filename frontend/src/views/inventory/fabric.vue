@@ -1,9 +1,9 @@
 <template>
   <div class="page-card page-card--fill inventory-fabric-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
+    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="库存" name="stock">
         <div class="tab-pane-scroll">
-        <div class="filter-bar">
+        <el-form class="filter-bar" @submit.prevent>
           <el-input
             v-model="filter.name"
             placeholder="面料名称"
@@ -69,7 +69,7 @@
               出库
             </el-button>
           </div>
-        </div>
+        </el-form>
 
         <div ref="fabricStockShellRef" class="list-page-table-shell">
         <el-table
@@ -120,23 +120,21 @@
         </el-table>
         </div>
 
-        <div class="pagination-wrap">
-          <el-pagination
-            v-model:current-page="pagination.page"
-            v-model:page-size="pagination.pageSize"
-            :total="pagination.total"
-            :page-sizes="[20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="load"
-            @size-change="onPageSizeChange"
-          />
-        </div>
+        <AppPaginationBar
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.pageSize"
+          :total="pagination.total"
+          :total-quantity="stockTotalQuantity"
+          summary-label="总数量"
+          @current-change="load"
+          @size-change="onPageSizeChange"
+        />
         </div>
       </el-tab-pane>
 
       <el-tab-pane label="出库记录" name="outbounds">
         <div class="tab-pane-scroll">
-        <div class="filter-bar">
+        <el-form class="filter-bar" @submit.prevent>
           <el-input v-model="outboundFilter.name" placeholder="面料名称" clearable size="large" class="filter-bar-item" @keyup.enter="onOutboundSearch(true)" />
           <el-select v-model="outboundFilter.customerName" placeholder="客户" filterable clearable size="large" class="filter-bar-item" @change="onOutboundSearch(true)">
             <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
@@ -159,7 +157,7 @@
             <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
             <el-button size="large" @click="onOutboundReset">清空</el-button>
           </div>
-        </div>
+        </el-form>
 
         <div ref="fabricOutboundShellRef" class="list-page-table-shell">
         <el-table
@@ -197,215 +195,61 @@
         </el-table>
         </div>
 
-        <div class="pagination-wrap">
-          <el-pagination
-            v-model:current-page="outboundPagination.page"
-            v-model:page-size="outboundPagination.pageSize"
-            :total="outboundPagination.total"
-            :page-sizes="[20, 50, 100]"
-            layout="total, sizes, prev, pager, next"
-            @current-change="loadOutbounds"
-            @size-change="onOutboundPageSizeChange"
-          />
-        </div>
+        <AppPaginationBar
+          v-model:current-page="outboundPagination.page"
+          v-model:page-size="outboundPagination.pageSize"
+          :total="outboundPagination.total"
+          :total-quantity="outboundTotalQuantity"
+          summary-label="出库数量"
+          @current-change="loadOutbounds"
+          @size-change="onOutboundPageSizeChange"
+        />
         </div>
       </el-tab-pane>
     </el-tabs>
 
-    <el-dialog
-      v-model="formDialog.visible"
-      :title="formDialog.isEdit ? '编辑面料' : '新增面料'"
-      width="560"
-      destroy-on-close
+    <FabricFormDialog
+      :visible="formDialog.visible"
+      :submitting="formDialog.submitting"
+      :is-edit="formDialog.isEdit"
+      :quick-add-source="quickAddSource"
+      :form="form"
+      :form-rules="formRules"
+      :customer-options="customerOptions"
+      :fabric-supplier-options="fabricSupplierOptions"
+      :fabric-supplier-select-key="fabricSupplierSelectKey"
+      :fabric-supplier-options-loading="fabricSupplierOptionsLoading"
+      :warehouse-options="warehouseOptions"
+      @update:visible="formDialog.visible = $event"
+      @confirm="submitForm"
       @close="resetForm"
-    >
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="88px">
-        <el-alert
-          v-if="quickAddSource"
-          type="info"
-          :closable="false"
-          show-icon
-          style="margin-bottom: 10px"
-          :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
-        />
-        <el-form-item label="名称" prop="name">
-          <el-input v-model="form.name" placeholder="面料名称/编号" clearable />
-        </el-form-item>
-        <el-form-item label="数量" prop="quantity">
-          <el-input-number
-            v-model="form.quantity"
-            :min="0"
-            :precision="2"
-            controls-position="right"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="单位" prop="unit">
-          <el-input v-model="form.unit" placeholder="如米、公斤" clearable />
-        </el-form-item>
-        <el-form-item label="客户">
-          <el-select
-            v-model="form.customerName"
-            placeholder="请选择客户（可选）"
-            filterable
-            clearable
-          >
-            <el-option
-              v-for="opt in customerOptions"
-              :key="opt.value"
-              :label="opt.label"
-              :value="opt.value"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="供应商">
-          <el-select
-            :key="fabricSupplierSelectKey"
-            v-model="form.supplierId"
-            placeholder="面料供应商（可选），按名称中的连续文字筛选"
-            filterable
-            clearable
-            :loading="fabricSupplierOptionsLoading"
-          >
-            <el-option
-              v-for="opt in fabricSupplierOptions"
-              :key="opt.id"
-              :label="opt.name"
-              :value="opt.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="仓库">
-          <el-select v-model="form.warehouseId" placeholder="仓库（可选）" filterable clearable>
-            <el-option
-              v-for="opt in warehouseOptions"
-              :key="opt.id"
-              :label="opt.label"
-              :value="opt.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="存放地址">
-          <el-input v-model="form.storageLocation" placeholder="存放位置（可选）" clearable />
-        </el-form-item>
-        <el-form-item label="图片" prop="imageUrl">
-          <ImageUploadArea v-model="form.imageUrl" />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="备注" clearable />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="formDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="formDialog.submitting" @click="submitForm">
-          确定
-        </el-button>
-      </template>
-    </el-dialog>
+    />
 
-    <el-dialog
-      v-model="outboundDialog.visible"
-      title="面料出库"
-      width="500"
-      destroy-on-close
+    <FabricOutboundDialog
+      :visible="outboundDialog.visible"
+      :submitting="outboundDialog.submitting"
+      :outbound-form="outboundForm"
+      :outbound-rules="outboundRules"
+      :outbound-max-qty="outboundMaxQty"
+      :fabric-pickup-user-options="fabricPickupUserOptions"
+      @update:visible="outboundDialog.visible = $event"
+      @confirm="submitOutbound"
       @close="resetOutboundForm"
-    >
-      <el-form
-        ref="outboundFormRef"
-        :model="outboundForm"
-        :rules="outboundRules"
-        label-width="90px"
-      >
-        <el-form-item label="领取人" prop="pickupUserId">
-          <el-select
-            v-model="outboundForm.pickupUserId"
-            placeholder="请选择领取人"
-            filterable
-            clearable
-            style="width: 100%"
-          >
-            <el-option
-              v-for="opt in fabricPickupUserOptions"
-              :key="opt.id"
-              :label="opt.displayName?.trim() || opt.username"
-              :value="opt.id"
-            />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="出库数量" prop="quantity">
-          <el-input-number
-            v-model="outboundForm.quantity"
-            :min="0.01"
-            :max="outboundMaxQty"
-            :precision="2"
-            controls-position="right"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="拍照" prop="photoUrl" required>
-          <ImageUploadArea v-model="outboundForm.photoUrl" :compact="false" />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark" required>
-          <el-input
-            v-model="outboundForm.remark"
-            type="textarea"
-            :rows="3"
-            placeholder="请填写谁领走以及用途"
-            clearable
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="outboundDialog.visible = false">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="outboundDialog.submitting"
-          :disabled="
-            !outboundForm.pickupUserId ||
-            !outboundForm.photoUrl ||
-            !outboundForm.remark?.trim()
-          "
-          @click="submitOutbound"
-        >
-          确定出库
-        </el-button>
-      </template>
-    </el-dialog>
+    />
 
-    <el-drawer
-      v-model="detailDrawer.visible"
-      title="面料详情"
-      size="560px"
-      destroy-on-close
-    >
-      <div v-if="detailDrawer.row" class="detail-base">
-        <div><span class="detail-label">名称：</span>{{ detailDrawer.row.name || '-' }}</div>
-        <div><span class="detail-label">客户：</span>{{ detailDrawer.row.customerName || '-' }}</div>
-        <div><span class="detail-label">供应商：</span>{{ detailDrawer.row.supplierName || '-' }}</div>
-        <div><span class="detail-label">仓库：</span>{{ detailDrawer.row.warehouseLabel || '-' }}</div>
-        <div><span class="detail-label">存放地址：</span>{{ detailDrawer.row.storageLocation || '-' }}</div>
-        <div><span class="detail-label">当前库存：</span>{{ formatDisplayNumber(detailDrawer.row.quantity) }} {{ detailDrawer.row.unit || '' }}</div>
-        <div><span class="detail-label">备注：</span>{{ detailDrawer.row.remark || '-' }}</div>
-      </div>
-      <div class="detail-log-title">操作记录</div>
-      <el-timeline v-loading="detailDrawer.loading">
-        <el-timeline-item
-          v-for="log in detailDrawer.logs"
-          :key="log.id"
-          :timestamp="formatDate(log.createdAt)"
-          placement="top"
-        >
-          {{ formatLogAction(log.action) }}｜操作人：{{ log.operatorUsername || '-' }}{{ log.remark ? `｜备注：${log.remark}` : '' }}
-        </el-timeline-item>
-      </el-timeline>
-    </el-drawer>
+    <FabricDetailDrawer
+      :visible="detailDrawer.visible"
+      :row="detailDrawer.row"
+      :loading="detailDrawer.loading"
+      :logs="detailDrawer.logs"
+      @update:model-value="detailDrawer.visible = $event"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useFabricInventoryStock } from '@/composables/useFabricInventoryStock'
 import { useFabricInventoryOutbound } from '@/composables/useFabricInventoryOutbound'
@@ -417,6 +261,10 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
+import FabricFormDialog from '@/components/inventory/FabricFormDialog.vue'
+import FabricOutboundDialog from '@/components/inventory/FabricOutboundDialog.vue'
+import FabricDetailDrawer from '@/components/inventory/FabricDetailDrawer.vue'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 const {
   compactHeaderCellStyle,
   compactCellStyle,
@@ -450,7 +298,6 @@ const {
   onFabricStockHeaderDragEnd,
   formDialog,
   quickAddSource,
-  formRef,
   form,
   formRules,
   detailDrawer,
@@ -466,7 +313,6 @@ const {
   openForm,
   resetForm,
   submitForm,
-  formatLogAction,
   openDetail,
 } = stock
 
@@ -480,7 +326,6 @@ const {
   fabricOutboundTableHeight,
   onFabricOutboundHeaderDragEnd,
   outboundDialog,
-  outboundFormRef,
   outboundForm,
   outboundRules,
   outboundMaxQty,
@@ -495,6 +340,9 @@ const {
   resetOutboundForm,
   submitOutbound,
 } = outbound
+
+const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 
 function onPageTabChange() {
   if (pageTab.value === 'outbounds') {
@@ -533,19 +381,5 @@ onMounted(() => {
   line-height: 20px;
 }
 
-.detail-base {
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.detail-label {
-  color: var(--color-text-muted);
-}
-
-.detail-log-title {
-  margin: 8px 0 12px;
-  font-weight: 600;
-}
 
 </style>
