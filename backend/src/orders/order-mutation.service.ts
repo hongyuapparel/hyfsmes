@@ -155,17 +155,21 @@ export class OrderMutationService {
   private async generateNextOrderNo(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = String(year);
-    const last = await this.orderRepo
+    const rows = await this.orderRepo
       .createQueryBuilder('o')
+      .select('o.order_no', 'orderNo')
       .where('o.order_no LIKE :prefix', { prefix: `${prefix}%` })
-      .orderBy('o.order_no', 'DESC')
-      .getOne();
-    let nextSeq = 1;
-    if (last?.orderNo?.startsWith(prefix)) {
-      const suffix = last.orderNo.slice(prefix.length);
-      const n = parseInt(suffix, 10);
-      if (!Number.isNaN(n)) nextSeq = n + 1;
+      .getRawMany<{ orderNo: string | null }>();
+    let maxSeq = 0;
+    for (const row of rows) {
+      const orderNo = String(row.orderNo ?? '').trim();
+      if (!orderNo.startsWith(prefix)) continue;
+      const suffix = orderNo.slice(prefix.length);
+      if (!/^\d+$/.test(suffix)) continue;
+      const seq = Number(suffix);
+      if (Number.isFinite(seq) && seq > maxSeq) maxSeq = seq;
     }
+    const nextSeq = maxSeq + 1;
     return `${prefix}${String(nextSeq).padStart(3, '0')}`;
   }
 

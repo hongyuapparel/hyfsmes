@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="finished-outbound-tab-root">
     <div class="filter-bar">
       <el-input
         v-model="outboundFilter.orderNo"
@@ -48,6 +48,7 @@
       </div>
     </div>
 
+    <div ref="outboundShellRef" class="list-page-table-shell">
     <el-table
       v-loading="loading"
       :data="outboundList"
@@ -55,6 +56,7 @@
       stripe
       class="finished-table"
       :ref="tableRef"
+      :height="outboundTableHeight"
       :row-style="compactRowStyle"
       :cell-style="compactCellStyle"
       :header-cell-style="compactHeaderCellStyle"
@@ -119,6 +121,7 @@
         show-overflow-tooltip
       />
     </el-table>
+    </div>
 
     <AppPaginationBar
       :current-page="outboundPagination.page"
@@ -134,12 +137,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import type { FinishedOutboundRecord } from '@/api/inventory'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 type OutboundFilter = {
   orderNo: string
@@ -173,6 +177,9 @@ const emit = defineEmits<{
   (e: 'header-dragend', ...args: unknown[]): void
 }>()
 
+const outboundShellRef = ref<HTMLElement | null>(null)
+const { tableHeight: outboundTableHeight } = useFlexShellTableHeight(outboundShellRef)
+
 const { outboundPrimaryColumns, outboundTailColumns, getInventoryOutboundRangeStyle } = useFinishedViewColumns()
 
 const dateRangeModel = computed({
@@ -188,3 +195,13 @@ function handleHeaderDragEnd(...args: unknown[]) {
   emit('header-dragend', ...args)
 }
 </script>
+
+<style scoped>
+.finished-outbound-tab-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+</style>

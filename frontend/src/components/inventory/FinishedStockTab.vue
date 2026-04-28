@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="finished-stock-tab-root">
     <div class="filter-bar">
       <el-input
         v-model="filter.orderNo"
@@ -83,6 +83,7 @@
 
     <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
 
+    <div ref="stockShellRef" class="list-page-table-shell">
     <el-table
       v-loading="loading"
       :data="stockTableData"
@@ -90,6 +91,7 @@
       stripe
       class="finished-table"
       :ref="tableRef"
+      :height="tableHeight"
       :row-key="getStockTableRowKey"
       :tree-props="{ children: '_children' }"
       :indent="8"
@@ -205,6 +207,7 @@
         </template>
       </el-table-column>
     </el-table>
+    </div>
 
     <AppPaginationBar
       :current-page="pagination.page"
@@ -221,13 +224,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, type Ref } from 'vue'
+import { computed, ref, type Ref } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import { getFilterInputStyle, getOrderNoFilterStyle, getSkuCodeFilterStyle, getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableLeafRow, isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 type FinishedStockFilter = {
   orderNo: string
@@ -288,6 +292,9 @@ const emit = defineEmits<{
   (e: 'header-dragend', ...args: unknown[]): void
 }>()
 
+const stockShellRef = ref<HTMLElement | null>(null)
+const { tableHeight } = useFlexShellTableHeight(stockShellRef)
+
 const { stockPrimaryColumns, stockTailColumns } = useFinishedViewColumns()
 
 const inboundDateRangeModel = computed({
@@ -314,3 +321,13 @@ function handleHeaderDragEnd(...args: unknown[]) {
   emit('header-dragend', ...args)
 }
 </script>
+
+<style scoped>
+.finished-stock-tab-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+</style>

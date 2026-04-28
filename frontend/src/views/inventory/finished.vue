@@ -1,7 +1,8 @@
 <template>
-  <div class="page-card inventory-finished-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
+  <div class="page-card page-card--fill inventory-finished-page">
+    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="库存" name="stock">
+        <div class="tab-pane-scroll">
         <FinishedStockTab
           :filter="filter"
           :order-no-label-visible="orderNoLabelVisible"
@@ -50,8 +51,10 @@
           @page-size-change="onPageSizeChange"
           @header-dragend="onFinishedStockHeaderDragEnd"
         />
+        </div>
       </el-tab-pane>
       <el-tab-pane label="出库记录" name="outbounds">
+        <div class="tab-pane-scroll">
         <FinishedOutboundTab
           :outbound-filter="outboundFilter"
           :customer-options="customerOptions"
@@ -73,6 +76,7 @@
           @page-size-change="onOutboundSizeChange"
           @header-dragend="onFinishedOutboundHeaderDragEnd"
         />
+        </div>
       </el-tab-pane>
     </el-tabs>
     <FinishedInboundDialog v-model="inboundDialog.visible" :stock-id="inboundDialog.stockId" :stock-label="inboundDialog.stockLabel" @submitted="load()" />

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card page-card--fill">
+  <div class="page-card page-card--fill customers-page">
     <CustomerToolbar
       :company-name="filter.companyName"
       :salesperson="filter.salesperson"
@@ -140,17 +140,19 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.page-card {
+.customers-page {
   background: var(--color-card);
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
   min-height: 0;
+  overflow: hidden;
 }
 
 .pagination-wrap {
   margin-top: var(--space-sm);
   display: flex;
   justify-content: flex-end;
+  flex-shrink: 0;
 }
 </style>

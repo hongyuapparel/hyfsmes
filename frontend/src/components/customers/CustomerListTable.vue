@@ -1,8 +1,9 @@
 <template>
-  <div>
+  <div class="customer-list-table-root">
     <div v-if="selectedCount" class="table-selection-count">已选 {{ selectedCount }} 项</div>
     <div ref="tableShellRef" class="list-page-table-shell">
       <el-table
+        class="customer-list-table"
         :data="list"
         border
         stripe
@@ -70,10 +71,23 @@ function formatDate(value: string | null | undefined) {
 </script>
 
 <style scoped>
+.customer-list-table-root {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
+}
+
+.customer-list-table {
+  flex: 1;
+  min-height: 0;
 }
 
 :deep(.selection-column .cell) {

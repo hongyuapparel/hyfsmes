@@ -1,6 +1,6 @@
 <template>
   <div class="page-card page-card--fill inventory-fabric-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs" @tab-change="onPageTabChange">
+    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="库存" name="stock">
         <div class="tab-pane-scroll">
         <el-form class="filter-bar" @submit.prevent>
@@ -363,11 +363,14 @@ onMounted(() => {
 
 <style scoped>
 .inventory-fabric-page {
+  display: flex;
+  flex-direction: column;
   background: var(--color-card);
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
   min-height: 0;
+  overflow: hidden;
 }
 
 .inventory-fabric-page .fabric-table {

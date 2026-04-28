@@ -247,6 +247,8 @@ a:hover {
 
 .list-page-table-shell > .el-table {
   width: 100%;
+  flex: 1;
+  min-height: 0;
 }
 
 /**
@@ -280,6 +282,7 @@ a:hover {
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
+  overflow: hidden;
 }
 
 /* ========== 7.1 表格内滚动条（全站与产品列表一致：细、浅灰、圆角；仅作用于表格滚动容器）========== */
