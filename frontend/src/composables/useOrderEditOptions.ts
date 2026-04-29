@@ -7,12 +7,7 @@ import {
   getSupplierBusinessScopeTreeOptions,
   type SupplierBusinessScopeTreeNode,
 } from '@/api/suppliers'
-import {
-  getCustomers,
-  getMerchandisers,
-  getSalespeople,
-  type CustomerItem,
-} from '@/api/customers'
+import { getCustomerCompanyOptions, getMerchandisers, getSalespeople, type CustomerItem } from '@/api/customers'
 
 interface SimpleUser {
   id: number
@@ -175,7 +170,7 @@ async function loadFactoryOptions() {
 
 async function loadCustomerOptions() {
   try {
-    const res = await getCustomers({ page: 1, pageSize: 200 })
+    const res = await getCustomerCompanyOptions()
     const custList = (res.data?.list ?? []) as CustomerItem[]
     customerOptions.value = custList.map((c) => ({
       label: c.companyName,

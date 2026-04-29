@@ -520,8 +520,10 @@ const {
 
 onMounted(() => {
   void loadOptions()
-  void load()
-  void loadTabCounts()
+  void (async () => {
+    await load()
+    await loadTabCounts()
+  })()
 })
 </script>
 

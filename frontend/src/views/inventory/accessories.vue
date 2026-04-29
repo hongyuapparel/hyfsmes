@@ -274,7 +274,7 @@
 import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { getCustomers, getSalespeople, type CustomerItem } from '@/api/customers'
+import { getCustomerCompanyOptions, getSalespeople, type CustomerItem } from '@/api/customers'
 import { getAccessoriesList, getAccessoryOutboundRecords, type AccessoryItem, type AccessoryOutboundRecord } from '@/api/inventory'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -390,7 +390,7 @@ function onPageTabChange() {
 
 async function loadCustomerOptions() {
   try {
-    const res = await getCustomers({ page: 1, pageSize: 200, sortBy: 'companyName', sortOrder: 'asc' })
+    const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
     const customers = (res.data?.list ?? []) as CustomerItem[]
     customerOptions.value = customers.map((item) => ({ label: item.companyName, value: item.companyName }))
   } catch {

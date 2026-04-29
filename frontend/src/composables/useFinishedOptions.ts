@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getCustomers, type CustomerItem } from '@/api/customers'
+import { getCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
 import { getDictItems } from '@/api/dicts'
 import type { SystemOptionItem } from '@/api/system-options'
 import { getFinishedPickupUserOptions, type FinishedPickupUserOption } from '@/api/inventory'
@@ -13,7 +13,7 @@ export function useFinishedOptions() {
 
   async function loadCustomerOptions() {
     try {
-      const res = await getCustomers({ page: 1, pageSize: 200, sortBy: 'companyName', sortOrder: 'asc' })
+      const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
       const list = (res.data?.list ?? []) as CustomerItem[]
       customerOptions.value = list.map((c) => ({
         label: c.companyName,

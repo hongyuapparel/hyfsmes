@@ -176,7 +176,7 @@ function getSplitColorBreakdown(row: FinishedStockRow): {
 }
 
 function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
-  const groupKey = `${row.type}::${String(row.skuCode ?? '').trim().toLowerCase()}::${String(row.customerName ?? '').trim().toLowerCase()}`
+  const groupKey = `${row.type}::${String(row.skuCode ?? '').trim().toLowerCase()}`
   const breakdown = getSplitColorBreakdown(row)
   if (breakdown && breakdown.rows.length > 1) {
     return breakdown.rows.map((item, index) => {
@@ -223,6 +223,16 @@ function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
 
 function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTableParentRow {
   const first = rows[0]
+  const uniqueStrings = (values: unknown[]) => Array.from(new Set(values.map((item) => String(item ?? '').trim())))
+  const uniqueNullableNumbers = (values: unknown[]) =>
+    Array.from(
+      new Set(
+        values.map((item) => {
+          const n = Number(item)
+          return Number.isInteger(n) && n > 0 ? n : null
+        }),
+      ),
+    )
   const colorLabels = Array.from(
     new Set(rows.map((item) => item._displayColor).filter((item) => item && item !== '-')),
   )
@@ -236,22 +246,20 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
     new Set(rows.map((item) => item._effectiveImageUrl || getProductImageUrl(item)).filter(Boolean)),
   )
   const unitPrices = Array.from(new Set(rows.map((item) => String(item.unitPrice ?? '0'))))
-  const departments = Array.from(
-    new Set(rows.map((item) => String(item.department ?? '').trim()).filter(Boolean)),
-  )
-  const locations = Array.from(
-    new Set(rows.map((item) => String(item.location ?? '').trim()).filter(Boolean)),
-  )
-  const orderNos = Array.from(
-    new Set(rows.map((item) => String(item.orderNo ?? '').trim()).filter(Boolean)),
-  )
+  const inventoryTypeIds = uniqueNullableNumbers(rows.map((item) => item.inventoryTypeId))
+  const warehouseIds = uniqueNullableNumbers(rows.map((item) => item.warehouseId))
+  const departments = uniqueStrings(rows.map((item) => item.department))
+  const locations = uniqueStrings(rows.map((item) => item.location))
+  const orderNos = uniqueStrings(rows.map((item) => item.orderNo))
   return {
     ...first,
     quantity: rows.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
     unitPrice: unitPrices.length === 1 ? unitPrices[0] : '',
-    department: departments.length === 1 ? departments[0] : '',
-    location: locations.length === 1 ? locations[0] : '',
-    orderNo: orderNos.length === 1 ? orderNos[0] : '',
+    inventoryTypeId: inventoryTypeIds.length === 1 ? inventoryTypeIds[0] : null,
+    warehouseId: warehouseIds.length === 1 ? warehouseIds[0] : null,
+    department: departments.length === 1 ? departments[0] : '多个',
+    location: locations.length === 1 ? locations[0] : '多个',
+    orderNo: orderNos.length === 1 ? orderNos[0] : '多个',
     sizeBreakdown: null,
     _uiKey: `${groupKey}::parent`,
     _rowKind: 'parent',
@@ -260,6 +268,8 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
     _effectiveImageUrl: stockImages[0] || effectiveImages[0] || productImages[0] || '',
     _children: rows,
     _mixedUnitPrice: unitPrices.length > 1,
+    _mixedInventoryType: inventoryTypeIds.length > 1,
+    _mixedWarehouse: warehouseIds.length > 1,
     _mixedDepartment: departments.length > 1,
     _mixedLocation: locations.length > 1,
     _mixedOrderNo: orderNos.length > 1,

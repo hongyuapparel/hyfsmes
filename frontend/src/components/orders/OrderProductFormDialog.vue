@@ -26,10 +26,16 @@
             v-model="form.customerId"
             placeholder="选择客户"
             filterable
+            remote
+            reserve-keyword
             clearable
+            :remote-method="remoteSearchCustomers"
+            :loading="customerLoading"
             style="width: 100%"
+            @change="onCustomerChange"
+            @visible-change="onCustomerVisibleChange"
           >
-            <el-option v-for="c in customers" :key="c.id" :label="c.companyName" :value="c.id" />
+            <el-option v-for="c in customerOptions" :key="c.id" :label="c.companyName" :value="c.id" />
           </el-select>
           <el-input
             v-else-if="f.type === 'text'"
@@ -117,11 +123,14 @@ const props = defineProps<{
   productGroupTreeSelectData: { label: string; value: number; children?: unknown[]; disabled?: boolean }[]
   salespeople: string[]
   customers: { id: number; companyName: string }[]
+  customerLoading?: boolean
   applicablePeopleOptions: { id: number; value: string }[]
 }>()
 
 const emit = defineEmits<{
   success: []
+  'customer-search': [keyword: string]
+  'customer-dropdown-visible': [visible: boolean]
 }>()
 
 const dialogVisible = ref(false)
@@ -133,6 +142,14 @@ const imageUploading = ref(false)
 const imageFileInputRef = ref<HTMLInputElement | null>(null)
 const formRef = ref<FormInstance>()
 const form = reactive<Record<string, string | number | null>>({})
+const selectedCustomerOption = ref<{ id: number; companyName: string } | null>(null)
+
+const customerOptions = computed(() => {
+  const options = [...props.customers]
+  const selected = selectedCustomerOption.value
+  if (selected && !options.some((item) => item.id === selected.id)) options.unshift(selected)
+  return options
+})
 
 const formRules = computed<FormRules>(() => {
   const rules: FormRules = {}
@@ -170,10 +187,29 @@ function resetForm() {
   formRef.value?.resetFields()
 }
 
+function remoteSearchCustomers(keyword: string) {
+  emit('customer-search', keyword)
+}
+
+function onCustomerVisibleChange(visible: boolean) {
+  emit('customer-dropdown-visible', visible)
+}
+
+function onCustomerChange(value: string | number | null | undefined) {
+  if (value == null || value === '') {
+    selectedCustomerOption.value = null
+    return
+  }
+  const id = Number(value)
+  selectedCustomerOption.value = customerOptions.value.find((item) => item.id === id) ?? null
+}
+
 async function openCreate() {
   isEdit.value = false
   editId.value = 0
   form.customerId = null
+  selectedCustomerOption.value = null
+  emit('customer-search', '')
   for (const f of props.formFields) form[f.code] = ''
   try {
     const res = await getNextSkuCode()
@@ -188,6 +224,8 @@ function openEdit(row: ProductItem) {
   isEdit.value = true
   editId.value = row.id
   form.customerId = row.customerId ?? null
+  selectedCustomerOption.value = row.customer ? { id: row.customer.id, companyName: row.customer.companyName } : null
+  emit('customer-search', '')
   for (const f of props.formFields) {
     if (f.code === 'companyName') continue
     if (f.code === 'productGroup') {

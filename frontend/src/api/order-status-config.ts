@@ -1,4 +1,5 @@
 import request from './request'
+import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 export interface OrderStatusItem {
   id: number
@@ -36,7 +37,10 @@ export interface OrderWorkflowChainWithSteps {
 }
 
 export function getOrderStatuses() {
-  return request.get<OrderStatusItem[]>('/order-status-config/statuses')
+  const key = buildSharedGetKey('/order-status-config/statuses')
+  return sharedGet(key, () => request.get<OrderStatusItem[]>('/order-status-config/statuses'), {
+    ttlMs: 30000,
+  })
 }
 
 export function createOrderStatus(data: {
@@ -46,23 +50,35 @@ export function createOrderStatus(data: {
   isFinal?: boolean
   enabled?: boolean
 }) {
-  return request.post<OrderStatusItem>('/order-status-config/statuses', data)
+  return request.post<OrderStatusItem>('/order-status-config/statuses', data).then((response) => {
+    invalidateSharedGetCache('/order-status-config/statuses')
+    return response
+  })
 }
 
 export function updateOrderStatus(
   id: number,
   data: Partial<{ code: string; label: string; sortOrder: number; isFinal: boolean; enabled: boolean }>,
 ) {
-  return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}`, data)
+  return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}`, data).then((response) => {
+    invalidateSharedGetCache('/order-status-config/statuses')
+    return response
+  })
 }
 
 /** 仅切换启用状态（列表开关使用） */
 export function toggleOrderStatusEnabled(id: number) {
-  return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}/enabled`, {})
+  return request.patch<OrderStatusItem>(`/order-status-config/statuses/${id}/enabled`, {}).then((response) => {
+    invalidateSharedGetCache('/order-status-config/statuses')
+    return response
+  })
 }
 
 export function deleteOrderStatus(id: number) {
-  return request.delete(`/order-status-config/statuses/${id}`)
+  return request.delete(`/order-status-config/statuses/${id}`).then((response) => {
+    invalidateSharedGetCache('/order-status-config/statuses')
+    return response
+  })
 }
 
 export function getOrderStatusTransitions(fromStatus?: string) {

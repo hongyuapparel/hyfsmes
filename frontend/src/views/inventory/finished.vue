@@ -15,7 +15,7 @@
           :has-stored-selection="hasStoredSelection"
           :selected-rows="selectedRows"
           :loading="loading"
-          :stock-table-data="displayStockTableData"
+          :stock-table-data="pagedStockTableData"
           :table-ref="finishedStockTableRef"
           :compact-header-cell-style="compactHeaderCellStyle"
           :compact-cell-style="compactCellStyle"
@@ -192,7 +192,13 @@ const {
 })
 const { currentTab, filter, orderNoLabelVisible, skuCodeLabelVisible, inboundDateRange, pagination, onSearch, debouncedSearch, onReset, onPageSizeChange, onCurrentPageChange } =
   useFinishedViewStockFilter(load, clearSelection)
-const displayStockTableData = computed(() => stockTableData.value.slice(0, pagination.pageSize))
+
+/**
+ * 成品库存表格的 pageSize 只约束顶层父行数量。
+ * stockTableData 本身就是顶层行数组；子行挂在父行的 _children 上，
+ * 所以这里按 pageSize 截断不会影响展开后的子行展示。
+ */
+const pagedStockTableData = computed(() => stockTableData.value.slice(0, pagination.pageSize))
 
 const stockListFooterQuantity = computed(() => {
   if (selectedRows.value.length > 0) {
@@ -254,6 +260,7 @@ async function load() {
       endDate: endDate || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
+      paginateByVisibleGroup: currentTab.value === 'stored',
     })
     const data = res.data
     if (data) {

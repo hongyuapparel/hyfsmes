@@ -422,10 +422,12 @@ function getTabLabel(tab: CuttingTabConfig): string {
 }
 
 onMounted(() => {
-  load()
-  void loadTabCounts()
   void loadCuttingDepartments()
   void loadCutterOptions()
+  void (async () => {
+    await load()
+    await loadTabCounts()
+  })()
 })
 </script>
 

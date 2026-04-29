@@ -15,7 +15,7 @@ import {
   getProductSalespeople,
   type ProductItem,
 } from '@/api/products'
-import { getCustomers, type CustomerItem } from '@/api/customers'
+import { getCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
 import { getDictItems, getDictTree } from '@/api/dicts'
 import type { SystemOptionItem, SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -42,6 +42,7 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
   const sidebarCollapsed = ref(false)
   const salespeople = ref<string[]>([])
   const customers = ref<{ id: number; companyName: string }[]>([])
+  const customersLoading = ref(false)
   const applicablePeopleOptions = ref<SystemOptionItem[]>([])
   const selectedIds = ref<number[]>([])
   const fieldDefinitions = ref<FieldDefinitionItem[]>([])
@@ -77,6 +78,7 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
   const productGroupTreeSelectData = computed(() => toProductGroupTreeSelect(productGroupsTree.value))
 
   let loadReqId = 0
+  let customerSearchReqId = 0
   let listAbortController: AbortController | null = null
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -123,12 +125,44 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
     }
   }
 
+  function setCustomerOptions(custList: CustomerItem[]) {
+    const seen = new Set<number>()
+    customers.value = custList
+      .filter((c) => {
+        if (!c?.id || seen.has(c.id)) return false
+        seen.add(c.id)
+        return true
+      })
+      .map((c) => ({ id: c.id, companyName: c.companyName }))
+  }
+
+  async function searchCustomerOptions(keyword = '') {
+    const currentReqId = ++customerSearchReqId
+    customersLoading.value = true
+    try {
+      const res = await getCustomerCompanyOptions({
+        companyName: keyword.trim() || undefined,
+        page: 1,
+        pageSize: 200,
+      })
+      if (currentReqId === customerSearchReqId) setCustomerOptions((res.data?.list ?? []) as CustomerItem[])
+    } catch (e: unknown) {
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '客户加载失败'))
+    } finally {
+      if (currentReqId === customerSearchReqId) customersLoading.value = false
+    }
+  }
+
+  function onCustomerDropdownVisible(visible: boolean) {
+    if (visible) void searchCustomerOptions('')
+  }
+
   async function loadOptions() {
     try {
       const [ct, sp, custRes, treeRes, countsRes, apRes] = await Promise.all([
         getProductGroups(),
         getProductSalespeople(),
-        getCustomers({ pageSize: 200 }),
+        getCustomerCompanyOptions(),
         getDictTree('product_groups'),
         getProductGroupCounts(),
         getDictItems('applicable_people'),
@@ -141,8 +175,7 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
         return acc
       }, {})
       salespeople.value = sp.data ?? []
-      const custList = (custRes.data?.list ?? []) as CustomerItem[]
-      customers.value = custList.map((c) => ({ id: c.id, companyName: c.companyName }))
+      setCustomerOptions((custRes.data?.list ?? []) as CustomerItem[])
       applicablePeopleOptions.value = apRes.data ?? []
       if (!groupCollapseInitialized.value) {
         collapsedGroupPaths.value = collectDefaultCollapsedPaths(productGroupsTree.value)
@@ -324,6 +357,7 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
     productGroupOptions,
     salespeople,
     customers,
+    customersLoading,
     applicablePeopleOptions,
     fieldDefinitions,
     selectedIds,
@@ -338,6 +372,8 @@ export function useOrderProductsList(options: UseOrderProductsListOptions = {}) 
     load,
     loadFieldDefinitions,
     loadOptions,
+    searchCustomerOptions,
+    onCustomerDropdownVisible,
     onMenuSelect,
     toggleGroupCollapse,
     onFilterChange,

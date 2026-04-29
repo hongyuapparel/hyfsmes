@@ -1,8 +1,9 @@
-import { computed, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems } from '@/api/dicts'
-import { getOrderCost, getOrderDetail, type OrderDetail } from '@/api/orders'
+import { getOrderCost, getOrderDetail, getOrders, type OrderDetail, type OrderListItem } from '@/api/orders'
+import { getOrderStatuses } from '@/api/order-status-config'
 import { getProductionProcesses, type ProductionProcessItem } from '@/api/production-processes'
 import { getSupplierBusinessScopeTreeOptions, type SupplierBusinessScopeTreeNode } from '@/api/suppliers'
 import { getProcessQuoteTemplates, getProcessQuoteTemplateItems } from '@/api/process-quote-templates'
@@ -20,6 +21,7 @@ import {
   type ProcessItemRow,
   type ProductionRow,
 } from '@/utils/order-cost'
+import { getOrderStatusTagType, type OrderStatusTagType } from '@/utils/order-status-display'
 import { useOrderCostCalculations } from './useOrderCostCalculations'
 
 interface ProcessOptionNode {
@@ -27,6 +29,18 @@ interface ProcessOptionNode {
   value: string
   children?: ProcessOptionNode[]
 }
+
+interface ImportOrderDialogState {
+  visible: boolean
+  keyword: string
+  loading: boolean
+  applying: boolean
+  results: OrderListItem[]
+  selectedId: number | null
+}
+
+const IMPORT_ORDER_SEARCH_PAGE_SIZE = 20
+const IMPORT_ORDER_SEARCH_DEBOUNCE_MS = 350
 
 export function useOrderCostData(orderId: number) {
   const order = ref<OrderDetail | null>(null)
@@ -46,9 +60,53 @@ export function useOrderCostData(orderId: number) {
   const profitMargin = ref(DEFAULT_PROFIT_MARGIN)
   const importTemplateDialog = ref<{ visible: boolean; templateId: number | null }>({ visible: false, templateId: null })
   const importTemplateOptions = ref<Array<{ id: number; name: string }>>([])
+  const importOrderDialog = ref<ImportOrderDialogState>({
+    visible: false,
+    keyword: '',
+    loading: false,
+    applying: false,
+    results: [],
+    selectedId: null,
+  })
+  const importOrderStatusLabelMap = ref<Record<string, string>>({})
   const quoteConfirmedAt = ref('')
   const quoteConfirmedBy = ref('')
   const quoteNeedsReconfirm = ref(false)
+  let importOrderSearchTimer: ReturnType<typeof setTimeout> | null = null
+  let importOrderSearchSeq = 0
+
+  function clearImportOrderSearchTimer() {
+    if (!importOrderSearchTimer) return
+    clearTimeout(importOrderSearchTimer)
+    importOrderSearchTimer = null
+  }
+
+  function resetImportOrderSearchResults() {
+    importOrderDialog.value.results = []
+    importOrderDialog.value.selectedId = null
+  }
+
+  watch(
+    () => [importOrderDialog.value.visible, importOrderDialog.value.keyword] as const,
+    ([visible, keyword]) => {
+      clearImportOrderSearchTimer()
+      if (!visible) return
+      if (!keyword.trim()) {
+        importOrderSearchSeq += 1
+        importOrderDialog.value.loading = false
+        resetImportOrderSearchResults()
+        return
+      }
+      importOrderSearchTimer = setTimeout(() => {
+        importOrderSearchTimer = null
+        void searchImportOrders({ showNotice: false })
+      }, IMPORT_ORDER_SEARCH_DEBOUNCE_MS)
+    },
+  )
+
+  onBeforeUnmount(() => {
+    clearImportOrderSearchTimer()
+  })
 
   const productionAddedIdsSignature = computed(() => {
     const ids = productionRows.value.map((row) => Number(row.processId)).filter((id) => Number.isInteger(id) && id > 0)
@@ -283,6 +341,153 @@ export function useOrderCostData(orderId: number) {
     }
   }
 
+  function normalizeImportedProductionRow(item: Partial<ProductionRow>): ProductionRow {
+    const processId = Number(item.processId)
+    const unitPrice = Number(item.unitPrice)
+    const quantity = Number(item.quantity)
+    return {
+      processId: Number.isInteger(processId) && processId > 0 ? processId : null,
+      department: String(item.department ?? ''),
+      jobType: String(item.jobType ?? ''),
+      processName: String(item.processName ?? ''),
+      unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+      quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : DEFAULT_PRODUCTION_PROCESS_QTY,
+      remark: String(item.remark ?? ''),
+    }
+  }
+
+  function mapImportedProductionRows(value: unknown): ProductionRow[] {
+    if (!Array.isArray(value)) return []
+    return value
+      .map((item) => normalizeImportedProductionRow((item ?? {}) as Partial<ProductionRow>))
+      .filter((row) => {
+        return Boolean(
+          row.processId ||
+          row.department?.trim() ||
+          row.jobType?.trim() ||
+          row.processName?.trim() ||
+          row.remark?.trim() ||
+          Number(row.unitPrice) > 0,
+        )
+      })
+  }
+
+  async function loadImportOrderStatusLabels() {
+    if (Object.keys(importOrderStatusLabelMap.value).length) return
+    try {
+      const res = await getOrderStatuses()
+      importOrderStatusLabelMap.value = Object.fromEntries((res.data ?? []).map((item) => [item.code, item.label]))
+    } catch {
+      importOrderStatusLabelMap.value = {}
+    }
+  }
+
+  function getImportOrderStatusLabel(status: string): string {
+    const value = String(status ?? '')
+    return importOrderStatusLabelMap.value[value] || value || '-'
+  }
+
+  function getImportOrderStatusTagType(status: string): OrderStatusTagType {
+    return getOrderStatusTagType(status)
+  }
+
+  function openImportOrderDialog() {
+    clearImportOrderSearchTimer()
+    importOrderDialog.value = {
+      visible: true,
+      keyword: '',
+      loading: false,
+      applying: false,
+      results: [],
+      selectedId: null,
+    }
+    void loadImportOrderStatusLabels()
+  }
+
+  function closeImportOrderDialog() {
+    clearImportOrderSearchTimer()
+    importOrderSearchSeq += 1
+    importOrderDialog.value = {
+      visible: false,
+      keyword: '',
+      loading: false,
+      applying: false,
+      results: [],
+      selectedId: null,
+    }
+  }
+
+  function mergeImportOrderResults(...lists: OrderListItem[][]): OrderListItem[] {
+    const map = new Map<number, OrderListItem>()
+    lists.flat().forEach((item) => {
+      if (item?.id != null && !map.has(item.id)) map.set(item.id, item)
+    })
+    return Array.from(map.values())
+  }
+
+  async function searchImportOrders(options?: { showNotice?: boolean }) {
+    clearImportOrderSearchTimer()
+    const showNotice = options?.showNotice !== false
+    const keyword = importOrderDialog.value.keyword.trim()
+    const searchSeq = ++importOrderSearchSeq
+    if (!keyword) {
+      resetImportOrderSearchResults()
+      if (showNotice) ElMessage.warning('请输入订单号或 SKU')
+      return
+    }
+    importOrderDialog.value.loading = true
+    try {
+      const [byOrderNo, bySkuCode] = await Promise.all([
+        getOrders({ orderNo: keyword, page: 1, pageSize: IMPORT_ORDER_SEARCH_PAGE_SIZE }),
+        getOrders({ skuCode: keyword, page: 1, pageSize: IMPORT_ORDER_SEARCH_PAGE_SIZE }),
+      ])
+      if (searchSeq !== importOrderSearchSeq || keyword !== importOrderDialog.value.keyword.trim()) return
+      const results = mergeImportOrderResults(byOrderNo.data?.list ?? [], bySkuCode.data?.list ?? [])
+      importOrderDialog.value.results = results
+      importOrderDialog.value.selectedId = null
+      if (!results.length && showNotice) ElMessage.warning('未找到匹配订单')
+    } catch (e: unknown) {
+      if (searchSeq === importOrderSearchSeq && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '搜索订单失败'))
+    } finally {
+      if (searchSeq === importOrderSearchSeq) importOrderDialog.value.loading = false
+    }
+  }
+
+  async function applyImportOrder(): Promise<boolean> {
+    const sourceOrderId = importOrderDialog.value.selectedId
+    if (!sourceOrderId) return false
+    importOrderDialog.value.applying = true
+    try {
+      const res = await getOrderCost(sourceOrderId)
+      const snapshot = (res.data?.snapshot ?? {}) as Record<string, unknown>
+      const rows = mapImportedProductionRows(snapshot.productionRows)
+      if (!rows.length) {
+        ElMessage.warning('该订单暂无可导入的生产工序成本')
+        return false
+      }
+      try {
+        await ElMessageBox.confirm(
+          '确定用来源订单的生产工序成本覆盖当前生产工序表吗？导入后不会自动保存。',
+          '导入订单工序成本',
+          { type: 'warning', confirmButtonText: '覆盖导入', cancelButtonText: '取消' },
+        )
+      } catch {
+        return false
+      }
+      productionRows.value = rows
+      selectedProductionRows.value = []
+      productionCostMultiplier.value = normalizeProductionCostMultiplier(snapshot.productionCostMultiplier)
+      importOrderDialog.value.visible = false
+      ElMessage.success(`已导入 ${rows.length} 条生产工序成本`)
+      return true
+    } catch (e: unknown) {
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导入订单生产工序成本失败'))
+      return false
+    } finally {
+      importOrderDialog.value.applying = false
+    }
+  }
+
   async function loadImportTemplateOptions() {
     try {
       const res = await getProcessQuoteTemplates()
@@ -325,6 +530,7 @@ export function useOrderCostData(orderId: number) {
     profitMargin,
     importTemplateDialog,
     importTemplateOptions,
+    importOrderDialog,
     quoteConfirmedAt,
     quoteConfirmedBy,
     quoteNeedsReconfirm,
@@ -358,5 +564,11 @@ export function useOrderCostData(orderId: number) {
     openImportTemplateDialog,
     applyImportTemplate,
     loadImportTemplateOptions,
+    openImportOrderDialog,
+    closeImportOrderDialog,
+    searchImportOrders,
+    applyImportOrder,
+    getImportOrderStatusLabel,
+    getImportOrderStatusTagType,
   }
 }

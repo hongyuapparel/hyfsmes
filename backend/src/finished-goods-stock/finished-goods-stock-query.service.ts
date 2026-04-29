@@ -30,6 +30,7 @@ type StockListQueryParams = {
   endDate?: string;
   page?: number;
   pageSize?: number;
+  paginateByVisibleGroup?: boolean;
 };
 
 type StockListQueryResult = {

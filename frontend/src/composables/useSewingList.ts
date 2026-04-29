@@ -108,16 +108,14 @@ export function useSewingList() {
     base.page = 1
     base.pageSize = 1
     const counts: Record<string, number> = {}
-    await Promise.all(
-      SEWING_TABS.map(async (tab) => {
-        try {
-          const res = await getSewingItems({ ...base, tab: tab.value })
-          counts[tab.value] = res.data?.total ?? 0
-        } catch {
-          counts[tab.value] = 0
-        }
-      }),
-    )
+    for (const tab of SEWING_TABS) {
+      try {
+        const res = await getSewingItems({ ...base, tab: tab.value })
+        counts[tab.value] = res.data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }
     tabCounts.value = counts
     tabTotal.value = counts.all ?? 0
   }

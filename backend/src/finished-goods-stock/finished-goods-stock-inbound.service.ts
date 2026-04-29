@@ -218,8 +218,9 @@ export class FinishedGoodsStockInboundService {
           : this.normalizeOrderUnitPrice('0');
     const warehouseId = dto.warehouseId != null ? Number(dto.warehouseId) : null;
     const inventoryTypeId = dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null;
-    const department = dto.department?.trim() ?? '', location = dto.location?.trim() ?? '';
     const imageUrl = dto.imageUrl?.trim() ?? '', skuCode = dto.skuCode?.trim() ?? '';
+    if (!skuCode) throw new BadRequestException('SKU不能为空');
+    const department = dto.department?.trim() ?? '', location = dto.location?.trim() ?? '';
 
     const existing = await this.inboundQueryService.findMergeableFinishedStock({
       skuCode,

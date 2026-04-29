@@ -17,6 +17,8 @@ export type StockTableParentRow = FinishedStockRow & {
   _effectiveImageUrl: string
   _children: StockTableLeafRow[]
   _mixedUnitPrice: boolean
+  _mixedInventoryType: boolean
+  _mixedWarehouse: boolean
   _mixedDepartment: boolean
   _mixedLocation: boolean
   _mixedOrderNo: boolean

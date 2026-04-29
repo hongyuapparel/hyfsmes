@@ -41,7 +41,7 @@ function getTabKey(r: RouteLocationNormalizedLoaded): string {
 }
 
 function getTitle(r: RouteLocationNormalizedLoaded) {
-  if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit') {
+  if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit' || r.name === 'OrdersCost') {
     const queryTitle = typeof r.query?.tabTitle === 'string' ? r.query.tabTitle.trim() : ''
     if (queryTitle) return queryTitle
   }

@@ -48,30 +48,32 @@
     />
 
     <!-- 订单卡片宫格 -->
-    <OrderCardGrid
-      :loading="loading"
-      :list="list"
-      :card-selected="cardSelected"
-      :size-popover-loading-id="sizePopoverLoadingId"
-      :size-breakdown-cache="sizeBreakdownCache"
-      :get-status-tag-type="getStatusTagType"
-      :get-status-label="getStatusLabel"
-      :format-date-time="formatDateTime"
-      :format-date="formatDate"
-      :get-customer-due-date-class="getCustomerDueDateClass"
-      :is-sample-order="isSampleOrder"
-      :get-size-popover-width="getSizePopoverWidth"
-      :size-popover-blocks="sizePopoverBlocks"
-      :get-order-meta-tags="getOrderMetaTags"
-      :can-edit-order-item="canEditOrderItem"
-      @toggle-select="onCardToggle"
-      @show-size-popover="onShowSizePopover"
-      @edit="openEdit"
-      @cost="openCost"
-      @remark="openRemark"
-      @operation-log="openOperationLog"
-      @print="printOrder"
-    />
+    <div ref="cardScrollRef" class="orders-card-scroll" @scroll="onCardScroll">
+      <OrderCardGrid
+        :loading="loading"
+        :list="list"
+        :card-selected="cardSelected"
+        :size-popover-loading-id="sizePopoverLoadingId"
+        :size-breakdown-cache="sizeBreakdownCache"
+        :get-status-tag-type="getStatusTagType"
+        :get-status-label="getStatusLabel"
+        :format-date-time="formatDateTime"
+        :format-date="formatDate"
+        :get-customer-due-date-class="getCustomerDueDateClass"
+        :is-sample-order="isSampleOrder"
+        :get-size-popover-width="getSizePopoverWidth"
+        :size-popover-blocks="sizePopoverBlocks"
+        :get-order-meta-tags="getOrderMetaTags"
+        :can-edit-order-item="canEditOrderItem"
+        @toggle-select="onCardToggle"
+        @show-size-popover="onShowSizePopover"
+        @edit="openEdit"
+        @cost="openCost"
+        @remark="openRemark"
+        @operation-log="openOperationLog"
+        @print="printOrder"
+      />
+    </div>
 
     <!-- 分页 -->
     <div class="pagination-wrap">
@@ -116,7 +118,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, watchEffect, onMounted, onBeforeUnmount, onDeactivated, computed } from 'vue'
+import { ref, watchEffect, nextTick, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -285,6 +287,30 @@ const {
   skuCodeLabelVisible,
 })
 const stopPersistWatch = startPersistWatch()
+const cardScrollRef = ref<HTMLElement | null>(null)
+const cardScrollTop = ref(0)
+
+function onCardScroll() {
+  cardScrollTop.value = cardScrollRef.value?.scrollTop ?? 0
+}
+
+function restoreCardScroll() {
+  nextTick(() => {
+    const el = cardScrollRef.value
+    if (!el) return
+    el.scrollTop = cardScrollTop.value
+    window.requestAnimationFrame(() => {
+      if (cardScrollRef.value) cardScrollRef.value.scrollTop = cardScrollTop.value
+    })
+  })
+}
+
+function resetCardScroll() {
+  cardScrollTop.value = 0
+  nextTick(() => {
+    if (cardScrollRef.value) cardScrollRef.value.scrollTop = 0
+  })
+}
 
 /**
  * refreshCounts=true 时刷新状态 tab 数量；
@@ -300,6 +326,7 @@ async function load(options?: { refreshCounts?: boolean }) {
 /** @param byUser 仅当用户按回车或点击搜索按钮时为 true，输入防抖触发时为 false */
 function onSearch(byUser = false) {
   baseOnSearch(totalQuantity, byUser)
+  resetCardScroll()
   void refreshStatusCounts()
 }
 
@@ -314,22 +341,26 @@ function debouncedSearch() {
 
 function onReset() {
   baseOnReset(totalQuantity)
+  resetCardScroll()
   resetSelection()
   void refreshStatusCounts()
 }
 
 function onStatusChange() {
   pagination.page = 1
+  resetCardScroll()
   resetSelection()
   load()
 }
 
 function onPageChange(page: number) {
   baseOnPageChange(page, totalQuantity)
+  resetCardScroll()
 }
 
 function onPageSizeChange(pageSize: number) {
   baseOnPageSizeChange(pageSize, totalQuantity)
+  resetCardScroll()
 }
 
 function onCardToggle(orderId: number, checked: boolean) {
@@ -356,7 +387,12 @@ function openView(order: OrderListItem) {
 }
 
 function openCost(order: OrderListItem) {
-  router.push(`/orders/cost/${order.id}`)
+  const title = `订单成本 ${order.orderNo || order.id}`
+  router.push({
+    name: 'OrdersCost',
+    params: { id: order.id },
+    query: { tabTitle: title, tabKey: `orders-cost-${order.id}` },
+  })
 }
 
 function printOrder(_order: OrderListItem) {
@@ -395,7 +431,12 @@ onBeforeUnmount(() => {
   abortStatusCounts()
 })
 
+onActivated(() => {
+  restoreCardScroll()
+})
+
 onDeactivated(() => {
+  cardScrollTop.value = cardScrollRef.value?.scrollTop ?? cardScrollTop.value
   persistFilterState()
   abortListRequest()
   abortStatusCounts()
@@ -413,6 +454,12 @@ watchEffect(() => {
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  height: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .status-tabs {
@@ -421,6 +468,7 @@ watchEffect(() => {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-sm);
+  flex-shrink: 0;
 }
 
 .status-tabs-left {
@@ -441,6 +489,7 @@ watchEffect(() => {
   margin-bottom: var(--space-md);
   border-radius: var(--radius-lg);
   background-color: var(--color-bg-subtle, #f5f6f8);
+  flex-shrink: 0;
 }
 
 .filter-bar :deep(.el-form-item) {
@@ -467,11 +516,38 @@ watchEffect(() => {
   margin-left: auto;
 }
 
+.orders-card-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--app-table-scrollbar-thumb, #c0c4cc) transparent;
+}
+
+.orders-card-scroll::-webkit-scrollbar {
+  width: var(--app-table-scrollbar-size, 6px);
+}
+
+.orders-card-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.orders-card-scroll::-webkit-scrollbar-thumb {
+  background-color: var(--app-table-scrollbar-thumb, #c0c4cc);
+  border-radius: var(--app-table-scrollbar-radius, 3px);
+}
+
+.orders-card-scroll :deep(.orders-card-list) {
+  min-height: 100%;
+}
+
 .pagination-wrap {
   margin-top: var(--space-md);
   display: flex;
   justify-content: space-between;
   align-items: center;
+  flex-shrink: 0;
 }
 
 .pagination-summary {

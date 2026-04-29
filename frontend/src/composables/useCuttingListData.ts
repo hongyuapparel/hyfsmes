@@ -51,17 +51,15 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     base.page = 1
     base.pageSize = 1
     const counts: Record<string, number> = {}
-    await Promise.all(
-      tabs.map(async (tab) => {
-        try {
-          const res = await getCuttingItems({ ...base, tab: tab.value })
-          const data = res.data
-          counts[tab.value] = data?.total ?? 0
-        } catch {
-          counts[tab.value] = 0
-        }
-      }),
-    )
+    for (const tab of tabs) {
+      try {
+        const res = await getCuttingItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }
     tabCounts.value = counts
     tabTotal.value = counts.all ?? 0
   }

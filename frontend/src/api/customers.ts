@@ -1,4 +1,5 @@
 import request from './request'
+import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 /** 客户项，字段与 customer-fields code 对应；productGroupId 为存库值，productGroup 为展示用路径 */
 export interface CustomerItem {
@@ -38,6 +39,26 @@ export function getCustomers(params?: CustomerListQuery) {
   return request.get<CustomerListRes>('/customers', { params })
 }
 
+export function getCustomerCompanyOptions(params?: {
+  companyName?: string
+  page?: number
+  pageSize?: number
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}) {
+  const query = {
+    page: 1,
+    pageSize: 200,
+    sortBy: 'companyName',
+    sortOrder: 'asc' as const,
+    ...(params ?? {}),
+  }
+  const key = buildSharedGetKey('/customers', query)
+  return sharedGet(key, () => request.get<CustomerListRes>('/customers', { params: query }), {
+    ttlMs: 30000,
+  })
+}
+
 export function getCustomer(id: number) {
   return request.get<CustomerItem>(`/customers/${id}`)
 }
@@ -48,7 +69,10 @@ export function createCustomer(data: Record<string, unknown>) {
     const snake = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
     body[snake] = v
   }
-  return request.post<CustomerItem>('/customers', body)
+  return request.post<CustomerItem>('/customers', body).then((response) => {
+    invalidateSharedGetCache('/customers')
+    return response
+  })
 }
 
 export function updateCustomer(id: number, data: Record<string, unknown>) {
@@ -57,27 +81,41 @@ export function updateCustomer(id: number, data: Record<string, unknown>) {
     const snake = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
     body[snake] = v
   }
-  return request.patch<CustomerItem>(`/customers/${id}`, body)
+  return request.patch<CustomerItem>(`/customers/${id}`, body).then((response) => {
+    invalidateSharedGetCache('/customers')
+    return response
+  })
 }
 
 export function deleteCustomer(id: number) {
-  return request.delete(`/customers/${id}`)
+  return request.delete(`/customers/${id}`).then((response) => {
+    invalidateSharedGetCache('/customers')
+    return response
+  })
 }
 
 export function batchDeleteCustomers(ids: number[]) {
-  return request.post('/customers/batch-delete', { ids })
+  return request.post('/customers/batch-delete', { ids }).then((response) => {
+    invalidateSharedGetCache('/customers')
+    return response
+  })
 }
 
 export function getSalespeople() {
-  return request.get<string[]>('/customers/options/salespeople')
+  const key = buildSharedGetKey('/customers/options/salespeople')
+  return sharedGet(key, () => request.get<string[]>('/customers/options/salespeople'), { ttlMs: 30000 })
 }
 
 export function getMerchandisers() {
-  return request.get<string[]>('/customers/options/merchandisers')
+  const key = buildSharedGetKey('/customers/options/merchandisers')
+  return sharedGet(key, () => request.get<string[]>('/customers/options/merchandisers'), { ttlMs: 30000 })
 }
 
 export function getProductGroups() {
-  return request.get<{ id: number; path: string }[]>('/customers/options/product-groups')
+  const key = buildSharedGetKey('/customers/options/product-groups')
+  return sharedGet(key, () => request.get<{ id: number; path: string }[]>('/customers/options/product-groups'), {
+    ttlMs: 30000,
+  })
 }
 
 /** 小满客户项 */

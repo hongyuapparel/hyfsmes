@@ -1,4 +1,5 @@
 import request from './request'
+import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 export interface EmployeeItem {
   id: number
@@ -39,7 +40,8 @@ export interface StaffOptionItem {
 }
 
 export function getStaffOptions() {
-  return request.get<StaffOptionItem[]>('/hr/staff-options')
+  const key = buildSharedGetKey('/hr/staff-options')
+  return sharedGet(key, () => request.get<StaffOptionItem[]>('/hr/staff-options'), { ttlMs: 30000 })
 }
 
 export function getEmployeeList(params?: {
@@ -88,7 +90,10 @@ export function createEmployee(body: {
   remark?: string
   photoUrl?: string
 }) {
-  return request.post<EmployeeItem>('/hr/items', body)
+  return request.post<EmployeeItem>('/hr/items', body).then((response) => {
+    invalidateSharedGetCache('/hr')
+    return response
+  })
 }
 
 export function updateEmployee(
@@ -116,19 +121,31 @@ export function updateEmployee(
     photoUrl?: string
   }
 ) {
-  return request.put<EmployeeItem>(`/hr/items/${id}`, body)
+  return request.put<EmployeeItem>(`/hr/items/${id}`, body).then((response) => {
+    invalidateSharedGetCache('/hr')
+    return response
+  })
 }
 
 export function deleteEmployee(id: number) {
-  return request.delete<void>(`/hr/items/${id}`)
+  return request.delete<void>(`/hr/items/${id}`).then((response) => {
+    invalidateSharedGetCache('/hr')
+    return response
+  })
 }
 
 export function batchUpdateEmployeeOrder(items: { id: number; sort_order: number }[]) {
-  return request.patch('/hr/batch/order', { items })
+  return request.patch('/hr/batch/order', { items }).then((response) => {
+    invalidateSharedGetCache('/hr')
+    return response
+  })
 }
 
 export function updateEmployeeSortOrder(id: number, sortOrder: number) {
-  return request.patch(`/hr/items/${id}/sort-order`, { sort_order: sortOrder })
+  return request.patch(`/hr/items/${id}/sort-order`, { sort_order: sortOrder }).then((response) => {
+    invalidateSharedGetCache('/hr')
+    return response
+  })
 }
 
 /** 人事页「关联用户」下拉，仅需 /hr 权限 */
@@ -139,7 +156,8 @@ export interface HrUserOption {
 }
 
 export function getHrUserOptions() {
-  return request.get<HrUserOption[]>('/hr/user-options')
+  const key = buildSharedGetKey('/hr/user-options')
+  return sharedGet(key, () => request.get<HrUserOption[]>('/hr/user-options'), { ttlMs: 30000 })
 }
 
 export function checkEmployeeNameExists(name: string, excludeId?: number | null) {

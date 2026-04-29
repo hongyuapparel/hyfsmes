@@ -63,6 +63,27 @@
   line-height: 1.5;
 }
 
+.import-order-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
+}
+
+.import-order-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.import-order-table {
+  width: 100%;
+}
+
+.import-order-empty {
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
+}
+
 .summary-card .order-summary {
   display: flex;
   flex-wrap: wrap;

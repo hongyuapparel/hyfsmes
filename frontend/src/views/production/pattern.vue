@@ -75,7 +75,7 @@
           <span v-if="filter.sampleMaker">车版师：{{ label }}</span>
           <span v-else>{{ label }}</span>
         </template>
-        <el-option v-for="e in sampleMakerOptions" :key="e.id" :label="e.name" :value="e.name" />
+      <el-option v-for="e in sampleMakerOptions" :key="e.id" :label="e.name" :value="e.name" />
       </el-select>
       <el-tree-select
         v-model="filter.orderTypeId"
@@ -595,9 +595,11 @@ const {
 onMounted(() => {
   void loadOptions()
   void loadMaterialTypes()
-  void load()
-  void loadTabCounts()
   void loadPatternStaffOptions()
+  void (async () => {
+    await load()
+    await loadTabCounts()
+  })()
 })
 </script>
 

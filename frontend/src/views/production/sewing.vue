@@ -402,8 +402,10 @@ function sewingBriefFromRow(row: SewingListItem): ProductionOrderBriefModel {
 
 onMounted(() => {
   void loadFactorySuppliers()
-  void load()
-  void loadTabCounts()
+  void (async () => {
+    await load()
+    await loadTabCounts()
+  })()
 })
 </script>
 

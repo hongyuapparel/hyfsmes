@@ -1,5 +1,6 @@
 import request from './request'
 import type { AxiosRequestConfig } from 'axios'
+import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 export interface SystemOptionItem {
   id: number
@@ -15,15 +16,28 @@ export interface SystemOptionTreeNode extends SystemOptionItem {
 }
 
 export function getSystemOptions(type: string) {
-  return request.get<string[]>('/system-options', { params: { type } })
+  const params = { type }
+  const key = buildSharedGetKey('/system-options', params)
+  return sharedGet(key, () => request.get<string[]>('/system-options', { params }), { ttlMs: 30000 })
 }
 
 export function getSystemOptionsList(type: string, config?: AxiosRequestConfig) {
-  return request.get<SystemOptionItem[]>('/system-options/list', { params: { type }, ...(config ?? {}) })
+  const params = { type }
+  if (config?.signal) {
+    return request.get<SystemOptionItem[]>('/system-options/list', { params, ...(config ?? {}) })
+  }
+  const key = buildSharedGetKey('/system-options/list', params)
+  return sharedGet(key, () => request.get<SystemOptionItem[]>('/system-options/list', { params }), {
+    ttlMs: 30000,
+  })
 }
 
 export function getSystemOptionsTree(type: string) {
-  return request.get<SystemOptionTreeNode[]>('/system-options/tree', { params: { type } })
+  const params = { type }
+  const key = buildSharedGetKey('/system-options/tree', params)
+  return sharedGet(key, () => request.get<SystemOptionTreeNode[]>('/system-options/tree', { params }), {
+    ttlMs: 30000,
+  })
 }
 
 /** 懒加载树：根节点（含 hasChildren） */
@@ -35,14 +49,22 @@ export interface SystemOptionLazyNode {
 }
 
 export function getSystemOptionsRoots(type: string) {
-  return request.get<SystemOptionLazyNode[]>('/system-options/roots', { params: { type } })
+  const params = { type }
+  const key = buildSharedGetKey('/system-options/roots', params)
+  return sharedGet(key, () => request.get<SystemOptionLazyNode[]>('/system-options/roots', { params }), {
+    ttlMs: 30000,
+  })
 }
 
 /** 懒加载树：子节点 */
 export function getSystemOptionsChildren(type: string, parentId: number) {
-  return request.get<SystemOptionLazyNode[]>('/system-options/children', {
-    params: { type, parent_id: parentId },
-  })
+  const params = { type, parent_id: parentId }
+  const key = buildSharedGetKey('/system-options/children', params)
+  return sharedGet(
+    key,
+    () => request.get<SystemOptionLazyNode[]>('/system-options/children', { params }),
+    { ttlMs: 30000 },
+  )
 }
 
 export function createSystemOption(data: {
@@ -52,18 +74,33 @@ export function createSystemOption(data: {
   parent_id?: number | null
   remark?: string
 }) {
-  return request.post<SystemOptionItem>('/system-options', data)
+  return request.post<SystemOptionItem>('/system-options', data).then((response) => {
+    invalidateSharedGetCache('/system-options')
+    invalidateSharedGetCache('/dicts')
+    invalidateSharedGetCache('/suppliers/options')
+    return response
+  })
 }
 
 export function updateSystemOption(
   id: number,
   data: { value?: string; sort_order?: number; parent_id?: number | null; remark?: string },
 ) {
-  return request.patch<SystemOptionItem>(`/system-options/${id}`, data)
+  return request.patch<SystemOptionItem>(`/system-options/${id}`, data).then((response) => {
+    invalidateSharedGetCache('/system-options')
+    invalidateSharedGetCache('/dicts')
+    invalidateSharedGetCache('/suppliers/options')
+    return response
+  })
 }
 
 export function deleteSystemOption(id: number) {
-  return request.delete(`/system-options/${id}`)
+  return request.delete(`/system-options/${id}`).then((response) => {
+    invalidateSharedGetCache('/system-options')
+    invalidateSharedGetCache('/dicts')
+    invalidateSharedGetCache('/suppliers/options')
+    return response
+  })
 }
 
 export function batchUpdateSystemOptionOrder(
@@ -71,5 +108,10 @@ export function batchUpdateSystemOptionOrder(
   parentId: number | null,
   items: { id: number; sort_order: number }[],
 ) {
-  return request.patch('/system-options/batch/order', { type, parent_id: parentId, items })
+  return request.patch('/system-options/batch/order', { type, parent_id: parentId, items }).then((response) => {
+    invalidateSharedGetCache('/system-options')
+    invalidateSharedGetCache('/dicts')
+    invalidateSharedGetCache('/suppliers/options')
+    return response
+  })
 }

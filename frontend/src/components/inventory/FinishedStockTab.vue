@@ -183,10 +183,10 @@
         </template>
       </el-table-column>
       <el-table-column label="库存类型" min-width="100" show-overflow-tooltip align="center" header-align="center">
-        <template #default="{ row }">{{ findInventoryTypeLabelById(row.inventoryTypeId) || '-' }}</template>
+        <template #default="{ row }">{{ getTableInventoryTypeText(row) }}</template>
       </el-table-column>
       <el-table-column label="仓库" min-width="90" show-overflow-tooltip align="center" header-align="center">
-        <template #default="{ row }">{{ findWarehouseLabelById(row.warehouseId) || '-' }}</template>
+        <template #default="{ row }">{{ getTableWarehouseText(row) }}</template>
       </el-table-column>
       <el-table-column
         v-for="column in stockTailColumns"
@@ -315,6 +315,16 @@ function getTableGrandTotalText(row: StockTableRow): string {
   }
   const total = (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0)
   return Number.isFinite(total) ? `￥${formatDisplayNumber(total)}` : '￥0'
+}
+
+function getTableInventoryTypeText(row: StockTableRow): string {
+  if (isStockTableParentRow(row) && row._mixedInventoryType) return '多个'
+  return props.findInventoryTypeLabelById(row.inventoryTypeId) || '-'
+}
+
+function getTableWarehouseText(row: StockTableRow): string {
+  if (isStockTableParentRow(row) && row._mixedWarehouse) return '多个'
+  return props.findWarehouseLabelById(row.warehouseId) || '-'
 }
 
 function handleHeaderDragEnd(...args: unknown[]) {

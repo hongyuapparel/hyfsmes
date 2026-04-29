@@ -143,17 +143,15 @@ export function usePatternList() {
     base.page = 1
     base.pageSize = 1
     const counts: Record<string, number> = {}
-    await Promise.all(
-      PATTERN_TABS.map(async (tab) => {
-        try {
-          const res = await getPatternItems({ ...base, tab: tab.value })
-          const data = res.data
-          counts[tab.value] = data?.total ?? 0
-        } catch {
-          counts[tab.value] = 0
-        }
-      }),
-    )
+    for (const tab of PATTERN_TABS) {
+      try {
+        const res = await getPatternItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }
     if (reqId !== tabCountsReqId) return
     tabCounts.value = counts
     tabTotal.value = counts.all ?? 0

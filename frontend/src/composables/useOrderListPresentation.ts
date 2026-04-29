@@ -1,6 +1,7 @@
 import type { Ref } from 'vue'
 import type { OrderListItem } from '@/api/orders'
 import type { SystemOptionTreeNode } from '@/api/system-options'
+import { getOrderStatusTagType } from '@/utils/order-status-display'
 
 interface UseOrderListPresentationParams {
   statusLabelMap: Ref<Record<string, string>>
@@ -29,11 +30,7 @@ export function useOrderListPresentation(params: UseOrderListPresentationParams)
   function getStatusTagType(
     status: string,
   ): 'success' | 'warning' | 'info' | 'danger' | 'primary' | undefined {
-    const s = (status ?? '').toLowerCase()
-    if (s === 'completed') return 'success'
-    if (s === 'draft' || s === 'pending_review') return 'info'
-    if (!s) return 'info'
-    return 'warning'
+    return getOrderStatusTagType(status)
   }
 
   function getCustomerDueDateClass(

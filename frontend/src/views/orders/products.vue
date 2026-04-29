@@ -211,7 +211,10 @@
       :product-group-tree-select-data="productGroupTreeSelectData"
       :salespeople="salespeople"
       :customers="customers"
+      :customer-loading="customersLoading"
       :applicable-people-options="applicablePeopleOptions"
+      @customer-search="searchCustomerOptions"
+      @customer-dropdown-visible="onCustomerDropdownVisible"
       @success="load"
     />
   </div>
@@ -251,6 +254,7 @@ const {
   productGroupOptions,
   salespeople,
   customers,
+  customersLoading,
   applicablePeopleOptions,
   selectedIds,
   sidebarCollapsed,
@@ -264,6 +268,8 @@ const {
   load,
   loadFieldDefinitions,
   loadOptions,
+  searchCustomerOptions,
+  onCustomerDropdownVisible,
   onMenuSelect,
   toggleGroupCollapse,
   onFilterChange,

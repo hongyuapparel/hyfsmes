@@ -117,17 +117,15 @@ export function usePurchaseList() {
     base.page = 1
     base.pageSize = 1
     const counts: Record<string, number> = {}
-    await Promise.all(
-      PURCHASE_TABS.map(async (tab) => {
-        try {
-          const res = await getPurchaseItems({ ...base, tab: tab.value })
-          const data = res.data
-          counts[tab.value] = data?.total ?? 0
-        } catch {
-          counts[tab.value] = 0
-        }
-      }),
-    )
+    for (const tab of PURCHASE_TABS) {
+      try {
+        const res = await getPurchaseItems({ ...base, tab: tab.value })
+        const data = res.data
+        counts[tab.value] = data?.total ?? 0
+      } catch {
+        counts[tab.value] = 0
+      }
+    }
     tabCounts.value = counts
     tabTotal.value = counts.all ?? 0
   }

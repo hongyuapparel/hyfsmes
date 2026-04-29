@@ -63,6 +63,12 @@
       :import-template-options="importTemplateOptions"
       :import-dialog-visible="importTemplateDialog.visible"
       :import-template-id="importTemplateDialog.templateId"
+      :import-order-dialog-visible="importOrderDialog.visible"
+      :import-order-keyword="importOrderDialog.keyword"
+      :import-order-loading="importOrderDialog.loading"
+      :import-order-applying="importOrderDialog.applying"
+      :import-order-results="importOrderDialog.results"
+      :import-order-selected-id="importOrderDialog.selectedId"
       :save-dialog-visible="saveTemplateDialog.visible"
       :save-dialog-name="saveTemplateDialog.name"
       :save-dialog-submitting="saveTemplateDialog.submitting"
@@ -72,8 +78,11 @@
       :get-process-options="getProductionProcessSelectOptions"
       :get-job-type-amount-by-index="getJobTypeGroupAmountByRowIndex"
       :get-department-amount-by-index="getDepartmentGroupAmountByRowIndex"
+      :get-import-order-status-label="getImportOrderStatusLabel"
+      :get-import-order-status-tag-type="getImportOrderStatusTagType"
       :format-money="formatMoney"
       @open-import-dialog="openImportTemplateDialog"
+      @open-import-order-dialog="openImportOrderDialog"
       @open-save-dialog="openSaveTemplateDialog"
       @open-picker="openProductionPickerDialog"
       @batch-remove="batchRemoveProductionRows"
@@ -85,11 +94,17 @@
       @update-production-cost-multiplier="(v) => (productionCostMultiplier = v)"
       @update-import-dialog-visible="(v) => (importTemplateDialog.visible = v)"
       @update-import-template-id="(v) => (importTemplateDialog.templateId = v)"
+      @update-import-order-dialog-visible="(v) => (importOrderDialog.visible = v)"
+      @update-import-order-keyword="(v) => (importOrderDialog.keyword = v)"
+      @update-import-order-selected-id="(v) => (importOrderDialog.selectedId = v)"
       @update-save-dialog-visible="(v) => (saveTemplateDialog.visible = v)"
       @update-save-dialog-name="(v) => (saveTemplateDialog.name = v)"
       @import-dialog-close="importTemplateDialog.templateId = null"
+      @import-order-dialog-close="closeImportOrderDialog"
+      @search-import-orders="searchImportOrders"
       @save-dialog-close="saveTemplateDialog.name = ''"
       @apply-import-template="applyImportTemplate"
+      @apply-import-order="applyImportOrder"
       @save-current-template="saveCurrentProcessesAsTemplate"
       @update:production-picker-visible="(v) => (productionPickerVisible = v)"
       @picker-append="onProductionPickerAppend"
@@ -154,6 +169,7 @@ const {
   confirmingQuote,
   importTemplateDialog,
   importTemplateOptions,
+  importOrderDialog,
   saveTemplateDialog,
   canSubmitCost,
   costNotice,
@@ -171,6 +187,8 @@ const {
   getJobTypeOptions,
   getProductionProcessSelectOptions,
   formatMoney,
+  getImportOrderStatusLabel,
+  getImportOrderStatusTagType,
   onSupplierSelectVisibleChange,
   searchSuppliers,
   onProcessOptionsVisibleChange,
@@ -192,9 +210,13 @@ const {
   confirmQuote,
   goBack,
   openImportTemplateDialog,
+  openImportOrderDialog,
+  closeImportOrderDialog,
+  searchImportOrders,
   openSaveTemplateDialog,
   saveCurrentProcessesAsTemplate,
   applyImportTemplate,
+  applyImportOrder,
 } = useOrderCostPage(authStore)
 </script>
 

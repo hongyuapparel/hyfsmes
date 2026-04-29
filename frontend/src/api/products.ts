@@ -1,5 +1,6 @@
 import type { AxiosRequestConfig } from 'axios'
 import request from './request'
+import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 /** 产品项，字段与 product-fields code 对应；productGroupId 为存库值，productGroup 为展示用路径 */
 export interface ProductItem {
@@ -53,7 +54,10 @@ export function createProduct(data: Record<string, unknown>) {
     const snake = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
     body[snake] = v
   }
-  return request.post<ProductItem>('/products', body)
+  return request.post<ProductItem>('/products', body).then((response) => {
+    invalidateSharedGetCache('/products/options')
+    return response
+  })
 }
 
 export function updateProduct(id: number, data: Record<string, unknown>) {
@@ -62,27 +66,49 @@ export function updateProduct(id: number, data: Record<string, unknown>) {
     const snake = k.replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`)
     body[snake] = v
   }
-  return request.patch<ProductItem>(`/products/${id}`, body)
+  return request.patch<ProductItem>(`/products/${id}`, body).then((response) => {
+    invalidateSharedGetCache('/products/options')
+    return response
+  })
 }
 
 export function deleteProduct(id: number) {
-  return request.delete(`/products/${id}`)
+  return request.delete(`/products/${id}`).then((response) => {
+    invalidateSharedGetCache('/products/options')
+    return response
+  })
 }
 
 export function batchDeleteProducts(ids: number[]) {
-  return request.post('/products/batch-delete', { ids })
+  return request.post('/products/batch-delete', { ids }).then((response) => {
+    invalidateSharedGetCache('/products/options')
+    return response
+  })
 }
 
 export function getProductGroups() {
-  return request.get<{ id: number; path: string }[]>('/products/options/product-groups')
+  const key = buildSharedGetKey('/products/options/product-groups')
+  return sharedGet(
+    key,
+    () => request.get<{ id: number; path: string }[]>('/products/options/product-groups'),
+    { ttlMs: 30000 },
+  )
 }
 
 export function getProductGroupCounts() {
-  return request.get<{ productGroupId: number; productGroupPath: string; count: number }[]>('/products/options/group-counts')
+  const key = buildSharedGetKey('/products/options/group-counts')
+  return sharedGet(
+    key,
+    () => request.get<{ productGroupId: number; productGroupPath: string; count: number }[]>(
+      '/products/options/group-counts',
+    ),
+    { ttlMs: 30000 },
+  )
 }
 
 export function getProductSalespeople() {
-  return request.get<string[]>('/products/options/salespeople')
+  const key = buildSharedGetKey('/products/options/salespeople')
+  return sharedGet(key, () => request.get<string[]>('/products/options/salespeople'), { ttlMs: 30000 })
 }
 
 export function getNextSkuCode() {

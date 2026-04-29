@@ -69,7 +69,7 @@
             <el-button text type="primary" @click="handleLogout">退出</el-button>
           </div>
         </header>
-        <main class="layout-main">
+        <main ref="layoutMainRef" class="layout-main">
           <router-view v-slot="{ Component, route }">
             <keep-alive>
               <component :is="Component" :key="getRouteCacheKey(route)" />
@@ -82,7 +82,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import {
   Expand,
@@ -112,6 +112,22 @@ const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const healthStatus = ref('')
+const layoutMainRef = ref<HTMLElement | null>(null)
+
+interface RouteScrollSnapshot {
+  fullPath: string
+  path: string
+  tabKey: string
+}
+
+interface LayoutScrollPosition {
+  top: number
+  left: number
+}
+
+const layoutScrollMap = new Map<string, LayoutScrollPosition>()
+let restoreFrame = 0
+let restoreTimer: number | undefined
 
 const showHeaderTabs = computed(() => route.path !== '/')
 
@@ -146,6 +162,54 @@ const allowedMenus = computed(() => {
 
 const activeMenu = computed(() => route.path)
 
+function getRouteScrollSnapshot(r: RouteLocationNormalizedLoaded): RouteScrollSnapshot {
+  return {
+    fullPath: r.fullPath,
+    path: r.path,
+    tabKey: typeof r.query?.tabKey === 'string' ? r.query.tabKey.trim() : '',
+  }
+}
+
+function getRouteScrollKey(snapshot: RouteScrollSnapshot): string {
+  return snapshot.tabKey || snapshot.path || snapshot.fullPath
+}
+
+function saveLayoutScroll(key = getRouteScrollKey(getRouteScrollSnapshot(route))) {
+  const el = layoutMainRef.value
+  if (!el) return
+  layoutScrollMap.set(key, { top: el.scrollTop, left: el.scrollLeft })
+}
+
+function restoreLayoutScroll(key = getRouteScrollKey(getRouteScrollSnapshot(route))) {
+  const el = layoutMainRef.value
+  if (!el) return
+  const pos = layoutScrollMap.get(key) ?? { top: 0, left: 0 }
+  el.scrollTop = pos.top
+  el.scrollLeft = pos.left
+}
+
+function queueRestoreLayoutScroll(key: string) {
+  if (restoreFrame) {
+    window.cancelAnimationFrame(restoreFrame)
+    restoreFrame = 0
+  }
+  if (restoreTimer != null) {
+    window.clearTimeout(restoreTimer)
+    restoreTimer = undefined
+  }
+  nextTick(() => {
+    restoreLayoutScroll(key)
+    restoreFrame = window.requestAnimationFrame(() => {
+      restoreFrame = 0
+      restoreLayoutScroll(key)
+      restoreTimer = window.setTimeout(() => {
+        restoreTimer = undefined
+        restoreLayoutScroll(key)
+      }, 50)
+    })
+  })
+}
+
 function getRouteCacheKey(r: RouteLocationNormalizedLoaded): string {
   // MainLayout 只按一级业务分组缓存（如 /orders、/inventory），
   // 避免在二级页面切换时重建 RouterViewWrapper 导致子页面闪刷。
@@ -169,6 +233,21 @@ onMounted(async () => {
   } catch {
     healthStatus.value = '后端未连接'
   }
+})
+
+watch(
+  () => getRouteScrollSnapshot(route),
+  (nextRoute, previousRoute) => {
+    saveLayoutScroll(getRouteScrollKey(previousRoute))
+    queueRestoreLayoutScroll(getRouteScrollKey(nextRoute))
+  },
+  { flush: 'pre' },
+)
+
+onBeforeUnmount(() => {
+  saveLayoutScroll()
+  if (restoreFrame) window.cancelAnimationFrame(restoreFrame)
+  if (restoreTimer != null) window.clearTimeout(restoreTimer)
 })
 </script>
 

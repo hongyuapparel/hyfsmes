@@ -1,4 +1,5 @@
 import request from './request'
+import { buildSharedGetKey, sharedGet } from './shared-request-cache'
 
 export interface SupplierItem {
   id: number
@@ -101,19 +102,28 @@ export function searchSuppliers(keyword?: string, page = 1, pageSize = 20) {
 
 /** 供应商类型下拉选项（一级，来自系统设置-供应商设置） */
 export function getSupplierTypeOptions() {
-  return request.get<string[]>('/suppliers/options')
+  const key = buildSharedGetKey('/suppliers/options')
+  return sharedGet(key, () => request.get<string[]>('/suppliers/options'), { ttlMs: 30000 })
 }
 
 /** 某供应商类型下的业务范围下拉选项（返回可选层级路径，父/子分组都可选） */
 export function getSupplierBusinessScopeOptions(type: string) {
-  return request.get<string[]>('/suppliers/options/business-scope', {
-    params: { type },
-  })
+  const params = { type }
+  const key = buildSharedGetKey('/suppliers/options/business-scope', params)
+  return sharedGet(
+    key,
+    () => request.get<string[]>('/suppliers/options/business-scope', { params }),
+    { ttlMs: 30000 },
+  )
 }
 
 /** 某供应商类型下的业务范围树（父/子分组树形，可展开） */
 export function getSupplierBusinessScopeTreeOptions(type: string) {
-  return request.get<SupplierBusinessScopeTreeNode[]>('/suppliers/options/business-scope/tree', {
-    params: { type },
-  })
+  const params = { type }
+  const key = buildSharedGetKey('/suppliers/options/business-scope/tree', params)
+  return sharedGet(
+    key,
+    () => request.get<SupplierBusinessScopeTreeNode[]>('/suppliers/options/business-scope/tree', { params }),
+    { ttlMs: 30000 },
+  )
 }

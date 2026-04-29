@@ -1,5 +1,6 @@
 import request from './request'
 import type { AxiosRequestConfig } from 'axios'
+import { buildSharedGetKey, sharedGet } from './shared-request-cache'
 import type { SystemOptionTreeNode, SystemOptionItem } from './system-options'
 
 /**
@@ -25,14 +26,33 @@ export type DictType =
   | 'process_job_types'
 
 export function getDictOptions(type: DictType, config?: AxiosRequestConfig) {
-  return request.get<string[]>('/dicts', { params: { type }, ...(config ?? {}) })
+  const params = { type }
+  if (config?.signal) {
+    return request.get<string[]>('/dicts', { params, ...(config ?? {}) })
+  }
+  const key = buildSharedGetKey('/dicts', params)
+  return sharedGet(key, () => request.get<string[]>('/dicts', { params }), { ttlMs: 30000 })
 }
 
 export function getDictTree(type: DictType, config?: AxiosRequestConfig) {
-  return request.get<SystemOptionTreeNode[]>('/dicts/tree', { params: { type }, ...(config ?? {}) })
+  const params = { type }
+  if (config?.signal) {
+    return request.get<SystemOptionTreeNode[]>('/dicts/tree', { params, ...(config ?? {}) })
+  }
+  const key = buildSharedGetKey('/dicts/tree', params)
+  return sharedGet(key, () => request.get<SystemOptionTreeNode[]>('/dicts/tree', { params }), {
+    ttlMs: 30000,
+  })
 }
 
 /** 获取带 id 的完整字典项列表（用于按 optionId 存储与筛选） */
 export function getDictItems(type: DictType, config?: AxiosRequestConfig) {
-  return request.get<SystemOptionItem[]>('/dicts/list', { params: { type }, ...(config ?? {}) })
+  const params = { type }
+  if (config?.signal) {
+    return request.get<SystemOptionItem[]>('/dicts/list', { params, ...(config ?? {}) })
+  }
+  const key = buildSharedGetKey('/dicts/list', params)
+  return sharedGet(key, () => request.get<SystemOptionItem[]>('/dicts/list', { params }), {
+    ttlMs: 30000,
+  })
 }

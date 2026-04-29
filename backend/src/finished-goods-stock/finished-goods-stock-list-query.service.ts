@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { Brackets, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
@@ -40,6 +40,72 @@ export class FinishedGoodsStockListQueryService {
     if (endDate?.trim()) {
       qb.andWhere(`${columnSql} <= :inboundEnd`, { inboundEnd: `${endDate.trim()} 23:59:59` });
     }
+  }
+
+  private applyStoredListFilters(
+    qb: SelectQueryBuilder<any>,
+    filters: {
+      orderNo?: string;
+      skuCode?: string;
+      customerName?: string;
+      inventoryTypeId?: number | null;
+      startDate?: string;
+      endDate?: string;
+    },
+  ) {
+    if (filters.orderNo?.trim()) {
+      qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${filters.orderNo.trim()}%` });
+    }
+    if (filters.skuCode?.trim()) {
+      qb.andWhere('s.sku_code LIKE :skuCode', { skuCode: `%${filters.skuCode.trim()}%` });
+    }
+    if (filters.customerName?.trim()) {
+      qb.andWhere('s.customer_name LIKE :customerName', {
+        customerName: `%${filters.customerName.trim()}%`,
+      });
+    }
+    if (filters.inventoryTypeId != null) {
+      qb.andWhere('s.inventory_type_id = :inventoryTypeId', {
+        inventoryTypeId: filters.inventoryTypeId,
+      });
+    }
+    this.applyInboundTimeRange(qb, 's.created_at', filters.startDate, filters.endDate);
+  }
+
+  private getStoredSkuGroupSql() {
+    return "LOWER(TRIM(COALESCE(s.sku_code, '')))";
+  }
+
+  private createStoredListQueryBuilder() {
+    return this.stockRepo
+      .createQueryBuilder('s')
+      .leftJoin(Order, 'o', 'o.id = s.order_id')
+      .leftJoin(
+        Product,
+        'pr',
+        'TRIM(pr.sku_code) COLLATE utf8mb4_general_ci = TRIM(s.sku_code) COLLATE utf8mb4_general_ci',
+      )
+      .select([
+        's.id AS id',
+        's.order_id AS orderId',
+        "COALESCE(o.order_no, '') AS orderNo",
+        's.customer_name AS customerName',
+        's.sku_code AS skuCode',
+        's.quantity AS quantity',
+        `CASE
+          WHEN s.unit_price IS NOT NULL AND s.unit_price > 0 THEN s.unit_price
+          WHEN o.ex_factory_price IS NOT NULL AND o.ex_factory_price > 0 THEN o.ex_factory_price
+          ELSE 0
+        END AS unitPrice`,
+        's.warehouse_id AS warehouseId',
+        's.inventory_type_id AS inventoryTypeId',
+        's.department AS department',
+        's.location AS location',
+        "COALESCE(pr.image_url, '') AS productImageUrl",
+        "COALESCE(s.image_url, '') AS imageUrl",
+        's.created_at AS createdAt',
+        's.color_size_snapshot AS colorSizeSnapshot',
+      ]);
   }
 
   private async sumPendingQuantitiesForList(filters: {
@@ -103,6 +169,7 @@ export class FinishedGoodsStockListQueryService {
     endDate?: string;
     page?: number;
     pageSize?: number;
+    paginateByVisibleGroup?: boolean;
   }): Promise<{
     list: FinishedStockRow[];
     total: number;
@@ -123,6 +190,7 @@ export class FinishedGoodsStockListQueryService {
     endDate?: string;
     page?: number;
     pageSize?: number;
+    paginateByVisibleGroup?: boolean;
   }): Promise<{
     list: FinishedStockRow[];
     total: number;
@@ -140,6 +208,7 @@ export class FinishedGoodsStockListQueryService {
       endDate,
       page = 1,
       pageSize = 20,
+      paginateByVisibleGroup = false,
     } = params;
 
     const [pendingQtyTotal, storedQtyTotal] = await Promise.all([
@@ -229,48 +298,18 @@ export class FinishedGoodsStockListQueryService {
     }
 
     if (tab === 'stored' || tab === 'all') {
-      const stockQb = this.stockRepo
-        .createQueryBuilder('s')
-        .leftJoin(Order, 'o', 'o.id = s.order_id')
-        .leftJoin(
-          Product,
-          'pr',
-          'TRIM(pr.sku_code) COLLATE utf8mb4_general_ci = TRIM(s.sku_code) COLLATE utf8mb4_general_ci',
-        )
-        .select([
-          's.id AS id',
-          's.order_id AS orderId',
-          "COALESCE(o.order_no, '') AS orderNo",
-          's.customer_name AS customerName',
-          's.sku_code AS skuCode',
-          's.quantity AS quantity',
-          `CASE
-            WHEN s.unit_price IS NOT NULL AND s.unit_price > 0 THEN s.unit_price
-            WHEN o.ex_factory_price IS NOT NULL AND o.ex_factory_price > 0 THEN o.ex_factory_price
-            ELSE 0
-          END AS unitPrice`,
-          's.warehouse_id AS warehouseId',
-          's.inventory_type_id AS inventoryTypeId',
-          's.department AS department',
-          's.location AS location',
-          "COALESCE(pr.image_url, '') AS productImageUrl",
-          "COALESCE(s.image_url, '') AS imageUrl",
-          's.created_at AS createdAt',
-          's.color_size_snapshot AS colorSizeSnapshot',
-        ]);
-      if (orderNo?.trim()) stockQb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
-      if (skuCode?.trim()) stockQb.andWhere('s.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
-      if (customerName?.trim()) {
-        stockQb.andWhere('s.customer_name LIKE :customerName', { customerName: `%${customerName.trim()}%` });
-      }
-      if (inventoryTypeId != null) stockQb.andWhere('s.inventory_type_id = :inventoryTypeId', { inventoryTypeId });
-      this.applyInboundTimeRange(stockQb, 's.created_at', startDate, endDate);
-      stockQb.orderBy('s.created_at', 'DESC');
-      const storedCount = await stockQb.getCount();
-      const storedRows = await stockQb
-        .offset(tab === 'stored' ? (page - 1) * pageSize : 0)
-        .limit(tab === 'stored' ? pageSize : 10000)
-        .getRawMany<{
+      const stockQb = this.createStoredListQueryBuilder();
+      this.applyStoredListFilters(stockQb, {
+        orderNo,
+        skuCode,
+        customerName,
+        inventoryTypeId,
+        startDate,
+        endDate,
+      });
+
+      let storedCount = 0;
+      let storedRows: Array<{
           id: number;
           orderId: number | null;
           orderNo: string;
@@ -286,7 +325,66 @@ export class FinishedGoodsStockListQueryService {
           imageUrl: string;
           createdAt: Date;
           colorSizeSnapshot?: unknown;
+        }> = [];
+
+      if (tab === 'stored' && paginateByVisibleGroup) {
+        const skuGroupSql = this.getStoredSkuGroupSql();
+        const groupedQb = this.stockRepo
+          .createQueryBuilder('s')
+          .leftJoin(Order, 'o', 'o.id = s.order_id')
+          .select(`${skuGroupSql}`, 'skuGroupKey')
+          .addSelect('MAX(s.created_at)', 'latestCreatedAt')
+          .groupBy(skuGroupSql)
+          .orderBy('latestCreatedAt', 'DESC')
+          .addOrderBy('skuGroupKey', 'ASC');
+        this.applyStoredListFilters(groupedQb, {
+          orderNo,
+          skuCode,
+          customerName,
+          inventoryTypeId,
+          startDate,
+          endDate,
+        });
+        const visibleGroups = await groupedQb.getRawMany<{
+          skuGroupKey: string;
+          latestCreatedAt: string | Date;
         }>();
+        storedCount = visibleGroups.length;
+        const pageGroups = visibleGroups.slice((page - 1) * pageSize, page * pageSize);
+        if (pageGroups.length > 0) {
+          stockQb.andWhere(
+            new Brackets((whereQb) => {
+              pageGroups.forEach((group, index) => {
+                whereQb.orWhere(
+                  `${skuGroupSql} = :skuGroupKey${index}`,
+                  {
+                    [`skuGroupKey${index}`]: group.skuGroupKey ?? '',
+                  },
+                );
+              });
+            }),
+          );
+          const groupOrderSql = pageGroups
+            .map(
+              (_, index) =>
+                `WHEN ${skuGroupSql} = :skuGroupKey${index} THEN ${index}`,
+            )
+            .join(' ');
+          storedRows = await stockQb
+            .orderBy(`CASE ${groupOrderSql} ELSE ${pageGroups.length} END`, 'ASC')
+            .addOrderBy('s.created_at', 'DESC')
+            .addOrderBy('s.id', 'DESC')
+            .getRawMany();
+        }
+      } else {
+        stockQb.orderBy('s.created_at', 'DESC');
+        storedCount = await stockQb.getCount();
+        storedRows = await stockQb
+          .offset(tab === 'stored' ? (page - 1) * pageSize : 0)
+          .limit(tab === 'stored' ? pageSize : 10000)
+          .getRawMany();
+      }
+
       const storedList: FinishedStockRow[] = storedRows.map((r) => ({
         id: r.id,
         orderId: r.orderId ?? null,

@@ -181,6 +181,11 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   }
 
   async function submitCreate() {
+    const skuCode = String(createForm.skuCode ?? '').trim()
+    if (!skuCode) {
+      ElMessage.warning('请选择SKU')
+      return
+    }
     const valid = await createFormRef.value?.validate().then(() => true).catch(() => false)
     if (!valid) return
     const totalQty = sizeTotalQuantity.value
@@ -193,7 +198,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     try {
       await createFinishedStock({
         orderNo: createForm.orderNo?.trim() || undefined,
-        skuCode: createForm.skuCode,
+        skuCode,
         quantity: createForm.quantity,
         unitPrice: createForm.unitPrice?.trim() || undefined,
         warehouseId: createForm.warehouseId,

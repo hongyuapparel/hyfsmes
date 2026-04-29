@@ -1,5 +1,6 @@
 import request from './request'
 import type { AxiosRequestConfig } from 'axios'
+import { buildSharedGetKey, sharedGet } from './shared-request-cache'
 
 /** 成品库存快照结构（调整日志 before/after 字段） */
 export interface FinishedStockSnapshot {
@@ -43,6 +44,7 @@ export function getFinishedStockList(params?: {
   endDate?: string
   page?: number
   pageSize?: number
+  paginateByVisibleGroup?: boolean
 }, config?: AxiosRequestConfig) {
   return request.get<{
     list: FinishedStockRow[]
@@ -75,7 +77,12 @@ export interface FinishedPickupUserOption {
 }
 
 export function getFinishedPickupUserOptions() {
-  return request.get<FinishedPickupUserOption[]>('/inventory/finished/pickup-users')
+  const key = buildSharedGetKey('/inventory/finished/pickup-users')
+  return sharedGet(
+    key,
+    () => request.get<FinishedPickupUserOption[]>('/inventory/finished/pickup-users'),
+    { ttlMs: 30000 },
+  )
 }
 
 export interface FinishedStockDetailRes {

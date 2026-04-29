@@ -1,5 +1,10 @@
 import { computed, ref } from 'vue'
-import { getCustomers, getSalespeople, getMerchandisers, type CustomerItem } from '@/api/customers'
+import {
+  getCustomerCompanyOptions,
+  getSalespeople,
+  getMerchandisers,
+  type CustomerItem,
+} from '@/api/customers'
 import { getDictItems, getDictTree } from '@/api/dicts'
 import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-config'
 import {
@@ -176,7 +181,7 @@ export function useOrderListOptions() {
   }
 
   async function loadCustomerOptions() {
-    const custRes = await getCustomers({ page: 1, pageSize: 200 })
+    const custRes = await getCustomerCompanyOptions()
     const custList = (custRes.data?.list ?? []) as CustomerItem[]
     customerOptions.value = custList.map((c) => ({
       label: c.companyName,

@@ -1,6 +1,6 @@
 import { nextTick, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { getCustomers, type CustomerItem } from '@/api/customers'
+import { getCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
 import {
   createFabric,
   getFabricList,
@@ -132,7 +132,7 @@ export function useFabricInventoryStock() {
 
   async function loadCustomerOptions() {
     try {
-      const res = await getCustomers({ page: 1, pageSize: 200, sortBy: 'companyName', sortOrder: 'asc' })
+      const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
       const list = (res.data?.list ?? []) as CustomerItem[]
       customerOptions.value = list.map((c) => ({
         label: c.companyName,

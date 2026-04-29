@@ -28,6 +28,7 @@ export class FinishedGoodsStockController {
     @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('paginateByVisibleGroup') paginateByVisibleGroup?: string,
   ) {
     const inventoryTypeId =
       inventoryTypeIdStr != null && inventoryTypeIdStr !== ''
@@ -43,6 +44,8 @@ export class FinishedGoodsStockController {
       endDate,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      paginateByVisibleGroup:
+        paginateByVisibleGroup === 'true' || paginateByVisibleGroup === '1',
     });
   }
 

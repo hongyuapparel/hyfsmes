@@ -43,6 +43,7 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     profitMargin,
     importTemplateDialog,
     importTemplateOptions,
+    importOrderDialog,
     quoteConfirmedAt,
     quoteConfirmedBy,
     quoteNeedsReconfirm,
@@ -87,6 +88,12 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     openImportTemplateDialog,
     applyImportTemplate,
     loadImportTemplateOptions,
+    openImportOrderDialog,
+    closeImportOrderDialog,
+    searchImportOrders,
+    applyImportOrder: applyImportOrderFromData,
+    getImportOrderStatusLabel,
+    getImportOrderStatusTagType,
   } = useOrderCostData(orderId.value)
 
   const savingDraft = ref(false)
@@ -207,6 +214,11 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     }
   }
 
+  async function applyImportOrder() {
+    const imported = await applyImportOrderFromData()
+    if (imported && !suppressDirtyTracking.value) hasLocalDraftChanges.value = true
+  }
+
   function goBack() { void router.push('/orders/list') }
 
   onMounted(async () => {
@@ -249,6 +261,7 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     confirmingQuote,
     importTemplateDialog,
     importTemplateOptions,
+    importOrderDialog,
     saveTemplateDialog,
     canSubmitCost,
     costNotice,
@@ -288,8 +301,14 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     confirmQuote,
     goBack,
     openImportTemplateDialog,
+    openImportOrderDialog,
+    closeImportOrderDialog,
+    searchImportOrders,
     openSaveTemplateDialog,
     saveCurrentProcessesAsTemplate,
     applyImportTemplate,
+    applyImportOrder,
+    getImportOrderStatusLabel,
+    getImportOrderStatusTagType,
   }
 }
