@@ -26,6 +26,12 @@ import {
 } from './orderSettingsProcessTreeHelpers'
 
 const processDepartments = ['裁床', '车缝', '尾部'] as const
+const MAX_PROCESS_REFRESH_SIZE = 2000
+
+interface ProcessPosition {
+  department: string
+  jobTypePath: string
+}
 
 export function useOrderSettingsProductionProcesses() {
   const processTreeTableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
@@ -42,6 +48,7 @@ export function useOrderSettingsProductionProcesses() {
 
   const processDialog = ref<{ visible: boolean; id?: number }>({ visible: false })
   const processForm = ref({ department: '', jobType: '', name: '', unitPrice: 0, sortOrder: 0 })
+  const editingProcessPosition = ref<ProcessPosition | null>(null)
   const processJobTypeOptions = ref<string[]>([])
   const jobTypeDialog = ref<{ visible: boolean; mode: 'edit' | 'add'; nodeId?: number; parentId?: number | null; isTopLevel?: boolean }>({ visible: false, mode: 'add' })
   const jobTypeForm = ref<{ value: string; parentId: number | null }>({ value: '', parentId: null })
@@ -139,21 +146,71 @@ export function useOrderSettingsProductionProcesses() {
     }
   }
 
-  async function fetchProcessRowsByMeta(nodeId: number, department: string, jobTypePath: string, page = 1) {
-    const pageRes = (await getProductionProcessesPage({ department, jobType: jobTypePath, page, pageSize: PAGE_SIZE })).data
+  const getTreeTable = () => processTreeTableRef.value as unknown as { updateKeyChildren?: (key: string | number, rows: ProcessTreeRow[]) => void } | undefined
+  const getLoadedPageCount = (nodeId: number) => Math.max(1, Math.ceil((processRowsCacheRef.value.get(nodeId)?.length ?? PAGE_SIZE) / PAGE_SIZE))
+  const getPreservedPageSize = (nodeId: number) => Math.min(MAX_PROCESS_REFRESH_SIZE, getLoadedPageCount(nodeId) * PAGE_SIZE)
+  const isProcessNodeVisible = (nodeId: number) => processRowsCacheRef.value.has(nodeId) || expandedKeys.value.includes(`job-${nodeId}`)
+
+  function getProcessPosition(item: { department?: string; jobType?: string }): ProcessPosition {
+    return { department: item.department ?? '', jobTypePath: item.jobType ?? '' }
+  }
+
+  function isSameProcessPosition(left: ProcessPosition | null, right: ProcessPosition | null) {
+    return !!left && !!right && left.department === right.department && left.jobTypePath === right.jobTypePath
+  }
+
+  function findJobTypeNodeIdByPosition(position: ProcessPosition | null): number | null {
+    if (!position?.department || !position.jobTypePath) return null
+    for (const [nodeId, meta] of processJobMetaByNodeIdRef.value.entries()) {
+      if (meta.department === position.department && meta.jobTypePath === position.jobTypePath) return nodeId
+    }
+
+    const root = processJobTypeListRef.value.find((item) => item.parentId == null && item.value === position.department)
+    if (!root) return null
+    const parts = position.jobTypePath.split('>').map((part) => part.trim()).filter(Boolean)
+    const pathParts = parts[0] === position.department ? parts.slice(1) : parts
+    let parentId = root.id
+    let nodeId: number | null = null
+    for (const part of pathParts) {
+      const current = processJobTypeListRef.value.find((item) => item.parentId === parentId && item.value === part)
+      if (!current) return null
+      nodeId = current.id
+      parentId = current.id
+    }
+    if (nodeId != null) processJobMetaByNodeIdRef.value.set(nodeId, position)
+    return nodeId
+  }
+
+  function syncCachedProcessRowsToTable(nodeId: number) {
+    const meta = processJobMetaByNodeIdRef.value.get(nodeId)
+    if (!meta) return
+    const list = processRowsCacheRef.value.get(nodeId) ?? []
+    const total = processTotalMapRef.value.get(nodeId) ?? list.length
+    const rows = buildProcessRowsWithLoadMore(nodeId, meta.department, meta.jobTypePath, list, total, list.length)
+    getTreeTable()?.updateKeyChildren?.(`job-${nodeId}`, rows)
+  }
+
+  async function fetchProcessRowsByMeta(nodeId: number, department: string, jobTypePath: string, page = 1, pageSize = PAGE_SIZE) {
+    const pageRes = (await getProductionProcessesPage({ department, jobType: jobTypePath, page, pageSize })).data
     const newItems = pageRes?.items ?? []
     const total = pageRes?.total ?? 0
     const existing = page === 1 ? [] : (processRowsCacheRef.value.get(nodeId) ?? [])
     const accumulated = [...existing, ...newItems]
     processRowsCacheRef.value.set(nodeId, accumulated)
     processTotalMapRef.value.set(nodeId, total)
-    processPageMapRef.value.set(nodeId, page)
+    processPageMapRef.value.set(nodeId, page === 1 ? Math.max(1, Math.ceil(accumulated.length / PAGE_SIZE)) : page)
     return buildProcessRowsWithLoadMore(nodeId, department, jobTypePath, accumulated, total, accumulated.length)
   }
 
-  async function refreshJobTypeChildrenByMeta(nodeId: number, department: string, jobTypePath: string, page = 1) {
-    const rows = await fetchProcessRowsByMeta(nodeId, department, jobTypePath, page)
-    ;(processTreeTableRef.value as unknown as { updateKeyChildren?: (key: string | number, rows: ProcessTreeRow[]) => void })?.updateKeyChildren?.(`job-${nodeId}`, rows)
+  async function refreshJobTypeChildrenByMeta(nodeId: number, department: string, jobTypePath: string, page = 1, pageSize = PAGE_SIZE) {
+    const rows = await fetchProcessRowsByMeta(nodeId, department, jobTypePath, page, pageSize)
+    getTreeTable()?.updateKeyChildren?.(`job-${nodeId}`, rows)
+  }
+
+  async function refreshProcessNodePreservingLoadedCount(nodeId: number) {
+    const meta = processJobMetaByNodeIdRef.value.get(nodeId)
+    if (!meta || !isProcessNodeVisible(nodeId)) return
+    await refreshJobTypeChildrenByMeta(nodeId, meta.department, meta.jobTypePath, 1, getPreservedPageSize(nodeId))
   }
 
   async function loadMoreProcesses(row: ProcessTreeRow) {
@@ -174,6 +231,7 @@ export function useOrderSettingsProductionProcesses() {
 
   async function openProcessDialog(row?: ProductionProcessItem, treeRow?: ProcessTreeRow) {
     if (row) {
+      editingProcessPosition.value = getProcessPosition(row)
       processDialog.value = { visible: true, id: row.id }
       processForm.value = { department: row.department ?? '', jobType: row.jobType ?? '', name: row.name ?? '', unitPrice: Number(row.unitPrice) || 0, sortOrder: row.sortOrder ?? 0 }
       await loadProcessJobTypeOptions(processForm.value.department)
@@ -181,6 +239,7 @@ export function useOrderSettingsProductionProcesses() {
     }
     const dept = treeRow?.department ?? ''
     const job = treeRow?.jobTypePath ?? treeRow?.jobType ?? ''
+    editingProcessPosition.value = null
     processDialog.value = { visible: true }
     processForm.value = { department: dept, jobType: job, name: '', unitPrice: 0, sortOrder: 0 }
     if (dept) await loadProcessJobTypeOptions(dept)
@@ -192,38 +251,46 @@ export function useOrderSettingsProductionProcesses() {
     void loadProcessJobTypeOptions(processForm.value.department)
   }
 
-  async function refreshExpandedJobTypeRows() {
-    for (const key of expandedKeys.value) {
-      if (typeof key !== 'string' || !key.startsWith('job-')) continue
-      const nodeId = Number(key.replace('job-', ''))
-      const meta = processJobMetaByNodeIdRef.value.get(nodeId)
-      if (meta) {
-        processRowsCacheRef.value.delete(nodeId)
-        processPageMapRef.value.delete(nodeId)
-        await refreshJobTypeChildrenByMeta(nodeId, meta.department, meta.jobTypePath, 1)
-      }
-    }
-  }
-
   function patchProcessRowLocal(item: ProductionProcessItem) {
+    const patchedNodeIds: number[] = []
     for (const [nodeId, list] of processRowsCacheRef.value.entries()) {
       const idx = list.findIndex((x) => x.id === item.id)
       if (idx < 0) continue
       const next = [...list]
       next.splice(idx, 1, { ...next[idx], ...item })
       processRowsCacheRef.value.set(nodeId, next)
+      patchedNodeIds.push(nodeId)
     }
+    return patchedNodeIds
   }
 
-  function removeProcessRowLocal(processId: number) {
-    const stack = [...processTreeData.value]
-    while (stack.length) {
-      const current = stack.shift()!
-      const holder = current as unknown as { children?: ProcessTreeRow[] }
-      if (!holder.children?.length) continue
-      holder.children = holder.children.filter((item) => !(item.rowType === 'process' && item.processRow?.id === processId))
-      stack.unshift(...holder.children)
+  function findCachedNodeIdsByProcessId(processId: number) {
+    const nodeIds: number[] = []
+    for (const [nodeId, list] of processRowsCacheRef.value.entries()) {
+      if (list.some((item) => item.id === processId)) nodeIds.push(nodeId)
     }
+    return nodeIds
+  }
+
+  async function syncSavedProcessRow(savedItem: ProductionProcessItem, originalPosition: ProcessPosition | null) {
+    const nextPosition = getProcessPosition(savedItem)
+    const sourceNodeId = findJobTypeNodeIdByPosition(originalPosition)
+    const targetNodeId = findJobTypeNodeIdByPosition(nextPosition)
+    const moved = originalPosition != null && !isSameProcessPosition(originalPosition, nextPosition)
+
+    if (!moved) {
+      const patchedNodeIds = patchProcessRowLocal(savedItem)
+      if (patchedNodeIds.length) {
+        patchedNodeIds.forEach(syncCachedProcessRowsToTable)
+        return
+      }
+    }
+
+    const nodeIdsToRefresh = new Set<number>()
+    if (sourceNodeId != null) nodeIdsToRefresh.add(sourceNodeId)
+    else findCachedNodeIdsByProcessId(savedItem.id).forEach((nodeId) => nodeIdsToRefresh.add(nodeId))
+    if (targetNodeId != null) nodeIdsToRefresh.add(targetNodeId)
+    await Promise.all([...nodeIdsToRefresh].map((nodeId) => refreshProcessNodePreservingLoadedCount(nodeId)))
   }
 
   async function submitProcess() {
@@ -240,10 +307,10 @@ export function useOrderSettingsProductionProcesses() {
         savedItem = res.data ?? null
       }
       processDialog.value.visible = false
-      if (savedItem) patchProcessRowLocal(savedItem)
-      await refreshExpandedJobTypeRows()
+      if (savedItem) await syncSavedProcessRow(savedItem, editingProcessPosition.value)
       await nextTick()
       restoreScrollTop()
+      editingProcessPosition.value = null
     } catch (e: unknown) {
       ElMessage.error((e as { message?: string })?.message ?? '操作失败')
     }
@@ -254,8 +321,9 @@ export function useOrderSettingsProductionProcesses() {
       await ElMessageBox.confirm(`确定删除工序「${row.name}」？`, '删除确认', { type: 'warning' })
       await deleteProductionProcess(row.id)
       captureScrollTop()
-      removeProcessRowLocal(row.id)
-      await refreshExpandedJobTypeRows()
+      const nodeId = findJobTypeNodeIdByPosition(getProcessPosition(row))
+      const nodeIdsToRefresh = nodeId != null ? [nodeId] : findCachedNodeIdsByProcessId(row.id)
+      await Promise.all(nodeIdsToRefresh.map((item) => refreshProcessNodePreservingLoadedCount(item)))
       await nextTick()
       restoreScrollTop()
       ElMessage.success('已删除')

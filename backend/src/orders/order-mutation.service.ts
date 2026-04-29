@@ -52,6 +52,27 @@ export class OrderMutationService {
     return '0';
   }
 
+  private isDuplicateOrderNoError(err: unknown): boolean {
+    if (!err || typeof err !== 'object') return false;
+    const anyErr = err as { code?: unknown; message?: unknown };
+    const code = typeof anyErr.code === 'string' ? anyErr.code : '';
+    const message = typeof anyErr.message === 'string' ? anyErr.message : '';
+    return code === 'ER_DUP_ENTRY' && message.includes('orders');
+  }
+
+  private async saveOrderWithRetry(order: Order, regenerateOrderNo: () => Promise<string>): Promise<Order> {
+    const maxAttempts = 5;
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
+        return await this.orderRepo.save(order);
+      } catch (err) {
+        if (!this.isDuplicateOrderNoError(err) || attempt === maxAttempts - 1) throw err;
+        order.orderNo = await regenerateOrderNo();
+      }
+    }
+    return this.orderRepo.save(order);
+  }
+
   private collectSupplierNamesFromOrderExt(ext: OrderExt | null | undefined): string[] {
     if (!ext) return [];
     const names: string[] = [];
@@ -195,7 +216,7 @@ export class OrderMutationService {
       status: 'draft',
       statusTime: now,
     });
-    const saved = await this.orderRepo.save(entity);
+    const saved = await this.saveOrderWithRetry(entity, () => this.generateNextOrderNo());
     const extPayload: Partial<OrderExt> = { orderId: saved.id };
     if (payload.materials && Array.isArray(payload.materials)) extPayload.materials = this.normalizeMaterialRows(payload.materials);
     if (payload.colorSizeHeaders && Array.isArray(payload.colorSizeHeaders)) extPayload.colorSizeHeaders = payload.colorSizeHeaders;
@@ -297,7 +318,10 @@ export class OrderMutationService {
   async submit(id: number, actor: OrderActor): Promise<Order> {
     const order = await this.orderQueryService.findOne(id);
     const beforeStatus = order.status;
-    if (!order.orderNo) order.orderNo = await this.generateNextOrderNo();
+    const needsOrderNo = !order.orderNo;
+    if (needsOrderNo) {
+      order.orderNo = await this.generateNextOrderNo();
+    }
     if (beforeStatus === 'draft') {
       order.orderDate = new Date();
       const next = await this.orderWorkflowService.resolveNextStatus({
@@ -308,7 +332,7 @@ export class OrderMutationService {
       order.status = next ?? 'pending_review';
       order.statusTime = new Date();
     }
-    const saved = await this.orderRepo.save(order);
+    const saved = needsOrderNo ? await this.saveOrderWithRetry(order, () => this.generateNextOrderNo()) : await this.orderRepo.save(order);
     if ((beforeStatus || '') !== (saved.status || '')) {
       await this.orderStatusService.addLog(saved, actor, 'submit', `状态: ${beforeStatus || '-'} -> ${saved.status}`);
       await this.orderStatusService.appendStatusHistory(saved.id, saved.status);
@@ -369,7 +393,7 @@ export class OrderMutationService {
         status: 'draft',
         statusTime: now,
       });
-      const saved = await this.orderRepo.save(draft);
+      const saved = await this.saveOrderWithRetry(draft, () => this.generateNextOrderNo());
       await this.orderStatusService.appendStatusHistory(saved.id, 'draft');
       const srcExt = extMap.get(src.id) ?? null;
       if (srcExt) {
