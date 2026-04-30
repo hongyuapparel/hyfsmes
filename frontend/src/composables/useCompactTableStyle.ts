@@ -13,13 +13,14 @@ const COMPACT_TABLE_IMAGE_COLUMN_MIN_WIDTH =
 
 export function useCompactTableStyle() {
   function compactHeaderCellStyle() {
-    return { whiteSpace: 'nowrap' }
+    return { whiteSpace: 'nowrap' as const, textAlign: 'center' as const }
   }
 
   function compactCellStyle() {
     return {
       padding: `${COMPACT_TABLE_CELL_PADDING_Y}px ${COMPACT_TABLE_CELL_PADDING_X}px`,
-      whiteSpace: 'nowrap',
+      whiteSpace: 'nowrap' as const,
+      textAlign: 'center' as const,
     }
   }
 

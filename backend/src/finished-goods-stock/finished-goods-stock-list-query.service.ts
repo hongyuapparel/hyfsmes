@@ -76,6 +76,14 @@ export class FinishedGoodsStockListQueryService {
     return "LOWER(TRIM(COALESCE(s.sku_code, '')))";
   }
 
+  private getStoredUnitPriceSql() {
+    return `CASE
+      WHEN s.unit_price IS NOT NULL AND s.unit_price > 0 THEN s.unit_price
+      WHEN o.ex_factory_price IS NOT NULL AND o.ex_factory_price > 0 THEN o.ex_factory_price
+      ELSE 0
+    END`;
+  }
+
   private createStoredListQueryBuilder() {
     return this.stockRepo
       .createQueryBuilder('s')
@@ -92,11 +100,7 @@ export class FinishedGoodsStockListQueryService {
         's.customer_name AS customerName',
         's.sku_code AS skuCode',
         's.quantity AS quantity',
-        `CASE
-          WHEN s.unit_price IS NOT NULL AND s.unit_price > 0 THEN s.unit_price
-          WHEN o.ex_factory_price IS NOT NULL AND o.ex_factory_price > 0 THEN o.ex_factory_price
-          ELSE 0
-        END AS unitPrice`,
+        `${this.getStoredUnitPriceSql()} AS unitPrice`,
         's.warehouse_id AS warehouseId',
         's.inventory_type_id AS inventoryTypeId',
         's.department AS department',
@@ -159,6 +163,23 @@ export class FinishedGoodsStockListQueryService {
     return Number(row?.qty ?? 0) || 0;
   }
 
+  private async sumStoredAmountForList(filters: {
+    orderNo?: string;
+    skuCode?: string;
+    customerName?: string;
+    inventoryTypeId?: number | null;
+    startDate?: string;
+    endDate?: string;
+  }): Promise<number> {
+    const qb = this.stockRepo
+      .createQueryBuilder('s')
+      .leftJoin(Order, 'o', 'o.id = s.order_id')
+      .select(`COALESCE(SUM(s.quantity * ${this.getStoredUnitPriceSql()}), 0)`, 'amount');
+    this.applyStoredListFilters(qb, filters);
+    const row = await qb.getRawOne<{ amount: string | number }>();
+    return Number(row?.amount ?? 0) || 0;
+  }
+
   getList(params: {
     tab?: string;
     orderNo?: string;
@@ -176,6 +197,7 @@ export class FinishedGoodsStockListQueryService {
     page: number;
     pageSize: number;
     totalQuantity: number;
+    totalAmount: number;
   }> {
     return this.getListInternal(params);
   }
@@ -197,6 +219,7 @@ export class FinishedGoodsStockListQueryService {
     page: number;
     pageSize: number;
     totalQuantity: number;
+    totalAmount: number;
   }> {
     const {
       tab = 'all',
@@ -211,15 +234,19 @@ export class FinishedGoodsStockListQueryService {
       paginateByVisibleGroup = false,
     } = params;
 
-    const [pendingQtyTotal, storedQtyTotal] = await Promise.all([
+    const [pendingQtyTotal, storedQtyTotal, storedAmountTotal] = await Promise.all([
       tab === 'pending' || tab === 'all'
         ? this.sumPendingQuantitiesForList({ orderNo, skuCode, customerName, startDate, endDate })
         : Promise.resolve(0),
       tab === 'stored' || tab === 'all'
         ? this.sumStoredQuantitiesForList({ orderNo, skuCode, customerName, inventoryTypeId, startDate, endDate })
         : Promise.resolve(0),
+      tab === 'stored' || tab === 'all'
+        ? this.sumStoredAmountForList({ orderNo, skuCode, customerName, inventoryTypeId, startDate, endDate })
+        : Promise.resolve(0),
     ]);
     const listTotalQuantity = pendingQtyTotal + storedQtyTotal;
+    const listTotalAmount = storedAmountTotal;
 
     const list: FinishedStockRow[] = [];
     let total = 0;
@@ -291,6 +318,7 @@ export class FinishedGoodsStockListQueryService {
           page,
           pageSize,
           totalQuantity: pendingQtyTotal,
+          totalAmount: 0,
         };
       }
       list.push(...pendingList);
@@ -440,6 +468,7 @@ export class FinishedGoodsStockListQueryService {
           page,
           pageSize,
           totalQuantity: storedQtyTotal,
+          totalAmount: storedAmountTotal,
         };
       }
       list.push(...storedList);
@@ -455,9 +484,10 @@ export class FinishedGoodsStockListQueryService {
         page,
         pageSize,
         totalQuantity: listTotalQuantity,
+        totalAmount: listTotalAmount,
       };
     }
 
-    return { list: [], total: 0, page, pageSize, totalQuantity: 0 };
+    return { list: [], total: 0, page, pageSize, totalQuantity: 0, totalAmount: 0 };
   }
 }

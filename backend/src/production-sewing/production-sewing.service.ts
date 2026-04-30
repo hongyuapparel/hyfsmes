@@ -268,15 +268,17 @@ export class ProductionSewingService {
   async getSewingList(query: SewingListQuery): Promise<{
     list: SewingListItem[];
     total: number;
+    totalQuantity: number;
     page: number;
     pageSize: number;
   }> {
     const { page = 1, pageSize = 20 } = query;
     const rows = await this.buildSewingRows(query);
     const total = rows.length;
+    const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize };
   }
 
   async getSewingExportRows(query: SewingListQuery): Promise<SewingListItem[]> {

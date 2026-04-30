@@ -53,6 +53,8 @@ export function getFinishedStockList(params?: {
     pageSize: number
     /** 当前筛选条件下全部匹配记录的总件数（非仅本页） */
     totalQuantity: number
+    /** 当前筛选条件下全部匹配记录的总金额（非仅本页） */
+    totalAmount: number
   }>('/inventory/finished/items', { params, ...(config ?? {}) })
 }
 

@@ -120,27 +120,6 @@
         </template>
         <el-option v-for="opt in collaborationOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
       </el-select>
-      <el-select
-        v-model="filter.purchaseStatus"
-        placeholder="采购状态"
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.purchaseStatus ? `采购状态：${purchaseStatusLabel(filter.purchaseStatus)}` : undefined,
-          )
-        "
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.purchaseStatus">采购状态：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option label="全部" value="" />
-        <el-option label="已完成" value="completed" />
-        <el-option label="未完成" value="pending" />
-      </el-select>
       <el-date-picker
         v-model="orderDateRange"
         type="daterange"
@@ -203,7 +182,6 @@
         :compact-image-column-min-width="compactImageColumnMinWidth"
         :find-order-type-label-by-id="findOrderTypeLabelById"
         :find-collaboration-label-by-id="findCollaborationLabelById"
-        :purchase-status-label="purchaseStatusLabel"
         @header-dragend="onHeaderDragEnd"
         @selection-change="onSelectionChange"
         @open-detail="openPatternDetailDrawer"
@@ -214,6 +192,9 @@
       v-model:current-page="pagination.page"
       v-model:page-size="pagination.pageSize"
       :total="pagination.total"
+      :total-quantity="totalQuantity"
+      summary-label="订单数量合计"
+      unit="件"
       :page-sizes="[20, 50, 100]"
       @current-change="load"
       @size-change="onPageSizeChange"
@@ -503,6 +484,7 @@ const {
   loading,
   exporting,
   pagination,
+  totalQuantity,
   selectedRows,
   hasSelection,
   canCompleteSelection,
@@ -510,7 +492,6 @@ const {
   collaborationOptions,
   findOrderTypeLabelById,
   findCollaborationLabelById,
-  purchaseStatusLabel,
   getFilterSelectAutoWidthStyle,
   getTabLabel,
   load: loadList,

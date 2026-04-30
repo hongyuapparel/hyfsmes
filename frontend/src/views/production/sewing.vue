@@ -109,6 +109,9 @@
       v-model:current-page="pagination.page"
       v-model:page-size="pagination.pageSize"
       :total="pagination.total"
+      :total-quantity="totalQuantity"
+      summary-label="订单数量合计"
+      unit="件"
       :page-sizes="[20, 50, 100]"
       @current-change="load"
       @size-change="onPageSizeChange"
@@ -324,6 +327,7 @@ const {
   loading,
   exporting,
   pagination,
+  totalQuantity,
   selectedRows,
   hasSelection,
   canAssignSelection,

@@ -113,9 +113,7 @@ COMMIT;
 - `production_sewing_complete`：车缝管理-登记车缝完成
 - `production_finishing_receive`：尾部管理-登记收货
 - `production_finishing_packaging`：尾部管理-登记包装完成
-- `production_finishing_ship`：尾部管理-发货
 - `production_finishing_inbound`：尾部管理-入库
-- `production_finishing_finance_approve`：尾部管理-财务审批发货
 
 ## 6. 上线后的后台配置建议
 
@@ -124,6 +122,7 @@ COMMIT;
 - 纸样账号：勾选 `menu_production_pattern`，按需要勾选纸样分配、纸样完成、纸样物料维护。
 - 裁床账号：勾选 `menu_production_cutting`、`production_cutting_complete`。
 - 尾部账号：勾选 `menu_production_finishing`，按岗位勾选收货、包装完成等动作。
+- 尾部不再配置「发货」和「财务审批发货」动作权限；尾部发货/财务放货旧权限已废弃并会被权限种子清理。
 - 超级管理员：由系统自动补齐全部 `permissions`，仍建议在后台核对。
 
 ## 7. 已移除的冗余控制
@@ -185,9 +184,7 @@ COMMIT;
 - `production_sewing_complete`
 - `production_finishing_receive`
 - `production_finishing_packaging`
-- `production_finishing_ship`
 - `production_finishing_inbound`
-- `production_finishing_finance_approve`
 
 前端按钮权限读取：
 

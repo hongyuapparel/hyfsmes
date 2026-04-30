@@ -15,6 +15,7 @@ export class ProductionFinishingService {
   getFinishingList(query: FinishingListQuery): Promise<{
     list: FinishingListItem[];
     total: number;
+    totalQuantity: number;
     page: number;
     pageSize: number;
   }> {
@@ -63,16 +64,8 @@ export class ProductionFinishingService {
     );
   }
 
-  financeApproveFinishing(orderId: number, actorUserId?: number): Promise<void> {
-    return this.mutationService.financeApproveFinishing(orderId, actorUserId);
-  }
-
   registerPackaging(orderId: number, tailReceivedQty: number, defectQuantity: number): Promise<void> {
     return this.mutationService.registerPackaging(orderId, tailReceivedQty, defectQuantity);
-  }
-
-  ship(orderId: number, quantity: number): Promise<void> {
-    return this.mutationService.ship(orderId, quantity);
   }
 
   inbound(orderId: number, quantity: number, actorUserId?: number): Promise<void> {

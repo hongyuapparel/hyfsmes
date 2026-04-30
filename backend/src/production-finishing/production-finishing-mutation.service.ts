@@ -273,60 +273,6 @@ export class ProductionFinishingMutationService {
     if (pendingRows.length) await this.inboundPendingRepo.save(pendingRows);
   }
 
-  async financeApproveFinishing(orderId: number, actorUserId?: number): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('订单不存在');
-    const finishing = await this.finishingRepo.findOne({ where: { orderId } });
-    if (!finishing) throw new NotFoundException('无尾部记录');
-    if (finishing.status !== 'pending_ship') throw new NotFoundException('仅等待发货状态可进行财务审批');
-    const received = finishing.tailReceivedQty ?? 0;
-    const shipped = finishing.tailShippedQty ?? 0;
-    const inbound = finishing.tailInboundQty ?? 0;
-    const defect = finishing.defectQuantity ?? 0;
-    if (shipped + inbound + defect !== received) {
-      throw new NotFoundException(`出货数(${shipped})+入库数(${inbound})+次品数(${defect}) 须等于尾部收货数(${received})后才能审批完成`);
-    }
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'tailing_inbound_completed',
-      actorUserId: actorUserId ?? 0,
-    });
-    if (!next) {
-      throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
-    }
-    finishing.status = 'inbound';
-    await this.finishingRepo.save(finishing);
-    if (next && next !== order.status) {
-      order.status = next;
-      order.statusTime = new Date();
-      await this.orderRepo.save(order);
-    }
-    const pendingRows: InboundPending[] = [];
-    if (inbound > 0) {
-      pendingRows.push(
-        this.inboundPendingRepo.create({
-          orderId: order.id,
-          skuCode: order.skuCode ?? '',
-          quantity: inbound,
-          sourceType: 'normal',
-          status: 'pending',
-        }),
-      );
-    }
-    if (defect > 0) {
-      pendingRows.push(
-        this.inboundPendingRepo.create({
-          orderId: order.id,
-          skuCode: order.skuCode ?? '',
-          quantity: defect,
-          sourceType: 'defect',
-          status: 'pending',
-        }),
-      );
-    }
-    if (pendingRows.length) await this.inboundPendingRepo.save(pendingRows);
-  }
-
   async registerPackaging(orderId: number, tailReceivedQty: number, defectQuantity: number): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
@@ -353,30 +299,6 @@ export class ProductionFinishingMutationService {
       finishing.defectQuantity = defectQuantity ?? 0;
       finishing.status = 'pending_ship';
     }
-    await this.finishingRepo.save(finishing);
-  }
-
-  async ship(orderId: number, quantity: number): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('订单不存在');
-    const finishing = await this.finishingRepo.findOne({ where: { orderId } });
-    if (!finishing) throw new NotFoundException('请先登记包装完成');
-    if (finishing.status !== 'pending_ship' && finishing.status !== 'shipped') {
-      throw new NotFoundException('仅等待发货或已发货状态可操作发货');
-    }
-
-    const qty = Number(quantity) || 0;
-    if (qty <= 0) throw new NotFoundException('请填写本次出货数');
-    const received = finishing.tailReceivedQty ?? 0;
-    const defect = finishing.defectQuantity ?? 0;
-    const inbound = finishing.tailInboundQty ?? 0;
-    const newShipped = (finishing.tailShippedQty ?? 0) + qty;
-    if (newShipped + inbound + defect > received) {
-      throw new NotFoundException(`出货数+入库数+次品数不能超过尾部收货数(${received})，当前出货将累加为${newShipped}`);
-    }
-
-    finishing.tailShippedQty = newShipped;
-    if (finishing.status === 'pending_ship') finishing.status = 'shipped';
     await this.finishingRepo.save(finishing);
   }
 

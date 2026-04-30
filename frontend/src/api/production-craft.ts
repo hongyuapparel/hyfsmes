@@ -37,6 +37,7 @@ export interface CraftListItem {
 export interface CraftListRes {
   list: CraftListItem[]
   total: number
+  totalQuantity: number
   page: number
   pageSize: number
 }

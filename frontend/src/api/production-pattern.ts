@@ -20,7 +20,6 @@ export interface PatternListItem {
   orderTypeId: number | null
   /** 合作方式 ID（system_options.id, option_type='collaboration'） */
   collaborationTypeId: number | null
-  purchaseStatus: string
   patternStatus: string
   patternMaster: string
   sampleMaker: string
@@ -32,6 +31,7 @@ export interface PatternListItem {
 export interface PatternListRes {
   list: PatternListItem[]
   total: number
+  totalQuantity: number
   page: number
   pageSize: number
 }
@@ -48,7 +48,6 @@ export interface PatternListQuery {
   orderTypeId?: number
   /** 合作方式 ID */
   collaborationTypeId?: number
-  purchaseStatus?: string
   orderDateStart?: string
   orderDateEnd?: string
   completedStart?: string

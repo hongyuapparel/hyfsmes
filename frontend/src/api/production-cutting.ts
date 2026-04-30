@@ -26,6 +26,7 @@ export interface CuttingListItem {
 export interface CuttingListRes {
   list: CuttingListItem[]
   total: number
+  totalQuantity: number
   page: number
   pageSize: number
 }

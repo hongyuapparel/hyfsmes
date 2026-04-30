@@ -25,9 +25,7 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'production_sewing_complete', name: '车缝管理-登记车缝完成', routePath: '/production/sewing', type: 'action' },
   { code: 'production_finishing_receive', name: '尾部管理-登记收货', routePath: '/production/finishing', type: 'action' },
   { code: 'production_finishing_packaging', name: '尾部管理-登记包装完成', routePath: '/production/finishing', type: 'action' },
-  { code: 'production_finishing_ship', name: '尾部管理-发货', routePath: '/production/finishing', type: 'action' },
   { code: 'production_finishing_inbound', name: '尾部管理-入库', routePath: '/production/finishing', type: 'action' },
-  { code: 'production_finishing_finance_approve', name: '尾部管理-财务审批发货', routePath: '/production/finishing', type: 'action' },
   { code: 'menu_inventory', name: '库存管理', routePath: '/inventory', type: 'menu' },
   { code: 'menu_inventory_pending', name: '待仓处理', routePath: '/inventory/pending', type: 'menu' },
   { code: 'menu_inventory_finished', name: '成品库存', routePath: '/inventory/finished', type: 'menu' },
@@ -59,7 +57,13 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
 export async function seedPermissions(dataSource: DataSource): Promise<void> {
   const repo = dataSource.getRepository(Permission);
   const rolePermRepo = dataSource.getRepository(RolePermission);
-  const deprecatedCodes = ['menu_settings_permissions', 'menu_settings_products', 'orders_cost_save_process_quote_template'];
+  const deprecatedCodes = [
+    'menu_settings_permissions',
+    'menu_settings_products',
+    'orders_cost_save_process_quote_template',
+    'production_finishing_ship',
+    'production_finishing_finance_approve',
+  ];
   const deprecatedRoutes = ['/settings/permissions', '/settings/products'];
 
   for (const p of PERMISSIONS) {

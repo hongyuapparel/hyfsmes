@@ -274,6 +274,7 @@ export class ProductionCuttingListService {
   async getCuttingList(query: CuttingListQuery, actorUserId?: number): Promise<{
     list: CuttingListItem[];
     total: number;
+    totalQuantity: number;
     page: number;
     pageSize: number;
   }> {
@@ -281,9 +282,10 @@ export class ProductionCuttingListService {
     const { page = 1, pageSize = 20 } = query;
     const rows = await this.buildCuttingRows(query);
     const total = rows.length;
+    const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize };
   }
 
   async getCuttingExportRows(query: CuttingListQuery, actorUserId?: number): Promise<CuttingListItem[]> {

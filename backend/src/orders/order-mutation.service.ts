@@ -54,10 +54,27 @@ export class OrderMutationService {
 
   private isDuplicateOrderNoError(err: unknown): boolean {
     if (!err || typeof err !== 'object') return false;
-    const anyErr = err as { code?: unknown; message?: unknown };
-    const code = typeof anyErr.code === 'string' ? anyErr.code : '';
-    const message = typeof anyErr.message === 'string' ? anyErr.message : '';
-    return code === 'ER_DUP_ENTRY' && message.includes('orders');
+    const anyErr = err as {
+      code?: unknown;
+      errno?: unknown;
+      message?: unknown;
+      sqlMessage?: unknown;
+      driverError?: { code?: unknown; errno?: unknown; message?: unknown; sqlMessage?: unknown };
+    };
+    const parts = [
+      anyErr.code,
+      anyErr.errno,
+      anyErr.message,
+      anyErr.sqlMessage,
+      anyErr.driverError?.code,
+      anyErr.driverError?.errno,
+      anyErr.driverError?.message,
+      anyErr.driverError?.sqlMessage,
+    ]
+      .filter((v) => typeof v === 'string' || typeof v === 'number')
+      .map((v) => String(v));
+    const haystack = parts.join(' | ').toLowerCase();
+    return haystack.includes('duplicate entry') && haystack.includes('orders');
   }
 
   private async saveOrderWithRetry(order: Order, regenerateOrderNo: () => Promise<string>): Promise<Order> {

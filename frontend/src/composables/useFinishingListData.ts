@@ -29,6 +29,7 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
   const loading = ref(false)
   const exporting = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+  const totalQuantity = ref(0)
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -73,6 +74,7 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
+        totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
         onAfterLoad?.()
       }
     } catch (e: unknown) {
@@ -161,6 +163,7 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
     loading,
     exporting,
     pagination,
+    totalQuantity,
     loadTabCounts,
     load,
     onExport,

@@ -39,6 +39,7 @@ export function useSewingList() {
   const loading = ref(false)
   const exporting = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+  const totalQuantity = ref(0)
   const selectedRows = ref<SewingListItem[]>([])
   const hasSelection = computed(() => selectedRows.value.length > 0)
   const canAssignSelection = computed(() =>
@@ -128,6 +129,7 @@ export function useSewingList() {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
+        totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
         restoreColumnWidths(sewingTableRef.value?.getTableRef?.())
       }
     } catch (e: unknown) {
@@ -240,6 +242,7 @@ export function useSewingList() {
     loading,
     exporting,
     pagination,
+    totalQuantity,
     selectedRows,
     hasSelection,
     canAssignSelection,

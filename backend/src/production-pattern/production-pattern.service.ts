@@ -29,8 +29,6 @@ export interface PatternListItem {
   orderTypeId: number | null;
   /** 合作方式 ID（system_options.id, option_type='collaboration'） */
   collaborationTypeId: number | null;
-  /** 采购状态：completed | pending */
-  purchaseStatus: string;
   patternStatus: string;
   patternMaster: string;
   sampleMaker: string;
@@ -49,7 +47,6 @@ export interface PatternListQuery {
   orderTypeId?: number;
   /** 合作方式 ID */
   collaborationTypeId?: number;
-  purchaseStatus?: string;
   orderDateStart?: string;
   orderDateEnd?: string;
   completedStart?: string;
@@ -232,15 +229,6 @@ export class ProductionPatternService {
     return text.includes(search);
   }
 
-  private isPurchaseCompleted(materials: OrderMaterialRow[] | null): boolean {
-    if (!materials || materials.length === 0) return false;
-    return materials.every((m) => {
-      const purchaseDone = (m.purchaseStatus ?? 'pending').toLowerCase() === 'completed';
-      const pickDone = (m.pickStatus ?? 'pending').toLowerCase() === 'completed';
-      return purchaseDone || pickDone;
-    });
-  }
-
   private mapOrderMaterialsToPatternMaterials(materials: OrderMaterialRow[] | null | undefined): PatternMaterialRow[] {
     const list = Array.isArray(materials) ? materials : [];
     return list.map((m) => ({
@@ -298,7 +286,6 @@ export class ProductionPatternService {
       sampleMaker,
       orderTypeId,
       collaborationTypeId,
-      purchaseStatus,
       orderDateStart,
       orderDateEnd,
       completedStart,
@@ -354,24 +341,16 @@ export class ProductionPatternService {
       return [];
     }
 
-    const [patterns, extList, arrivedAtPatternMap] = await Promise.all([
+    const [patterns, arrivedAtPatternMap] = await Promise.all([
       this.patternRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
-      this.orderExtRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
       this.getEnteredAtMap(orderIds, 'pending_pattern'),
     ]);
     const patternMap = new Map(patterns.map((p) => [p.orderId, p]));
-    const extMap = new Map(extList.map((e) => [e.orderId, e]));
     const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     const rows: PatternListItem[] = [];
     for (const order of orders) {
       const pattern = patternMap.get(order.id);
-      const ext = extMap.get(order.id);
-      const materials = ext?.materials ?? null;
-      const purchaseCompleted = this.isPurchaseCompleted(materials);
-      const purchaseStatusStr = purchaseCompleted ? 'completed' : 'pending';
-      if (purchaseStatus === 'completed' && !purchaseCompleted) continue;
-      if (purchaseStatus === 'pending' && purchaseStatusStr === 'completed') continue;
 
       const pStatus = pattern?.status ?? 'pending_assign';
       const patternMasterName = pattern?.patternMaster ?? '';
@@ -425,7 +404,6 @@ export class ProductionPatternService {
         imageUrl: order.imageUrl ?? '',
         orderTypeId: order.orderTypeId ?? null,
         collaborationTypeId: order.collaborationTypeId ?? null,
-        purchaseStatus: purchaseStatusStr,
         patternStatus: pStatus,
         patternMaster: patternMasterName,
         sampleMaker: sampleMakerName,
@@ -440,6 +418,7 @@ export class ProductionPatternService {
   async getPatternList(query: PatternListQuery, actorUserId?: number): Promise<{
     list: PatternListItem[];
     total: number;
+    totalQuantity: number;
     page: number;
     pageSize: number;
   }> {
@@ -447,9 +426,10 @@ export class ProductionPatternService {
     const { page = 1, pageSize = 20 } = query;
     const rows = await this.buildPatternRows(query);
     const total = rows.length;
+    const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize };
   }
 
   async getPatternExportRows(query: PatternListQuery, actorUserId?: number): Promise<PatternListItem[]> {

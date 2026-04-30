@@ -183,6 +183,7 @@ export class ProductionCraftService {
   async getCraftList(query: CraftListQuery, actorUserId?: number): Promise<{
     list: CraftListItem[];
     total: number;
+    totalQuantity: number;
     page: number;
     pageSize: number;
   }> {
@@ -228,7 +229,7 @@ export class ProductionCraftService {
     const orders = await qb.getMany();
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) {
-      return { list: [], total: 0, page, pageSize };
+      return { list: [], total: 0, totalQuantity: 0, page, pageSize };
     }
 
     const [crafts, extList, processItemsMap] = await Promise.all([
@@ -352,10 +353,11 @@ export class ProductionCraftService {
     }
 
     const total = rows.length;
+    const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
 
-    return { list, total, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize };
   }
 
   async getCraftExportRows(query: CraftListQuery, actorUserId?: number): Promise<CraftListItem[]> {

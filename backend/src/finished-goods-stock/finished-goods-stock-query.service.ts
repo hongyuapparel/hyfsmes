@@ -39,6 +39,7 @@ type StockListQueryResult = {
   page: number;
   pageSize: number;
   totalQuantity: number;
+  totalAmount: number;
 };
 
 @Injectable()

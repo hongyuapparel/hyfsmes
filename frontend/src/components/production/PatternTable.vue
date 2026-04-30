@@ -55,13 +55,6 @@
         <div class="text-muted pattern-sub-attr">{{ findCollaborationLabelById(row.collaborationTypeId) }}</div>
       </template>
     </el-table-column>
-    <el-table-column label="采购" width="80" align="center">
-      <template #default="{ row }">
-        <el-tag :type="row.purchaseStatus === 'completed' ? 'success' : 'info'" size="small">
-          {{ purchaseStatusLabel(row.purchaseStatus) }}
-        </el-tag>
-      </template>
-    </el-table-column>
     <el-table-column prop="patternMaster" label="纸样师" width="90" />
     <el-table-column prop="sampleMaker" label="车版师" width="90" />
     <el-table-column label="详情" width="84" align="center" fixed="right">
@@ -92,7 +85,6 @@ defineProps<{
   compactImageColumnMinWidth: number
   findOrderTypeLabelById: (id: number | null | undefined) => string
   findCollaborationLabelById: (id: number | null | undefined) => string
-  purchaseStatusLabel: (value: string) => string
 }>()
 
 const emit = defineEmits<{

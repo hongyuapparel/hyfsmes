@@ -1,7 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { createFinishedStock } from '@/api/inventory'
-import { getOrderColorSizeBreakdown } from '@/api/orders'
+import { getOrderColorSizeBreakdown, getOrderDetail, getOrders, type OrderListItem } from '@/api/orders'
 import { getProducts, type ProductItem } from '@/api/products'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -161,13 +161,28 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     createFormRef.value?.clearValidate()
   }
 
+  async function resolveCreateOrder(value: string): Promise<OrderListItem | null> {
+    const listRes = await getOrders({ orderNo: value, page: 1, pageSize: 5 })
+    const rows = listRes.data?.list ?? []
+    const exact = rows.find((row) => String(row.orderNo ?? '').trim() === value)
+    if (exact) return exact
+    if (rows.length === 1) return rows[0]
+    const orderId = Number(value)
+    if (!Number.isInteger(orderId) || orderId <= 0) return null
+    return (await getOrderDetail(orderId)).data ?? null
+  }
+
   async function onOrderNoBlur() {
     const value = String(createForm.orderNo ?? '').trim()
-    if (!value || createSizeRows.value.some((row) => sumDetailRowQty(row.quantities) > 0)) return
-    const orderId = Number(value)
-    if (!Number.isInteger(orderId) || orderId <= 0) return
+    if (!value) return
     try {
-      const res = await getOrderColorSizeBreakdown(orderId)
+      const order = await resolveCreateOrder(value)
+      if (!order) return
+      createForm.skuCode = order.skuCode || createForm.skuCode
+      createForm.unitPrice = order.exFactoryPrice != null ? String(order.exFactoryPrice) : createForm.unitPrice
+      if (order.imageUrl && !createForm.imageUrl) createForm.imageUrl = order.imageUrl
+      if (createSizeRows.value.some((row) => sumDetailRowQty(row.quantities) > 0)) return
+      const res = await getOrderColorSizeBreakdown(order.id)
       const data = res.data
       const headers = (Array.isArray(data?.headers) ? data.headers : []).map((item) => String(item ?? '').trim()).filter((item) => item && item !== '合计')
       const rows = Array.isArray(data?.rows) ? data.rows : []

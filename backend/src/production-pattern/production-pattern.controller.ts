@@ -21,7 +21,6 @@ export class ProductionPatternController {
     @Query('sampleMaker') sampleMaker?: string,
     @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('collaborationTypeId') collaborationTypeIdStr?: string,
-    @Query('purchaseStatus') purchaseStatus?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('completedStart') completedStart?: string,
@@ -42,7 +41,6 @@ export class ProductionPatternController {
       collaborationTypeId: Number.isNaN(collaborationTypeId as number)
         ? undefined
         : (collaborationTypeId as number),
-      purchaseStatus,
       orderDateStart,
       orderDateEnd,
       completedStart,
@@ -62,7 +60,6 @@ export class ProductionPatternController {
     @Query('sampleMaker') sampleMaker?: string,
     @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('collaborationTypeId') collaborationTypeIdStr?: string,
-    @Query('purchaseStatus') purchaseStatus?: string,
     @Query('orderDateStart') orderDateStart?: string,
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('completedStart') completedStart?: string,
@@ -82,7 +79,6 @@ export class ProductionPatternController {
       collaborationTypeId: Number.isNaN(collaborationTypeId as number)
         ? undefined
         : (collaborationTypeId as number),
-      purchaseStatus,
       orderDateStart,
       orderDateEnd,
       completedStart,
@@ -100,7 +96,6 @@ export class ProductionPatternController {
       '下单时间',
       '纸样师',
       '车版师',
-      '采购状态',
       '纸样状态',
       '纸样完成时间',
     ];
@@ -123,7 +118,6 @@ export class ProductionPatternController {
           r.orderDate ?? '',
           r.patternMaster,
           r.sampleMaker,
-          r.purchaseStatus,
           r.patternStatus,
           r.completedAt ?? '',
         ].map(escape).join(','),

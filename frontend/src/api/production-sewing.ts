@@ -25,6 +25,7 @@ export interface SewingListItem {
 export interface SewingListRes {
   list: SewingListItem[]
   total: number
+  totalQuantity: number
   page: number
   pageSize: number
 }

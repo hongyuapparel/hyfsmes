@@ -29,6 +29,7 @@ export interface FinishingListItem {
 export interface FinishingListRes {
   list: FinishingListItem[]
   total: number
+  totalQuantity: number
   page: number
   pageSize: number
 }
@@ -105,15 +106,6 @@ export function registerFinishingPackaging(payload: {
   return request.post<void>('/production/finishing/items/register', payload)
 }
 
-export function shipFinishingOrder(orderId: number, quantity: number) {
-  return request.post<void>('/production/finishing/items/ship', { orderId, quantity })
-}
-
 export function inboundFinishingOrder(orderId: number, quantity: number) {
   return request.post<void>('/production/finishing/items/inbound', { orderId, quantity })
-}
-
-/** 财务审批通过：等待发货且已分配完毕时，订单完成 */
-export function financeApproveFinishingOrder(orderId: number) {
-  return request.post<void>(`/production/finishing/items/${orderId}/finance-approve`)
 }

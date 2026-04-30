@@ -26,7 +26,6 @@ export function usePatternList() {
     sampleMaker: '',
     orderTypeId: null as number | null,
     collaborationTypeId: null as number | null,
-    purchaseStatus: '',
   })
   const orderDateRange = ref<[string, string] | null>(null)
   const completedRange = ref<[string, string] | null>(null)
@@ -39,6 +38,7 @@ export function usePatternList() {
   const loading = ref(false)
   const exporting = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+  const totalQuantity = ref(0)
   const selectedRows = ref<PatternListItem[]>([])
   const hasSelection = computed(() => selectedRows.value.length > 0)
   const canCompleteSelection = computed(() =>
@@ -89,10 +89,6 @@ export function usePatternList() {
     return found?.label ?? ''
   }
 
-  function purchaseStatusLabel(value: string): string {
-    return value === 'completed' ? '已完成' : value === 'pending' ? '未完成' : value
-  }
-
   function getFilterSelectAutoWidthStyle(value: unknown) {
     if (!value) return undefined
     const text = String(value)
@@ -116,7 +112,6 @@ export function usePatternList() {
       sampleMaker: normalizeTextFilter(filter.sampleMaker),
       orderTypeId: filter.orderTypeId ?? undefined,
       collaborationTypeId: filter.collaborationTypeId ?? undefined,
-      purchaseStatus: filter.purchaseStatus || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     }
@@ -171,6 +166,7 @@ export function usePatternList() {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
+        totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
         getTableRef?.()
       }
     } catch (e: unknown) {
@@ -234,7 +230,6 @@ export function usePatternList() {
     filter.sampleMaker = ''
     filter.orderTypeId = null
     filter.collaborationTypeId = null
-    filter.purchaseStatus = ''
     orderDateRange.value = null
     completedRange.value = null
     currentTab.value = 'all'
@@ -288,6 +283,7 @@ export function usePatternList() {
     loading,
     exporting,
     pagination,
+    totalQuantity,
     selectedRows,
     hasSelection,
     canCompleteSelection,
@@ -295,7 +291,6 @@ export function usePatternList() {
     collaborationOptions,
     findOrderTypeLabelById,
     findCollaborationLabelById,
-    purchaseStatusLabel,
     getFilterSelectAutoWidthStyle,
     getTabLabel,
     load,

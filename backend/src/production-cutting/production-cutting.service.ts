@@ -30,6 +30,7 @@ export class ProductionCuttingService {
   getCuttingList(query: CuttingListQuery, actorUserId?: number): Promise<{
     list: CuttingListItem[];
     total: number;
+    totalQuantity: number;
     page: number;
     pageSize: number;
   }> {

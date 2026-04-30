@@ -166,15 +166,6 @@ export class ProductionFinishingController {
     );
   }
 
-  @Post('items/ship')
-  @RequirePermission('production_finishing_ship')
-  ship(
-    @Body('orderId') orderId: number,
-    @Body('quantity') quantity: number,
-  ) {
-    return this.finishingMutationService.ship(Number(orderId), Number(quantity ?? 0));
-  }
-
   @Post('items/inbound')
   @RequirePermission('production_finishing_inbound')
   inbound(
@@ -183,14 +174,5 @@ export class ProductionFinishingController {
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.finishingMutationService.inbound(Number(orderId), Number(quantity ?? 0), user?.userId);
-  }
-
-  @Post('items/:orderId/finance-approve')
-  @RequirePermission('production_finishing_finance_approve')
-  financeApprove(
-    @Param('orderId', ParseIntPipe) orderId: number,
-    @CurrentUser() user?: { userId: number; username: string },
-  ) {
-    return this.finishingMutationService.financeApproveFinishing(orderId, user?.userId);
   }
 }

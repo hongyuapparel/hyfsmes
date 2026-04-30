@@ -70,6 +70,7 @@ export function useProductionProcessPage() {
   const exporting = ref(false)
   const completing = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+  const totalQuantity = ref(0)
   const selectedRows = ref<CraftListItem[]>([])
   const hasSelection = computed(() => selectedRows.value.length > 0)
   const canCompleteSelection = computed(() =>
@@ -129,6 +130,7 @@ export function useProductionProcessPage() {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
+        totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       }
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -308,6 +310,7 @@ export function useProductionProcessPage() {
     exporting,
     completing,
     pagination,
+    totalQuantity,
     selectedRows,
     hasSelection,
     canCompleteSelection,

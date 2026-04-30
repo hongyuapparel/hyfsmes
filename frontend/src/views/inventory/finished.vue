@@ -167,6 +167,7 @@ const {
 const loading = ref(false)
 /** 当前筛选下全量匹配的总件数（接口返回）；有表格勾选时底部改为已选行的件数合计 */
 const stockTotalQuantity = ref(0)
+const stockTotalAmount = ref(0)
 const {
   selectedRows,
   hasPendingSelection,
@@ -208,8 +209,10 @@ const stockListFooterQuantity = computed(() => {
 })
 
 const stockListFooterAmount = computed(() => {
-  const rows = selectedRows.value.length > 0 ? selectedRows.value : list.value
-  return rows.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0), 0)
+  if (selectedRows.value.length > 0) {
+    return selectedRows.value.reduce((sum, row) => sum + (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0), 0)
+  }
+  return stockTotalAmount.value
 })
 
 function getTableImageUrl(row: StockTableRow): string {
@@ -267,6 +270,7 @@ async function load() {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
       stockTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
+      stockTotalAmount.value = Number(data.totalAmount ?? 0) || 0
       restoreFinishedStockColumnWidths(finishedStockTableRef.value)
       void prefetchStoredRowBreakdowns(list.value)
     }

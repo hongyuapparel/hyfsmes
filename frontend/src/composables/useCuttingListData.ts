@@ -28,6 +28,7 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
   const loading = ref(false)
   const exporting = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+  const totalQuantity = ref(0)
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -72,6 +73,7 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
+        totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       }
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -159,6 +161,7 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     loading,
     exporting,
     pagination,
+    totalQuantity,
     load,
     loadTabCounts,
     onExport,

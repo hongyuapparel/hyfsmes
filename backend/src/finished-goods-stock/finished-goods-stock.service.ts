@@ -53,6 +53,7 @@ export class FinishedGoodsStockService {
     page: number;
     pageSize: number;
     totalQuantity: number;
+    totalAmount: number;
   }> {
     return this.queryService.getList(params);
   }
