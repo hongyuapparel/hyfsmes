@@ -488,9 +488,15 @@ export class FabricStockService {
 
   async getOperationLogs(fabricStockId: number): Promise<FabricStockOperationLog[]> {
     await this.getOne(fabricStockId);
-    return this.operationLogRepo.find({
-      where: { fabricStockId },
-      order: { createdAt: 'DESC' },
-    });
+    try {
+      return await this.operationLogRepo.find({
+        where: { fabricStockId },
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      if (!this.isTableMissingError(error, 'fabric_stock_operation_log')) throw error;
+      this.logger.warn('fabric_stock_operation_log 表不存在，已返回空操作日志');
+      return [];
+    }
   }
 }

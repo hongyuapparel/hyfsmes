@@ -373,9 +373,15 @@ export class InventoryAccessoriesService {
 
   async getOperationLogs(accessoryId: number): Promise<InventoryAccessoryOperationLog[]> {
     await this.getOne(accessoryId);
-    return this.operationLogRepo.find({
-      where: { accessoryId },
-      order: { createdAt: 'DESC' },
-    });
+    try {
+      return await this.operationLogRepo.find({
+        where: { accessoryId },
+        order: { createdAt: 'DESC' },
+      });
+    } catch (error) {
+      if (!this.isMissingTableError(error)) throw error;
+      this.logger.warn('inventory_accessory_operation_log 表不存在，已返回空操作日志');
+      return [];
+    }
   }
 }

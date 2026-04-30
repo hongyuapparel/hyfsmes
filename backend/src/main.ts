@@ -78,6 +78,40 @@ async function ensureSupplierRemarkColumn(dataSource: DataSource) {
   console.log('[Schema] Added suppliers.remark');
 }
 
+async function ensureInventoryOperationLogTables(dataSource: DataSource) {
+  await dataSource.query(`
+    CREATE TABLE IF NOT EXISTS inventory_accessory_operation_log (
+      id INT NOT NULL AUTO_INCREMENT,
+      accessory_id INT NOT NULL,
+      operator_username VARCHAR(128) NOT NULL DEFAULT '',
+      action VARCHAR(32) NOT NULL DEFAULT '',
+      before_snapshot JSON NULL,
+      after_snapshot JSON NULL,
+      remark VARCHAR(500) NOT NULL DEFAULT '',
+      created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+      PRIMARY KEY (id),
+      INDEX IDX_inventory_accessory_operation_log_accessory_id (accessory_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  await dataSource.query(`
+    CREATE TABLE IF NOT EXISTS fabric_stock_operation_log (
+      id INT NOT NULL AUTO_INCREMENT,
+      fabric_stock_id INT NOT NULL,
+      operator_username VARCHAR(128) NOT NULL DEFAULT '',
+      action VARCHAR(32) NOT NULL DEFAULT '',
+      before_snapshot JSON NULL,
+      after_snapshot JSON NULL,
+      remark VARCHAR(500) NOT NULL DEFAULT '',
+      created_at DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+      PRIMARY KEY (id),
+      INDEX IDX_fabric_stock_operation_log_fabric_stock_id (fabric_stock_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+  `);
+
+  console.log('[Schema] Ensured inventory operation log tables');
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -111,6 +145,7 @@ async function bootstrap() {
     await ensureSupplierLastActiveColumn(dataSource);
     await dropSupplierCooperationDateColumn(dataSource);
     await ensureSupplierRemarkColumn(dataSource);
+    await ensureInventoryOperationLogTables(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);
