@@ -159,6 +159,20 @@ export class FabricStockService {
     return Math.floor(n);
   }
 
+  private normalizeName(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private async findByName(name: string): Promise<FabricStock | null> {
+    const normalized = this.normalizeName(name);
+    if (!normalized) return null;
+    return this.stockRepo
+      .createQueryBuilder('s')
+      .where('s.name = :name', { name: normalized })
+      .orderBy('s.id', 'ASC')
+      .getOne();
+  }
+
   private async addOperationLog(params: {
     fabricStockId: number;
     action: string;
@@ -246,13 +260,41 @@ export class FabricStockService {
     storageLocation?: string;
     operatorUsername?: string;
   }): Promise<FabricStockListRow> {
+    const name = this.normalizeName(dto.name);
+    if (!name) throw new BadRequestException('面料名称不能为空');
+    const qty = Number(dto.quantity ?? 0);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new BadRequestException('新增数量必须大于 0');
+    }
     const supplierId = this.normalizeOptionalPositiveInt(dto.supplierId);
     const warehouseId = this.normalizeOptionalPositiveInt(dto.warehouseId);
     if (supplierId != null) await this.assertFabricSupplierId(supplierId);
     if (warehouseId != null) await this.assertWarehouseId(warehouseId);
+    const existing = await this.findByName(name);
+    if (existing) {
+      const before = this.toSnapshot(existing);
+      existing.quantity = String((Number(existing.quantity) || 0) + qty);
+      if (!existing.unit && dto.unit) existing.unit = dto.unit.trim();
+      if (!existing.customerName && dto.customerName) existing.customerName = dto.customerName.trim();
+      if (existing.supplierId == null) existing.supplierId = supplierId;
+      if (existing.warehouseId == null) existing.warehouseId = warehouseId;
+      if (!existing.storageLocation && dto.storageLocation) existing.storageLocation = dto.storageLocation.trim();
+      if (!existing.imageUrl && dto.imageUrl) existing.imageUrl = dto.imageUrl.trim();
+      const savedExisting = await this.stockRepo.save(existing);
+      await this.addOperationLog({
+        fabricStockId: savedExisting.id,
+        action: 'inbound',
+        operatorUsername: dto.operatorUsername ?? '',
+        beforeSnapshot: before,
+        afterSnapshot: this.toSnapshot(savedExisting),
+        remark: dto.remark ?? '',
+      });
+      const [row] = await this.decorateFabricStocks([savedExisting]);
+      return row;
+    }
     const entity = this.stockRepo.create({
-      name: dto.name?.trim() ?? '',
-      quantity: String(dto.quantity ?? 0),
+      name,
+      quantity: String(qty),
       unit: dto.unit?.trim() ?? '米',
       customerName: dto.customerName?.trim() ?? '',
       supplierId,
@@ -291,8 +333,15 @@ export class FabricStockService {
     const item = await this.stockRepo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('面料记录不存在');
     const before = this.toSnapshot(item);
-    if (dto.name !== undefined) item.name = dto.name.trim();
-    if (dto.quantity !== undefined) item.quantity = String(dto.quantity);
+    if (dto.name !== undefined) {
+      const nextName = this.normalizeName(dto.name);
+      if (!nextName) throw new BadRequestException('面料名称不能为空');
+      const existing = await this.findByName(nextName);
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('面料名称已存在，不能改成重复名称');
+      }
+      item.name = nextName;
+    }
     if (dto.unit !== undefined) item.unit = dto.unit?.trim() ?? '米';
     if (dto.customerName !== undefined) item.customerName = dto.customerName?.trim() ?? '';
     if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';

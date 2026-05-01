@@ -42,6 +42,71 @@ export class OrderMutationService {
     });
   }
 
+  private materialTextKeyPart(v: unknown): string {
+    return String(v ?? '').trim();
+  }
+
+  private materialNumberKeyPart(v: unknown): string {
+    if (v === null || v === undefined || v === '') return '';
+    const n = Number(v);
+    return Number.isFinite(n) ? String(Number(n.toFixed(6))) : String(v).trim();
+  }
+
+  private materialOperationMatchKey(row: OrderMaterialRow): string {
+    return [
+      this.materialNumberKeyPart(row.materialSourceId),
+      this.materialNumberKeyPart(row.materialTypeId),
+      this.materialTextKeyPart(row.supplierName),
+      this.materialTextKeyPart(row.materialName),
+      this.materialTextKeyPart(row.color),
+      this.materialTextKeyPart(row.fabricWidth),
+      this.materialNumberKeyPart(row.usagePerPiece),
+      this.materialNumberKeyPart(row.lossPercent),
+      this.materialNumberKeyPart(row.orderPieces),
+      this.materialNumberKeyPart(row.purchaseQuantity),
+      this.materialNumberKeyPart(row.cuttingQuantity),
+    ].join('|');
+  }
+
+  private withPreservedMaterialOperationFields(row: OrderMaterialRow, source: OrderMaterialRow): OrderMaterialRow {
+    return {
+      ...row,
+      purchaseStatus: row.purchaseStatus ?? source.purchaseStatus,
+      actualPurchaseQuantity: row.actualPurchaseQuantity ?? source.actualPurchaseQuantity,
+      purchaseAmount: row.purchaseAmount ?? source.purchaseAmount,
+      purchaseCompletedAt: row.purchaseCompletedAt ?? source.purchaseCompletedAt,
+      purchaseUnitPrice: row.purchaseUnitPrice ?? source.purchaseUnitPrice,
+      purchaseOtherCost: row.purchaseOtherCost ?? source.purchaseOtherCost,
+      purchaseRemark: row.purchaseRemark ?? source.purchaseRemark,
+      purchaseImageUrl: row.purchaseImageUrl ?? source.purchaseImageUrl,
+      pickStatus: row.pickStatus ?? source.pickStatus,
+      pickCompletedAt: row.pickCompletedAt ?? source.pickCompletedAt,
+      pickRemark: row.pickRemark ?? source.pickRemark,
+      pickLogs: row.pickLogs ?? source.pickLogs?.map((log) => ({ ...log })),
+    };
+  }
+
+  private preserveMaterialOperationFields(
+    rows: OrderMaterialRow[],
+    existingRows: OrderMaterialRow[] | null | undefined,
+  ): OrderMaterialRow[] {
+    const existing = Array.isArray(existingRows) ? existingRows : [];
+    if (!rows.length || !existing.length) return rows;
+    const existingByKey = new Map<string, OrderMaterialRow[]>();
+    for (const row of existing) {
+      const key = this.materialOperationMatchKey(row);
+      const bucket = existingByKey.get(key) ?? [];
+      bucket.push(row);
+      existingByKey.set(key, bucket);
+    }
+    return rows.map((row) => {
+      const key = this.materialOperationMatchKey(row);
+      const bucket = existingByKey.get(key);
+      const matched = bucket?.shift();
+      return matched ? this.withPreservedMaterialOperationFields(row, matched) : row;
+    });
+  }
+
   private normalizeDecimalInput(v: unknown): string {
     if (v === null || v === undefined) return '0';
     if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '0';
@@ -256,9 +321,8 @@ export class OrderMutationService {
     const order = await this.orderQueryService.findOne(id);
     const before = { ...order };
     const shouldRebaseWorkflow =
-      this.orderStatusService.hasWorkflowRelevantPayload(payload) &&
-      (this.orderStatusService.hasWorkflowRelevantChanges(before, payload) ||
-        this.orderStatusService.canRebaseWorkflowStatus(order.status));
+      this.orderStatusService.canRebaseWorkflowStatus(order.status) &&
+      this.orderStatusService.hasWorkflowRelevantChanges(before, payload);
 
     if (payload.skuCode !== undefined) order.skuCode = payload.skuCode.trim();
     if (payload.customerId !== undefined) order.customerId = payload.customerId;
@@ -309,7 +373,11 @@ export class OrderMutationService {
           attachments: payload.attachments ?? null,
         });
       } else {
-        if (payload.materials !== undefined) ext.materials = Array.isArray(payload.materials) ? this.normalizeMaterialRows(payload.materials) : payload.materials;
+        if (payload.materials !== undefined) {
+          ext.materials = Array.isArray(payload.materials)
+            ? this.preserveMaterialOperationFields(this.normalizeMaterialRows(payload.materials), ext.materials)
+            : payload.materials;
+        }
         if (payload.colorSizeHeaders !== undefined) ext.colorSizeHeaders = payload.colorSizeHeaders;
         if (payload.colorSizeRows !== undefined) ext.colorSizeRows = payload.colorSizeRows;
         if (payload.sizeInfoMetaHeaders !== undefined) ext.sizeInfoMetaHeaders = payload.sizeInfoMetaHeaders;

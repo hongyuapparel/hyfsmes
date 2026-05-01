@@ -18,6 +18,7 @@ export function useAccessoriesDetailDrawer() {
 
   function formatLogAction(action: string) {
     if (action === 'create') return '新建'
+    if (action === 'inbound') return '新增入库'
     if (action === 'update') return '编辑'
     if (action === 'outbound') return '出库'
     if (action === 'delete') return '删除'

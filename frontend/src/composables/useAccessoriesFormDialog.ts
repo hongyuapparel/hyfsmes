@@ -21,7 +21,6 @@ export function useAccessoriesFormDialog(
     isEdit: false,
   })
   const quickAddSource = ref<AccessoryItem | null>(null)
-  const quickAddBaseQuantity = ref(0)
   const editId = ref<number | null>(null)
   const form = reactive({
     name: '',
@@ -40,7 +39,6 @@ export function useAccessoriesFormDialog(
 
   function openForm(row: AccessoryItem | null) {
     quickAddSource.value = null
-    quickAddBaseQuantity.value = 0
     formDialog.isEdit = !!row
     editId.value = row ? row.id : null
     const seed = row ?? (selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
@@ -56,7 +54,6 @@ export function useAccessoriesFormDialog(
         form.quantity = seed.quantity ?? 0
       } else {
         quickAddSource.value = seed
-        quickAddBaseQuantity.value = Number(seed.quantity) || 0
         form.quantity = 0
       }
     } else {
@@ -99,10 +96,10 @@ export function useAccessoriesFormDialog(
             ElMessage.warning('请输入大于 0 的新增数量')
             return
           }
-          await updateAccessory(quickAddSource.value.id, {
+          await createAccessory({
             name: form.name,
             category: form.category,
-            quantity: quickAddBaseQuantity.value + inputQty,
+            quantity: inputQty,
             unit: form.unit,
             customerName: form.customerName || undefined,
             salesperson: form.salesperson,

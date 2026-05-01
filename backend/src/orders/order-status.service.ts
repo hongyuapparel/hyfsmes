@@ -140,7 +140,23 @@ export class OrderStatusService {
   private normalizeWorkflowMaterialRows(rows: unknown): OrderMaterialRow[] {
     return Array.isArray(rows)
       ? (rows as OrderMaterialRow[]).map((row) => {
-          const { materialType: _dropType, materialSource: _dropSource, ...rest } = row;
+          const {
+            materialType: _dropType,
+            materialSource: _dropSource,
+            purchaseStatus: _dropPurchaseStatus,
+            actualPurchaseQuantity: _dropActualPurchaseQuantity,
+            purchaseAmount: _dropPurchaseAmount,
+            purchaseCompletedAt: _dropPurchaseCompletedAt,
+            purchaseUnitPrice: _dropPurchaseUnitPrice,
+            purchaseOtherCost: _dropPurchaseOtherCost,
+            purchaseRemark: _dropPurchaseRemark,
+            purchaseImageUrl: _dropPurchaseImageUrl,
+            pickStatus: _dropPickStatus,
+            pickCompletedAt: _dropPickCompletedAt,
+            pickRemark: _dropPickRemark,
+            pickLogs: _dropPickLogs,
+            ...rest
+          } = row;
           return rest as OrderMaterialRow;
         })
       : [];

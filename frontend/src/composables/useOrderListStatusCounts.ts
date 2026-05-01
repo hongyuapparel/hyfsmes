@@ -1,6 +1,6 @@
 import { ref, type Ref } from 'vue'
 import { getOrderStatusCounts, type OrderListQuery } from '@/api/orders'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getErrorMessage, isErrorHandled, isRequestCanceled } from '@/api/request'
 
 interface OrderListFilterStateLike {
   orderNo: string
@@ -61,14 +61,17 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
     const currentReqId = ++countsReqId
     loading.value = true
     try {
-      const countsRes = await getOrderStatusCounts(buildCountQuery(), { signal: controller.signal })
+      const countsRes = await getOrderStatusCounts(buildCountQuery(), {
+        signal: controller.signal,
+        skipGlobalErrorHandler: true,
+      })
       const countsData = countsRes.data
       if (currentReqId !== countsReqId) return
       statusTotal.value = countsData?.total ?? 0
       statusCounts.value = countsData?.byStatus ?? {}
     } catch (e: unknown) {
-      if ((e as { code?: string; name?: string })?.code === 'ERR_CANCELED') return
-      if ((e as { code?: string; name?: string })?.name === 'CanceledError') return
+      if (currentReqId !== countsReqId) return
+      if (isRequestCanceled(e)) return
       if (!isErrorHandled(e)) {
         console.warn('订单状态统计加载失败：', getErrorMessage(e, '状态统计加载失败'))
       }

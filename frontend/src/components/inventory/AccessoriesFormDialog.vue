@@ -16,7 +16,7 @@
         :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
       />
       <el-form-item label="名称" prop="name">
-        <el-input v-model="form.name" placeholder="请输入名称" clearable />
+        <el-input v-model="form.name" placeholder="请输入名称" clearable :disabled="Boolean(quickAddSource)" />
       </el-form-item>
       <el-form-item label="类别" prop="category">
         <el-select
@@ -25,7 +25,7 @@
           filterable
           clearable
           style="width: 100%"
-          :disabled="categoryOptions.length === 0"
+          :disabled="categoryOptions.length === 0 || Boolean(quickAddSource)"
         >
           <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
         </el-select>
@@ -34,19 +34,19 @@
         </div>
       </el-form-item>
       <el-form-item label="客户" prop="customerName">
-        <el-select v-model="form.customerName" placeholder="请选择客户" filterable clearable>
+        <el-select v-model="form.customerName" placeholder="请选择客户" filterable clearable :disabled="Boolean(quickAddSource)">
           <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
         </el-select>
       </el-form-item>
       <el-form-item label="业务员" prop="salesperson" required>
-        <el-select v-model="form.salesperson" placeholder="请选择业务员" filterable clearable style="width: 100%">
+        <el-select v-model="form.salesperson" placeholder="请选择业务员" filterable clearable style="width: 100%" :disabled="Boolean(quickAddSource)">
           <el-option v-for="s in salespersonOptions" :key="s" :label="s" :value="s" />
         </el-select>
       </el-form-item>
       <el-form-item label="数量" prop="quantity">
         <div class="qty-unit-row">
-          <el-input-number v-model="form.quantity" :min="0" :precision="0" controls-position="right" class="qty-input" />
-          <el-input v-model="form.unit" placeholder="单位（如个、卷）" clearable class="unit-input" />
+          <el-input-number v-model="form.quantity" :min="0" :precision="0" controls-position="right" class="qty-input" :disabled="isEdit" />
+          <el-input v-model="form.unit" placeholder="单位（如个、卷）" clearable class="unit-input" :disabled="Boolean(quickAddSource)" />
         </div>
       </el-form-item>
       <el-form-item label="图片" prop="imageUrl">

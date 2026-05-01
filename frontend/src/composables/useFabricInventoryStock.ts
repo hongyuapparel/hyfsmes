@@ -46,7 +46,6 @@ export function useFabricInventoryStock() {
     isEdit: false,
   })
   const quickAddSource = ref<FabricItem | null>(null)
-  const quickAddBaseQuantity = ref(0)
   const editId = ref<number | null>(null)
   const formRef = ref<FormInstance>()
   const form = reactive({
@@ -168,7 +167,6 @@ export function useFabricInventoryStock() {
 
   async function openForm(row: FabricItem | null) {
     quickAddSource.value = null
-    quickAddBaseQuantity.value = 0
     formDialog.isEdit = !!row
     editId.value = row ? row.id : null
     const seed = row ?? (selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
@@ -185,7 +183,6 @@ export function useFabricInventoryStock() {
         form.quantity = parseFloat(String(seed.quantity)) || 0
       } else {
         quickAddSource.value = seed
-        quickAddBaseQuantity.value = parseFloat(String(seed.quantity)) || 0
         form.quantity = 0
       }
     } else {
@@ -233,9 +230,9 @@ export function useFabricInventoryStock() {
             ElMessage.warning('请输入大于 0 的新增数量')
             return
           }
-          await updateFabric(quickAddSource.value.id, {
+          await createFabric({
             name: form.name,
-            quantity: quickAddBaseQuantity.value + inputQty,
+            quantity: inputQty,
             unit: form.unit,
             customerName: form.customerName || undefined,
             imageUrl: form.imageUrl || undefined,
@@ -271,6 +268,7 @@ export function useFabricInventoryStock() {
 
   function formatLogAction(action: string) {
     if (action === 'create') return '新建'
+    if (action === 'inbound') return '新增入库'
     if (action === 'update') return '编辑'
     if (action === 'outbound') return '出库'
     if (action === 'delete') return '删除'

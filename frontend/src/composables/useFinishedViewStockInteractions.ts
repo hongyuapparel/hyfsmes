@@ -71,6 +71,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   })
 
   const createDialogVisible = ref(false)
+  const createSeed = ref<StockTableLeafRow | null>(null)
 
   function onSelectionChange(rows: StockTableRow[]) {
     selectedRows.value = rows.filter((row): row is StockTableLeafRow => isStockTableLeafRow(row))
@@ -113,6 +114,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   }
 
   function openCreateDialog() {
+    createSeed.value = storedRows.value.length === 1 ? { ...storedRows.value[0] } : null
     createDialogVisible.value = true
   }
 
@@ -173,6 +175,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     inboundDialog,
     outboundDialog,
     createDialogVisible,
+    createSeed,
     onSelectionChange,
     openDetail,
     openInboundDialog,

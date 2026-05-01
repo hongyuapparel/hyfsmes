@@ -1,7 +1,7 @@
 <template>
   <el-dialog
     :model-value="modelValue"
-    title="新增库存"
+    :title="quickAddSource ? '新增库存数量' : '新增库存'"
     width="960"
     destroy-on-close
     @update:model-value="onDialogVisibleChange"
@@ -26,20 +26,21 @@
                   placeholder="选填，不填则不关联订单"
                   clearable
                   size="small"
+                  :disabled="Boolean(quickAddSource)"
                   @blur="onOrderNoBlur"
                 />
               </div>
               <div class="detail-basic-label">SKU</div>
               <div class="detail-basic-value">
-                <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small">
+                <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small" :disabled="Boolean(quickAddSource)">
                   <template #suffix>
-                    <el-button link type="primary" size="small" @click.stop="openCreateSkuDialog">选择</el-button>
+                    <el-button v-if="!quickAddSource" link type="primary" size="small" @click.stop="openCreateSkuDialog">选择</el-button>
                   </template>
                 </el-input>
               </div>
               <div class="detail-basic-label">部门</div>
               <div class="detail-basic-value">
-                <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small">
+                <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small" :disabled="Boolean(quickAddSource)">
                   <el-option
                     v-for="opt in departmentOptions"
                     :key="opt.value"
@@ -56,6 +57,7 @@
                   filterable
                   clearable
                   size="small"
+                  :disabled="Boolean(quickAddSource)"
                 >
                   <el-option
                     v-for="opt in inventoryTypeOptions"
@@ -67,7 +69,7 @@
               </div>
               <div class="detail-basic-label">仓库</div>
               <div class="detail-basic-value">
-                <el-select v-model="createForm.warehouseId" placeholder="请选择仓库" filterable clearable size="small">
+                <el-select v-model="createForm.warehouseId" placeholder="请选择仓库" filterable clearable size="small" :disabled="Boolean(quickAddSource)">
                   <el-option
                     v-for="opt in warehouseOptions"
                     :key="opt.id"
@@ -96,6 +98,7 @@
           :summary-method="getCreateColorSizeSummary"
           :sum-detail-row-qty="sumDetailRowQty"
           :create-row-total-price="createRowTotalPrice"
+          :structure-readonly="Boolean(quickAddSource)"
           @add-color-row="addCreateColorRow"
           @add-size-column="addCreateSizeColumn"
           @remove-color-row="removeCreateColorRow"
@@ -151,10 +154,11 @@ import { watch } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import FinishedCreateSizeMatrix from '@/components/inventory/FinishedCreateSizeMatrix.vue'
-import { useFinishedCreateForm } from '@/composables/useFinishedCreateForm'
+import { useFinishedCreateForm, type FinishedCreateQuickAddSource } from '@/composables/useFinishedCreateForm'
 
 const props = defineProps<{
   modelValue: boolean
+  quickAddSource?: FinishedCreateQuickAddSource | null
   warehouseOptions: Array<{ id: number; label: string }>
   inventoryTypeOptions: Array<{ id: number; label: string }>
   departmentOptions: Array<{ value: string; label: string }>
@@ -171,6 +175,7 @@ const {
   createSkuDialogVisible,
   createSkuDialogLoading,
   createSkuKeyword,
+  quickAddSource,
   createForm,
   createRules,
   createSizeHeaders,
@@ -201,7 +206,7 @@ watch(
   () => props.modelValue,
   (visible) => {
     if (!visible) return
-    resetCreateForm()
+    resetCreateForm(props.quickAddSource ?? null)
   },
 )
 </script>

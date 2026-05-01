@@ -2,7 +2,7 @@
   <div class="detail-section">
     <div class="detail-section-head">
       <div class="detail-section-title">颜色图片与码数明细</div>
-      <div class="detail-head-actions">
+      <div v-if="!structureReadonly" class="detail-head-actions">
         <el-button type="primary" link size="small" @click="emit('addColorRow')">+ 新增颜色</el-button>
         <el-button type="primary" link size="small" @click="emit('addSizeColumn')">+ 新增尺码列</el-button>
       </div>
@@ -18,7 +18,7 @@
       >
         <el-table-column label="颜色" width="88" align="center" header-align="center">
           <template #default="{ row }">
-            <el-input v-model="row.colorName" placeholder="颜色" clearable size="small" />
+            <el-input v-model="row.colorName" placeholder="颜色" clearable size="small" :disabled="structureReadonly" />
           </template>
         </el-table-column>
         <el-table-column label="颜色图片" width="122" align="center" header-align="center">
@@ -40,10 +40,11 @@
                 size="small"
                 class="b-header-input"
                 :input-style="{ textAlign: 'center' }"
+                :disabled="structureReadonly"
               />
               <div class="b-header-actions">
                 <el-button
-                  v-if="sizeHeaders.length > 1"
+                  v-if="!structureReadonly && sizeHeaders.length > 1"
                   link
                   type="danger"
                   size="small"
@@ -71,7 +72,7 @@
         </el-table-column>
         <el-table-column label="出厂价" width="88" align="center" header-align="center">
           <template #default>
-            <el-input v-model="unitPrice" placeholder="请输入" clearable size="small" />
+            <el-input v-model="unitPrice" placeholder="请输入" clearable size="small" :disabled="structureReadonly" />
           </template>
         </el-table-column>
         <el-table-column label="总价" width="120" align="center" header-align="center">
@@ -80,7 +81,7 @@
         <el-table-column label="操作" width="48" align="center" header-align="center">
           <template #default="{ $index }">
             <el-button
-              v-if="sizeRows.length > 1"
+              v-if="!structureReadonly && sizeRows.length > 1"
               type="danger"
               link
               size="small"
@@ -99,6 +100,7 @@
               clearable
               size="small"
               style="width: 100%"
+              :disabled="structureReadonly"
             />
           </template>
         </el-table-column>
@@ -118,6 +120,7 @@ defineProps<{
   summaryMethod: SummaryMethod
   sumDetailRowQty: (quantities: unknown[]) => number
   createRowTotalPrice: (quantities: unknown[]) => string
+  structureReadonly?: boolean
 }>()
 
 const emit = defineEmits<{

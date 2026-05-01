@@ -83,6 +83,7 @@
     <FinishedOutboundDialog v-model="outboundDialog.visible" :stock-id="outboundDialog.stockId" :stock-info="outboundDialog.stockInfo" @submitted="load()" />
     <FinishedCreateDialog
       v-model="createDialogVisible"
+      :quick-add-source="createSeed"
       :warehouse-options="warehouseOptions"
       :inventory-type-options="inventoryTypeOptions"
       :department-options="departmentOptions"
@@ -176,6 +177,7 @@ const {
   inboundDialog,
   outboundDialog,
   createDialogVisible,
+  createSeed,
   onSelectionChange,
   openDetail,
   openInboundDialog,

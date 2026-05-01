@@ -16,7 +16,7 @@
         :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
       />
       <el-form-item label="名称" prop="name">
-        <el-input v-model="form.name" placeholder="面料名称/编号" clearable />
+        <el-input v-model="form.name" placeholder="面料名称/编号" clearable :disabled="Boolean(quickAddSource)" />
       </el-form-item>
       <el-form-item label="数量" prop="quantity">
         <el-input-number
@@ -25,10 +25,11 @@
           :precision="2"
           controls-position="right"
           style="width: 100%"
+          :disabled="isEdit"
         />
       </el-form-item>
       <el-form-item label="单位" prop="unit">
-        <el-input v-model="form.unit" placeholder="如米、公斤" clearable />
+        <el-input v-model="form.unit" placeholder="如米、公斤" clearable :disabled="Boolean(quickAddSource)" />
       </el-form-item>
       <el-form-item label="客户">
         <el-select
@@ -36,6 +37,7 @@
           placeholder="请选择客户（可选）"
           filterable
           clearable
+          :disabled="Boolean(quickAddSource)"
         >
           <el-option
             v-for="opt in customerOptions"
@@ -53,6 +55,7 @@
           filterable
           clearable
           :loading="fabricSupplierOptionsLoading"
+          :disabled="Boolean(quickAddSource)"
         >
           <el-option
             v-for="opt in fabricSupplierOptions"
@@ -63,7 +66,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="仓库">
-        <el-select v-model="form.warehouseId" placeholder="仓库（可选）" filterable clearable>
+        <el-select v-model="form.warehouseId" placeholder="仓库（可选）" filterable clearable :disabled="Boolean(quickAddSource)">
           <el-option
             v-for="opt in warehouseOptions"
             :key="opt.id"
@@ -73,7 +76,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="存放地址">
-        <el-input v-model="form.storageLocation" placeholder="存放位置（可选）" clearable />
+        <el-input v-model="form.storageLocation" placeholder="存放位置（可选）" clearable :disabled="Boolean(quickAddSource)" />
       </el-form-item>
       <el-form-item label="图片" prop="imageUrl">
         <ImageUploadArea v-model="form.imageUrl" />

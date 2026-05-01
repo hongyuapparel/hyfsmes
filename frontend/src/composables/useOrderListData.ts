@@ -66,7 +66,10 @@ async function loadList(totalQuantity?: { value: number }) {
   const currentReqId = ++listReqId
   loading.value = true
   try {
-    const listRes = await getOrders(buildQuery(), { signal: controller.signal })
+    const listRes = await getOrders(buildQuery(), {
+      signal: controller.signal,
+      skipGlobalErrorHandler: true,
+    })
     const data = listRes.data
     if (data && currentReqId === listReqId) {
       list.value = data.list ?? []
@@ -74,6 +77,7 @@ async function loadList(totalQuantity?: { value: number }) {
       if (totalQuantity) totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
     }
   } catch (e: unknown) {
+    if (currentReqId !== listReqId) return
     if (isRequestCanceled(e)) return
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {

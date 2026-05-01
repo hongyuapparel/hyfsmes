@@ -6,6 +6,23 @@ import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outb
 import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
 import { User, UserStatus } from '../entities/user.entity';
 
+type AccessoryOutboundRawRow = {
+  id: number | string;
+  accessoryId: number | string;
+  orderId: number | string | null;
+  orderNo: string | null;
+  outboundType: 'manual' | 'order_auto' | null;
+  quantity: number | string | null;
+  beforeQuantity: number | string | null;
+  afterQuantity: number | string | null;
+  operatorUsername: string | null;
+  remark: string | null;
+  createdAt: Date | string | null;
+  imageUrl: string | null;
+  customerName: string | null;
+  category: string | null;
+};
+
 @Injectable()
 export class InventoryAccessoriesService {
   private readonly logger = new Logger(InventoryAccessoriesService.name);
@@ -39,6 +56,20 @@ export class InventoryAccessoriesService {
       imageUrl: item.imageUrl,
       remark: item.remark,
     };
+  }
+
+  private normalizeName(value: unknown): string {
+    return String(value ?? '').trim();
+  }
+
+  private async findByName(name: string): Promise<InventoryAccessory | null> {
+    const normalized = this.normalizeName(name);
+    if (!normalized) return null;
+    return this.repo
+      .createQueryBuilder('a')
+      .where('a.name = :name', { name: normalized })
+      .orderBy('a.id', 'ASC')
+      .getOne();
   }
 
   private async addOperationLog(params: {
@@ -130,12 +161,38 @@ export class InventoryAccessoriesService {
     salesperson?: string;
     operatorUsername?: string;
   }): Promise<InventoryAccessory> {
+    const name = this.normalizeName(dto.name);
+    if (!name) throw new BadRequestException('辅料名称不能为空');
+    const qty = Number(dto.quantity ?? 0);
+    if (!Number.isFinite(qty) || qty <= 0) {
+      throw new BadRequestException('新增数量必须大于 0');
+    }
     const salesperson = (dto.salesperson ?? '').trim();
     if (!salesperson) throw new BadRequestException('业务员不能为空');
+    const existing = await this.findByName(name);
+    if (existing) {
+      const before = this.toSnapshot(existing);
+      existing.quantity = (Number(existing.quantity) || 0) + qty;
+      if (!existing.category && dto.category) existing.category = dto.category.trim();
+      if (!existing.unit && dto.unit) existing.unit = dto.unit.trim();
+      if (!existing.customerName && dto.customerName) existing.customerName = dto.customerName.trim();
+      if (!existing.salesperson && salesperson) existing.salesperson = salesperson;
+      if (!existing.imageUrl && dto.imageUrl) existing.imageUrl = dto.imageUrl.trim();
+      const savedExisting = await this.repo.save(existing);
+      await this.addOperationLog({
+        accessoryId: savedExisting.id,
+        action: 'inbound',
+        operatorUsername: dto.operatorUsername ?? '',
+        beforeSnapshot: before,
+        afterSnapshot: this.toSnapshot(savedExisting),
+        remark: dto.remark ?? '',
+      });
+      return savedExisting;
+    }
     const entity = this.repo.create({
-      name: dto.name?.trim() ?? '',
+      name,
       category: dto.category?.trim() ?? '',
-      quantity: dto.quantity ?? 0,
+      quantity: qty,
       unit: dto.unit?.trim() ?? '个',
       remark: dto.remark?.trim() ?? '',
       imageUrl: dto.imageUrl?.trim() ?? '',
@@ -170,9 +227,16 @@ export class InventoryAccessoriesService {
     const item = await this.repo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('辅料记录不存在');
     const before = this.toSnapshot(item);
-    if (dto.name !== undefined) item.name = dto.name.trim();
+    if (dto.name !== undefined) {
+      const nextName = this.normalizeName(dto.name);
+      if (!nextName) throw new BadRequestException('辅料名称不能为空');
+      const existing = await this.findByName(nextName);
+      if (existing && existing.id !== id) {
+        throw new BadRequestException('辅料名称已存在，不能改成重复名称');
+      }
+      item.name = nextName;
+    }
     if (dto.category !== undefined) item.category = dto.category?.trim() ?? '';
-    if (dto.quantity !== undefined) item.quantity = dto.quantity;
     if (dto.unit !== undefined) item.unit = dto.unit?.trim() ?? '个';
     if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
     if (dto.imageUrl !== undefined) item.imageUrl = dto.imageUrl?.trim() ?? '';
@@ -351,8 +415,8 @@ export class InventoryAccessoriesService {
     const list = await qb
       .skip((page - 1) * pageSize)
       .take(pageSize)
-      .getRawMany<any>();
-    const rows = list.map((r: any) => ({
+      .getRawMany<AccessoryOutboundRawRow>();
+    const rows = list.map((r) => ({
       id: Number(r.id),
       accessoryId: Number(r.accessoryId),
       orderId: r.orderId != null ? Number(r.orderId) : null,

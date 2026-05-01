@@ -42,6 +42,17 @@ export function isRequestCanceled(err: unknown): boolean {
   return axios.isCancel(err) || e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError' || e?.message === 'canceled'
 }
 
+function readResponseMessage(data: unknown): string | undefined {
+  if (!data || typeof data !== 'object' || !('message' in data)) return undefined
+  const msg = (data as { message?: unknown }).message
+  if (Array.isArray(msg)) return typeof msg[0] === 'string' ? msg[0] : undefined
+  return typeof msg === 'string' ? msg : undefined
+}
+
+function isLikelyProxyNetworkError(err: AxiosError): boolean {
+  return err.response?.status === 500 && !readResponseMessage(err.response?.data)
+}
+
 function shouldShowNetworkErrorMessage(): boolean {
   const now = Date.now()
   const isOffline = typeof navigator !== 'undefined' && navigator.onLine === false
@@ -51,12 +62,11 @@ function shouldShowNetworkErrorMessage(): boolean {
 }
 
 function extractErrorMessage(err: AxiosError): string {
-  const data = err.response?.data as { message?: string | string[] } | undefined
-  const msg = data?.message
-  if (Array.isArray(msg)) return msg[0] ?? '请求失败'
-  if (typeof msg === 'string') return msg
+  const msg = readResponseMessage(err.response?.data)
+  if (msg) return msg
   if (err.response?.status === 403) return '无权限访问'
   if (err.response?.status === 404) return '接口不存在(404)，请确认后端已启动且端口、路由正确'
+  if (isLikelyProxyNetworkError(err)) return '无法连接服务器，请检查网络或后端是否启动'
   if (err.response?.status && err.response.status >= 500) return '服务器错误，请稍后重试'
   if (err.code === 'ERR_NETWORK' || !err.response) return '无法连接服务器，请检查网络或后端是否启动'
   return '操作失败'
@@ -90,7 +100,8 @@ request.interceptors.response.use(
       const skip = err.config?.skipGlobalErrorHandler
       const shouldShow = !skip && (status === 400 || status === 403 || status === 404 || (status != null && status >= 500) || !err.response)
       if (shouldShow) {
-        if (err.response || shouldShowNetworkErrorMessage()) {
+        const useNetworkCooldown = !err.response || isLikelyProxyNetworkError(err)
+        if (!useNetworkCooldown || shouldShowNetworkErrorMessage()) {
           ElMessage.error(msg)
         }
         ;(err as AxiosError & { errorHandled?: boolean }).errorHandled = true

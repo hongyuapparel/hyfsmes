@@ -1,20 +1,17 @@
-import { computed, reactive, ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+﻿import { computed, reactive, ref } from 'vue'
+import { ElMessage, type FormInstance } from 'element-plus'
 import { createFinishedStock } from '@/api/inventory'
-import { getOrderColorSizeBreakdown, getOrderDetail, getOrders, type OrderListItem } from '@/api/orders'
+import { getOrderColorSizeBreakdown } from '@/api/orders'
 import { getProducts, type ProductItem } from '@/api/products'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { formatDisplayNumber } from '@/utils/display-number'
+import {
+  DEFAULT_CREATE_SIZE_HEADERS, buildQuickAddSizeMatrix, createDefaultSizeRow, createFinishedCreateRules,
+  filterFinishedCreateSkuProducts, formatCreateTotalPrice, formatCreateUnitPrice, resolveFinishedCreateOrder, sumCreateSizeQuantities,
+  type FinishedCreateQuickAddSource,
+} from '@/composables/finishedCreateFormHelpers'
+export type { FinishedCreateQuickAddSource, FinishedCreateSizeRow } from '@/composables/finishedCreateFormHelpers'
 
-const DEFAULT_CREATE_SIZE_HEADERS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL'] as const
-export type FinishedCreateSizeRow = { colorName: string; imageUrl: string; quantities: Array<number | null> }
 type SummaryColumns = Array<{ label?: string }>
-const createDefaultSizeRow = (): FinishedCreateSizeRow => ({
-  colorName: '默认',
-  imageUrl: '',
-  quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0),
-})
-
 export function useFinishedCreateForm(onCreated: () => void, onClose: () => void) {
   const createSubmitting = ref(false)
   const createFormRef = ref<FormInstance>()
@@ -23,7 +20,8 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   const createSkuKeyword = ref('')
   const createSkuProducts = ref<ProductItem[]>([])
   const createSizeHeaders = ref<string[]>([...DEFAULT_CREATE_SIZE_HEADERS])
-  const createSizeRows = ref<FinishedCreateSizeRow[]>([createDefaultSizeRow()])
+  const createSizeRows = ref([createDefaultSizeRow()])
+  const quickAddSource = ref<FinishedCreateQuickAddSource | null>(null)
 
   const createForm = reactive({
     orderNo: '',
@@ -38,43 +36,15 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     remark: '',
   })
 
-  const createRules: FormRules = {
-    skuCode: [{ required: true, message: '请选择SKU', trigger: 'change' }],
-    quantity: [{ required: true, message: '请输入数量', trigger: 'blur' }],
-    warehouseId: [{ required: true, message: '请选择仓库', trigger: 'change' }],
-    department: [{ required: true, message: '请选择部门', trigger: 'change' }],
-    location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
-  }
+  const createRules = createFinishedCreateRules()
 
   const sizeTotalQuantity = computed(() => createSizeRows.value.reduce((sum, row) => sum + sumDetailRowQty(row.quantities), 0))
-  const filteredCreateSkuProducts = computed(() => {
-    const kw = createSkuKeyword.value.trim().toLowerCase()
-    if (!kw) return createSkuProducts.value
-    return createSkuProducts.value.filter((item) => {
-      const sku = String(item.skuCode ?? '').toLowerCase()
-      const customer = String(item.customer?.companyName ?? '').toLowerCase()
-      return sku.includes(kw) || customer.includes(kw)
-    })
-  })
+  const filteredCreateSkuProducts = computed(() => filterFinishedCreateSkuProducts(createSkuProducts.value, createSkuKeyword.value))
 
-  function sumDetailRowQty(quantities: unknown[]): number {
-    return quantities.reduce<number>((sum, q) => sum + Math.max(0, Math.trunc(Number(q) || 0)), 0)
-  }
-
-  function formatPrice(unitPrice: string | undefined): string {
-    if (unitPrice == null || unitPrice === '') return '￥0'
-    const n = Number(unitPrice)
-    return Number.isFinite(n) ? `￥${formatDisplayNumber(n)}` : '￥0'
-  }
-
-  function formatTotalPrice(quantity: number, unitPrice: string | undefined): string {
-    const n = Number(unitPrice)
-    if (!Number.isFinite(n) || !Number.isFinite(quantity)) return '￥0'
-    return `￥${formatDisplayNumber(quantity * n)}`
-  }
+  const sumDetailRowQty = sumCreateSizeQuantities
 
   function createRowTotalPrice(quantities: unknown[]): string {
-    return formatTotalPrice(sumDetailRowQty(quantities), createForm.unitPrice || undefined)
+    return formatCreateTotalPrice(sumDetailRowQty(quantities), createForm.unitPrice || undefined)
   }
 
   function getCreateColorSizeSummary({ columns }: { columns: SummaryColumns }) {
@@ -82,11 +52,11 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     const sumQtyColIndex = 2 + headersLen
     const unitPriceColIndex = 3 + headersLen
     const totalPriceColIndex = 4 + headersLen
-    const tableTotalPrice = formatTotalPrice(sizeTotalQuantity.value, createForm.unitPrice || undefined)
+    const tableTotalPrice = formatCreateTotalPrice(sizeTotalQuantity.value, createForm.unitPrice || undefined)
     return columns.map((_, index) => {
       if (index === 0) return '汇总'
       if (index === sumQtyColIndex) return String(sizeTotalQuantity.value)
-      if (index === unitPriceColIndex) return formatPrice(createForm.unitPrice || undefined)
+      if (index === unitPriceColIndex) return formatCreateUnitPrice(createForm.unitPrice || undefined)
       if (index === totalPriceColIndex) return tableTotalPrice
       return ''
     })
@@ -101,7 +71,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   }
 
   function addCreateSizeColumn() {
-    createSizeHeaders.value.push(`尺码${createSizeHeaders.value.length + 1}`)
+    createSizeHeaders.value.push(`灏虹爜${createSizeHeaders.value.length + 1}`)
     normalizeCreateSizeRows()
   }
 
@@ -111,7 +81,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   function removeCreateColorRow(index: number) {
     createSizeRows.value.splice(index, 1)
     if (createSizeRows.value.length) return
-    createSizeRows.value.push({ colorName: '默认', imageUrl: '', quantities: Array(createSizeHeaders.value.length).fill(0) })
+    createSizeRows.value.push({ colorName: '榛樿', imageUrl: '', quantities: Array(createSizeHeaders.value.length).fill(0) })
   }
 
   function removeCreateSizeColumn(index: number) {
@@ -143,7 +113,23 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     createSkuDialogVisible.value = false
   }
 
-  function resetCreateForm() {
+  function applyQuickAddSource(source: FinishedCreateQuickAddSource) {
+    createForm.orderNo = String(source.orderNo ?? '')
+    createForm.skuCode = String(source.skuCode ?? '')
+    createForm.unitPrice = source.unitPrice != null ? String(source.unitPrice) : ''
+    createForm.warehouseId = source.warehouseId ?? null
+    createForm.inventoryTypeId = source.inventoryTypeId ?? null
+    createForm.department = String(source.department ?? '')
+    createForm.location = String(source.location ?? '')
+    createForm.imageUrl = String(source.imageUrl || source.productImageUrl || '')
+    const matrix = buildQuickAddSizeMatrix(source)
+    createSizeHeaders.value = matrix.headers
+    createSizeRows.value = matrix.rows
+    normalizeCreateSizeRows()
+  }
+
+  function resetCreateForm(source: FinishedCreateQuickAddSource | null = null) {
+    quickAddSource.value = source
     Object.assign(createForm, {
       orderNo: '',
       skuCode: '',
@@ -158,25 +144,15 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     })
     createSizeHeaders.value = [...DEFAULT_CREATE_SIZE_HEADERS]
     createSizeRows.value = [createDefaultSizeRow()]
+    if (source) applyQuickAddSource(source)
     createFormRef.value?.clearValidate()
-  }
-
-  async function resolveCreateOrder(value: string): Promise<OrderListItem | null> {
-    const listRes = await getOrders({ orderNo: value, page: 1, pageSize: 5 })
-    const rows = listRes.data?.list ?? []
-    const exact = rows.find((row) => String(row.orderNo ?? '').trim() === value)
-    if (exact) return exact
-    if (rows.length === 1) return rows[0]
-    const orderId = Number(value)
-    if (!Number.isInteger(orderId) || orderId <= 0) return null
-    return (await getOrderDetail(orderId)).data ?? null
   }
 
   async function onOrderNoBlur() {
     const value = String(createForm.orderNo ?? '').trim()
     if (!value) return
     try {
-      const order = await resolveCreateOrder(value)
+      const order = await resolveFinishedCreateOrder(value)
       if (!order) return
       createForm.skuCode = order.skuCode || createForm.skuCode
       createForm.unitPrice = order.exFactoryPrice != null ? String(order.exFactoryPrice) : createForm.unitPrice
@@ -184,28 +160,28 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
       if (createSizeRows.value.some((row) => sumDetailRowQty(row.quantities) > 0)) return
       const res = await getOrderColorSizeBreakdown(order.id)
       const data = res.data
-      const headers = (Array.isArray(data?.headers) ? data.headers : []).map((item) => String(item ?? '').trim()).filter((item) => item && item !== '合计')
+      const headers = (Array.isArray(data?.headers) ? data.headers : []).map((item) => String(item ?? '').trim()).filter((item) => item && item !== '鍚堣')
       const rows = Array.isArray(data?.rows) ? data.rows : []
       if (!headers.length || !rows.length) return
       createSizeHeaders.value = headers
       createSizeRows.value = rows.map((row) => ({ colorName: String(row.colorName ?? '').trim(), imageUrl: '', quantities: headers.map(() => null) }))
       normalizeCreateSizeRows()
     } catch {
-      // 按需自动带出，不阻断用户手工录入
+      // 鎸夐渶鑷姩甯﹀嚭锛屼笉闃绘柇鐢ㄦ埛鎵嬪伐褰曞叆
     }
   }
 
   async function submitCreate() {
     const skuCode = String(createForm.skuCode ?? '').trim()
     if (!skuCode) {
-      ElMessage.warning('请选择SKU')
+      ElMessage.warning('璇烽€夋嫨SKU')
       return
     }
     const valid = await createFormRef.value?.validate().then(() => true).catch(() => false)
     if (!valid) return
     const totalQty = sizeTotalQuantity.value
     if (!totalQty || totalQty <= 0) {
-      ElMessage.warning('请填写尺寸对应的数量')
+      ElMessage.warning('璇峰～鍐欏昂瀵稿搴旂殑鏁伴噺')
       return
     }
     createForm.quantity = totalQty
@@ -231,7 +207,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
           })),
         },
       })
-      ElMessage.success('新增库存成功')
+      ElMessage.success('鏂板搴撳瓨鎴愬姛')
       onClose()
       onCreated()
     } catch (e: unknown) {
@@ -247,6 +223,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     createSkuDialogVisible,
     createSkuDialogLoading,
     createSkuKeyword,
+    quickAddSource,
     createForm,
     createRules,
     createSizeHeaders,
