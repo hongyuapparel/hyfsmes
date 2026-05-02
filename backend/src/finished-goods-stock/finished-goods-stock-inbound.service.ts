@@ -88,13 +88,19 @@ export class FinishedGoodsStockInboundService {
     before: Record<string, unknown>,
     after: Record<string, unknown>,
     remark: string,
+    meta: { sourceOrderNo?: string; action?: string } = {},
   ): Promise<void> {
     try {
+      const logMeta: Record<string, unknown> = {};
+      const sourceOrderNo = String(meta.sourceOrderNo ?? '').trim();
+      const action = String(meta.action ?? '').trim();
+      if (sourceOrderNo) logMeta.sourceOrderNo = sourceOrderNo;
+      if (action) logMeta.logAction = action;
       await this.adjustLogRepo.save(this.adjustLogRepo.create({
         finishedStockId,
         operatorUsername: (operatorUsername ?? '').trim(),
-        before,
-        after,
+        before: { ...before, ...logMeta },
+        after: { ...after, ...logMeta },
         remark: (remark ?? '').trim(),
       }));
     } catch (e) {
@@ -195,10 +201,11 @@ export class FinishedGoodsStockInboundService {
 
   async createManual(dto: ManualInboundDto, operatorUsername = ''): Promise<FinishedGoodsStock> {
     const orderNo = dto.orderNo?.trim();
-    const { snapshot, imageRows } = this.inboundQueryService.parseColorSizeInput(dto.colorSize);
+    const parsedColorSize = this.inboundQueryService.parseColorSizeInput(dto.colorSize);
+    let snapshot = parsedColorSize.snapshot;
+    const { imageRows } = parsedColorSize;
     const q = Number(dto.quantity);
     if (!Number.isInteger(q) || q <= 0) throw new NotFoundException('数量必须为正整数');
-    if (snapshot) this.inboundQueryService.assertColorSizeSnapshotTotal(snapshot, q, '新增库存的尺码明细合计必须等于新增数量');
     let orderId: number | null = null, customerId: number | null = null;
     let customerName = '', orderExFactoryPrice: string | number | null = null;
     if (orderNo) {
@@ -209,6 +216,10 @@ export class FinishedGoodsStockInboundService {
       customerName = linkedOrder.customerName?.trim() ?? '';
       orderExFactoryPrice = linkedOrder.exFactoryPrice ?? '0';
     }
+    if (!snapshot && orderId != null) {
+      snapshot = await this.inboundQueryService.buildOrderColorSizeSnapshot(orderId, q);
+    }
+    if (snapshot) this.inboundQueryService.assertColorSizeSnapshotTotal(snapshot, q, '新增库存的尺码明细合计必须等于新增数量');
 
     const unitPriceStr =
       dto.unitPrice != null && dto.unitPrice !== ''
@@ -224,11 +235,11 @@ export class FinishedGoodsStockInboundService {
 
     const existing = await this.inboundQueryService.findMergeableFinishedStock({
       skuCode,
-      orderId,
       warehouseId,
       inventoryTypeId,
       department,
     });
+    const inboundRemark = orderNo ? `从订单 ${orderNo} 新增库存` : '手工新增库存';
     if (existing) {
       const before = this.inboundQueryService.stockAdjustSnapshot(existing);
       const oldQty = Math.max(0, Math.trunc(Number(existing.quantity) || 0));
@@ -258,7 +269,14 @@ export class FinishedGoodsStockInboundService {
       try {
         const saved = await this.stockRepo.save(existing);
         await this.persistColorImagesForStock(saved.id, imageRows);
-        await this.appendFinishedStockAdjustLog(saved.id, operatorUsername, before, this.inboundQueryService.stockAdjustSnapshot(saved), `合并入库 +${q} 件`);
+        await this.appendFinishedStockAdjustLog(
+          saved.id,
+          operatorUsername,
+          before,
+          this.inboundQueryService.stockAdjustSnapshot(saved),
+          inboundRemark,
+          { sourceOrderNo: orderNo, action: 'inbound' },
+        );
         return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
       } catch (e: unknown) {
         const msg = String((e as { message?: unknown })?.message ?? '');
@@ -271,6 +289,14 @@ export class FinishedGoodsStockInboundService {
     try {
       const saved = await this.stockRepo.save(stock);
       await this.persistColorImagesForStock(saved.id, imageRows);
+      await this.appendFinishedStockAdjustLog(
+        saved.id,
+        operatorUsername,
+        { quantity: 0, colorSizeSnapshot: null },
+        this.inboundQueryService.stockAdjustSnapshot(saved),
+        inboundRemark,
+        { sourceOrderNo: orderNo, action: 'inbound' },
+      );
       return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
     } catch (e: unknown) {
       const msg = String((e as { message?: unknown })?.message ?? '');

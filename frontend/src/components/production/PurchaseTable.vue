@@ -28,12 +28,32 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
+      <el-table-column label="采购物料" min-width="150" show-overflow-tooltip>
+        <template #default="{ row }">
+          <div class="material-cell">
+            <div class="material-cell-main">{{ displayMaterialName(row) }}</div>
+            <div v-if="displayMaterialMeta(row)" class="material-cell-meta">
+              {{ displayMaterialMeta(row) }}
+            </div>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="供应商" min-width="110" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span :class="{ 'text-muted': isMissingSupplier(row) }">{{ displaySupplier(row) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="计划用量" width="96" align="center">
+        <template #default="{ row }">
+          {{ formatMaterialQuantity(row.planQuantity, row) }}
+        </template>
+      </el-table-column>
       <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
       <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
       <el-table-column label="客户交期" width="110" align="center">
         <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
       </el-table-column>
-      <el-table-column label="订单件数" width="88" align="right">
+      <el-table-column label="订单件数" width="88" align="center">
         <template #default="{ row }">{{ formatDisplayNumber(row.orderQuantity) }}</template>
       </el-table-column>
       <el-table-column prop="pendingPurchaseAt" label="到采购时间" width="155" align="center">
@@ -72,6 +92,7 @@ import { ref } from 'vue'
 import type { PurchaseItemRow } from '@/api/production-purchase'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { formatMaterialQuantity } from '@/utils/material-quantity-unit'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
@@ -111,6 +132,27 @@ function displayStatusLabel(row: PurchaseItemRow): string {
   return displayStatus(row) === 'completed' ? '采购完成' : '等待采购'
 }
 
+function normalizeCellText(value: string | null | undefined): string {
+  const text = (value ?? '').trim()
+  return text && text !== '-' ? text : ''
+}
+
+function displayMaterialName(row: PurchaseItemRow): string {
+  return normalizeCellText(row.materialName) || '-'
+}
+
+function displayMaterialMeta(row: PurchaseItemRow): string {
+  return [normalizeCellText(row.materialType), normalizeCellText(row.color)].filter(Boolean).join(' - ')
+}
+
+function displaySupplier(row: PurchaseItemRow): string {
+  return normalizeCellText(row.supplierName) || '未指定'
+}
+
+function isMissingSupplier(row: PurchaseItemRow): boolean {
+  return !normalizeCellText(row.supplierName)
+}
+
 defineExpose({
   purchaseTableRef,
   tableShellRef,
@@ -131,6 +173,27 @@ defineExpose({
 
 .text-muted {
   color: var(--el-text-color-secondary);
+}
+
+.material-cell {
+  min-width: 0;
+}
+
+.material-cell-main,
+.material-cell-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.material-cell-main {
+  color: var(--el-text-color-primary);
+}
+
+.material-cell-meta {
+  margin-top: 2px;
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
 }
 </style>
 

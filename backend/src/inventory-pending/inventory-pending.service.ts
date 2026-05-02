@@ -3,13 +3,12 @@ import { errMsg } from '../common/http-exception.filter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { InboundPending } from '../entities/inbound-pending.entity';
-import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
-import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import { Order } from '../entities/order.entity';
 import { Role } from '../entities/role.entity';
 import { Product } from '../entities/product.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
+import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
 
 export interface PendingListItem {
   id: number;
@@ -30,7 +29,21 @@ export interface PendingListItem {
 type PendingOutboundItemInput = {
   id: number;
   quantity: number;
-  sizeBreakdown?: any;
+  sizeBreakdown?: unknown;
+};
+
+type PendingShippedRawRow = {
+  id: number | string;
+  orderId: number | string | null;
+  orderNo: string | null;
+  customerName: string | null;
+  skuCode: string | null;
+  imageUrl: string | null;
+  quantity: number | string | null;
+  pickupUserName: string | null;
+  operatorUsername: string | null;
+  remark: string | null;
+  createdAt: Date | string | null;
 };
 
 @Injectable()
@@ -40,12 +53,11 @@ export class InventoryPendingService {
   constructor(
     @InjectRepository(InboundPending)
     private readonly pendingRepo: Repository<InboundPending>,
-    @InjectRepository(FinishedGoodsStock)
-    private readonly stockRepo: Repository<FinishedGoodsStock>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
+    private readonly finishedGoodsStockService: FinishedGoodsStockService,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
@@ -137,8 +149,8 @@ export class InventoryPendingService {
       const rows = await qb
         .offset((page - 1) * pageSize)
         .limit(pageSize)
-        .getRawMany<any>();
-      const list: PendingListItem[] = rows.map((r: any) => ({
+        .getRawMany<PendingShippedRawRow>();
+      const list: PendingListItem[] = rows.map((r) => ({
         id: Number(r.id),
         tabType: 'shipped',
         orderId: Number(r.orderId) || 0,
@@ -235,6 +247,7 @@ export class InventoryPendingService {
     department: string,
     location: string,
     imageUrl?: string,
+    operatorUsername = '',
   ): Promise<void> {
     if (!ids?.length) {
       throw new NotFoundException('请选择待仓处理记录');
@@ -262,20 +275,20 @@ export class InventoryPendingService {
     }
     for (const p of pendings) {
       const order = orderMap.get(p.orderId);
-      const stock = this.stockRepo.create({
-        orderId: p.orderId,
-        skuCode: p.skuCode,
-        quantity: p.quantity,
-        unitPrice: order?.exFactoryPrice != null ? String(order.exFactoryPrice) : '0',
-        warehouseId: warehouseId != null ? Number(warehouseId) : null,
-        inventoryTypeId: inventoryTypeId != null ? Number(inventoryTypeId) : null,
-        department: department?.trim() ?? '',
-        location: location?.trim() ?? '',
-        customerId: order?.customerId ?? null,
-        customerName: order?.customerName?.trim() ?? '',
-        imageUrl: img,
-      });
-      await this.stockRepo.save(stock);
+      await this.finishedGoodsStockService.createManual(
+        {
+          orderNo: order?.orderNo ?? '',
+          skuCode: p.skuCode,
+          quantity: p.quantity,
+          unitPrice: order?.exFactoryPrice != null ? String(order.exFactoryPrice) : '0',
+          warehouseId: warehouseId != null ? Number(warehouseId) : null,
+          inventoryTypeId: inventoryTypeId != null ? Number(inventoryTypeId) : null,
+          department: department?.trim() ?? '',
+          location: location?.trim() ?? '',
+          imageUrl: img,
+        },
+        operatorUsername,
+      );
       p.status = 'completed';
       await this.pendingRepo.save(p);
     }
@@ -345,8 +358,6 @@ export class InventoryPendingService {
     try {
       await this.pendingRepo.manager.transaction(async (manager) => {
         const txPendingRepo = manager.getRepository(InboundPending);
-        const txStockRepo = manager.getRepository(FinishedGoodsStock);
-        const txOutboundRepo = manager.getRepository(FinishedGoodsOutbound);
 
         for (const item of normalizedItems) {
           const txPending = await txPendingRepo.findOne({
@@ -393,7 +404,7 @@ export class InventoryPendingService {
           );
           this.logger.log(`[doOutbound] step=insert_stock table=finished_goods_stock sql=${stockInsertSql}`);
           this.logger.log(`[doOutbound] step=insert_stock parameters=${JSON.stringify(stockInsertParams)}`);
-          const stockInsertRes: any = await manager.query(stockInsertSql, stockInsertParams);
+          const stockInsertRes = (await manager.query(stockInsertSql, stockInsertParams)) as { insertId?: unknown };
           const savedStockId = Number(stockInsertRes?.insertId ?? 0);
           if (!savedStockId) {
             throw new BadRequestException('待仓处理发货失败：库存记录写入失败');

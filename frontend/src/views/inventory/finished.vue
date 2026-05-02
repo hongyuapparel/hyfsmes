@@ -5,7 +5,6 @@
         <div class="tab-pane-scroll">
         <FinishedStockTab
           :filter="filter"
-          :order-no-label-visible="orderNoLabelVisible"
           :sku-code-label-visible="skuCodeLabelVisible"
           :inbound-date-range="inboundDateRange"
           :customer-options="customerOptions"
@@ -193,7 +192,7 @@ const {
   getGroupSizeHeaders,
   load,
 })
-const { currentTab, filter, orderNoLabelVisible, skuCodeLabelVisible, inboundDateRange, pagination, onSearch, debouncedSearch, onReset, onPageSizeChange, onCurrentPageChange } =
+const { currentTab, filter, skuCodeLabelVisible, inboundDateRange, pagination, onSearch, debouncedSearch, onReset, onPageSizeChange, onCurrentPageChange } =
   useFinishedViewStockFilter(load, clearSelection)
 
 /**
@@ -257,7 +256,6 @@ async function load() {
       inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
     const res = await getFinishedStockList({
       tab: currentTab.value,
-      orderNo: filter.orderNo || undefined,
       skuCode: filter.skuCode || undefined,
       customerName: filter.customerName || undefined,
       inventoryTypeId: filter.inventoryTypeId ?? undefined,

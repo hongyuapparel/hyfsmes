@@ -194,11 +194,7 @@
               {{ (purchaseBriefDrawer.row.materialSource ?? '').trim() || '—' }}
             </el-descriptions-item>
             <el-descriptions-item label="计划用量">
-              {{
-                purchaseBriefDrawer.row.planQuantity != null
-                  ? formatDisplayNumber(purchaseBriefDrawer.row.planQuantity)
-                  : '—'
-              }}
+              {{ formatMaterialQuantity(purchaseBriefDrawer.row.planQuantity, purchaseBriefDrawer.row) }}
             </el-descriptions-item>
           </el-descriptions>
         </ProductionDetailSection>
@@ -362,7 +358,7 @@
           <div><span class="pick-brief-label">物料来源：</span>{{ pickDialog.row.materialSource || '-' }}</div>
           <div><span class="pick-brief-label">颜色：</span>{{ pickDialog.row.color || '-' }}</div>
           <div>
-            <span class="pick-brief-label">计划用量：</span>{{ pickDialog.row.planQuantity != null ? formatDisplayNumber(pickDialog.row.planQuantity) : '-' }} 米
+            <span class="pick-brief-label">计划用量：</span>{{ formatMaterialQuantity(pickDialog.row.planQuantity, pickDialog.row) }}
           </div>
           <div v-if="pickDialog.total > 1"><span class="pick-brief-label">当前处理：</span>{{ pickDialog.index + 1 }} / {{ pickDialog.total }}</div>
         </div>
@@ -409,7 +405,7 @@
           <el-form-item label="调取数量" prop="quantity">
             <div class="pick-qty-row">
               <el-input-number v-model="pickForm.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
-              <span class="pick-qty-unit">米</span>
+              <span class="pick-qty-unit">{{ getMaterialQuantityUnit(pickDialog.row) || '单位' }}</span>
             </div>
           </el-form-item>
           <el-form-item label="备注" prop="remark">
@@ -430,6 +426,7 @@ import { computed, onMounted } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { formatMaterialQuantity, getMaterialQuantityUnit } from '@/utils/material-quantity-unit'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,

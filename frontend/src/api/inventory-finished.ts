@@ -98,6 +98,9 @@ export interface FinishedStockDetailRes {
     before: FinishedStockSnapshot | null
     after: FinishedStockSnapshot | null
     remark: string
+    sourceOrderNo?: string
+    summary?: string
+    summaries?: string[]
     createdAt: string
   }>
   colorSize: {

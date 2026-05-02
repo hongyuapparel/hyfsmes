@@ -2,21 +2,6 @@
   <div class="finished-stock-tab-root">
     <div class="filter-bar">
       <el-input
-        v-model="filter.orderNo"
-        placeholder="订单号"
-        clearable
-        size="large"
-        class="filter-bar-item"
-        :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
-        :input-style="getFilterInputStyle(filter.orderNo)"
-        @input="emit('debounced-search')"
-        @keyup.enter="emit('search', true)"
-      >
-        <template #prefix>
-          <span v-if="filter.orderNo && orderNoLabelVisible" :style="{ color: activeFilterColor }">订单号：</span>
-        </template>
-      </el-input>
-      <el-input
         v-model="filter.skuCode"
         placeholder="SKU"
         clearable
@@ -228,13 +213,12 @@ import { computed, ref, type Ref } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
-import { getFilterInputStyle, getOrderNoFilterStyle, getSkuCodeFilterStyle, getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
+import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableLeafRow, isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 type FinishedStockFilter = {
-  orderNo: string
   skuCode: string
   customerName: string
   inventoryTypeId: number | null
@@ -242,7 +226,6 @@ type FinishedStockFilter = {
 
 const props = defineProps<{
   filter: FinishedStockFilter
-  orderNoLabelVisible: boolean
   skuCodeLabelVisible: boolean
   inboundDateRange: [string, string] | null
   customerOptions: Array<{ label: string; value: string }>

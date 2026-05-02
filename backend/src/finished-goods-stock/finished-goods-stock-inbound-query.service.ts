@@ -245,9 +245,29 @@ export class FinishedGoodsStockInboundQueryService {
     return this.orderRepo.findOne({ where: { orderNo } });
   }
 
+  async buildOrderColorSizeSnapshot(orderId: number | null, quantity: number): Promise<ColorSizeSnapshot | null> {
+    if (orderId == null) return null;
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const headers = Array.isArray(ext?.colorSizeHeaders)
+      ? ext.colorSizeHeaders.map((header) => String(header ?? '').trim()).filter((header) => header.length > 0)
+      : [];
+    const baseRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
+    if (!headers.length || !baseRows.length) return null;
+    return {
+      headers,
+      rows: this.scaleColorSizeRowsToQuantity(
+        headers,
+        baseRows.map((row: { colorName?: string; quantities?: number[] }) => ({
+          colorName: row?.colorName,
+          quantities: Array.isArray(row?.quantities) ? row.quantities : [],
+        })),
+        quantity,
+      ),
+    };
+  }
+
   async findMergeableFinishedStock(params: {
     skuCode: string;
-    orderId: number | null;
     warehouseId: number | null;
     inventoryTypeId: number | null;
     department: string;
@@ -259,8 +279,6 @@ export class FinishedGoodsStockInboundQueryService {
       .createQueryBuilder('s')
       .where('s.skuCode = :sku', { sku })
       .andWhere('s.department = :dep', { dep });
-    if (params.orderId != null) qb.andWhere('s.orderId = :oid', { oid: params.orderId });
-    else qb.andWhere('s.orderId IS NULL');
     if (params.warehouseId != null) qb.andWhere('s.warehouseId = :wid', { wid: params.warehouseId });
     else qb.andWhere('s.warehouseId IS NULL');
     if (params.inventoryTypeId != null) qb.andWhere('s.inventoryTypeId = :iid', { iid: params.inventoryTypeId });
@@ -405,8 +423,6 @@ export class FinishedGoodsStockInboundQueryService {
       .createQueryBuilder('s')
       .where('s.skuCode = :sku', { sku })
       .andWhere('s.department = :dep', { dep });
-    if (seed.orderId != null) qb.andWhere('s.orderId = :oid', { oid: seed.orderId });
-    else qb.andWhere('s.orderId IS NULL');
     if (seed.warehouseId != null) qb.andWhere('s.warehouseId = :wid', { wid: seed.warehouseId });
     else qb.andWhere('s.warehouseId IS NULL');
     if (seed.inventoryTypeId != null) qb.andWhere('s.inventoryTypeId = :iid', { iid: seed.inventoryTypeId });

@@ -27,7 +27,7 @@ export interface FinishedStockRow {
 export type FinishedOutboundItemInput = {
   id: number;
   quantity: number;
-  sizeBreakdown?: any;
+  sizeBreakdown?: unknown;
 };
 
 export type ColorSizeSnapshot = {
@@ -52,7 +52,17 @@ export type FinishedGoodsStockDetailResult = {
   orderNo: string;
   productImageUrl: string;
   colorImages: Array<{ colorName: string; imageUrl: string; updatedAt: string }>;
-  adjustLogs: Array<{ id: number; operatorUsername: string; before: any; after: any; remark: string; createdAt: string }>;
+  adjustLogs: Array<{
+    id: number;
+    operatorUsername: string;
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
+    remark: string;
+    sourceOrderNo: string;
+    summary: string;
+    summaries: string[];
+    createdAt: string;
+  }>;
   colorSize: { headers: string[]; colors: string[]; rows: Array<{ colorName: string; quantities: number[] }> };
   groupSizeHeaders: string[];
 };

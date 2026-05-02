@@ -19,6 +19,10 @@ import {
   parseStoredColorSizeSnapshot,
   scaleColorSizeRowsToQuantity,
 } from './finished-goods-stock-query.utils';
+import {
+  buildFinishedStockAdjustLogSummary,
+  getFinishedStockAdjustLogSourceOrderNo,
+} from './finished-goods-stock-log-summary';
 
 type StockListQueryParams = {
   tab?: string;
@@ -204,14 +208,30 @@ export class FinishedGoodsStockQueryService {
         imageUrl: row.imageUrl ?? '',
         updatedAt: formatDateTimeForResponse(row.updatedAt),
       })),
-      adjustLogs: logs.map((row) => ({
-        id: row.id,
-        operatorUsername: row.operatorUsername ?? '',
-        before: row.before ?? null,
-        after: row.after ?? null,
-        remark: row.remark ?? '',
-        createdAt: formatDateTimeForResponse(row.createdAt),
-      })),
+      adjustLogs: logs.map((row) => {
+        const sourceOrderNo = getFinishedStockAdjustLogSourceOrderNo({
+          before: row.before,
+          after: row.after,
+          remark: row.remark,
+        });
+        const summary = buildFinishedStockAdjustLogSummary({
+          before: row.before,
+          after: row.after,
+          remark: row.remark,
+          sourceOrderNo,
+        });
+        return {
+          id: row.id,
+          operatorUsername: row.operatorUsername ?? '',
+          before: row.before ?? null,
+          after: row.after ?? null,
+          remark: row.remark ?? '',
+          sourceOrderNo,
+          summary,
+          summaries: summary ? [summary] : [],
+          createdAt: formatDateTimeForResponse(row.createdAt),
+        };
+      }),
       colorSize: { headers, colors, rows: mappedRows },
       groupSizeHeaders,
     };

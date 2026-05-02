@@ -39,6 +39,7 @@ export class InventoryPendingController {
     @Body('department') department: string,
     @Body('location') location: string,
     @Body('imageUrl') imageUrl?: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.service.doInbound(
       Array.isArray(ids) ? ids : [ids].filter(Number),
@@ -47,6 +48,7 @@ export class InventoryPendingController {
       department ?? '',
       location ?? '',
       imageUrl,
+      user?.username ?? '',
     );
   }
 
@@ -57,11 +59,11 @@ export class InventoryPendingController {
 
   @Post('outbound')
   async doOutbound(
-    @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: any }> | undefined,
+    @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: unknown }> | undefined,
     @Body('id') id: number,
     @Body('quantity') quantity: number,
     @Body('pickupUserId') pickupUserId: number | null,
-    @Body('sizeBreakdown') sizeBreakdown: any,
+    @Body('sizeBreakdown') sizeBreakdown: unknown,
     @CurrentUser() user: { userId: number; username: string },
   ) {
     const normalizedItems =

@@ -10,6 +10,7 @@ import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
+import { FinishedGoodsStockModule } from '../finished-goods-stock/finished-goods-stock.module';
 import { InventoryPendingController } from './inventory-pending.controller';
 import { InventoryPendingService } from './inventory-pending.service';
 
@@ -27,6 +28,7 @@ import { InventoryPendingService } from './inventory-pending.service';
       RolePermission,
     ]),
     AuthModule,
+    FinishedGoodsStockModule,
   ],
   controllers: [InventoryPendingController],
   providers: [InventoryPendingService],
