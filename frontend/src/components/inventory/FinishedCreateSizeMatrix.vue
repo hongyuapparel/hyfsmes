@@ -79,6 +79,18 @@
         <el-table-column label="总价" width="120" align="center" header-align="center">
           <template #default="{ row }">{{ createRowTotalPrice(row.quantities) }}</template>
         </el-table-column>
+        <el-table-column label="存放地址" width="150" align="center" header-align="center">
+          <template #default>
+            <el-input
+              v-model="location"
+              placeholder="请输入具体存放地址"
+              clearable
+              size="small"
+              style="width: 100%"
+              :disabled="structureReadonly"
+            />
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="48" align="center" header-align="center">
           <template #default="{ $index }">
             <el-button
@@ -91,18 +103,6 @@
             >
               <el-icon><Delete /></el-icon>
             </el-button>
-          </template>
-        </el-table-column>
-        <el-table-column label="存放地址" width="150" align="center" header-align="center">
-          <template #default>
-            <el-input
-              v-model="location"
-              placeholder="请输入具体存放地址"
-              clearable
-              size="small"
-              style="width: 100%"
-              :disabled="structureReadonly"
-            />
           </template>
         </el-table-column>
       </el-table>

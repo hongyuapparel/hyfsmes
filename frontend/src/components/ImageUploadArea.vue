@@ -17,7 +17,7 @@
     />
     <template v-if="displayUrl">
       <div class="preview-wrap">
-        <el-image :src="displayUrl" fit="contain" class="preview-img" />
+        <el-image :src="displayUrl" fit="contain" class="preview-img" @error="onImageError" />
         <span v-if="uploading" class="preview-uploading">上传中...</span>
         <template v-if="props.compact">
           <div class="preview-actions preview-actions-compact">
@@ -58,6 +58,7 @@ import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { useUploadListImage } from '@/composables/useUploadListImage'
 
 const props = withDefaults(
   defineProps<{
@@ -78,7 +79,21 @@ const isDragover = ref(false)
 const uploading = ref(false)
 const localPreviewUrl = ref('')
 
-const displayUrl = computed(() => localPreviewUrl.value || props.modelValue || '')
+const { src: resolveUploadSrc, onError: onUploadListError } = useUploadListImage()
+
+const displayUrl = computed(() => {
+  // 本地刚上传的预览（blob:）直接使用，无需经过站点资源解析
+  if (localPreviewUrl.value) return localPreviewUrl.value
+  const raw = (props.modelValue ?? '').trim()
+  if (!raw) return ''
+  // 与 AppImageThumb 一致：处理 /uploads/ 等站内路径，应用 small_ 缩略规则与失败回退
+  return resolveUploadSrc(raw)
+})
+
+function onImageError() {
+  // 失败时推进列表回退阶段（small_ → 原图 → 占位），避免死循环
+  if (!localPreviewUrl.value && props.modelValue) onUploadListError(props.modelValue)
+}
 
 const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
 

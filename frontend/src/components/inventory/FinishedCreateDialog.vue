@@ -3,7 +3,9 @@
     :model-value="modelValue"
     :title="quickAddSource ? '新增库存数量' : '新增库存'"
     width="960"
+    top="6vh"
     destroy-on-close
+    class="finished-create-dialog"
     @update:model-value="onDialogVisibleChange"
     @close="resetCreateForm"
   >
@@ -226,4 +228,26 @@ watch(
 .detail-basic-grid > :nth-last-child(-n + 2) { border-bottom: none; }
 .detail-product-image-panel { display: flex; flex-direction: column; gap: 6px; width: 170px; min-width: 170px; }
 .detail-image-label { font-size: 12px; color: var(--el-text-color-secondary); }
+</style>
+
+<style>
+/* 内容多时，弹窗高度受限于视口，body 内部滚动而不撑出屏幕 */
+.finished-create-dialog.el-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: 88vh;
+  margin-bottom: 0 !important;
+}
+.finished-create-dialog .el-dialog__header {
+  flex-shrink: 0;
+}
+.finished-create-dialog .el-dialog__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+.finished-create-dialog .el-dialog__footer {
+  flex-shrink: 0;
+  border-top: 1px solid var(--el-border-color-lighter);
+}
 </style>
