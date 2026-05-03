@@ -95,6 +95,7 @@
       :initial-quantity="detailDrawer.selectedQuantity"
       :group-product-image="detailDrawer.groupProductImage"
       :group-size-headers="detailDrawer.groupSizeHeaders"
+      :group-color-size-snapshot="detailDrawer.groupColorSizeSnapshot"
       :inventory-type-options="inventoryTypeOptions"
       :warehouse-options="warehouseOptions"
       :department-options="departmentOptions"
@@ -154,6 +155,7 @@ const {
 } = useFinishedOutboundRecords()
 const {
   stockTableData,
+  getGroupLeafRows,
   getGroupSizeHeaders,
   buildPreviewData,
   getSharedProductImageUrl,
@@ -189,6 +191,7 @@ const {
 } = useFinishedViewStockInteractions({
   list,
   getSharedProductImageUrl,
+  getGroupLeafRows,
   getGroupSizeHeaders,
   load,
 })
@@ -232,8 +235,8 @@ function getFinishedStockRowClassName({ row }: { row: StockTableRow }): string {
   return row._rowKind === 'parent' ? 'stock-parent-row' : 'stock-child-row'
 }
 
-function isSelectableStockRow(row: StockTableRow): boolean {
-  return row._rowKind === 'leaf'
+function isSelectableStockRow(_row: StockTableRow): boolean {
+  return true
 }
 
 function getPreviewHeaders(row: StockTableRow): string[] {

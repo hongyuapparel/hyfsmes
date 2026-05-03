@@ -10,6 +10,7 @@
     <div class="create-size-table-wrap">
       <el-table
         :data="sizeRows"
+        :row-key="(row) => row._key"
         border
         size="small"
         class="create-size-table detail-color-size-table"
@@ -153,4 +154,16 @@ const location = defineModel<string>('location', { required: true })
 .detail-section-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--el-text-color-primary); }
 .detail-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .detail-head-actions { display: flex; align-items: center; gap: 6px; }
+
+/* 单元格内容上下左右居中 */
+:deep(.create-size-table .el-table__cell) { vertical-align: middle; }
+:deep(.create-size-table .cell) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  line-height: 1.4;
+}
+:deep(.create-size-table .el-input-number) { width: 100%; }
+:deep(.create-size-table .el-input) { width: 100%; }
 </style>

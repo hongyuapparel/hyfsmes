@@ -186,7 +186,13 @@
       />
       <el-table-column label="操作" width="88" align="center" header-align="center" fixed="right">
         <template #default="{ row }">
-          <el-button v-if="isStockTableLeafRow(row)" link type="primary" size="small" @click="emit('open-detail', row)">
+          <el-button
+            v-if="row._rowKind === 'parent'"
+            link
+            type="primary"
+            size="small"
+            @click="emit('open-detail', row)"
+          >
             详情
           </el-button>
         </template>
@@ -214,7 +220,7 @@ import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
-import { isStockTableLeafRow, isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
+import { isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 

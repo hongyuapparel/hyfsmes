@@ -1,17 +1,30 @@
-﻿import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { createFinishedStock } from '@/api/inventory'
 import { getOrderColorSizeBreakdown } from '@/api/orders'
 import { getProducts, type ProductItem } from '@/api/products'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 import {
-  DEFAULT_CREATE_SIZE_HEADERS, buildQuickAddSizeMatrix, createDefaultSizeRow, createFinishedCreateRules,
-  filterFinishedCreateSkuProducts, formatCreateTotalPrice, formatCreateUnitPrice, resolveFinishedCreateOrder, sumCreateSizeQuantities,
+  DEFAULT_CREATE_SIZE_HEADERS,
+  buildQuickAddSizeMatrix,
+  createDefaultSizeRow,
+  createFinishedCreateRules,
+  filterFinishedCreateSkuProducts,
+  formatCreateTotalPrice,
+  formatCreateUnitPrice,
+  remapCreateQuantities,
+  resolveFinishedCreateOrder,
+  sumCreateSizeQuantities,
   type FinishedCreateQuickAddSource,
 } from '@/composables/finishedCreateFormHelpers'
 export type { FinishedCreateQuickAddSource, FinishedCreateSizeRow } from '@/composables/finishedCreateFormHelpers'
 
+let _localRowKey = 0
+const nextLocalKey = () => `cr-local-${Date.now()}-${++_localRowKey}`
+
 type SummaryColumns = Array<{ label?: string }>
+
 export function useFinishedCreateForm(onCreated: () => void, onClose: () => void) {
   const createSubmitting = ref(false)
   const createFormRef = ref<FormInstance>()
@@ -38,8 +51,12 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
 
   const createRules = createFinishedCreateRules()
 
-  const sizeTotalQuantity = computed(() => createSizeRows.value.reduce((sum, row) => sum + sumDetailRowQty(row.quantities), 0))
-  const filteredCreateSkuProducts = computed(() => filterFinishedCreateSkuProducts(createSkuProducts.value, createSkuKeyword.value))
+  const sizeTotalQuantity = computed(() =>
+    createSizeRows.value.reduce((sum, row) => sum + sumDetailRowQty(row.quantities), 0),
+  )
+  const filteredCreateSkuProducts = computed(() =>
+    filterFinishedCreateSkuProducts(createSkuProducts.value, createSkuKeyword.value),
+  )
 
   const sumDetailRowQty = sumCreateSizeQuantities
 
@@ -65,23 +82,30 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   function normalizeCreateSizeRows() {
     const len = createSizeHeaders.value.length
     createSizeRows.value.forEach((row) => {
-      if (row.quantities.length < len) row.quantities.push(...Array(len - row.quantities.length).fill(0))
+      if (row.quantities.length < len)
+        row.quantities.push(...Array(len - row.quantities.length).fill(0))
       else if (row.quantities.length > len) row.quantities.splice(len)
     })
   }
 
   function addCreateSizeColumn() {
-    createSizeHeaders.value.push(`灏虹爜${createSizeHeaders.value.length + 1}`)
+    createSizeHeaders.value.push(`尺码${createSizeHeaders.value.length + 1}`)
     normalizeCreateSizeRows()
   }
 
-  const createEmptySizeRow = () => ({ colorName: '', imageUrl: '', quantities: Array(createSizeHeaders.value.length).fill(0) })
-  function addCreateColorRow() { createSizeRows.value.push(createEmptySizeRow()) }
+  function addCreateColorRow() {
+    createSizeRows.value.push({
+      _key: nextLocalKey(),
+      colorName: '',
+      imageUrl: '',
+      quantities: Array(createSizeHeaders.value.length).fill(0),
+    })
+  }
 
   function removeCreateColorRow(index: number) {
     createSizeRows.value.splice(index, 1)
     if (createSizeRows.value.length) return
-    createSizeRows.value.push({ colorName: '榛樿', imageUrl: '', quantities: Array(createSizeHeaders.value.length).fill(0) })
+    createSizeRows.value.push(createDefaultSizeRow())
   }
 
   function removeCreateSizeColumn(index: number) {
@@ -155,38 +179,48 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
       const order = await resolveFinishedCreateOrder(value)
       if (!order) return
       createForm.skuCode = order.skuCode || createForm.skuCode
-      createForm.unitPrice = order.exFactoryPrice != null ? String(order.exFactoryPrice) : createForm.unitPrice
+      createForm.unitPrice =
+        order.exFactoryPrice != null ? String(order.exFactoryPrice) : createForm.unitPrice
       if (order.imageUrl && !createForm.imageUrl) createForm.imageUrl = order.imageUrl
       if (createSizeRows.value.some((row) => sumDetailRowQty(row.quantities) > 0)) return
       const res = await getOrderColorSizeBreakdown(order.id)
       const data = res.data
-      const headers = (Array.isArray(data?.headers) ? data.headers : []).map((item) => String(item ?? '').trim()).filter((item) => item && item !== '鍚堣')
+      const headers = (Array.isArray(data?.headers) ? data.headers : [])
+        .map(normalizeSizeHeader)
+        .filter(Boolean)
+      const sortedHeaders = sortSizeHeaders(headers)
       const rows = Array.isArray(data?.rows) ? data.rows : []
-      if (!headers.length || !rows.length) return
-      createSizeHeaders.value = headers
-      createSizeRows.value = rows.map((row) => ({ colorName: String(row.colorName ?? '').trim(), imageUrl: '', quantities: headers.map(() => null) }))
+      if (!sortedHeaders.length || !rows.length) return
+      createSizeHeaders.value = sortedHeaders
+      createSizeRows.value = rows.map((row) => ({
+        _key: nextLocalKey(),
+        colorName: String(row.colorName ?? '').trim(),
+        imageUrl: '',
+        quantities: remapCreateQuantities(headers, row.values ?? [], sortedHeaders),
+      }))
       normalizeCreateSizeRows()
     } catch {
-      // 鎸夐渶鑷姩甯﹀嚭锛屼笉闃绘柇鐢ㄦ埛鎵嬪伐褰曞叆
+      // 按需自动带出，不阻断用户手工录入
     }
   }
 
   async function submitCreate() {
     const skuCode = String(createForm.skuCode ?? '').trim()
     if (!skuCode) {
-      ElMessage.warning('璇烽€夋嫨SKU')
+      ElMessage.warning('请选择SKU')
       return
     }
     const valid = await createFormRef.value?.validate().then(() => true).catch(() => false)
     if (!valid) return
     const totalQty = sizeTotalQuantity.value
     if (!totalQty || totalQty <= 0) {
-      ElMessage.warning('璇峰～鍐欏昂瀵稿搴旂殑鏁伴噺')
+      ElMessage.warning('请填写尺码对应的数量')
       return
     }
     createForm.quantity = totalQty
     createSubmitting.value = true
     try {
+      const submittedHeaders = sortSizeHeaders(createSizeHeaders.value)
       await createFinishedStock({
         orderNo: createForm.orderNo?.trim() || undefined,
         skuCode,
@@ -199,15 +233,19 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
         imageUrl: createForm.imageUrl || undefined,
         remark: createForm.remark?.trim() || undefined,
         colorSize: {
-          headers: createSizeHeaders.value.map((header) => String(header ?? '').trim()),
+          headers: submittedHeaders,
           rows: createSizeRows.value.map((row) => ({
             colorName: row.colorName,
             imageUrl: row.imageUrl,
-            quantities: row.quantities.map((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0))),
+            quantities: remapCreateQuantities(
+              createSizeHeaders.value,
+              row.quantities,
+              submittedHeaders,
+            ).map((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0))),
           })),
         },
       })
-      ElMessage.success('鏂板搴撳瓨鎴愬姛')
+      ElMessage.success('新增库存成功')
       onClose()
       onCreated()
     } catch (e: unknown) {

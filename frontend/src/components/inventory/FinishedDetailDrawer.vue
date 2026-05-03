@@ -2,46 +2,53 @@
   <AppDrawer
     :model-value="modelValue"
     title="库存详情"
-    :size="drawerWidth"
+    :size="900"
+    :min-size="760"
+    :resizable="true"
     class="finished-detail-drawer"
     @update:model-value="emit('update:modelValue', $event)"
   >
-    <div class="detail-drawer-resizer" title="拖拽调整宽度" @mousedown="startResize" />
     <div v-loading="loading" class="detail-wrap">
       <div v-if="data" class="detail-sections">
-        <FinishedDetailBasicInfoSection
-          :stock="stockInfo"
-          :order-no="orderNo"
-          :display-product-image="displayProductImage"
-          :meta-editing="metaEditing"
-          :saving="saving"
-          :edit-form="editForm"
-          :inventory-type-options="inventoryTypeOptions"
-          :warehouse-options="warehouseOptions"
-          :department-options="departmentOptions"
-          :format-date-time="formatDateTime"
-          :find-inventory-type-label="findInventoryTypeLabel"
-          :find-warehouse-label="findWarehouseLabel"
-          :update-field="updateEditFormField"
-          @toggle-edit-mode="toggleEditMode"
-          @save-meta="handleSaveMeta"
-        />
+        <el-tabs v-model="activeDetailTab" class="detail-tabs">
+          <!-- 库存明细：基本信息 + 颜色尺码合并在一个 tab -->
+          <el-tab-pane label="库存明细" name="size">
+            <FinishedDetailBasicInfoSection
+              :stock="stockInfo"
+              :order-no="orderNo"
+              :display-product-image="displayProductImage"
+              :meta-editing="metaEditing"
+              :saving="saving"
+              :edit-form="editForm"
+              :inventory-type-options="inventoryTypeOptions"
+              :warehouse-options="warehouseOptions"
+              :department-options="departmentOptions"
+              :format-date-time="formatDateTime"
+              :find-inventory-type-label="findInventoryTypeLabel"
+              :find-warehouse-label="findWarehouseLabel"
+              :update-field="updateEditFormField"
+              @toggle-edit-mode="toggleEditMode"
+              @save-meta="handleSaveMeta"
+            />
+            <FinishedDetailColorSizeSection
+              :meta-editing="metaEditing"
+              :size-headers="displaySizeHeaders"
+              :color-size-rows="displayColorSizeRows"
+              :color-image-map="colorImageMap"
+              :unit-price="editForm.unitPrice"
+              :table-unit-price="tableUnitPrice"
+              :sum-row-qty="sumRowQty"
+              :row-total-price="rowTotalPrice"
+              :get-color-size-summary="getColorSizeSummary"
+              @save-color-image="handleSaveColorImage"
+              @update-unit-price="(value) => updateEditFormField('unitPrice', value)"
+            />
+          </el-tab-pane>
 
-        <FinishedDetailColorSizeSection
-          :meta-editing="metaEditing"
-          :size-headers="displaySizeHeaders"
-          :color-size-rows="displayColorSizeRows"
-          :color-image-map="colorImageMap"
-          :unit-price="editForm.unitPrice"
-          :table-unit-price="tableUnitPrice"
-          :sum-row-qty="sumRowQty"
-          :row-total-price="rowTotalPrice"
-          :get-color-size-summary="getColorSizeSummary"
-          @save-color-image="handleSaveColorImage"
-          @update-unit-price="(value) => updateEditFormField('unitPrice', value)"
-        />
-
-        <FinishedDetailLogsSection :logs="adjustLogs" />
+          <el-tab-pane label="操作记录" name="logs">
+            <FinishedDetailLogsSection :logs="adjustLogs" />
+          </el-tab-pane>
+        </el-tabs>
       </div>
       <div v-else class="detail-muted">暂无数据</div>
     </div>
@@ -49,13 +56,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppDrawer from '@/components/AppDrawer.vue'
 import { formatDateTime } from '@/utils/date-format'
 import { sumRowQty } from '@/composables/useFinishedDetailHelpers'
 import type { FinishedDetailEditForm } from '@/composables/useFinishedDetailData'
 import { useFinishedDetailData } from '@/composables/useFinishedDetailData'
-import { useFinishedDetailResize } from '@/composables/useFinishedDetailResize'
+import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTableUtils'
 import FinishedDetailBasicInfoSection from '@/components/inventory/finished-detail/FinishedDetailBasicInfoSection.vue'
 import FinishedDetailColorSizeSection from '@/components/inventory/finished-detail/FinishedDetailColorSizeSection.vue'
 import FinishedDetailLogsSection from '@/components/inventory/finished-detail/FinishedDetailLogsSection.vue'
@@ -68,6 +75,7 @@ const props = withDefaults(
     initialQuantity: number | null
     groupProductImage: string
     groupSizeHeaders: string[]
+    groupColorSizeSnapshot: NormalizedStoredBreakdownSnapshot | null
     inventoryTypeOptions: { id: number; label: string }[]
     warehouseOptions: { id: number; label: string }[]
     departmentOptions: { value: string; label: string }[]
@@ -87,7 +95,7 @@ const emit = defineEmits<{
   (e: 'metaSaved'): void
 }>()
 
-const { drawerWidth, startResize, resetWidthFromStorage } = useFinishedDetailResize()
+const activeDetailTab = ref('size')
 
 const {
   loading,
@@ -161,14 +169,15 @@ watch(
   () => [props.modelValue, props.stockId] as const,
   ([visible, stockId]) => {
     if (visible && stockId) {
-      resetWidthFromStorage()
       openDetail({
         stockId,
         groupProductImage: props.groupProductImage,
         groupSizeHeaders: props.groupSizeHeaders,
+        groupColorSizeSnapshot: props.groupColorSizeSnapshot,
         initialColorName: props.initialColorName,
         initialQuantity: props.initialQuantity,
       })
+      activeDetailTab.value = 'size'
     }
   },
 )
@@ -183,24 +192,26 @@ watch(
   flex-direction: column;
   gap: 10px;
 }
+.detail-tabs {
+  min-width: 0;
+}
+.detail-tabs :deep(.el-tabs__content) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.detail-tabs :deep(.el-tab-pane) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 .detail-muted {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.detail-drawer-resizer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 10px;
-  height: 100%;
-  z-index: 10;
-  cursor: ew-resize;
-}
-.detail-drawer-resizer:hover { background: rgba(64, 158, 255, 0.12); }
 
 /* el-drawer overrides */
 :deep(.el-drawer__header) { margin-bottom: 6px; padding-bottom: 0; }
-:deep(.el-drawer) { position: relative; }
 :deep(.el-drawer__body) { padding-top: 0; }
 :deep(.el-form-item__label),
 :deep(.el-input__inner),
@@ -211,11 +222,6 @@ watch(
 </style>
 
 <style>
-:global(body.detail-drawer-resizing) {
-  cursor: ew-resize !important;
-  user-select: none !important;
-}
-
 /* tooltip 弹层在 body 下，需用全局样式；通过 popper-class 精确作用范围 */
 .finished-qty-popper {
   padding: 0;

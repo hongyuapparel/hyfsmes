@@ -2,10 +2,12 @@ import type { FormRules } from 'element-plus'
 import type { ProductItem } from '@/api/products'
 import { getOrderDetail, getOrders, type OrderListItem } from '@/api/orders'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 
 export const DEFAULT_CREATE_SIZE_HEADERS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL'] as const
 
 export type FinishedCreateSizeRow = {
+  _key: string
   colorName: string
   imageUrl: string
   quantities: Array<number | null>
@@ -21,6 +23,7 @@ export type FinishedCreateQuickAddSource = {
   location?: string
   imageUrl?: string
   productImageUrl?: string
+  colorImages?: Array<{ colorName: string; imageUrl: string }>
   sizeBreakdown?: {
     headers: string[]
     rows: Array<{ colorName: string; values?: number[]; quantities?: number[] }>
@@ -29,7 +32,13 @@ export type FinishedCreateQuickAddSource = {
   _displayColor?: string
 }
 
+let _rowKeyCounter = 0
+function nextRowKey(): string {
+  return `cr-${Date.now()}-${++_rowKeyCounter}`
+}
+
 export const createDefaultSizeRow = (): FinishedCreateSizeRow => ({
+  _key: nextRowKey(),
   colorName: '默认',
   imageUrl: '',
   quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0),
@@ -51,30 +60,56 @@ export function formatCreateTotalPrice(quantity: number, unitPrice: string | und
   return `¥${formatDisplayNumber(quantity * n)}`
 }
 
+export function remapCreateQuantities(sourceHeaders: string[], values: unknown[], targetHeaders: string[]): Array<number | null> {
+  const indexMap = new Map(sourceHeaders.map((header, index) => [getSizeHeaderKey(header), index]))
+  return targetHeaders.map((header) => {
+    const sourceIndex = indexMap.get(getSizeHeaderKey(header))
+    if (sourceIndex == null) return null
+    const quantity = Number(values[sourceIndex])
+    return Number.isFinite(quantity) && quantity >= 0 ? Math.trunc(quantity) : null
+  })
+}
+
 export function buildQuickAddSizeMatrix(source: FinishedCreateQuickAddSource): {
   headers: string[]
   rows: FinishedCreateSizeRow[]
 } {
   const snapshot = source.sizeBreakdown
   const headers = Array.isArray(snapshot?.headers)
-    ? snapshot.headers.map((header) => String(header ?? '').trim()).filter(Boolean)
+    ? snapshot.headers.map(normalizeSizeHeader).filter(Boolean)
     : []
+  const sortedHeaders = sortSizeHeaders(headers)
   const rows = Array.isArray(snapshot?.rows) ? snapshot.rows : []
-  if (headers.length > 0 && rows.length > 0) {
+
+  // Build colorImages lookup map for image URL population
+  const colorImageLookup = new Map<string, string>()
+  if (Array.isArray(source.colorImages)) {
+    source.colorImages.forEach((ci) => {
+      const colorName = String(ci?.colorName ?? '').trim()
+      if (colorName && ci?.imageUrl) colorImageLookup.set(colorName, ci.imageUrl)
+    })
+  }
+
+  if (sortedHeaders.length > 0 && rows.length > 0) {
     return {
-      headers,
-      rows: rows.map((row) => ({
-        colorName: String(row.colorName ?? '').trim() || '默认',
-        imageUrl: '',
-        quantities: headers.map(() => null),
-      })),
+      headers: sortedHeaders,
+      rows: rows.map((row) => {
+        const colorName = String(row.colorName ?? '').trim() || '默认'
+        return {
+          _key: nextRowKey(),
+          colorName,
+          imageUrl: colorImageLookup.get(colorName) || '',
+          // Use 0 (not null) so el-input-number renders as empty input cleanly
+          quantities: sortedHeaders.map(() => 0),
+        }
+      }),
     }
   }
 
   const colorName = String(source._selectedColorName || source._displayColor || '默认').trim() || '默认'
   return {
     headers: [...DEFAULT_CREATE_SIZE_HEADERS],
-    rows: [{ colorName, imageUrl: '', quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0) }],
+    rows: [{ _key: nextRowKey(), colorName, imageUrl: colorImageLookup.get(colorName) || '', quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0) }],
   }
 }
 

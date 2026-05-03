@@ -1,12 +1,23 @@
 import { computed, reactive, ref, type Ref } from 'vue'
 import type { FinishedStockRow } from '@/api/inventory'
-import { normalizeColorName, isStockTableLeafRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
+import type { FinishedCreateQuickAddSource } from '@/composables/useFinishedCreateForm'
+import {
+  normalizeColorName,
+  isStockTableLeafRow,
+  isStockTableParentRow,
+  remapValuesByHeaders,
+  snapshotRowTotal,
+  type NormalizedStoredBreakdownSnapshot,
+  type StockTableLeafRow,
+  type StockTableRow,
+} from '@/utils/finishedStockTableUtils'
 
 type DetailDrawerState = {
   visible: boolean
   stockId: number | null
   groupProductImage: string
   groupSizeHeaders: string[]
+  groupColorSizeSnapshot: NormalizedStoredBreakdownSnapshot | null
   selectedColorName: string | null
   selectedQuantity: number | null
 }
@@ -36,12 +47,13 @@ type OutboundDialogState = {
 type StockInteractionsOptions = {
   list: Ref<FinishedStockRow[]>
   getSharedProductImageUrl: (row: StockTableRow) => string
+  getGroupLeafRows: (row: StockTableRow) => StockTableLeafRow[]
   getGroupSizeHeaders: (row: StockTableRow) => string[]
   load: () => void | Promise<void>
 }
 
 export function useFinishedViewStockInteractions(options: StockInteractionsOptions) {
-  const { list, getSharedProductImageUrl, getGroupSizeHeaders, load } = options
+  const { list, getSharedProductImageUrl, getGroupLeafRows, getGroupSizeHeaders, load } = options
 
   const selectedRows = ref<StockTableLeafRow[]>([])
   const pendingRows = computed(() => selectedRows.value.filter((row) => row.type === 'pending'))
@@ -54,6 +66,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     stockId: null,
     groupProductImage: '',
     groupSizeHeaders: [],
+    groupColorSizeSnapshot: null,
     selectedColorName: null,
     selectedQuantity: null,
   })
@@ -71,19 +84,74 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   })
 
   const createDialogVisible = ref(false)
-  const createSeed = ref<StockTableLeafRow | null>(null)
+  const createSeed = ref<FinishedCreateQuickAddSource | null>(null)
 
   function onSelectionChange(rows: StockTableRow[]) {
-    selectedRows.value = rows.filter((row): row is StockTableLeafRow => isStockTableLeafRow(row))
+    // Parent row selection → expand to all its children; deduplicate by id
+    const seen = new Set<number>()
+    const result: StockTableLeafRow[] = []
+    rows.forEach((row) => {
+      if (isStockTableParentRow(row)) {
+        row._children.forEach((child) => {
+          if (!seen.has(child.id)) {
+            seen.add(child.id)
+            result.push(child)
+          }
+        })
+      } else if (isStockTableLeafRow(row)) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id)
+          result.push(row)
+        }
+      }
+    })
+    selectedRows.value = result
+  }
+
+  function buildGroupColorSizeSnapshot(row: StockTableRow): NormalizedStoredBreakdownSnapshot | null {
+    const headers = getGroupSizeHeaders(row)
+    if (!headers.length) return null
+    const rowOrder: string[] = []
+    const rowMap = new Map<string, number[]>()
+    getGroupLeafRows(row).forEach((leaf) => {
+      const breakdown = leaf.sizeBreakdown
+      if (!breakdown?.headers?.length || !breakdown.rows?.length) return
+      breakdown.rows.forEach((item) => {
+        const colorName = normalizeColorName(item.colorName)
+        const values = remapValuesByHeaders(breakdown.headers, item.values ?? [], headers)
+        if (snapshotRowTotal(values) <= 0) return
+        let target = rowMap.get(colorName)
+        if (!target) {
+          target = Array(headers.length).fill(0)
+          rowMap.set(colorName, target)
+          rowOrder.push(colorName)
+        }
+        values.forEach((value, index) => {
+          target![index] += value
+        })
+      })
+    })
+    const rows = rowOrder.map((colorName) => ({ colorName, values: [...(rowMap.get(colorName) ?? [])] }))
+    return rows.length ? { headers, rows } : null
   }
 
   function openDetail(row: StockTableRow) {
-    if (!isStockTableLeafRow(row)) return
+    const detailRow = isStockTableParentRow(row) ? row._children[0] : row
+    if (!isStockTableLeafRow(detailRow)) return
     detailDrawer.groupProductImage = getSharedProductImageUrl(row)
     detailDrawer.groupSizeHeaders = getGroupSizeHeaders(row)
-    detailDrawer.stockId = row.id
-    detailDrawer.selectedColorName = row._selectedColorName != null ? normalizeColorName(row._selectedColorName) : null
-    detailDrawer.selectedQuantity = row.quantity != null ? Math.max(0, Math.trunc(Number(row.quantity) || 0)) : null
+    detailDrawer.groupColorSizeSnapshot = buildGroupColorSizeSnapshot(row)
+    detailDrawer.stockId = detailRow.id
+    detailDrawer.selectedColorName = isStockTableParentRow(row)
+      ? null
+      : detailRow._selectedColorName != null
+        ? normalizeColorName(detailRow._selectedColorName)
+        : null
+    detailDrawer.selectedQuantity = isStockTableParentRow(row)
+      ? null
+      : detailRow.quantity != null
+        ? Math.max(0, Math.trunc(Number(detailRow.quantity) || 0))
+        : null
     detailDrawer.visible = true
   }
 
@@ -114,7 +182,18 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   }
 
   function openCreateDialog() {
-    createSeed.value = storedRows.value.length === 1 ? { ...storedRows.value[0] } : null
+    if (storedRows.value.length >= 1) {
+      const seed = storedRows.value[0]
+      // Include colorImages so the matrix can show per-color images
+      const colorImages = Array.isArray(seed.colorImages) ? seed.colorImages : []
+      createSeed.value = {
+        ...seed,
+        sizeBreakdown: buildGroupColorSizeSnapshot(seed) ?? seed.sizeBreakdown,
+        colorImages,
+      }
+    } else {
+      createSeed.value = null
+    }
     createDialogVisible.value = true
   }
 
