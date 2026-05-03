@@ -76,6 +76,7 @@ const props = withDefaults(
     groupProductImage: string
     groupSizeHeaders: string[]
     groupColorSizeSnapshot: NormalizedStoredBreakdownSnapshot | null
+    groupColorImages: Array<{ colorName: string; imageUrl: string }>
     inventoryTypeOptions: { id: number; label: string }[]
     warehouseOptions: { id: number; label: string }[]
     departmentOptions: { value: string; label: string }[]
@@ -85,6 +86,7 @@ const props = withDefaults(
     initialQuantity: null,
     groupProductImage: '',
     groupSizeHeaders: () => [],
+    groupColorImages: () => [],
   },
 )
 
@@ -174,6 +176,7 @@ watch(
         groupProductImage: props.groupProductImage,
         groupSizeHeaders: props.groupSizeHeaders,
         groupColorSizeSnapshot: props.groupColorSizeSnapshot,
+        groupColorImages: props.groupColorImages,
         initialColorName: props.initialColorName,
         initialQuantity: props.initialQuantity,
       })

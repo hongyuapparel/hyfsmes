@@ -96,6 +96,7 @@
       :group-product-image="detailDrawer.groupProductImage"
       :group-size-headers="detailDrawer.groupSizeHeaders"
       :group-color-size-snapshot="detailDrawer.groupColorSizeSnapshot"
+      :group-color-images="detailDrawer.groupColorImages"
       :inventory-type-options="inventoryTypeOptions"
       :warehouse-options="warehouseOptions"
       :department-options="departmentOptions"

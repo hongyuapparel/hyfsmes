@@ -18,6 +18,7 @@ type DetailDrawerState = {
   groupProductImage: string
   groupSizeHeaders: string[]
   groupColorSizeSnapshot: NormalizedStoredBreakdownSnapshot | null
+  groupColorImages: Array<{ colorName: string; imageUrl: string }>
   selectedColorName: string | null
   selectedQuantity: number | null
 }
@@ -67,6 +68,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     groupProductImage: '',
     groupSizeHeaders: [],
     groupColorSizeSnapshot: null,
+    groupColorImages: [],
     selectedColorName: null,
     selectedQuantity: null,
   })
@@ -135,12 +137,31 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     return rows.length ? { headers, rows } : null
   }
 
+  /**
+   * 聚合整组所有子库存条目的颜色图片，避免单个子条目缺失某些颜色的图片。
+   * 同一颜色取首个非空的 imageUrl。
+   */
+  function buildGroupColorImages(row: StockTableRow): Array<{ colorName: string; imageUrl: string }> {
+    const map = new Map<string, string>()
+    getGroupLeafRows(row).forEach((leaf) => {
+      const items = Array.isArray(leaf.colorImages) ? leaf.colorImages : []
+      items.forEach((entry) => {
+        const colorName = normalizeColorName(entry?.colorName)
+        const imageUrl = String(entry?.imageUrl ?? '').trim()
+        if (!colorName || !imageUrl) return
+        if (!map.has(colorName)) map.set(colorName, imageUrl)
+      })
+    })
+    return Array.from(map.entries()).map(([colorName, imageUrl]) => ({ colorName, imageUrl }))
+  }
+
   function openDetail(row: StockTableRow) {
     const detailRow = isStockTableParentRow(row) ? row._children[0] : row
     if (!isStockTableLeafRow(detailRow)) return
     detailDrawer.groupProductImage = getSharedProductImageUrl(row)
     detailDrawer.groupSizeHeaders = getGroupSizeHeaders(row)
     detailDrawer.groupColorSizeSnapshot = buildGroupColorSizeSnapshot(row)
+    detailDrawer.groupColorImages = buildGroupColorImages(row)
     detailDrawer.stockId = detailRow.id
     detailDrawer.selectedColorName = isStockTableParentRow(row)
       ? null
@@ -184,8 +205,8 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   function openCreateDialog() {
     if (storedRows.value.length >= 1) {
       const seed = storedRows.value[0]
-      // Include colorImages so the matrix can show per-color images
-      const colorImages = Array.isArray(seed.colorImages) ? seed.colorImages : []
+      // 使用整组聚合后的颜色图片，避免某些颜色因属于其他子条目而无图
+      const colorImages = buildGroupColorImages(seed)
       createSeed.value = {
         ...seed,
         sizeBreakdown: buildGroupColorSizeSnapshot(seed) ?? seed.sizeBreakdown,
