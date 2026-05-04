@@ -29,10 +29,6 @@
                   </template>
                 </el-input>
               </div>
-              <div class="detail-basic-label">备注</div>
-              <div class="detail-basic-value">
-                <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
-              </div>
               <div class="detail-basic-label">部门</div>
               <div class="detail-basic-value">
                 <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small">
@@ -75,6 +71,10 @@
               <div class="detail-basic-label">存放地址</div>
               <div class="detail-basic-value">
                 <el-input v-model="createForm.location" placeholder="存放地址（默认值）" clearable size="small" />
+              </div>
+              <div class="detail-basic-label">备注</div>
+              <div class="detail-basic-value detail-basic-value-span-3">
+                <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
               </div>
             </div>
             <div class="detail-product-image-panel">

@@ -7,6 +7,7 @@ import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-ad
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
+import { OrderCutting } from '../entities/order-cutting.entity';
 import { Product } from '../entities/product.entity';
 import { Employee } from '../entities/employee.entity';
 import { User } from '../entities/user.entity';
@@ -34,6 +35,7 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
       InboundPending,
       Order,
       OrderExt,
+      OrderCutting,
       Product,
       Employee,
       User,
