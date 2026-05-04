@@ -19,6 +19,7 @@
       <el-table
         :data="sizeRows"
         :row-key="(row) => row._key"
+        :max-height="tableMaxHeight"
         border
         size="small"
         class="create-size-table detail-color-size-table"
@@ -213,6 +214,12 @@ const unitPrice = defineModel<string>('unitPrice', { required: true })
 function hasAnyOverride(field: FinishedCreateRowMetaField): boolean {
   return (sizeRows.value ?? []).some((row) => row._overrides[field])
 }
+
+/**
+ * 表格自身固定最大高度，让水平滚动条始终位于本区域底部可见。
+ * 避免因外层 dialog body 滚动后，表格底部水平滚动条被推到视口外。
+ */
+const tableMaxHeight = 360
 </script>
 
 <style scoped>
@@ -247,6 +254,19 @@ function hasAnyOverride(field: FinishedCreateRowMetaField): boolean {
 :deep(.create-size-table .el-input-number) { width: 100%; }
 :deep(.create-size-table .el-input) { width: 100%; }
 :deep(.create-size-table .el-select) { width: 100%; }
+
+/* 水平滚动条始终可见，便于用户感知右侧还有列（部门/库存类型/仓库/存放地址等） */
+:deep(.create-size-table .el-scrollbar__bar) {
+  opacity: 1 !important;
+}
+:deep(.create-size-table .el-scrollbar__bar.is-horizontal) {
+  height: 8px;
+  display: block !important;
+}
+:deep(.create-size-table .el-scrollbar__thumb) {
+  background: var(--el-border-color-darker);
+  opacity: 0.7;
+}
 /* 已脱钩的行字段：橙色边框示意 */
 :deep(.row-override .el-input__wrapper),
 :deep(.row-override .el-select__wrapper) {

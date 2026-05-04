@@ -21,17 +21,6 @@
           <div class="detail-section-title">基础信息与产品图</div>
           <div class="detail-basic-main">
             <div class="detail-basic-grid">
-              <div class="detail-basic-label">订单号</div>
-              <div class="detail-basic-value">
-                <el-input
-                  v-model="createForm.orderNo"
-                  placeholder="选填，不填则不关联订单"
-                  clearable
-                  size="small"
-                  :disabled="Boolean(quickAddSource)"
-                  @blur="onOrderNoBlur"
-                />
-              </div>
               <div class="detail-basic-label">SKU</div>
               <div class="detail-basic-value">
                 <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small" :disabled="Boolean(quickAddSource)">
@@ -39,6 +28,10 @@
                     <el-button v-if="!quickAddSource" link type="primary" size="small" @click.stop="openCreateSkuDialog">选择</el-button>
                   </template>
                 </el-input>
+              </div>
+              <div class="detail-basic-label">备注</div>
+              <div class="detail-basic-value">
+                <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
               </div>
               <div class="detail-basic-label">部门</div>
               <div class="detail-basic-value">
@@ -82,10 +75,6 @@
               <div class="detail-basic-label">存放地址</div>
               <div class="detail-basic-value">
                 <el-input v-model="createForm.location" placeholder="存放地址（默认值）" clearable size="small" />
-              </div>
-              <div class="detail-basic-label">备注</div>
-              <div class="detail-basic-value detail-basic-value-span-3">
-                <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
               </div>
             </div>
             <div class="detail-product-image-panel">
@@ -200,7 +189,6 @@ const {
   openCreateSkuDialog,
   onSkuSelected,
   resetCreateForm,
-  onOrderNoBlur,
   submitCreate,
   setRowMetaField,
   applyBasicInfoToAllRows,
