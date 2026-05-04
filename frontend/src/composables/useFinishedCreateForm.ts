@@ -1,4 +1,4 @@
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
 import { ElMessage, type FormInstance } from 'element-plus'
 import { createFinishedStock } from '@/api/inventory'
 import { getOrderColorSizeBreakdown } from '@/api/orders'
@@ -17,8 +17,14 @@ import {
   resolveFinishedCreateOrder,
   sumCreateSizeQuantities,
   type FinishedCreateQuickAddSource,
+  type FinishedCreateRowMetaField,
+  type FinishedCreateSizeRow,
 } from '@/composables/finishedCreateFormHelpers'
-export type { FinishedCreateQuickAddSource, FinishedCreateSizeRow } from '@/composables/finishedCreateFormHelpers'
+export type {
+  FinishedCreateQuickAddSource,
+  FinishedCreateSizeRow,
+  FinishedCreateRowMetaField,
+} from '@/composables/finishedCreateFormHelpers'
 
 let _localRowKey = 0
 const nextLocalKey = () => `cr-local-${Date.now()}-${++_localRowKey}`
@@ -33,7 +39,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   const createSkuKeyword = ref('')
   const createSkuProducts = ref<ProductItem[]>([])
   const createSizeHeaders = ref<string[]>([...DEFAULT_CREATE_SIZE_HEADERS])
-  const createSizeRows = ref([createDefaultSizeRow()])
+  const createSizeRows = ref<FinishedCreateSizeRow[]>([createDefaultSizeRow()])
   const quickAddSource = ref<FinishedCreateQuickAddSource | null>(null)
 
   const createForm = reactive({
@@ -48,6 +54,9 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     imageUrl: '',
     remark: '',
   })
+
+  /** 同步基础信息→行字段时设置，避免 watch 误判用户主动改动而标记为 override */
+  let suppressAutoOverride = false
 
   const createRules = createFinishedCreateRules()
 
@@ -94,18 +103,31 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   }
 
   function addCreateColorRow() {
+    // 新行直接继承当前基础信息（默认状态，未脱钩）
     createSizeRows.value.push({
       _key: nextLocalKey(),
       colorName: '',
       imageUrl: '',
       quantities: Array(createSizeHeaders.value.length).fill(0),
+      department: createForm.department,
+      inventoryTypeId: createForm.inventoryTypeId,
+      warehouseId: createForm.warehouseId,
+      location: createForm.location,
+      _overrides: { department: false, inventoryTypeId: false, warehouseId: false, location: false },
     })
   }
 
   function removeCreateColorRow(index: number) {
     createSizeRows.value.splice(index, 1)
     if (createSizeRows.value.length) return
-    createSizeRows.value.push(createDefaultSizeRow())
+    createSizeRows.value.push(
+      createDefaultSizeRow({
+        department: createForm.department,
+        inventoryTypeId: createForm.inventoryTypeId,
+        warehouseId: createForm.warehouseId,
+        location: createForm.location,
+      }),
+    )
   }
 
   function removeCreateSizeColumn(index: number) {
@@ -113,6 +135,58 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     createSizeHeaders.value.splice(index, 1)
     normalizeCreateSizeRows()
   }
+
+  /**
+   * 行级元数据修改：标记该字段为"已脱钩"，后续基础信息变化不再覆盖
+   */
+  function setRowMetaField<K extends FinishedCreateRowMetaField>(
+    rowKey: string,
+    field: K,
+    value: FinishedCreateSizeRow[K],
+  ) {
+    const row = createSizeRows.value.find((r) => r._key === rowKey)
+    if (!row) return
+    ;(row as FinishedCreateSizeRow)[field] = value
+    if (!suppressAutoOverride) row._overrides[field] = true
+  }
+
+  /**
+   * 把基础信息强制应用到所有行（清除所有行的脱钩标记）。
+   * 用于"应用基础信息到所有行"按钮。
+   */
+  function applyBasicInfoToAllRows() {
+    suppressAutoOverride = true
+    try {
+      createSizeRows.value.forEach((row) => {
+        row.department = createForm.department
+        row.inventoryTypeId = createForm.inventoryTypeId
+        row.warehouseId = createForm.warehouseId
+        row.location = createForm.location
+        row._overrides = { department: false, inventoryTypeId: false, warehouseId: false, location: false }
+      })
+    } finally {
+      suppressAutoOverride = false
+    }
+    ElMessage.success('已应用到所有行')
+  }
+
+  // 基础信息变化 → 同步到所有未脱钩行
+  watch(
+    () => [createForm.department, createForm.inventoryTypeId, createForm.warehouseId, createForm.location] as const,
+    ([dept, invType, wh, loc]) => {
+      suppressAutoOverride = true
+      try {
+        createSizeRows.value.forEach((row) => {
+          if (!row._overrides.department) row.department = dept
+          if (!row._overrides.inventoryTypeId) row.inventoryTypeId = invType
+          if (!row._overrides.warehouseId) row.warehouseId = wh
+          if (!row._overrides.location) row.location = loc
+        })
+      } finally {
+        suppressAutoOverride = false
+      }
+    },
+  )
 
   async function loadCreateSkuProducts() {
     createSkuDialogLoading.value = true
@@ -138,36 +212,46 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   }
 
   function applyQuickAddSource(source: FinishedCreateQuickAddSource) {
-    createForm.orderNo = String(source.orderNo ?? '')
-    createForm.skuCode = String(source.skuCode ?? '')
-    createForm.unitPrice = source.unitPrice != null ? String(source.unitPrice) : ''
-    createForm.warehouseId = source.warehouseId ?? null
-    createForm.inventoryTypeId = source.inventoryTypeId ?? null
-    createForm.department = String(source.department ?? '')
-    createForm.location = String(source.location ?? '')
-    createForm.imageUrl = String(source.imageUrl || source.productImageUrl || '')
-    const matrix = buildQuickAddSizeMatrix(source)
-    createSizeHeaders.value = matrix.headers
-    createSizeRows.value = matrix.rows
-    normalizeCreateSizeRows()
+    suppressAutoOverride = true
+    try {
+      createForm.orderNo = String(source.orderNo ?? '')
+      createForm.skuCode = String(source.skuCode ?? '')
+      createForm.unitPrice = source.unitPrice != null ? String(source.unitPrice) : ''
+      createForm.warehouseId = source.warehouseId ?? null
+      createForm.inventoryTypeId = source.inventoryTypeId ?? null
+      createForm.department = String(source.department ?? '')
+      createForm.location = String(source.location ?? '')
+      createForm.imageUrl = String(source.imageUrl || source.productImageUrl || '')
+      const matrix = buildQuickAddSizeMatrix(source)
+      createSizeHeaders.value = matrix.headers
+      createSizeRows.value = matrix.rows
+      normalizeCreateSizeRows()
+    } finally {
+      suppressAutoOverride = false
+    }
   }
 
   function resetCreateForm(source: FinishedCreateQuickAddSource | null = null) {
-    quickAddSource.value = source
-    Object.assign(createForm, {
-      orderNo: '',
-      skuCode: '',
-      quantity: 1,
-      unitPrice: '',
-      warehouseId: null,
-      inventoryTypeId: null,
-      department: '',
-      location: '',
-      imageUrl: '',
-      remark: '',
-    })
-    createSizeHeaders.value = [...DEFAULT_CREATE_SIZE_HEADERS]
-    createSizeRows.value = [createDefaultSizeRow()]
+    suppressAutoOverride = true
+    try {
+      quickAddSource.value = source
+      Object.assign(createForm, {
+        orderNo: '',
+        skuCode: '',
+        quantity: 1,
+        unitPrice: '',
+        warehouseId: null,
+        inventoryTypeId: null,
+        department: '',
+        location: '',
+        imageUrl: '',
+        remark: '',
+      })
+      createSizeHeaders.value = [...DEFAULT_CREATE_SIZE_HEADERS]
+      createSizeRows.value = [createDefaultSizeRow()]
+    } finally {
+      suppressAutoOverride = false
+    }
     if (source) applyQuickAddSource(source)
     createFormRef.value?.clearValidate()
   }
@@ -191,17 +275,71 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
       const sortedHeaders = sortSizeHeaders(headers)
       const rows = Array.isArray(data?.rows) ? data.rows : []
       if (!sortedHeaders.length || !rows.length) return
-      createSizeHeaders.value = sortedHeaders
-      createSizeRows.value = rows.map((row) => ({
-        _key: nextLocalKey(),
-        colorName: String(row.colorName ?? '').trim(),
-        imageUrl: '',
-        quantities: remapCreateQuantities(headers, row.values ?? [], sortedHeaders),
-      }))
-      normalizeCreateSizeRows()
+      suppressAutoOverride = true
+      try {
+        createSizeHeaders.value = sortedHeaders
+        createSizeRows.value = rows.map((row) => ({
+          _key: nextLocalKey(),
+          colorName: String(row.colorName ?? '').trim(),
+          imageUrl: '',
+          quantities: remapCreateQuantities(headers, row.values ?? [], sortedHeaders),
+          department: createForm.department,
+          inventoryTypeId: createForm.inventoryTypeId,
+          warehouseId: createForm.warehouseId,
+          location: createForm.location,
+          _overrides: { department: false, inventoryTypeId: false, warehouseId: false, location: false },
+        }))
+        normalizeCreateSizeRows()
+      } finally {
+        suppressAutoOverride = false
+      }
     } catch {
       // 按需自动带出，不阻断用户手工录入
     }
+  }
+
+  /** 按 (warehouseId, department, inventoryTypeId, location) 分组提交，每组 1 次 createFinishedStock */
+  function buildSubmitGroups() {
+    type Group = {
+      warehouseId: number | null
+      inventoryTypeId: number | null
+      department: string
+      location: string
+      rows: FinishedCreateSizeRow[]
+    }
+    const groups = new Map<string, Group>()
+    for (const row of createSizeRows.value) {
+      const total = sumDetailRowQty(row.quantities)
+      if (total <= 0) continue
+      const key = [
+        row.warehouseId ?? 'null',
+        String(row.department ?? '').trim(),
+        row.inventoryTypeId ?? 'null',
+        String(row.location ?? '').trim(),
+      ].join('|')
+      let g = groups.get(key)
+      if (!g) {
+        g = {
+          warehouseId: row.warehouseId,
+          inventoryTypeId: row.inventoryTypeId,
+          department: String(row.department ?? '').trim(),
+          location: String(row.location ?? '').trim(),
+          rows: [],
+        }
+        groups.set(key, g)
+      }
+      g.rows.push(row)
+    }
+    return Array.from(groups.values())
+  }
+
+  function validateGroups(groups: ReturnType<typeof buildSubmitGroups>): string {
+    for (const g of groups) {
+      if (g.warehouseId == null) return '请为所有有数量的行选择仓库'
+      if (!g.department) return '请为所有有数量的行选择部门'
+      if (!g.location) return '请为所有有数量的行填写存放地址'
+    }
+    return ''
   }
 
   async function submitCreate() {
@@ -217,35 +355,48 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
       ElMessage.warning('请填写尺码对应的数量')
       return
     }
+    const groups = buildSubmitGroups()
+    const validateError = validateGroups(groups)
+    if (validateError) {
+      ElMessage.warning(validateError)
+      return
+    }
     createForm.quantity = totalQty
     createSubmitting.value = true
     try {
       const submittedHeaders = sortSizeHeaders(createSizeHeaders.value)
-      await createFinishedStock({
-        orderNo: createForm.orderNo?.trim() || undefined,
-        skuCode,
-        quantity: createForm.quantity,
-        unitPrice: createForm.unitPrice?.trim() || undefined,
-        warehouseId: createForm.warehouseId,
-        inventoryTypeId: createForm.inventoryTypeId ?? undefined,
-        department: createForm.department,
-        location: createForm.location,
-        imageUrl: createForm.imageUrl || undefined,
-        remark: createForm.remark?.trim() || undefined,
-        colorSize: {
-          headers: submittedHeaders,
-          rows: createSizeRows.value.map((row) => ({
-            colorName: row.colorName,
-            imageUrl: row.imageUrl,
-            quantities: remapCreateQuantities(
-              createSizeHeaders.value,
-              row.quantities,
-              submittedHeaders,
-            ).map((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0))),
-          })),
-        },
-      })
-      ElMessage.success('新增库存成功')
+      let succeeded = 0
+      for (const g of groups) {
+        const groupQty = g.rows.reduce((sum, r) => sum + sumDetailRowQty(r.quantities), 0)
+        await createFinishedStock({
+          orderNo: createForm.orderNo?.trim() || undefined,
+          skuCode,
+          quantity: groupQty,
+          unitPrice: createForm.unitPrice?.trim() || undefined,
+          warehouseId: g.warehouseId,
+          inventoryTypeId: g.inventoryTypeId ?? undefined,
+          department: g.department,
+          location: g.location,
+          imageUrl: createForm.imageUrl || undefined,
+          remark: createForm.remark?.trim() || undefined,
+          colorSize: {
+            headers: submittedHeaders,
+            rows: g.rows.map((row) => ({
+              colorName: row.colorName,
+              imageUrl: row.imageUrl,
+              quantities: remapCreateQuantities(
+                createSizeHeaders.value,
+                row.quantities,
+                submittedHeaders,
+              ).map((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0))),
+            })),
+          },
+        })
+        succeeded += 1
+      }
+      ElMessage.success(
+        succeeded > 1 ? `已按仓库/部门拆分为 ${succeeded} 条库存记录` : '新增库存成功',
+      )
       onClose()
       onCreated()
     } catch (e: unknown) {
@@ -279,5 +430,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     resetCreateForm,
     onOrderNoBlur,
     submitCreate,
+    setRowMetaField,
+    applyBasicInfoToAllRows,
   }
 }

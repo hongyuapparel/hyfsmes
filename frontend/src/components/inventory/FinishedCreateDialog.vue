@@ -42,7 +42,7 @@
               </div>
               <div class="detail-basic-label">部门</div>
               <div class="detail-basic-value">
-                <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small" :disabled="Boolean(quickAddSource)">
+                <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small">
                   <el-option
                     v-for="opt in departmentOptions"
                     :key="opt.value"
@@ -59,7 +59,6 @@
                   filterable
                   clearable
                   size="small"
-                  :disabled="Boolean(quickAddSource)"
                 >
                   <el-option
                     v-for="opt in inventoryTypeOptions"
@@ -71,7 +70,7 @@
               </div>
               <div class="detail-basic-label">仓库</div>
               <div class="detail-basic-value">
-                <el-select v-model="createForm.warehouseId" placeholder="请选择仓库" filterable clearable size="small" :disabled="Boolean(quickAddSource)">
+                <el-select v-model="createForm.warehouseId" placeholder="请选择仓库" filterable clearable size="small">
                   <el-option
                     v-for="opt in warehouseOptions"
                     :key="opt.id"
@@ -79,6 +78,10 @@
                     :value="opt.id"
                   />
                 </el-select>
+              </div>
+              <div class="detail-basic-label">存放地址</div>
+              <div class="detail-basic-value">
+                <el-input v-model="createForm.location" placeholder="存放地址（默认值）" clearable size="small" />
               </div>
               <div class="detail-basic-label">备注</div>
               <div class="detail-basic-value detail-basic-value-span-3">
@@ -96,15 +99,19 @@
           v-model:size-headers="createSizeHeaders"
           v-model:size-rows="createSizeRows"
           v-model:unit-price="createForm.unitPrice"
-          v-model:location="createForm.location"
           :summary-method="getCreateColorSizeSummary"
           :sum-detail-row-qty="sumDetailRowQty"
           :create-row-total-price="createRowTotalPrice"
           :structure-readonly="Boolean(quickAddSource)"
+          :warehouse-options="warehouseOptions"
+          :inventory-type-options="inventoryTypeOptions"
+          :department-options="departmentOptions"
           @add-color-row="addCreateColorRow"
           @add-size-column="addCreateSizeColumn"
           @remove-color-row="removeCreateColorRow"
           @remove-size-column="removeCreateSizeColumn"
+          @apply-basic-info-to-all-rows="applyBasicInfoToAllRows"
+          @row-meta-change="onRowMetaChange"
         />
       </div>
     </el-form>
@@ -195,10 +202,17 @@ const {
   resetCreateForm,
   onOrderNoBlur,
   submitCreate,
+  setRowMetaField,
+  applyBasicInfoToAllRows,
 } = useFinishedCreateForm(
   () => emit('created'),
   () => emit('update:modelValue', false),
 )
+
+// 转发行级元数据修改：FinishedCreateRowMetaField 在 useFinishedCreateForm 中定义
+function onRowMetaChange(rowKey: string, field: 'department' | 'inventoryTypeId' | 'warehouseId' | 'location', value: string | number | null) {
+  setRowMetaField(rowKey, field, value as never)
+}
 
 function onDialogVisibleChange(value: boolean) {
   emit('update:modelValue', value)

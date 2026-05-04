@@ -207,8 +207,12 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
       const seed = storedRows.value[0]
       // 使用整组聚合后的颜色图片，避免某些颜色因属于其他子条目而无图
       const colorImages = buildGroupColorImages(seed)
+      // 产品图沿用表格里 _effectiveImageUrl 已生效的 URL（避免单条目 imageUrl 为空导致主图 FAILED）
+      const sharedImage = getSharedProductImageUrl(seed)
       createSeed.value = {
         ...seed,
+        imageUrl: sharedImage || seed.imageUrl || '',
+        productImageUrl: sharedImage || seed.productImageUrl || '',
         sizeBreakdown: buildGroupColorSizeSnapshot(seed) ?? seed.sizeBreakdown,
         colorImages,
       }

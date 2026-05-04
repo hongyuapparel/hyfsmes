@@ -2,10 +2,18 @@
   <div class="detail-section">
     <div class="detail-section-head">
       <div class="detail-section-title">颜色图片与码数明细</div>
-      <div v-if="!structureReadonly" class="detail-head-actions">
-        <el-button type="primary" link size="small" @click="emit('addColorRow')">+ 新增颜色</el-button>
-        <el-button type="primary" link size="small" @click="emit('addSizeColumn')">+ 新增尺码列</el-button>
+      <div class="detail-head-actions">
+        <template v-if="!structureReadonly">
+          <el-button type="primary" link size="small" @click="emit('addColorRow')">+ 新增颜色</el-button>
+          <el-button type="primary" link size="small" @click="emit('addSizeColumn')">+ 新增尺码列</el-button>
+        </template>
+        <el-button type="success" link size="small" @click="emit('applyBasicInfoToAllRows')">
+          ↓ 应用基础信息到所有行
+        </el-button>
       </div>
+    </div>
+    <div class="detail-section-tip">
+      默认每行继承上方"基础信息"中的部门 / 库存类型 / 仓库 / 存放地址；只在该行单独修改后，基础信息变化才不再覆盖该行。
     </div>
     <div class="create-size-table-wrap">
       <el-table
@@ -79,15 +87,74 @@
         <el-table-column label="总价" width="120" align="center" header-align="center">
           <template #default="{ row }">{{ createRowTotalPrice(row.quantities) }}</template>
         </el-table-column>
+
+        <el-table-column label="部门" width="120" align="center" header-align="center">
+          <template #header>
+            <span :class="{ 'col-header-overridden': hasAnyOverride('department') }">部门</span>
+          </template>
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.department"
+              filterable
+              clearable
+              size="small"
+              :placeholder="row._overrides.department ? '已自定义' : '继承基础信息'"
+              :class="{ 'row-override': row._overrides.department }"
+              @update:model-value="(v) => emit('rowMetaChange', row._key, 'department', String(v ?? ''))"
+            >
+              <el-option v-for="opt in departmentOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="库存类型" width="120" align="center" header-align="center">
+          <template #header>
+            <span :class="{ 'col-header-overridden': hasAnyOverride('inventoryTypeId') }">库存类型</span>
+          </template>
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.inventoryTypeId"
+              filterable
+              clearable
+              size="small"
+              :placeholder="row._overrides.inventoryTypeId ? '已自定义' : '继承基础信息'"
+              :class="{ 'row-override': row._overrides.inventoryTypeId }"
+              @update:model-value="(v) => emit('rowMetaChange', row._key, 'inventoryTypeId', (v as number | null) ?? null)"
+            >
+              <el-option v-for="opt in inventoryTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
+            </el-select>
+          </template>
+        </el-table-column>
+        <el-table-column label="仓库" width="120" align="center" header-align="center">
+          <template #header>
+            <span :class="{ 'col-header-overridden': hasAnyOverride('warehouseId') }">仓库</span>
+          </template>
+          <template #default="{ row }">
+            <el-select
+              :model-value="row.warehouseId"
+              filterable
+              clearable
+              size="small"
+              :placeholder="row._overrides.warehouseId ? '已自定义' : '继承基础信息'"
+              :class="{ 'row-override': row._overrides.warehouseId }"
+              @update:model-value="(v) => emit('rowMetaChange', row._key, 'warehouseId', (v as number | null) ?? null)"
+            >
+              <el-option v-for="opt in warehouseOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
+            </el-select>
+          </template>
+        </el-table-column>
         <el-table-column label="存放地址" width="150" align="center" header-align="center">
-          <template #default>
+          <template #header>
+            <span :class="{ 'col-header-overridden': hasAnyOverride('location') }">存放地址</span>
+          </template>
+          <template #default="{ row }">
             <el-input
-              v-model="location"
-              placeholder="请输入具体存放地址"
+              :model-value="row.location"
+              :placeholder="row._overrides.location ? '已自定义' : '继承基础信息'"
               clearable
               size="small"
               style="width: 100%"
-              :disabled="structureReadonly"
+              :class="{ 'row-override': row._overrides.location }"
+              @update:model-value="(v) => emit('rowMetaChange', row._key, 'location', String(v ?? ''))"
             />
           </template>
         </el-table-column>
@@ -113,7 +180,10 @@
 <script setup lang="ts">
 import { Close, Delete } from '@element-plus/icons-vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
-import type { FinishedCreateSizeRow } from '@/composables/useFinishedCreateForm'
+import type {
+  FinishedCreateSizeRow,
+  FinishedCreateRowMetaField,
+} from '@/composables/useFinishedCreateForm'
 
 type SummaryMethod = (params: { columns: Array<{ label?: string }> }) => string[]
 
@@ -122,6 +192,9 @@ defineProps<{
   sumDetailRowQty: (quantities: unknown[]) => number
   createRowTotalPrice: (quantities: unknown[]) => string
   structureReadonly?: boolean
+  warehouseOptions: Array<{ id: number; label: string }>
+  inventoryTypeOptions: Array<{ id: number; label: string }>
+  departmentOptions: Array<{ value: string; label: string }>
 }>()
 
 const emit = defineEmits<{
@@ -129,12 +202,17 @@ const emit = defineEmits<{
   (e: 'addSizeColumn'): void
   (e: 'removeColorRow', index: number): void
   (e: 'removeSizeColumn', index: number): void
+  (e: 'applyBasicInfoToAllRows'): void
+  (e: 'rowMetaChange', rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null): void
 }>()
 
 const sizeHeaders = defineModel<string[]>('sizeHeaders', { required: true })
 const sizeRows = defineModel<FinishedCreateSizeRow[]>('sizeRows', { required: true })
 const unitPrice = defineModel<string>('unitPrice', { required: true })
-const location = defineModel<string>('location', { required: true })
+
+function hasAnyOverride(field: FinishedCreateRowMetaField): boolean {
+  return (sizeRows.value ?? []).some((row) => row._overrides[field])
+}
 </script>
 
 <style scoped>
@@ -154,6 +232,8 @@ const location = defineModel<string>('location', { required: true })
 .detail-section-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--el-text-color-primary); }
 .detail-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .detail-head-actions { display: flex; align-items: center; gap: 6px; }
+.detail-section-tip { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 8px; line-height: 1.5; }
+.col-header-overridden { color: var(--el-color-warning); }
 
 /* 单元格内容上下左右居中 */
 :deep(.create-size-table .el-table__cell) { vertical-align: middle; }
@@ -166,4 +246,10 @@ const location = defineModel<string>('location', { required: true })
 }
 :deep(.create-size-table .el-input-number) { width: 100%; }
 :deep(.create-size-table .el-input) { width: 100%; }
+:deep(.create-size-table .el-select) { width: 100%; }
+/* 已脱钩的行字段：橙色边框示意 */
+:deep(.row-override .el-input__wrapper),
+:deep(.row-override .el-select__wrapper) {
+  box-shadow: 0 0 0 1px var(--el-color-warning) inset !important;
+}
 </style>

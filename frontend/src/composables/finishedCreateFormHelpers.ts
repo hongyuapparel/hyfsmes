@@ -6,11 +6,24 @@ import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/
 
 export const DEFAULT_CREATE_SIZE_HEADERS = ['XXS', 'XS', 'S', 'M', 'L', 'XL', '2XL'] as const
 
+export type FinishedCreateRowMetaField = 'department' | 'inventoryTypeId' | 'warehouseId' | 'location'
+
 export type FinishedCreateSizeRow = {
   _key: string
   colorName: string
   imageUrl: string
   quantities: Array<number | null>
+  // 行级元数据（默认继承基础信息，单独修改后即"脱钩"，不再被基础信息覆盖）
+  department: string
+  inventoryTypeId: number | null
+  warehouseId: number | null
+  location: string
+  _overrides: {
+    department: boolean
+    inventoryTypeId: boolean
+    warehouseId: boolean
+    location: boolean
+  }
 }
 
 export type FinishedCreateQuickAddSource = {
@@ -37,11 +50,27 @@ function nextRowKey(): string {
   return `cr-${Date.now()}-${++_rowKeyCounter}`
 }
 
-export const createDefaultSizeRow = (): FinishedCreateSizeRow => ({
+export type FinishedCreateRowDefaults = {
+  department?: string
+  inventoryTypeId?: number | null
+  warehouseId?: number | null
+  location?: string
+}
+
+function buildEmptyOverrides(): FinishedCreateSizeRow['_overrides'] {
+  return { department: false, inventoryTypeId: false, warehouseId: false, location: false }
+}
+
+export const createDefaultSizeRow = (defaults: FinishedCreateRowDefaults = {}): FinishedCreateSizeRow => ({
   _key: nextRowKey(),
   colorName: '默认',
   imageUrl: '',
   quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0),
+  department: defaults.department ?? '',
+  inventoryTypeId: defaults.inventoryTypeId ?? null,
+  warehouseId: defaults.warehouseId ?? null,
+  location: defaults.location ?? '',
+  _overrides: buildEmptyOverrides(),
 })
 
 export function sumCreateSizeQuantities(quantities: unknown[]): number {
@@ -90,6 +119,13 @@ export function buildQuickAddSizeMatrix(source: FinishedCreateQuickAddSource): {
     })
   }
 
+  const rowDefaults: FinishedCreateRowDefaults = {
+    department: String(source.department ?? ''),
+    inventoryTypeId: source.inventoryTypeId ?? null,
+    warehouseId: source.warehouseId ?? null,
+    location: String(source.location ?? ''),
+  }
+
   if (sortedHeaders.length > 0 && rows.length > 0) {
     return {
       headers: sortedHeaders,
@@ -101,6 +137,11 @@ export function buildQuickAddSizeMatrix(source: FinishedCreateQuickAddSource): {
           imageUrl: colorImageLookup.get(colorName) || '',
           // Use 0 (not null) so el-input-number renders as empty input cleanly
           quantities: sortedHeaders.map(() => 0),
+          department: rowDefaults.department ?? '',
+          inventoryTypeId: rowDefaults.inventoryTypeId ?? null,
+          warehouseId: rowDefaults.warehouseId ?? null,
+          location: rowDefaults.location ?? '',
+          _overrides: buildEmptyOverrides(),
         }
       }),
     }
@@ -109,7 +150,19 @@ export function buildQuickAddSizeMatrix(source: FinishedCreateQuickAddSource): {
   const colorName = String(source._selectedColorName || source._displayColor || '默认').trim() || '默认'
   return {
     headers: [...DEFAULT_CREATE_SIZE_HEADERS],
-    rows: [{ _key: nextRowKey(), colorName, imageUrl: colorImageLookup.get(colorName) || '', quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0) }],
+    rows: [
+      {
+        _key: nextRowKey(),
+        colorName,
+        imageUrl: colorImageLookup.get(colorName) || '',
+        quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0),
+        department: rowDefaults.department ?? '',
+        inventoryTypeId: rowDefaults.inventoryTypeId ?? null,
+        warehouseId: rowDefaults.warehouseId ?? null,
+        location: rowDefaults.location ?? '',
+        _overrides: buildEmptyOverrides(),
+      },
+    ],
   }
 }
 
