@@ -8,6 +8,7 @@ import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
+import { OrderFinishing } from '../entities/order-finishing.entity';
 import { Product } from '../entities/product.entity';
 import { Employee } from '../entities/employee.entity';
 import { User } from '../entities/user.entity';
@@ -36,6 +37,7 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
       Order,
       OrderExt,
       OrderCutting,
+      OrderFinishing,
       Product,
       Employee,
       User,

@@ -78,6 +78,33 @@ async function ensureSupplierRemarkColumn(dataSource: DataSource) {
   console.log('[Schema] Added suppliers.remark');
 }
 
+/**
+ * 确保 order_finishing 三个尺码明细列存在。
+ * 这些列存的是「尾部登记入库时按尺码分配的数量」，是反推成品库存尺码分布
+ * 的最权威数据源。缺列会导致前端填的尺码 silently 丢失，反推时只能按订单
+ * 计划比例（不准），引发 XXL=27 vs 实际 55 这类 bug。
+ */
+async function ensureOrderFinishingQtyRowColumns(dataSource: DataSource) {
+  const cols: Array<{ name: string; ddl: string }> = [
+    { name: 'tail_received_qty_row', ddl: 'JSON NULL AFTER tail_received_qty' },
+    { name: 'tail_inbound_qty_row', ddl: 'JSON NULL AFTER tail_inbound_qty' },
+    { name: 'defect_quantity_row', ddl: 'JSON NULL AFTER defect_quantity' },
+  ];
+  for (const col of cols) {
+    const rows: Array<{ cnt: number }> = await dataSource.query(
+      `SELECT COUNT(*) AS cnt
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'order_finishing'
+         AND COLUMN_NAME = ?`,
+      [col.name],
+    );
+    if (Number(rows?.[0]?.cnt ?? 0) > 0) continue;
+    await dataSource.query(`ALTER TABLE order_finishing ADD COLUMN ${col.name} ${col.ddl}`);
+    console.log(`[Schema] Added order_finishing.${col.name}`);
+  }
+}
+
 async function ensureInventoryOperationLogTables(dataSource: DataSource) {
   await dataSource.query(`
     CREATE TABLE IF NOT EXISTS inventory_accessory_operation_log (
@@ -146,6 +173,7 @@ async function bootstrap() {
     await dropSupplierCooperationDateColumn(dataSource);
     await ensureSupplierRemarkColumn(dataSource);
     await ensureInventoryOperationLogTables(dataSource);
+    await ensureOrderFinishingQtyRowColumns(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);

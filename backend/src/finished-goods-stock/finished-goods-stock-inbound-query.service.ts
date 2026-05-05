@@ -5,6 +5,7 @@ import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
+import { OrderFinishing } from '../entities/order-finishing.entity';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
@@ -19,7 +20,42 @@ export class FinishedGoodsStockInboundQueryService {
     private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(OrderCutting)
     private readonly orderCuttingRepo: Repository<OrderCutting>,
+    @InjectRepository(OrderFinishing)
+    private readonly orderFinishingRepo: Repository<OrderFinishing>,
   ) {}
+
+  /**
+   * 读 order_finishing.tail_inbound_qty_row（实体上 select=false，要原生 SQL 取）。
+   * 格式：[size1, size2, ..., sizeN, total]，最后一项是合计，剥掉。
+   * 仅当尺码数量与 expectedHeaderLength 匹配时才返回，避免 schema 不一致时误用。
+   */
+  private async fetchTailInboundQtyRow(orderId: number, expectedHeaderLength: number): Promise<number[] | null> {
+    if (orderId == null || expectedHeaderLength <= 0) return null;
+    try {
+      const rows = await this.orderFinishingRepo.query(
+        'SELECT tail_inbound_qty_row AS rowJson FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { rowJson?: unknown }).rowJson : null;
+      if (raw == null) return null;
+      let parsed: unknown = raw;
+      if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw); } catch { return null; }
+      }
+      if (!Array.isArray(parsed)) return null;
+      // 兼容两种历史格式：N+1（尾部为合计）或 N（无合计）
+      const candidates = parsed.length >= expectedHeaderLength + 1
+        ? parsed.slice(0, expectedHeaderLength)
+        : parsed.length === expectedHeaderLength
+          ? parsed
+          : null;
+      if (!candidates) return null;
+      const sizes = candidates.map((v) => Math.max(0, Math.trunc(Number(v) || 0)));
+      return sizes.some((v) => v > 0) ? sizes : null;
+    } catch {
+      return null;
+    }
+  }
 
   private snapshotRowTotal(row: { quantities: unknown[] }): number {
     return row.quantities.reduce<number>(
@@ -257,62 +293,80 @@ export class FinishedGoodsStockInboundQueryService {
   }
 
   /**
-   * 根据订单生成颜色尺码快照（用于 createManual 缺 colorSize 时的兜底）。
+   * 根据订单生成颜色尺码快照（用于 createManual 缺 colorSize 时的兜底反推）。
    *
-   * 来源优先级：
-   * 1) **裁床实际数量** OrderCutting.actualCutRows（真实生产数据，与实际入库尺码一致）
-   * 2) **订单计划数量** OrderExt.colorSizeRows（订单原始下单尺码）
+   * 来源优先级（从高到低）：
+   * 1. **OrderFinishing.tail_inbound_qty_row** — 尾部登记入库时强制录入的实际尺码。
+   *    这是与 InboundPending 配对的"真值"，用它反推能让待仓处理 → 成品库存的尺码
+   *    分布与尾部登记完全一致。**单色订单首选**。
+   * 2. **OrderCutting.actualCutRows** — 裁床实际数量。如果尾部尺码缺失但裁床有数据，
+   *    按裁床比例分配总数 quantity，仍接近真实生产分布。
+   * 3. **OrderExt.colorSizeRows** — 订单计划比例。最后兜底，与历史行为一致。
    *
-   * 历史 bug：原实现仅读取 OrderExt（计划），导致裁床数量 ≠ 计划数量时
-   * 入库的尺码明细按计划比例分配，与实际入库尺码不符。例如：
-   * - 订单计划 XXL=25，裁床实际 XXL=55，尾部入库 247 件
-   * - 旧逻辑按 1:2:3:2:1 计划比例 → XXL = 247×25/225 ≈ 27（错误）
-   * - 新逻辑按裁床 27:55:55:55:55 比例 → XXL = 247×55/247 = 55（正确）
+   * 历史 bug：原实现仅读取 OrderExt（订单计划），导致 计划比例 ≠ 实际生产 时
+   * 单尺码计算严重失真（用户报告：订单 XXL 计划 25 件 → 旧逻辑反推 27 件，
+   * 但裁床/尾部实际 55 件，出库 18 后剩 9 件而非 37 件）。
+   *
+   * 多色订单注意：tail_inbound_qty_row 没有颜色维度，故仅在 plan 仅一种颜色时使用；
+   * 多色订单仍按 OrderCutting / OrderExt 兜底（含颜色维度）。
    */
   async buildOrderColorSizeSnapshot(orderId: number | null, quantity: number): Promise<ColorSizeSnapshot | null> {
     if (orderId == null) return null;
 
-    // 1) 优先：裁床实际数量
-    const cutting = await this.orderCuttingRepo.findOne({ where: { orderId } });
-    const cuttingRows = Array.isArray(cutting?.actualCutRows) ? cutting!.actualCutRows : [];
-    if (cuttingRows.length) {
-      // 裁床的 headers 复用订单 OrderExt 的 headers（同一订单同一表头体系）
-      const ext = await this.orderExtRepo.findOne({ where: { orderId } });
-      const headers = Array.isArray(ext?.colorSizeHeaders)
-        ? ext!.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
-        : [];
-      // 检查裁床数据是否有非零项；全 0 / 缺失视为未登记
-      const hasCuttingQty = cuttingRows.some((row) =>
-        Array.isArray(row?.quantities) &&
-        row.quantities.some((q) => Math.max(0, Math.trunc(Number(q) || 0)) > 0),
-      );
-      if (headers.length && hasCuttingQty) {
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const headers = Array.isArray(ext?.colorSizeHeaders)
+      ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
+      : [];
+    if (!headers.length) {
+      // headers 缺失则无法构造快照（任何来源都需要 headers）
+      return null;
+    }
+    const planRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
+
+    // 1) 优先：尾部实际入库尺码（仅单色订单可直接使用）
+    if (planRows.length === 1) {
+      const tailRow = await this.fetchTailInboundQtyRow(orderId, headers.length);
+      if (tailRow) {
+        const colorName = String(planRows[0]?.colorName ?? '').trim();
         return {
           headers,
           rows: this.scaleColorSizeRowsToQuantity(
             headers,
-            cuttingRows.map((row) => ({
-              colorName: row?.colorName,
-              quantities: Array.isArray(row?.quantities) ? row.quantities : [],
-            })),
+            [{ colorName, quantities: tailRow }],
             quantity,
           ),
         };
       }
     }
 
-    // 2) 兜底：订单计划数量（保持向后兼容）
-    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
-    const headers = Array.isArray(ext?.colorSizeHeaders)
-      ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
-      : [];
-    const baseRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
-    if (!headers.length || !baseRows.length) return null;
+    // 2) 次选：裁床实际数量
+    const cutting = await this.orderCuttingRepo.findOne({ where: { orderId } });
+    const cuttingRows = Array.isArray(cutting?.actualCutRows) ? cutting.actualCutRows : [];
+    const hasCuttingQty = cuttingRows.some((row) =>
+      Array.isArray(row?.quantities) &&
+      row.quantities.some((q) => Math.max(0, Math.trunc(Number(q) || 0)) > 0),
+    );
+    if (hasCuttingQty) {
+      return {
+        headers,
+        rows: this.scaleColorSizeRowsToQuantity(
+          headers,
+          cuttingRows.map((row) => ({
+            colorName: row?.colorName,
+            quantities: Array.isArray(row?.quantities) ? row.quantities : [],
+          })),
+          quantity,
+        ),
+      };
+    }
+
+    // 3) 兜底：订单计划比例
+    if (!planRows.length) return null;
     return {
       headers,
       rows: this.scaleColorSizeRowsToQuantity(
         headers,
-        baseRows.map((row: { colorName?: string; quantities?: number[] }) => ({
+        planRows.map((row: { colorName?: string; quantities?: number[] }) => ({
           colorName: row?.colorName,
           quantities: Array.isArray(row?.quantities) ? row.quantities : [],
         })),
