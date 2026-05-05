@@ -187,7 +187,7 @@
       <el-table-column label="操作" width="88" align="center" header-align="center" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="row._rowKind === 'parent'"
+            v-if="shouldShowDetailAction(row)"
             link
             type="primary"
             size="small"
@@ -314,6 +314,13 @@ function getTableInventoryTypeText(row: StockTableRow): string {
 function getTableWarehouseText(row: StockTableRow): string {
   if (isStockTableParentRow(row) && row._mixedWarehouse) return '多个'
   return props.findWarehouseLabelById(row.warehouseId) || '-'
+}
+
+function shouldShowDetailAction(row: StockTableRow): boolean {
+  if (isStockTableParentRow(row)) return true
+  return !props.stockTableData.some(
+    (item) => isStockTableParentRow(item) && item._children.some((child) => child._uiKey === row._uiKey),
+  )
 }
 
 function handleHeaderDragEnd(...args: unknown[]) {
