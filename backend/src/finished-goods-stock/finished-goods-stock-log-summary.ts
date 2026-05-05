@@ -1,3 +1,5 @@
+import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
+
 type SnapshotRow = {
   colorName: string;
   quantities: number[];
@@ -36,8 +38,9 @@ function normalizeSnapshot(value: unknown): Snapshot | null {
   const raw = asRecord(value);
   const rawHeaders = Array.isArray(raw.headers) ? raw.headers : [];
   const headers = rawHeaders
-    .map((header) => normalizeText(header))
-    .filter((header) => header && header !== '__UNASSIGNED__' && header !== '合计');
+    .map(normalizeSizeHeader)
+    .filter(Boolean);
+  const sortedHeaders = sortSizeHeaders(headers);
   const rawRows = Array.isArray(raw.rows) ? raw.rows : [];
   if (!headers.length || !rawRows.length) return null;
 
@@ -51,19 +54,19 @@ function normalizeSnapshot(value: unknown): Snapshot | null {
           : [];
       return {
         colorName: normalizeText(row.colorName),
-        quantities: headers.map((_, index) => normalizeQuantity(rawQuantities[index])),
+        quantities: remapQuantitiesBySizeHeaders(headers, rawQuantities, sortedHeaders),
       };
     })
     .filter((row) => row.quantities.some((quantity) => quantity > 0));
 
-  return rows.length ? { headers, rows } : null;
+  return rows.length ? { headers: sortedHeaders, rows } : null;
 }
 
 function mergeHeaders(...snapshots: Array<Snapshot | null>): string[] {
   const headers: string[] = [];
   snapshots.forEach((snapshot) => {
     snapshot?.headers.forEach((header) => {
-      if (!headers.includes(header)) headers.push(header);
+      if (!headers.some((item) => getSizeHeaderKey(item) === getSizeHeaderKey(header))) headers.push(header);
     });
   });
   return headers;
@@ -72,9 +75,9 @@ function mergeHeaders(...snapshots: Array<Snapshot | null>): string[] {
 function remapValues(snapshot: Snapshot | null, colorName: string, headers: string[]): number[] {
   if (!snapshot) return headers.map(() => 0);
   const row = snapshot.rows.find((item) => item.colorName === colorName);
-  const indexMap = new Map(snapshot.headers.map((header, index) => [header, index]));
+  const indexMap = new Map(snapshot.headers.map((header, index) => [getSizeHeaderKey(header), index]));
   return headers.map((header) => {
-    const sourceIndex = indexMap.get(header);
+    const sourceIndex = indexMap.get(getSizeHeaderKey(header));
     return sourceIndex == null ? 0 : normalizeQuantity(row?.quantities[sourceIndex]);
   });
 }

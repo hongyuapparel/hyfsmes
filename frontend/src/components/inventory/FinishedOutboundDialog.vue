@@ -98,6 +98,7 @@ import AppImageThumb from '@/components/AppImageThumb.vue'
 import { finishedOutbound, getFinishedPickupUserOptions, type FinishedPickupUserOption } from '@/api/inventory'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 
 type OutboundStockInfo = {
   orderId: number | null
@@ -164,14 +165,18 @@ function getColorImage(colorName: string): string {
 }
 
 function toHeaders(headers: string[]): string[] {
-  return headers.filter((item) => String(item ?? '').trim() && item !== '合计')
+  return sortSizeHeaders(headers.map(normalizeSizeHeader).filter(Boolean))
 }
 
-function toSnapshotRows(headers: string[], rows: Array<{ colorName?: string; values?: number[] }>) {
+function toSnapshotRows(sourceHeaders: string[], headers: string[], rows: Array<{ colorName?: string; values?: number[] }>) {
+  const indexMap = new Map(sourceHeaders.map((header, index) => [getSizeHeaderKey(header), index]))
   return rows.map((item) => ({
     colorName: normalizeColorName(item.colorName) || '-',
     imageUrl: getColorImage(item.colorName),
-    quantities: headers.map((_, index) => Math.max(0, Math.trunc(Number(item.values?.[index]) || 0))),
+    quantities: headers.map((header) => {
+      const index = indexMap.get(getSizeHeaderKey(header))
+      return index == null ? 0 : Math.max(0, Math.trunc(Number(item.values?.[index]) || 0))
+    }),
   }))
 }
 
@@ -196,9 +201,10 @@ async function initOutboundSizeList() {
   if (!props.stockInfo) return
   const snapshot = props.stockInfo.sizeBreakdown
   if (snapshot?.headers?.length && snapshot.rows?.length) {
+    const sourceHeaders = snapshot.headers.map(normalizeSizeHeader).filter(Boolean)
     const headers = toHeaders(snapshot.headers)
     outboundSizeList.headers = headers
-    outboundSizeList.rows = toSnapshotRows(headers, snapshot.rows)
+    outboundSizeList.rows = toSnapshotRows(sourceHeaders, headers, snapshot.rows)
     return
   }
   if (!props.stockInfo.orderId) return

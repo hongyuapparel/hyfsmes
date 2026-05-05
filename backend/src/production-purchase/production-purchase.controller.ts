@@ -174,6 +174,39 @@ export class ProductionPurchaseController {
     );
   }
 
+  @Post('items/register/batch')
+  @RequirePermission('production_purchase_register')
+  registerBatch(
+    @Body('items') items: Array<{
+      orderId: number;
+      materialIndex: number;
+      supplierName: string;
+      actualPurchaseQuantity: number;
+      unitPrice: string;
+      otherCost: string;
+      remark?: string | null;
+      imageUrl?: string | null;
+    }> | undefined,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    const normalizedItems = Array.isArray(items)
+      ? items.map((item) => ({
+          orderId: Number(item.orderId),
+          materialIndex: Number(item.materialIndex),
+          supplierName: item.supplierName == null ? '' : String(item.supplierName),
+          actualPurchaseQuantity: Number(item.actualPurchaseQuantity),
+          unitPrice: item.unitPrice == null ? '0' : String(item.unitPrice),
+          otherCost: item.otherCost == null ? '0' : String(item.otherCost),
+          remark: item.remark == null ? null : String(item.remark),
+          imageUrl: item.imageUrl == null ? null : String(item.imageUrl),
+        }))
+      : [];
+    return this.purchaseService.registerPurchaseBatch({
+      items: normalizedItems,
+      actorUserId: user?.userId,
+    });
+  }
+
   /**
    * 登记领料（可选择库存扣减或仅备注处理）
    */

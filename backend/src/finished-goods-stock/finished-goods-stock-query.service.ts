@@ -23,6 +23,7 @@ import {
   buildFinishedStockAdjustLogSummary,
   getFinishedStockAdjustLogSourceOrderNo,
 } from './finished-goods-stock-log-summary';
+import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
 type StockListQueryParams = {
   tab?: string;
@@ -89,7 +90,7 @@ export class FinishedGoodsStockQueryService {
 
     const ext = await this.orderExtRepo.findOne({ where: { orderId: stock.orderId } });
     const headers = Array.isArray(ext?.colorSizeHeaders)
-      ? ext.colorSizeHeaders.map((header) => String(header ?? '').trim()).filter((header) => header.length > 0)
+      ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
       : [];
     const baseRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
     if (!headers.length || !baseRows.length) return null;
@@ -124,11 +125,11 @@ export class FinishedGoodsStockQueryService {
     for (const item of groupStocks) {
       const snapshot = await this.buildCurrentStockSnapshot(item);
       snapshot?.headers.forEach((header) => {
-        const normalized = String(header ?? '').trim();
-        if (normalized && !headers.includes(normalized)) headers.push(normalized);
+        const normalized = normalizeSizeHeader(header);
+        if (normalized && !headers.some((item) => getSizeHeaderKey(item) === getSizeHeaderKey(normalized))) headers.push(normalized);
       });
     }
-    return headers;
+    return sortSizeHeaders(headers);
   }
 
   private async getDetailInternal(id: number): Promise<FinishedGoodsStockDetailResult> {
@@ -161,28 +162,21 @@ export class FinishedGoodsStockQueryService {
     let mappedRows: Array<{ colorName: string; quantities: number[] }> = [];
     if (snap) {
       stock.colorSizeSnapshot = snap;
-      headers = snap.headers.map((header) => String(header ?? '').trim()).filter((header) => header.length > 0);
+      headers = sortSizeHeaders(snap.headers.map(normalizeSizeHeader).filter((header) => header.length > 0));
       mappedRows = snap.rows.map((row) => ({
         colorName: String(row.colorName ?? ''),
-        quantities: Array.isArray(row.quantities)
-          ? row.quantities.map((quantity) => {
-              const n = Number(quantity);
-              return Number.isFinite(n) ? n : 0;
-            })
-          : [],
+        quantities: remapQuantitiesBySizeHeaders(snap.headers, Array.isArray(row.quantities) ? row.quantities : [], headers),
       }));
     } else {
-      headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
+      const sourceHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter(Boolean) : [];
+      headers = sortSizeHeaders(sourceHeaders);
       const rows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
       mappedRows = rows.map((row) => {
         const rowRecord = row as Record<string, unknown> | null;
         const quantities = Array.isArray(rowRecord?.quantities) ? rowRecord.quantities : [];
         return {
           colorName: String(rowRecord?.colorName ?? ''),
-          quantities: quantities.map((quantity) => {
-            const n = Number(quantity);
-            return Number.isFinite(n) ? n : 0;
-          }),
+          quantities: remapQuantitiesBySizeHeaders(sourceHeaders, quantities, headers),
         };
       });
     }

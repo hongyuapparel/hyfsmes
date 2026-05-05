@@ -84,6 +84,23 @@ export function registerPurchase(payload: {
   return request.post<void>('/production/purchase/items/register', payload)
 }
 
+export interface RegisterPurchaseBatchItem {
+  orderId: number
+  materialIndex: number
+  supplierName: string
+  actualPurchaseQuantity: number
+  unitPrice: string
+  otherCost: string
+  remark?: string
+  imageUrl?: string
+}
+
+export function registerPurchaseBatch(payload: {
+  items: RegisterPurchaseBatchItem[]
+}) {
+  return request.post<void>('/production/purchase/items/register/batch', payload)
+}
+
 export function registerPick(payload: {
   orderId: number
   materialIndex: number

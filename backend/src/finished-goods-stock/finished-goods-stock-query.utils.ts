@@ -1,4 +1,5 @@
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
+import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
 export function formatDateTimeForResponse(value: unknown): string {
   if (!value) return '';
@@ -38,9 +39,9 @@ function normalizeColorSizeSnapshot(snapshot: ColorSizeSnapshot | null): ColorSi
   const headers: string[] = [];
   const sourceHeaderToTarget: number[] = [];
   snapshot.headers.forEach((header, sourceIndex) => {
-    const normalized = String(header ?? '').trim();
+    const normalized = normalizeSizeHeader(header);
     if (!normalized || normalized === '__UNASSIGNED__') return;
-    let targetIndex = headers.indexOf(normalized);
+    let targetIndex = headers.findIndex((item) => getSizeHeaderKey(item) === getSizeHeaderKey(normalized));
     if (targetIndex < 0) {
       targetIndex = headers.length;
       headers.push(normalized);
@@ -92,11 +93,18 @@ function normalizeColorSizeSnapshot(snapshot: ColorSizeSnapshot | null): ColorSi
     else addRow('', quantities);
   });
 
+  const sortedHeaders = sortSizeHeaders(headers);
   const rows = orderedColors
     .map((colorName) => ({ colorName, quantities: [...(rowMap.get(colorName) ?? [])] }))
     .filter((row) => snapshotRowTotal(row) > 0);
   if (!rows.length) return null;
-  return { headers, rows };
+  return {
+    headers: sortedHeaders,
+    rows: rows.map((row) => ({
+      colorName: row.colorName,
+      quantities: remapQuantitiesBySizeHeaders(headers, row.quantities, sortedHeaders),
+    })),
+  };
 }
 
 export function parseStoredColorSizeSnapshot(raw: unknown): ColorSizeSnapshot | null {
@@ -112,7 +120,7 @@ export function parseStoredColorSizeSnapshot(raw: unknown): ColorSizeSnapshot | 
   if (!parsed || typeof parsed !== 'object') return null;
   const rec = parsed as Record<string, unknown>;
   const headersRaw = Array.isArray(rec.headers) ? rec.headers : [];
-  const headers = headersRaw.map((h) => String(h ?? '').trim()).filter((h) => h.length > 0);
+  const headers = headersRaw.map(normalizeSizeHeader).filter((h) => h.length > 0);
   const rowsRaw = Array.isArray(rec.rows) ? rec.rows : [];
   if (!headers.length || !rowsRaw.length) return null;
   const rows: Array<{ colorName: string; quantities: number[] }> = [];

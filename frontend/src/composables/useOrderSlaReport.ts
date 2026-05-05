@@ -60,7 +60,7 @@ export function useOrderSlaReport() {
   function getFilterRangeStyle(v?: [string, string] | null) {
     const hasValue = !!(v && v.length === 2)
     const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-    return { width, flex: `0 0 ${width}` }
+    return { width, minWidth: width, flex: `0 0 ${width}` }
   }
 
   function centerStyle() {

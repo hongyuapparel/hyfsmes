@@ -144,6 +144,7 @@
       :loading="loading"
       :list="list"
       :material-progress-column-label="materialProgressColumnLabel"
+      :row-selectable="isPurchaseRowSelectable"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
       @open-brief="openPurchaseBriefDrawer"
@@ -263,161 +264,31 @@
       </template>
     </ProductionDetailDrawerShell>
 
-    <el-dialog
+    <PurchaseRegisterDialog
       v-model="registerDialog.visible"
-      title="登记实际采购"
-      width="560"
-      destroy-on-close
-      @close="resetRegisterForm"
-    >
-      <template v-if="registerDialog.row">
-        <div class="register-brief">
-          <div>订单号：{{ registerDialog.row.orderNo }}</div>
-          <div>物料：{{ registerDialog.row.materialName }}</div>
-          <div>供应商：{{ registerDialog.row.supplierName }}</div>
-        </div>
-        <el-form
-          ref="registerFormRef"
-          :model="registerForm"
-          :rules="registerRules"
-          label-width="110px"
-          class="register-form"
-        >
-          <el-form-item label="实际采购数量" prop="actualPurchaseQuantity">
-            <el-input-number
-              v-model="registerForm.actualPurchaseQuantity"
-              :min="0"
-              :precision="0"
-              controls-position="right"
-              style="width: 100%"
-            />
-          </el-form-item>
-          <el-form-item label="单价">
-            <el-input
-              v-model="registerForm.unitPrice"
-              placeholder="元 / 单位"
-              clearable
-            >
-              <template #prepend>￥</template>
-            </el-input>
-          </el-form-item>
-          <el-form-item label="其他费用">
-            <el-input
-              v-model="registerForm.otherCost"
-              placeholder="如运费、杂费，元"
-              clearable
-            >
-              <template #prepend>￥</template>
-            </el-input>
-          </el-form-item>
-          <el-form-item label="采购总金额">
-            <el-input
-              v-model="registerForm.purchaseAmount"
-              placeholder="自动计算"
-              disabled
-            >
-              <template #prepend>￥</template>
-            </el-input>
-          </el-form-item>
-          <el-form-item label="采购凭证">
-            <ImageUploadArea v-model="registerForm.imageUrl" />
-          </el-form-item>
-          <el-form-item label="备注">
-            <el-input
-              v-model="registerForm.remark"
-              type="textarea"
-              :rows="3"
-              maxlength="200"
-              show-word-limit
-              placeholder="本次采购的补充说明"
-            />
-          </el-form-item>
-        </el-form>
-      </template>
-      <template #footer>
-        <el-button @click="registerDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="registerDialog.submitting" @click="submitRegister">
-          确定
-        </el-button>
-      </template>
-    </el-dialog>
+      :rows="registerDialog.rows"
+      :submitting="registerDialog.submitting"
+      :supplier-options="registerSupplierOptions"
+      :supplier-loading="registerSupplierLoading"
+      @closed="resetRegisterForm"
+      @submit="submitRegister"
+      @search-suppliers="searchRegisterSuppliers"
+      @supplier-visible-change="onRegisterSupplierVisibleChange"
+    />
 
-    <el-dialog
+    <PurchasePickDialog
       v-model="pickDialog.visible"
-      title="领料"
-      width="620"
-      destroy-on-close
-      @close="resetPickForm"
-    >
-      <template v-if="pickDialog.row">
-        <div class="register-brief pick-brief-grid">
-          <div><span class="pick-brief-label">订单号：</span>{{ pickDialog.row.orderNo }}</div>
-          <div><span class="pick-brief-label">SKU：</span>{{ pickDialog.row.skuCode }}</div>
-          <div><span class="pick-brief-label">物料：</span>{{ pickDialog.row.materialName }}</div>
-          <div><span class="pick-brief-label">物料类型：</span>{{ displayMaterialType(pickDialog.row) }}</div>
-          <div><span class="pick-brief-label">物料来源：</span>{{ pickDialog.row.materialSource || '-' }}</div>
-          <div><span class="pick-brief-label">颜色：</span>{{ pickDialog.row.color || '-' }}</div>
-          <div>
-            <span class="pick-brief-label">计划用量：</span>{{ formatMaterialQuantity(pickDialog.row.planQuantity, pickDialog.row) }}
-          </div>
-          <div v-if="pickDialog.total > 1"><span class="pick-brief-label">当前处理：</span>{{ pickDialog.index + 1 }} / {{ pickDialog.total }}</div>
-        </div>
-        <el-alert
-          v-if="pickDialog.row.materialSource === '客供面料'"
-          type="warning"
-          :closable="false"
-          title="请联系对应业务员或跟单领取客供面料"
-          style="margin-bottom: 12px"
-        />
-        <el-form ref="pickFormRef" :model="pickForm" :rules="pickRules" label-width="120px">
-          <el-form-item label="库存来源类型">
-            <el-select v-model="pickForm.inventorySourceType" clearable placeholder="可选（不选则仅备注处理）" @change="onPickSourceTypeChange">
-              <el-option label="面料库存" value="fabric" />
-              <el-option label="辅料库存" value="accessory" />
-              <el-option label="成衣库存" value="finished" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="具体库存">
-            <el-select
-              v-model="pickForm.inventoryId"
-              clearable
-              filterable
-              remote
-              :remote-method="onPickInventorySearch"
-              :loading="pickInventoryLoading"
-              placeholder="先选择库存来源类型，再输入关键字搜索"
-              :disabled="!pickForm.inventorySourceType"
-            >
-              <el-option v-for="opt in pickInventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
-                <div class="pick-stock-option">
-                  <AppImageThumb
-                    v-if="opt.imageUrl"
-                    :raw-url="opt.imageUrl"
-                    :width="28"
-                    :height="28"
-                  />
-                  <span v-else class="pick-stock-thumb-empty">-</span>
-                  <span class="pick-stock-option-label">{{ opt.label }}</span>
-                </div>
-              </el-option>
-            </el-select>
-          </el-form-item>
-          <el-form-item label="调取数量" prop="quantity">
-            <div class="pick-qty-row">
-              <el-input-number v-model="pickForm.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
-              <span class="pick-qty-unit">{{ getMaterialQuantityUnit(pickDialog.row) || '单位' }}</span>
-            </div>
-          </el-form-item>
-          <el-form-item label="备注" prop="remark">
-            <el-input v-model="pickForm.remark" type="textarea" :rows="3" maxlength="300" show-word-limit />
-          </el-form-item>
-        </el-form>
-      </template>
-      <template #footer>
-        <el-button @click="pickDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="pickDialog.submitting" @click="submitPick">确认</el-button>
-      </template>
-    </el-dialog>
+      :dialog="pickDialog"
+      :form="pickForm"
+      :rules="pickRules"
+      :inventory-options="pickInventoryOptions"
+      :inventory-loading="pickInventoryLoading"
+      :display-material-type="displayMaterialType"
+      @closed="resetPickForm"
+      @submit="submitPick"
+      @source-type-change="onPickSourceTypeChange"
+      @inventory-search="onPickInventorySearch"
+    />
   </div>
 </template>
 
@@ -426,7 +297,7 @@ import { computed, onMounted } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
-import { formatMaterialQuantity, getMaterialQuantityUnit } from '@/utils/material-quantity-unit'
+import { formatMaterialQuantity } from '@/utils/material-quantity-unit'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -436,14 +307,16 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import { PURCHASE_TABS, usePurchaseList } from '@/composables/usePurchaseList'
 import { usePurchaseDialogs } from '@/composables/usePurchaseDialogs'
-import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import PurchaseTable from '@/components/production/PurchaseTable.vue'
+import PurchaseRegisterDialog from '@/components/production/PurchaseRegisterDialog.vue'
+import PurchasePickDialog from '@/components/production/PurchasePickDialog.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import { useAuthStore } from '@/stores/auth'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 
 const authStore = useAuthStore()
 const canRegisterPurchase = computed(() => authStore.hasPermission('production_purchase_register'))
@@ -487,16 +360,17 @@ const {
 
 const {
   registerDialog,
-  registerFormRef,
-  registerForm,
-  registerRules,
+  registerSupplierOptions,
+  registerSupplierLoading,
   pickDialog,
-  pickFormRef,
   pickForm,
   pickInventoryOptions,
   pickInventoryLoading,
   pickRules,
   batchButtonLabel,
+  isPurchaseRowSelectable,
+  onRegisterSupplierVisibleChange,
+  searchRegisterSuppliers,
   onBatchHandle,
   onPickSourceTypeChange,
   onPickInventorySearch,
@@ -550,76 +424,4 @@ onMounted(() => {
   font-size: 13px;
 }
 
-.register-brief {
-  margin-bottom: var(--space-md);
-  padding: var(--space-sm);
-  background: var(--el-fill-color-light);
-  border-radius: var(--radius);
-  font-size: var(--font-size-caption, 12px);
-  color: var(--el-text-color-regular);
-}
-
-.register-brief > div + div {
-  margin-top: 4px;
-}
-
-.pick-brief-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px 16px;
-}
-
-.pick-brief-grid > div + div {
-  margin-top: 0;
-}
-
-.pick-brief-label {
-  color: var(--el-text-color-secondary);
-}
-
-.pick-stock-option {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pick-stock-thumb-empty {
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  border: 1px dashed var(--el-border-color-lighter);
-  color: var(--el-text-color-placeholder);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 auto;
-}
-
-.pick-stock-option-label {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pick-qty-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.pick-qty-unit {
-  color: var(--el-text-color-secondary);
-  flex: 0 0 auto;
-}
-
-.register-form {
-  margin-top: var(--space-sm);
-}
-
-.register-form :deep(.el-form-item__label) {
-  white-space: normal;
-  line-height: 1.3;
-}
 </style>

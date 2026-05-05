@@ -12,6 +12,18 @@ import { FabricStockService } from '../fabric-stock/fabric-stock.service';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
 import { User } from '../entities/user.entity';
+
+interface RegisterPurchaseBatchItem {
+  orderId: number;
+  materialIndex: number;
+  supplierName: string;
+  actualPurchaseQuantity: number;
+  unitPrice: string;
+  otherCost: string;
+  remark?: string | null;
+  imageUrl?: string | null;
+}
+
 @Injectable()
 export class ProductionPurchaseService {
   constructor(
@@ -66,6 +78,11 @@ export class ProductionPurchaseService {
       return t || '0';
     }
     return '0';
+  }
+
+  private normalizeNonNegativeNumber(v: unknown): number {
+    const n = typeof v === 'number' ? v : Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : 0;
   }
 
   private async ensureMaterialSourceOptionCache(): Promise<void> {
@@ -178,6 +195,125 @@ export class ProductionPurchaseService {
       await this.orderRepo.save(order);
       await this.appendStatusHistory(order.id, nextStatus);
     }
+  }
+
+  async registerPurchaseBatch(params: {
+    items: RegisterPurchaseBatchItem[];
+    remark?: string | null;
+    imageUrl?: string | null;
+    actorUserId?: number;
+  }): Promise<void> {
+    const items = Array.isArray(params.items) ? params.items : [];
+    if (!items.length) {
+      throw new BadRequestException('请选择需要登记的采购物料');
+    }
+    await this.ensureMaterialSourceOptionCache();
+
+    const touchedSupplierNames = new Set<string>();
+    const completedAt = this.toDateTimeLocalString(new Date());
+    const remark = (params.remark ?? '').trim() || null;
+    const imageUrl = (params.imageUrl ?? '').trim() || null;
+
+    await this.orderRepo.manager.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      const orderExtRepo = manager.getRepository(OrderExt);
+      const statusHistoryRepo = manager.getRepository(OrderStatusHistory);
+      const itemsByOrderId = new Map<number, RegisterPurchaseBatchItem[]>();
+      const seenMaterialKeys = new Set<string>();
+
+      for (const item of items) {
+        const orderId = Number(item.orderId);
+        const materialIndex = Number(item.materialIndex);
+        if (!Number.isInteger(orderId) || orderId <= 0) throw new BadRequestException('订单 ID 无效');
+        if (!Number.isInteger(materialIndex) || materialIndex < 0) throw new BadRequestException('物料索引无效');
+        const key = `${orderId}:${materialIndex}`;
+        if (seenMaterialKeys.has(key)) throw new BadRequestException('不能重复登记同一条物料');
+        seenMaterialKeys.add(key);
+        const group = itemsByOrderId.get(orderId) ?? [];
+        group.push({ ...item, orderId, materialIndex });
+        itemsByOrderId.set(orderId, group);
+      }
+
+      for (const [orderId, orderItems] of itemsByOrderId.entries()) {
+        const order = await orderRepo.findOne({ where: { id: orderId } });
+        if (!order) throw new NotFoundException('订单不存在');
+        const ext = await orderExtRepo.findOne({ where: { orderId } });
+        if (!ext || !Array.isArray(ext.materials)) throw new NotFoundException('该订单无物料数据');
+
+        const materials = [...ext.materials];
+        for (const item of orderItems) {
+          if (item.materialIndex < 0 || item.materialIndex >= materials.length) {
+            throw new NotFoundException('物料索引无效');
+          }
+          const row = materials[item.materialIndex] as OrderMaterialRow;
+          const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
+          if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'purchase') {
+            throw new NotFoundException('该物料来源不在等待采购流程，请使用领料处理');
+          }
+          if ((row.purchaseStatus ?? 'pending').toLowerCase() === 'completed') {
+            throw new BadRequestException('已采购完成的物料不能重复登记');
+          }
+
+          const supplierName = (item.supplierName ?? '').trim();
+          if (!supplierName || supplierName === '-') {
+            throw new BadRequestException('请为所有采购物料填写供应商');
+          }
+          const normalizedQty = this.normalizeNonNegativeNumber(item.actualPurchaseQuantity);
+          const unitPrice = this.normalizeDecimalInput(item.unitPrice);
+          const otherCost = this.normalizeDecimalInput(item.otherCost);
+          const normalizedUnit = Number(unitPrice) || 0;
+          const normalizedOther = Number(otherCost) || 0;
+          const total = normalizedQty * normalizedUnit + normalizedOther;
+          const totalStr = Number.isFinite(total) ? total.toFixed(2) : '0';
+
+          const itemRemark = (item.remark ?? '').trim() || null;
+          const itemImageUrl = (item.imageUrl ?? '').trim() || null;
+          materials[item.materialIndex] = {
+            ...row,
+            supplierName,
+            purchaseStatus: 'completed',
+            actualPurchaseQuantity: normalizedQty,
+            purchaseUnitPrice: unitPrice,
+            purchaseOtherCost: otherCost,
+            purchaseAmount: totalStr,
+            purchaseCompletedAt: completedAt,
+            purchaseRemark: itemRemark,
+            purchaseImageUrl: itemImageUrl,
+          };
+          touchedSupplierNames.add(supplierName);
+        }
+
+        let nextStatus: string | null = null;
+        if (order.status === 'pending_purchase') {
+          const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
+          if (allCompleted) {
+            nextStatus = await this.orderWorkflowService.resolveNextStatus({
+              order,
+              triggerCode: 'purchase_all_completed',
+              actorUserId: params.actorUserId ?? 0,
+            });
+            if (!nextStatus) {
+              throw new BadRequestException('未匹配到“采购完成”流转规则，请先在订单设置中检查流程链路配置');
+            }
+          }
+        }
+
+        ext.materials = materials;
+        await orderExtRepo.save(ext);
+
+        if (nextStatus && nextStatus !== order.status) {
+          order.status = nextStatus;
+          order.statusTime = new Date();
+          await orderRepo.save(order);
+          const status = await manager.getRepository(OrderStatus).findOne({ where: { code: nextStatus } });
+          if (status) {
+            await statusHistoryRepo.save(statusHistoryRepo.create({ orderId: order.id, statusId: status.id }));
+          }
+        }
+      }
+    });
+
+    await this.suppliersService.touchLastActiveByNames([...touchedSupplierNames]);
   }
 
   async registerPicking(params: {

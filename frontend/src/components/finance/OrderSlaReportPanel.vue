@@ -20,8 +20,8 @@
         :shortcuts="rangeShortcuts"
         unlink-panels
         clearable
-        size="default"
-        :class="['filter-item filter-range', { 'range-single': !filter.orderDateRange }]"
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !filter.orderDateRange }]"
         :style="getFilterRangeStyle(filter.orderDateRange)"
         @change="onSearch"
       />
@@ -35,8 +35,8 @@
         :shortcuts="rangeShortcuts"
         unlink-panels
         clearable
-        size="default"
-        :class="['filter-item filter-range', { 'range-single': !filter.completedRange }]"
+        size="large"
+        :class="['filter-bar-item', 'filter-range', { 'range-single': !filter.completedRange }]"
         :style="getFilterRangeStyle(filter.completedRange)"
         @change="onSearch"
       />
@@ -44,8 +44,8 @@
         v-model="filter.statusId"
         placeholder="状态"
         clearable
-        size="default"
-        class="filter-item"
+        size="large"
+        class="filter-bar-item"
         @change="onSearch"
       >
         <el-option v-for="s in statusOptions" :key="s.id" :label="s.label" :value="s.id" />
@@ -54,8 +54,8 @@
         v-model="filter.collaborationTypeId"
         placeholder="合作方式"
         clearable
-        size="default"
-        class="filter-item"
+        size="large"
+        class="filter-bar-item"
         @change="onSearch"
       >
         <el-option v-for="opt in collaborationOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
@@ -64,17 +64,17 @@
         v-model="filter.orderTypeId"
         placeholder="订单类型"
         clearable
-        size="default"
-        class="filter-item"
+        size="large"
+        class="filter-bar-item"
         @change="onSearch"
       >
         <el-option v-for="opt in orderTypeOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
 
       <div class="filter-bar-actions">
-        <el-button type="primary" size="default" @click="onSearch">搜索</el-button>
-        <el-button size="default" :disabled="activeTab === 'sla' ? !list.length : !profitList.length" @click="onExport(false)">导出当前</el-button>
-        <el-button size="default" :disabled="currentSelectionCount === 0" @click="onExport(true)">导出选中</el-button>
+        <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
+        <el-button size="large" :disabled="activeTab === 'sla' ? !list.length : !profitList.length" @click="onExport(false)">导出当前</el-button>
+        <el-button size="large" :disabled="currentSelectionCount === 0" @click="onExport(true)">导出选中</el-button>
       </div>
     </div>
 
@@ -89,6 +89,7 @@
       <el-table
         v-loading="loading"
         :data="list"
+        :max-height="tableMaxHeight"
         border
         stripe
         size="small"
@@ -210,6 +211,7 @@
       <el-table
         v-loading="loading"
         :data="profitList"
+        :max-height="tableMaxHeight"
         border
         stripe
         size="small"
@@ -301,6 +303,8 @@ const {
   onPageChange,
   onPageSizeChange,
 } = useOrderSlaReport()
+
+const tableMaxHeight = 520
 </script>
 
 <style scoped>
@@ -330,14 +334,6 @@ const {
   margin-bottom: var(--space-md);
   border-radius: var(--radius-lg);
   background-color: var(--color-bg-subtle, #f5f6f8);
-}
-
-.filter-item {
-  width: 140px;
-}
-
-.filter-range {
-  width: 170px;
 }
 
 .range-single.el-date-editor--daterange :deep(.el-range-separator) {

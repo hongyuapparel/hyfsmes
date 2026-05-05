@@ -14,7 +14,7 @@
       @header-dragend="(newWidth, oldWidth, column) => emit('header-dragend', newWidth, oldWidth, column)"
       @selection-change="emit('selection-change', $event)"
     >
-      <el-table-column type="selection" width="48" align="center" />
+      <el-table-column type="selection" width="48" align="center" :selectable="props.rowSelectable" />
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
       <el-table-column prop="skuCode" label="SKU" min-width="100" />
       <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
@@ -50,9 +50,6 @@
       </el-table-column>
       <el-table-column prop="customerName" label="客户" min-width="90" show-overflow-tooltip />
       <el-table-column prop="merchandiser" label="跟单" width="80" show-overflow-tooltip />
-      <el-table-column label="客户交期" width="110" align="center">
-        <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
-      </el-table-column>
       <el-table-column label="订单件数" width="88" align="center">
         <template #default="{ row }">{{ formatDisplayNumber(row.orderQuantity) }}</template>
       </el-table-column>
@@ -90,17 +87,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import type { PurchaseItemRow } from '@/api/production-purchase'
-import { formatDate, formatDateTime } from '@/utils/date-format'
+import { formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { formatMaterialQuantity } from '@/utils/material-quantity-unit'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
-defineProps<{
+const props = defineProps<{
   list: PurchaseItemRow[]
   loading: boolean
   materialProgressColumnLabel: string
+  rowSelectable?: (row: PurchaseItemRow, index: number) => boolean
 }>()
 
 const emit = defineEmits<{

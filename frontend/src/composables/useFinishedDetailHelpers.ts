@@ -1,4 +1,5 @@
 import { formatDisplayNumber } from '@/utils/display-number'
+import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 
 type SnapshotRow = { colorName: string; values: number[] }
 type AdjustSnapshotRow = { colorName: string; values: number[] }
@@ -21,20 +22,20 @@ export function normalizeColorName(value: unknown): string {
 
 function normalizeBreakdownHeaders(headers: string[]): string[] {
   if (!headers.length) return []
-  return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
+  return headers.map(normalizeSizeHeader).filter(Boolean)
 }
 
 export function mergeSizeHeaders(...sources: Array<string[] | null | undefined>): string[] {
   const result: string[] = []
   sources.forEach((source) => {
     normalizeBreakdownHeaders(Array.isArray(source) ? source : []).forEach((header) => {
-      const normalizedHeader = String(header ?? '').trim()
+      const normalizedHeader = normalizeSizeHeader(header)
       if (normalizedHeader && normalizedHeader !== '__UNASSIGNED__' && !result.includes(normalizedHeader)) {
         result.push(normalizedHeader)
       }
     })
   })
-  return result
+  return sortSizeHeaders(result)
 }
 
 export function remapValuesByHeaders(
@@ -43,9 +44,9 @@ export function remapValuesByHeaders(
   targetHeaders: string[],
 ): number[] {
   const baseHeaders = normalizeBreakdownHeaders(sourceHeaders)
-  const indexMap = new Map(baseHeaders.map((header, index) => [header, index]))
+  const indexMap = new Map(baseHeaders.map((header, index) => [getSizeHeaderKey(header), index]))
   return targetHeaders.map((header) => {
-    const index = indexMap.get(header)
+    const index = indexMap.get(getSizeHeaderKey(header))
     return index == null ? 0 : Math.max(0, Math.trunc(Number(values?.[index]) || 0))
   })
 }
@@ -101,7 +102,8 @@ export function normalizeStoredSnapshot(
   const visibleIndexes = normalizedHeaders
     .map((header, index) => ({ header: String(header ?? '').trim(), index }))
     .filter((item) => item.header && item.header !== '__UNASSIGNED__')
-  const headers = visibleIndexes.map((item) => item.header)
+  const sourceHeaders = visibleIndexes.map((item) => item.header)
+  const headers = sortSizeHeaders(sourceHeaders)
 
   const rowOrder: string[] = []
   const rowMap = new Map<string, number[]>()
@@ -121,7 +123,7 @@ export function normalizeStoredSnapshot(
 
   source.rows.forEach((row) => {
     const sourceValues = Array.isArray(row.values) ? row.values : []
-    const values = visibleIndexes.map(({ index }) => Math.max(0, Math.trunc(Number(sourceValues[index]) || 0)))
+    const values = remapValuesByHeaders(sourceHeaders, sourceValues, headers)
     if (String(row.colorName ?? '').trim() === '__UNASSIGNED__') {
       blankRows.push(values)
       return
@@ -168,8 +170,9 @@ function normalizeAdjustSnapshot(snapshot: unknown): { headers: string[]; rows: 
   if (!snapshot || typeof snapshot !== 'object') return null
   const source = snapshot as { headers?: unknown[]; rows?: Array<{ colorName?: unknown; quantities?: unknown[]; values?: unknown[] }> }
   const headers = (Array.isArray(source.headers) ? source.headers : [])
-    .map((header) => String(header ?? '').trim())
-    .filter((header) => header && header !== '__UNASSIGNED__' && header !== '合计')
+    .map(normalizeSizeHeader)
+    .filter(Boolean)
+  const sortedHeaders = sortSizeHeaders(headers)
   const rowsRaw = Array.isArray(source.rows) ? source.rows : []
   if (!headers.length || !rowsRaw.length) return null
 
@@ -182,13 +185,11 @@ function normalizeAdjustSnapshot(snapshot: unknown): { headers: string[]; rows: 
           : []
       return {
         colorName: String(row?.colorName ?? '').trim(),
-        values: headers.map((_, index) =>
-          Math.max(0, Math.trunc(Number(sourceValues[index]) || 0)),
-        ),
+        values: remapValuesByHeaders(headers, sourceValues, sortedHeaders),
       }
     })
     .filter((row) => row.values.some((value) => value > 0))
-  return rows.length ? { headers, rows } : null
+  return rows.length ? { headers: sortedHeaders, rows } : null
 }
 
 function remapAdjustValues(
@@ -198,9 +199,9 @@ function remapAdjustValues(
 ): number[] {
   if (!snapshot) return headers.map(() => 0)
   const row = snapshot.rows.find((item) => item.colorName === colorName)
-  const indexMap = new Map(snapshot.headers.map((header, index) => [header, index]))
+  const indexMap = new Map(snapshot.headers.map((header, index) => [getSizeHeaderKey(header), index]))
   return headers.map((header) => {
-    const index = indexMap.get(header)
+    const index = indexMap.get(getSizeHeaderKey(header))
     return index == null ? 0 : Math.max(0, Math.trunc(Number(row?.values?.[index]) || 0))
   })
 }

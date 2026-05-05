@@ -1,4 +1,5 @@
 import type { FinishedStockRow } from '@/api/inventory'
+import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 
 export type StockTableLeafRow = FinishedStockRow & {
   _uiKey: string
@@ -45,7 +46,7 @@ export function isStockTableLeafRow(row: StockTableRow | FinishedStockRow | null
 
 export function normalizeBreakdownHeaders(headers: string[]): string[] {
   if (!headers.length) return []
-  return headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
+  return headers.map(normalizeSizeHeader).filter(Boolean)
 }
 
 export const INTERNAL_UNASSIGNED_SIZE_HEADER = '__UNASSIGNED__'
@@ -63,19 +64,19 @@ export function mergeSizeHeaders(...sources: Array<string[] | null | undefined>)
   const result: string[] = []
   sources.forEach((source) => {
     normalizeBreakdownHeaders(Array.isArray(source) ? source : []).forEach((header) => {
-      const normalized = String(header ?? '').trim()
+      const normalized = normalizeSizeHeader(header)
       if (!normalized || isInternalUnassignedSizeHeader(normalized)) return
-      if (!result.includes(normalized)) result.push(normalized)
+      if (!result.some((item) => getSizeHeaderKey(item) === getSizeHeaderKey(normalized))) result.push(normalized)
     })
   })
-  return result
+  return sortSizeHeaders(result)
 }
 
 export function remapValuesByHeaders(sourceHeaders: string[], values: unknown[], targetHeaders: string[]): number[] {
   const sourceBaseHeaders = normalizeBreakdownHeaders(sourceHeaders)
-  const sourceIndex = new Map(sourceBaseHeaders.map((header, index) => [header, index]))
+  const sourceIndex = new Map(sourceBaseHeaders.map((header, index) => [getSizeHeaderKey(header), index]))
   return targetHeaders.map((header) => {
-    const index = sourceIndex.get(header)
+    const index = sourceIndex.get(getSizeHeaderKey(header))
     return index == null ? 0 : Math.max(0, Math.trunc(Number(values?.[index]) || 0))
   })
 }
@@ -97,7 +98,8 @@ export function normalizeStoredBreakdownSnapshot(
   const visibleHeaderIndexes = normalizedHeaders
     .map((header, index) => ({ header: String(header ?? '').trim(), index }))
     .filter((item) => item.header && !isInternalUnassignedSizeHeader(item.header))
-  const headers = visibleHeaderIndexes.map((item) => item.header)
+  const sourceHeaders = visibleHeaderIndexes.map((item) => item.header)
+  const headers = sortSizeHeaders(sourceHeaders)
   const rowOrder: string[] = []
   const rowMap = new Map<string, number[]>()
   const blankRows: number[][] = []
@@ -115,10 +117,10 @@ export function normalizeStoredBreakdownSnapshot(
   snapshot.rows.forEach((item) => {
     const sourceValues = Array.isArray(item.values) ? item.values : []
     if (isInternalUnassignedColorName(item.colorName)) {
-      blankRows.push(visibleHeaderIndexes.map(({ index }) => Math.max(0, Math.trunc(Number(sourceValues[index]) || 0))))
+      blankRows.push(remapValuesByHeaders(sourceHeaders, sourceValues, headers))
       return
     }
-    const values = visibleHeaderIndexes.map(({ index }) => Math.max(0, Math.trunc(Number(sourceValues[index]) || 0)))
+    const values = remapValuesByHeaders(sourceHeaders, sourceValues, headers)
     if (snapshotRowTotal(values) <= 0) return
     const colorName = normalizeColorName(item.colorName)
     if (!colorName) blankRows.push(values)

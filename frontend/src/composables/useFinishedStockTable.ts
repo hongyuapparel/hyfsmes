@@ -1,6 +1,7 @@
 import { computed, reactive, type Ref } from 'vue'
 import type { FinishedStockRow } from '@/api/inventory'
 import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
+import { getSizeHeaderKey } from '@/utils/sizeHeaders'
 import {
   normalizeColorName,
   normalizeBreakdownHeaders,
@@ -361,9 +362,10 @@ function filterEmptyPreviewRows(dataset: PreviewDataset | null): PreviewDataset 
 function remapPreviewValues(sourceHeaders: string[], values: number[], targetHeaders: string[]): number[] {
   const sourceBaseHeaders = getPreviewBaseHeaders(sourceHeaders)
   const targetBaseHeaders = getPreviewBaseHeaders(targetHeaders)
+  const sourceIndex = new Map(sourceBaseHeaders.map((header, index) => [getSizeHeaderKey(header), index]))
   const remapped = targetBaseHeaders.map((header) => {
-    const sourceIndex = sourceBaseHeaders.indexOf(header)
-    return sourceIndex >= 0 ? Number(values[sourceIndex]) || 0 : 0
+    const index = sourceIndex.get(getSizeHeaderKey(header))
+    return index != null ? Number(values[index]) || 0 : 0
   })
   return targetHeaders[targetHeaders.length - 1] === '合计'
     ? [...remapped, remapped.reduce((sum, item) => sum + item, 0)]
@@ -419,15 +421,14 @@ export function useFinishedStockTable(list: Ref<FinishedStockRow[]>) {
       }))
       return filterEmptyPreviewRows({ headers: fullHeaders, rows })
     }
-    const baseHeaders: string[] = []
+    const headerSources: string[][] = []
     const childPreviews = row._children
       .map((child) => getLeafPreviewData(child))
       .filter((preview): preview is PreviewDataset => !!preview)
     childPreviews.forEach((preview) => {
-      getPreviewBaseHeaders(preview.headers).forEach((header) => {
-        if (!baseHeaders.includes(header)) baseHeaders.push(header)
-      })
+      headerSources.push(getPreviewBaseHeaders(preview.headers))
     })
+    const baseHeaders = mergeSizeHeaders(...headerSources)
     if (!baseHeaders.length) return null
     const fullHeaders = [...baseHeaders, '合计']
     const rowOrder: string[] = []

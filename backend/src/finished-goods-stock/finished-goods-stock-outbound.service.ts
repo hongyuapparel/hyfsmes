@@ -9,6 +9,7 @@ import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
 import type { ColorSizeSnapshot, FinishedOutboundItemInput } from './finished-goods-stock.types';
+import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
 @Injectable()
 export class FinishedGoodsStockOutboundService {
@@ -51,9 +52,9 @@ export class FinishedGoodsStockOutboundService {
     const headers: string[] = [];
     const sourceHeaderToTarget: number[] = [];
     snapshot.headers.forEach((header, sourceIndex) => {
-      const normalized = String(header ?? '').trim();
+      const normalized = normalizeSizeHeader(header);
       if (!normalized || normalized === '__UNASSIGNED__') return;
-      let targetIndex = headers.indexOf(normalized);
+      let targetIndex = headers.findIndex((item) => getSizeHeaderKey(item) === getSizeHeaderKey(normalized));
       if (targetIndex < 0) {
         targetIndex = headers.length;
         headers.push(normalized);
@@ -101,11 +102,18 @@ export class FinishedGoodsStockOutboundService {
       else if (orderedColors.length === 1) addRow(orderedColors[0], quantities);
       else addRow('', quantities);
     });
+    const sortedHeaders = sortSizeHeaders(headers);
     const rows = orderedColors
       .map((colorName) => ({ colorName, quantities: [...(rowMap.get(colorName) ?? [])] }))
       .filter((row) => this.snapshotRowTotal(row) > 0);
     if (!rows.length) return null;
-    return { headers, rows };
+    return {
+      headers: sortedHeaders,
+      rows: rows.map((row) => ({
+        colorName: row.colorName,
+        quantities: remapQuantitiesBySizeHeaders(headers, row.quantities, sortedHeaders),
+      })),
+    };
   }
 
   private parseStoredColorSizeSnapshot(raw: unknown): ColorSizeSnapshot | null {
@@ -121,7 +129,7 @@ export class FinishedGoodsStockOutboundService {
     if (!parsed || typeof parsed !== 'object') return null;
     const rec = parsed as Record<string, unknown>;
     const headersRaw = Array.isArray(rec.headers) ? rec.headers : [];
-    const headers = headersRaw.map((h) => String(h ?? '').trim()).filter((h) => h.length > 0);
+    const headers = headersRaw.map(normalizeSizeHeader).filter((h) => h.length > 0);
     const rowsRaw = Array.isArray(rec.rows) ? rec.rows : [];
     if (!headers.length || !rowsRaw.length) return null;
     const rows: Array<{ colorName: string; quantities: number[] }> = [];
@@ -172,7 +180,7 @@ export class FinishedGoodsStockOutboundService {
       quantities: headers.map((_, index) => Math.max(0, Math.trunc(Number(row.quantities[index]) || 0))),
     }));
     const rowMap = new Map(rows.map((row) => [row.colorName, row]));
-    const headerIndex = new Map(headers.map((header, index) => [header, index]));
+    const headerIndex = new Map(headers.map((header, index) => [getSizeHeaderKey(header), index]));
     outgoing.rows.forEach((outRow) => {
       const colorName = String(outRow.colorName ?? '').trim();
       const targetRow = rowMap.get(colorName);
@@ -180,7 +188,7 @@ export class FinishedGoodsStockOutboundService {
       outgoing.headers.forEach((header, outIndex) => {
         const qty = Math.max(0, Math.trunc(Number(outRow.quantities?.[outIndex]) || 0));
         if (qty <= 0) return;
-        const targetIndex = headerIndex.get(header);
+        const targetIndex = headerIndex.get(getSizeHeaderKey(header));
         if (targetIndex == null) throw new BadRequestException(`尺码「${header}」库存明细不足，无法出库`);
         const remain = Math.max(0, Math.trunc(Number(targetRow.quantities[targetIndex]) || 0));
         if (remain < qty) throw new BadRequestException(`颜色「${colorName || '-'}」尺码「${header}」库存不足`);
