@@ -41,7 +41,7 @@
           @search="onSearch"
           @debounced-search="debouncedSearch"
           @reset="onReset"
-          @open-create="openCreateDialog"
+          @open-create="openCreateDrawer"
           @open-inbound="openInboundDialog"
           @open-outbound="openOutboundDialog"
           @selection-change="onSelectionChange"
@@ -80,8 +80,8 @@
     </el-tabs>
     <FinishedInboundDialog v-model="inboundDialog.visible" :stock-id="inboundDialog.stockId" :stock-label="inboundDialog.stockLabel" @submitted="load()" />
     <FinishedOutboundDialog v-model="outboundDialog.visible" :stock-id="outboundDialog.stockId" :stock-info="outboundDialog.stockInfo" @submitted="load()" />
-    <FinishedCreateDialog
-      v-model="createDialogVisible"
+    <FinishedCreateDrawer
+      v-model="createDrawerVisible"
       :quick-add-source="createSeed"
       :warehouse-options="warehouseOptions"
       :inventory-type-options="inventoryTypeOptions"
@@ -114,7 +114,7 @@ import '@/styles/inventory-finished.css'
 import FinishedDetailDrawer from '@/components/inventory/FinishedDetailDrawer.vue'
 import FinishedInboundDialog from '@/components/inventory/FinishedInboundDialog.vue'
 import FinishedOutboundDialog from '@/components/inventory/FinishedOutboundDialog.vue'
-import FinishedCreateDialog from '@/components/inventory/FinishedCreateDialog.vue'
+import FinishedCreateDrawer from '@/components/inventory/FinishedCreateDrawer.vue'
 import FinishedStockTab from '@/components/inventory/FinishedStockTab.vue'
 import FinishedOutboundTab from '@/components/inventory/FinishedOutboundTab.vue'
 import { getFinishedStockList, type FinishedStockRow } from '@/api/inventory'
@@ -178,13 +178,13 @@ const {
   detailDrawer,
   inboundDialog,
   outboundDialog,
-  createDialogVisible,
+  createDrawerVisible,
   createSeed,
   onSelectionChange,
   openDetail,
   openInboundDialog,
   openOutboundDialog,
-  openCreateDialog,
+  openCreateDrawer,
   onColorImagesSynced,
   onColorImageSaved,
   onMetaSaved,

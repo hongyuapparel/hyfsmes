@@ -440,6 +440,10 @@ export class OrderMutationService {
     return this.orderLifecycleService.reviewRejectMany(ids, reason, actor);
   }
 
+  async restoreMany(ids: number[], actor: OrderActor): Promise<void> {
+    return this.orderLifecycleService.restoreMany(ids, actor);
+  }
+
   private normalizeProfitMargin(v: unknown): number {
     const n = typeof v === 'number' ? v : Number(v);
     if (!Number.isFinite(n) || n < 0) return 0.1;

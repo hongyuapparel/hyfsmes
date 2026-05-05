@@ -20,7 +20,7 @@
 /**
  * 成品库存「基础信息 + 产品图」共享布局。
  *
- * 抽取自 FinishedDetailBasicInfoSection 与 FinishedCreateDialog 的重复
+ * 抽取自 FinishedDetailBasicInfoSection 与 FinishedCreateDrawer 的重复
  * detail-basic-* CSS 与结构。两者字段集和编辑模式不同，但视觉布局一致：
  * - 左侧：4 列 grid，label/value 交替；可由 slot 内容自由填充
  * - 右侧：170px 宽产品图栏；通过 image slot 注入
@@ -38,7 +38,7 @@ defineProps<{
 <style scoped>
 .detail-section {
   min-width: 0;
-  flex: 1;
+  flex: none;
   padding: 10px 12px;
   border: 1px solid var(--el-border-color-lighter);
   border-radius: 8px;
@@ -80,6 +80,7 @@ defineProps<{
   padding: 7px 10px;
   border-right: 1px solid var(--el-border-color-lighter);
   border-bottom: 1px solid var(--el-border-color-lighter);
+  min-height: 40px;
   display: flex;
   align-items: center;
   box-sizing: border-box;

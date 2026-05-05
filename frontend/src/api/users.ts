@@ -12,6 +12,7 @@ export interface UserItem {
   status: string
   createdAt: string
   lastLoginAt: string | null
+  lastActiveAt?: string | null
 }
 
 export function getUsers() {

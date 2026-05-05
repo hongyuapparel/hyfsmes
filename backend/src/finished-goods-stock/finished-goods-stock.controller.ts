@@ -82,11 +82,11 @@ export class FinishedGoodsStockController {
 
   @Post('outbound')
   outbound(
-    @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: any }> | undefined,
+    @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: unknown }> | undefined,
     @Body('id') id: number,
     @Body('quantity') quantity: number,
     @Body('pickupUserId') pickupUserId: number | null,
-    @Body('sizeBreakdown') sizeBreakdown: any,
+    @Body('sizeBreakdown') sizeBreakdown: unknown,
     @Body('remark') remark: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
@@ -123,6 +123,7 @@ export class FinishedGoodsStockController {
   @Patch('items/:id')
   updateMeta(
     @Param('id') id: string,
+    @Body('skuCode') skuCode: string | undefined,
     @Body('department') department: string | undefined,
     @Body('inventoryTypeId') inventoryTypeId: number | null | undefined,
     @Body('warehouseId') warehouseId: number | null | undefined,
@@ -130,11 +131,13 @@ export class FinishedGoodsStockController {
     @Body('unitPrice') unitPrice: string | number | undefined,
     @Body('imageUrl') imageUrl: string | undefined,
     @Body('remark') remark: string | undefined,
+    @Body('colorSize') colorSize: unknown,
+    @Body('colorImages') colorImages: Array<{ colorName?: string; imageUrl?: string }> | undefined,
     @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.operationService.updateMeta(
       Number(id),
-      { department, inventoryTypeId, warehouseId, location, unitPrice, imageUrl, remark },
+      { skuCode, department, inventoryTypeId, warehouseId, location, unitPrice, imageUrl, remark, colorSize, colorImages },
       user?.username ?? '',
     );
   }

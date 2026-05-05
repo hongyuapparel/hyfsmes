@@ -87,12 +87,15 @@ export class FinishedGoodsStockService {
     id: number,
     dto: {
       department?: string;
+      skuCode?: string;
       inventoryTypeId?: number | null;
       warehouseId?: number | null;
       location?: string;
       unitPrice?: string | number;
       imageUrl?: string;
       remark?: string;
+      colorSize?: unknown;
+      colorImages?: Array<{ colorName?: string; imageUrl?: string }>;
     },
     operatorUsername: string,
   ) {

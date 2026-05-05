@@ -1,5 +1,5 @@
 <template>
-  <FinishedBasicInfoGrid title="基础信息与产品图" image-label="产品图（可更换）">
+  <FinishedBasicInfoGrid title="基础信息与产品图" image-label="产品图">
     <template #actions>
       <el-button
         v-if="!metaEditing"
@@ -28,16 +28,39 @@
       </template>
     </template>
 
-    <!-- 字段网格内容 -->
-    <div class="detail-basic-label">入库时间</div>
-    <div class="detail-basic-value">{{ formatDateTime(stock.createdAt) }}</div>
-    <div class="detail-basic-label">订单号</div>
-    <div class="detail-basic-value">{{ orderNo || '-' }}</div>
-
     <div class="detail-basic-label">SKU</div>
-    <div class="detail-basic-value">{{ stock.skuCode }}</div>
-    <div class="detail-basic-label">客户</div>
-    <div class="detail-basic-value">{{ stock.customerName || '-' }}</div>
+    <div class="detail-basic-value">
+      <el-input
+        v-if="metaEditing"
+        :model-value="editForm.skuCode"
+        clearable
+        size="small"
+        placeholder="SKU"
+        @update:model-value="(value) => updateField('skuCode', String(value ?? ''))"
+      />
+      <span v-else>{{ stock.skuCode || '-' }}</span>
+    </div>
+
+    <div class="detail-basic-label">部门</div>
+    <div class="detail-basic-value">
+      <el-select
+        v-if="metaEditing"
+        :model-value="editForm.department"
+        filterable
+        clearable
+        size="small"
+        placeholder="请选择部门"
+        @update:model-value="(value) => updateField('department', String(value ?? ''))"
+      >
+        <el-option
+          v-for="option in departmentOptions"
+          :key="option.value"
+          :label="option.label"
+          :value="option.value"
+        />
+      </el-select>
+      <span v-else>{{ stock.department || '-' }}</span>
+    </div>
 
     <div class="detail-basic-label">库存类型</div>
     <div class="detail-basic-value">
@@ -47,6 +70,7 @@
         filterable
         clearable
         size="small"
+        placeholder="请选择库存类型"
         @update:model-value="(value) => updateField('inventoryTypeId', value as number | null)"
       >
         <el-option
@@ -67,6 +91,7 @@
         filterable
         clearable
         size="small"
+        placeholder="请选择仓库"
         @update:model-value="(value) => updateField('warehouseId', value as number | null)"
       >
         <el-option
@@ -79,26 +104,6 @@
       <span v-else>{{ findWarehouseLabel(stock.warehouseId) || '-' }}</span>
     </div>
 
-    <div class="detail-basic-label">部门</div>
-    <div class="detail-basic-value">
-      <el-select
-        v-if="metaEditing"
-        :model-value="editForm.department"
-        filterable
-        clearable
-        size="small"
-        @update:model-value="(value) => updateField('department', String(value ?? ''))"
-      >
-        <el-option
-          v-for="option in departmentOptions"
-          :key="option.value"
-          :label="option.label"
-          :value="option.value"
-        />
-      </el-select>
-      <span v-else>{{ stock.department || '-' }}</span>
-    </div>
-
     <div class="detail-basic-label">存放地址</div>
     <div class="detail-basic-value">
       <el-input
@@ -106,13 +111,14 @@
         :model-value="editForm.location"
         clearable
         size="small"
+        placeholder="存放地址（默认值）"
         @update:model-value="(value) => updateField('location', String(value ?? ''))"
       />
       <span v-else>{{ stock.location || '-' }}</span>
     </div>
 
     <div class="detail-basic-label">备注</div>
-    <div class="detail-basic-value detail-basic-value-span-3">
+    <div class="detail-basic-value">
       <el-input
         v-if="metaEditing"
         :model-value="editForm.remark"
@@ -124,7 +130,6 @@
       <span v-else>{{ editForm.remark || '-' }}</span>
     </div>
 
-    <!-- 产品图栏 -->
     <template #image>
       <ImageUploadArea
         v-if="metaEditing"
@@ -152,9 +157,7 @@ import FinishedBasicInfoGrid from '@/components/inventory/finished-shared/Finish
 import type { FinishedDetailEditForm } from '@/composables/useFinishedDetailData'
 
 type StockInfo = {
-  createdAt?: string
   skuCode?: string
-  customerName?: string
   inventoryTypeId?: number | null
   warehouseId?: number | null
   department?: string
@@ -163,7 +166,6 @@ type StockInfo = {
 
 const props = defineProps<{
   stock: StockInfo
-  orderNo: string
   displayProductImage: string
   metaEditing: boolean
   saving: boolean
@@ -171,7 +173,6 @@ const props = defineProps<{
   inventoryTypeOptions: { id: number; label: string }[]
   warehouseOptions: { id: number; label: string }[]
   departmentOptions: { value: string; label: string }[]
-  formatDateTime: (value: unknown) => string
   findInventoryTypeLabel: (id: number | null | undefined) => string
   findWarehouseLabel: (id: number | null | undefined) => string
   updateField: <K extends keyof FinishedDetailEditForm>(key: K, value: FinishedDetailEditForm[K]) => void
@@ -184,7 +185,6 @@ defineEmits<{
 
 const {
   stock,
-  orderNo,
   displayProductImage,
   metaEditing,
   saving,
@@ -192,7 +192,6 @@ const {
   inventoryTypeOptions,
   warehouseOptions,
   departmentOptions,
-  formatDateTime,
   findInventoryTypeLabel,
   findWarehouseLabel,
   updateField,

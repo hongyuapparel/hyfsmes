@@ -26,6 +26,17 @@ export type FinishedCreateSizeRow = {
   }
 }
 
+export type FinishedCreateQuickAddSizeRow = {
+  colorName: string
+  values?: number[]
+  quantities?: number[]
+  imageUrl?: string
+  department?: string
+  inventoryTypeId?: number | null
+  warehouseId?: number | null
+  location?: string
+}
+
 export type FinishedCreateQuickAddSource = {
   orderNo?: string
   skuCode?: string
@@ -39,7 +50,7 @@ export type FinishedCreateQuickAddSource = {
   colorImages?: Array<{ colorName: string; imageUrl: string }>
   sizeBreakdown?: {
     headers: string[]
-    rows: Array<{ colorName: string; values?: number[]; quantities?: number[] }>
+    rows: FinishedCreateQuickAddSizeRow[]
   } | null
   _selectedColorName?: string | null
   _displayColor?: string
@@ -131,17 +142,26 @@ export function buildQuickAddSizeMatrix(source: FinishedCreateQuickAddSource): {
       headers: sortedHeaders,
       rows: rows.map((row) => {
         const colorName = String(row.colorName ?? '').trim() || '默认'
+        const department = row.department != null ? String(row.department) : rowDefaults.department ?? ''
+        const inventoryTypeId = row.inventoryTypeId !== undefined ? row.inventoryTypeId : rowDefaults.inventoryTypeId ?? null
+        const warehouseId = row.warehouseId !== undefined ? row.warehouseId : rowDefaults.warehouseId ?? null
+        const location = row.location != null ? String(row.location) : rowDefaults.location ?? ''
         return {
           _key: nextRowKey(),
           colorName,
-          imageUrl: colorImageLookup.get(colorName) || '',
+          imageUrl: String(row.imageUrl ?? '').trim() || colorImageLookup.get(colorName) || '',
           // Use 0 (not null) so el-input-number renders as empty input cleanly
           quantities: sortedHeaders.map(() => 0),
-          department: rowDefaults.department ?? '',
-          inventoryTypeId: rowDefaults.inventoryTypeId ?? null,
-          warehouseId: rowDefaults.warehouseId ?? null,
-          location: rowDefaults.location ?? '',
-          _overrides: buildEmptyOverrides(),
+          department,
+          inventoryTypeId,
+          warehouseId,
+          location,
+          _overrides: {
+            department: row.department != null && department !== (rowDefaults.department ?? ''),
+            inventoryTypeId: row.inventoryTypeId !== undefined && inventoryTypeId !== (rowDefaults.inventoryTypeId ?? null),
+            warehouseId: row.warehouseId !== undefined && warehouseId !== (rowDefaults.warehouseId ?? null),
+            location: row.location != null && location !== (rowDefaults.location ?? ''),
+          },
         }
       }),
     }
@@ -154,7 +174,7 @@ export function buildQuickAddSizeMatrix(source: FinishedCreateQuickAddSource): {
       {
         _key: nextRowKey(),
         colorName,
-        imageUrl: colorImageLookup.get(colorName) || '',
+        imageUrl: colorImageLookup.get(colorName) || String(source.imageUrl || source.productImageUrl || ''),
         quantities: Array(DEFAULT_CREATE_SIZE_HEADERS.length).fill(0),
         department: rowDefaults.department ?? '',
         inventoryTypeId: rowDefaults.inventoryTypeId ?? null,

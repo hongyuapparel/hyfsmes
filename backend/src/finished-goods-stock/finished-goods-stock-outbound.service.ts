@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
+import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-adjust-log.entity';
 import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
 import { User, UserStatus } from '../entities/user.entity';
@@ -18,6 +19,8 @@ export class FinishedGoodsStockOutboundService {
     private readonly stockRepo: Repository<FinishedGoodsStock>,
     @InjectRepository(FinishedGoodsStockColorImage)
     private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
+    @InjectRepository(FinishedGoodsStockAdjustLog)
+    private readonly adjustLogRepo: Repository<FinishedGoodsStockAdjustLog>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(Product)
@@ -169,6 +172,37 @@ export class FinishedGoodsStockOutboundService {
     if (actual !== safeExpectedQty) {
       throw new BadRequestException(`${message}（尺码合计 ${actual}，总数量 ${safeExpectedQty}）`);
     }
+  }
+
+  private stockAdjustSnapshot(stock: FinishedGoodsStock): Record<string, unknown> {
+    return {
+      skuCode: stock.skuCode ?? '',
+      department: stock.department ?? '',
+      inventoryTypeId: stock.inventoryTypeId ?? null,
+      warehouseId: stock.warehouseId ?? null,
+      location: stock.location ?? '',
+      quantity: stock.quantity ?? 0,
+      unitPrice: stock.unitPrice != null ? String(stock.unitPrice) : '0',
+      imageUrl: stock.imageUrl ?? '',
+      colorSizeSnapshot: this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot),
+    };
+  }
+
+  private async appendOutboundAdjustLog(
+    manager: EntityManager,
+    finishedStockId: number,
+    operatorUsername: string,
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    remark: string,
+  ): Promise<void> {
+    await manager.getRepository(FinishedGoodsStockAdjustLog).save(this.adjustLogRepo.create({
+      finishedStockId,
+      operatorUsername: (operatorUsername ?? '').trim(),
+      before: { ...before, logAction: 'outbound' },
+      after: { ...after, logAction: 'outbound' },
+      remark: (remark ?? '').trim() || '成品出库',
+    }));
   }
 
   private subtractColorSizeSnapshots(currentRaw: unknown, outgoing: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
@@ -370,6 +404,7 @@ export class FinishedGoodsStockOutboundService {
           const txStock = await txStockRepo.findOne({ where: { id: item.id } });
           if (!txStock) throw new NotFoundException('库存记录不存在');
           if (item.quantity > txStock.quantity) throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 的出库数量不能大于当前库存`);
+          const beforeAdjust = this.stockAdjustSnapshot(txStock);
           const currentSnapshot = this.parseStoredColorSizeSnapshot(txStock.colorSizeSnapshot);
           const outgoingSnapshot = this.parseStoredColorSizeSnapshot(item.sizeBreakdown);
           if (outgoingSnapshot) this.assertColorSizeSnapshotTotal(outgoingSnapshot, item.quantity, '出库尺码明细合计必须等于出库数量');
@@ -379,8 +414,10 @@ export class FinishedGoodsStockOutboundService {
             txStock.colorSizeSnapshot = this.subtractColorSizeSnapshots(currentSnapshot, outgoingSnapshot);
           }
           txStock.quantity -= item.quantity;
+          const afterAdjust = this.stockAdjustSnapshot(txStock);
           if (txStock.quantity === 0) await txStockRepo.remove(txStock);
           else await txStockRepo.save(txStock);
+          await this.appendOutboundAdjustLog(manager, item.id, operatorUsername, beforeAdjust, afterAdjust, remark);
 
           const stock = stockMap.get(item.id) ?? txStock;
           const order = stock.orderId != null ? orderMap.get(stock.orderId) ?? null : null;

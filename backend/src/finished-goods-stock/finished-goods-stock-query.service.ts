@@ -182,6 +182,7 @@ export class FinishedGoodsStockQueryService {
     }
     const colors = mappedRows.map((row) => row.colorName).filter((value) => value);
     const groupSizeHeaders = await this.getSkuGroupSizeHeaders(stock);
+    const latestRemark = logs.find((row) => String(row.remark ?? '').trim())?.remark?.trim() ?? '';
 
     const stockUnitPrice = Number(stock.unitPrice);
     const orderUnitPrice = Number(order?.exFactoryPrice);
@@ -194,7 +195,7 @@ export class FinishedGoodsStockQueryService {
     stock.unitPrice = normalizeOrderUnitPrice(resolvedUnitPrice);
 
     return {
-      stock,
+      stock: { ...stock, remark: latestRemark },
       orderNo: order?.orderNo ?? '',
       productImageUrl: product?.imageUrl?.trim() || stock.imageUrl?.trim() || '',
       colorImages: colorImages.map((row) => ({

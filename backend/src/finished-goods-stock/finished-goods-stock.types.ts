@@ -48,7 +48,7 @@ export type FinishedGoodsOutboundListResult = {
 };
 
 export type FinishedGoodsStockDetailResult = {
-  stock: FinishedGoodsStock;
+  stock: FinishedGoodsStock & { remark?: string };
   orderNo: string;
   productImageUrl: string;
   colorImages: Array<{ colorName: string; imageUrl: string; updatedAt: string }>;

@@ -62,6 +62,10 @@ export class OrdersService {
     return this.orderMutationService.deleteMany(ids, actor);
   }
 
+  restoreMany(ids: number[], actor: OrderActor) {
+    return this.orderMutationService.restoreMany(ids, actor);
+  }
+
   reviewMany(ids: number[], actor: OrderActor) {
     return this.orderMutationService.reviewMany(ids, actor);
   }

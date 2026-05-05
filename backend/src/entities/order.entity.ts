@@ -95,6 +95,18 @@ export class Order {
   @Column({ name: 'image_url', length: 512, default: '' })
   imageUrl: string;
 
+  /** 软删除时间（null 表示未删除） */
+  @Column({ name: 'deleted_at', type: 'datetime', nullable: true })
+  deletedAt: Date | null;
+
+  /** 软删除操作人（用户名） */
+  @Column({ name: 'deleted_by', type: 'varchar', length: 64, nullable: true })
+  deletedBy: string | null;
+
+  /** 软删除原因 */
+  @Column({ name: 'delete_reason', type: 'varchar', length: 255, nullable: true })
+  deleteReason: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 

@@ -1,5 +1,5 @@
 <template>
-  <div class="page-card order-sla-report-page">
+  <div class="page-card page-card--fill order-sla-report-page">
     <el-tabs v-model="activeTab" class="report-tabs" @tab-change="onTabChange">
       <el-tab-pane label="时效报表" name="sla" />
       <el-tab-pane label="利润报表" name="profit" />
@@ -86,19 +86,23 @@
     <div v-if="currentSelectionCount > 0" class="table-selection-count">已选 {{ currentSelectionCount }} 项</div>
 
     <template v-if="activeTab === 'sla'">
-      <el-table
-        v-loading="loading"
-        :data="list"
-        :max-height="tableMaxHeight"
-        border
-        stripe
-        size="small"
-        class="report-table"
-        :header-cell-style="centerStyle"
-        :cell-style="centerStyle"
-        table-layout="fixed"
-        @selection-change="onSelectionChange"
-      >
+      <div class="report-section">
+        <div ref="slaTableShellRef" class="list-page-table-shell">
+          <el-table
+            v-loading="loading"
+            :data="list"
+            :height="slaTableHeight ?? defaultTableHeight"
+            :fit="false"
+            border
+            stripe
+            size="small"
+            class="report-table"
+            scrollbar-always-on
+            :header-cell-style="centerStyle"
+            :cell-style="centerStyle"
+            table-layout="fixed"
+            @selection-change="onSelectionChange"
+          >
         <el-table-column type="selection" width="46" />
         <el-table-column prop="orderNo" label="订单号" width="110" show-overflow-tooltip />
         <el-table-column prop="skuCode" label="sku" width="90" show-overflow-tooltip />
@@ -192,35 +196,38 @@
         <el-table-column label="时效判定" width="90" align="center" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="currentSegmentSlaLabel(row)" /></template>
         </el-table-column>
-      </el-table>
+          </el-table>
+        </div>
 
-      <div class="pagination-wrap">
-        <el-pagination
+        <AppPaginationBar
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
           :total="summary?.total ?? 0"
           :page-sizes="[20, 50, 100]"
-          layout="total, sizes, prev, pager, next"
           @current-change="onPageChange"
           @size-change="onPageSizeChange"
         />
       </div>
     </template>
 
-    <div v-else class="profit-placeholder">
-      <el-table
-        v-loading="loading"
-        :data="profitList"
-        :max-height="tableMaxHeight"
-        border
-        stripe
-        size="small"
-        class="profit-table report-table"
-        :header-cell-style="centerStyle"
-        :cell-style="centerStyle"
-        table-layout="fixed"
-        @selection-change="onProfitSelectionChange"
-      >
+    <template v-else>
+      <div class="report-section">
+        <div ref="profitTableShellRef" class="list-page-table-shell">
+          <el-table
+            v-loading="loading"
+            :data="profitList"
+            :height="profitTableHeight ?? defaultTableHeight"
+            :fit="false"
+            border
+            stripe
+            size="small"
+            class="profit-table report-table"
+            scrollbar-always-on
+            :header-cell-style="centerStyle"
+            :cell-style="centerStyle"
+            table-layout="fixed"
+            @selection-change="onProfitSelectionChange"
+          >
         <el-table-column type="selection" width="46" />
         <el-table-column prop="orderNo" label="订单号" width="110" />
         <el-table-column prop="skuCode" label="SKU" width="100" />
@@ -253,26 +260,28 @@
         <el-table-column label="工厂总利润" width="130">
           <template #default="{ row }">{{ formatBizNumberForTable(calcFactoryTotalProfit(row)) }}</template>
         </el-table-column>
-      </el-table>
+          </el-table>
+        </div>
 
-      <div class="pagination-wrap">
-        <el-pagination
+        <AppPaginationBar
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
           :total="profitSummary?.total ?? 0"
           :page-sizes="[20, 50, 100]"
-          layout="total, sizes, prev, pager, next"
           @current-change="onPageChange"
           @size-change="onPageSizeChange"
         />
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
+import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 
 const {
@@ -304,7 +313,11 @@ const {
   onPageSizeChange,
 } = useOrderSlaReport()
 
-const tableMaxHeight = 520
+const slaTableShellRef = ref<HTMLElement | null>(null)
+const profitTableShellRef = ref<HTMLElement | null>(null)
+const defaultTableHeight = 520
+const { tableHeight: slaTableHeight } = useFlexShellTableHeight(slaTableShellRef)
+const { tableHeight: profitTableHeight } = useFlexShellTableHeight(profitTableShellRef)
 </script>
 
 <style scoped>
@@ -323,6 +336,7 @@ const tableMaxHeight = 520
   padding: var(--space-md);
   border-radius: var(--radius-xl);
   border: 1px solid var(--color-border);
+  overflow: hidden;
 }
 
 .filter-bar {
@@ -379,13 +393,11 @@ const tableMaxHeight = 520
   margin-top: 8px;
 }
 
-.pagination-wrap {
-  margin-top: var(--space-md);
+.report-section {
+  flex: 1;
+  min-height: 0;
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
 }
 
-.profit-placeholder {
-  padding: 8px 0;
-}
 </style>

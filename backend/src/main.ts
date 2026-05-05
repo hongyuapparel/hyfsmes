@@ -47,6 +47,23 @@ async function ensureSupplierLastActiveColumn(dataSource: DataSource) {
   console.log('[Schema] Added suppliers.last_active_at');
 }
 
+async function ensureUserLastActiveColumn(dataSource: DataSource) {
+  const rows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'users'
+       AND COLUMN_NAME = 'last_active_at'`,
+  );
+  const cnt = Number(rows?.[0]?.cnt ?? 0);
+  if (cnt > 0) return;
+  await dataSource.query(
+    `ALTER TABLE users
+     ADD COLUMN last_active_at DATETIME NULL AFTER last_login_at`,
+  );
+  console.log('[Schema] Added users.last_active_at');
+}
+
 async function dropSupplierCooperationDateColumn(dataSource: DataSource) {
   const rows: Array<{ cnt: number }> = await dataSource.query(
     `SELECT COUNT(*) AS cnt
@@ -139,6 +156,39 @@ async function ensureInventoryOperationLogTables(dataSource: DataSource) {
   console.log('[Schema] Ensured inventory operation log tables');
 }
 
+async function ensureOrderSoftDeleteColumns(dataSource: DataSource) {
+  const columns: Array<{ name: string; ddl: string }> = [
+    { name: 'deleted_at', ddl: 'DATETIME NULL AFTER image_url' },
+    { name: 'deleted_by', ddl: 'VARCHAR(64) NULL AFTER deleted_at' },
+    { name: 'delete_reason', ddl: 'VARCHAR(255) NULL AFTER deleted_by' },
+  ];
+  for (const column of columns) {
+    const rows: Array<{ cnt: number }> = await dataSource.query(
+      `SELECT COUNT(*) AS cnt
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'orders'
+         AND COLUMN_NAME = ?`,
+      [column.name],
+    );
+    if (Number(rows?.[0]?.cnt ?? 0) > 0) continue;
+    await dataSource.query(`ALTER TABLE orders ADD COLUMN ${column.name} ${column.ddl}`);
+    console.log(`[Schema] Added orders.${column.name}`);
+  }
+
+  const indexRows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.STATISTICS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'orders'
+       AND INDEX_NAME = 'IDX_orders_deleted_at'`,
+  );
+  if (Number(indexRows?.[0]?.cnt ?? 0) <= 0) {
+    await dataSource.query('CREATE INDEX IDX_orders_deleted_at ON orders (deleted_at)');
+    console.log('[Schema] Added index IDX_orders_deleted_at');
+  }
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -170,10 +220,12 @@ async function bootstrap() {
   try {
     await ensureSupplierMultiScopeColumn(dataSource);
     await ensureSupplierLastActiveColumn(dataSource);
+    await ensureUserLastActiveColumn(dataSource);
     await dropSupplierCooperationDateColumn(dataSource);
     await ensureSupplierRemarkColumn(dataSource);
     await ensureInventoryOperationLogTables(dataSource);
     await ensureOrderFinishingQtyRowColumns(dataSource);
+    await ensureOrderSoftDeleteColumns(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);

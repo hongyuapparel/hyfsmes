@@ -1,17 +1,13 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  type FinishedStockDetailRes,
-  getFinishedStockDetail,
-  updateFinishedStockMeta,
-  upsertFinishedStockColorImage,
-} from '@/api/inventory'
+import { type FinishedStockDetailRes, getFinishedStockDetail, updateFinishedStockMeta, upsertFinishedStockColorImage } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { createAdjustLogSummaryBuilder, mergeSizeHeaders } from '@/composables/useFinishedDetailHelpers'
 import { useFinishedDetailDisplayData } from '@/composables/useFinishedDetailDisplayData'
 import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTableUtils'
 
 export type FinishedDetailEditForm = {
+  skuCode: string
   department: string
   inventoryTypeId: number | null
   warehouseId: number | null
@@ -24,6 +20,11 @@ export type FinishedDetailEditForm = {
 type UseFinishedDetailDataOptions = {
   inventoryTypeOptions: () => Array<{ id: number; label: string }>
   warehouseOptions: () => Array<{ id: number; label: string }>
+  buildEditColorSize?: () => {
+    headers: string[]
+    rows: Array<{ colorName: string; imageUrl?: string; quantities: number[] }>
+  } | null
+  buildEditColorImages?: () => Array<{ colorName: string; imageUrl: string }> | null
   onColorImagesSynced: (stockId: number, colorImages: unknown[]) => void
   onColorImageSaved: (payload: { stockId: number; colorName: string; imageUrl: string }) => void
   onMetaSaved: () => void
@@ -39,18 +40,16 @@ type OpenDetailPayload = {
   initialQuantity: number | null
 }
 
-type FinishedDetailData = FinishedStockDetailRes & {
-  groupSizeHeaders?: string[]
-}
+type FinishedDetailData = FinishedStockDetailRes & { groupSizeHeaders?: string[] }
 
 type StockMeta = {
+  skuCode?: string
   department?: string
   inventoryTypeId?: number | null
   warehouseId?: number | null
   location?: string
   unitPrice?: number | string | null
-  imageUrl?: string
-  quantity?: number
+  imageUrl?: string; remark?: string
 }
 
 export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
@@ -67,6 +66,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   const metaEditing = ref(false)
 
   const editForm = reactive<FinishedDetailEditForm>({
+    skuCode: '',
     department: '',
     inventoryTypeId: null,
     warehouseId: null,
@@ -123,13 +123,14 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
 
   function fillEditFormFromStock() {
     const stock = data.value?.stock as StockMeta | undefined
+    editForm.skuCode = stock?.skuCode ?? ''
     editForm.department = stock?.department ?? ''
     editForm.inventoryTypeId = stock?.inventoryTypeId ?? null
     editForm.warehouseId = stock?.warehouseId ?? null
     editForm.location = stock?.location ?? ''
     editForm.unitPrice = stock?.unitPrice != null ? String(stock.unitPrice) : ''
     editForm.imageUrl = stock?.imageUrl ?? ''
-    editForm.remark = ''
+    editForm.remark = stock?.remark ?? ''
   }
 
   async function loadDetail(stockId: number) {
@@ -179,6 +180,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     saving.value = true
     try {
       await updateFinishedStockMeta(stockId, {
+        skuCode: editForm.skuCode?.trim() || '',
         department: editForm.department,
         inventoryTypeId: editForm.inventoryTypeId,
         warehouseId: editForm.warehouseId,
@@ -186,6 +188,8 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
         unitPrice: editForm.unitPrice?.trim() || '0',
         imageUrl: editForm.imageUrl?.trim() || '',
         remark: editForm.remark || undefined,
+        colorSize: options.buildEditColorSize?.() ?? undefined,
+        colorImages: options.buildEditColorImages?.() ?? undefined,
       })
       ElMessage.success('保存成功')
       await loadDetail(stockId)

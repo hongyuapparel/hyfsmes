@@ -36,6 +36,7 @@ export interface OrderListQuery {
   status?: string;
   orderTypeId?: number | null;
   collaborationTypeId?: number | null;
+  deletedOnly?: boolean;
   page?: number;
   pageSize?: number;
 }

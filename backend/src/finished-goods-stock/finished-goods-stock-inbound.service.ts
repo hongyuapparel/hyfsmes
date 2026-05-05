@@ -21,6 +21,7 @@ type ManualInboundDto = {
 };
 
 type UpdateMetaDto = {
+  skuCode?: string;
   department?: string;
   inventoryTypeId?: number | null;
   warehouseId?: number | null;
@@ -28,6 +29,8 @@ type UpdateMetaDto = {
   unitPrice?: string | number;
   imageUrl?: string;
   remark?: string;
+  colorSize?: unknown;
+  colorImages?: Array<{ colorName?: string; imageUrl?: string }>;
 };
 @Injectable()
 export class FinishedGoodsStockInboundService {
@@ -80,6 +83,44 @@ export class FinishedGoodsStockInboundService {
         if (!this.isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
       }
     }
+  }
+
+  private async replaceColorImagesForStock(
+    stockId: number,
+    imageRows: Array<{ colorName?: string; imageUrl?: string }>,
+  ): Promise<void> {
+    try {
+      await this.colorImageRepo.delete({ finishedStockId: stockId });
+      const rows = imageRows
+        .map((row) => ({
+          colorName: String(row.colorName ?? '').trim(),
+          imageUrl: String(row.imageUrl ?? '').trim(),
+        }))
+        .filter((row) => row.colorName && row.imageUrl);
+      if (!rows.length) return;
+      await this.colorImageRepo.save(
+        rows.map((row) => this.colorImageRepo.create({ finishedStockId: stockId, ...row })),
+      );
+    } catch (e) {
+      if (!this.isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+    }
+  }
+
+  private async getColorImagesSnapshot(stockId: number): Promise<Array<{ colorName: string; imageUrl: string }>> {
+    try {
+      const rows = await this.colorImageRepo.find({ where: { finishedStockId: stockId }, order: { colorName: 'ASC' } });
+      return rows.map((row) => ({
+        colorName: String(row.colorName ?? '').trim(),
+        imageUrl: String(row.imageUrl ?? '').trim(),
+      }));
+    } catch (e) {
+      if (!this.isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+      return [];
+    }
+  }
+
+  private sameJson(a: unknown, b: unknown): boolean {
+    return JSON.stringify(a) === JSON.stringify(b);
   }
 
   private async appendFinishedStockAdjustLog(
@@ -309,37 +350,38 @@ export class FinishedGoodsStockInboundService {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('库存记录不存在');
     const before = {
-      department: stock.department ?? '',
-      inventoryTypeId: stock.inventoryTypeId ?? null,
-      warehouseId: stock.warehouseId ?? null,
-      location: stock.location ?? '',
-      unitPrice: stock.unitPrice != null ? String(stock.unitPrice) : '0',
-      imageUrl: stock.imageUrl ?? '',
+      ...this.inboundQueryService.stockAdjustSnapshot(stock),
+      colorImages: await this.getColorImagesSnapshot(id),
     };
+    if (dto.skuCode !== undefined) {
+      const skuCode = (dto.skuCode ?? '').trim();
+      if (!skuCode) throw new BadRequestException('SKU不能为空');
+      stock.skuCode = skuCode;
+    }
     if (dto.department !== undefined) stock.department = (dto.department ?? '').trim();
     if (dto.inventoryTypeId !== undefined) stock.inventoryTypeId = dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null;
     if (dto.warehouseId !== undefined) stock.warehouseId = dto.warehouseId != null ? Number(dto.warehouseId) : null;
     if (dto.location !== undefined) stock.location = (dto.location ?? '').trim();
     if (dto.unitPrice !== undefined) stock.unitPrice = this.normalizeOrderUnitPrice(dto.unitPrice);
     if (dto.imageUrl !== undefined) stock.imageUrl = (dto.imageUrl ?? '').trim();
+    if (dto.colorSize !== undefined) {
+      const parsed = this.inboundQueryService.parseColorSizeInput(dto.colorSize).snapshot;
+      this.inboundQueryService.assertColorSizeSnapshotTotal(parsed, stock.quantity, '库存详情的码数明细合计必须等于当前库存数量');
+      stock.colorSizeSnapshot = parsed;
+    }
     const saved = await this.stockRepo.save(stock);
+    if (dto.colorImages !== undefined) {
+      await this.replaceColorImagesForStock(saved.id, dto.colorImages);
+    }
     const after = {
-      department: saved.department ?? '',
-      inventoryTypeId: saved.inventoryTypeId ?? null,
-      warehouseId: saved.warehouseId ?? null,
-      location: saved.location ?? '',
-      unitPrice: saved.unitPrice != null ? String(saved.unitPrice) : '0',
-      imageUrl: saved.imageUrl ?? '',
+      ...this.inboundQueryService.stockAdjustSnapshot(saved),
+      colorImages: await this.getColorImagesSnapshot(saved.id),
     };
-    const changed =
-      before.department !== after.department ||
-      before.inventoryTypeId !== after.inventoryTypeId ||
-      before.warehouseId !== after.warehouseId ||
-      before.location !== after.location ||
-      before.unitPrice !== after.unitPrice ||
-      before.imageUrl !== after.imageUrl;
-    if (changed) {
-      await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, dto.remark ?? '');
+    const remarkText = (dto.remark ?? '').trim();
+    if (!this.sameJson(before, after) || remarkText) {
+      await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, remarkText || '修改库存信息', {
+        action: 'meta',
+      });
     }
     return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
   }
@@ -351,19 +393,36 @@ export class FinishedGoodsStockInboundService {
     if (!colorName) throw new NotFoundException('颜色不能为空');
     const imageUrl = (dto.imageUrl ?? '').trim();
     try {
+      const before = { colorImages: await this.getColorImagesSnapshot(id) };
       const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: id, colorName } });
       if (!imageUrl) {
         if (existing) await this.colorImageRepo.remove(existing);
+        const after = { colorImages: await this.getColorImagesSnapshot(id) };
+        if (!this.sameJson(before, after)) {
+          await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, `更新颜色图片：${colorName}`, {
+            action: 'image',
+          });
+        }
         await this.consolidateDuplicateFinishedStocks(stock, operatorUsername, '合并重复库存');
         return;
       }
       if (existing) {
         existing.imageUrl = imageUrl;
         await this.colorImageRepo.save(existing);
+        const after = { colorImages: await this.getColorImagesSnapshot(id) };
+        if (!this.sameJson(before, after)) {
+          await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, `更新颜色图片：${colorName}`, {
+            action: 'image',
+          });
+        }
         await this.consolidateDuplicateFinishedStocks(stock, operatorUsername, '合并重复库存');
         return;
       }
       await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: id, colorName, imageUrl }));
+      const after = { colorImages: await this.getColorImagesSnapshot(id) };
+      await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, `更新颜色图片：${colorName}`, {
+        action: 'image',
+      });
       await this.consolidateDuplicateFinishedStocks(stock, operatorUsername, '合并重复库存');
     } catch (e) {
       if (this.isTableMissingError(e, 'finished_goods_stock_color_images')) {

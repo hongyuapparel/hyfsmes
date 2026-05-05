@@ -21,6 +21,7 @@ export interface FinishedStockRow {
   inventoryTypeId: number | null
   department: string
   location: string
+  remark?: string
   productImageUrl?: string
   imageUrl?: string
   createdAt: string
@@ -117,6 +118,7 @@ export function getFinishedStockDetail(id: number) {
 export function updateFinishedStockMeta(
   id: number,
   body: {
+    skuCode?: string
     department?: string
     inventoryTypeId?: number | null
     warehouseId?: number | null
@@ -124,6 +126,11 @@ export function updateFinishedStockMeta(
     unitPrice?: string
     imageUrl?: string
     remark?: string
+    colorSize?: {
+      headers: string[]
+      rows: Array<{ colorName: string; imageUrl?: string; quantities: number[] }>
+    }
+    colorImages?: Array<{ colorName: string; imageUrl: string }>
   }
 ) {
   return request.patch<FinishedStockRow>(`/inventory/finished/items/${id}`, body)

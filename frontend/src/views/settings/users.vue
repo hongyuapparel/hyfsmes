@@ -58,8 +58,8 @@
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="lastLoginAt" label="最后登录" width="160">
-        <template #default="{ row }">{{ row.lastLoginAt ? formatDate(row.lastLoginAt) : '-' }}</template>
+      <el-table-column prop="lastActiveAt" label="最近活跃" width="160">
+        <template #default="{ row }">{{ row.lastActiveAt ? formatDate(row.lastActiveAt) : (row.lastLoginAt ? formatDate(row.lastLoginAt) : '-') }}</template>
       </el-table-column>
       <el-table-column label="操作" min-width="170">
         <template #default="{ row }">

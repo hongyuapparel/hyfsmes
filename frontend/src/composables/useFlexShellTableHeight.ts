@@ -1,4 +1,4 @@
-import { type Ref, ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { type Ref, ref, watch, onUnmounted, nextTick } from 'vue'
 
 export function useFlexShellTableHeight(
   shellRef: Ref<HTMLElement | null>,
@@ -13,15 +13,19 @@ export function useFlexShellTableHeight(
     }
   }
 
-  onMounted(() => {
-    nextTick(() => {
-      update()
-      if (shellRef.value) {
+  watch(shellRef, (el) => {
+    observer?.disconnect()
+    observer = null
+    if (el) {
+      nextTick(() => {
+        update()
         observer = new ResizeObserver(update)
-        observer.observe(shellRef.value)
-      }
-    })
-  })
+        observer.observe(el)
+      })
+    } else {
+      tableHeight.value = undefined
+    }
+  }, { immediate: true })
 
   onUnmounted(() => {
     observer?.disconnect()

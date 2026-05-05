@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository, SelectQueryBuilder } from 'typeorm';
+import { In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import {
   OrderExt,
@@ -117,8 +117,12 @@ export class OrderQueryService {
       customerDueEnd,
       factory,
       status,
+      deletedOnly,
     } = query;
     const includeStatus = options?.includeStatus ?? true;
+
+    if (deletedOnly) qb.andWhere('o.deleted_at IS NOT NULL');
+    else qb.andWhere('o.deleted_at IS NULL');
 
     if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
     if (skuCode?.trim()) qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
@@ -151,7 +155,7 @@ export class OrderQueryService {
   }
 
   async findOne(id: number): Promise<OrderDetail> {
-    const order = await this.orderRepo.findOne({ where: { id } });
+    const order = await this.orderRepo.findOne({ where: { id, deletedAt: IsNull() } });
     if (!order) throw new NotFoundException('订单不存在');
 
     const ext = await this.orderExtRepo.findOne({ where: { orderId: id } });

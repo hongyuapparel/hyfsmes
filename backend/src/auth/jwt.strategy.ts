@@ -15,6 +15,8 @@ export interface JwtPayload {
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private static readonly ACTIVE_TOUCH_INTERVAL_MS = 5 * 60 * 1000;
+
   constructor(
     @InjectRepository(User)
     private userRepo: Repository<User>,
@@ -45,6 +47,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     const user = await this.userRepo.findOne({ where: { id: payload.sub } });
     if (!user) throw new UnauthorizedException();
+    const now = new Date();
+    const shouldTouchActiveAt =
+      !user.lastActiveAt || now.getTime() - new Date(user.lastActiveAt).getTime() >= JwtStrategy.ACTIVE_TOUCH_INTERVAL_MS;
+    if (shouldTouchActiveAt) {
+      await this.userRepo.update(user.id, { lastActiveAt: now });
+      user.lastActiveAt = now;
+    }
     return { userId: user.id, username: user.username };
   }
 }

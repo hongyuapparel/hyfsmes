@@ -8,6 +8,8 @@ import { Role } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
+const UNGROUPED_PRODUCT_GROUP_LABEL = '未分组';
+
 export interface ProductListQuery {
   productName?: string;
   companyName?: string;
@@ -67,9 +69,12 @@ export class ProductsService {
     }
     if (typeof productGroupId === 'number') {
       const groupIds = await this.systemOptionsService.getSelfAndDescendantIds('product_groups', productGroupId);
-      qb.andWhere('p.product_group_id IN (:...groupIds)', {
-        groupIds,
-      });
+      const ungroupedGroupId = await this.getUngroupedProductGroupId();
+      if (ungroupedGroupId === productGroupId) {
+        qb.andWhere('(p.product_group_id IN (:...groupIds) OR p.product_group_id IS NULL)', { groupIds });
+      } else {
+        qb.andWhere('p.product_group_id IN (:...groupIds)', { groupIds });
+      }
     }
     if (typeof applicablePeopleId === 'number') {
       qb.andWhere('p.applicable_people_id = :apid', { apid: applicablePeopleId });
@@ -264,6 +269,10 @@ export class ProductsService {
     await this.productRepo.delete(ids);
   }
 
+  private getUngroupedProductGroupId(): Promise<number | null> {
+    return this.systemOptionsService.findRootIdByValue('product_groups', UNGROUPED_PRODUCT_GROUP_LABEL);
+  }
+
   /** 各产品分组下的产品数量（按 product_group_id），返回 id + 路径 + count，改名后展示自动同步 */
   async getGroupCounts(): Promise<{ productGroupId: number; productGroupPath: string; count: number }[]> {
     const rows = await this.productRepo
@@ -273,12 +282,28 @@ export class ProductsService {
       .where('p.product_group_id IS NOT NULL')
       .groupBy('p.product_group_id')
       .getRawMany<{ productGroupId: number; count: string }>();
-    const ids = rows.map((r) => r.productGroupId).filter((n) => typeof n === 'number');
+    const countByGroupId = new Map<number, number>();
+    for (const row of rows) {
+      countByGroupId.set(row.productGroupId, Number(row.count) || 0);
+    }
+
+    const ungroupedCount = await this.productRepo
+      .createQueryBuilder('p')
+      .where('p.product_group_id IS NULL')
+      .getCount();
+    if (ungroupedCount > 0) {
+      const ungroupedGroupId = await this.getUngroupedProductGroupId();
+      if (ungroupedGroupId != null) {
+        countByGroupId.set(ungroupedGroupId, (countByGroupId.get(ungroupedGroupId) ?? 0) + ungroupedCount);
+      }
+    }
+
+    const ids = Array.from(countByGroupId.keys());
     const pathMap = ids.length ? await this.systemOptionsService.getProductGroupPathsByIds(ids) : {};
-    return rows.map((r) => ({
-      productGroupId: r.productGroupId,
-      productGroupPath: pathMap[r.productGroupId] ?? '',
-      count: Number(r.count) || 0,
+    return ids.map((id) => ({
+      productGroupId: id,
+      productGroupPath: pathMap[id] ?? '',
+      count: countByGroupId.get(id) ?? 0,
     }));
   }
 

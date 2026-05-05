@@ -116,6 +116,24 @@ function buildSizeDeltaSummary(before: Snapshot | null, after: Snapshot | null):
     .filter(Boolean);
 }
 
+function formatMetaValue(value: unknown): string {
+  const text = normalizeText(value);
+  return text || '-';
+}
+
+function buildMetaChangeSummary(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
+  const items: string[] = [];
+  if (formatMetaValue(before.skuCode) !== formatMetaValue(after.skuCode)) items.push(`SKU改为${formatMetaValue(after.skuCode)}`);
+  if (formatMetaValue(before.department) !== formatMetaValue(after.department)) items.push(`部门改为${formatMetaValue(after.department)}`);
+  if ((before.inventoryTypeId ?? null) !== (after.inventoryTypeId ?? null)) items.push(`库存类型改为${formatMetaValue(after.inventoryTypeId)}`);
+  if ((before.warehouseId ?? null) !== (after.warehouseId ?? null)) items.push(`仓库改为${formatMetaValue(after.warehouseId)}`);
+  if (formatMetaValue(before.location) !== formatMetaValue(after.location)) items.push(`存放地址改为${formatMetaValue(after.location)}`);
+  if (formatMetaValue(before.unitPrice) !== formatMetaValue(after.unitPrice)) items.push(`出厂价改为${formatMetaValue(after.unitPrice)}`);
+  if (formatMetaValue(before.imageUrl) !== formatMetaValue(after.imageUrl)) items.push(formatMetaValue(after.imageUrl) === '-' ? '产品图已清空' : '产品图已更新');
+  if (JSON.stringify(before.colorImages ?? []) !== JSON.stringify(after.colorImages ?? [])) items.push('颜色图片已更新');
+  return items;
+}
+
 export function buildFinishedStockAdjustLogSummary(input: LogSummaryInput): string {
   const before = asRecord(input.before);
   const after = asRecord(input.after);
@@ -126,7 +144,9 @@ export function buildFinishedStockAdjustLogSummary(input: LogSummaryInput): stri
   const beforeQuantity = Number(before.quantity);
   const afterQuantity = Number(after.quantity);
   const hasQuantityDelta = Number.isFinite(beforeQuantity) && Number.isFinite(afterQuantity) && beforeQuantity !== afterQuantity;
-  const isInbound = afterQuantity > beforeQuantity || remark.includes('新增库存') || remark.includes('合并入库');
+  const action = normalizeText(after.logAction) || normalizeText(before.logAction);
+  const isInbound = action === 'inbound' || afterQuantity > beforeQuantity || remark.includes('新增库存') || remark.includes('合并入库');
+  const isOutbound = action === 'outbound' || afterQuantity < beforeQuantity || remark.includes('出库');
 
   const sizeSummaries = buildSizeDeltaSummary(beforeSnapshot, afterSnapshot);
   if (isInbound) {
@@ -135,7 +155,16 @@ export function buildFinishedStockAdjustLogSummary(input: LogSummaryInput): stri
     if (hasQuantityDelta) return `${prefix} +${formatQty(afterQuantity - beforeQuantity)}件`;
     return prefix;
   }
+  if (isOutbound) {
+    const prefix = remark || '成品出库';
+    if (sizeSummaries.length) return `${prefix} ${sizeSummaries.join('；')}`;
+    if (hasQuantityDelta) return `${prefix} -${formatQty(beforeQuantity - afterQuantity)}件`;
+    return prefix;
+  }
 
-  if (sizeSummaries.length) return sizeSummaries.join('；');
+  const metaSummaries = buildMetaChangeSummary(before, after);
+  if (metaSummaries.length || sizeSummaries.length) {
+    return `${remark || '修改库存信息'}：${[...metaSummaries, ...sizeSummaries].join('；')}`;
+  }
   return remark || '更新库存信息';
 }

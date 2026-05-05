@@ -1,12 +1,15 @@
 import { computed, reactive, ref, type Ref } from 'vue'
 import type { FinishedStockRow } from '@/api/inventory'
 import type { FinishedCreateQuickAddSource } from '@/composables/useFinishedCreateForm'
+import { buildFinishedQuickAddSourceFromRows } from '@/composables/finishedQuickAddSource'
+import {
+  buildFinishedGroupColorImages,
+  buildFinishedGroupColorSizeSnapshot,
+} from '@/composables/finishedStockGroupDetail'
 import {
   normalizeColorName,
   isStockTableLeafRow,
   isStockTableParentRow,
-  remapValuesByHeaders,
-  snapshotRowTotal,
   type NormalizedStoredBreakdownSnapshot,
   type StockTableLeafRow,
   type StockTableRow,
@@ -85,24 +88,24 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     stockInfo: null,
   })
 
-  const createDialogVisible = ref(false)
+  const createDrawerVisible = ref(false)
   const createSeed = ref<FinishedCreateQuickAddSource | null>(null)
 
   function onSelectionChange(rows: StockTableRow[]) {
-    // Parent row selection → expand to all its children; deduplicate by id
-    const seen = new Set<number>()
+    // Parent row selection expands to visible child rows; count by table row key, not stock id.
+    const seen = new Set<string>()
     const result: StockTableLeafRow[] = []
     rows.forEach((row) => {
       if (isStockTableParentRow(row)) {
         row._children.forEach((child) => {
-          if (!seen.has(child.id)) {
-            seen.add(child.id)
+          if (!seen.has(child._uiKey)) {
+            seen.add(child._uiKey)
             result.push(child)
           }
         })
       } else if (isStockTableLeafRow(row)) {
-        if (!seen.has(row.id)) {
-          seen.add(row.id)
+        if (!seen.has(row._uiKey)) {
+          seen.add(row._uiKey)
           result.push(row)
         }
       }
@@ -110,58 +113,13 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     selectedRows.value = result
   }
 
-  function buildGroupColorSizeSnapshot(row: StockTableRow): NormalizedStoredBreakdownSnapshot | null {
-    const headers = getGroupSizeHeaders(row)
-    if (!headers.length) return null
-    const rowOrder: string[] = []
-    const rowMap = new Map<string, number[]>()
-    getGroupLeafRows(row).forEach((leaf) => {
-      const breakdown = leaf.sizeBreakdown
-      if (!breakdown?.headers?.length || !breakdown.rows?.length) return
-      breakdown.rows.forEach((item) => {
-        const colorName = normalizeColorName(item.colorName)
-        const values = remapValuesByHeaders(breakdown.headers, item.values ?? [], headers)
-        if (snapshotRowTotal(values) <= 0) return
-        let target = rowMap.get(colorName)
-        if (!target) {
-          target = Array(headers.length).fill(0)
-          rowMap.set(colorName, target)
-          rowOrder.push(colorName)
-        }
-        values.forEach((value, index) => {
-          target![index] += value
-        })
-      })
-    })
-    const rows = rowOrder.map((colorName) => ({ colorName, values: [...(rowMap.get(colorName) ?? [])] }))
-    return rows.length ? { headers, rows } : null
-  }
-
-  /**
-   * 聚合整组所有子库存条目的颜色图片，避免单个子条目缺失某些颜色的图片。
-   * 同一颜色取首个非空的 imageUrl。
-   */
-  function buildGroupColorImages(row: StockTableRow): Array<{ colorName: string; imageUrl: string }> {
-    const map = new Map<string, string>()
-    getGroupLeafRows(row).forEach((leaf) => {
-      const items = Array.isArray(leaf.colorImages) ? leaf.colorImages : []
-      items.forEach((entry) => {
-        const colorName = normalizeColorName(entry?.colorName)
-        const imageUrl = String(entry?.imageUrl ?? '').trim()
-        if (!colorName || !imageUrl) return
-        if (!map.has(colorName)) map.set(colorName, imageUrl)
-      })
-    })
-    return Array.from(map.entries()).map(([colorName, imageUrl]) => ({ colorName, imageUrl }))
-  }
-
   function openDetail(row: StockTableRow) {
     const detailRow = isStockTableParentRow(row) ? row._children[0] : row
     if (!isStockTableLeafRow(detailRow)) return
     detailDrawer.groupProductImage = getSharedProductImageUrl(row)
     detailDrawer.groupSizeHeaders = getGroupSizeHeaders(row)
-    detailDrawer.groupColorSizeSnapshot = buildGroupColorSizeSnapshot(row)
-    detailDrawer.groupColorImages = buildGroupColorImages(row)
+    detailDrawer.groupColorSizeSnapshot = buildFinishedGroupColorSizeSnapshot(row, getGroupLeafRows, getGroupSizeHeaders)
+    detailDrawer.groupColorImages = buildFinishedGroupColorImages(row, getGroupLeafRows)
     detailDrawer.stockId = detailRow.id
     detailDrawer.selectedColorName = isStockTableParentRow(row)
       ? null
@@ -202,24 +160,17 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     outboundDialog.visible = true
   }
 
-  function openCreateDialog() {
+  function openCreateDrawer() {
     if (storedRows.value.length >= 1) {
-      const seed = storedRows.value[0]
-      // 使用整组聚合后的颜色图片，避免某些颜色因属于其他子条目而无图
-      const colorImages = buildGroupColorImages(seed)
-      // 产品图沿用表格里 _effectiveImageUrl 已生效的 URL（避免单条目 imageUrl 为空导致主图 FAILED）
-      const sharedImage = getSharedProductImageUrl(seed)
-      createSeed.value = {
-        ...seed,
-        imageUrl: sharedImage || seed.imageUrl || '',
-        productImageUrl: sharedImage || seed.productImageUrl || '',
-        sizeBreakdown: buildGroupColorSizeSnapshot(seed) ?? seed.sizeBreakdown,
-        colorImages,
-      }
+      createSeed.value = buildFinishedQuickAddSourceFromRows(
+        storedRows.value,
+        getSharedProductImageUrl,
+        getGroupSizeHeaders,
+      )
     } else {
       createSeed.value = null
     }
-    createDialogVisible.value = true
+    createDrawerVisible.value = true
   }
 
   function syncStockColorImage(stockId: number, colorName: string, imageUrl: string) {
@@ -278,13 +229,13 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     detailDrawer,
     inboundDialog,
     outboundDialog,
-    createDialogVisible,
+    createDrawerVisible,
     createSeed,
     onSelectionChange,
     openDetail,
     openInboundDialog,
     openOutboundDialog,
-    openCreateDialog,
+    openCreateDrawer,
     onColorImagesSynced,
     onColorImageSaved,
     onMetaSaved,

@@ -38,7 +38,8 @@ export class AuthService {
   async login(username: string, password: string): Promise<{ access_token: string }> {
     const user = await this.validateUser(username, password);
     if (!user) throw new UnauthorizedException('用户名或密码错误');
-    await this.userRepo.update(user.id, { lastLoginAt: new Date() });
+    const now = new Date();
+    await this.userRepo.update(user.id, { lastLoginAt: now, lastActiveAt: now });
     const roleIds = Array.from(new Set([user.roleId, ...(user.userRoles ?? []).map((x) => x.roleId)].filter(Boolean)));
     const payload = { sub: user.id, username: user.username, roleId: user.roleId, roleIds };
     return { access_token: this.jwtService.sign(payload) };

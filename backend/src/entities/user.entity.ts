@@ -51,4 +51,7 @@ export class User {
 
   @Column({ name: 'last_login_at', type: 'datetime', nullable: true })
   lastLoginAt: Date | null;
+
+  @Column({ name: 'last_active_at', type: 'datetime', nullable: true })
+  lastActiveAt: Date | null;
 }

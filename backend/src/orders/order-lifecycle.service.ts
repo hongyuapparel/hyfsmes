@@ -25,8 +25,29 @@ export class OrderLifecycleService {
     if (!ids?.length) return;
     const orders = await this.orderRepo.findByIds(ids);
     if (!orders.length) return;
-    for (const o of orders) await this.orderStatusService.addLog(o, actor, 'delete', '删除订单');
-    await this.orderRepo.delete(ids);
+    const now = new Date();
+    for (const o of orders) {
+      if (o.deletedAt) continue;
+      o.deletedAt = now;
+      o.deletedBy = actor.username;
+      o.deleteReason = '移入回收站';
+      await this.orderRepo.save(o);
+      await this.orderStatusService.addLog(o, actor, 'delete', '删除订单（移入回收站）');
+    }
+  }
+
+  async restoreMany(ids: number[], actor: OrderActor): Promise<void> {
+    if (!ids?.length) return;
+    const orders = await this.orderRepo.findByIds(ids);
+    if (!orders.length) return;
+    for (const o of orders) {
+      if (!o.deletedAt) continue;
+      o.deletedAt = null;
+      o.deletedBy = null;
+      o.deleteReason = null;
+      await this.orderRepo.save(o);
+      await this.orderStatusService.addLog(o, actor, 'restore', '恢复订单（从回收站恢复）');
+    }
   }
 
   async reviewMany(ids: number[], actor: OrderActor): Promise<void> {

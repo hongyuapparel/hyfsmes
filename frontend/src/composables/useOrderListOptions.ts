@@ -10,6 +10,7 @@ import { getOrderStatuses, type OrderStatusItem } from '@/api/order-status-confi
 import {
   getSupplierBusinessScopeOptions,
   getSupplierBusinessScopeTreeOptions,
+  getSupplierList,
   type SupplierBusinessScopeTreeNode,
 } from '@/api/suppliers'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -174,10 +175,10 @@ export function useOrderListOptions() {
   }
 
   async function loadFactoryOptions() {
-    const factoryRes = await getSupplierBusinessScopeOptions('加工供应商')
-    const factoryVals = [...(factoryRes.data ?? [])]
-    const uniqueFactoryVals = Array.from(new Set(factoryVals.map((v) => String(v).trim()).filter(Boolean)))
-    factoryOptions.value = uniqueFactoryVals.map((v) => ({ label: v, value: v }))
+    const factoryRes = await getSupplierList({ type: '加工供应商', page: 1, pageSize: 500 })
+    const suppliers = factoryRes.data?.list ?? []
+    const uniqueNames = Array.from(new Set(suppliers.map((s) => String(s.name ?? '').trim()).filter(Boolean)))
+    factoryOptions.value = uniqueNames.map((name) => ({ label: name, value: name }))
   }
 
   async function loadCustomerOptions() {

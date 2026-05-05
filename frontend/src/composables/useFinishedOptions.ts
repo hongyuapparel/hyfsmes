@@ -1,14 +1,16 @@
 import { ref } from 'vue'
 import { getCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
-import { getDictItems } from '@/api/dicts'
-import type { SystemOptionItem } from '@/api/system-options'
+import { getDictItems, getDictTree } from '@/api/dicts'
+import type { SystemOptionItem, SystemOptionTreeNode } from '@/api/system-options'
 import { getFinishedPickupUserOptions, type FinishedPickupUserOption } from '@/api/inventory'
+
+type DepartmentOption = { value: string; label: string }
 
 export function useFinishedOptions() {
   const customerOptions = ref<{ label: string; value: string }[]>([])
   const warehouseOptions = ref<{ id: number; label: string }[]>([])
   const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
-  const departmentOptions = ref<{ value: string; label: string }[]>([])
+  const departmentOptions = ref<DepartmentOption[]>([])
   const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
 
   async function loadCustomerOptions() {
@@ -46,9 +48,20 @@ export function useFinishedOptions() {
 
   async function loadDepartmentOptions() {
     try {
-      const res = await getDictItems('org_departments')
-      const list = (res.data ?? []) as SystemOptionItem[]
-      departmentOptions.value = list.map((o) => ({ value: o.value, label: o.value }))
+      const treeRes = await getDictTree('org_departments')
+      const tree = (treeRes.data ?? []) as SystemOptionTreeNode[]
+      const treeOptions = flattenDepartmentTree(tree)
+      if (treeOptions.length) {
+        departmentOptions.value = treeOptions
+        return
+      }
+    } catch {
+      // 树接口失败时继续回退到平铺字典，避免下拉不可用。
+    }
+    try {
+      const listRes = await getDictItems('org_departments')
+      const list = (listRes.data ?? []) as SystemOptionItem[]
+      departmentOptions.value = sortSystemOptions(list).map((o) => ({ value: o.value, label: o.value }))
     } catch {
       departmentOptions.value = []
     }
@@ -89,4 +102,18 @@ export function useFinishedOptions() {
     findWarehouseLabelById,
     findInventoryTypeLabelById,
   }
+}
+
+function sortSystemOptions<T extends Pick<SystemOptionItem, 'id' | 'sortOrder'>>(items: T[]): T[] {
+  return [...items].sort((a, b) => a.sortOrder - b.sortOrder || a.id - b.id)
+}
+
+function flattenDepartmentTree(nodes: SystemOptionTreeNode[], depth = 0): DepartmentOption[] {
+  return sortSystemOptions(nodes).flatMap((node) => {
+    const label = depth > 0 ? `${'　'.repeat(depth)}${node.value}` : node.value
+    return [
+      { value: node.value, label },
+      ...flattenDepartmentTree(Array.isArray(node.children) ? node.children : [], depth + 1),
+    ]
+  })
 }

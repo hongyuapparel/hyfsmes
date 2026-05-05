@@ -1,13 +1,14 @@
 <template>
-  <el-dialog
+  <AppDrawer
     :model-value="modelValue"
     :title="quickAddSource ? '新增库存数量' : '新增库存'"
-    width="960"
-    top="6vh"
-    destroy-on-close
-    class="finished-create-dialog"
-    @update:model-value="onDialogVisibleChange"
-    @close="resetCreateForm"
+    :size="980"
+    :min-size="760"
+    :max-size="1280"
+    :resizable="true"
+    class="finished-create-drawer"
+    @update:model-value="onDrawerVisibleChange"
+    @closed="resetCreateForm"
   >
     <el-form
       ref="createFormRef"
@@ -69,8 +70,8 @@
           <div class="detail-basic-value">
             <el-input v-model="createForm.location" placeholder="存放地址（默认值）" clearable size="small" />
           </div>
-          <div class="detail-basic-label detail-basic-label-row-start">备注</div>
-          <div class="detail-basic-value detail-basic-value-span-3">
+          <div class="detail-basic-label">备注</div>
+          <div class="detail-basic-value">
             <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
           </div>
           <template #image>
@@ -85,7 +86,10 @@
           :summary-method="getCreateColorSizeSummary"
           :sum-detail-row-qty="sumDetailRowQty"
           :create-row-total-price="createRowTotalPrice"
-          :structure-readonly="Boolean(quickAddSource)"
+          :quantity-readonly="false"
+          :image-editable="true"
+          :show-row-meta-columns="true"
+          :show-inheritance-tip="true"
           :warehouse-options="warehouseOptions"
           :inventory-type-options="inventoryTypeOptions"
           :department-options="departmentOptions"
@@ -102,7 +106,7 @@
       <el-button @click="emit('update:modelValue', false)">取消</el-button>
       <el-button type="primary" :loading="createSubmitting" @click="submitCreate">确定</el-button>
     </template>
-  </el-dialog>
+  </AppDrawer>
 
   <el-dialog v-model="createSkuDialogVisible" title="选择 SKU" width="760px" destroy-on-close>
     <el-input
@@ -143,11 +147,17 @@
 
 <script setup lang="ts">
 import { watch } from 'vue'
+import AppDrawer from '@/components/AppDrawer.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import FinishedBasicInfoGrid from '@/components/inventory/finished-shared/FinishedBasicInfoGrid.vue'
 import FinishedCreateSizeMatrix from '@/components/inventory/FinishedCreateSizeMatrix.vue'
-import { useFinishedCreateForm, type FinishedCreateQuickAddSource } from '@/composables/useFinishedCreateForm'
+import {
+  useFinishedCreateForm,
+  type FinishedCreateQuickAddSource,
+  type FinishedCreateRowMetaField,
+  type FinishedCreateSizeRow,
+} from '@/composables/useFinishedCreateForm'
 
 const props = defineProps<{
   modelValue: boolean
@@ -192,12 +202,15 @@ const {
   () => emit('update:modelValue', false),
 )
 
-// 转发行级元数据修改：FinishedCreateRowMetaField 在 useFinishedCreateForm 中定义
-function onRowMetaChange(rowKey: string, field: 'department' | 'inventoryTypeId' | 'warehouseId' | 'location', value: string | number | null) {
-  setRowMetaField(rowKey, field, value as never)
+function onRowMetaChange<K extends FinishedCreateRowMetaField>(
+  rowKey: string,
+  field: K,
+  value: FinishedCreateSizeRow[K],
+) {
+  setRowMetaField(rowKey, field, value)
 }
 
-function onDialogVisibleChange(value: boolean) {
+function onDrawerVisibleChange(value: boolean) {
   emit('update:modelValue', value)
 }
 
@@ -211,28 +224,16 @@ watch(
 </script>
 
 <style scoped>
+.create-form-grid { height: 100%; min-height: 0; }
 .create-form-grid .el-form-item { margin-bottom: var(--space-sm); }
-.create-sections { display: flex; flex-direction: column; gap: 10px; }
-</style>
+.create-sections { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; overflow: hidden; padding: 0 12px 8px; }
 
-<style>
-/* 内容多时，弹窗高度受限于视口，body 内部滚动而不撑出屏幕 */
-.finished-create-dialog.el-dialog {
-  display: flex;
-  flex-direction: column;
-  max-height: 88vh;
-  margin-bottom: 0 !important;
-}
-.finished-create-dialog .el-dialog__header {
-  flex-shrink: 0;
-}
-.finished-create-dialog .el-dialog__body {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow-y: auto;
-}
-.finished-create-dialog .el-dialog__footer {
-  flex-shrink: 0;
-  border-top: 1px solid var(--el-border-color-lighter);
-}
+:deep(.el-drawer__header) { margin-bottom: 0; padding-bottom: 0; }
+:deep(.el-drawer__body) { padding-top: 0; }
+:deep(.el-form-item__label),
+:deep(.el-input__inner),
+:deep(.el-select__selected-item),
+:deep(.el-table),
+:deep(.el-table th),
+:deep(.el-table td) { font-size: 12px; }
 </style>

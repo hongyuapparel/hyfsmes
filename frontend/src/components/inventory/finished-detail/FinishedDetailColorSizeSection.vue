@@ -1,92 +1,114 @@
 <template>
-  <div class="detail-section">
+  <FinishedCreateSizeMatrix
+    v-if="sizeHeaders.length && colorSizeRows.length"
+    v-model:size-headers="sizeHeadersModel"
+    v-model:size-rows="sizeRowsModel"
+    v-model:unit-price="unitPriceModel"
+    :summary-method="getMatrixSummary"
+    :sum-detail-row-qty="sumRowQty"
+    :create-row-total-price="rowTotalPrice"
+    :structure-readonly="!metaEditing"
+    :quantity-readonly="true"
+    :image-editable="metaEditing"
+    :unit-price-editable="metaEditing"
+    :unit-price-readonly-text="tableUnitPrice"
+    :show-row-meta-columns="true"
+    :show-inheritance-tip="true"
+    :show-header-actions="metaEditing"
+    :allow-structure-actions="false"
+    :row-meta-readonly="!metaEditing"
+    :warehouse-options="warehouseOptions"
+    :inventory-type-options="inventoryTypeOptions"
+    :department-options="departmentOptions"
+    @add-color-row="emit('addColorRow')"
+    @add-size-column="emit('addSizeColumn')"
+    @remove-color-row="(index) => emit('removeColorRow', index)"
+    @remove-size-column="(index) => emit('removeSizeColumn', index)"
+    @apply-basic-info-to-all-rows="emit('applyBasicInfoToAllRows')"
+    @row-meta-change="onRowMetaChange"
+    @save-color-image="onSaveColorImage"
+  />
+  <div v-else class="detail-section">
     <div class="detail-section-title">颜色图片与码数明细</div>
-    <div v-if="sizeHeaders.length && colorSizeRows.length" class="detail-color-size-table-wrap">
-      <el-table
-        :data="colorSizeRows"
-        border
-        size="small"
-        class="detail-color-size-table"
-        show-summary
-        :summary-method="getColorSizeSummary"
-      >
-        <el-table-column label="颜色" width="88" align="center" header-align="center">
-          <template #default="{ row }">{{ row.colorName || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="颜色图片" width="122" align="center" header-align="center">
-          <template #default="{ row }">
-            <ImageUploadArea
-              v-if="metaEditing"
-              class="detail-color-image-editor"
-              compact
-              :model-value="colorImageMap[row.colorName] || ''"
-              @update:model-value="(url) => $emit('saveColorImage', row.colorName, String(url ?? ''))"
-            />
-            <AppImageThumb
-              v-else-if="colorImageMap[row.colorName]"
-              :raw-url="colorImageMap[row.colorName]"
-              variant="table"
-            />
-            <span v-else class="text-placeholder">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          v-for="(size, sizeIndex) in sizeHeaders"
-          :key="`size-${sizeIndex}`"
-          :label="size"
-          min-width="64"
-          align="center"
-          header-align="center"
-        >
-          <template #default="{ row }">
-            {{ Number(row.quantities?.[sizeIndex] ?? 0) || 0 }}
-          </template>
-        </el-table-column>
-        <el-table-column label="合计" width="72" align="center" header-align="center">
-          <template #default="{ row }">{{ sumRowQty(row.quantities) }}</template>
-        </el-table-column>
-        <el-table-column label="出厂价" width="88" align="center" header-align="center">
-          <template #default>
-            <el-input
-              v-if="metaEditing"
-              :model-value="unitPrice"
-              placeholder="请输入"
-              clearable
-              size="small"
-              @update:model-value="(value) => $emit('updateUnitPrice', String(value ?? ''))"
-            />
-            <template v-else>{{ tableUnitPrice }}</template>
-          </template>
-        </el-table-column>
-        <el-table-column label="总价" width="120" align="center" header-align="center">
-          <template #default="{ row }">{{ rowTotalPrice(row.quantities) }}</template>
-        </el-table-column>
-      </el-table>
-    </div>
-    <div v-else class="detail-muted">暂无颜色尺码明细（未关联订单或订单未维护颜色尺码）。</div>
+    <div class="detail-muted">暂无颜色尺码明细（未关联订单或订单未维护颜色尺码）。</div>
   </div>
 </template>
 
 <script setup lang="ts">
-import ImageUploadArea from '@/components/ImageUploadArea.vue'
-import AppImageThumb from '@/components/AppImageThumb.vue'
+import { computed } from 'vue'
+import FinishedCreateSizeMatrix from '@/components/inventory/FinishedCreateSizeMatrix.vue'
+import type { FinishedCreateRowMetaField } from '@/composables/useFinishedCreateForm'
 
-defineProps<{
+type MatrixRow = {
+  _key: string
+  colorName: string
+  imageUrl: string
+  quantities: number[]
+  department: string
+  inventoryTypeId: number | null
+  warehouseId: number | null
+  location: string
+  _overrides?: Partial<Record<FinishedCreateRowMetaField, boolean>>
+}
+
+const props = defineProps<{
   metaEditing: boolean
   sizeHeaders: string[]
-  colorSizeRows: Array<{ colorName: string; quantities: number[] }>
-  colorImageMap: Record<string, string>
+  colorSizeRows: MatrixRow[]
   unitPrice: string
   tableUnitPrice: string
+  warehouseOptions: Array<{ id: number; label: string }>
+  inventoryTypeOptions: Array<{ id: number; label: string }>
+  departmentOptions: Array<{ value: string; label: string }>
   sumRowQty: (quantities: unknown[]) => number
   rowTotalPrice: (quantities: unknown[]) => string
-  getColorSizeSummary: (params: { columns: Array<{ label?: string }> }) => string[]
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
+  (e: 'addColorRow'): void
+  (e: 'addSizeColumn'): void
+  (e: 'removeColorRow', index: number): void
+  (e: 'removeSizeColumn', index: number): void
+  (e: 'applyBasicInfoToAllRows'): void
+  (e: 'rowMetaChange', rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null): void
   (e: 'saveColorImage', colorName: string, url: string): void
   (e: 'updateUnitPrice', value: string): void
 }>()
+
+const sizeHeadersModel = computed({
+  get: () => props.sizeHeaders,
+  set: (_value: string[]) => {},
+})
+
+const sizeRowsModel = computed<MatrixRow[]>({
+  get: () => props.colorSizeRows,
+  set: (_value: MatrixRow[]) => {},
+})
+
+const unitPriceModel = computed({
+  get: () => props.unitPrice,
+  set: (value: string) => emit('updateUnitPrice', value),
+})
+
+function getMatrixSummary({ columns }: { columns: Array<{ label?: string }> }) {
+  const headerLength = props.sizeHeaders.length
+  const totalQty = props.colorSizeRows.reduce((sum, row) => sum + props.sumRowQty(row.quantities), 0)
+  return columns.map((_, index) => {
+    if (index === 0) return '汇总'
+    if (index === 2 + headerLength) return String(totalQty)
+    if (index === 3 + headerLength) return props.tableUnitPrice
+    if (index === 4 + headerLength) return props.rowTotalPrice([totalQty])
+    return ''
+  })
+}
+
+function onSaveColorImage(row: MatrixRow, url: string) {
+  emit('saveColorImage', row.colorName, url)
+}
+
+function onRowMetaChange(rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null) {
+  emit('rowMetaChange', rowKey, field, value)
+}
 </script>
 
 <style scoped>
@@ -104,11 +126,5 @@ defineEmits<{
   font-size: 13px;
   color: var(--el-text-color-primary);
 }
-.detail-color-size-table-wrap { width: 100%; }
 .detail-muted { font-size: 12px; color: var(--el-text-color-secondary); }
-
-:deep(.detail-color-size-table .el-table__cell) { overflow: visible; vertical-align: top; }
-:deep(.detail-color-size-table .image-upload-area) { min-height: 92px; }
-:deep(.detail-color-image-editor.image-upload-area) { min-height: 64px; }
-:deep(.detail-color-image-editor .preview-img) { width: 60px; height: 60px; }
 </style>

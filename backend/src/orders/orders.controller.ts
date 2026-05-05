@@ -42,6 +42,7 @@ export class OrdersController {
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
     @Query('status') status?: string,
+    @Query('deletedOnly') deletedOnly?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @CurrentUser() user?: { userId: number; username: string },
@@ -67,6 +68,7 @@ export class OrdersController {
       customerDueEnd,
       factory,
       status,
+      deletedOnly: deletedOnly === '1' || deletedOnly === 'true',
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
@@ -98,6 +100,7 @@ export class OrdersController {
     @Query('customerDueStart') customerDueStart?: string,
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
+    @Query('deletedOnly') deletedOnly?: string,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
@@ -120,6 +123,7 @@ export class OrdersController {
       customerDueStart,
       customerDueEnd,
       factory,
+      deletedOnly: deletedOnly === '1' || deletedOnly === 'true',
     };
     return this.orderQueryService.countByStatus(query, user?.userId);
   }
@@ -207,6 +211,21 @@ export class OrdersController {
     await this.orderStatusService.assertOrderActionByIds(ids ?? [], user.userId, 'delete');
     const actor: OrderActor = { userId: user.userId, username: user.username };
     return this.orderMutationService.deleteMany(ids ?? [], actor);
+  }
+
+  /**
+   * 批量恢复订单（从回收站恢复）
+   * POST /orders/restore
+   * body: { ids: number[] }
+   */
+  @Post('restore')
+  @RequirePermission('orders_restore')
+  restoreMany(
+    @Body('ids') ids: number[],
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.orderMutationService.restoreMany(ids ?? [], actor);
   }
 
   /**

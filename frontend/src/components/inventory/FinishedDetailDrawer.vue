@@ -15,7 +15,6 @@
           <el-tab-pane label="库存明细" name="size">
             <FinishedDetailBasicInfoSection
               :stock="stockInfo"
-              :order-no="orderNo"
               :display-product-image="displayProductImage"
               :meta-editing="metaEditing"
               :saving="saving"
@@ -23,7 +22,6 @@
               :inventory-type-options="inventoryTypeOptions"
               :warehouse-options="warehouseOptions"
               :department-options="departmentOptions"
-              :format-date-time="formatDateTime"
               :find-inventory-type-label="findInventoryTypeLabel"
               :find-warehouse-label="findWarehouseLabel"
               :update-field="updateEditFormField"
@@ -32,14 +30,21 @@
             />
             <FinishedDetailColorSizeSection
               :meta-editing="metaEditing"
-              :size-headers="displaySizeHeaders"
-              :color-size-rows="displayColorSizeRows"
-              :color-image-map="colorImageMap"
+              :size-headers="editSizeHeaders"
+              :color-size-rows="editSizeRows"
               :unit-price="editForm.unitPrice"
               :table-unit-price="tableUnitPrice"
+              :warehouse-options="warehouseOptions"
+              :inventory-type-options="inventoryTypeOptions"
+              :department-options="departmentOptions"
               :sum-row-qty="sumRowQty"
               :row-total-price="rowTotalPrice"
-              :get-color-size-summary="getColorSizeSummary"
+              @add-color-row="addDetailColorRow(detailMatrixMeta)"
+              @add-size-column="addDetailSizeColumn"
+              @remove-color-row="removeDetailColorRow"
+              @remove-size-column="removeDetailSizeColumn"
+              @apply-basic-info-to-all-rows="syncRowsFromBasicInfo(detailMatrixMeta)"
+              @row-meta-change="onDetailRowMetaChange"
               @save-color-image="handleSaveColorImage"
               @update-unit-price="(value) => updateEditFormField('unitPrice', value)"
             />
@@ -58,10 +63,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import AppDrawer from '@/components/AppDrawer.vue'
-import { formatDateTime } from '@/utils/date-format'
 import { sumRowQty } from '@/composables/useFinishedDetailHelpers'
 import type { FinishedDetailEditForm } from '@/composables/useFinishedDetailData'
 import { useFinishedDetailData } from '@/composables/useFinishedDetailData'
+import { useFinishedDetailMatrixEdit } from '@/composables/useFinishedDetailMatrixEdit'
+import type { FinishedCreateRowMetaField } from '@/composables/useFinishedCreateForm'
 import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTableUtils'
 import FinishedDetailBasicInfoSection from '@/components/inventory/finished-detail/FinishedDetailBasicInfoSection.vue'
 import FinishedDetailColorSizeSection from '@/components/inventory/finished-detail/FinishedDetailColorSizeSection.vue'
@@ -100,6 +106,20 @@ const emit = defineEmits<{
 const activeDetailTab = ref('size')
 
 const {
+  editSizeHeaders,
+  editSizeRows,
+  resetEditMatrix,
+  syncRowsFromBasicInfo,
+  addDetailColorRow,
+  addDetailSizeColumn,
+  removeDetailColorRow,
+  removeDetailSizeColumn,
+  setDetailRowMetaField,
+  buildEditColorSize,
+  buildEditColorImages,
+} = useFinishedDetailMatrixEdit()
+
+const {
   loading,
   saving,
   data,
@@ -112,7 +132,6 @@ const {
   displayColorSizeRows,
   tableUnitPrice,
   rowTotalPrice,
-  getColorSizeSummary,
   findInventoryTypeLabel,
   findWarehouseLabel,
   toggleEditMode,
@@ -122,6 +141,8 @@ const {
 } = useFinishedDetailData({
   inventoryTypeOptions: () => props.inventoryTypeOptions,
   warehouseOptions: () => props.warehouseOptions,
+  buildEditColorSize: () => buildEditColorSize(),
+  buildEditColorImages: () => buildEditColorImages(),
   onColorImagesSynced: (stockId, colorImages) => emit('colorImagesSynced', stockId, colorImages),
   onColorImageSaved: (payload) => emit('colorImageSaved', payload),
   onMetaSaved: () => emit('metaSaved'),
@@ -130,17 +151,13 @@ const {
 const stockInfo = computed(
   () =>
     ((data.value?.stock as Record<string, unknown> | undefined) ?? {
-      createdAt: '',
       skuCode: '',
-      customerName: '',
       inventoryTypeId: null,
       warehouseId: null,
       department: '',
       location: '',
     }) as {
-      createdAt?: string
       skuCode?: string
-      customerName?: string
       inventoryTypeId?: number | null
       warehouseId?: number | null
       department?: string
@@ -148,7 +165,16 @@ const stockInfo = computed(
     },
 )
 
-const orderNo = computed(() => String((data.value?.orderNo as string | undefined) ?? ''))
+const detailMatrixMeta = computed(() => ({
+  department: metaEditing.value ? editForm.department : (stockInfo.value.department ?? ''),
+  inventoryTypeId: metaEditing.value ? editForm.inventoryTypeId : (stockInfo.value.inventoryTypeId ?? null),
+  warehouseId: metaEditing.value ? editForm.warehouseId : (stockInfo.value.warehouseId ?? null),
+  location: metaEditing.value ? editForm.location : (stockInfo.value.location ?? ''),
+}))
+
+function resetDetailMatrixFromDisplay() {
+  resetEditMatrix(displaySizeHeaders.value, displayColorSizeRows.value, colorImageMap.value, detailMatrixMeta.value)
+}
 
 function updateEditFormField<K extends keyof FinishedDetailEditForm>(
   key: K,
@@ -165,6 +191,18 @@ function handleSaveMeta() {
 function handleSaveColorImage(colorName: string, url: string) {
   if (!props.stockId) return
   saveColorImage(props.stockId, colorName, url)
+}
+
+function onDetailRowMetaChange(
+  _rowKey: string,
+  field: FinishedCreateRowMetaField,
+  value: string | number | null,
+) {
+  if (field === 'department') updateEditFormField('department', String(value ?? ''))
+  else if (field === 'inventoryTypeId') updateEditFormField('inventoryTypeId', value == null ? null : Number(value))
+  else if (field === 'warehouseId') updateEditFormField('warehouseId', value == null ? null : Number(value))
+  else updateEditFormField('location', String(value ?? ''))
+  setDetailRowMetaField(field, value)
 }
 
 watch(
@@ -184,37 +222,56 @@ watch(
     }
   },
 )
+
+watch(
+  () => [displaySizeHeaders.value, displayColorSizeRows.value, colorImageMap.value, data.value] as const,
+  () => {
+    if (!metaEditing.value) resetDetailMatrixFromDisplay()
+  },
+  { deep: true },
+)
+
+watch(
+  () => metaEditing.value,
+  () => resetDetailMatrixFromDisplay(),
+)
+
+watch(
+  detailMatrixMeta,
+  (meta) => {
+    if (metaEditing.value) syncRowsFromBasicInfo(meta)
+  },
+)
 </script>
 
 <style scoped>
 .detail-wrap {
-  padding: 0 12px 12px 12px;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0 12px 8px 12px;
 }
-.detail-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+.detail-sections { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .detail-tabs {
+  flex: 1;
   min-width: 0;
+  min-height: 0;
 }
 .detail-tabs :deep(.el-tabs__content) {
+  height: calc(100% - 40px);
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.detail-tabs :deep(.el-tab-pane) {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
+.detail-tabs :deep(.el-tab-pane) { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .detail-muted {
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
 
 /* el-drawer overrides */
-:deep(.el-drawer__header) { margin-bottom: 6px; padding-bottom: 0; }
+:deep(.el-drawer__header) { margin-bottom: 0; padding-bottom: 0; }
 :deep(.el-drawer__body) { padding-top: 0; }
 :deep(.el-form-item__label),
 :deep(.el-input__inner),
