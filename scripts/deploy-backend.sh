@@ -24,7 +24,7 @@ if [ "$ENABLE_GIT_PUSH" = "1" ]; then
 fi
 
 cd "$BACKEND_DIR"
-npm install
+npm install --include=dev
 npm run build
 if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
   pm2 restart "$PM2_APP_NAME"

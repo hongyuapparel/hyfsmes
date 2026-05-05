@@ -25,7 +25,7 @@ if [ "$ENABLE_GIT_PUSH" = "1" ]; then
 fi
 
 cd "$FRONTEND_DIR"
-npm install
+npm install --include=dev
 npm run build
 
 if [ ! -d "$FRONTEND_DIST" ]; then

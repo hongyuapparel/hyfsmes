@@ -27,7 +27,7 @@ fi
 
 echo "[deploy-full] start backend"
 cd "$BACKEND_DIR"
-npm install
+npm install --include=dev
 npm run build
 if pm2 describe "$PM2_APP_NAME" >/dev/null 2>&1; then
   pm2 restart "$PM2_APP_NAME"
@@ -38,7 +38,7 @@ pm2 save
 
 echo "[deploy-full] start frontend"
 cd "$FRONTEND_DIR"
-npm install
+npm install --include=dev
 npm run build
 
 if [ ! -d "$FRONTEND_DIST" ]; then
