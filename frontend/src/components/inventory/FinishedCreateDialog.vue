@@ -17,72 +17,66 @@
       class="create-form-grid"
     >
       <div class="create-sections">
-        <div class="detail-section">
-          <div class="detail-section-title">基础信息与产品图</div>
-          <div class="detail-basic-main">
-            <div class="detail-basic-grid">
-              <div class="detail-basic-label">SKU</div>
-              <div class="detail-basic-value">
-                <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small" :disabled="Boolean(quickAddSource)">
-                  <template #suffix>
-                    <el-button v-if="!quickAddSource" link type="primary" size="small" @click.stop="openCreateSkuDialog">选择</el-button>
-                  </template>
-                </el-input>
-              </div>
-              <div class="detail-basic-label">部门</div>
-              <div class="detail-basic-value">
-                <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small">
-                  <el-option
-                    v-for="opt in departmentOptions"
-                    :key="opt.value"
-                    :label="opt.label"
-                    :value="opt.value"
-                  />
-                </el-select>
-              </div>
-              <div class="detail-basic-label">库存类型</div>
-              <div class="detail-basic-value">
-                <el-select
-                  v-model="createForm.inventoryTypeId"
-                  placeholder="请选择库存类型"
-                  filterable
-                  clearable
-                  size="small"
-                >
-                  <el-option
-                    v-for="opt in inventoryTypeOptions"
-                    :key="opt.id"
-                    :label="opt.label"
-                    :value="opt.id"
-                  />
-                </el-select>
-              </div>
-              <div class="detail-basic-label">仓库</div>
-              <div class="detail-basic-value">
-                <el-select v-model="createForm.warehouseId" placeholder="请选择仓库" filterable clearable size="small">
-                  <el-option
-                    v-for="opt in warehouseOptions"
-                    :key="opt.id"
-                    :label="opt.label"
-                    :value="opt.id"
-                  />
-                </el-select>
-              </div>
-              <div class="detail-basic-label">存放地址</div>
-              <div class="detail-basic-value">
-                <el-input v-model="createForm.location" placeholder="存放地址（默认值）" clearable size="small" />
-              </div>
-              <div class="detail-basic-label">备注</div>
-              <div class="detail-basic-value detail-basic-value-span-3">
-                <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
-              </div>
-            </div>
-            <div class="detail-product-image-panel">
-              <div class="detail-image-label">产品图</div>
-              <ImageUploadArea v-model="createForm.imageUrl" compact />
-            </div>
+        <FinishedBasicInfoGrid title="基础信息与产品图" image-label="产品图">
+          <div class="detail-basic-label">SKU</div>
+          <div class="detail-basic-value">
+            <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small" :disabled="Boolean(quickAddSource)">
+              <template #suffix>
+                <el-button v-if="!quickAddSource" link type="primary" size="small" @click.stop="openCreateSkuDialog">选择</el-button>
+              </template>
+            </el-input>
           </div>
-        </div>
+          <div class="detail-basic-label">部门</div>
+          <div class="detail-basic-value">
+            <el-select v-model="createForm.department" placeholder="请选择部门" filterable clearable size="small">
+              <el-option
+                v-for="opt in departmentOptions"
+                :key="opt.value"
+                :label="opt.label"
+                :value="opt.value"
+              />
+            </el-select>
+          </div>
+          <div class="detail-basic-label">库存类型</div>
+          <div class="detail-basic-value">
+            <el-select
+              v-model="createForm.inventoryTypeId"
+              placeholder="请选择库存类型"
+              filterable
+              clearable
+              size="small"
+            >
+              <el-option
+                v-for="opt in inventoryTypeOptions"
+                :key="opt.id"
+                :label="opt.label"
+                :value="opt.id"
+              />
+            </el-select>
+          </div>
+          <div class="detail-basic-label">仓库</div>
+          <div class="detail-basic-value">
+            <el-select v-model="createForm.warehouseId" placeholder="请选择仓库" filterable clearable size="small">
+              <el-option
+                v-for="opt in warehouseOptions"
+                :key="opt.id"
+                :label="opt.label"
+                :value="opt.id"
+              />
+            </el-select>
+          </div>
+          <div class="detail-basic-label">存放地址</div>
+          <div class="detail-basic-value">
+            <el-input v-model="createForm.location" placeholder="存放地址（默认值）" clearable size="small" />
+          </div>
+          <div class="detail-basic-label detail-basic-label-row-start">备注</div>
+          <div class="detail-basic-value detail-basic-value-span-3">
+            <el-input v-model="createForm.remark" placeholder="选填" clearable size="small" />
+          </div>
+          <template #image>
+            <ImageUploadArea v-model="createForm.imageUrl" compact />
+          </template>
+        </FinishedBasicInfoGrid>
 
         <FinishedCreateSizeMatrix
           v-model:size-headers="createSizeHeaders"
@@ -151,6 +145,7 @@
 import { watch } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
+import FinishedBasicInfoGrid from '@/components/inventory/finished-shared/FinishedBasicInfoGrid.vue'
 import FinishedCreateSizeMatrix from '@/components/inventory/FinishedCreateSizeMatrix.vue'
 import { useFinishedCreateForm, type FinishedCreateQuickAddSource } from '@/composables/useFinishedCreateForm'
 
@@ -218,18 +213,6 @@ watch(
 <style scoped>
 .create-form-grid .el-form-item { margin-bottom: var(--space-sm); }
 .create-sections { display: flex; flex-direction: column; gap: 10px; }
-.detail-section { min-width: 0; flex: 1; padding: 10px 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; background: #fff; }
-.detail-section-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--el-text-color-primary); }
-.detail-basic-main { display: grid; grid-template-columns: minmax(0, 1fr) 170px; gap: 12px; align-items: stretch; }
-.detail-basic-grid { display: grid; grid-template-columns: 96px minmax(0, 1fr) 96px minmax(0, 1fr); border: 1px solid var(--el-border-color-lighter); font-size: 12px; }
-.detail-basic-label, .detail-basic-value { min-width: 0; padding: 7px 10px; border-right: 1px solid var(--el-border-color-lighter); border-bottom: 1px solid var(--el-border-color-lighter); display: flex; align-items: center; box-sizing: border-box; }
-.detail-basic-label { font-weight: 600; color: var(--el-text-color-primary); background: var(--el-fill-color-lighter); }
-.detail-basic-value { color: var(--el-text-color-regular); overflow: hidden; }
-.detail-basic-value-span-3 { grid-column: 2 / 5; }
-.detail-basic-grid > :nth-child(4n) { border-right: none; }
-.detail-basic-grid > :nth-last-child(-n + 2) { border-bottom: none; }
-.detail-product-image-panel { display: flex; flex-direction: column; gap: 6px; width: 170px; min-width: 170px; }
-.detail-image-label { font-size: 12px; color: var(--el-text-color-secondary); }
 </style>
 
 <style>
