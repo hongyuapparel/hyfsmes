@@ -8,12 +8,7 @@
     @update:model-value="onVisibleChange"
     @close="onClose"
   >
-    <el-form
-      :ref="formRef"
-      :model="form"
-      :rules="rules"
-      label-width="80px"
-    >
+    <el-form ref="localFormRef" :model="form" :rules="rules" label-width="80px">
       <el-form-item label="领取人" prop="pickupUserId">
         <el-select
           v-model="form.pickupUserId"
@@ -96,7 +91,7 @@
     </el-form>
     <template #footer>
       <el-button @click="onCancel">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="$emit('submit')">
+      <el-button type="primary" :loading="submitting" @click="onSubmit">
         确定发货
       </el-button>
     </template>
@@ -104,6 +99,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+
 type PendingOutboundDialogItem = {
   row: {
     id: number
@@ -126,11 +124,10 @@ defineProps<{
   visible: boolean
   submitting: boolean
   items: PendingOutboundDialogItem[]
-  formRef: object
   form: {
     pickupUserId: number | null
   }
-  rules: object
+  rules: FormRules
   pickupUserOptions: PickupUserOption[]
   outboundSelectedCustomer: string
   outboundGrandTotal: number
@@ -149,6 +146,8 @@ const emit = defineEmits<{
   (e: 'submit'): void
 }>()
 
+const localFormRef = ref<FormInstance>()
+
 function onVisibleChange(value: boolean) {
   emit('update:visible', value)
 }
@@ -159,6 +158,12 @@ function onClose() {
 
 function onCancel() {
   emit('update:visible', false)
+}
+
+async function onSubmit() {
+  const valid = await localFormRef.value?.validate().then(() => true).catch(() => false)
+  if (valid) emit('submit')
+  else ElMessage.warning('请选择领取人')
 }
 </script>
 

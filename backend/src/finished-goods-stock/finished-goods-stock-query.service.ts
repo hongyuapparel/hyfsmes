@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
@@ -132,6 +132,52 @@ export class FinishedGoodsStockQueryService {
     return sortSizeHeaders(headers);
   }
 
+  private async getSkuCustomerStockIds(stock: FinishedGoodsStock): Promise<number[]> {
+    const sku = String(stock.skuCode ?? '').trim();
+    if (!sku) return [stock.id];
+    const customerName = String(stock.customerName ?? '').trim();
+    const groupStocks = await this.stockRepo
+      .createQueryBuilder('s')
+      .select(['s.id'])
+      .where('s.skuCode = :sku', { sku })
+      .andWhere('s.customerName = :customerName', { customerName })
+      .getMany();
+    const ids = groupStocks.map((item) => item.id).filter((item) => Number.isInteger(item) && item > 0);
+    return Array.from(new Set([stock.id, ...ids]));
+  }
+
+  private getLogSnapshotText(snapshot: Record<string, unknown> | null | undefined, key: string): string {
+    return snapshot && typeof snapshot === 'object' ? String(snapshot[key] ?? '').trim() : '';
+  }
+
+  private isDetailLogForStockGroup(log: FinishedGoodsStockAdjustLog, stock: FinishedGoodsStock, stockIds: number[]): boolean {
+    if (stockIds.includes(log.finishedStockId)) return true;
+    const sku = String(stock.skuCode ?? '').trim();
+    if (!sku) return false;
+    const beforeSku = this.getLogSnapshotText(log.before, 'skuCode');
+    const afterSku = this.getLogSnapshotText(log.after, 'skuCode');
+    if (beforeSku !== sku && afterSku !== sku) return false;
+    const customerName = String(stock.customerName ?? '').trim();
+    if (!customerName) return true;
+    const beforeCustomer = this.getLogSnapshotText(log.before, 'customerName');
+    const afterCustomer = this.getLogSnapshotText(log.after, 'customerName');
+    return (!beforeCustomer && !afterCustomer) || beforeCustomer === customerName || afterCustomer === customerName;
+  }
+
+  private async getDetailAdjustLogs(stock: FinishedGoodsStock): Promise<FinishedGoodsStockAdjustLog[]> {
+    const stockIds = await this.getSkuCustomerStockIds(stock);
+    const [directLogs, recentLogs] = await Promise.all([
+      this.adjustLogRepo.find({ where: { finishedStockId: In(stockIds) }, order: { createdAt: 'DESC' }, take: 100 }),
+      this.adjustLogRepo.find({ order: { createdAt: 'DESC' }, take: 500 }),
+    ]);
+    const map = new Map<number, FinishedGoodsStockAdjustLog>();
+    directLogs.forEach((log) => map.set(log.id, log));
+    recentLogs
+      .filter((log) => this.isDetailLogForStockGroup(log, stock, stockIds))
+      .forEach((log) => map.set(log.id, log));
+    return Array.from(map.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 100);
+  }
+
   private async getDetailInternal(id: number): Promise<FinishedGoodsStockDetailResult> {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('库存记录不存在');
@@ -152,7 +198,7 @@ export class FinishedGoodsStockQueryService {
       if (!isTableMissingError(error, 'finished_goods_stock_color_images')) throw error;
     }
     try {
-      logs = await this.adjustLogRepo.find({ where: { finishedStockId: id }, order: { createdAt: 'DESC' }, take: 50 });
+      logs = await this.getDetailAdjustLogs(stock);
     } catch (error) {
       if (!isTableMissingError(error, 'finished_goods_stock_adjust_logs')) throw error;
     }

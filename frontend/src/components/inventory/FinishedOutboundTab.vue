@@ -72,6 +72,9 @@
         :show-overflow-tooltip="column.prop !== 'createdAt'"
         align="center"
       />
+      <el-table-column label="颜色" min-width="90" align="center" show-overflow-tooltip>
+        <template #default="{ row }">{{ getOutboundColorText(row) }}</template>
+      </el-table-column>
       <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
         <template #default="{ row }">
           <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" :width="compactImageSize" :height="compactImageSize" />
@@ -193,6 +196,14 @@ const outboundPageTotalQuantity = computed(() =>
 
 function handleHeaderDragEnd(...args: unknown[]) {
   emit('header-dragend', ...args)
+}
+
+function getOutboundColorText(row: FinishedOutboundRecord) {
+  const colors = Array.from(
+    new Set((row.sizeBreakdown?.rows ?? []).map((item) => item.colorName.trim()).filter(Boolean)),
+  )
+  if (colors.length === 0) return '-'
+  return colors.length === 1 ? colors[0] : '多个'
 }
 </script>
 

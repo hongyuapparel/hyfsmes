@@ -204,7 +204,6 @@
       v-model:visible="outboundDialog.visible"
       :submitting="outboundDialog.submitting"
       :items="outboundDialog.items"
-      :form-ref="outboundFormRef"
       :form="outboundForm"
       :rules="outboundRules"
       :pickup-user-options="pickupUserOptions"
@@ -291,7 +290,6 @@ const {
   inventoryTypeOptions,
   departmentOptions,
   outboundDialog,
-  outboundFormRef,
   outboundForm,
   outboundRules,
   pickupUserOptions,

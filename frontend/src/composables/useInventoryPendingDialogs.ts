@@ -88,7 +88,6 @@ export function useInventoryPendingDialogs({
     submitting: boolean
     items: PendingOutboundDialogItem[]
   }>({ visible: false, submitting: false, items: [] })
-  const outboundFormRef = ref<FormInstance>()
   const outboundForm = reactive({
     pickupUserId: null as number | null,
   })
@@ -225,40 +224,49 @@ export function useInventoryPendingDialogs({
       return
     }
     outboundForm.pickupUserId = null
-    await Promise.all(
-      rows
-        .map((row) => row.orderId)
-        .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-        .map((orderId) => ensureColorSizeBreakdown(orderId)),
-    )
-    outboundDialog.items = rows.map((row) => {
-      const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-      const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-      const br = breakdown?.rows ?? []
-      const dialogRows = br.map((r) => ({
-        colorName: r.colorName,
-        quantities: headers.map(() => 0),
-      }))
-      distributePendingToColorSizeGrid(dialogRows, br, headers.length, Number(row.quantity) || 0)
-      return {
-        row,
-        headers,
-        rows: dialogRows,
-      }
-    })
-    outboundDialog.visible = true
+    outboundDialog.submitting = true
+    try {
+      await Promise.all(
+        rows
+          .map((row) => row.orderId)
+          .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
+          .map((orderId) => ensureColorSizeBreakdown(orderId)),
+      )
+      outboundDialog.items = rows.map((row) => {
+        const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
+        const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
+        const br = breakdown?.rows ?? []
+        const dialogRows = br.map((r) => ({
+          colorName: r.colorName,
+          quantities: headers.map(() => 0),
+        }))
+        distributePendingToColorSizeGrid(dialogRows, br, headers.length, Number(row.quantity) || 0)
+        return {
+          row,
+          headers,
+          rows: dialogRows,
+        }
+      })
+      outboundDialog.visible = true
+    } catch (e: unknown) {
+      outboundDialog.items = []
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    } finally {
+      outboundDialog.submitting = false
+    }
   }
 
   function resetOutboundForm() {
     outboundDialog.items = []
     outboundForm.pickupUserId = null
-    outboundFormRef.value?.clearValidate()
   }
 
   async function submitOutbound() {
     if (!outboundDialog.items.length) return
-    const valid = await outboundFormRef.value?.validate().catch(() => false)
-    if (!valid) return
+    if (outboundForm.pickupUserId == null) {
+      ElMessage.warning('请选择领取人')
+      return
+    }
     const invalidItem = outboundDialog.items.find((item) => {
       const qty = getOutboundItemTotal(item)
       return item.headers.length === 0 || qty <= 0 || qty > item.row.quantity
@@ -311,7 +319,6 @@ export function useInventoryPendingDialogs({
     inventoryTypeOptions,
     departmentOptions,
     outboundDialog,
-    outboundFormRef,
     outboundForm,
     outboundRules,
     pickupUserOptions,

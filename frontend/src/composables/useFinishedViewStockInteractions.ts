@@ -1,7 +1,9 @@
 import { computed, reactive, ref, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import type { FinishedStockRow } from '@/api/inventory'
 import type { FinishedCreateQuickAddSource } from '@/composables/useFinishedCreateForm'
 import { buildFinishedQuickAddSourceFromRows } from '@/composables/finishedQuickAddSource'
+import type { FinishedOutboundStockInfo } from '@/composables/useFinishedOutboundDialog'
 import {
   buildFinishedGroupColorImages,
   buildFinishedGroupColorSizeSnapshot,
@@ -34,18 +36,7 @@ type InboundDialogState = {
 
 type OutboundDialogState = {
   visible: boolean
-  stockId: number | null
-  stockInfo: {
-    orderId: number | null
-    orderNo: string
-    skuCode: string
-    customerName: string
-    quantity: number
-    imageUrl: string
-    colorName: string
-    sizeBreakdown: FinishedStockRow['sizeBreakdown'] | null
-    colorImages: Array<{ colorName: string; imageUrl: string }>
-  } | null
+  items: FinishedOutboundStockInfo[]
 }
 
 type StockInteractionsOptions = {
@@ -84,8 +75,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
 
   const outboundDialog = reactive<OutboundDialogState>({
     visible: false,
-    stockId: null,
-    stockInfo: null,
+    items: [],
   })
 
   const createDrawerVisible = ref(false)
@@ -143,20 +133,25 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   }
 
   function openOutboundDialog() {
-    if (storedRows.value.length === 0) return
-    const row = { ...storedRows.value[0] }
-    outboundDialog.stockId = row.id
-    outboundDialog.stockInfo = {
+    const rows = storedRows.value
+    if (rows.length === 0) return
+    const customerNames = Array.from(new Set(rows.map((row) => row.customerName?.trim() || '__EMPTY__')))
+    if (customerNames.length > 1) {
+      ElMessage.warning('批量出库请只选择同一客户的记录')
+      return
+    }
+    outboundDialog.items = rows.map((row) => ({
+      id: row.id,
       orderId: row.orderId ?? null,
       orderNo: row.orderNo || '',
       skuCode: row.skuCode || '',
       customerName: row.customerName || '',
       quantity: Number(row.quantity) || 0,
-      imageUrl: getSharedProductImageUrl(row) || '',
+      imageUrl: String(row._effectiveImageUrl || getSharedProductImageUrl(row) || row.imageUrl || '').trim(),
       colorName: normalizeColorName(row._selectedColorName || row._displayColor),
       sizeBreakdown: row.sizeBreakdown ?? null,
       colorImages: Array.isArray(row.colorImages) ? row.colorImages : [],
-    }
+    }))
     outboundDialog.visible = true
   }
 

@@ -2,17 +2,12 @@
   <el-dialog
     :model-value="modelValue"
     title="出库"
-    width="860"
+    width="920"
     destroy-on-close
     @update:model-value="onDialogVisibleChange"
     @close="resetOutboundForm"
   >
-    <el-form
-      ref="outboundFormRef"
-      :model="outboundForm"
-      :rules="outboundRules"
-      label-width="80px"
-    >
+    <el-form ref="outboundFormRef" :model="outboundForm" :rules="outboundRules" label-width="80px">
       <el-form-item label="领取人" prop="pickupUserId">
         <el-select
           v-model="outboundForm.pickupUserId"
@@ -29,96 +24,93 @@
           />
         </el-select>
       </el-form-item>
+
       <div class="outbound-batch-head">
-        <span>客户：{{ stockInfo?.customerName || '-' }}</span>
-        <span>订单号：{{ stockInfo?.orderNo || '-' }}</span>
-        <span>SKU：{{ stockInfo?.skuCode || '-' }}</span>
+        <span>客户：{{ selectedCustomer }}</span>
+        <span>选中记录：{{ outboundItems.length }} 条</span>
         <span>出库总数：{{ outboundGrandTotal }}</span>
       </div>
-      <div class="outbound-batch-list">
-        <div class="outbound-batch-card">
+
+      <div v-loading="outboundLoading" class="outbound-batch-list">
+        <div v-for="group in groupedOutboundItems" :key="group.key" class="outbound-batch-card">
           <div class="outbound-card-meta">
-            <div>颜色：{{ stockInfo?.colorName || '-' }}</div>
-            <div>当前库存：{{ stockQuantity }}</div>
+            <div>SKU：{{ group.skuCode }}</div>
+            <div>选中记录：{{ group.recordCount }} 条</div>
+            <div>当前库存：{{ group.stockQuantity }}</div>
           </div>
-          <div v-if="outboundSizeList.headers.length" class="outbound-size-wrap">
-            <el-table :data="outboundSizeList.rows" border size="small" class="outbound-size-table">
-              <el-table-column label="颜色" min-width="100" align="center" header-align="center">
-                <template #default="{ row }">
-                  {{ row.colorName || '-' }}
-                </template>
-              </el-table-column>
-              <el-table-column label="图片" width="90" align="center" header-align="center">
-                <template #default="{ row }">
-                  <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="table" />
-                  <span v-else class="text-placeholder">-</span>
-                </template>
-              </el-table-column>
-              <el-table-column
-                v-for="(h, hIdx) in outboundSizeList.headers"
-                :key="hIdx"
-                :label="h"
-                min-width="80"
-                align="center"
-                header-align="center"
-              >
-                <template #default="{ row }">
-                  <el-input-number
-                    v-model="row.quantities[hIdx]"
-                    :min="0"
-                    :precision="0"
-                    controls-position="right"
-                    size="small"
-                    class="outbound-qty-input"
-                    style="width: 100%"
-                  />
-                </template>
-              </el-table-column>
-            </el-table>
-            <div class="outbound-size-footer">该记录合计：{{ outboundGrandTotal }}</div>
-          </div>
-          <div v-else-if="outboundLoading" class="detail-muted">明细加载中...</div>
+
+          <el-table
+            v-if="group.headers.length && group.rows.length"
+            :data="group.rows"
+            border
+            size="small"
+            class="outbound-size-table"
+          >
+            <el-table-column label="颜色" min-width="100" align="center" header-align="center">
+              <template #default="{ row }">
+                {{ row.row.colorName || '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="图片" width="90" align="center" header-align="center">
+              <template #default="{ row }">
+                <AppImageThumb v-if="row.row.imageUrl" :raw-url="row.row.imageUrl" variant="table" />
+                <span v-else class="text-placeholder">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column
+              v-for="(header, hIdx) in group.headers"
+              :key="`${group.key}-${header}-${hIdx}`"
+              :label="header"
+              min-width="82"
+              align="center"
+              header-align="center"
+            >
+              <template #default="{ row }">
+                <el-input-number
+                  :model-value="getDisplayQuantity(row, header)"
+                  :min="0"
+                  :precision="0"
+                  :disabled="!hasSizeHeader(row.item, header)"
+                  controls-position="right"
+                  size="small"
+                  class="outbound-qty-input"
+                  @update:model-value="setDisplayQuantity(row, header, $event)"
+                />
+              </template>
+            </el-table-column>
+            <el-table-column label="合计" width="76" align="center" header-align="center">
+              <template #default="{ row }">
+                {{ getDisplayRowTotal(row) }}
+              </template>
+            </el-table-column>
+          </el-table>
           <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法按明细出库。</div>
+          <div class="outbound-size-footer">该 SKU 合计：{{ getGroupTotal(group) }}</div>
         </div>
       </div>
     </el-form>
+
     <template #footer>
       <el-button @click="closeDialog">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="submitOutbound">
-        确定出库
-      </el-button>
+      <el-button type="primary" :loading="submitting" @click="submitOutbound">确定出库</el-button>
     </template>
   </el-dialog>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { computed, watch } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
-import { finishedOutbound, getFinishedPickupUserOptions, type FinishedPickupUserOption } from '@/api/inventory'
-import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
-
-type OutboundStockInfo = {
-  orderId: number | null
-  orderNo: string
-  skuCode: string
-  customerName: string
-  quantity: number
-  imageUrl: string
-  colorName: string
-  sizeBreakdown: {
-    headers: string[]
-    rows: Array<{ colorName?: string; values?: number[] }>
-  } | null
-  colorImages: Array<{ colorName: string; imageUrl: string }>
-}
+import {
+  useFinishedOutboundDialog,
+  type FinishedOutboundDialogItem,
+  type FinishedOutboundDialogRow,
+  type FinishedOutboundStockInfo,
+} from '@/composables/useFinishedOutboundDialog'
+import { getSizeHeaderKey, sortSizeHeaders } from '@/utils/sizeHeaders'
 
 const props = defineProps<{
   modelValue: boolean
-  stockId: number | null
-  stockInfo: OutboundStockInfo | null
+  stockItems: FinishedOutboundStockInfo[]
 }>()
 
 const emit = defineEmits<{
@@ -126,107 +118,96 @@ const emit = defineEmits<{
   (e: 'submitted'): void
 }>()
 
-const outboundLoading = ref(false)
-const submitting = ref(false)
-const outboundFormRef = ref<FormInstance>()
-const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
-const outboundForm = reactive({
-  pickupUserId: null as number | null,
-})
-const outboundRules: FormRules = {
-  pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
+function closeDialog() {
+  emit('update:modelValue', false)
 }
-const outboundSizeList = reactive<{
+
+const {
+  outboundLoading,
+  submitting,
+  outboundFormRef,
+  outboundForm,
+  outboundRules,
+  pickupUserOptions,
+  outboundItems,
+  outboundGrandTotal,
+  loadPickupUsers,
+  resetOutboundForm,
+  initOutboundSizeList,
+  getRowTotal,
+  submitOutbound,
+} = useFinishedOutboundDialog(() => emit('submitted'), closeDialog)
+
+const selectedCustomer = computed(() => props.stockItems[0]?.customerName?.trim() || '-')
+
+type DisplayOutboundRow = {
+  item: FinishedOutboundDialogItem
+  row: FinishedOutboundDialogRow
+}
+
+type OutboundSkuGroup = {
+  key: string
+  skuCode: string
+  recordCount: number
+  stockQuantity: number
   headers: string[]
-  rows: Array<{ colorName: string; imageUrl: string; quantities: number[] }>
-}>({
-  headers: [],
-  rows: [],
+  rows: DisplayOutboundRow[]
+}
+
+function mergeHeaders(left: string[], right: string[]): string[] {
+  const merged = [...left]
+  right.forEach((header) => {
+    if (!merged.some((item) => getSizeHeaderKey(item) === getSizeHeaderKey(header))) merged.push(header)
+  })
+  return sortSizeHeaders(merged)
+}
+
+const groupedOutboundItems = computed<OutboundSkuGroup[]>(() => {
+  const groups = new Map<string, OutboundSkuGroup>()
+  outboundItems.value.forEach((item) => {
+    const skuCode = item.stock.skuCode?.trim() || '-'
+    const key = skuCode === '-' ? `stock-${item.stock.id}` : skuCode.toLowerCase()
+    let group = groups.get(key)
+    if (!group) {
+      group = { key, skuCode, recordCount: 0, stockQuantity: 0, headers: [], rows: [] }
+      groups.set(key, group)
+    }
+    group.recordCount += 1
+    group.stockQuantity += Math.max(0, Math.trunc(Number(item.stock.quantity) || 0))
+    group.headers = mergeHeaders(group.headers, item.headers)
+    item.rows.forEach((row) => group.rows.push({ item, row }))
+  })
+  return Array.from(groups.values())
 })
 
-const stockQuantity = computed(() => Math.max(0, Math.trunc(Number(props.stockInfo?.quantity) || 0)))
-const outboundGrandTotal = computed(() =>
-  outboundSizeList.rows.reduce(
-    (sum, row) => sum + row.quantities.reduce((rowSum, qty) => rowSum + (Number(qty) || 0), 0),
-    0,
-  ),
-)
-
-function normalizeColorName(value: unknown): string {
-  return String(value ?? '').trim()
+function findSizeIndex(item: FinishedOutboundDialogItem, header: string): number {
+  return item.headers.findIndex((itemHeader) => getSizeHeaderKey(itemHeader) === getSizeHeaderKey(header))
 }
 
-function getColorImage(colorName: string): string {
-  const normalized = normalizeColorName(colorName)
-  const matched = props.stockInfo?.colorImages?.find(
-    (item) => normalizeColorName(item.colorName) === normalized && String(item.imageUrl || '').trim(),
-  )
-  return String(matched?.imageUrl || props.stockInfo?.imageUrl || '').trim()
+function hasSizeHeader(item: FinishedOutboundDialogItem, header: string): boolean {
+  return findSizeIndex(item, header) >= 0
 }
 
-function toHeaders(headers: string[]): string[] {
-  return sortSizeHeaders(headers.map(normalizeSizeHeader).filter(Boolean))
+function getDisplayQuantity(row: DisplayOutboundRow, header: string): number {
+  const index = findSizeIndex(row.item, header)
+  return index >= 0 ? Math.max(0, Math.trunc(Number(row.row.quantities[index]) || 0)) : 0
 }
 
-function toSnapshotRows(sourceHeaders: string[], headers: string[], rows: Array<{ colorName?: string; values?: number[] }>) {
-  const indexMap = new Map(sourceHeaders.map((header, index) => [getSizeHeaderKey(header), index]))
-  return rows.map((item) => ({
-    colorName: normalizeColorName(item.colorName) || '-',
-    imageUrl: getColorImage(item.colorName),
-    quantities: headers.map((header) => {
-      const index = indexMap.get(getSizeHeaderKey(header))
-      return index == null ? 0 : Math.max(0, Math.trunc(Number(item.values?.[index]) || 0))
-    }),
-  }))
+function setDisplayQuantity(row: DisplayOutboundRow, header: string, value: number | undefined) {
+  const index = findSizeIndex(row.item, header)
+  if (index >= 0) row.row.quantities[index] = Math.max(0, Math.trunc(Number(value) || 0))
 }
 
-async function loadPickupUsers() {
-  try {
-    const res = await getFinishedPickupUserOptions()
-    pickupUserOptions.value = (res.data ?? []) as FinishedPickupUserOption[]
-  } catch {
-    pickupUserOptions.value = []
-  }
+function getDisplayRowTotal(row: DisplayOutboundRow): number {
+  return getRowTotal(row.row)
 }
 
-function resetOutboundForm() {
-  outboundForm.pickupUserId = null
-  outboundSizeList.headers = []
-  outboundSizeList.rows = []
-  outboundFormRef.value?.clearValidate()
+function getGroupTotal(group: OutboundSkuGroup): number {
+  return group.rows.reduce((sum, row) => sum + getDisplayRowTotal(row), 0)
 }
 
-async function initOutboundSizeList() {
-  resetOutboundForm()
-  if (!props.stockInfo) return
-  const snapshot = props.stockInfo.sizeBreakdown
-  if (snapshot?.headers?.length && snapshot.rows?.length) {
-    const sourceHeaders = snapshot.headers.map(normalizeSizeHeader).filter(Boolean)
-    const headers = toHeaders(snapshot.headers)
-    outboundSizeList.headers = headers
-    outboundSizeList.rows = toSnapshotRows(sourceHeaders, headers, snapshot.rows)
-    return
-  }
-  if (!props.stockInfo.orderId) return
-  outboundLoading.value = true
-  try {
-    const res = await getOrderColorSizeBreakdown(props.stockInfo.orderId)
-    const data = (res.data ?? { headers: [], rows: [] }) as OrderColorSizeBreakdownRes
-    const headers = toHeaders(Array.isArray(data.headers) ? data.headers : [])
-    const rows = Array.isArray(data.rows) ? data.rows : []
-    outboundSizeList.headers = headers
-    outboundSizeList.rows = rows.map((item) => ({
-      colorName: normalizeColorName(item.colorName) || '-',
-      imageUrl: getColorImage(item.colorName),
-      quantities: headers.map(() => 0),
-    }))
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-    outboundSizeList.headers = []
-    outboundSizeList.rows = []
-  } finally {
-    outboundLoading.value = false
-  }
+function onDialogVisibleChange(value: boolean) {
+  emit('update:modelValue', value)
 }
 
 watch(
@@ -234,94 +215,20 @@ watch(
   (visible) => {
     if (!visible) return
     void loadPickupUsers()
-    void initOutboundSizeList()
+    void initOutboundSizeList(props.stockItems)
   },
 )
 
 watch(
-  () => props.stockId,
-  () => {
-    if (!props.modelValue) return
-    void initOutboundSizeList()
+  () => props.stockItems,
+  (items) => {
+    if (props.modelValue) void initOutboundSizeList(items)
   },
+  { deep: true },
 )
-
-function onDialogVisibleChange(value: boolean) {
-  emit('update:modelValue', value)
-}
-
-function closeDialog() {
-  emit('update:modelValue', false)
-}
-
-async function submitOutbound() {
-  if (!props.stockId) {
-    ElMessage.warning('未选择可出库记录')
-    return
-  }
-  const valid = await outboundFormRef.value?.validate().then(() => true).catch(() => false)
-  if (!valid) return
-  if (!outboundSizeList.headers.length || !outboundSizeList.rows.length) {
-    ElMessage.warning('该记录暂无颜色尺码明细，无法出库')
-    return
-  }
-  if (outboundGrandTotal.value <= 0) {
-    ElMessage.warning('请填写出库数量')
-    return
-  }
-  if (outboundGrandTotal.value > stockQuantity.value) {
-    ElMessage.warning('出库数量不能大于当前库存')
-    return
-  }
-  submitting.value = true
-  try {
-    await finishedOutbound({
-      items: [
-        {
-          id: props.stockId,
-          quantity: outboundGrandTotal.value,
-          sizeBreakdown: {
-            headers: outboundSizeList.headers,
-            rows: outboundSizeList.rows.map((item) => ({
-              colorName: normalizeColorName(item.colorName) || '-',
-              quantities: item.quantities.map((qty) => Math.max(0, Math.trunc(Number(qty) || 0))),
-            })),
-          },
-        },
-      ],
-      pickupUserId: outboundForm.pickupUserId,
-    })
-    ElMessage.success('出库成功')
-    emit('update:modelValue', false)
-    emit('submitted')
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    submitting.value = false
-  }
-}
 </script>
 
 <style scoped>
-.outbound-size-wrap {
-  width: 100%;
-}
-
-.outbound-size-wrap :deep(.el-table .cell) {
-  text-align: center;
-}
-
-.outbound-size-wrap :deep(.outbound-qty-input .el-input__inner) {
-  text-align: center;
-}
-
-.outbound-size-footer {
-  margin-top: 8px;
-  text-align: right;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
 .outbound-batch-head {
   display: flex;
   flex-wrap: wrap;
@@ -333,8 +240,8 @@ async function submitOutbound() {
 .outbound-batch-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  max-height: 55vh;
+  gap: 14px;
+  max-height: 58vh;
   overflow: auto;
   padding-right: 4px;
 }
@@ -342,15 +249,34 @@ async function submitOutbound() {
 .outbound-batch-card {
   padding: 12px;
   border: 1px solid var(--el-border-color-light);
-  border-radius: 10px;
+  border-radius: 8px;
   background: var(--el-fill-color-blank);
 }
 
 .outbound-card-meta {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
   gap: 8px 12px;
   margin-bottom: 10px;
   color: var(--el-text-color-regular);
+}
+
+.outbound-size-table :deep(.cell) {
+  text-align: center;
+}
+
+.outbound-qty-input {
+  width: 100%;
+}
+
+.outbound-qty-input :deep(.el-input__inner) {
+  text-align: center;
+}
+
+.outbound-size-footer {
+  margin-top: 8px;
+  text-align: right;
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
 }
 </style>

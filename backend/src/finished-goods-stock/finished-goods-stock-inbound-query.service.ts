@@ -399,6 +399,7 @@ export class FinishedGoodsStockInboundQueryService {
   stockAdjustSnapshot(stock: FinishedGoodsStock): Record<string, unknown> {
     return {
       skuCode: stock.skuCode ?? '',
+      customerName: stock.customerName ?? '',
       department: stock.department ?? '',
       inventoryTypeId: stock.inventoryTypeId ?? null,
       warehouseId: stock.warehouseId ?? null,

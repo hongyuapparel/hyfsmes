@@ -79,7 +79,7 @@
       </el-tab-pane>
     </el-tabs>
     <FinishedInboundDialog v-model="inboundDialog.visible" :stock-id="inboundDialog.stockId" :stock-label="inboundDialog.stockLabel" @submitted="load()" />
-    <FinishedOutboundDialog v-model="outboundDialog.visible" :stock-id="outboundDialog.stockId" :stock-info="outboundDialog.stockInfo" @submitted="load()" />
+    <FinishedOutboundDialog v-model="outboundDialog.visible" :stock-items="outboundDialog.items" @submitted="load()" />
     <FinishedCreateDrawer
       v-model="createDrawerVisible"
       :quick-add-source="createSeed"
