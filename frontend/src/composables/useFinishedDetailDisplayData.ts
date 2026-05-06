@@ -14,7 +14,20 @@ import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTab
 
 type DetailLike = {
   stock?: { quantity?: number; unitPrice?: string | number | null }
-  colorSize?: { headers?: string[]; rows?: Array<{ colorName?: string; quantities?: number[] }> }
+  colorSize?: {
+    headers?: string[]
+    rows?: Array<{ colorName?: string; imageUrl?: string; quantities?: number[] }>
+  }
+}
+
+type DisplayColorSizeRow = {
+  colorName: string
+  imageUrl?: string
+  quantities: number[]
+  department?: string
+  inventoryTypeId?: number | null
+  warehouseId?: number | null
+  location?: string
 }
 
 export function useFinishedDetailDisplayData(params: {
@@ -42,9 +55,14 @@ export function useFinishedDetailDisplayData(params: {
         : groupSnapshot.rows
       const displayHeaders = mergeSizeHeaders(targetHeaders, groupSnapshot.headers)
       const displayRows = visibleRows
-        .map((row) => ({
+        .map<DisplayColorSizeRow>((row) => ({
           colorName: row.colorName,
+          imageUrl: row.imageUrl,
           quantities: remapValuesByHeaders(groupSnapshot.headers, row.values, displayHeaders),
+          department: row.department,
+          inventoryTypeId: row.inventoryTypeId,
+          warehouseId: row.warehouseId,
+          location: row.location,
         }))
         .filter((row) => snapshotRowTotal(row.quantities) > 0)
       return displayRows.length ? { headers: displayHeaders, rows: displayRows } : { headers: [], rows: [] }
@@ -61,7 +79,10 @@ export function useFinishedDetailDisplayData(params: {
         : normalizedSnapshot.rows
       const displayHeaders = mergeSizeHeaders(targetHeaders, normalizedSnapshot.headers)
       const displayRows = visibleRows
-        .map((row) => ({ colorName: row.colorName, quantities: remapValuesByHeaders(normalizedSnapshot.headers, row.values, displayHeaders) }))
+        .map<DisplayColorSizeRow>((row) => ({
+          colorName: row.colorName,
+          quantities: remapValuesByHeaders(normalizedSnapshot.headers, row.values, displayHeaders),
+        }))
         .filter((row) => snapshotRowTotal(row.quantities) > 0)
       return displayRows.length ? { headers: displayHeaders, rows: displayRows } : { headers: [], rows: [] }
     }
@@ -74,7 +95,11 @@ export function useFinishedDetailDisplayData(params: {
       return {
         headers: [...targetHeaders],
         rows: filteredRows
-          .map((row) => ({ colorName: String(row.colorName ?? ''), quantities: remapValuesByHeaders(headers, row.quantities ?? [], targetHeaders) }))
+          .map<DisplayColorSizeRow>((row) => ({
+            colorName: String(row.colorName ?? ''),
+            imageUrl: row.imageUrl,
+            quantities: remapValuesByHeaders(headers, row.quantities ?? [], targetHeaders),
+          }))
           .filter((row) => snapshotRowTotal(row.quantities) > 0),
       }
     }
@@ -85,11 +110,16 @@ export function useFinishedDetailDisplayData(params: {
     return {
       headers: [...targetHeaders],
       rows: filteredRows
-        .map((row) => ({
+        .map<DisplayColorSizeRow>((row) => ({
           colorName: String(row.colorName ?? ''),
+          imageUrl: row.imageUrl,
           quantities: headers.map(() => allocated[cursor++] ?? 0),
         }))
-        .map((row) => ({ colorName: row.colorName, quantities: remapValuesByHeaders(headers, row.quantities, targetHeaders) }))
+        .map<DisplayColorSizeRow>((row) => ({
+          colorName: row.colorName,
+          imageUrl: row.imageUrl,
+          quantities: remapValuesByHeaders(headers, row.quantities, targetHeaders),
+        }))
         .filter((row) => snapshotRowTotal(row.quantities) > 0),
     }
   })

@@ -29,7 +29,15 @@ export type StockTableRow = StockTableLeafRow | StockTableParentRow
 
 export type NormalizedStoredBreakdownSnapshot = {
   headers: string[]
-  rows: Array<{ colorName: string; values: number[] }>
+  rows: Array<{
+    colorName: string
+    values: number[]
+    imageUrl?: string
+    department?: string
+    inventoryTypeId?: number | null
+    warehouseId?: number | null
+    location?: string
+  }>
 }
 
 export function normalizeColorName(value: unknown): string {

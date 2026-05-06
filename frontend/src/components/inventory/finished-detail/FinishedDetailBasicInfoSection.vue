@@ -142,6 +142,7 @@
         :raw-url="displayProductImage"
         :width="160"
         :height="120"
+        :use-original-src="true"
       />
       <div v-else class="detail-image-empty">-</div>
     </template>

@@ -14,7 +14,15 @@ export type FinishedDetailMatrixRow = {
   _overrides: Partial<Record<FinishedCreateRowMetaField, boolean>>
 }
 
-type DetailSourceRow = { colorName: string; quantities: number[] }
+type DetailSourceRow = {
+  colorName: string
+  imageUrl?: string
+  quantities: number[]
+  department?: string
+  inventoryTypeId?: number | null
+  warehouseId?: number | null
+  location?: string
+}
 type DetailRowMeta = {
   department: string
   inventoryTypeId: number | null
@@ -44,9 +52,12 @@ export function useFinishedDetailMatrixEdit() {
     editSizeRows.value = rows.map((row, index) => ({
       _key: `${row.colorName || 'color'}-${index}`,
       colorName: row.colorName,
-      imageUrl: colorImageMap[row.colorName] || '',
+      imageUrl: String(row.imageUrl ?? '').trim() || colorImageMap[row.colorName] || '',
       quantities: [...row.quantities],
-      ...meta,
+      department: row.department ?? meta.department,
+      inventoryTypeId: row.inventoryTypeId ?? meta.inventoryTypeId,
+      warehouseId: row.warehouseId ?? meta.warehouseId,
+      location: row.location ?? meta.location,
       _overrides: emptyOverrides(),
     }))
   }

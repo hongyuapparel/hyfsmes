@@ -42,14 +42,10 @@ type OpenDetailPayload = {
 
 type FinishedDetailData = FinishedStockDetailRes & { groupSizeHeaders?: string[] }
 
-type StockMeta = {
-  skuCode?: string
-  department?: string
+type StockMeta = Partial<Record<'skuCode' | 'department' | 'location' | 'imageUrl' | 'remark', string>> & {
   inventoryTypeId?: number | null
   warehouseId?: number | null
-  location?: string
   unitPrice?: number | string | null
-  imageUrl?: string; remark?: string
 }
 
 export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
@@ -100,10 +96,9 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     })
   })
 
-  const displayProductImage = computed(() => {
-    const stock = data.value?.stock as StockMeta | undefined
-    return String(stock?.imageUrl || internalGroupProductImage.value || data.value?.productImageUrl || '')
-  })
+  const displayProductImage = computed(() =>
+    String((data.value?.stock as StockMeta | undefined)?.imageUrl || internalGroupProductImage.value || data.value?.productImageUrl || ''),
+  )
 
   const {
     displaySizeHeaders,
@@ -129,7 +124,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     editForm.warehouseId = stock?.warehouseId ?? null
     editForm.location = stock?.location ?? ''
     editForm.unitPrice = stock?.unitPrice != null ? String(stock.unitPrice) : ''
-    editForm.imageUrl = stock?.imageUrl ?? ''
+    editForm.imageUrl = String(stock?.imageUrl || internalGroupProductImage.value || data.value?.productImageUrl || '')
     editForm.remark = stock?.remark ?? ''
   }
 
@@ -148,6 +143,10 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
       )
       const records = Array.isArray(detail?.colorImages) ? detail.colorImages : []
       const nextColorImageMap: Record<string, string> = {}
+      internalGroupColorSizeSnapshot.value?.rows.forEach((entry) => {
+        const colorName = String(entry?.colorName ?? '').trim(), imageUrl = String(entry?.imageUrl ?? '').trim()
+        if (colorName && imageUrl && !nextColorImageMap[colorName]) nextColorImageMap[colorName] = imageUrl
+      })
       // 先用整组聚合的图片填充（覆盖整个 SKU 组所有颜色）
       internalGroupColorImages.value.forEach((entry) => {
         const colorName = String(entry?.colorName ?? '').trim()

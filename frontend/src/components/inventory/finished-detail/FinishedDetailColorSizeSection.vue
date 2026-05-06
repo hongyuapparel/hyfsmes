@@ -16,6 +16,7 @@
     :show-inheritance-tip="true"
     :show-header-actions="metaEditing"
     :allow-structure-actions="false"
+    :prefer-original-image="true"
     :row-meta-readonly="!metaEditing"
     :warehouse-options="warehouseOptions"
     :inventory-type-options="inventoryTypeOptions"

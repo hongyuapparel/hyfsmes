@@ -50,6 +50,7 @@
               v-else-if="getRowImageUrl(row)"
               :raw-url="getRowImageUrl(row)"
               variant="table"
+              :use-original-src="preferOriginalImage"
             />
             <span v-else class="text-placeholder">-</span>
           </template>
@@ -252,6 +253,7 @@ const props = withDefaults(
     showHeaderActions?: boolean
     allowStructureActions?: boolean
     rowMetaReadonly?: boolean
+    preferOriginalImage?: boolean
     warehouseOptions: Array<{ id: number; label: string }>
     inventoryTypeOptions: Array<{ id: number; label: string }>
     departmentOptions: Array<{ value: string; label: string }>
@@ -267,6 +269,7 @@ const props = withDefaults(
     showInheritanceTip: true,
     showHeaderActions: true, allowStructureActions: true,
     rowMetaReadonly: false,
+    preferOriginalImage: false,
   },
 )
 

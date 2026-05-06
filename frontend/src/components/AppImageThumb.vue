@@ -145,6 +145,7 @@ const props = withDefaults(
     /** 点击预览时多图切换（如附件列表），不传则仅预览当前图 */
     previewGallery?: string[]
     previewGalleryIndex?: number
+    useOriginalSrc?: boolean
   }>(),
   {
     variant: 'table',
@@ -153,6 +154,7 @@ const props = withDefaults(
     teleported: true,
     previewDisabled: false,
     previewGalleryIndex: 0,
+    useOriginalSrc: false,
   },
 )
 
@@ -182,7 +184,11 @@ const boxStyle = computed(() => ({
 const hasInput = computed(() => !!(props.rawUrl?.trim() || props.src?.trim()))
 
 const thumbDisplaySrc = computed(() => {
-  if (props.rawUrl?.trim()) return resolveUploadSrc(props.rawUrl)
+  if (props.rawUrl?.trim()) {
+    return props.useOriginalSrc
+      ? getUploadImageOriginalForPreview(props.rawUrl) || resolveUploadSrc(props.rawUrl)
+      : resolveUploadSrc(props.rawUrl)
+  }
   const s = (props.src || '').trim()
   if (!s) return ''
   if (directFailed.value) return LIST_IMAGE_PLACEHOLDER
