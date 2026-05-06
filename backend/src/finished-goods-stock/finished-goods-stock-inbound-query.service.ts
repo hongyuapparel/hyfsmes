@@ -6,10 +6,11 @@ import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
-import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { scaleColorSizeRowsToQuantity, subtractColorSizeSnapshots } from './finished-goods-stock-query.utils';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
+
+type OutboundSnapshotRawRow = { quantity: string | number | null; sizeBreakdown: unknown };
 
 @Injectable()
 export class FinishedGoodsStockInboundQueryService {
@@ -24,8 +25,6 @@ export class FinishedGoodsStockInboundQueryService {
     private readonly orderCuttingRepo: Repository<OrderCutting>,
     @InjectRepository(OrderFinishing)
     private readonly orderFinishingRepo: Repository<OrderFinishing>,
-    @InjectRepository(FinishedGoodsOutbound)
-    private readonly outboundRepo: Repository<FinishedGoodsOutbound>,
   ) {}
 
   /**
@@ -361,10 +360,10 @@ export class FinishedGoodsStockInboundQueryService {
     const snapshot = this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot);
     if (snapshot) return snapshot;
     if (stock.orderId == null) return null;
-    const outboundRows = await this.outboundRepo.find({
-      where: { finishedStockId: stock.id },
-      order: { createdAt: 'ASC', id: 'ASC' },
-    });
+    const outboundRows = await this.stockRepo.manager.query(
+      'SELECT quantity, size_breakdown AS sizeBreakdown FROM finished_goods_outbound WHERE finished_stock_id = ? ORDER BY created_at ASC, id ASC',
+      [stock.id],
+    ) as OutboundSnapshotRawRow[];
     if (!outboundRows.length) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
 
     let outboundTotal = 0;
@@ -374,19 +373,19 @@ export class FinishedGoodsStockInboundQueryService {
       outboundTotal += qty;
       if (qty <= 0) continue;
       const outboundSnapshot = this.parseStoredColorSizeSnapshot(row.sizeBreakdown);
-      if (!outboundSnapshot || this.getColorSizeSnapshotTotal(outboundSnapshot) !== qty) return null;
+      if (!outboundSnapshot || this.getColorSizeSnapshotTotal(outboundSnapshot) !== qty) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
       outboundSnapshots.push(outboundSnapshot);
     }
     let current = await this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity + outboundTotal);
-    if (!current) return null;
+    if (!current) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
     try {
       for (const outboundSnapshot of outboundSnapshots) {
         current = subtractColorSizeSnapshots(current, outboundSnapshot);
       }
     } catch {
-      return null;
+      return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
     }
-    return this.getColorSizeSnapshotTotal(current) === Math.max(0, Math.trunc(Number(stock.quantity) || 0)) ? current : null;
+    return this.getColorSizeSnapshotTotal(current) === Math.max(0, Math.trunc(Number(stock.quantity) || 0)) ? current : this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
   }
 
   mergeColorSizeSnapshots(currentRaw: unknown, incoming: ColorSizeSnapshot | null): ColorSizeSnapshot | null {

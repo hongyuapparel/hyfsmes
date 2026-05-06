@@ -6,7 +6,6 @@ import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
 import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-adjust-log.entity';
-import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
@@ -47,6 +46,14 @@ type StockListQueryResult = {
   totalAmount: number;
 };
 
+type OutboundSnapshotRawRow = {
+  id: string | number;
+  finishedStockId: string | number;
+  quantity: string | number | null;
+  sizeBreakdown: unknown;
+  createdAt: string | Date | null;
+};
+
 @Injectable()
 export class FinishedGoodsStockQueryService {
   constructor(
@@ -60,8 +67,6 @@ export class FinishedGoodsStockQueryService {
     private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
     @InjectRepository(FinishedGoodsStockAdjustLog)
     private readonly adjustLogRepo: Repository<FinishedGoodsStockAdjustLog>,
-    @InjectRepository(FinishedGoodsOutbound)
-    private readonly outboundRepo: Repository<FinishedGoodsOutbound>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
@@ -216,25 +221,41 @@ export class FinishedGoodsStockQueryService {
     return rowSummaries.length ? `${prefix} ${rowSummaries.join('；')}` : `${prefix} -${this.formatQuantity(quantity)}件`;
   }
 
+  private getRawOutboundCreatedAtTime(value: OutboundSnapshotRawRow['createdAt']): number | null {
+    if (!value) return null;
+    const date = value instanceof Date ? value : new Date(value);
+    const time = date.getTime();
+    return Number.isFinite(time) ? time : null;
+  }
+
   private async getOutboundDetailSummaryMap(logs: FinishedGoodsStockAdjustLog[]): Promise<Map<number, string>> {
     const outboundLogs = logs.filter((log) => this.isOutboundLog(log));
     const stockIds = Array.from(new Set(outboundLogs.map((log) => log.finishedStockId).filter((id) => Number.isInteger(id) && id > 0)));
     if (!stockIds.length) return new Map();
-    const outbounds = await this.outboundRepo.find({
-      where: { finishedStockId: In(stockIds) },
-      order: { createdAt: 'DESC', id: 'DESC' },
-    });
+    const placeholders = stockIds.map(() => '?').join(', ');
+    const outbounds = await this.stockRepo.manager.query(
+      `SELECT id, finished_stock_id AS finishedStockId, quantity, size_breakdown AS sizeBreakdown, created_at AS createdAt
+       FROM finished_goods_outbound
+       WHERE finished_stock_id IN (${placeholders})
+       ORDER BY created_at DESC, id DESC`,
+      stockIds,
+    ) as OutboundSnapshotRawRow[];
     const result = new Map<number, string>();
     outboundLogs.forEach((log) => {
       const logTime = log.createdAt.getTime();
       const expectedQuantity = this.getOutboundLogQuantity(log);
       const matched = outbounds
         .filter((row) => {
-          if (row.finishedStockId !== log.finishedStockId) return false;
-          if (Math.abs(row.createdAt.getTime() - logTime) > 3000) return false;
+          if (Number(row.finishedStockId) !== log.finishedStockId) return false;
+          const rowTime = this.getRawOutboundCreatedAtTime(row.createdAt);
+          if (rowTime == null || Math.abs(rowTime - logTime) > 3000) return false;
           return expectedQuantity == null || Math.max(0, Math.trunc(Number(row.quantity) || 0)) === expectedQuantity;
         })
-        .sort((a, b) => Math.abs(a.createdAt.getTime() - logTime) - Math.abs(b.createdAt.getTime() - logTime))[0];
+        .sort((a, b) => {
+          const aTime = this.getRawOutboundCreatedAtTime(a.createdAt) ?? 0;
+          const bTime = this.getRawOutboundCreatedAtTime(b.createdAt) ?? 0;
+          return Math.abs(aTime - logTime) - Math.abs(bTime - logTime);
+        })[0];
       if (!matched) return;
       const quantity = expectedQuantity ?? Math.max(0, Math.trunc(Number(matched.quantity) || 0));
       const snapshot = parseStoredColorSizeSnapshot(matched.sizeBreakdown);
