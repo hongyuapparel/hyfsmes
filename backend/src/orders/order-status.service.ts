@@ -1,6 +1,6 @@
 import { ForbiddenException, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/order-ext.entity';
@@ -82,20 +82,22 @@ export class OrderStatusService {
     return result;
   }
 
-  async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
+  async appendStatusHistory(orderId: number, statusCode: string, manager?: EntityManager): Promise<void> {
     const code = (statusCode ?? '').trim();
     if (!code) return;
-    const status = await this.orderStatusRepo.findOne({ where: { code } });
+    const orderStatusRepo = manager?.getRepository(OrderStatus) ?? this.orderStatusRepo;
+    const orderStatusHistoryRepo = manager?.getRepository(OrderStatusHistory) ?? this.orderStatusHistoryRepo;
+    const status = await orderStatusRepo.findOne({ where: { code } });
     if (!status) return;
-    await this.orderStatusHistoryRepo.save(
-      this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
-    );
+    await orderStatusHistoryRepo.save(orderStatusHistoryRepo.create({ orderId, statusId: status.id }));
   }
 
-  async addLog(order: Order, actor: OrderActor, action: string, detail: string): Promise<void> {
+  async addLog(order: Order, actor: OrderActor, action: string, detail: string, manager?: EntityManager): Promise<void> {
+    const userRepo = manager?.getRepository(User) ?? this.userRepo;
+    const orderLogRepo = manager?.getRepository(OrderOperationLog) ?? this.orderLogRepo;
     let operatorUsername = actor.username;
     try {
-      const user = await this.userRepo.findOne({ where: { id: actor.userId } });
+      const user = await userRepo.findOne({ where: { id: actor.userId } });
       if (user) {
         operatorUsername = (user.displayName && user.displayName.trim()) || user.username || actor.username;
       }
@@ -108,7 +110,7 @@ export class OrderStatusService {
 
     const MERGE_WINDOW_MS = 3000;
     const since = new Date(Date.now() - MERGE_WINDOW_MS);
-    const latest = await this.orderLogRepo
+    const latest = await orderLogRepo
       .createQueryBuilder('l')
       .where('l.order_id = :orderId', { orderId: order.id })
       .andWhere('l.operator_username = :operatorUsername', { operatorUsername })
@@ -122,19 +124,19 @@ export class OrderStatusService {
       const next = normalizedDetail.trim();
       if (prev && prev !== next) {
         latest.detail = this.formatLogDetail(`${prev}; ${next}`);
-        await this.orderLogRepo.save(latest);
+        await orderLogRepo.save(latest);
       }
       return;
     }
 
-    const log = this.orderLogRepo.create({
+    const log = orderLogRepo.create({
       orderId: order.id,
       orderNo: order.orderNo,
       operatorUsername,
       action,
       detail: normalizedDetail,
     });
-    await this.orderLogRepo.save(log);
+    await orderLogRepo.save(log);
   }
 
   private normalizeWorkflowMaterialRows(rows: unknown): OrderMaterialRow[] {

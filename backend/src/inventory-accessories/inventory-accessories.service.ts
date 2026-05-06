@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
 import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
@@ -21,6 +21,21 @@ type AccessoryOutboundRawRow = {
   imageUrl: string | null;
   customerName: string | null;
   category: string | null;
+};
+
+type InventoryAccessoryOutboundParams = {
+  accessoryId: number;
+  quantity: number;
+  outboundType: 'order_auto' | 'manual';
+  operatorUsername: string;
+  remark?: string;
+  orderId?: number | null;
+  orderNo?: string;
+};
+
+type InventoryAccessoryOutboundResult = {
+  accessory: InventoryAccessory;
+  record: InventoryAccessoryOutbound;
 };
 
 @Injectable()
@@ -299,72 +314,69 @@ export class InventoryAccessoriesService {
    * 辅料出库（事务 + 行锁），并写出库记录。
    * @param params.quantity 出库数量（正数）
    */
-  async outbound(params: {
-    accessoryId: number;
-    quantity: number;
-    outboundType: 'order_auto' | 'manual';
-    operatorUsername: string;
-    remark?: string;
-    orderId?: number | null;
-    orderNo?: string;
-  }): Promise<{ accessory: InventoryAccessory; record: InventoryAccessoryOutbound }> {
+  async outbound(params: InventoryAccessoryOutboundParams): Promise<InventoryAccessoryOutboundResult> {
+    return this.repo.manager.transaction((manager) => this.outboundInTransaction(manager, params));
+  }
+
+  async outboundInTransaction(
+    manager: EntityManager,
+    params: InventoryAccessoryOutboundParams,
+  ): Promise<InventoryAccessoryOutboundResult> {
     const qty = Number(params.quantity) || 0;
     if (!params.accessoryId || qty <= 0) {
       throw new BadRequestException('出库参数不合法');
     }
 
-    return this.repo.manager.transaction(async (manager) => {
-      const accessoryRepo = manager.getRepository(InventoryAccessory);
-      const recordRepo = manager.getRepository(InventoryAccessoryOutbound);
-      const operationLogRepo = manager.getRepository(InventoryAccessoryOperationLog);
+    const accessoryRepo = manager.getRepository(InventoryAccessory);
+    const recordRepo = manager.getRepository(InventoryAccessoryOutbound);
+    const operationLogRepo = manager.getRepository(InventoryAccessoryOperationLog);
 
-      const accessory = await accessoryRepo
-        .createQueryBuilder('a')
-        .setLock('pessimistic_write')
-        .where('a.id = :id', { id: params.accessoryId })
-        .getOne();
+    const accessory = await accessoryRepo
+      .createQueryBuilder('a')
+      .setLock('pessimistic_write')
+      .where('a.id = :id', { id: params.accessoryId })
+      .getOne();
 
-      if (!accessory) throw new NotFoundException('辅料记录不存在');
+    if (!accessory) throw new NotFoundException('辅料记录不存在');
 
-      const before = Number(accessory.quantity) || 0;
-      const beforeSnapshot = this.toSnapshot(accessory);
-      if (before < qty) {
-        throw new BadRequestException(`库存不足：当前 ${before}，需要出库 ${qty}`);
-      }
+    const before = Number(accessory.quantity) || 0;
+    const beforeSnapshot = this.toSnapshot(accessory);
+    if (before < qty) {
+      throw new BadRequestException(`库存不足：当前 ${before}，需要出库 ${qty}`);
+    }
 
-      accessory.quantity = before - qty;
-      const savedAccessory = await accessoryRepo.save(accessory);
+    accessory.quantity = before - qty;
+    const savedAccessory = await accessoryRepo.save(accessory);
 
-      const record = recordRepo.create({
-        accessoryId: params.accessoryId,
-        orderId: params.orderId ?? null,
-        orderNo: params.orderNo ?? '',
-        outboundType: params.outboundType,
-        quantity: qty,
-        beforeQuantity: before,
-        afterQuantity: savedAccessory.quantity,
-        operatorUsername: (params.operatorUsername ?? '').trim(),
-        remark: (params.remark ?? '').trim(),
-      });
-      const savedRecord = await recordRepo.save(record);
-      try {
-        await operationLogRepo.save(
-          operationLogRepo.create({
-            accessoryId: params.accessoryId,
-            action: 'outbound',
-            operatorUsername: (params.operatorUsername ?? '').trim(),
-            beforeSnapshot,
-            afterSnapshot: this.toSnapshot(savedAccessory),
-            remark: (params.remark ?? '').trim(),
-          }),
-        );
-      } catch (error) {
-        if (!this.isMissingTableError(error)) throw error;
-        this.logger.warn('操作记录表不存在，已跳过本次辅料出库日志写入');
-      }
-
-      return { accessory: savedAccessory, record: savedRecord };
+    const record = recordRepo.create({
+      accessoryId: params.accessoryId,
+      orderId: params.orderId ?? null,
+      orderNo: params.orderNo ?? '',
+      outboundType: params.outboundType,
+      quantity: qty,
+      beforeQuantity: before,
+      afterQuantity: savedAccessory.quantity,
+      operatorUsername: (params.operatorUsername ?? '').trim(),
+      remark: (params.remark ?? '').trim(),
     });
+    const savedRecord = await recordRepo.save(record);
+    try {
+      await operationLogRepo.save(
+        operationLogRepo.create({
+          accessoryId: params.accessoryId,
+          action: 'outbound',
+          operatorUsername: (params.operatorUsername ?? '').trim(),
+          beforeSnapshot,
+          afterSnapshot: this.toSnapshot(savedAccessory),
+          remark: (params.remark ?? '').trim(),
+        }),
+      );
+    } catch (error) {
+      if (!this.isMissingTableError(error)) throw error;
+      this.logger.warn('操作记录表不存在，已跳过本次辅料出库日志写入');
+    }
+
+    return { accessory: savedAccessory, record: savedRecord };
   }
 
   async getOutboundRecords(params: {

@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
+import { OrderExt, type PackagingCell } from '../entities/order-ext.entity';
 import { OrderRemark } from '../entities/order-remark.entity';
 import { User } from '../entities/user.entity';
+import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusService } from './order-status.service';
 import { type OrderActor } from './order.types';
@@ -19,7 +21,42 @@ export class OrderLifecycleService {
     private readonly userRepo: Repository<User>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly orderStatusService: OrderStatusService,
+    private readonly inventoryAccessoriesService: InventoryAccessoriesService,
   ) {}
+
+  private async autoOutboundAccessoriesByPackagingCells(
+    order: Order,
+    actor: OrderActor,
+    manager: EntityManager,
+  ): Promise<void> {
+    const orderExtRepo = manager.getRepository(OrderExt);
+    const ext = await orderExtRepo.findOne({ where: { orderId: order.id } });
+    const cells: PackagingCell[] = Array.isArray(ext?.packagingCells) ? ext.packagingCells : [];
+    if (!cells.length) return;
+    const orderQty = Number(order.quantity) || 0;
+    if (orderQty <= 0) return;
+
+    const countById = new Map<number, number>();
+    for (const cell of cells) {
+      const accessoryId = Number(cell.accessoryId);
+      if (!Number.isInteger(accessoryId) || accessoryId <= 0) continue;
+      countById.set(accessoryId, (countById.get(accessoryId) ?? 0) + 1);
+    }
+    if (!countById.size) return;
+
+    for (const [accessoryId, times] of countById.entries()) {
+      const quantity = orderQty * times;
+      await this.inventoryAccessoriesService.outboundInTransaction(manager, {
+        accessoryId,
+        quantity,
+        outboundType: 'order_auto',
+        operatorUsername: actor.username,
+        remark: `订单自动出库：${order.orderNo}（${orderQty} * ${times}）`,
+        orderId: order.id,
+        orderNo: order.orderNo,
+      });
+    }
+  }
 
   async deleteMany(ids: number[], actor: OrderActor): Promise<void> {
     if (!ids?.length) return;
@@ -51,24 +88,32 @@ export class OrderLifecycleService {
   }
 
   async reviewMany(ids: number[], actor: OrderActor): Promise<void> {
-    if (!ids?.length) return;
-    const orders = await this.orderRepo.findByIds(ids);
-    for (const o of orders) {
-      if (o.status !== 'pending_review') continue;
-      const before = o.status;
-      const next = await this.orderWorkflowService.resolveNextStatus({
-        order: o as Order,
-        triggerCode: 'review_approve',
-        actorUserId: actor.userId,
+    const orderIds = [...new Set((ids ?? []).filter((id) => Number.isInteger(id) && id > 0))];
+    if (!orderIds.length) return;
+    for (const id of orderIds) {
+      await this.orderRepo.manager.transaction(async (manager) => {
+        const orderRepo = manager.getRepository(Order);
+        const o = await orderRepo
+          .createQueryBuilder('o')
+          .setLock('pessimistic_write')
+          .where('o.id = :id', { id })
+          .getOne();
+        if (!o || o.status !== 'pending_review') return;
+        const before = o.status;
+        const next = await this.orderWorkflowService.resolveNextStatus({
+          order: o,
+          triggerCode: 'review_approve',
+          actorUserId: actor.userId,
+        });
+        const to = next ?? 'pending_purchase';
+        if (before === to) return;
+        o.status = to;
+        o.statusTime = new Date();
+        const saved = await orderRepo.save(o);
+        await this.orderStatusService.addLog(saved, actor, 'review', `审核订单：${before} -> ${to}`, manager);
+        await this.orderStatusService.appendStatusHistory(saved.id, to, manager);
+        await this.autoOutboundAccessoriesByPackagingCells(saved, actor, manager);
       });
-      const to = next ?? 'pending_purchase';
-      o.status = to;
-      o.statusTime = new Date();
-      await this.orderRepo.save(o);
-      if (before !== to) {
-        await this.orderStatusService.addLog(o, actor, 'review', `审核订单：${before} -> ${to}`);
-        await this.orderStatusService.appendStatusHistory(o.id, to);
-      }
     }
   }
 

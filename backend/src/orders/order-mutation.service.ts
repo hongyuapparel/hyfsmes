@@ -2,11 +2,10 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
-import { OrderExt, type OrderMaterialRow, type PackagingCell } from '../entities/order-ext.entity';
+import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderRemark } from '../entities/order-remark.entity';
 import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { User } from '../entities/user.entity';
-import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { SuppliersService } from '../suppliers/suppliers.service';
 import { OrderQueryService } from './order-query.service';
@@ -27,7 +26,6 @@ export class OrderMutationService {
     private readonly orderCostSnapshotRepo: Repository<OrderCostSnapshot>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    private readonly inventoryAccessoriesService: InventoryAccessoriesService,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly suppliersService: SuppliersService,
     private readonly orderQueryService: OrderQueryService,
@@ -175,35 +173,6 @@ export class OrderMutationService {
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const names = this.collectSupplierNamesFromOrderExt(ext);
     await this.suppliersService.touchLastActiveByNames(names);
-  }
-
-  private async autoOutboundAccessoriesByPackagingCells(
-    order: Order & { packagingCells?: PackagingCell[] },
-    actor: OrderActor,
-  ): Promise<void> {
-    const cells = Array.isArray((order as any).packagingCells) ? ((order as any).packagingCells as PackagingCell[]) : [];
-    if (!cells.length) return;
-    const orderQty = Number(order.quantity) || 0;
-    if (orderQty <= 0) return;
-    const countById = new Map<number, number>();
-    cells.forEach((c) => {
-      const id = Number((c as any).accessoryId);
-      if (!id || Number.isNaN(id)) return;
-      countById.set(id, (countById.get(id) ?? 0) + 1);
-    });
-    if (!countById.size) return;
-    for (const [accessoryId, times] of countById.entries()) {
-      const qty = orderQty * (times || 1);
-      await this.inventoryAccessoriesService.outbound({
-        accessoryId,
-        quantity: qty,
-        outboundType: 'order_auto',
-        operatorUsername: actor.username,
-        remark: `订单自动出库：${order.orderNo}（${orderQty} * ${times}）`,
-        orderId: order.id,
-        orderNo: order.orderNo,
-      });
-    }
   }
 
   private buildUpdateChangesDescription(before: Order, payload: OrderEditPayload): string {
@@ -423,7 +392,6 @@ export class OrderMutationService {
       await this.orderStatusService.appendStatusHistory(saved.id, saved.status);
     }
     await this.touchSuppliersActiveByOrderId(saved.id);
-    if (beforeStatus === 'draft') await this.autoOutboundAccessoriesByPackagingCells(order as any, actor);
     await this.syncCostSnapshotFromOrder(id, { keepExistingPricing: true });
     return saved;
   }
