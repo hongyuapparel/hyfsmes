@@ -103,17 +103,22 @@
           <el-table-column type="selection" width="46" fixed />
           <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
             <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" :width="compactImageSize" :height="compactImageSize" />
+              <AppImageThumb v-if="getMainImageUrl(row)" :raw-url="getMainImageUrl(row)" :width="compactImageSize" :height="compactImageSize" />
               <span v-else>-</span>
             </template>
           </el-table-column>
           <el-table-column prop="name" label="名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="salesperson" label="业务员" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="category" label="类别" width="100" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="数量" width="90" align="center" header-align="center">
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
           </el-table-column>
           <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
+          <el-table-column label="仓库" min-width="120" show-overflow-tooltip align="center" header-align="center">
+            <template #default="{ row }">{{ formatWarehouseLabel(row.warehouseId) }}</template>
+          </el-table-column>
+          <el-table-column prop="location" label="存放地址" min-width="140" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
@@ -245,6 +250,7 @@
       :category-options="categoryOptions"
       :customer-options="customerOptions"
       :salesperson-options="salespersonOptions"
+      :warehouse-options="warehouseOptions"
       @close="resetForm"
       @confirm="submitForm"
     />
@@ -274,10 +280,7 @@
 import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { getCustomerCompanyOptions, getSalespeople, type CustomerItem } from '@/api/customers'
 import { getAccessoriesList, getAccessoryOutboundRecords, type AccessoryItem, type AccessoryOutboundRecord } from '@/api/inventory'
-import { getDictTree } from '@/api/dicts'
-import type { SystemOptionTreeNode } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
@@ -288,6 +291,7 @@ import {
   getTextFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useAccessoriesDetailDrawer } from '@/composables/useAccessoriesDetailDrawer'
+import { useAccessoryInventoryOptions } from '@/composables/useAccessoryInventoryOptions'
 import { useAccessoriesFormDialog, type AccessoriesFormDialogExpose } from '@/composables/useAccessoriesFormDialog'
 import { useAccessoriesOutboundDialog, type AccessoriesOutboundDialogExpose } from '@/composables/useAccessoriesOutboundDialog'
 import AccessoriesDetailDrawer from '@/components/inventory/AccessoriesDetailDrawer.vue'
@@ -307,9 +311,6 @@ const accessoriesStockTableRef = ref()
 const accessoriesOutboundTableRef = ref()
 const accessoriesStockShellRef = ref<HTMLElement | null>(null)
 const accessoriesOutboundShellRef = ref<HTMLElement | null>(null)
-const customerOptions = ref<{ label: string; value: string }[]>([])
-const salespersonOptions = ref<string[]>([])
-const categoryOptions = ref<string[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<AccessoryItem[]>([])
@@ -333,6 +334,10 @@ const {
   onHeaderDragEnd: onAccessoriesOutboundHeaderDragEnd,
   restoreColumnWidths: restoreAccessoriesOutboundColumnWidths,
 } = useTableColumnWidthPersist('inventory-accessories-outbounds')
+const {
+  customerOptions, salespersonOptions, categoryOptions, warehouseOptions, loadCustomerOptions, loadSalespersonOptions,
+  loadCategoryOptions, loadWarehouseOptions, formatWarehouseLabel, getMainImageUrl,
+} = useAccessoryInventoryOptions()
 const { detailDrawer, formatLogAction, openDetail } = useAccessoriesDetailDrawer()
 
 const { formDialog, quickAddSource, form, formRules, openForm, resetForm, submitForm } = useAccessoriesFormDialog(
@@ -388,25 +393,6 @@ function onPageTabChange() {
   }
 }
 
-async function loadCustomerOptions() {
-  try {
-    const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
-    const customers = (res.data?.list ?? []) as CustomerItem[]
-    customerOptions.value = customers.map((item) => ({ label: item.companyName, value: item.companyName }))
-  } catch {
-    console.warn('客户选项加载失败')
-  }
-}
-
-async function loadSalespersonOptions() {
-  try {
-    const res = await getSalespeople()
-    salespersonOptions.value = (res.data ?? []).filter((v) => !!String(v ?? '').trim())
-  } catch {
-    salespersonOptions.value = []
-  }
-}
-
 function onSearch(byUser = false) {
   if (byUser && filter.name && String(filter.name).trim()) nameLabelVisible.value = true
   pagination.page = 1
@@ -440,28 +426,6 @@ function onPageSizeChange() {
 
 function onSelectionChange(rows: AccessoryItem[]) {
   selectedRows.value = rows ?? []
-}
-
-function findNodeByValue(nodes: SystemOptionTreeNode[], value: string): SystemOptionTreeNode | null {
-  for (const node of nodes) {
-    if (node.value === value) return node
-    if (node.children?.length) {
-      const found = findNodeByValue(node.children, value)
-      if (found) return found
-    }
-  }
-  return null
-}
-
-async function loadCategoryOptions() {
-  try {
-    const res = await getDictTree('supplier_types')
-    const tree = res.data ?? []
-    const accessoryRoot = findNodeByValue(tree, '辅料供应商')
-    categoryOptions.value = (accessoryRoot?.children ?? []).map((child) => child.value).filter(Boolean)
-  } catch {
-    categoryOptions.value = []
-  }
 }
 
 async function loadOutbounds() {
@@ -506,6 +470,7 @@ onMounted(() => {
   loadCustomerOptions()
   loadSalespersonOptions()
   loadCategoryOptions()
+  loadWarehouseOptions()
   load()
 })
 </script>

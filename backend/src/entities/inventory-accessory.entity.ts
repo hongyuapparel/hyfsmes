@@ -31,12 +31,24 @@ export class InventoryAccessory {
   @Column({ length: 32, default: '个' })
   unit: string;
 
+  /** 仓库 system_options.id（option_type = warehouses） */
+  @Column({ name: 'warehouse_id', type: 'int', nullable: true })
+  warehouseId: number | null;
+
+  /** 存放地址 */
+  @Column({ length: 255, default: '' })
+  location: string;
+
   @Column({ type: 'varchar', length: 500, default: '' })
   remark: string;
 
   /** 图片 URL（新增/编辑时上传） */
   @Column({ name: 'image_url', length: 512, default: '' })
   imageUrl: string;
+
+  /** 多图 URL 列表（第一张作为主图） */
+  @Column({ name: 'image_urls', type: 'json', nullable: true })
+  imageUrls: string[] | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

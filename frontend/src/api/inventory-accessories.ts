@@ -8,10 +8,13 @@ export interface AccessoryItem {
   category: string
   quantity: number
   unit: string
+  warehouseId?: number | null
+  location?: string
   remark: string
   customerName?: string
   salesperson?: string
   imageUrl?: string
+  imageUrls?: string[]
   createdAt: string
 }
 
@@ -42,10 +45,13 @@ export function createAccessory(body: {
   category?: string
   quantity?: number
   unit?: string
+  warehouseId?: number | null
+  location?: string
   customerName?: string
   salesperson: string
   remark?: string
   imageUrl?: string
+  imageUrls?: string[]
 }) {
   return request.post<AccessoryItem>('/inventory/accessories/items', body)
 }
@@ -57,10 +63,13 @@ export function updateAccessory(
     category?: string
     quantity?: number
     unit?: string
+    warehouseId?: number | null
+    location?: string
     customerName?: string
     salesperson?: string
     remark?: string
     imageUrl?: string
+    imageUrls?: string[]
   }
 ) {
   return request.put<AccessoryItem>(`/inventory/accessories/items/${id}`, body)

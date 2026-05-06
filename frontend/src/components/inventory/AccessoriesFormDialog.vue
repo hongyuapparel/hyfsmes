@@ -3,6 +3,7 @@
     v-model="dialogVisible"
     :title="isEdit ? '编辑辅料' : '新增辅料'"
     width="480"
+    top="4vh"
     destroy-on-close
     @close="onClose"
   >
@@ -49,8 +50,43 @@
           <el-input v-model="form.unit" placeholder="单位（如个、卷）" clearable class="unit-input" :disabled="Boolean(quickAddSource)" />
         </div>
       </el-form-item>
-      <el-form-item label="图片" prop="imageUrl">
-        <ImageUploadArea v-model="form.imageUrl" />
+      <el-form-item label="仓库" prop="warehouseId">
+        <el-select v-model="form.warehouseId" placeholder="请选择仓库" filterable clearable style="width: 100%">
+          <el-option v-for="opt in warehouseOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
+        </el-select>
+      </el-form-item>
+      <el-form-item label="存放地址" prop="location">
+        <el-input v-model="form.location" placeholder="请输入存放地址" clearable />
+      </el-form-item>
+      <el-form-item label="图片" prop="imageUrls">
+        <div class="multi-image-wrap">
+          <div class="multi-image-row">
+            <div v-for="(_url, idx) in form.imageUrls" :key="`img-${idx}`" class="multi-image-item">
+              <ImageUploadArea v-model="form.imageUrls[idx]" compact class="multi-image-upload" />
+              <el-button
+                v-if="form.imageUrls.length > 1"
+                class="remove-image-btn"
+                type="danger"
+                link
+                size="small"
+                @click="removeImage(idx)"
+              >
+                删除
+              </el-button>
+            </div>
+            <el-button
+              v-if="form.imageUrls.length < 9"
+              class="add-image-btn"
+              type="primary"
+              plain
+              size="small"
+              @click="addImage"
+            >
+              + 添加
+            </el-button>
+          </div>
+          <div class="image-tip">第一张为主图（用于表格展示）</div>
+        </div>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
         <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="备注" clearable />
@@ -64,7 +100,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { AccessoryItem } from '@/api/inventory'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
@@ -74,9 +110,12 @@ interface AccessoriesFormModel {
   category: string
   quantity: number
   unit: string
+  warehouseId: number | null
+  location: string
   customerName: string
   salesperson: string
   imageUrl: string
+  imageUrls: string[]
   remark: string
 }
 
@@ -88,8 +127,9 @@ const props = defineProps<{
   form: AccessoriesFormModel
   formRules: FormRules
   categoryOptions: string[]
-  customerOptions: Array<{ label: string; value: string }>
+  customerOptions: Array<{ label: string; value: string; salesperson?: string }>
   salespersonOptions: string[]
+  warehouseOptions: Array<{ id: number; label: string }>
 }>()
 
 const emit = defineEmits<{
@@ -108,6 +148,34 @@ const dialogVisible = computed({
 function onClose() {
   emit('close')
 }
+
+function addImage() {
+  if (props.form.imageUrls.length >= 9) return
+  props.form.imageUrls.push('')
+}
+
+function removeImage(index: number) {
+  if (props.form.imageUrls.length <= 1) {
+    props.form.imageUrls[0] = ''
+    return
+  }
+  props.form.imageUrls.splice(index, 1)
+}
+
+watch(
+  () => props.form.customerName,
+  (customerName) => {
+    const name = String(customerName ?? '').trim()
+    if (!name) return
+    const matched = props.customerOptions.find((opt) => opt.value === name)
+    const sp = String(matched?.salesperson ?? '').trim()
+    if (sp && !props.form.salesperson) {
+      props.form.salesperson = sp
+      return
+    }
+    if (sp) props.form.salesperson = sp
+  },
+)
 
 defineExpose({
   validate: () => formRef.value?.validate(),
@@ -135,5 +203,56 @@ defineExpose({
 
 .unit-input {
   flex: 1;
+}
+
+.multi-image-wrap {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+}
+
+.multi-image-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.multi-image-item {
+  display: grid;
+  gap: 4px;
+  width: 110px;
+  min-width: 110px;
+}
+
+.remove-image-btn {
+  justify-self: center;
+}
+
+.add-image-btn {
+  width: 76px;
+  min-width: 76px;
+  height: 76px;
+  align-self: center;
+}
+
+.multi-image-upload {
+  width: 110px;
+}
+
+.multi-image-upload :deep(.image-upload-area) {
+  min-height: 110px;
+  height: 110px;
+}
+
+.multi-image-upload :deep(.preview-img) {
+  aspect-ratio: 1 / 1;
+  max-width: 100px;
+}
+
+.image-tip {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
 }
 </style>

@@ -66,15 +66,25 @@ export class InventoryAccessoriesService {
       category: item.category,
       quantity: item.quantity,
       unit: item.unit,
+      warehouseId: item.warehouseId,
+      location: item.location,
       customerName: item.customerName,
       salesperson: item.salesperson,
       imageUrl: item.imageUrl,
+      imageUrls: Array.isArray(item.imageUrls) ? item.imageUrls : [],
       remark: item.remark,
     };
   }
 
   private normalizeName(value: unknown): string {
     return String(value ?? '').trim();
+  }
+
+  private normalizeImageUrls(value: unknown): string[] {
+    if (!Array.isArray(value)) return [];
+    return value
+      .map((url) => String(url ?? '').trim())
+      .filter((url) => !!url);
   }
 
   private async findByName(name: string): Promise<InventoryAccessory | null> {
@@ -170,8 +180,11 @@ export class InventoryAccessoriesService {
     category?: string;
     quantity?: number;
     unit?: string;
+    warehouseId?: number | null;
+    location?: string;
     remark?: string;
     imageUrl?: string;
+    imageUrls?: string[];
     customerName?: string;
     salesperson?: string;
     operatorUsername?: string;
@@ -184,15 +197,20 @@ export class InventoryAccessoriesService {
     }
     const salesperson = (dto.salesperson ?? '').trim();
     if (!salesperson) throw new BadRequestException('业务员不能为空');
+    const imageUrls = this.normalizeImageUrls(dto.imageUrls);
+    const mainImageUrl = imageUrls[0] ?? this.normalizeName(dto.imageUrl);
     const existing = await this.findByName(name);
     if (existing) {
       const before = this.toSnapshot(existing);
       existing.quantity = (Number(existing.quantity) || 0) + qty;
       if (!existing.category && dto.category) existing.category = dto.category.trim();
       if (!existing.unit && dto.unit) existing.unit = dto.unit.trim();
+      if (existing.warehouseId == null && dto.warehouseId != null) existing.warehouseId = dto.warehouseId;
+      if (!existing.location && dto.location) existing.location = dto.location.trim();
       if (!existing.customerName && dto.customerName) existing.customerName = dto.customerName.trim();
       if (!existing.salesperson && salesperson) existing.salesperson = salesperson;
-      if (!existing.imageUrl && dto.imageUrl) existing.imageUrl = dto.imageUrl.trim();
+      if (!existing.imageUrl && mainImageUrl) existing.imageUrl = mainImageUrl;
+      if ((!existing.imageUrls || !existing.imageUrls.length) && imageUrls.length) existing.imageUrls = imageUrls;
       const savedExisting = await this.repo.save(existing);
       await this.addOperationLog({
         accessoryId: savedExisting.id,
@@ -209,8 +227,11 @@ export class InventoryAccessoriesService {
       category: dto.category?.trim() ?? '',
       quantity: qty,
       unit: dto.unit?.trim() ?? '个',
+      warehouseId: dto.warehouseId ?? null,
+      location: dto.location?.trim() ?? '',
       remark: dto.remark?.trim() ?? '',
-      imageUrl: dto.imageUrl?.trim() ?? '',
+      imageUrl: mainImageUrl || '',
+      imageUrls: imageUrls.length ? imageUrls : null,
       customerName: dto.customerName?.trim() ?? '',
       salesperson,
     });
@@ -232,8 +253,11 @@ export class InventoryAccessoriesService {
       category?: string;
       quantity?: number;
       unit?: string;
+      warehouseId?: number | null;
+      location?: string;
       remark?: string;
       imageUrl?: string;
+      imageUrls?: string[];
       customerName?: string;
       salesperson?: string;
       operatorUsername?: string;
@@ -253,8 +277,18 @@ export class InventoryAccessoriesService {
     }
     if (dto.category !== undefined) item.category = dto.category?.trim() ?? '';
     if (dto.unit !== undefined) item.unit = dto.unit?.trim() ?? '个';
+    if (dto.warehouseId !== undefined) item.warehouseId = dto.warehouseId ?? null;
+    if (dto.location !== undefined) item.location = dto.location?.trim() ?? '';
     if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
-    if (dto.imageUrl !== undefined) item.imageUrl = dto.imageUrl?.trim() ?? '';
+    if (dto.imageUrls !== undefined) {
+      const imageUrls = this.normalizeImageUrls(dto.imageUrls);
+      item.imageUrls = imageUrls.length ? imageUrls : null;
+      item.imageUrl = imageUrls[0] ?? '';
+    } else if (dto.imageUrl !== undefined) {
+      const imageUrl = dto.imageUrl?.trim() ?? '';
+      item.imageUrl = imageUrl;
+      item.imageUrls = imageUrl ? [imageUrl] : null;
+    }
     if (dto.customerName !== undefined) item.customerName = dto.customerName?.trim() ?? '';
     if (dto.salesperson !== undefined) {
       const salesperson = dto.salesperson?.trim() ?? '';

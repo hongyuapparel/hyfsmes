@@ -63,13 +63,16 @@ export class InventoryAccessoriesController {
     @Body('category') category?: string,
     @Body('quantity') quantity?: number,
     @Body('unit') unit?: string,
+    @Body('warehouseId') warehouseId?: number | null,
+    @Body('location') location?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('imageUrls') imageUrls?: string[],
     @Body('customerName') customerName?: string,
     @Body('salesperson') salesperson?: string,
     @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.create({ name, category, quantity, unit, remark, imageUrl, customerName, salesperson, operatorUsername: user?.username ?? '' });
+    return this.service.create({ name, category, quantity, unit, warehouseId, location, remark, imageUrl, imageUrls, customerName, salesperson, operatorUsername: user?.username ?? '' });
   }
 
   @Put('items/:id')
@@ -79,8 +82,11 @@ export class InventoryAccessoriesController {
     @Body('category') category?: string,
     @Body('quantity') quantity?: number,
     @Body('unit') unit?: string,
+    @Body('warehouseId') warehouseId?: number | null,
+    @Body('location') location?: string,
     @Body('remark') remark?: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('imageUrls') imageUrls?: string[],
     @Body('customerName') customerName?: string,
     @Body('salesperson') salesperson?: string,
     @CurrentUser() user?: { username?: string },
@@ -90,8 +96,11 @@ export class InventoryAccessoriesController {
       category,
       quantity,
       unit,
+      warehouseId,
+      location,
       remark,
       imageUrl,
+      imageUrls,
       customerName,
       salesperson,
       operatorUsername: user?.username ?? '',

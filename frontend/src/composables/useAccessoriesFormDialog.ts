@@ -27,9 +27,12 @@ export function useAccessoriesFormDialog(
     category: '',
     quantity: 0,
     unit: '个',
+    warehouseId: null as number | null,
+    location: '',
     customerName: '',
     salesperson: '',
     imageUrl: '',
+    imageUrls: [] as string[],
     remark: '',
   })
   const formRules: FormRules = {
@@ -46,9 +49,15 @@ export function useAccessoriesFormDialog(
       form.name = seed.name
       form.category = seed.category ?? ''
       form.unit = seed.unit ?? '个'
+      form.warehouseId = seed.warehouseId ?? null
+      form.location = seed.location ?? ''
       form.customerName = seed.customerName ?? ''
       form.salesperson = seed.salesperson ?? ''
       form.imageUrl = seed.imageUrl ?? ''
+      const seedImageUrls = Array.isArray(seed.imageUrls)
+        ? seed.imageUrls.filter((url) => !!String(url ?? '').trim())
+        : (seed.imageUrl ? [seed.imageUrl] : [''])
+      form.imageUrls = seedImageUrls.length ? seedImageUrls : ['']
       form.remark = seed.remark ?? ''
       if (row) {
         form.quantity = seed.quantity ?? 0
@@ -61,9 +70,12 @@ export function useAccessoriesFormDialog(
       form.category = ''
       form.quantity = 0
       form.unit = '个'
+      form.warehouseId = null
+      form.location = ''
       form.customerName = ''
       form.salesperson = ''
       form.imageUrl = ''
+      form.imageUrls = ['']
       form.remark = ''
     }
     formDialog.visible = true
@@ -73,19 +85,30 @@ export function useAccessoriesFormDialog(
     dialogRef.value?.clearValidate()
   }
 
+  function getImagePayload(): { imageUrl?: string; imageUrls: string[] } {
+    const imageUrls = form.imageUrls.map((url) => String(url ?? '').trim()).filter(Boolean)
+    return {
+      imageUrl: imageUrls[0] || undefined,
+      imageUrls,
+    }
+  }
+
   async function submitForm() {
     await dialogRef.value?.validate?.().catch(() => {})
     formDialog.submitting = true
     try {
+      const imagePayload = getImagePayload()
       if (formDialog.isEdit && editId.value != null) {
         await updateAccessory(editId.value, {
           name: form.name,
           category: form.category,
           quantity: form.quantity,
           unit: form.unit,
+          warehouseId: form.warehouseId ?? null,
+          location: form.location || undefined,
           customerName: form.customerName || undefined,
           salesperson: form.salesperson,
-          imageUrl: form.imageUrl || undefined,
+          ...imagePayload,
           remark: form.remark,
         })
         ElMessage.success('保存成功')
@@ -101,9 +124,11 @@ export function useAccessoriesFormDialog(
             category: form.category,
             quantity: inputQty,
             unit: form.unit,
+            warehouseId: form.warehouseId ?? null,
+            location: form.location || undefined,
             customerName: form.customerName || undefined,
             salesperson: form.salesperson,
-            imageUrl: form.imageUrl || undefined,
+            ...imagePayload,
             remark: form.remark,
           })
           ElMessage.success('库存增加成功')
@@ -113,9 +138,11 @@ export function useAccessoriesFormDialog(
             category: form.category,
             quantity: form.quantity,
             unit: form.unit,
+            warehouseId: form.warehouseId ?? null,
+            location: form.location || undefined,
             customerName: form.customerName || undefined,
             salesperson: form.salesperson,
-            imageUrl: form.imageUrl || undefined,
+            ...imagePayload,
             remark: form.remark,
           })
           ElMessage.success('新增成功')
