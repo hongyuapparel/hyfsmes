@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
@@ -156,6 +157,39 @@ export function parseListSizeBreakdownFromSnapshot(raw: unknown): {
       values: [...row.quantities],
     })),
   };
+}
+
+export function subtractColorSizeSnapshots(current: ColorSizeSnapshot | null, outgoing: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
+  if (!current || !outgoing) return current;
+  const headers = [...current.headers];
+  const rows = current.rows.map((row) => ({
+    colorName: String(row.colorName ?? '').trim(),
+    quantities: headers.map((_, index) => Math.max(0, Math.trunc(Number(row.quantities[index]) || 0))),
+  }));
+  const rowMap = new Map(rows.map((row) => [row.colorName, row]));
+  const headerIndex = new Map(headers.map((header, index) => [getSizeHeaderKey(header), index]));
+  outgoing.rows.forEach((outRow) => {
+    const colorName = String(outRow.colorName ?? '').trim();
+    const targetRow = rowMap.get(colorName);
+    if (!targetRow) throw new BadRequestException(`颜色「${colorName || '-'}」库存明细不足，无法出库`);
+    outgoing.headers.forEach((header, outIndex) => {
+      const qty = Math.max(0, Math.trunc(Number(outRow.quantities?.[outIndex]) || 0));
+      if (qty <= 0) return;
+      const targetIndex = headerIndex.get(getSizeHeaderKey(header));
+      if (targetIndex == null) throw new BadRequestException(`尺码「${header}」库存明细不足，无法出库`);
+      const remain = Math.max(0, Math.trunc(Number(targetRow.quantities[targetIndex]) || 0));
+      if (remain < qty) throw new BadRequestException(`颜色「${colorName || '-'}」尺码「${header}」库存不足`);
+      targetRow.quantities[targetIndex] = remain - qty;
+    });
+  });
+  const activeRows = rows
+    .map((row) => ({
+      colorName: row.colorName,
+      quantities: headers.map((_, index) => Math.max(0, Math.trunc(Number(row.quantities[index]) || 0))),
+    }))
+    .filter((row) => row.quantities.some((qty) => qty > 0));
+  if (!activeRows.length) return { headers: [], rows: [] };
+  return normalizeColorSizeSnapshot({ headers, rows: activeRows });
 }
 
 function allocateByWeight(weights: number[], total: number): number[] {

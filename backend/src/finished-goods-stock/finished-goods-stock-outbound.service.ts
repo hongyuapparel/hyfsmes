@@ -10,6 +10,8 @@ import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
 import type { ColorSizeSnapshot, FinishedOutboundItemInput } from './finished-goods-stock.types';
+import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
+import { subtractColorSizeSnapshots } from './finished-goods-stock-query.utils';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
 @Injectable()
@@ -31,6 +33,7 @@ export class FinishedGoodsStockOutboundService {
     private readonly roleRepo: Repository<Role>,
     @InjectRepository(UserRole)
     private readonly userRoleRepo: Repository<UserRole>,
+    private readonly inboundQueryService: FinishedGoodsStockInboundQueryService,
   ) {}
 
   private isTableMissingError(e: unknown, tableName: string): boolean {
@@ -174,7 +177,15 @@ export class FinishedGoodsStockOutboundService {
     }
   }
 
-  private stockAdjustSnapshot(stock: FinishedGoodsStock): Record<string, unknown> {
+  private cloneColorSizeSnapshot(snapshot: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
+    if (!snapshot) return null;
+    return {
+      headers: [...snapshot.headers],
+      rows: snapshot.rows.map((row) => ({ colorName: row.colorName, quantities: [...row.quantities] })),
+    };
+  }
+
+  private stockAdjustSnapshot(stock: FinishedGoodsStock, colorSizeSnapshot?: ColorSizeSnapshot | null): Record<string, unknown> {
     return {
       skuCode: stock.skuCode ?? '',
       customerName: stock.customerName ?? '',
@@ -185,7 +196,9 @@ export class FinishedGoodsStockOutboundService {
       quantity: stock.quantity ?? 0,
       unitPrice: stock.unitPrice != null ? String(stock.unitPrice) : '0',
       imageUrl: stock.imageUrl ?? '',
-      colorSizeSnapshot: this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot),
+      colorSizeSnapshot: this.cloneColorSizeSnapshot(
+        colorSizeSnapshot !== undefined ? colorSizeSnapshot : this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot),
+      ),
     };
   }
 
@@ -204,40 +217,6 @@ export class FinishedGoodsStockOutboundService {
       after: { ...after, logAction: 'outbound' },
       remark: (remark ?? '').trim() || '成品出库',
     }));
-  }
-
-  private subtractColorSizeSnapshots(currentRaw: unknown, outgoing: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
-    const current = this.parseStoredColorSizeSnapshot(currentRaw);
-    if (!current || !outgoing) return current;
-    const headers = [...current.headers];
-    const rows = current.rows.map((row) => ({
-      colorName: String(row.colorName ?? '').trim(),
-      quantities: headers.map((_, index) => Math.max(0, Math.trunc(Number(row.quantities[index]) || 0))),
-    }));
-    const rowMap = new Map(rows.map((row) => [row.colorName, row]));
-    const headerIndex = new Map(headers.map((header, index) => [getSizeHeaderKey(header), index]));
-    outgoing.rows.forEach((outRow) => {
-      const colorName = String(outRow.colorName ?? '').trim();
-      const targetRow = rowMap.get(colorName);
-      if (!targetRow) throw new BadRequestException(`颜色「${colorName || '-'}」库存明细不足，无法出库`);
-      outgoing.headers.forEach((header, outIndex) => {
-        const qty = Math.max(0, Math.trunc(Number(outRow.quantities?.[outIndex]) || 0));
-        if (qty <= 0) return;
-        const targetIndex = headerIndex.get(getSizeHeaderKey(header));
-        if (targetIndex == null) throw new BadRequestException(`尺码「${header}」库存明细不足，无法出库`);
-        const remain = Math.max(0, Math.trunc(Number(targetRow.quantities[targetIndex]) || 0));
-        if (remain < qty) throw new BadRequestException(`颜色「${colorName || '-'}」尺码「${header}」库存不足`);
-        targetRow.quantities[targetIndex] = remain - qty;
-      });
-    });
-    const activeRows = rows
-      .map((row) => ({
-        colorName: row.colorName,
-        quantities: headers.map((_, index) => Math.max(0, Math.trunc(Number(row.quantities[index]) || 0))),
-      }))
-      .filter((row) => row.quantities.some((qty) => qty > 0));
-    if (!activeRows.length) return { headers: [], rows: [] };
-    return this.normalizeColorSizeSnapshot({ headers, rows: activeRows });
   }
 
   private async getColorImageMapsForStocks(stockIds: number[]): Promise<Map<number, Map<string, string>>> {
@@ -289,6 +268,16 @@ export class FinishedGoodsStockOutboundService {
     const link = await this.userRoleRepo.findOne({ where: { userId: pickupUser.id, roleId: salespersonRole.id } });
     if (!(pickupUser.roleId === salespersonRole.id || !!link)) throw new NotFoundException('领取人不存在或不是在职业务员');
     return { pickupId: pickupUser.id, pickupUserName: (pickupUser.displayName?.trim() || pickupUser.username || '').trim() };
+  }
+
+  private async resolveOperatorDisplayName(operatorUsername: string): Promise<string> {
+    const username = String(operatorUsername ?? '').trim();
+    if (!username) return '';
+    const user = await this.userRepo.findOne({
+      where: { username },
+      select: ['username', 'displayName'],
+    });
+    return (user?.displayName?.trim() || user?.username || username).trim();
   }
 
   private async insertFinishedGoodsOutboundRecord(
@@ -389,11 +378,12 @@ export class FinishedGoodsStockOutboundService {
 
     const orderIds = Array.from(new Set(stocks.map((stock) => stock.orderId).filter((id): id is number => id != null)));
     const skuCodes = Array.from(new Set(stocks.map((stock) => stock.skuCode?.trim()).filter((code): code is string => !!code)));
-    const [orders, products, pickupInfo, colorImageMaps] = await Promise.all([
+    const [orders, products, pickupInfo, colorImageMaps, operatorDisplayName] = await Promise.all([
       orderIds.length ? this.orderRepo.find({ where: { id: In(orderIds) } }) : Promise.resolve([]),
       skuCodes.length ? this.productRepo.find({ where: skuCodes.map((skuCode) => ({ skuCode })) }) : Promise.resolve([]),
       this.resolvePickupUser(pickupUserId),
       this.getColorImageMapsForStocks(uniqueIds),
+      this.resolveOperatorDisplayName(operatorUsername),
     ]);
     const orderMap = new Map(orders.map((order) => [order.id, order]));
     const productMap = new Map(products.map((product) => [product.skuCode?.trim() ?? '', product]));
@@ -405,20 +395,23 @@ export class FinishedGoodsStockOutboundService {
           const txStock = await txStockRepo.findOne({ where: { id: item.id } });
           if (!txStock) throw new NotFoundException('库存记录不存在');
           if (item.quantity > txStock.quantity) throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 的出库数量不能大于当前库存`);
-          const beforeAdjust = this.stockAdjustSnapshot(txStock);
-          const currentSnapshot = this.parseStoredColorSizeSnapshot(txStock.colorSizeSnapshot);
+          const currentSnapshot = await this.inboundQueryService.buildCurrentStockSnapshot(txStock);
+          const beforeAdjust = this.stockAdjustSnapshot(txStock, currentSnapshot);
           const outgoingSnapshot = this.parseStoredColorSizeSnapshot(item.sizeBreakdown);
           if (outgoingSnapshot) this.assertColorSizeSnapshotTotal(outgoingSnapshot, item.quantity, '出库尺码明细合计必须等于出库数量');
           if (currentSnapshot && !outgoingSnapshot) throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 需要按颜色尺码明细出库`);
+          if (!currentSnapshot && outgoingSnapshot) throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 无法读取当前颜色尺码明细，请先在库存详情中修正后再出库`);
+          let afterSnapshot: ColorSizeSnapshot | null = currentSnapshot;
           if (currentSnapshot && outgoingSnapshot) {
             this.assertColorSizeSnapshotTotal(currentSnapshot, txStock.quantity, '当前库存尺码明细与总数量不一致，请先修正后再出库');
-            txStock.colorSizeSnapshot = this.subtractColorSizeSnapshots(currentSnapshot, outgoingSnapshot);
+            afterSnapshot = subtractColorSizeSnapshots(currentSnapshot, outgoingSnapshot);
+            txStock.colorSizeSnapshot = afterSnapshot;
           }
           txStock.quantity -= item.quantity;
-          const afterAdjust = this.stockAdjustSnapshot(txStock);
+          const afterAdjust = this.stockAdjustSnapshot(txStock, afterSnapshot);
           if (txStock.quantity === 0) await txStockRepo.remove(txStock);
           else await txStockRepo.save(txStock);
-          await this.appendOutboundAdjustLog(manager, item.id, operatorUsername, beforeAdjust, afterAdjust, remark);
+          await this.appendOutboundAdjustLog(manager, item.id, operatorDisplayName, beforeAdjust, afterAdjust, remark);
 
           const stock = stockMap.get(item.id) ?? txStock;
           const order = stock.orderId != null ? orderMap.get(stock.orderId) ?? null : null;
@@ -438,7 +431,7 @@ export class FinishedGoodsStockOutboundService {
             pickupUserId: pickupInfo.pickupId,
             pickupUserName: pickupInfo.pickupUserName,
             sizeBreakdown: item.sizeBreakdown ?? null,
-            operatorUsername: (operatorUsername ?? '').trim(),
+            operatorUsername: operatorDisplayName,
             remark: (remark ?? '').trim(),
           });
         }

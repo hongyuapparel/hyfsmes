@@ -6,18 +6,18 @@ import { Order } from '../entities/order.entity';
 import { Product } from '../entities/product.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
 import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-adjust-log.entity';
-import { OrderExt } from '../entities/order-ext.entity';
+import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { Role } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
 import type { ColorSizeSnapshot, FinishedGoodsStockDetailResult, FinishedStockRow } from './finished-goods-stock.types';
 import { FinishedGoodsStockListQueryService } from './finished-goods-stock-list-query.service';
+import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import {
   formatDateTimeForResponse,
   isTableMissingError,
   normalizeOrderUnitPrice,
   parseStoredColorSizeSnapshot,
-  scaleColorSizeRowsToQuantity,
 } from './finished-goods-stock-query.utils';
 import {
   buildFinishedStockAdjustLogSummary,
@@ -54,14 +54,14 @@ export class FinishedGoodsStockQueryService {
     private readonly stockRepo: Repository<FinishedGoodsStock>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
-    @InjectRepository(OrderExt)
-    private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
     @InjectRepository(FinishedGoodsStockColorImage)
     private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
     @InjectRepository(FinishedGoodsStockAdjustLog)
     private readonly adjustLogRepo: Repository<FinishedGoodsStockAdjustLog>,
+    @InjectRepository(FinishedGoodsOutbound)
+    private readonly outboundRepo: Repository<FinishedGoodsOutbound>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     @InjectRepository(Role)
@@ -69,6 +69,7 @@ export class FinishedGoodsStockQueryService {
     @InjectRepository(UserRole)
     private readonly userRoleRepo: Repository<UserRole>,
     private readonly listQueryService: FinishedGoodsStockListQueryService,
+    private readonly inboundQueryService: FinishedGoodsStockInboundQueryService,
   ) {}
 
   getList(params: StockListQueryParams): Promise<StockListQueryResult> {
@@ -84,30 +85,7 @@ export class FinishedGoodsStockQueryService {
   }
 
   private async buildCurrentStockSnapshot(stock: FinishedGoodsStock): Promise<ColorSizeSnapshot | null> {
-    const snapshot = parseStoredColorSizeSnapshot(stock.colorSizeSnapshot);
-    if (snapshot) return snapshot;
-    if (stock.orderId == null) return null;
-
-    const ext = await this.orderExtRepo.findOne({ where: { orderId: stock.orderId } });
-    const headers = Array.isArray(ext?.colorSizeHeaders)
-      ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
-      : [];
-    const baseRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
-    if (!headers.length || !baseRows.length) return null;
-    return {
-      headers,
-      rows: scaleColorSizeRowsToQuantity(
-        headers,
-        baseRows.map((row) => {
-          const rowRecord = row as Record<string, unknown> | null;
-          return {
-            colorName: rowRecord?.colorName as string | undefined,
-            quantities: Array.isArray(rowRecord?.quantities) ? rowRecord?.quantities : [],
-          };
-        }),
-        stock.quantity,
-      ),
-    };
+    return this.inboundQueryService.buildCurrentStockSnapshot(stock);
   }
 
   private async getSkuGroupSizeHeaders(stock: FinishedGoodsStock): Promise<string[]> {
@@ -178,16 +156,103 @@ export class FinishedGoodsStockQueryService {
     return Array.from(map.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 100);
   }
 
+  private async getOperatorDisplayNameMap(operatorUsernames: string[]): Promise<Map<string, string>> {
+    const names = Array.from(new Set(operatorUsernames.map((item) => String(item ?? '').trim()).filter(Boolean)));
+    if (!names.length) return new Map();
+    const users = await this.userRepo.find({
+      where: { username: In(names) },
+      select: ['username', 'displayName'],
+    });
+    return new Map(
+      users.map((user) => [
+        user.username,
+        (user.displayName?.trim() || user.username || '').trim(),
+      ]),
+    );
+  }
+
+  private asLogRecord(value: unknown): Record<string, unknown> {
+    return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
+  }
+
+  private getLogSnapshotNumber(snapshot: unknown, key: string): number | null {
+    const value = Number(this.asLogRecord(snapshot)[key]);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private isOutboundLog(log: FinishedGoodsStockAdjustLog): boolean {
+    const action = this.getLogSnapshotText(log.after, 'logAction') || this.getLogSnapshotText(log.before, 'logAction');
+    return action === 'outbound' || String(log.remark ?? '').includes('出库');
+  }
+
+  private getOutboundLogQuantity(log: FinishedGoodsStockAdjustLog): number | null {
+    const beforeQuantity = this.getLogSnapshotNumber(log.before, 'quantity');
+    const afterQuantity = this.getLogSnapshotNumber(log.after, 'quantity');
+    if (beforeQuantity == null || afterQuantity == null || beforeQuantity <= afterQuantity) return null;
+    return Math.max(0, Math.trunc(beforeQuantity - afterQuantity));
+  }
+
+  private formatQuantity(value: number): string {
+    return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+  }
+
+  private buildOutboundBreakdownSummary(snapshot: ColorSizeSnapshot | null, quantity: number, remark: string): string {
+    const prefix = remark.trim() || '成品出库';
+    if (!snapshot?.headers.length || !snapshot.rows.length) return `${prefix} -${this.formatQuantity(quantity)}件`;
+    const rowSummaries = snapshot.rows
+      .map((row) => {
+        const deltas = snapshot.headers
+          .map((header, index) => ({
+            header,
+            quantity: Math.max(0, Math.trunc(Number(row.quantities[index]) || 0)),
+          }))
+          .filter((item) => item.quantity > 0)
+          .map((item) => `${item.header} -${this.formatQuantity(item.quantity)}件`);
+        if (!deltas.length) return '';
+        const colorName = String(row.colorName ?? '').trim();
+        return colorName ? `${colorName}：${deltas.join('、')}` : deltas.join('、');
+      })
+      .filter(Boolean);
+    return rowSummaries.length ? `${prefix} ${rowSummaries.join('；')}` : `${prefix} -${this.formatQuantity(quantity)}件`;
+  }
+
+  private async getOutboundDetailSummaryMap(logs: FinishedGoodsStockAdjustLog[]): Promise<Map<number, string>> {
+    const outboundLogs = logs.filter((log) => this.isOutboundLog(log));
+    const stockIds = Array.from(new Set(outboundLogs.map((log) => log.finishedStockId).filter((id) => Number.isInteger(id) && id > 0)));
+    if (!stockIds.length) return new Map();
+    const outbounds = await this.outboundRepo.find({
+      where: { finishedStockId: In(stockIds) },
+      order: { createdAt: 'DESC', id: 'DESC' },
+    });
+    const result = new Map<number, string>();
+    outboundLogs.forEach((log) => {
+      const logTime = log.createdAt.getTime();
+      const expectedQuantity = this.getOutboundLogQuantity(log);
+      const matched = outbounds
+        .filter((row) => {
+          if (row.finishedStockId !== log.finishedStockId) return false;
+          if (Math.abs(row.createdAt.getTime() - logTime) > 3000) return false;
+          return expectedQuantity == null || Math.max(0, Math.trunc(Number(row.quantity) || 0)) === expectedQuantity;
+        })
+        .sort((a, b) => Math.abs(a.createdAt.getTime() - logTime) - Math.abs(b.createdAt.getTime() - logTime))[0];
+      if (!matched) return;
+      const quantity = expectedQuantity ?? Math.max(0, Math.trunc(Number(matched.quantity) || 0));
+      const snapshot = parseStoredColorSizeSnapshot(matched.sizeBreakdown);
+      if (!snapshot) return;
+      result.set(log.id, this.buildOutboundBreakdownSummary(snapshot, quantity, String(log.remark ?? '')));
+    });
+    return result;
+  }
+
   private async getDetailInternal(id: number): Promise<FinishedGoodsStockDetailResult> {
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('库存记录不存在');
 
-    const [order, product, ext] = await Promise.all([
+    const [order, product] = await Promise.all([
       stock.orderId != null ? this.orderRepo.findOne({ where: { id: stock.orderId } }) : Promise.resolve(null),
       stock.skuCode?.trim()
         ? this.productRepo.findOne({ where: { skuCode: stock.skuCode.trim() } })
         : Promise.resolve(null),
-      stock.orderId != null ? this.orderExtRepo.findOne({ where: { orderId: stock.orderId } }) : Promise.resolve(null),
     ]);
 
     let colorImages: FinishedGoodsStockColorImage[] = [];
@@ -203,7 +268,7 @@ export class FinishedGoodsStockQueryService {
       if (!isTableMissingError(error, 'finished_goods_stock_adjust_logs')) throw error;
     }
 
-    const snap = parseStoredColorSizeSnapshot(stock.colorSizeSnapshot);
+    const snap = await this.buildCurrentStockSnapshot(stock);
     let headers: string[] = [];
     let mappedRows: Array<{ colorName: string; quantities: number[] }> = [];
     if (snap) {
@@ -213,18 +278,6 @@ export class FinishedGoodsStockQueryService {
         colorName: String(row.colorName ?? ''),
         quantities: remapQuantitiesBySizeHeaders(snap.headers, Array.isArray(row.quantities) ? row.quantities : [], headers),
       }));
-    } else {
-      const sourceHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter(Boolean) : [];
-      headers = sortSizeHeaders(sourceHeaders);
-      const rows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
-      mappedRows = rows.map((row) => {
-        const rowRecord = row as Record<string, unknown> | null;
-        const quantities = Array.isArray(rowRecord?.quantities) ? rowRecord.quantities : [];
-        return {
-          colorName: String(rowRecord?.colorName ?? ''),
-          quantities: remapQuantitiesBySizeHeaders(sourceHeaders, quantities, headers),
-        };
-      });
     }
     const colors = mappedRows.map((row) => row.colorName).filter((value) => value);
     const groupSizeHeaders = await this.getSkuGroupSizeHeaders(stock);
@@ -239,6 +292,8 @@ export class FinishedGoodsStockQueryService {
           ? orderUnitPrice
           : 0;
     stock.unitPrice = normalizeOrderUnitPrice(resolvedUnitPrice);
+    const operatorDisplayNameMap = await this.getOperatorDisplayNameMap(logs.map((row) => row.operatorUsername));
+    const outboundDetailSummaryMap = await this.getOutboundDetailSummaryMap(logs);
 
     return {
       stock: { ...stock, remark: latestRemark },
@@ -255,7 +310,7 @@ export class FinishedGoodsStockQueryService {
           after: row.after,
           remark: row.remark,
         });
-        const summary = buildFinishedStockAdjustLogSummary({
+        const summary = outboundDetailSummaryMap.get(row.id) ?? buildFinishedStockAdjustLogSummary({
           before: row.before,
           after: row.after,
           remark: row.remark,
@@ -263,7 +318,7 @@ export class FinishedGoodsStockQueryService {
         });
         return {
           id: row.id,
-          operatorUsername: row.operatorUsername ?? '',
+          operatorUsername: operatorDisplayNameMap.get(String(row.operatorUsername ?? '').trim()) ?? row.operatorUsername ?? '',
           before: row.before ?? null,
           after: row.after ?? null,
           remark: row.remark ?? '',

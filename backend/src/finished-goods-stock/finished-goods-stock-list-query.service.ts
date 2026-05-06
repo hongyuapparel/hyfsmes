@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { Brackets, In, ObjectLiteral, Repository, SelectQueryBuilder } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
@@ -12,6 +12,8 @@ import {
   isTableMissingError,
   parseListSizeBreakdownFromSnapshot,
 } from './finished-goods-stock-query.utils';
+import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
+import { snapshotToListSizeBreakdown, type StoredStockRawRow } from './finished-goods-stock-list-query.helpers';
 
 @Injectable()
 export class FinishedGoodsStockListQueryService {
@@ -26,10 +28,11 @@ export class FinishedGoodsStockListQueryService {
     private readonly productRepo: Repository<Product>,
     @InjectRepository(FinishedGoodsStockColorImage)
     private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
+    private readonly inboundQueryService: FinishedGoodsStockInboundQueryService,
   ) {}
 
-  private applyInboundTimeRange(
-    qb: SelectQueryBuilder<any>,
+  private applyInboundTimeRange<Entity extends ObjectLiteral>(
+    qb: SelectQueryBuilder<Entity>,
     columnSql: string,
     startDate?: string,
     endDate?: string,
@@ -42,8 +45,8 @@ export class FinishedGoodsStockListQueryService {
     }
   }
 
-  private applyStoredListFilters(
-    qb: SelectQueryBuilder<any>,
+  private applyStoredListFilters<Entity extends ObjectLiteral>(
+    qb: SelectQueryBuilder<Entity>,
     filters: {
       orderNo?: string;
       skuCode?: string;
@@ -337,23 +340,7 @@ export class FinishedGoodsStockListQueryService {
       });
 
       let storedCount = 0;
-      let storedRows: Array<{
-          id: number;
-          orderId: number | null;
-          orderNo: string;
-          customerName: string;
-          skuCode: string;
-          quantity: number;
-          unitPrice: string;
-          warehouseId: number | null;
-          inventoryTypeId: number | null;
-          department: string;
-          location: string;
-          productImageUrl: string;
-          imageUrl: string;
-          createdAt: Date;
-          colorSizeSnapshot?: unknown;
-        }> = [];
+      let storedRows: StoredStockRawRow[] = [];
 
       if (tab === 'stored' && paginateByVisibleGroup) {
         const skuGroupSql = this.getStoredSkuGroupSql();
@@ -413,23 +400,38 @@ export class FinishedGoodsStockListQueryService {
           .getRawMany();
       }
 
-      const storedList: FinishedStockRow[] = storedRows.map((r) => ({
-        id: r.id,
-        orderId: r.orderId ?? null,
-        orderNo: r.orderNo ?? '',
-        customerName: r.customerName ?? '',
-        skuCode: r.skuCode ?? '',
-        quantity: r.quantity ?? 0,
-        unitPrice: r.unitPrice ?? '0',
-        warehouseId: r.warehouseId ?? null,
-        inventoryTypeId: r.inventoryTypeId ?? null,
-        department: r.department ?? '',
-        location: r.location ?? '',
-        productImageUrl: r.productImageUrl ?? '',
-        imageUrl: r.imageUrl ?? '',
-        createdAt: formatDateTimeForResponse(r.createdAt),
-        type: 'stored',
-        sizeBreakdown: parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot),
+      const storedList: FinishedStockRow[] = await Promise.all(storedRows.map(async (r) => {
+        const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
+        let sizeBreakdown = storedBreakdown;
+        if (!sizeBreakdown && r.orderId != null) {
+          const stock = this.stockRepo.create({
+            id: r.id,
+            orderId: r.orderId,
+            skuCode: r.skuCode ?? '',
+            customerName: r.customerName ?? '',
+            quantity: r.quantity ?? 0,
+            colorSizeSnapshot: null,
+          });
+          sizeBreakdown = snapshotToListSizeBreakdown(await this.inboundQueryService.buildCurrentStockSnapshot(stock));
+        }
+        return {
+          id: r.id,
+          orderId: r.orderId ?? null,
+          orderNo: r.orderNo ?? '',
+          customerName: r.customerName ?? '',
+          skuCode: r.skuCode ?? '',
+          quantity: r.quantity ?? 0,
+          unitPrice: r.unitPrice ?? '0',
+          warehouseId: r.warehouseId ?? null,
+          inventoryTypeId: r.inventoryTypeId ?? null,
+          department: r.department ?? '',
+          location: r.location ?? '',
+          productImageUrl: r.productImageUrl ?? '',
+          imageUrl: r.imageUrl ?? '',
+          createdAt: formatDateTimeForResponse(r.createdAt),
+          type: 'stored',
+          sizeBreakdown,
+        };
       }));
       if (storedList.length) {
         try {

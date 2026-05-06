@@ -1,4 +1,3 @@
-import type { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import type { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 
 export interface FinishedStockRow {
@@ -35,13 +34,28 @@ export type ColorSizeSnapshot = {
   rows: Array<{ colorName: string; quantities: number[] }>;
 };
 
+export type FinishedGoodsOutboundRecord = {
+  id: number;
+  finishedStockId: number;
+  orderId: number | null;
+  orderNo: string;
+  skuCode: string;
+  customerName: string;
+  quantity: number;
+  department: string;
+  warehouseId: number | null;
+  inventoryTypeId: number | null;
+  pickupUserId: number | null;
+  pickupUserName: string;
+  sizeBreakdown: ColorSizeSnapshot | null;
+  operatorUsername: string;
+  remark: string;
+  createdAt: string;
+  imageUrl?: string;
+};
+
 export type FinishedGoodsOutboundListResult = {
-  list: Array<
-    Omit<FinishedGoodsOutbound, 'createdAt'> & {
-      createdAt: string;
-      imageUrl?: string;
-    }
-  >;
+  list: FinishedGoodsOutboundRecord[];
   total: number;
   page: number;
   pageSize: number;

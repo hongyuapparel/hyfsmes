@@ -4,7 +4,33 @@ import { In, Repository } from 'typeorm';
 import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import { Product } from '../entities/product.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
+import { User } from '../entities/user.entity';
 import type { ColorSizeSnapshot, FinishedGoodsOutboundListResult } from './finished-goods-stock.types';
+
+type OutboundRawRow = {
+  id: string | number;
+  finishedStockId: string | number;
+  orderId: string | number | null;
+  orderNo: string | null;
+  skuCode: string | null;
+  imageUrlSnapshot?: string | null;
+  customerName: string | null;
+  quantity: string | number;
+  department: string | null;
+  warehouseId: string | number | null;
+  inventoryTypeId: string | number | null;
+  pickupUserId: string | number | null;
+  pickupUserName: string | null;
+  sizeBreakdown: unknown;
+  operatorUsername: string | null;
+  remark: string | null;
+  createdAt: string | Date | null;
+  imageUrl: string | null;
+};
+
+type OutboundResponseRow = FinishedGoodsOutboundListResult['list'][number] & {
+  productImageUrl?: string;
+};
 
 @Injectable()
 export class FinishedGoodsStockReportService {
@@ -15,18 +41,20 @@ export class FinishedGoodsStockReportService {
     private readonly productRepo: Repository<Product>,
     @InjectRepository(FinishedGoodsStockColorImage)
     private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
   ) {}
 
   private formatDateTimeForResponse(value: unknown): string {
     if (!value) return '';
-    const date = value instanceof Date ? value : new Date(value as any);
+    const date = value instanceof Date ? value : new Date(value as string | number);
     if (Number.isNaN(date.getTime())) return '';
     const pad = (n: number) => String(n).padStart(2, '0');
     return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
   }
 
   private isTableMissingError(e: unknown, tableName: string): boolean {
-    const msg = String((e as any)?.message || '');
+    const msg = String((e as { message?: unknown } | null)?.message || '');
     return msg.includes('Table') && msg.includes(tableName) && msg.includes("doesn't exist");
   }
 
@@ -103,6 +131,69 @@ export class FinishedGoodsStockReportService {
     return Array.from(colorImages.values()).find((imageUrl) => !!imageUrl) ?? '';
   }
 
+  private getSnapshotTotal(snapshot: ColorSizeSnapshot | null): number {
+    if (!snapshot) return 0;
+    return snapshot.rows.reduce(
+      (sum, row) =>
+        sum +
+        row.quantities.reduce((rowSum, quantity) => rowSum + Math.max(0, Math.trunc(Number(quantity) || 0)), 0),
+      0,
+    );
+  }
+
+  private async getOperatorDisplayNameMap(operatorUsernames: string[]): Promise<Map<string, string>> {
+    const names = Array.from(new Set(operatorUsernames.map((item) => String(item ?? '').trim()).filter(Boolean)));
+    if (!names.length) return new Map();
+    const users = await this.userRepo.find({
+      where: { username: In(names) },
+      select: ['username', 'displayName'],
+    });
+    return new Map(
+      users.map((user) => [
+        user.username,
+        (user.displayName?.trim() || user.username || '').trim(),
+      ]),
+    );
+  }
+
+  private withResolvedImage(
+    row: OutboundResponseRow,
+    colorImages: Map<string, string> | undefined,
+  ): OutboundResponseRow {
+    const imageUrl =
+      this.pickColorImageForSnapshot(row.sizeBreakdown, colorImages) ||
+      String(row.imageUrl ?? '').trim() ||
+      row.productImageUrl ||
+      '';
+    return { ...row, imageUrl };
+  }
+
+  private splitOutboundRowByColor(
+    row: OutboundResponseRow,
+    colorImages: Map<string, string> | undefined,
+  ): OutboundResponseRow[] {
+    const snapshot = row.sizeBreakdown;
+    if (!snapshot?.headers.length || !snapshot.rows.length) return [this.withResolvedImage(row, colorImages)];
+    const activeRows = snapshot.rows.filter((item) =>
+      item.quantities.some((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0)) > 0),
+    );
+    if (activeRows.length <= 1) return [this.withResolvedImage(row, colorImages)];
+    return activeRows.map((item) => {
+      const singleSnapshot: ColorSizeSnapshot = {
+        headers: [...snapshot.headers],
+        rows: [{ colorName: item.colorName, quantities: [...item.quantities] }],
+      };
+      return this.withResolvedImage(
+        {
+          ...row,
+          quantity: this.getSnapshotTotal(singleSnapshot),
+          sizeBreakdown: singleSnapshot,
+        },
+        colorImages,
+      );
+    });
+  }
+
   async getOutboundRecords(params: {
     orderNo?: string;
     skuCode?: string;
@@ -149,21 +240,23 @@ export class FinishedGoodsStockReportService {
       qb.orderBy('o.created_at', 'DESC');
       return qb;
     };
-    let total = 0;
-    let list: any[] = [];
+    let list: OutboundRawRow[] = [];
     try {
       const qb = buildQb(true);
-      total = await qb.getCount();
-      list = await qb.skip((page - 1) * pageSize).take(pageSize).getRawMany<any>();
-    } catch (e: any) {
-      const msg = String(e?.message || '');
+      list = await qb.getRawMany<OutboundRawRow>();
+    } catch (e: unknown) {
+      const msg = String((e as { message?: unknown } | null)?.message || '');
       if (!(msg.includes('Unknown column') && msg.includes('o.image_url'))) throw e;
       const qb = buildQb(false);
-      total = await qb.getCount();
-      list = await qb.skip((page - 1) * pageSize).take(pageSize).getRawMany<any>();
+      list = await qb.getRawMany<OutboundRawRow>();
     }
 
-    const rows = list.map((r: any) => ({
+    const operatorDisplayNameMap = await this.getOperatorDisplayNameMap(
+      list.map((row) => String(row.operatorUsername ?? '')),
+    );
+    const rows: OutboundResponseRow[] = list.map((r) => {
+      const operatorUsername = String(r.operatorUsername ?? '').trim();
+      return {
       id: Number(r.id),
       finishedStockId: Number(r.finishedStockId),
       orderId: r.orderId != null ? Number(r.orderId) : null,
@@ -178,27 +271,32 @@ export class FinishedGoodsStockReportService {
       inventoryTypeId: r.inventoryTypeId != null ? Number(r.inventoryTypeId) : null,
       pickupUserId: r.pickupUserId != null ? Number(r.pickupUserId) : null,
       pickupUserName: r.pickupUserName ?? '',
-      sizeBreakdown: r.sizeBreakdown ?? null,
-      operatorUsername: r.operatorUsername ?? '',
+      sizeBreakdown: this.parseStoredColorSizeSnapshot(r.sizeBreakdown),
+      operatorUsername: operatorDisplayNameMap.get(operatorUsername) ?? operatorUsername,
       remark: r.remark ?? '',
       createdAt: this.formatDateTimeForResponse(r.createdAt),
-    }));
-
-    const rowsMissingImage = rows.filter((row) => !String(row.imageUrl ?? '').trim());
-    if (rowsMissingImage.length) {
-      const colorImageMaps = await this.getColorImageMapsForStocks(rowsMissingImage.map((row) => row.finishedStockId));
-      rowsMissingImage.forEach((row) => {
-        row.imageUrl =
-          this.pickColorImageForSnapshot(
-            this.parseStoredColorSizeSnapshot(row.sizeBreakdown),
-            colorImageMaps.get(row.finishedStockId),
-          ) || row.productImageUrl || '';
-      });
-    }
-    rows.forEach((row) => {
-      if (!String(row.imageUrl ?? '').trim()) row.imageUrl = row.productImageUrl || '';
-      delete (row as any).productImageUrl;
+      };
     });
-    return { list: rows, total, page, pageSize };
+
+    const rowsNeedingColorImages = rows.filter(
+      (row) => row.sizeBreakdown?.rows?.length || !String(row.imageUrl ?? '').trim(),
+    );
+    const colorImageMaps = rowsNeedingColorImages.length
+      ? await this.getColorImageMapsForStocks(rowsNeedingColorImages.map((row) => row.finishedStockId))
+      : new Map<number, Map<string, string>>();
+    const expandedRows = rows.flatMap((row) => this.splitOutboundRowByColor(row, colorImageMaps.get(row.finishedStockId)));
+    expandedRows.forEach((row) => {
+      if (!String(row.imageUrl ?? '').trim()) row.imageUrl = row.productImageUrl || '';
+      delete row.productImageUrl;
+    });
+    const safePage = Math.max(1, Math.trunc(Number(page) || 1));
+    const safePageSize = Math.max(1, Math.trunc(Number(pageSize) || 20));
+    const start = (safePage - 1) * safePageSize;
+    return {
+      list: expandedRows.slice(start, start + safePageSize),
+      total: expandedRows.length,
+      page: safePage,
+      pageSize: safePageSize,
+    };
   }
 }

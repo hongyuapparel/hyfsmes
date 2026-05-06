@@ -6,7 +6,9 @@ import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
+import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
+import { scaleColorSizeRowsToQuantity, subtractColorSizeSnapshots } from './finished-goods-stock-query.utils';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
 @Injectable()
@@ -22,6 +24,8 @@ export class FinishedGoodsStockInboundQueryService {
     private readonly orderCuttingRepo: Repository<OrderCutting>,
     @InjectRepository(OrderFinishing)
     private readonly orderFinishingRepo: Repository<OrderFinishing>,
+    @InjectRepository(FinishedGoodsOutbound)
+    private readonly outboundRepo: Repository<FinishedGoodsOutbound>,
   ) {}
 
   /**
@@ -136,64 +140,6 @@ export class FinishedGoodsStockInboundQueryService {
         quantities: remapQuantitiesBySizeHeaders(headers, row.quantities, sortedHeaders),
       })),
     };
-  }
-
-  private allocateByWeight(weights: number[], total: number): number[] {
-    const safeTotal = Math.max(0, Math.trunc(Number(total) || 0));
-    if (!weights.length) return [];
-    const normalized = weights.map((weight) => Math.max(0, Number(weight) || 0));
-    const sumWeight = normalized.reduce((sum, weight) => sum + weight, 0);
-    if (safeTotal <= 0) return normalized.map(() => 0);
-    if (sumWeight <= 0) {
-      const allocated = normalized.map(() => 0);
-      allocated[0] = safeTotal;
-      return allocated;
-    }
-    const exact = normalized.map((weight) => (weight * safeTotal) / sumWeight);
-    const base = exact.map((value) => Math.floor(value));
-    let remain = safeTotal - base.reduce((sum, value) => sum + value, 0);
-    const order = exact
-      .map((value, index) => ({ index, frac: value - Math.floor(value) }))
-      .sort((a, b) => b.frac - a.frac);
-    let cursor = 0;
-    while (remain > 0 && order.length > 0) {
-      base[order[cursor % order.length].index] += 1;
-      remain -= 1;
-      cursor += 1;
-    }
-    return base;
-  }
-
-  private scaleColorSizeRowsToQuantity(
-    headers: string[],
-    rows: Array<{ colorName?: string; quantities?: number[] }>,
-    targetQty: number,
-  ): Array<{ colorName: string; quantities: number[] }> {
-    if (!headers.length || !rows.length) return [];
-    const safeTarget = Math.max(0, Math.trunc(Number(targetQty) || 0));
-    const weights: number[] = [];
-    rows.forEach((row) => {
-      for (let i = 0; i < headers.length; i += 1) {
-        weights.push(Math.max(0, Number(row.quantities?.[i]) || 0));
-      }
-    });
-    const weightSum = weights.reduce((sum, value) => sum + value, 0);
-    if (weightSum <= 0) {
-      return rows.map((row) => ({
-        colorName: String(row.colorName ?? '').trim(),
-        quantities: Array(headers.length).fill(0),
-      }));
-    }
-    const allocated = weightSum === safeTarget ? [...weights] : this.allocateByWeight(weights, safeTarget);
-    let cursor = 0;
-    return rows.map((row) => {
-      const quantities: number[] = [];
-      for (let i = 0; i < headers.length; i += 1) {
-        quantities.push(allocated[cursor] ?? 0);
-        cursor += 1;
-      }
-      return { colorName: String(row.colorName ?? '').trim(), quantities };
-    });
   }
 
   parseColorSizeInput(raw: unknown): {
@@ -330,7 +276,7 @@ export class FinishedGoodsStockInboundQueryService {
         const colorName = String(planRows[0]?.colorName ?? '').trim();
         return {
           headers,
-          rows: this.scaleColorSizeRowsToQuantity(
+          rows: scaleColorSizeRowsToQuantity(
             headers,
             [{ colorName, quantities: tailRow }],
             quantity,
@@ -349,7 +295,7 @@ export class FinishedGoodsStockInboundQueryService {
     if (hasCuttingQty) {
       return {
         headers,
-        rows: this.scaleColorSizeRowsToQuantity(
+        rows: scaleColorSizeRowsToQuantity(
           headers,
           cuttingRows.map((row) => ({
             colorName: row?.colorName,
@@ -364,7 +310,7 @@ export class FinishedGoodsStockInboundQueryService {
     if (!planRows.length) return null;
     return {
       headers,
-      rows: this.scaleColorSizeRowsToQuantity(
+      rows: scaleColorSizeRowsToQuantity(
         headers,
         planRows.map((row: { colorName?: string; quantities?: number[] }) => ({
           colorName: row?.colorName,
@@ -415,23 +361,32 @@ export class FinishedGoodsStockInboundQueryService {
     const snapshot = this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot);
     if (snapshot) return snapshot;
     if (stock.orderId == null) return null;
-    const ext = await this.orderExtRepo.findOne({ where: { orderId: stock.orderId } });
-    const headers = Array.isArray(ext?.colorSizeHeaders)
-      ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
-      : [];
-    const baseRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
-    if (!headers.length || !baseRows.length) return null;
-    return {
-      headers,
-      rows: this.scaleColorSizeRowsToQuantity(
-        headers,
-        baseRows.map((row: { colorName?: string; quantities?: number[] }) => ({
-          colorName: row?.colorName,
-          quantities: Array.isArray(row?.quantities) ? row.quantities : [],
-        })),
-        stock.quantity,
-      ),
-    };
+    const outboundRows = await this.outboundRepo.find({
+      where: { finishedStockId: stock.id },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    if (!outboundRows.length) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
+
+    let outboundTotal = 0;
+    const outboundSnapshots: ColorSizeSnapshot[] = [];
+    for (const row of outboundRows) {
+      const qty = Math.max(0, Math.trunc(Number(row.quantity) || 0));
+      outboundTotal += qty;
+      if (qty <= 0) continue;
+      const outboundSnapshot = this.parseStoredColorSizeSnapshot(row.sizeBreakdown);
+      if (!outboundSnapshot || this.getColorSizeSnapshotTotal(outboundSnapshot) !== qty) return null;
+      outboundSnapshots.push(outboundSnapshot);
+    }
+    let current = await this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity + outboundTotal);
+    if (!current) return null;
+    try {
+      for (const outboundSnapshot of outboundSnapshots) {
+        current = subtractColorSizeSnapshots(current, outboundSnapshot);
+      }
+    } catch {
+      return null;
+    }
+    return this.getColorSizeSnapshotTotal(current) === Math.max(0, Math.trunc(Number(stock.quantity) || 0)) ? current : null;
   }
 
   mergeColorSizeSnapshots(currentRaw: unknown, incoming: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
