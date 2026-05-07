@@ -21,6 +21,7 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { getRouteTabKey, markRouteCacheDropped } from '@/composables/useRouteCacheControl'
 
 interface TabItem {
   key: string
@@ -35,11 +36,6 @@ const router = useRouter()
 const tabs = ref<TabItem[]>([])
 const activeKey = ref('')
 
-function getTabKey(r: RouteLocationNormalizedLoaded): string {
-  const k = typeof r.query?.tabKey === 'string' ? r.query.tabKey.trim() : ''
-  return k || r.path
-}
-
 function getTitle(r: RouteLocationNormalizedLoaded) {
   if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit' || r.name === 'OrdersCost') {
     const queryTitle = typeof r.query?.tabTitle === 'string' ? r.query.tabTitle.trim() : ''
@@ -53,7 +49,7 @@ function getTitle(r: RouteLocationNormalizedLoaded) {
 
 function addTab(r: RouteLocationNormalizedLoaded) {
   if (r.meta?.hideInTabs) return
-  const key = getTabKey(r)
+  const key = getRouteTabKey(r)
 
   const title = getTitle(r)
   const exists = tabs.value.find((t) => t.key === key)
@@ -72,7 +68,8 @@ function closeByKey(key: string) {
   if (index === -1) return
 
   const isActive = key === activeKey.value
-  tabs.value.splice(index, 1)
+  const [closed] = tabs.value.splice(index, 1)
+  if (closed) markRouteCacheDropped(closed)
 
   if (!isActive) return
 

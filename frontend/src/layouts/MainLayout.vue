@@ -77,9 +77,18 @@
         </header>
         <main ref="layoutMainRef" class="layout-main">
           <router-view v-slot="{ Component, route }">
-            <keep-alive>
-              <component :is="Component" :key="getRouteCacheKey(route)" />
+            <keep-alive :max="OUTER_ROUTE_CACHE_MAX">
+              <component
+                v-if="Component && shouldUseOuterKeepAlive(route)"
+                :is="Component"
+                :key="getOuterRouteCacheKey(route)"
+              />
             </keep-alive>
+            <component
+              v-if="Component && !shouldUseOuterKeepAlive(route)"
+              :is="Component"
+              :key="getOuterRouteCacheKey(route)"
+            />
           </router-view>
         </main>
       </div>
@@ -112,6 +121,7 @@ import { menuConfig } from '@/router/menu'
 import { getHealth } from '@/api/health'
 import type { MenuItem } from '@/router/menu'
 import brandLogoUrl from '@/assets/brand-logo.svg'
+import { OUTER_ROUTE_CACHE_MAX, getOuterRouteCacheKey } from '@/composables/useRouteCacheControl'
 
 const route = useRoute()
 const router = useRouter()
@@ -217,14 +227,7 @@ function queueRestoreLayoutScroll(key: string) {
   })
 }
 
-function getRouteCacheKey(r: RouteLocationNormalizedLoaded): string {
-  // MainLayout 只按一级业务分组缓存（如 /orders、/inventory），
-  // 避免在二级页面切换时重建 RouterViewWrapper 导致子页面闪刷。
-  return r.matched[1]?.path || r.path
-}
-
 function shouldUseOuterKeepAlive(r: RouteLocationNormalizedLoaded): boolean {
-  // 对声明了 useInnerKeepAlive 的分组，外层不再缓存，避免双层 keep-alive。
   return !Boolean(r.matched[1]?.meta?.useInnerKeepAlive)
 }
 

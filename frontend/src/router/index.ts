@@ -127,7 +127,7 @@ const routes: RouteRecordRaw[] = [
         path: 'inventory',
         component: RouterViewWrapper,
         redirect: '/inventory/pending',
-        meta: { title: '库存管理', permissionPath: '/inventory' },
+        meta: { title: '库存管理', permissionPath: '/inventory', useInnerKeepAlive: true },
         children: [
           {
             path: 'pending',
@@ -159,7 +159,7 @@ const routes: RouteRecordRaw[] = [
         path: 'finance',
         component: RouterViewWrapper,
         redirect: '/finance/dashboard',
-        meta: { title: '财务管理', permissionPath: '/finance' },
+        meta: { title: '财务管理', permissionPath: '/finance', useInnerKeepAlive: true },
         children: [
           {
             path: 'dashboard',
@@ -203,7 +203,7 @@ const routes: RouteRecordRaw[] = [
         path: 'settings',
         component: RouterViewWrapper,
         redirect: '/settings/users',
-        meta: { title: '系统设置', permissionPath: '/settings' },
+        meta: { title: '系统设置', permissionPath: '/settings', useInnerKeepAlive: true },
         children: [
           {
             path: '',
