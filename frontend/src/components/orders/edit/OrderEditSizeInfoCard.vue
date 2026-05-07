@@ -81,7 +81,14 @@
       <el-table-column label="操作" width="80" fixed="right" align="center" header-align="center">
         <template #default="{ $index }">
           <el-tooltip content="删除" placement="top">
-            <el-button link type="danger" size="small" circle @click="removeSizeInfoRow($index)">
+            <el-button
+              link
+              type="danger"
+              size="small"
+              circle
+              :aria-label="`Delete size row ${$index + 1}`"
+              @click="removeSizeInfoRow($index)"
+            >
               <el-icon><Delete /></el-icon>
             </el-button>
           </el-tooltip>

@@ -4,6 +4,7 @@
       <el-date-picker
         v-model="filter.occurDateRange"
         type="daterange"
+        :name="['financeIncomeStartDate', 'financeIncomeEndDate']"
         range-separator=""
         start-placeholder="收款日期"
         end-placeholder=""

@@ -96,6 +96,7 @@
       <el-date-picker
         v-model="orderDateRange"
         type="daterange"
+        :name="['purchaseOrderDateStart', 'purchaseOrderDateEnd']"
         range-separator=""
         start-placeholder="下单时间"
         end-placeholder=""
@@ -110,6 +111,7 @@
       <el-date-picker
         v-model="completedRange"
         type="daterange"
+        :name="['purchaseCompletedDateStart', 'purchaseCompletedDateEnd']"
         range-separator=""
         start-placeholder="完成时间"
         end-placeholder=""

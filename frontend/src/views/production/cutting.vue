@@ -60,6 +60,7 @@
       <el-date-picker
         v-model="completedRange"
         type="daterange"
+        :name="['cuttingCompletedDateStart', 'cuttingCompletedDateEnd']"
         range-separator=""
         start-placeholder="完成时间"
         end-placeholder=""

@@ -1,5 +1,5 @@
 import { computed, reactive, ref, type Ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, type FormRules } from 'element-plus'
 import {
   doPendingInbound,
   doPendingOutbound,
@@ -66,7 +66,6 @@ export function useInventoryPendingDialogs({
     visible: false,
     submitting: false,
   })
-  const inboundFormRef = ref<FormInstance>()
   const inboundForm = reactive({
     warehouseId: null as number | null,
     inventoryTypeId: null as number | null,
@@ -135,11 +134,9 @@ export function useInventoryPendingDialogs({
     inboundForm.inventoryTypeId = null
     inboundForm.department = ''
     inboundForm.location = ''
-    inboundFormRef.value?.clearValidate()
   }
 
   async function submitInbound() {
-    await inboundFormRef.value?.validate().catch(() => {})
     const ids = selectedRows.value.map((r) => r.id)
     if (!ids.length) return
     inboundDialog.submitting = true
@@ -311,7 +308,6 @@ export function useInventoryPendingDialogs({
 
   return {
     inboundDialog,
-    inboundFormRef,
     inboundForm,
     inboundRules,
     inboundPreviewItems,

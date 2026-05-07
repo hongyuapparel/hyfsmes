@@ -166,7 +166,7 @@ interface QtyPopoverBlock {
 const props = defineProps<{
   loading: boolean
   list: FinishingListItem[]
-  tableHeight: number
+  tableHeight: number | undefined
   compactHeaderCellStyle: unknown
   compactCellStyle: unknown
   compactRowStyle: unknown

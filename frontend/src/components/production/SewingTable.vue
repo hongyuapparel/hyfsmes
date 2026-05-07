@@ -244,13 +244,23 @@ import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 
+type TableRowStyle = CSSProperties | ((data: { row: SewingListItem; rowIndex: number }) => CSSProperties)
+type TableCellStyle = CSSProperties | ((data: {
+  row: SewingListItem
+  column: unknown
+  rowIndex: number
+  columnIndex: number
+}) => CSSProperties)
+type TableHeaderCellStyle = CSSProperties | ((data: { column: unknown; columnIndex: number }) => CSSProperties)
+type HeaderDragEndArgs = [newWidth: number, oldWidth: number, column: unknown, event?: MouseEvent]
+
 defineProps<{
   list: SewingListItem[]
   loading: boolean
-  tableHeight: number | string
-  compactRowStyle: CSSProperties
-  compactCellStyle: CSSProperties
-  compactHeaderCellStyle: CSSProperties
+  tableHeight: number | string | undefined
+  compactRowStyle: TableRowStyle
+  compactCellStyle: TableCellStyle
+  compactHeaderCellStyle: TableHeaderCellStyle
   compactImageSize: number
   compactImageColumnMinWidth: number
   sizeBreakdownCache: Record<number, OrderSizeBreakdownRes>
@@ -260,7 +270,7 @@ defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'header-dragend', ...args: any[]): void
+  (e: 'header-dragend', ...args: HeaderDragEndArgs): void
   (e: 'selection-change', rows: SewingListItem[]): void
   (e: 'show-qty-popover', row: SewingListItem): void
   (e: 'open-brief', row: SewingListItem): void
@@ -268,7 +278,7 @@ const emit = defineEmits<{
 
 const tableRef = ref()
 
-function onHeaderDragEnd(...args: any[]) {
+function onHeaderDragEnd(...args: HeaderDragEndArgs) {
   emit('header-dragend', ...args)
 }
 

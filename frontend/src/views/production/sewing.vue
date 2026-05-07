@@ -48,6 +48,7 @@
       <el-date-picker
         v-model="completedRange"
         type="daterange"
+        :name="['sewingCompletedDateStart', 'sewingCompletedDateEnd']"
         range-separator=""
         start-placeholder="完成时间"
         end-placeholder=""

@@ -55,6 +55,7 @@
           <el-date-picker
             v-model="inboundDateRange"
             type="daterange"
+            :name="['accessoriesInboundDateStart', 'accessoriesInboundDateEnd']"
             range-separator=""
             start-placeholder="入库时间"
             end-placeholder=""
@@ -169,6 +170,7 @@
           <el-date-picker
             v-model="outboundFilter.dateRange"
             type="daterange"
+            :name="['accessoriesOutboundDateStart', 'accessoriesOutboundDateEnd']"
             start-placeholder="出库时间"
             end-placeholder=""
             range-separator=""

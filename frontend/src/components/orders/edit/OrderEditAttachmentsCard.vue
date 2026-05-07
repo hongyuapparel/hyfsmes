@@ -35,6 +35,7 @@
             size="small"
             class="attachment-remove"
             circle
+            :aria-label="`Delete attachment ${idx + 1}`"
             @click="removeAttachment(idx)"
           >
             <el-icon><Delete /></el-icon>

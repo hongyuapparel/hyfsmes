@@ -1,0 +1,6 @@
+# Hongyu ERP
+
+Internal B2B ERP for order, customer, production, inventory, finance, and permission management.
+
+- [Application home](/)
+- [Login](/login)

@@ -42,10 +42,13 @@
       </div>
     </template>
     <template v-else>
-      <div class="placeholder">
+      <div class="placeholder" :class="{ 'placeholder-compact-icon': props.compact && props.compactIconOnly }">
+        <template v-if="props.compact && props.compactIconOnly">
+          <el-icon class="placeholder-plus-icon"><Plus /></el-icon>
+        </template>
         <span v-if="uploading" class="uploading-text">上传中...</span>
         <span v-else class="placeholder-text">
-          点击上传、拖拽图片到此处，或粘贴剪贴板图片
+          {{ props.compact && props.compactIconOnly ? '点击上传' : '点击上传、拖拽图片到此处，或粘贴剪贴板图片' }}
         </span>
       </div>
     </template>
@@ -56,6 +59,7 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
+import { Plus } from '@element-plus/icons-vue'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useUploadListImage } from '@/composables/useUploadListImage'
@@ -64,9 +68,11 @@ const props = withDefaults(
   defineProps<{
     modelValue?: string
     compact?: boolean
+    compactIconOnly?: boolean
   }>(),
   {
     compact: true,
+    compactIconOnly: false,
   },
 )
 
@@ -215,6 +221,18 @@ onBeforeUnmount(() => {
 .placeholder {
   padding: 8px;
   text-align: center;
+}
+
+.placeholder-compact-icon {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.placeholder-plus-icon {
+  font-size: 18px;
+  color: var(--el-color-primary);
 }
 
 .placeholder-text,

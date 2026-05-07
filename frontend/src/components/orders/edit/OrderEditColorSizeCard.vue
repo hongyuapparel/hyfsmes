@@ -60,6 +60,7 @@
                 type="primary"
                 size="small"
                 class="b-header-insert"
+                :aria-label="`Insert size column before ${size}`"
                 @click.stop="insertSizeColumnBefore(sIndex)"
               >
                 <el-icon><Plus /></el-icon>
@@ -149,7 +150,14 @@
       <el-table-column label="操作" width="80" fixed="right" align="center" header-align="center">
         <template #default="{ $index }">
           <el-tooltip content="删除" placement="top">
-            <el-button link type="danger" size="small" circle @click="removeColorRow($index)">
+            <el-button
+              link
+              type="danger"
+              size="small"
+              circle
+              :aria-label="`Delete color row ${$index + 1}`"
+              @click="removeColorRow($index)"
+            >
               <el-icon><Delete /></el-icon>
             </el-button>
           </el-tooltip>

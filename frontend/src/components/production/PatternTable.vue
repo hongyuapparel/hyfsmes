@@ -77,7 +77,7 @@ import type { PatternListItem } from '@/api/production-pattern'
 defineProps<{
   loading: boolean
   list: PatternListItem[]
-  tableHeight: number | string
+  tableHeight: number | string | undefined
   compactRowStyle: ((data: { row: PatternListItem; rowIndex: number }) => Record<string, string>) | Record<string, string>
   compactCellStyle: ((data: { row: PatternListItem; column: unknown; rowIndex: number; columnIndex: number }) => Record<string, string>) | Record<string, string>
   compactHeaderCellStyle: ((data: { column: unknown; columnIndex: number }) => Record<string, string>) | Record<string, string>

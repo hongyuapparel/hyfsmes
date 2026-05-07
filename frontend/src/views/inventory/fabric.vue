@@ -43,6 +43,7 @@
           <el-date-picker
             v-model="inboundDateRange"
             type="daterange"
+            :name="['fabricInboundDateStart', 'fabricInboundDateEnd']"
             range-separator=""
             start-placeholder="入库时间"
             end-placeholder=""
@@ -142,6 +143,7 @@
           <el-date-picker
             v-model="outboundFilter.dateRange"
             type="daterange"
+            :name="['fabricOutboundDateStart', 'fabricOutboundDateEnd']"
             start-placeholder="出库时间"
             end-placeholder=""
             range-separator=""

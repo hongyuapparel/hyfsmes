@@ -4,7 +4,7 @@
       <h2 class="home-section-title">待办事项</h2>
       <el-popover placement="bottom-start" :width="320" trigger="click">
         <template #reference>
-          <el-button link type="info" size="small">规则说明</el-button>
+          <el-button link type="primary" size="small">规则说明</el-button>
         </template>
         <div class="todo-rules-popover">
           <p><strong>待审核：</strong>订单状态为「待审单」(pending_review)，即已提交未审核的订单。</p>

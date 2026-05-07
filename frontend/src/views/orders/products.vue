@@ -118,7 +118,13 @@
             <el-button size="large" @click="openColumnConfig">列设置</el-button>
             <el-button type="primary" size="large" @click="openCreate">新建SKU</el-button>
             <el-tooltip v-if="selectedIds.length" content="删除" placement="top">
-              <el-button type="danger" size="large" circle @click="batchDelete">
+              <el-button
+                type="danger"
+                size="large"
+                circle
+                aria-label="Delete selected SKUs"
+                @click="batchDelete"
+              >
                 <el-icon><Delete /></el-icon>
               </el-button>
             </el-tooltip>

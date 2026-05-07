@@ -47,7 +47,7 @@
       </div>
     </div>
     <el-form
-      :ref="formRef"
+      ref="localFormRef"
       :model="form"
       :rules="rules"
       label-width="100px"
@@ -106,7 +106,7 @@
     </el-form>
     <template #footer>
       <el-button @click="onCancel">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="$emit('submit')">
+      <el-button type="primary" :loading="submitting" @click="onSubmit">
         确定入库
       </el-button>
     </template>
@@ -114,6 +114,9 @@
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+
 type InboundPreviewItem = {
   id: number
   orderNo: string
@@ -129,14 +132,13 @@ defineProps<{
   visible: boolean
   submitting: boolean
   previewItems: InboundPreviewItem[]
-  formRef: object
   form: {
     warehouseId: number | null
     inventoryTypeId: number | null
     department: string
     location: string
   }
-  rules: object
+  rules: FormRules
   departmentOptions: Array<{ value: string; label: string }>
   inventoryTypeOptions: Array<{ id: number; label: string }>
   warehouseOptions: Array<{ id: number; label: string }>
@@ -151,6 +153,8 @@ const emit = defineEmits<{
   (e: 'submit'): void
 }>()
 
+const localFormRef = ref<FormInstance>()
+
 function onVisibleChange(value: boolean) {
   emit('update:visible', value)
 }
@@ -161,6 +165,12 @@ function onClose() {
 
 function onCancel() {
   emit('update:visible', false)
+}
+
+async function onSubmit() {
+  const valid = await localFormRef.value?.validate().then(() => true).catch(() => false)
+  if (valid) emit('submit')
+  else ElMessage.warning('请完善入库信息')
 }
 </script>
 

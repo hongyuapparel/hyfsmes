@@ -15,7 +15,6 @@
           :selected-rows="selectedRows"
           :loading="loading"
           :stock-table-data="pagedStockTableData"
-          :table-ref="finishedStockTableRef"
           :compact-header-cell-style="compactHeaderCellStyle"
           :compact-cell-style="compactCellStyle"
           :compact-row-style="compactRowStyle"
@@ -49,6 +48,7 @@
           @current-change="onCurrentPageChange"
           @page-size-change="onPageSizeChange"
           @header-dragend="onFinishedStockHeaderDragEnd"
+          @table-ref-change="setFinishedStockTableRef"
         />
         </div>
       </el-tab-pane>
@@ -60,7 +60,6 @@
           :loading="outboundLoading2"
           :outbound-list="outboundList"
           :outbound-pagination="outboundPagination"
-          :table-ref="finishedOutboundTableRef"
           :compact-header-cell-style="compactHeaderCellStyle"
           :compact-cell-style="compactCellStyle"
           :compact-row-style="compactRowStyle"
@@ -74,6 +73,7 @@
           @current-change="onOutboundCurrentChange"
           @page-size-change="onOutboundSizeChange"
           @header-dragend="onFinishedOutboundHeaderDragEnd"
+          @table-ref-change="setFinishedOutboundTableRef"
         />
         </div>
       </el-tab-pane>
@@ -252,6 +252,14 @@ const { onHeaderDragEnd: onFinishedStockHeaderDragEnd, restoreColumnWidths: rest
   useTableColumnWidthPersist('inventory-finished-stock')
 const { onHeaderDragEnd: onFinishedOutboundHeaderDragEnd } =
   useTableColumnWidthPersist('inventory-finished-outbounds')
+
+function setFinishedStockTableRef(value: unknown | null) {
+  finishedStockTableRef.value = value
+}
+
+function setFinishedOutboundTableRef(value: unknown | null) {
+  finishedOutboundTableRef.value = value
+}
 
 async function load() {
   loading.value = true

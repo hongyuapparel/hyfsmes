@@ -28,7 +28,14 @@
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
           <el-button link type="primary" size="small" @click="openAdd(row.id)">新建下级分组</el-button>
           <el-tooltip content="删除" placement="top">
-          <el-button link type="danger" size="small" circle @click="remove(row)">
+          <el-button
+            link
+            type="danger"
+            size="small"
+            circle
+            :aria-label="`Delete option ${row.value}`"
+            @click="remove(row)"
+          >
             <el-icon><Delete /></el-icon>
           </el-button>
         </el-tooltip>

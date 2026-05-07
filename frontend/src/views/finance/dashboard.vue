@@ -14,6 +14,7 @@
       <el-date-picker
         v-model="filter.occurDateRange"
         type="daterange"
+        :name="['financeDashboardStartDate', 'financeDashboardEndDate']"
         range-separator=""
         start-placeholder="统计区间"
         end-placeholder=""

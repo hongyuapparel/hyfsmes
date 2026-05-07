@@ -13,6 +13,7 @@
       <el-date-picker
         v-model="filter.orderDateRange"
         type="daterange"
+        :name="['orderSlaOrderDateStart', 'orderSlaOrderDateEnd']"
         range-separator=""
         start-placeholder="下单时间"
         end-placeholder=""
@@ -28,6 +29,7 @@
       <el-date-picker
         v-model="filter.completedRange"
         type="daterange"
+        :name="['orderSlaCompletedDateStart', 'orderSlaCompletedDateEnd']"
         range-separator=""
         start-placeholder="完成时间"
         end-placeholder=""

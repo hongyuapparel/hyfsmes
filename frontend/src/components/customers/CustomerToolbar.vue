@@ -44,7 +44,13 @@
     <div class="filter-actions">
       <el-button type="primary" size="large" @click="$emit('create')">新建客户</el-button>
       <el-tooltip v-if="selectedCount" content="删除" placement="top">
-        <el-button type="danger" size="large" circle @click="$emit('batch-delete')">
+        <el-button
+          type="danger"
+          size="large"
+          circle
+          aria-label="Delete selected customers"
+          @click="$emit('batch-delete')"
+        >
           <el-icon><Delete /></el-icon>
         </el-button>
       </el-tooltip>

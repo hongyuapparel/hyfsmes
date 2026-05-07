@@ -5,7 +5,7 @@ const ABSOLUTE_HTTP_RE = /^https?:\/\//i
 const IMAGE_EXT_RE = /\.(jpe?g|png|gif|webp)$/i
 
 /** 与上传目录 sibling 的 small_ 缩略图规则适用的路径（站内相对路径） */
-const SIBLING_THUMB_PATH_RE = /^\/(?:uploads\/|migration-old\/)/i
+const SIBLING_THUMB_PATH_RE = /^\/(?:api\/)?(?:uploads\/|migration-old\/)/i
 
 export type ListImagePhase = 'thumb' | 'full' | 'placeholder'
 

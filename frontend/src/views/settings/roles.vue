@@ -17,7 +17,15 @@
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
           <el-tooltip content="删除" placement="top">
-            <el-button link type="danger" size="small" circle :disabled="row.code === 'admin'" @click="removeRole(row)">
+            <el-button
+              link
+              type="danger"
+              size="small"
+              circle
+              :disabled="row.code === 'admin'"
+              :aria-label="`Delete role ${row.name}`"
+              @click="removeRole(row)"
+            >
               <el-icon><Delete /></el-icon>
             </el-button>
           </el-tooltip>

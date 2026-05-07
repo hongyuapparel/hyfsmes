@@ -25,6 +25,8 @@
             <el-sub-menu
               v-if="item.children?.length"
               :index="item.path"
+              :aria-label="item.title"
+              :title="item.title"
               popper-class="sidebar-submenu-popper"
               :popper-offset="0"
             >
@@ -38,11 +40,13 @@
                 v-for="child in item.children"
                 :key="child.path"
                 :index="child.path"
+                :aria-label="child.title"
+                :title="child.title"
               >
                 <span class="menu-title">{{ child.title }}</span>
               </el-menu-item>
             </el-sub-menu>
-            <el-menu-item v-else :index="item.path">
+            <el-menu-item v-else :index="item.path" :aria-label="item.title" :title="item.title">
               <el-icon v-if="item.icon" class="menu-icon">
                 <component :is="iconMap[item.icon]" />
               </el-icon>
@@ -58,13 +62,15 @@
             <el-button
               :icon="appStore.sidebarCollapsed ? Expand : Fold"
               class="header-toggle"
+              :aria-label="sidebarToggleLabel"
+              :title="sidebarToggleLabel"
               text
               @click="appStore.toggleSidebar"
             />
             <AppTabs v-if="showHeaderTabs" />
           </div>
           <div class="header-actions">
-            <el-tag v-if="healthStatus" type="success" size="small">{{ healthStatus }}</el-tag>
+            <el-tag v-if="healthStatus" type="success" size="small" class="health-status-tag">{{ healthStatus }}</el-tag>
             <span class="user-name">{{ authStore.user?.displayName || authStore.user?.username }}</span>
             <el-button text type="primary" @click="handleLogout">退出</el-button>
           </div>
@@ -130,6 +136,7 @@ let restoreFrame = 0
 let restoreTimer: number | undefined
 
 const showHeaderTabs = computed(() => route.path !== '/')
+const sidebarToggleLabel = computed(() => (appStore.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'))
 
 const iconMap = {
   HomeFilled,
@@ -369,9 +376,14 @@ onBeforeUnmount(() => {
   gap: var(--space-sm);
 }
 
+.health-status-tag {
+  color: #2f7d1f;
+  border-color: #a8d696;
+}
+
 .user-name {
   font-size: var(--font-size-body);
-  color: var(--color-text-muted);
+  color: var(--color-text);
 }
 
 .layout-main {

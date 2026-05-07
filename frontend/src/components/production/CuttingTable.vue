@@ -153,7 +153,7 @@ const props = defineProps<{
   loading: boolean
   list: CuttingListItem[]
   currentTab: string
-  tableHeight: number
+  tableHeight: number | undefined
   compactHeaderCellStyle: unknown
   compactCellStyle: unknown
   compactRowStyle: unknown

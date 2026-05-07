@@ -53,6 +53,7 @@
       <el-date-picker
         v-model="filter.entryDateRange"
         type="daterange"
+        :name="['employeeEntryDateStart', 'employeeEntryDateEnd']"
         value-format="YYYY-MM-DD"
         placeholder="入职日期"
         range-separator="—"
@@ -65,6 +66,7 @@
       <el-date-picker
         v-model="filter.leaveDateRange"
         type="daterange"
+        :name="['employeeLeaveDateStart', 'employeeLeaveDateEnd']"
         value-format="YYYY-MM-DD"
         placeholder="离职日期"
         range-separator="—"
@@ -78,7 +80,14 @@
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
         <el-button size="large" @click="onExport">导出</el-button>
-        <el-button v-if="selectedIds.length" type="danger" size="large" circle @click="onBatchDelete">
+        <el-button
+          v-if="selectedIds.length"
+          type="danger"
+          size="large"
+          circle
+          aria-label="Delete selected employees"
+          @click="onBatchDelete"
+        >
           <el-icon><Delete /></el-icon>
         </el-button>
         <el-button type="primary" size="large" @click="drawerRef?.openForm(null)">新建人员</el-button>

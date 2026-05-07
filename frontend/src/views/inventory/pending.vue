@@ -187,7 +187,6 @@
       v-model:visible="inboundDialog.visible"
       :submitting="inboundDialog.submitting"
       :preview-items="inboundPreviewItems"
-      :form-ref="inboundFormRef"
       :form="inboundForm"
       :rules="inboundRules"
       :department-options="departmentOptions"
@@ -282,7 +281,6 @@ const colorSizeCache = reactive<Record<
 
 const {
   inboundDialog,
-  inboundFormRef,
   inboundForm,
   inboundRules,
   inboundPreviewItems,

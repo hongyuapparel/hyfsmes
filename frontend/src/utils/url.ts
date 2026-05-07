@@ -21,8 +21,8 @@ function normalizeLegacyAbsoluteAssetUrl(value: string): string {
   try {
     const parsed = new URL(url)
     const pathWithQuery = `${parsed.pathname}${parsed.search}${parsed.hash}` || '/'
-    // 旧站 /Public 资源仍挂在原域名，不能改写成当前站点相对路径。
-    if (/^\/(?:uploads|migration-old)(?:\/|$)/i.test(parsed.pathname)) return pathWithQuery
+    // Keep legacy server asset paths same-origin so browsers do not hit the old HTTPS certificate.
+    if (/^\/(?:uploads|Public|migration-old)(?:\/|$)/i.test(parsed.pathname)) return pathWithQuery
     return url
   } catch {
     return url

@@ -41,6 +41,7 @@
       <el-date-picker
         v-model="inboundDateRangeModel"
         type="daterange"
+        :name="['finishedInboundDateStart', 'finishedInboundDateEnd']"
         range-separator=""
         start-placeholder="入库时间"
         end-placeholder=""
@@ -75,7 +76,7 @@
       border
       stripe
       class="finished-table"
-      :ref="tableRef"
+      ref="tableRef"
       :height="tableHeight"
       :row-key="getStockTableRowKey"
       :tree-props="{ children: '_children' }"
@@ -215,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
@@ -242,7 +243,6 @@ const props = defineProps<{
   selectedRows: StockTableLeafRow[]
   loading: boolean
   stockTableData: StockTableRow[]
-  tableRef: Ref<unknown>
   compactHeaderCellStyle: unknown
   compactCellStyle: unknown
   compactRowStyle: unknown
@@ -279,8 +279,10 @@ const emit = defineEmits<{
   (e: 'current-change', page: number): void
   (e: 'page-size-change', pageSize: number): void
   (e: 'header-dragend', ...args: unknown[]): void
+  (e: 'table-ref-change', value: unknown | null): void
 }>()
 
+const tableRef = ref<unknown | null>(null)
 const stockShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(stockShellRef)
 
@@ -326,6 +328,12 @@ function shouldShowDetailAction(row: StockTableRow): boolean {
 function handleHeaderDragEnd(...args: unknown[]) {
   emit('header-dragend', ...args)
 }
+
+watch(tableRef, (value) => emit('table-ref-change', value), { immediate: true })
+
+onUnmounted(() => {
+  emit('table-ref-change', null)
+})
 </script>
 
 <style scoped>

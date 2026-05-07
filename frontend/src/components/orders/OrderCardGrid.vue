@@ -165,14 +165,29 @@
           <div class="footer-actions">
             <span v-if="canEditOrderItem(item)" class="footer-action-item">
               <el-tooltip content="编辑" placement="top">
-                <el-button link type="primary" size="small" circle class="action-btn" @click="emit('edit', item)">
+                <el-button
+                  link
+                  type="primary"
+                  size="small"
+                  circle
+                  class="action-btn"
+                  :aria-label="`Edit order ${item.orderNo}`"
+                  @click="emit('edit', item)"
+                >
                   <el-icon><Edit /></el-icon>
                 </el-button>
               </el-tooltip>
             </span>
             <span class="footer-action-item">
               <el-tooltip content="订单成本" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="emit('cost', item)">
+                <el-button
+                  link
+                  size="small"
+                  circle
+                  class="action-btn"
+                  :aria-label="`View cost for order ${item.orderNo}`"
+                  @click="emit('cost', item)"
+                >
                   <el-icon><Coin /></el-icon>
                 </el-button>
               </el-tooltip>
@@ -180,7 +195,14 @@
             <span class="footer-action-item">
               <el-tooltip content="订单备注" placement="top">
                 <el-badge :value="item.remarkCount ?? 0" :hidden="!(item.remarkCount ?? 0)" :max="99" class="remark-badge">
-                  <el-button link size="small" circle class="action-btn" @click="emit('remark', item)">
+                  <el-button
+                    link
+                    size="small"
+                    circle
+                    class="action-btn"
+                    :aria-label="`View remarks for order ${item.orderNo}`"
+                    @click="emit('remark', item)"
+                  >
                     <el-icon><ChatDotRound /></el-icon>
                   </el-button>
                 </el-badge>
@@ -188,14 +210,28 @@
             </span>
             <span class="footer-action-item">
               <el-tooltip content="操作记录" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="emit('operation-log', item)">
+                <el-button
+                  link
+                  size="small"
+                  circle
+                  class="action-btn"
+                  :aria-label="`View operation log for order ${item.orderNo}`"
+                  @click="emit('operation-log', item)"
+                >
                   <el-icon><Clock /></el-icon>
                 </el-button>
               </el-tooltip>
             </span>
             <span class="footer-action-item">
               <el-tooltip content="打印" placement="top">
-                <el-button link size="small" circle class="action-btn" @click="emit('print', item)">
+                <el-button
+                  link
+                  size="small"
+                  circle
+                  class="action-btn"
+                  :aria-label="`Print order ${item.orderNo}`"
+                  @click="emit('print', item)"
+                >
                   <el-icon><Printer /></el-icon>
                 </el-button>
               </el-tooltip>

@@ -25,7 +25,14 @@
         </div>
         <div class="packaging-footer">
           <el-tooltip content="删除列" placement="top">
-            <el-button link type="danger" size="small" circle @click="removePackagingHeader(idx)">
+            <el-button
+              link
+              type="danger"
+              size="small"
+              circle
+              :aria-label="`Delete packaging column ${idx + 1}`"
+              @click="removePackagingHeader(idx)"
+            >
               <el-icon><Delete /></el-icon>
             </el-button>
           </el-tooltip>

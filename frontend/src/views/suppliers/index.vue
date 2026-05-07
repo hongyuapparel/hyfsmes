@@ -42,7 +42,14 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
-        <el-button v-if="selectedIds.length" type="danger" size="large" circle @click="onBatchDelete">
+        <el-button
+          v-if="selectedIds.length"
+          type="danger"
+          size="large"
+          circle
+          aria-label="Delete selected suppliers"
+          @click="onBatchDelete"
+        >
           <el-icon><Delete /></el-icon>
         </el-button>
         <el-button type="primary" size="large" @click="openForm(null)">新建供应商</el-button>
