@@ -205,6 +205,73 @@ export class FinishedGoodsStockListQueryService {
     return this.getListInternal(params);
   }
 
+  private async buildStoredRowsWithDetails(storedRows: StoredStockRawRow[]): Promise<FinishedStockRow[]> {
+    const storedList: FinishedStockRow[] = await Promise.all(storedRows.map(async (r) => {
+      const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
+      let sizeBreakdown = storedBreakdown;
+      if (!sizeBreakdown && r.orderId != null) {
+        const stock = this.stockRepo.create({
+          id: r.id,
+          orderId: r.orderId,
+          skuCode: r.skuCode ?? '',
+          customerName: r.customerName ?? '',
+          quantity: r.quantity ?? 0,
+          colorSizeSnapshot: null,
+        });
+        sizeBreakdown = snapshotToListSizeBreakdown(await this.inboundQueryService.buildCurrentStockSnapshot(stock));
+      }
+      return {
+        id: r.id,
+        orderId: r.orderId ?? null,
+        orderNo: r.orderNo ?? '',
+        customerName: r.customerName ?? '',
+        skuCode: r.skuCode ?? '',
+        quantity: r.quantity ?? 0,
+        unitPrice: r.unitPrice ?? '0',
+        warehouseId: r.warehouseId ?? null,
+        inventoryTypeId: r.inventoryTypeId ?? null,
+        department: r.department ?? '',
+        location: r.location ?? '',
+        productImageUrl: r.productImageUrl ?? '',
+        imageUrl: r.imageUrl ?? '',
+        createdAt: formatDateTimeForResponse(r.createdAt),
+        type: 'stored' as const,
+        sizeBreakdown,
+      };
+    }));
+    if (storedList.length) {
+      try {
+        const colorImageRows = await this.colorImageRepo.find({
+          where: { finishedStockId: In(storedList.map((item) => item.id)) },
+          order: { updatedAt: 'DESC' },
+        });
+        const colorImageMap = new Map<number, Map<string, string>>();
+        colorImageRows.forEach((item) => {
+          const stockId = Number(item.finishedStockId);
+          if (!Number.isInteger(stockId) || stockId <= 0) return;
+          const colorName = String(item.colorName ?? '').trim();
+          const imageUrl = String(item.imageUrl ?? '').trim();
+          if (!colorName || !imageUrl) return;
+          let stockMap = colorImageMap.get(stockId);
+          if (!stockMap) {
+            stockMap = new Map<string, string>();
+            colorImageMap.set(stockId, stockMap);
+          }
+          if (!stockMap.has(colorName)) stockMap.set(colorName, imageUrl);
+        });
+        storedList.forEach((item) => {
+          const stockMap = colorImageMap.get(item.id);
+          item.colorImages = stockMap
+            ? Array.from(stockMap.entries()).map(([colorName, imageUrl]) => ({ colorName, imageUrl }))
+            : [];
+        });
+      } catch (error) {
+        if (!isTableMissingError(error, 'finished_goods_stock_color_images')) throw error;
+      }
+    }
+    return storedList;
+  }
+
   private async getListInternal(params: {
     tab?: string;
     orderNo?: string;
@@ -251,10 +318,86 @@ export class FinishedGoodsStockListQueryService {
     const listTotalQuantity = pendingQtyTotal + storedQtyTotal;
     const listTotalAmount = storedAmountTotal;
 
-    const list: FinishedStockRow[] = [];
-    let total = 0;
+    // tab=all: 只取 id+createdAt 合并排序，再按页取完整详情，避免全表加载
+    if (tab === 'all') {
+      const buildPendingIdQb = () => {
+        const qb = this.pendingRepo
+          .createQueryBuilder('p')
+          .innerJoin(Order, 'o', 'o.id = p.order_id')
+          .where('p.status = :allPStatus', { allPStatus: 'pending' })
+          .select(['p.id AS id', 'p.created_at AS createdAt']);
+        if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :allPOrderNo', { allPOrderNo: `%${orderNo.trim()}%` });
+        if (skuCode?.trim()) qb.andWhere('p.sku_code LIKE :allPSkuCode', { allPSkuCode: `%${skuCode.trim()}%` });
+        if (customerName?.trim()) qb.andWhere('o.customer_name LIKE :allPCustomer', { allPCustomer: `%${customerName.trim()}%` });
+        this.applyInboundTimeRange(qb, 'p.created_at', startDate, endDate);
+        return qb;
+      };
+      const buildStoredIdQb = () => {
+        const qb = this.stockRepo
+          .createQueryBuilder('s')
+          .leftJoin(Order, 'o', 'o.id = s.order_id')
+          .select(['s.id AS id', 's.created_at AS createdAt']);
+        if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :allSOrderNo', { allSOrderNo: `%${orderNo.trim()}%` });
+        if (skuCode?.trim()) qb.andWhere('s.sku_code LIKE :allSSkuCode', { allSSkuCode: `%${skuCode.trim()}%` });
+        if (customerName?.trim()) qb.andWhere('s.customer_name LIKE :allSCustomer', { allSCustomer: `%${customerName.trim()}%` });
+        if (inventoryTypeId != null) qb.andWhere('s.inventory_type_id = :allSInvType', { allSInvType: inventoryTypeId });
+        this.applyInboundTimeRange(qb, 's.created_at', startDate, endDate);
+        return qb;
+      };
 
-    if (tab === 'pending' || tab === 'all') {
+      const [pendingIdRows, storedIdRows] = await Promise.all([
+        buildPendingIdQb().getRawMany<{ id: number; createdAt: Date | string }>(),
+        buildStoredIdQb().getRawMany<{ id: number; createdAt: Date | string }>(),
+      ]);
+
+      type AllItem = { id: number; itemType: 'pending' | 'stored'; ts: number };
+      const toTs = (v: Date | string) => (v instanceof Date ? v : new Date(v)).getTime();
+      const allItems: AllItem[] = [
+        ...pendingIdRows.map((r) => ({ id: Number(r.id), itemType: 'pending' as const, ts: toTs(r.createdAt) })),
+        ...storedIdRows.map((r) => ({ id: Number(r.id), itemType: 'stored' as const, ts: toTs(r.createdAt) })),
+      ].sort((a, b) => b.ts - a.ts || b.id - a.id);
+
+      const total = allItems.length;
+      const pageItems = allItems.slice((page - 1) * pageSize, page * pageSize);
+
+      const pendingIdsForPage = pageItems.filter((r) => r.itemType === 'pending').map((r) => r.id);
+      const storedIdsForPage = pageItems.filter((r) => r.itemType === 'stored').map((r) => r.id);
+
+      const pendingMap = new Map<number, FinishedStockRow>();
+      if (pendingIdsForPage.length > 0) {
+        const rows = await this.pendingRepo
+          .createQueryBuilder('p')
+          .innerJoin(Order, 'o', 'o.id = p.order_id')
+          .where('p.id IN (:...allPIds)', { allPIds: pendingIdsForPage })
+          .select(['p.id AS id', 'p.order_id AS orderId', 'o.order_no AS orderNo', 'o.customer_name AS customerName', 'p.sku_code AS skuCode', 'p.quantity AS quantity', 'p.created_at AS createdAt'])
+          .getRawMany<{ id: number; orderId: number; orderNo: string; customerName: string; skuCode: string; quantity: number; createdAt: Date }>();
+        for (const r of rows) {
+          pendingMap.set(Number(r.id), {
+            id: Number(r.id), orderId: r.orderId, orderNo: r.orderNo ?? '', customerName: r.customerName ?? '',
+            skuCode: r.skuCode ?? '', quantity: r.quantity ?? 0, unitPrice: '0', warehouseId: null,
+            inventoryTypeId: null, department: '', location: '', imageUrl: '',
+            createdAt: formatDateTimeForResponse(r.createdAt), type: 'pending',
+          });
+        }
+      }
+
+      const storedMap = new Map<number, FinishedStockRow>();
+      if (storedIdsForPage.length > 0) {
+        const storedRawRows = await this.createStoredListQueryBuilder()
+          .where('s.id IN (:...allSIds)', { allSIds: storedIdsForPage })
+          .getRawMany<StoredStockRawRow>();
+        const storedDetails = await this.buildStoredRowsWithDetails(storedRawRows);
+        for (const r of storedDetails) storedMap.set(r.id, r);
+      }
+
+      const list = pageItems
+        .map((r) => (r.itemType === 'pending' ? pendingMap.get(r.id) : storedMap.get(r.id)))
+        .filter((r): r is FinishedStockRow => r != null);
+
+      return { list, total, page, pageSize, totalQuantity: listTotalQuantity, totalAmount: listTotalAmount };
+    }
+
+    if (tab === 'pending') {
       const countQb = this.pendingRepo
         .createQueryBuilder('p')
         .innerJoin(Order, 'o', 'o.id = p.order_id')
@@ -286,7 +429,7 @@ export class FinishedGoodsStockListQueryService {
         pendingQb.andWhere('o.customer_name LIKE :customerName', { customerName: `%${customerName.trim()}%` });
       }
       this.applyInboundTimeRange(pendingQb, 'p.created_at', startDate, endDate);
-      pendingQb.orderBy('p.created_at', 'DESC');
+      pendingQb.orderBy('p.created_at', 'DESC').limit(pageSize).offset((page - 1) * pageSize);
       const pendingRows = await pendingQb.getRawMany<{
         id: number;
         orderId: number;
@@ -296,39 +439,32 @@ export class FinishedGoodsStockListQueryService {
         quantity: number;
         createdAt: Date;
       }>();
-      const pendingList: FinishedStockRow[] = pendingRows.map((r) => ({
-        id: r.id,
-        orderId: r.orderId,
-        orderNo: r.orderNo ?? '',
-        customerName: r.customerName ?? '',
-        skuCode: r.skuCode ?? '',
-        quantity: r.quantity ?? 0,
-        unitPrice: '0',
-        warehouseId: null,
-        inventoryTypeId: null,
-        department: '',
-        location: '',
-        imageUrl: '',
-        createdAt: formatDateTimeForResponse(r.createdAt),
-        type: 'pending',
-      }));
-      if (tab === 'pending') {
-        total = pendingTotal;
-        const start = (page - 1) * pageSize;
-        return {
-          list: pendingList.slice(start, start + pageSize),
-          total,
-          page,
-          pageSize,
-          totalQuantity: pendingQtyTotal,
-          totalAmount: 0,
-        };
-      }
-      list.push(...pendingList);
-      total += pendingTotal;
+      return {
+        list: pendingRows.map((r) => ({
+          id: r.id,
+          orderId: r.orderId,
+          orderNo: r.orderNo ?? '',
+          customerName: r.customerName ?? '',
+          skuCode: r.skuCode ?? '',
+          quantity: r.quantity ?? 0,
+          unitPrice: '0',
+          warehouseId: null,
+          inventoryTypeId: null,
+          department: '',
+          location: '',
+          imageUrl: '',
+          createdAt: formatDateTimeForResponse(r.createdAt),
+          type: 'pending' as const,
+        })),
+        total: pendingTotal,
+        page,
+        pageSize,
+        totalQuantity: pendingQtyTotal,
+        totalAmount: 0,
+      };
     }
 
-    if (tab === 'stored' || tab === 'all') {
+    if (tab === 'stored') {
       const stockQb = this.createStoredListQueryBuilder();
       this.applyStoredListFilters(stockQb, {
         orderNo,
@@ -342,7 +478,7 @@ export class FinishedGoodsStockListQueryService {
       let storedCount = 0;
       let storedRows: StoredStockRawRow[] = [];
 
-      if (tab === 'stored' && paginateByVisibleGroup) {
+      if (paginateByVisibleGroup) {
         const skuGroupSql = this.getStoredSkuGroupSql();
         const groupedQb = this.stockRepo
           .createQueryBuilder('s')
@@ -372,18 +508,13 @@ export class FinishedGoodsStockListQueryService {
               pageGroups.forEach((group, index) => {
                 whereQb.orWhere(
                   `${skuGroupSql} = :skuGroupKey${index}`,
-                  {
-                    [`skuGroupKey${index}`]: group.skuGroupKey ?? '',
-                  },
+                  { [`skuGroupKey${index}`]: group.skuGroupKey ?? '' },
                 );
               });
             }),
           );
           const groupOrderSql = pageGroups
-            .map(
-              (_, index) =>
-                `WHEN ${skuGroupSql} = :skuGroupKey${index} THEN ${index}`,
-            )
+            .map((_, index) => `WHEN ${skuGroupSql} = :skuGroupKey${index} THEN ${index}`)
             .join(' ');
           storedRows = await stockQb
             .orderBy(`CASE ${groupOrderSql} ELSE ${pageGroups.length} END`, 'ASC')
@@ -395,98 +526,19 @@ export class FinishedGoodsStockListQueryService {
         stockQb.orderBy('s.created_at', 'DESC');
         storedCount = await stockQb.getCount();
         storedRows = await stockQb
-          .offset(tab === 'stored' ? (page - 1) * pageSize : 0)
-          .limit(tab === 'stored' ? pageSize : 10000)
+          .offset((page - 1) * pageSize)
+          .limit(pageSize)
           .getRawMany();
       }
 
-      const storedList: FinishedStockRow[] = await Promise.all(storedRows.map(async (r) => {
-        const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
-        let sizeBreakdown = storedBreakdown;
-        if (!sizeBreakdown && r.orderId != null) {
-          const stock = this.stockRepo.create({
-            id: r.id,
-            orderId: r.orderId,
-            skuCode: r.skuCode ?? '',
-            customerName: r.customerName ?? '',
-            quantity: r.quantity ?? 0,
-            colorSizeSnapshot: null,
-          });
-          sizeBreakdown = snapshotToListSizeBreakdown(await this.inboundQueryService.buildCurrentStockSnapshot(stock));
-        }
-        return {
-          id: r.id,
-          orderId: r.orderId ?? null,
-          orderNo: r.orderNo ?? '',
-          customerName: r.customerName ?? '',
-          skuCode: r.skuCode ?? '',
-          quantity: r.quantity ?? 0,
-          unitPrice: r.unitPrice ?? '0',
-          warehouseId: r.warehouseId ?? null,
-          inventoryTypeId: r.inventoryTypeId ?? null,
-          department: r.department ?? '',
-          location: r.location ?? '',
-          productImageUrl: r.productImageUrl ?? '',
-          imageUrl: r.imageUrl ?? '',
-          createdAt: formatDateTimeForResponse(r.createdAt),
-          type: 'stored',
-          sizeBreakdown,
-        };
-      }));
-      if (storedList.length) {
-        try {
-          const colorImageRows = await this.colorImageRepo.find({
-            where: { finishedStockId: In(storedList.map((item) => item.id)) },
-            order: { updatedAt: 'DESC' },
-          });
-          const colorImageMap = new Map<number, Map<string, string>>();
-          colorImageRows.forEach((item) => {
-            const stockId = Number(item.finishedStockId);
-            if (!Number.isInteger(stockId) || stockId <= 0) return;
-            const colorName = String(item.colorName ?? '').trim();
-            const imageUrl = String(item.imageUrl ?? '').trim();
-            if (!colorName || !imageUrl) return;
-            let stockMap = colorImageMap.get(stockId);
-            if (!stockMap) {
-              stockMap = new Map<string, string>();
-              colorImageMap.set(stockId, stockMap);
-            }
-            if (!stockMap.has(colorName)) stockMap.set(colorName, imageUrl);
-          });
-          storedList.forEach((item) => {
-            const stockMap = colorImageMap.get(item.id);
-            item.colorImages = stockMap
-              ? Array.from(stockMap.entries()).map(([colorName, imageUrl]) => ({ colorName, imageUrl }))
-              : [];
-          });
-        } catch (error) {
-          if (!isTableMissingError(error, 'finished_goods_stock_color_images')) throw error;
-        }
-      }
-      if (tab === 'stored') {
-        return {
-          list: storedList,
-          total: storedCount,
-          page,
-          pageSize,
-          totalQuantity: storedQtyTotal,
-          totalAmount: storedAmountTotal,
-        };
-      }
-      list.push(...storedList);
-      total += storedCount;
-    }
-
-    if (tab === 'all') {
-      list.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
-      const start = (page - 1) * pageSize;
+      const storedList = await this.buildStoredRowsWithDetails(storedRows);
       return {
-        list: list.slice(start, start + pageSize),
-        total,
+        list: storedList,
+        total: storedCount,
         page,
         pageSize,
-        totalQuantity: listTotalQuantity,
-        totalAmount: listTotalAmount,
+        totalQuantity: storedQtyTotal,
+        totalAmount: storedAmountTotal,
       };
     }
 
