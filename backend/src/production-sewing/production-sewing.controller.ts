@@ -12,6 +12,16 @@ import type { Response } from 'express';
 export class ProductionSewingController {
   constructor(private readonly sewingService: ProductionSewingService) {}
 
+  @Get('tab-counts')
+  getTabCounts(
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
+  ) {
+    return this.sewingService.getSewingTabCounts({ orderNo, skuCode, completedStart, completedEnd });
+  }
+
   @Get('items')
   getItems(
     @Query('tab') tab?: string,

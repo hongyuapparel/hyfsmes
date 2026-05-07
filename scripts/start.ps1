@@ -10,6 +10,15 @@ $BackendErrLog = Join-Path $ProjectRoot ".codex-backend-3000.err.log"
 $FrontendLog = Join-Path $ProjectRoot ".codex-frontend-5173.log"
 $FrontendErrLog = Join-Path $ProjectRoot ".codex-frontend-5173.err.log"
 
+function Repair-DuplicatePathEnvironment {
+    $pathKeys = @([System.Environment]::GetEnvironmentVariables("Process").Keys | Where-Object { $_ -ieq "PATH" })
+    if ($pathKeys.Count -gt 1 -and ($pathKeys -contains "Path") -and ($pathKeys -contains "PATH")) {
+        [System.Environment]::SetEnvironmentVariable("PATH", $null, "Process")
+    }
+}
+
+Repair-DuplicatePathEnvironment
+
 if (-not (Test-Path (Join-Path $BackendDir ".env"))) {
     Write-Host "ERROR: backend\.env not found. Copy backend\.env.example to backend\.env and configure." -ForegroundColor Red
     exit 1
@@ -42,9 +51,15 @@ function Start-DetachedNpm {
         New-Item -ItemType File -Path $StderrLog -Force | Out-Null
     }
 
-    $command = "npm.cmd $Arguments >> `"$StdoutLog`" 2>> `"$StderrLog`""
-    $cmdArgs = "/d /s /c `"$command`""
-    Start-Process -FilePath $env:ComSpec -ArgumentList $cmdArgs -WorkingDirectory $WorkingDirectory -WindowStyle Hidden | Out-Null
+    $npmCmd = (Get-Command npm.cmd -ErrorAction Stop).Source
+    $argumentList = $Arguments -split "\s+"
+    Start-Process `
+        -FilePath $npmCmd `
+        -ArgumentList $argumentList `
+        -WorkingDirectory $WorkingDirectory `
+        -RedirectStandardOutput $StdoutLog `
+        -RedirectStandardError $StderrLog `
+        -WindowStyle Hidden | Out-Null
 }
 
 # If port in use, run stop.ps1 once and wait, then re-check

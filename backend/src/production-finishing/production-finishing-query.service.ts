@@ -288,6 +288,15 @@ export class ProductionFinishingQueryService {
     return { list, total, totalQuantity, page, pageSize };
   }
 
+  async getFinishingTabCounts(query: FinishingListQuery): Promise<Record<string, number>> {
+    const rows = await this.buildFinishingRows({ ...query, tab: 'all' });
+    const counts: Record<string, number> = { all: rows.length, pending_receive: 0, pending_assign: 0, inbound: 0 };
+    for (const row of rows) {
+      if (row.finishingStatus in counts) counts[row.finishingStatus]++;
+    }
+    return counts;
+  }
+
   async getFinishingExportRows(query: FinishingListQuery): Promise<FinishingListItem[]> {
     return this.buildFinishingRows(query);
   }

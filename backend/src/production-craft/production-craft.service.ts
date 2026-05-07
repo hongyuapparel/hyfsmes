@@ -360,6 +360,15 @@ export class ProductionCraftService {
     return { list, total, totalQuantity, page, pageSize };
   }
 
+  async getCraftTabCounts(query: CraftListQuery): Promise<Record<string, number>> {
+    const allRows = await this.getCraftExportRows({ ...query, tab: 'all' });
+    const counts: Record<string, number> = { all: allRows.length, pending: 0, completed: 0 };
+    for (const row of allRows) {
+      if (row.craftStatus in counts) counts[row.craftStatus]++;
+    }
+    return counts;
+  }
+
   async getCraftExportRows(query: CraftListQuery, actorUserId?: number): Promise<CraftListItem[]> {
     const res = await this.getCraftList({ ...query, page: 1, pageSize: Number.MAX_SAFE_INTEGER }, actorUserId);
     return res.list;

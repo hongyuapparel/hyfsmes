@@ -224,6 +224,24 @@ export class ProductionPurchaseQueryService {
     return { list, total, page, pageSize };
   }
 
+  async getPurchaseTabCounts(query: PurchaseListQuery): Promise<Record<string, number>> {
+    const allRows = await this.getPurchaseExportRows({ ...query, tab: 'all' });
+    const counts: Record<string, number> = { all: allRows.length, pending: 0, picking: 0, completed: 0 };
+    for (const row of allRows) {
+      const routeCompleted =
+        (row.processRoute === 'purchase' && row.purchaseStatus === 'completed') ||
+        (row.processRoute === 'picking' && row.pickStatus === 'completed');
+      if (routeCompleted) {
+        counts.completed++;
+      } else if (row.processRoute === 'purchase') {
+        counts.pending++;
+      } else {
+        counts.picking++;
+      }
+    }
+    return counts;
+  }
+
   async getPurchaseExportRows(query: PurchaseListQuery, actorUserId?: number): Promise<PurchaseItemRow[]> {
     const res = await this.getPurchaseItems({ ...query, page: 1, pageSize: Number.MAX_SAFE_INTEGER }, actorUserId);
     return res.list;

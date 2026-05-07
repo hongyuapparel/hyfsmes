@@ -56,6 +56,10 @@ export interface PatternListQuery {
   pageSize?: number
 }
 
+export function getPatternTabCounts(params?: Omit<PatternListQuery, 'tab' | 'page' | 'pageSize'>) {
+  return request.get<Record<string, number>>('/production/pattern/tab-counts', { params })
+}
+
 export function getPatternItems(params?: PatternListQuery, config?: AxiosRequestConfig) {
   return request.get<PatternListRes>('/production/pattern/items', { params, ...(config ?? {}) })
 }

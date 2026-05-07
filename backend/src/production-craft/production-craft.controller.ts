@@ -12,6 +12,29 @@ import type { Response } from 'express';
 export class ProductionCraftController {
   constructor(private readonly craftService: ProductionCraftService) {}
 
+  @Get('tab-counts')
+  getTabCounts(
+    @Query('supplier') supplier?: string,
+    @Query('processItem') processItem?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
+    @Query('orderDateStart') orderDateStart?: string,
+    @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
+    const query: CraftListQuery = {
+      supplier, processItem,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number) ? undefined : (collaborationTypeId as number),
+      orderDateStart, orderDateEnd, completedStart, completedEnd,
+    };
+    return this.craftService.getCraftTabCounts(query);
+  }
+
   @Get('items')
   getItems(
     @Query('tab') tab?: string,

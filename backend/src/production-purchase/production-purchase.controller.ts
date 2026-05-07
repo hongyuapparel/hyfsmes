@@ -17,6 +17,26 @@ export class ProductionPurchaseController {
     private readonly purchaseQueryService: ProductionPurchaseQueryService,
   ) {}
 
+  @Get('tab-counts')
+  getTabCounts(
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('supplier') supplier?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
+    @Query('orderDateStart') orderDateStart?: string,
+    @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
+  ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const query: PurchaseListQuery = {
+      orderNo, skuCode, supplier,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
+      orderDateStart, orderDateEnd, completedStart, completedEnd,
+    };
+    return this.purchaseQueryService.getPurchaseTabCounts(query);
+  }
+
   /**
    * 采购物料列表（已审单订单的物料，支持 tab 与筛选）
    */

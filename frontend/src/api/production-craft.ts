@@ -58,6 +58,10 @@ export interface CraftListQuery {
   pageSize?: number
 }
 
+export function getCraftTabCounts(params?: Omit<CraftListQuery, 'tab' | 'page' | 'pageSize'>) {
+  return request.get<Record<string, number>>('/production/process/tab-counts', { params })
+}
+
 export function getCraftItems(params?: CraftListQuery) {
   return request.get<CraftListRes>('/production/process/items', { params })
 }

@@ -41,6 +41,10 @@ export interface CuttingListQuery {
   pageSize?: number
 }
 
+export function getCuttingTabCounts(params?: Omit<CuttingListQuery, 'tab' | 'page' | 'pageSize'>) {
+  return request.get<Record<string, number>>('/production/cutting/tab-counts', { params })
+}
+
 export function getCuttingItems(params?: CuttingListQuery) {
   return request.get<CuttingListRes>('/production/cutting/items', { params })
 }

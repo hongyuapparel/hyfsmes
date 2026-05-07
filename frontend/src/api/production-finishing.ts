@@ -44,6 +44,10 @@ export interface FinishingListQuery {
   pageSize?: number
 }
 
+export function getFinishingTabCounts(params?: Omit<FinishingListQuery, 'tab' | 'page' | 'pageSize'>) {
+  return request.get<Record<string, number>>('/production/finishing/tab-counts', { params })
+}
+
 export function getFinishingItems(params?: FinishingListQuery) {
   return request.get<FinishingListRes>('/production/finishing/items', { params })
 }

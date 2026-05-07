@@ -432,6 +432,15 @@ export class ProductionPatternService {
     return { list, total, totalQuantity, page, pageSize };
   }
 
+  async getPatternTabCounts(query: PatternListQuery): Promise<Record<string, number>> {
+    const rows = await this.buildPatternRows({ ...query, tab: 'all' });
+    const counts: Record<string, number> = { all: rows.length, pending_assign: 0, in_progress: 0, completed: 0 };
+    for (const row of rows) {
+      if (row.patternStatus in counts) counts[row.patternStatus]++;
+    }
+    return counts;
+  }
+
   async getPatternExportRows(query: PatternListQuery, actorUserId?: number): Promise<PatternListItem[]> {
     this.schedulePatternReconcile(actorUserId);
     return this.buildPatternRows(query);

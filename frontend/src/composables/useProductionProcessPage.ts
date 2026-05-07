@@ -1,6 +1,6 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getCraftItems, completeCraft, exportCraftItems, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
+import { getCraftItems, getCraftTabCounts, completeCraft, exportCraftItems, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -105,21 +105,14 @@ export function useProductionProcessPage() {
   }
 
   async function loadTabCounts() {
-    const base = buildQuery()
-    base.page = 1
-    base.pageSize = 1
-    const counts: Record<string, number> = {}
-    for (const tab of CRAFT_TABS) {
-      try {
-        const res = await getCraftItems({ ...base, tab: tab.value })
-        const data = res.data
-        counts[tab.value] = data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
+    try {
+      const res = await getCraftTabCounts(buildQuery())
+      const counts = res.data ?? {}
+      tabCounts.value = counts
+      tabTotal.value = counts.all ?? 0
+    } catch {
+      // keep existing counts on error
     }
-    tabCounts.value = counts
-    tabTotal.value = counts.all ?? 0
   }
 
   async function load() {

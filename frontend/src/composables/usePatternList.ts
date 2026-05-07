@@ -1,6 +1,6 @@
 import { computed, reactive, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getPatternItems, exportPatternItems, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
+import { getPatternItems, getPatternTabCounts, exportPatternItems, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -134,22 +134,15 @@ export function usePatternList() {
   async function loadTabCounts() {
     tabCountsReqId++
     const reqId = tabCountsReqId
-    const base = buildQuery()
-    base.page = 1
-    base.pageSize = 1
-    const counts: Record<string, number> = {}
-    for (const tab of PATTERN_TABS) {
-      try {
-        const res = await getPatternItems({ ...base, tab: tab.value })
-        const data = res.data
-        counts[tab.value] = data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
+    try {
+      const res = await getPatternTabCounts(buildQuery())
+      if (reqId !== tabCountsReqId) return
+      const counts = res.data ?? {}
+      tabCounts.value = counts
+      tabTotal.value = counts.all ?? 0
+    } catch {
+      // keep existing counts on error
     }
-    if (reqId !== tabCountsReqId) return
-    tabCounts.value = counts
-    tabTotal.value = counts.all ?? 0
   }
 
   async function load(getTableRef?: () => unknown) {

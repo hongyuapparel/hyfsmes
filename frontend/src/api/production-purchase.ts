@@ -60,6 +60,10 @@ export interface PurchaseListQuery {
   pageSize?: number
 }
 
+export function getPurchaseTabCounts(params?: Omit<PurchaseListQuery, 'tab' | 'page' | 'pageSize'>) {
+  return request.get<Record<string, number>>('/production/purchase/tab-counts', { params })
+}
+
 export function getPurchaseItems(params?: PurchaseListQuery) {
   return request.get<PurchaseListRes>('/production/purchase/items', { params })
 }

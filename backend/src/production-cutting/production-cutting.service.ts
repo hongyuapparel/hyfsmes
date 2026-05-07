@@ -37,6 +37,10 @@ export class ProductionCuttingService {
     return this.listService.getCuttingList(query, actorUserId);
   }
 
+  getCuttingTabCounts(query: CuttingListQuery): Promise<Record<string, number>> {
+    return this.listService.getCuttingTabCounts(query);
+  }
+
   getCuttingExportRows(query: CuttingListQuery, actorUserId?: number): Promise<CuttingListItem[]> {
     return this.listService.getCuttingExportRows(query, actorUserId);
   }

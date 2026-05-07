@@ -281,6 +281,15 @@ export class ProductionSewingService {
     return { list, total, totalQuantity, page, pageSize };
   }
 
+  async getSewingTabCounts(query: SewingListQuery): Promise<Record<string, number>> {
+    const rows = await this.buildSewingRows({ ...query, tab: 'all' });
+    const counts: Record<string, number> = { all: rows.length, pending: 0, completed: 0 };
+    for (const row of rows) {
+      if (row.sewingStatus in counts) counts[row.sewingStatus]++;
+    }
+    return counts;
+  }
+
   async getSewingExportRows(query: SewingListQuery): Promise<SewingListItem[]> {
     return this.buildSewingRows(query);
   }

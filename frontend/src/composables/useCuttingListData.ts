@@ -1,6 +1,6 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportCuttingItems, getCuttingItems, type CuttingListItem, type CuttingListQuery } from '@/api/production-cutting'
+import { exportCuttingItems, getCuttingItems, getCuttingTabCounts, type CuttingListItem, type CuttingListQuery } from '@/api/production-cutting'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
 
@@ -48,21 +48,14 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
   }
 
   async function loadTabCounts() {
-    const base = buildQuery()
-    base.page = 1
-    base.pageSize = 1
-    const counts: Record<string, number> = {}
-    for (const tab of tabs) {
-      try {
-        const res = await getCuttingItems({ ...base, tab: tab.value })
-        const data = res.data
-        counts[tab.value] = data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
+    try {
+      const res = await getCuttingTabCounts(buildQuery())
+      const counts = res.data ?? {}
+      tabCounts.value = counts
+      tabTotal.value = counts.all ?? 0
+    } catch {
+      // keep existing counts on error
     }
-    tabCounts.value = counts
-    tabTotal.value = counts.all ?? 0
   }
 
   async function load() {

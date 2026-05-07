@@ -111,24 +111,26 @@ export class FinanceDashboardService {
 
     // 各账户余额
     const accounts = await this.fundAccountRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
-    const accountBalances = await Promise.all(
-      accounts.map(async (a) => {
-        const [inR, exR] = await Promise.all([
-          this.incomeRepo
-            .createQueryBuilder('r')
-            .select('SUM(r.amount)', 'total')
-            .where('r.fund_account_id = :id', { id: a.id })
-            .getRawOne<{ total: string | null }>(),
-          this.expenseRepo
-            .createQueryBuilder('r')
-            .select('SUM(r.amount)', 'total')
-            .where('r.fund_account_id = :id', { id: a.id })
-            .getRawOne<{ total: string | null }>(),
-        ]);
-        const balance = toNum(inR?.total) - toNum(exR?.total);
-        return { fundAccountId: a.id, fundAccountName: a.name, balance: balance.toFixed(2) };
-      }),
-    );
+    const [incomeByAccount, expenseByAccount] = await Promise.all([
+      this.incomeRepo
+        .createQueryBuilder('r')
+        .select('r.fund_account_id', 'fundAccountId')
+        .addSelect('SUM(r.amount)', 'total')
+        .groupBy('r.fund_account_id')
+        .getRawMany<{ fundAccountId: number; total: string | null }>(),
+      this.expenseRepo
+        .createQueryBuilder('r')
+        .select('r.fund_account_id', 'fundAccountId')
+        .addSelect('SUM(r.amount)', 'total')
+        .groupBy('r.fund_account_id')
+        .getRawMany<{ fundAccountId: number; total: string | null }>(),
+    ]);
+    const incomeMap = new Map(incomeByAccount.map((r) => [Number(r.fundAccountId), r.total]));
+    const expenseMap = new Map(expenseByAccount.map((r) => [Number(r.fundAccountId), r.total]));
+    const accountBalances = accounts.map((a) => {
+      const balance = toNum(incomeMap.get(a.id)) - toNum(expenseMap.get(a.id));
+      return { fundAccountId: a.id, fundAccountName: a.name, balance: balance.toFixed(2) };
+    });
 
     // 区间最近流水
     const recentIncome = await this.applyOccurDateRange(

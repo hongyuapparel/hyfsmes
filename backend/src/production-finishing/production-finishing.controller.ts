@@ -17,6 +17,16 @@ export class ProductionFinishingController {
     private readonly finishingMutationService: ProductionFinishingMutationService,
   ) {}
 
+  @Get('tab-counts')
+  getTabCounts(
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
+  ) {
+    return this.finishingQueryService.getFinishingTabCounts({ orderNo, skuCode, completedStart, completedEnd });
+  }
+
   @Get('items')
   getItems(
     @Query('tab') tab?: string,

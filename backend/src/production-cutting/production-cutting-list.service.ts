@@ -288,6 +288,15 @@ export class ProductionCuttingListService {
     return { list, total, totalQuantity, page, pageSize };
   }
 
+  async getCuttingTabCounts(query: CuttingListQuery): Promise<Record<string, number>> {
+    const rows = await this.buildCuttingRows({ ...query, tab: 'all' });
+    const counts: Record<string, number> = { all: rows.length, pending: 0, completed: 0 };
+    for (const row of rows) {
+      if (row.cuttingStatus in counts) counts[row.cuttingStatus]++;
+    }
+    return counts;
+  }
+
   async getCuttingExportRows(query: CuttingListQuery, actorUserId?: number): Promise<CuttingListItem[]> {
     this.scheduleCuttingReconcile(actorUserId);
     return this.buildCuttingRows(query);

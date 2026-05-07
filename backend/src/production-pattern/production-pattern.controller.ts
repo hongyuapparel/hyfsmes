@@ -12,6 +12,30 @@ import type { Response } from 'express';
 export class ProductionPatternController {
   constructor(private readonly patternService: ProductionPatternService) {}
 
+  @Get('tab-counts')
+  getTabCounts(
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('patternMaster') patternMaster?: string,
+    @Query('sampleMaker') sampleMaker?: string,
+    @Query('orderTypeId') orderTypeIdStr?: string,
+    @Query('collaborationTypeId') collaborationTypeIdStr?: string,
+    @Query('orderDateStart') orderDateStart?: string,
+    @Query('orderDateEnd') orderDateEnd?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
+  ) {
+    const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
+    const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
+    const query: PatternListQuery = {
+      orderNo, skuCode, patternMaster, sampleMaker,
+      orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
+      collaborationTypeId: Number.isNaN(collaborationTypeId as number) ? undefined : (collaborationTypeId as number),
+      orderDateStart, orderDateEnd, completedStart, completedEnd,
+    };
+    return this.patternService.getPatternTabCounts(query);
+  }
+
   @Get('items')
   getItems(
     @Query('tab') tab?: string,

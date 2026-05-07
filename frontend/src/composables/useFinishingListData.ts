@@ -1,6 +1,6 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportFinishingItems, getFinishingItems, type FinishingListItem, type FinishingListQuery } from '@/api/production-finishing'
+import { exportFinishingItems, getFinishingItems, getFinishingTabCounts, type FinishingListItem, type FinishingListQuery } from '@/api/production-finishing'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
 
@@ -49,21 +49,14 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
   }
 
   async function loadTabCounts() {
-    const base = buildQuery()
-    base.page = 1
-    base.pageSize = 1
-    const counts: Record<string, number> = {}
-    for (const tab of tabs) {
-      try {
-        const res = await getFinishingItems({ ...base, tab: tab.value })
-        const data = res.data
-        counts[tab.value] = data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
+    try {
+      const res = await getFinishingTabCounts(buildQuery())
+      const counts = res.data ?? {}
+      tabCounts.value = counts
+      tabTotal.value = counts.all ?? 0
+    } catch {
+      // keep existing counts on error
     }
-    tabCounts.value = counts
-    tabTotal.value = counts.all ?? 0
   }
 
   async function load() {

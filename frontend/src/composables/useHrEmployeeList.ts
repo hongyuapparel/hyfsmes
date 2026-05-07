@@ -185,7 +185,7 @@ export function useHrEmployeeList() {
         '提示',
         { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' },
       )
-      for (const id of selectedIds.value) await deleteEmployee(id)
+      await Promise.all(selectedIds.value.map((id) => deleteEmployee(id)))
       ElMessage.success('批量删除成功')
       load()
     } catch (e: unknown) {

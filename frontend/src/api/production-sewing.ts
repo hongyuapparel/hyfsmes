@@ -40,6 +40,10 @@ export interface SewingListQuery {
   pageSize?: number
 }
 
+export function getSewingTabCounts(params?: Omit<SewingListQuery, 'tab' | 'page' | 'pageSize'>) {
+  return request.get<Record<string, number>>('/production/sewing/tab-counts', { params })
+}
+
 export function getSewingItems(params?: SewingListQuery) {
   return request.get<SewingListRes>('/production/sewing/items', { params })
 }

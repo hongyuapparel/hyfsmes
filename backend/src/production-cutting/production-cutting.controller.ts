@@ -17,6 +17,16 @@ export class ProductionCuttingController {
     private readonly cuttingMutationService: ProductionCuttingMutationService,
   ) {}
 
+  @Get('tab-counts')
+  getTabCounts(
+    @Query('orderNo') orderNo?: string,
+    @Query('skuCode') skuCode?: string,
+    @Query('completedStart') completedStart?: string,
+    @Query('completedEnd') completedEnd?: string,
+  ) {
+    return this.cuttingService.getCuttingTabCounts({ orderNo, skuCode, completedStart, completedEnd });
+  }
+
   @Get('items')
   getItems(
     @Query('tab') tab?: string,

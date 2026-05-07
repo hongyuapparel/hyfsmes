@@ -2,6 +2,7 @@ import { ref, reactive, computed, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getSewingItems,
+  getSewingTabCounts,
   exportSewingItems,
   type SewingListItem,
   type SewingListQuery,
@@ -105,20 +106,14 @@ export function useSewingList() {
   }
 
   async function loadTabCounts() {
-    const base = buildQuery()
-    base.page = 1
-    base.pageSize = 1
-    const counts: Record<string, number> = {}
-    for (const tab of SEWING_TABS) {
-      try {
-        const res = await getSewingItems({ ...base, tab: tab.value })
-        counts[tab.value] = res.data?.total ?? 0
-      } catch {
-        counts[tab.value] = 0
-      }
+    try {
+      const res = await getSewingTabCounts(buildQuery())
+      const counts = res.data ?? {}
+      tabCounts.value = counts
+      tabTotal.value = counts.all ?? 0
+    } catch {
+      // keep existing counts on error
     }
-    tabCounts.value = counts
-    tabTotal.value = counts.all ?? 0
   }
 
   async function load() {
