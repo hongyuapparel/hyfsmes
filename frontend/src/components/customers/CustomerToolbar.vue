@@ -28,7 +28,7 @@
       filterable
       size="large"
       class="filter-bar-item"
-      :style="getFilterSelectAutoWidthStyle(salespersonModel)"
+      :style="getAdaptiveSelectStyle(salespersonModel ? `业务员：${salespersonModel}` : '', '业务员', 42)"
       @change="$emit('search', false)"
     >
       <template #label="{ label }">
@@ -41,7 +41,7 @@
     <el-button type="primary" size="large" @click="$emit('search', true)">搜索</el-button>
     <el-button size="large" @click="$emit('reset')">清空</el-button>
 
-    <div class="filter-actions">
+    <div class="filter-bar-actions">
       <el-button type="primary" size="large" @click="$emit('create')">新建客户</el-button>
       <el-tooltip v-if="selectedCount" content="删除" placement="top">
         <el-button
@@ -67,7 +67,7 @@ import { Delete } from '@element-plus/icons-vue'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
-  getFilterSelectAutoWidthStyle,
+  getAdaptiveSelectStyle,
   getTextFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 
@@ -102,10 +102,4 @@ const salespersonModel = computed({
 </script>
 
 <style scoped>
-.filter-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
 </style>

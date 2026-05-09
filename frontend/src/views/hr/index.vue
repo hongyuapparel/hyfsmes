@@ -25,14 +25,17 @@
         filterable
         size="large"
         class="filter-bar-item"
+        popper-class="hr-department-tree-popper"
         :data="departmentTreeOptions"
         node-key="id"
         check-strictly
         :props="{ label: 'label', value: 'id', children: 'children' }"
+        :style="getAdaptiveSelectStyle(filter.departmentId ? `部门：${getDepartmentLabel(filter.departmentId)}` : '', '部门')"
         @change="onSearch(true)"
+        @visible-change="(v: boolean) => v && adjustTreePopperWidth('hr-department-tree-popper')"
       >
-        <template #label>
-          {{ filter.departmentId ? `部门：${getDepartmentLabel(filter.departmentId)}` : '部门' }}
+        <template #prefix>
+          <span v-if="filter.departmentId" :style="{ color: ACTIVE_FILTER_COLOR }">部门：</span>
         </template>
       </el-tree-select>
       <el-select
@@ -41,41 +44,60 @@
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.status ? `状态：${statusLabel(filter.status)}` : '')"
+        :style="getAdaptiveSelectStyle(filter.status ? `状态：${statusLabel(filter.status)}` : '', '状态')"
         @change="onSearch"
       >
-        <template #label>
-          {{ filter.status ? `状态：${statusLabel(filter.status)}` : '状态' }}
+        <template #label="{ label }">
+          <span v-if="filter.status">状态：{{ label }}</span>
+          <span v-else>{{ label }}</span>
         </template>
         <el-option label="在职" value="active" />
         <el-option label="离职" value="left" />
       </el-select>
-      <el-date-picker
-        v-model="filter.entryDateRange"
-        type="daterange"
-        :name="['employeeEntryDateStart', 'employeeEntryDateEnd']"
-        value-format="YYYY-MM-DD"
-        placeholder="入职日期"
-        range-separator="—"
-        unlink-panels
-        size="large"
-        class="filter-bar-item"
-        :shortcuts="hrDateRangeShortcuts"
-        @change="onSearch(true)"
-      />
-      <el-date-picker
-        v-model="filter.leaveDateRange"
-        type="daterange"
-        :name="['employeeLeaveDateStart', 'employeeLeaveDateEnd']"
-        value-format="YYYY-MM-DD"
-        placeholder="离职日期"
-        range-separator="—"
-        unlink-panels
-        size="large"
-        class="filter-bar-item"
-        :shortcuts="hrDateRangeShortcuts"
-        @change="onSearch(true)"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': filter.entryDateRange }"
+        :style="getFilterRangeStyle(filter.entryDateRange as [string, string] | [], '入职日期')"
+      >
+        <span v-if="filter.entryDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">入职日期：</span>
+        <el-date-picker
+          v-model="filter.entryDateRange"
+          type="daterange"
+          :name="['employeeEntryDateStart', 'employeeEntryDateEnd']"
+          value-format="YYYY-MM-DD"
+          :range-separator="filter.entryDateRange ? '~' : ''"
+          start-placeholder="入职日期"
+          end-placeholder=""
+          unlink-panels
+          clearable
+          size="large"
+          :shortcuts="hrDateRangeShortcuts"
+          :class="['filter-range', { 'range-single': !filter.entryDateRange }]"
+          @change="onSearch(true)"
+        />
+      </div>
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': filter.leaveDateRange }"
+        :style="getFilterRangeStyle(filter.leaveDateRange as [string, string] | [], '离职日期')"
+      >
+        <span v-if="filter.leaveDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">离职日期：</span>
+        <el-date-picker
+          v-model="filter.leaveDateRange"
+          type="daterange"
+          :name="['employeeLeaveDateStart', 'employeeLeaveDateEnd']"
+          value-format="YYYY-MM-DD"
+          :range-separator="filter.leaveDateRange ? '~' : ''"
+          start-placeholder="离职日期"
+          end-placeholder=""
+          unlink-panels
+          clearable
+          size="large"
+          :shortcuts="hrDateRangeShortcuts"
+          :class="['filter-range', { 'range-single': !filter.leaveDateRange }]"
+          @change="onSearch(true)"
+        />
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
@@ -191,16 +213,20 @@ import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getTextFilterStyle,
+  getAdaptiveSelectStyle,
+  getFilterRangeStyle,
 } from '@/composables/useFilterBarHelpers'
+import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import {
   useHrEmployeeList,
-  getFilterSelectAutoWidthStyle,
   statusLabel,
   genderLabel,
 } from '@/composables/useHrEmployeeList'
 import HrEmployeeDrawer from '@/components/hr/HrEmployeeDrawer.vue'
 import type { EmployeeItem } from '@/api/hr'
+
+const { adjustTreePopperWidth } = useTreeSelectAdjust()
 
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
@@ -272,5 +298,11 @@ onActivated(() => {
   color: var(--el-text-color-secondary);
   font-size: 13px;
   margin: 8px 0;
+}
+</style>
+
+<style>
+.hr-department-tree-popper.el-popper {
+  max-width: 440px;
 }
 </style>

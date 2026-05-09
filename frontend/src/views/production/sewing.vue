@@ -45,22 +45,28 @@
           </span>
         </template>
       </el-input>
-      <el-date-picker
-        v-model="completedRange"
-        type="daterange"
-        :name="['sewingCompletedDateStart', 'sewingCompletedDateEnd']"
-        range-separator=""
-        start-placeholder="完成时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
-        :style="getFilterRangeStyle(completedRange)"
-        @change="onSearch"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': completedRange }"
+        :style="getFilterRangeStyle(completedRange, '完成时间')"
+      >
+        <span v-if="completedRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">完成时间：</span>
+        <el-date-picker
+          v-model="completedRange"
+          type="daterange"
+          :name="['sewingCompletedDateStart', 'sewingCompletedDateEnd']"
+          :range-separator="completedRange ? '~' : ''"
+          start-placeholder="完成时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !completedRange }]"
+          @change="onSearch"
+        />
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>

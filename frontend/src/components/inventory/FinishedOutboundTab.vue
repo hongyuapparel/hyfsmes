@@ -7,16 +7,28 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(outboundFilter.orderNo ? `订单号：${outboundFilter.orderNo}` : '', '订单号')"
+        :input-style="getFilterInputStyle(outboundFilter.orderNo)"
         @keyup.enter="emit('search', true)"
-      />
+      >
+        <template #prefix>
+          <span v-if="outboundFilter.orderNo" :style="{ color: ACTIVE_FILTER_COLOR }">订单号：</span>
+        </template>
+      </el-input>
       <el-input
         v-model="outboundFilter.skuCode"
         placeholder="SKU"
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(outboundFilter.skuCode ? `SKU：${outboundFilter.skuCode}` : '', 'SKU')"
+        :input-style="getFilterInputStyle(outboundFilter.skuCode)"
         @keyup.enter="emit('search', true)"
-      />
+      >
+        <template #prefix>
+          <span v-if="outboundFilter.skuCode" :style="{ color: ACTIVE_FILTER_COLOR }">SKU：</span>
+        </template>
+      </el-input>
       <el-select
         v-model="outboundFilter.customerName"
         placeholder="客户"
@@ -24,25 +36,37 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(outboundFilter.customerName ? `客户：${outboundFilter.customerName}` : '', '客户', 42)"
         @change="emit('search', true)"
       >
+        <template #label="{ label }">
+          <span v-if="outboundFilter.customerName">客户：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
-      <el-date-picker
-        v-model="dateRangeModel"
-        type="daterange"
-        :name="['finishedOutboundDateStart', 'finishedOutboundDateEnd']"
-        range-separator=""
-        start-placeholder="出库时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        size="large"
-        :class="['filter-bar-item', { 'range-single': !(dateRangeModel && dateRangeModel.length === 2) }]"
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': dateRangeModel && dateRangeModel.length === 2 }"
         :style="getInventoryOutboundRangeStyle(dateRangeModel)"
-        @change="emit('search', true)"
-      />
+      >
+        <span v-if="dateRangeModel && dateRangeModel.length === 2" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">出库时间：</span>
+        <el-date-picker
+          v-model="dateRangeModel"
+          type="daterange"
+          :name="['finishedOutboundDateStart', 'finishedOutboundDateEnd']"
+          :range-separator="dateRangeModel && dateRangeModel.length === 2 ? '~' : ''"
+          start-placeholder="出库时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !(dateRangeModel && dateRangeModel.length === 2) }]"
+          @change="emit('search', true)"
+        />
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="emit('search', true)">搜索</el-button>
         <el-button size="large" @click="emit('reset')">清空</el-button>
@@ -143,6 +167,11 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
+import {
+  ACTIVE_FILTER_COLOR,
+  getFilterInputStyle,
+  getAdaptiveSelectStyle,
+} from '@/composables/useFilterBarHelpers'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import type { FinishedOutboundRecord } from '@/api/inventory'

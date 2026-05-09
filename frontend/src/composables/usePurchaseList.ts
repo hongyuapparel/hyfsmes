@@ -5,7 +5,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
-import { ACTIVE_FILTER_COLOR, normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
 import type { ProductionOrderBriefModel } from '@/components/production/ProductionOrderBriefPanel.vue'
 
 export const PURCHASE_TABS = [
@@ -16,11 +16,6 @@ export const PURCHASE_TABS = [
 ] as const
 
 type PurchaseTabConfig = (typeof PURCHASE_TABS)[number]
-
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR as string }
 
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
@@ -50,14 +45,6 @@ export function usePurchaseList() {
       if (node.children?.length) stack.push(...node.children)
     }
     return ''
-  }
-
-  function getFilterSelectAutoWidthStyle(v: unknown) {
-    if (!v) return undefined
-    const text = String(v)
-    const estimated = text.length * FILTER_CHAR_PX + 60
-    const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-    return { ...activeSelectStyle, width: `${width}px`, flex: `0 0 ${width}px` }
   }
 
   const filter = reactive({
@@ -280,7 +267,6 @@ export function usePurchaseList() {
     purchaseTableHostRef,
     purchaseBriefDrawer,
     getTabLabel,
-    getFilterSelectAutoWidthStyle,
     findOrderTypeLabelById,
     load,
     loadTabCounts,

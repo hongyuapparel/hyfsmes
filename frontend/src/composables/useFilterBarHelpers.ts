@@ -1,11 +1,40 @@
 export const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-/** 与订单列表日期筛选项一致，避免 placeholder（如「入库时间」）被截断 */
-const DATE_RANGE_WIDTH_EMPTY = '170px'
-const DATE_RANGE_WIDTH_FILLED = '220px'
+export const FILTER_CHAR_PX = 14
+export const ACTIVE_SELECT_STYLE = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
+
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const ACTIVE_SELECT_STYLE = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
+
+/** CJK/全角字符按 14px，ASCII/拉丁字符按 9px，更贴近实际渲染宽度 */
+function estimateTextWidth(text: string): number {
+  let w = 0
+  for (const c of text) {
+    w += c.charCodeAt(0) > 0x2e7f ? 14 : 9
+  }
+  return w
+}
+
+/**
+ * 根据文本内容自适应计算筛选项宽度。
+ * extraPadding：图标/箭头等 UI 装饰占位，默认 60px。
+ */
+export function getAdaptiveWidthStyle(text: unknown, extraPadding = 60) {
+  const raw = String(text ?? '').trim() || ' '
+  const width = estimateTextWidth(raw) + extraPadding
+  return { width: `${width}px`, minWidth: 'unset', flex: `0 0 ${width}px` }
+}
+
+/**
+ * 下拉/树选择筛选项自适应宽度。
+ * - 未选中：按 placeholder 文字宽度显示
+ * - 已选中：按已选文字宽度显示 + 激活色
+ * value 传入已含前缀的完整显示文字，如 "客户：TEMU店铺"。
+ */
+export function getAdaptiveSelectStyle(value: unknown, placeholder: string, extraPadding = 60) {
+  const text = value ? String(value) : placeholder
+  const base = getAdaptiveWidthStyle(text, extraPadding)
+  return value ? { ...base, ...ACTIVE_SELECT_STYLE } : base
+}
 
 export function getFilterInputStyle(v: unknown) {
   return v ? { color: ACTIVE_FILTER_COLOR } : undefined
@@ -26,11 +55,10 @@ export function normalizeTextFilter(v: unknown): string | undefined {
 }
 
 export function getTextFilterStyle(prefix: string, val: unknown, showLabel: boolean) {
-  if (!val || !showLabel) return undefined
-  const text = `${prefix}${String(val)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
+  if (val && showLabel) {
+    return getAdaptiveWidthStyle(`${prefix}${String(val)}`, 56)
+  }
+  return getAdaptiveWidthStyle(prefix.replace(/：$/, ''), 56)
 }
 
 export function getOrderNoFilterStyle(orderNo: unknown, showLabel: boolean) {
@@ -41,30 +69,21 @@ export function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
   return getTextFilterStyle('SKU：', skuCode, showLabel)
 }
 
-export function getFilterRangeStyle(v: [string, string] | [] | null | undefined) {
-  const hasValue = Array.isArray(v) && v.length === 2
-  const width = hasValue ? DATE_RANGE_WIDTH_FILLED : DATE_RANGE_WIDTH_EMPTY
-  // minWidth 覆盖 design-system 里 .filter-bar .filter-bar-item 的 min-width:120px
-  const base = { width, minWidth: width, flex: `0 0 ${width}` }
-  return hasValue ? { ...base, ...ACTIVE_SELECT_STYLE } : base
-}
-
-export function getFilterSelectStyle(v: unknown) {
-  return v ? ACTIVE_SELECT_STYLE : undefined
-}
-
 /**
- * 筛选项下拉宽度随内容调节。
- * @param extraPadding 右侧预留（箭头/清空图标等），默认 60；客户项用 42 以减少尾部空白
+ * 日期区间筛选项自适应宽度。
+ * - 未选中：按 placeholder 文字自适应（与其他筛选项视觉一致）
+ * - 已选中：固定 320px 显示完整日期区间
+ * placeholder 默认 4 字（如"完成时间"），与不传保持相同宽度。
  */
-export function getFilterSelectAutoWidthStyle(v: unknown, extraPadding = 60) {
-  if (!v) return undefined
-  const text = String(v)
-  const estimated = text.length * FILTER_CHAR_PX + extraPadding
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return {
-    ...ACTIVE_SELECT_STYLE,
-    width: `${width}px`,
-    flex: `0 0 ${width}px`,
+export function getFilterRangeStyle(
+  v: [string, string] | [] | null | undefined,
+  placeholder = '日期时间',
+) {
+  const hasValue = Array.isArray(v) && v.length === 2
+  if (hasValue) {
+    return { width: '320px', minWidth: 'unset', flex: '0 0 320px', ...ACTIVE_SELECT_STYLE }
   }
+  return getAdaptiveWidthStyle(placeholder, 60)
 }
+
+

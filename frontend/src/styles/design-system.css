@@ -603,29 +603,106 @@ a:hover {
 }
 
 /* ========== 10.1 筛选栏统一规范 ========== */
-/* 使用 Element Plus 的 size="large" 统一高度，宽度统一为 120px（含输入、选择、日期未选状态） */
+/* 全局生效，所有页面使用 .filter-bar 类即可获得统一外观 */
 .filter-bar {
   display: flex;
   flex-wrap: wrap;
   align-items: flex-end;
-  gap: var(--space-sm);
+  gap: 2px;
   padding: var(--space-sm);
   margin-bottom: var(--space-md);
   border-radius: var(--radius-lg);
   background-color: var(--color-bg-subtle, #f5f6f8);
 }
+
+/* 宽度由 JS 工具函数自适应设置，取消固定值 */
 .filter-bar > .el-input,
 .filter-bar > .el-select,
 .filter-bar > .el-date-editor,
 .filter-bar .filter-bar-item {
-  width: 120px;
-  min-width: 120px;
+  min-width: unset;
 }
+
+/* 压缩 size=large 内边距，减少视觉占位 */
+.filter-bar .el-input__wrapper,
+.filter-bar .el-select__wrapper,
+.filter-bar .el-date-editor.el-input__wrapper {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.filter-bar .el-input__prefix {
+  margin-right: 0;
+}
+
 .filter-bar-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 2px;
   margin-left: auto;
+}
+
+.filter-bar-actions .el-button--large {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* ── 日期选择器外包装盒（含字段标签 + picker）── */
+.filter-date-box {
+  display: flex;
+  align-items: center;
+  background: var(--el-fill-color-blank);
+  box-shadow: 0 0 0 1px var(--el-border-color) inset;
+  border-radius: var(--el-border-radius-base);
+  padding: 0 8px;
+  height: 40px;
+  box-sizing: border-box;
+  cursor: text;
+  transition: box-shadow 0.2s;
+  flex-shrink: 0;
+  overflow: visible;
+}
+.filter-date-box:hover {
+  box-shadow: 0 0 0 1px var(--el-text-color-secondary) inset;
+}
+.filter-date-box.is-active {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+.filter-date-label-text {
+  font-size: 14px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* 内层 date-editor 融入包装盒：去边框背景、清零内边距 */
+.filter-date-box .el-date-editor.el-input__wrapper {
+  box-shadow: none !important;
+  background: transparent !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  width: 100% !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+
+/* ── 日期选择器空态：隐藏第二个输入和分隔符 ──
+   daterange 首子元素是 <i> 日历图标，:first-child/:last-child 无法命中 <input>，
+   必须用 :first-of-type/:last-of-type */
+.range-single.el-date-editor--daterange .el-range-separator {
+  display: none !important;
+}
+.range-single.el-date-editor--daterange .el-range-input:last-of-type {
+  display: none !important;
+}
+.range-single.el-date-editor--daterange .el-range-input:first-of-type {
+  flex: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+.range-single.el-date-editor--daterange .el-range__close-icon {
+  display: none !important;
 }
 
 .pagination-wrap {
@@ -634,19 +711,6 @@ a:hover {
   align-items: center;
   margin-top: var(--space-sm);
   flex-shrink: 0;
-}
-
-.range-single.el-date-editor--daterange .el-range-separator {
-  width: 0;
-}
-.range-single.el-date-editor--daterange .el-range-input:last-child {
-  display: none;
-}
-.range-single.el-date-editor--daterange .el-range-input:first-child {
-  width: 100%;
-}
-.range-single.el-date-editor--daterange .el-range__close-icon {
-  display: none;
 }
 
 /* ========== 11. 响应式断点 ========== */

@@ -87,7 +87,7 @@
             filterable
             size="large"
             class="filter-bar-item"
-            :style="getFilterSelectAutoWidthStyle(filter.applicablePeopleId)"
+            :style="getAdaptiveSelectStyle(filter.applicablePeopleId ? `适用人群：${applicablePeopleOptions.find(o => o.id === filter.applicablePeopleId)?.value ?? ''}` : '', '适用人群')"
             @change="onFilterChange"
           >
             <template #label="{ label }">
@@ -103,7 +103,7 @@
             filterable
             size="large"
             class="filter-bar-item"
-            :style="getFilterSelectAutoWidthStyle(filter.salesperson)"
+            :style="getAdaptiveSelectStyle(filter.salesperson ? `业务员：${filter.salesperson}` : '', '业务员')"
             @change="onFilterChange"
           >
             <template #label="{ label }">
@@ -114,7 +114,7 @@
           </el-select>
           <el-button type="primary" size="large" @click="onFilterChange(true)">搜索</el-button>
           <el-button size="large" @click="resetFilter">清空</el-button>
-          <div class="filter-actions">
+          <div class="filter-bar-actions">
             <el-button size="large" @click="openColumnConfig">列设置</el-button>
             <el-button type="primary" size="large" @click="openCreate">新建SKU</el-button>
             <el-tooltip v-if="selectedIds.length" content="删除" placement="top">
@@ -236,6 +236,7 @@ import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useOrderProductsList } from '@/composables/useOrderProductsList'
 import { formatDate, getColumnMinWidth, productListColumnProp } from '@/utils/order-products'
+import { ACTIVE_FILTER_COLOR, getFilterInputStyle, getAdaptiveSelectStyle, getTextFilterStyle } from '@/composables/useFilterBarHelpers'
 
 const tableRef = ref<InstanceType<typeof import('element-plus')['ElTable']>>()
 const tableShellRef = ref<HTMLElement | null>(null)
@@ -300,37 +301,6 @@ const {
   compactImageSize,
   compactImageColumnMinWidth,
 } = useCompactTableStyle()
-
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
-
-function getFilterInputStyle(v: unknown) {
-  return v ? activeInputStyle : undefined
-}
-
-function getFilterSelectAutoWidthStyle(v: unknown) {
-  if (!v) return undefined
-  const text = String(v)
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return {
-    ...activeSelectStyle,
-    width: `${width}px`,
-    flex: `0 0 ${width}px`,
-  }
-}
-
-function getTextFilterStyle(labelPrefix: string, value: unknown, showLabel: boolean) {
-  if (!value || !showLabel) return undefined
-  const text = `${labelPrefix}${String(value)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
 
 function getHeaderCellStyle() {
   return compactHeaderCellStyle()
@@ -497,13 +467,6 @@ onBeforeUnmount(() => cleanup())
   gap: var(--space-xs);
   min-height: 0;
 }
-.filter-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);

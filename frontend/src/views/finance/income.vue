@@ -1,31 +1,43 @@
 <template>
   <div class="page-card finance-page">
     <div class="filter-bar">
-      <el-date-picker
-        v-model="filter.occurDateRange"
-        type="daterange"
-        :name="['financeIncomeStartDate', 'financeIncomeEndDate']"
-        range-separator=""
-        start-placeholder="收款日期"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        class="filter-item filter-range"
-        :class="{ 'range-single': !hasDateRangeValue(filter.occurDateRange) }"
-        :style="getFinanceRangeStyle(filter.occurDateRange)"
-        @change="onSearch"
-        @clear="onDateRangeClear"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': hasDateRangeValue(filter.occurDateRange) }"
+        :style="getFilterRangeStyle(filter.occurDateRange, '收款日期')"
+      >
+        <span v-if="hasDateRangeValue(filter.occurDateRange)" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">收款日期：</span>
+        <el-date-picker
+          v-model="filter.occurDateRange"
+          type="daterange"
+          :name="['financeIncomeStartDate', 'financeIncomeEndDate']"
+          :range-separator="hasDateRangeValue(filter.occurDateRange) ? '~' : ''"
+          start-placeholder="收款日期"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !hasDateRangeValue(filter.occurDateRange) }]"
+          @change="onSearch"
+          @clear="onDateRangeClear"
+        />
+      </div>
       <el-select
         v-model="filter.incomeTypeId"
         placeholder="收入类型"
         clearable
         filterable
-        class="filter-item filter-select"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.incomeTypeId != null ? `收入类型：${options.incomeTypes.find(t => t.id === filter.incomeTypeId)?.name ?? ''}` : '', '收入类型')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.incomeTypeId != null">收入类型：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="t in options.incomeTypes" :key="t.id" :label="t.name" :value="t.id" />
       </el-select>
       <el-select
@@ -33,9 +45,15 @@
         placeholder="收款账户"
         clearable
         filterable
-        class="filter-item filter-select"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.fundAccountId != null ? `收款账户：${options.fundAccounts.find(a => a.id === filter.fundAccountId)?.name ?? ''}` : '', '收款账户')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.fundAccountId != null">收款账户：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
       </el-select>
       <el-select
@@ -43,15 +61,21 @@
         placeholder="部门"
         clearable
         filterable
-        class="filter-item filter-select"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.departmentId != null ? `部门：${options.departments.find(d => d.id === filter.departmentId)?.value ?? ''}` : '', '部门')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.departmentId != null">部门：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="d in options.departments" :key="d.id" :label="d.value" :value="d.id" />
       </el-select>
-      <div class="filter-actions">
-        <el-button type="primary" @click="onSearch">查询</el-button>
-        <el-button @click="onReset">清空</el-button>
-        <el-button type="primary" @click="openForm(null)">登记收入</el-button>
+      <div class="filter-bar-actions">
+        <el-button type="primary" size="large" @click="onSearch">查询</el-button>
+        <el-button size="large" @click="onReset">清空</el-button>
+        <el-button type="primary" size="large" @click="openForm(null)">登记收入</el-button>
       </div>
     </div>
 
@@ -225,7 +249,7 @@ import {
 } from '@/api/finance'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadFinanceImage } from '@/api/uploads'
-import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
+import { ACTIVE_FILTER_COLOR, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 
@@ -312,15 +336,6 @@ function onAmountInput(value: string) {
 
 function hasDateRangeValue(v: DateRangeValue | undefined) {
   return Array.isArray(v) && v.length === 2
-}
-
-function getFinanceRangeStyle(v: DateRangeValue | undefined) {
-  const hasValue = hasDateRangeValue(v)
-  if (hasValue) return getFilterRangeStyle(v)
-  return {
-    width: '170px',
-    flex: '0 0 170px',
-  }
 }
 
 async function load() {
@@ -485,11 +500,6 @@ onMounted(async () => {
 
 <style scoped>
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
-.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); padding: var(--space-sm); background: var(--color-bg-subtle, #f5f6f8); border-radius: var(--radius-lg); }
-.filter-item { width: 150px; }
-.filter-range { min-width: 140px; }
-.filter-select { min-width: 120px; }
-.filter-actions { margin-left: auto; display: flex; gap: var(--space-sm); }
 .summary-bar { padding: 6px 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 13px; color: #0369a1; margin-bottom: var(--space-sm); }
 .amount-highlight { color: #16a34a; font-size: 15px; }
 .income-amount { color: #16a34a; font-weight: 600; }

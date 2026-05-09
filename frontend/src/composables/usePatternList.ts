@@ -4,7 +4,7 @@ import { getPatternItems, getPatternTabCounts, exportPatternItems, type PatternL
 import { getDictTree, getDictItems } from '@/api/dicts'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import type { SystemOptionTreeNode } from '@/api/system-options'
-import { ACTIVE_FILTER_COLOR, normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
 
 export const PATTERN_TABS = [
   { label: '全部', value: 'all' },
@@ -45,11 +45,6 @@ export function usePatternList() {
     selectedRows.value.length > 0 && selectedRows.value.every((r) => r.patternStatus !== 'completed'),
   )
 
-  const FILTER_AUTO_MIN_WIDTH = 140
-  const FILTER_AUTO_MAX_WIDTH = 320
-  const FILTER_CHAR_PX = 14
-  const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR as string }
-
   const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
 
   let tabCountsReqId = 0
@@ -87,14 +82,6 @@ export function usePatternList() {
     if (!id) return ''
     const found = collaborationOptions.value.find((opt) => opt.id === id)
     return found?.label ?? ''
-  }
-
-  function getFilterSelectAutoWidthStyle(value: unknown) {
-    if (!value) return undefined
-    const text = String(value)
-    const estimated = text.length * FILTER_CHAR_PX + 60
-    const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-    return { ...activeSelectStyle, width: `${width}px`, flex: `0 0 ${width}px` }
   }
 
   function getTabLabel(tab: PatternTabConfig): string {
@@ -284,7 +271,6 @@ export function usePatternList() {
     collaborationOptions,
     findOrderTypeLabelById,
     findCollaborationLabelById,
-    getFilterSelectAutoWidthStyle,
     getTabLabel,
     load,
     loadTabCounts,

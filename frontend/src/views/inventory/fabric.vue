@@ -31,8 +31,13 @@
             clearable
             size="large"
             class="filter-bar-item"
+            :style="getAdaptiveSelectStyle(filter.customerName ? `客户：${filter.customerName}` : '', '客户', 42)"
             @change="onSearch(true)"
           >
+            <template #label="{ label }">
+              <span v-if="filter.customerName">客户：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
             <el-option
               v-for="opt in customerOptions"
               :key="opt.value"
@@ -40,22 +45,28 @@
               :value="opt.value"
             />
           </el-select>
-          <el-date-picker
-            v-model="inboundDateRange"
-            type="daterange"
-            :name="['fabricInboundDateStart', 'fabricInboundDateEnd']"
-            range-separator=""
-            start-placeholder="入库时间"
-            end-placeholder=""
-            value-format="YYYY-MM-DD"
-            :shortcuts="rangeShortcuts"
-            unlink-panels
-            clearable
-            size="large"
-            :class="['filter-bar-item', 'filter-range', { 'range-single': !inboundDateRange }]"
-            :style="getFilterRangeStyle(inboundDateRange)"
-            @change="onSearch(true)"
-          />
+          <div
+            class="filter-bar-item filter-date-box"
+            :class="{ 'is-active': inboundDateRange }"
+            :style="getFilterRangeStyle(inboundDateRange, '入库时间')"
+          >
+            <span v-if="inboundDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">入库时间：</span>
+            <el-date-picker
+              v-model="inboundDateRange"
+              type="daterange"
+              :name="['fabricInboundDateStart', 'fabricInboundDateEnd']"
+              :range-separator="inboundDateRange ? '~' : ''"
+              start-placeholder="入库时间"
+              end-placeholder=""
+              value-format="YYYY-MM-DD"
+              :shortcuts="rangeShortcuts"
+              unlink-panels
+              clearable
+              size="large"
+              :class="['filter-range', { 'range-single': !inboundDateRange }]"
+              @change="onSearch(true)"
+            />
+          </div>
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
             <el-button size="large" @click="onReset">清空</el-button>
@@ -260,6 +271,7 @@ import {
   getFilterInputStyle,
   getTextFilterStyle,
   getFilterRangeStyle,
+  getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'

@@ -1,31 +1,43 @@
 <template>
   <div class="page-card finance-page">
     <div class="filter-bar">
-      <el-date-picker
-        v-model="filter.occurDateRange"
-        type="daterange"
-        :name="['financeExpenseStartDate', 'financeExpenseEndDate']"
-        range-separator=""
-        start-placeholder="支出日期"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        class="filter-item filter-range"
-        :class="{ 'range-single': !hasDateRangeValue(filter.occurDateRange) }"
-        :style="getFinanceRangeStyle(filter.occurDateRange)"
-        @change="onSearch"
-        @clear="onDateRangeClear"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': hasDateRangeValue(filter.occurDateRange) }"
+        :style="getFilterRangeStyle(filter.occurDateRange, '支出日期')"
+      >
+        <span v-if="hasDateRangeValue(filter.occurDateRange)" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">支出日期：</span>
+        <el-date-picker
+          v-model="filter.occurDateRange"
+          type="daterange"
+          :name="['financeExpenseStartDate', 'financeExpenseEndDate']"
+          :range-separator="hasDateRangeValue(filter.occurDateRange) ? '~' : ''"
+          start-placeholder="支出日期"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !hasDateRangeValue(filter.occurDateRange) }]"
+          @change="onSearch"
+          @clear="onDateRangeClear"
+        />
+      </div>
       <el-select
         v-model="filter.expenseTypeId"
         placeholder="支出类型"
         clearable
         filterable
-        class="filter-item filter-select"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.expenseTypeId != null ? `支出类型：${options.expenseTypes.find(t => t.id === filter.expenseTypeId)?.name ?? ''}` : '', '支出类型')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.expenseTypeId != null">支出类型：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
       </el-select>
       <el-select
@@ -33,33 +45,51 @@
         placeholder="支出账户"
         clearable
         filterable
-        class="filter-item filter-select"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.fundAccountId != null ? `支出账户：${options.fundAccounts.find(a => a.id === filter.fundAccountId)?.name ?? ''}` : '', '支出账户')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.fundAccountId != null">支出账户：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
       </el-select>
       <el-input
         v-model="filter.payeeKeyword"
-        placeholder="收款方关键词"
+        placeholder="收款方"
         clearable
-        class="filter-item"
-        style="width: 150px"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.payeeKeyword ? `收款方：${filter.payeeKeyword}` : '', '收款方')"
+        :input-style="getFilterInputStyle(filter.payeeKeyword)"
         @clear="onSearch"
         @keyup.enter="onSearch"
-      />
+      >
+        <template #prefix>
+          <span v-if="filter.payeeKeyword" :style="{ color: ACTIVE_FILTER_COLOR }">收款方：</span>
+        </template>
+      </el-input>
       <el-input
         v-model="filter.orderNo"
         placeholder="订单号"
         clearable
-        class="filter-item"
-        style="width: 140px"
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.orderNo ? `订单号：${filter.orderNo}` : '', '订单号')"
+        :input-style="getFilterInputStyle(filter.orderNo)"
         @clear="onSearch"
         @keyup.enter="onSearch"
-      />
-      <div class="filter-actions">
-        <el-button type="primary" @click="onSearch">查询</el-button>
-        <el-button @click="onReset">清空</el-button>
-        <el-button type="primary" @click="openForm(null)">登记支出</el-button>
+      >
+        <template #prefix>
+          <span v-if="filter.orderNo" :style="{ color: ACTIVE_FILTER_COLOR }">订单号：</span>
+        </template>
+      </el-input>
+      <div class="filter-bar-actions">
+        <el-button type="primary" size="large" @click="onSearch">查询</el-button>
+        <el-button size="large" @click="onReset">清空</el-button>
+        <el-button type="primary" size="large" @click="openForm(null)">登记支出</el-button>
       </div>
     </div>
 
@@ -240,7 +270,7 @@ import {
 } from '@/api/finance'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadFinanceImage } from '@/api/uploads'
-import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
+import { ACTIVE_FILTER_COLOR, getFilterRangeStyle, getAdaptiveSelectStyle, getFilterInputStyle } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 
@@ -307,15 +337,6 @@ function objectTypeLabel(v: string) {
 
 function hasDateRangeValue(v: DateRangeValue | undefined) {
   return Array.isArray(v) && v.length === 2
-}
-
-function getFinanceRangeStyle(v: DateRangeValue | undefined) {
-  const hasValue = hasDateRangeValue(v)
-  if (hasValue) return getFilterRangeStyle(v)
-  return {
-    width: '170px',
-    flex: '0 0 170px',
-  }
 }
 
 async function load() {
@@ -485,11 +506,6 @@ onMounted(async () => {
 
 <style scoped>
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
-.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); padding: var(--space-sm); background: var(--color-bg-subtle, #f5f6f8); border-radius: var(--radius-lg); }
-.filter-item { width: 150px; }
-.filter-range { min-width: 140px; }
-.filter-select { min-width: 120px; }
-.filter-actions { margin-left: auto; display: flex; gap: var(--space-sm); }
 .summary-bar { padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: 13px; color: #c2410c; margin-bottom: var(--space-sm); }
 .expense-highlight { color: #dc2626; font-size: 15px; }
 .expense-amount { color: #dc2626; font-weight: 600; }

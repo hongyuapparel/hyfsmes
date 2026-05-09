@@ -61,69 +61,81 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.supplier ? `供应商：${filter.supplier}` : '', '供应商')"
         :input-style="getFilterInputStyle(filter.supplier)"
         @input="debouncedSearch"
         @keyup.enter="onSearch(true)"
-      />
+      >
+        <template #prefix>
+          <span v-if="filter.supplier" :style="{ color: ACTIVE_FILTER_COLOR }">供应商：</span>
+        </template>
+      </el-input>
       <el-tree-select
         v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"
         placeholder="订单类型"
+        popper-class="purchase-order-type-tree-popper"
         filterable
         clearable
+        check-strictly
         default-expand-all
         :render-after-expand="false"
         node-key="value"
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         size="large"
         class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`,
-          )
-        "
+        :style="getAdaptiveSelectStyle(filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`, '订单类型')"
         @change="onSearch"
+        @visible-change="(v: boolean) => v && adjustTreePopperWidth('purchase-order-type-tree-popper')"
       >
         <template #prefix>
-          <span
-            v-if="filter.orderTypeId"
-            :style="{ color: ACTIVE_FILTER_COLOR }"
-          >
-            订单类型：
-          </span>
+          <span v-if="filter.orderTypeId" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
         </template>
       </el-tree-select>
-      <el-date-picker
-        v-model="orderDateRange"
-        type="daterange"
-        :name="['purchaseOrderDateStart', 'purchaseOrderDateEnd']"
-        range-separator=""
-        start-placeholder="下单时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        size="large"
-        class="filter-bar-item"
-        :style="getFilterRangeStyle(orderDateRange)"
-        @change="onSearch"
-      />
-      <el-date-picker
-        v-model="completedRange"
-        type="daterange"
-        :name="['purchaseCompletedDateStart', 'purchaseCompletedDateEnd']"
-        range-separator=""
-        start-placeholder="完成时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
-        :style="getFilterRangeStyle(completedRange)"
-        @change="onSearch"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': orderDateRange }"
+        :style="getFilterRangeStyle(orderDateRange, '下单时间')"
+      >
+        <span v-if="orderDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">下单时间：</span>
+        <el-date-picker
+          v-model="orderDateRange"
+          type="daterange"
+          :name="['purchaseOrderDateStart', 'purchaseOrderDateEnd']"
+          :range-separator="orderDateRange ? '~' : ''"
+          start-placeholder="下单时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !orderDateRange }]"
+          @change="onSearch"
+        />
+      </div>
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': completedRange }"
+        :style="getFilterRangeStyle(completedRange, '完成时间')"
+      >
+        <span v-if="completedRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">完成时间：</span>
+        <el-date-picker
+          v-model="completedRange"
+          type="daterange"
+          :name="['purchaseCompletedDateStart', 'purchaseCompletedDateEnd']"
+          :range-separator="completedRange ? '~' : ''"
+          start-placeholder="完成时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !completedRange }]"
+          @change="onSearch"
+        />
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
@@ -306,7 +318,11 @@ import {
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
   getFilterRangeStyle,
+  getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
+import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
+
+const { adjustTreePopperWidth } = useTreeSelectAdjust()
 import { PURCHASE_TABS, usePurchaseList } from '@/composables/usePurchaseList'
 import { usePurchaseDialogs } from '@/composables/usePurchaseDialogs'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
@@ -341,7 +357,6 @@ const {
   purchaseTableHostRef,
   purchaseBriefDrawer,
   getTabLabel,
-  getFilterSelectAutoWidthStyle,
   findOrderTypeLabelById,
   load,
   loadTabCounts,
@@ -426,4 +441,10 @@ onMounted(() => {
   font-size: 13px;
 }
 
+</style>
+
+<style>
+.purchase-order-type-tree-popper.el-popper {
+  max-width: 440px;
+}
 </style>

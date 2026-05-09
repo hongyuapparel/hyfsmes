@@ -23,8 +23,13 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.customerName ? `客户：${filter.customerName}` : '', '客户', 42)"
         @change="emit('search', true)"
       >
+        <template #label="{ label }">
+          <span v-if="filter.customerName">客户：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
       <el-select
@@ -34,26 +39,37 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.inventoryTypeId != null ? `库存类型：${findInventoryTypeLabelById(filter.inventoryTypeId)}` : '', '库存类型')"
         @change="emit('search', true)"
       >
+        <template #label="{ label }">
+          <span v-if="filter.inventoryTypeId != null">库存类型：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="opt in inventoryTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
       </el-select>
-      <el-date-picker
-        v-model="inboundDateRangeModel"
-        type="daterange"
-        :name="['finishedInboundDateStart', 'finishedInboundDateEnd']"
-        range-separator=""
-        start-placeholder="入库时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !inboundDateRangeModel }]"
-        :style="getFilterRangeStyle(inboundDateRangeModel)"
-        @change="emit('search', true)"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': inboundDateRangeModel }"
+        :style="getFilterRangeStyle(inboundDateRangeModel, '入库时间')"
+      >
+        <span v-if="inboundDateRangeModel" class="filter-date-label-text" :style="{ color: activeFilterColor }">入库时间：</span>
+        <el-date-picker
+          v-model="inboundDateRangeModel"
+          type="daterange"
+          :name="['finishedInboundDateStart', 'finishedInboundDateEnd']"
+          :range-separator="inboundDateRangeModel ? '~' : ''"
+          start-placeholder="入库时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !inboundDateRangeModel }]"
+          @change="emit('search', true)"
+        />
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="emit('search', true)">搜索</el-button>
         <el-button size="large" @click="emit('reset')">清空</el-button>
@@ -220,7 +236,7 @@ import { computed, onUnmounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
-import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
+import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'

@@ -23,14 +23,7 @@
         filterable
         size="large"
         class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.supplierTypeId != null
-              ? `供应商类型：${findSupplierTypeLabelById(filter.supplierTypeId)}`
-              : '供应商类型',
-            filter.supplierTypeId != null
-          )
-        "
+        :style="getAdaptiveSelectStyle(filter.supplierTypeId != null ? `供应商类型：${findSupplierTypeLabelById(filter.supplierTypeId)}` : '', '供应商类型')"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -150,6 +143,7 @@ import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getTextFilterStyle,
+  getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useSupplierDetailDrawer } from '@/composables/useSupplierDetailDrawer'
@@ -157,20 +151,6 @@ import { useSupplierForm } from '@/composables/useSupplierForm'
 import { useSupplierOptions } from '@/composables/useSupplierOptions'
 import { useSuppliersList } from '@/composables/useSuppliersList'
 import { formatDateTime } from '@/utils/date-format'
-
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
-
-function getFilterSelectAutoWidthStyle(labelText: string, active = false) {
-  if (!labelText) return undefined
-  const estimated = labelText.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return active
-    ? { ...activeSelectStyle, width: `${width}px`, flex: `0 0 ${width}px` }
-    : { width: `${width}px`, flex: `0 0 ${width}px` }
-}
 
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)

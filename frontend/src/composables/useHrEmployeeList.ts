@@ -5,20 +5,8 @@ import { getEmployeeList, deleteEmployee, getHrUserOptions, type EmployeeItem, t
 import { getDictItems, getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode, SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { ACTIVE_FILTER_COLOR } from '@/composables/useFilterBarHelpers'
 import { formatDate } from '@/utils/date-format'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-
-const FILTER_AUTO_MIN_WIDTH = 140
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-
-export function getFilterSelectAutoWidthStyle(labelText: string) {
-  if (!labelText) return undefined
-  const estimated = labelText.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px`, color: ACTIVE_FILTER_COLOR }
-}
 
 export function statusLabel(s: string) {
   return s === 'left' ? '离职' : '在职'

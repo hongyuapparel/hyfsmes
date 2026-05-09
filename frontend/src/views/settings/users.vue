@@ -1,39 +1,41 @@
 <template>
   <div class="page-card page-card--fill">
     <div class="filter-bar">
-      <div class="filter-left">
-        <el-input
-          v-model="filter.keyword"
-          placeholder="按显示名/登录账号搜索"
-          clearable
-          size="large"
-          class="filter-bar-item"
-          :style="getKeywordFilterStyle(filter.keyword, keywordLabelVisible)"
-          :input-style="getFilterInputStyle(filter.keyword)"
-          @keyup.enter="onSearch"
-          @clear="onSearch"
-        />
-        <el-select
-          v-model="filter.role"
-          placeholder="角色"
-          clearable
-          filterable
-          size="large"
-          class="filter-bar-item"
-          :style="getFilterSelectAutoWidthStyle(filter.role)"
-          @change="onSearch"
-          @clear="onSearch"
-        >
-          <template #label="{ label }">
-            <span v-if="filter.role">角色：{{ label }}</span>
-            <span v-else>{{ label }}</span>
-          </template>
-          <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.code" />
-        </el-select>
-      </div>
-      <div class="filter-actions">
-        <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
+      <el-input
+        v-model="filter.keyword"
+        placeholder="按显示名/登录账号搜索"
+        clearable
+        size="large"
+        class="filter-bar-item"
+        :style="getTextFilterStyle('关键字：', filter.keyword, keywordLabelVisible)"
+        :input-style="getFilterInputStyle(filter.keyword)"
+        @keyup.enter="onSearch"
+        @clear="onSearch"
+      >
+        <template #prefix>
+          <span v-if="filter.keyword && keywordLabelVisible" :style="{ color: ACTIVE_FILTER_COLOR }">关键字：</span>
+        </template>
+      </el-input>
+      <el-select
+        v-model="filter.role"
+        placeholder="角色"
+        clearable
+        filterable
+        size="large"
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.role ? `角色：${roles.find(r => r.code === filter.role)?.name ?? ''}` : '', '角色')"
+        @change="onSearch"
+        @clear="onSearch"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.role">角色：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.code" />
+      </el-select>
+      <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
+      <el-button size="large" @click="onReset">清空</el-button>
+      <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="openCreate">新增用户</el-button>
       </div>
     </div>
@@ -129,6 +131,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { ACTIVE_FILTER_COLOR, getFilterInputStyle, getAdaptiveSelectStyle, getTextFilterStyle } from '@/composables/useFilterBarHelpers'
 
 const list = ref<UserItem[]>([])
 const roles = ref<RoleItem[]>([])
@@ -147,37 +150,7 @@ const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('set
 const filter = ref<{ keyword: string; role: string }>({ keyword: '', role: '' })
 const keywordLabelVisible = ref(false)
 
-const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
-const FILTER_AUTO_MIN_WIDTH = 200
-const FILTER_AUTO_MAX_WIDTH = 320
-const FILTER_CHAR_PX = 14
-const activeInputStyle = { color: ACTIVE_FILTER_COLOR }
-const activeSelectStyle = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
 const USER_ROW_ORDER_STORAGE_KEY = 'settings-users-row-order-v1'
-
-function getFilterInputStyle(v: unknown) {
-  return v ? activeInputStyle : undefined
-}
-
-function getFilterSelectAutoWidthStyle(v: unknown) {
-  if (!v) return undefined
-  const text = String(v)
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return {
-    ...activeSelectStyle,
-    width: `${width}px`,
-    flex: `0 0 ${width}px`,
-  }
-}
-
-function getKeywordFilterStyle(value: unknown, showLabel: boolean) {
-  if (!value || !showLabel) return undefined
-  const text = `关键字：${String(value)}`
-  const estimated = text.length * FILTER_CHAR_PX + 60
-  const width = Math.min(FILTER_AUTO_MAX_WIDTH, Math.max(FILTER_AUTO_MIN_WIDTH, estimated))
-  return { width: `${width}px`, flex: `0 0 ${width}px` }
-}
 
 const form = ref({ username: '', password: '', displayName: '', roleIds: [] as number[], sortIndex: 1 })
 const rules: FormRules = {
@@ -387,29 +360,6 @@ onMounted(load)
   padding: 24px;
   border-radius: 8px;
   min-height: 0;
-}
-.filter-bar {
-  margin-bottom: 16px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-.filter-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.filter-actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.filter-bar-item {
-  width: 200px;
 }
 .op-cell {
   display: inline-flex;

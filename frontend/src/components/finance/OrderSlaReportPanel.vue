@@ -10,46 +10,63 @@
     </p>
 
     <div class="filter-bar">
-      <el-date-picker
-        v-model="filter.orderDateRange"
-        type="daterange"
-        :name="['orderSlaOrderDateStart', 'orderSlaOrderDateEnd']"
-        range-separator=""
-        start-placeholder="下单时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !filter.orderDateRange }]"
-        :style="getFilterRangeStyle(filter.orderDateRange)"
-        @change="onSearch"
-      />
-      <el-date-picker
-        v-model="filter.completedRange"
-        type="daterange"
-        :name="['orderSlaCompletedDateStart', 'orderSlaCompletedDateEnd']"
-        range-separator=""
-        start-placeholder="完成时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !filter.completedRange }]"
-        :style="getFilterRangeStyle(filter.completedRange)"
-        @change="onSearch"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': filter.orderDateRange }"
+        :style="getSlaFilterRangeStyle(filter.orderDateRange, '下单时间')"
+      >
+        <span v-if="filter.orderDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">下单时间：</span>
+        <el-date-picker
+          v-model="filter.orderDateRange"
+          type="daterange"
+          :name="['orderSlaOrderDateStart', 'orderSlaOrderDateEnd']"
+          :range-separator="filter.orderDateRange ? '~' : ''"
+          start-placeholder="下单时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !filter.orderDateRange }]"
+          @change="onSearch"
+        />
+      </div>
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': filter.completedRange }"
+        :style="getSlaFilterRangeStyle(filter.completedRange, '完成时间')"
+      >
+        <span v-if="filter.completedRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">完成时间：</span>
+        <el-date-picker
+          v-model="filter.completedRange"
+          type="daterange"
+          :name="['orderSlaCompletedDateStart', 'orderSlaCompletedDateEnd']"
+          :range-separator="filter.completedRange ? '~' : ''"
+          start-placeholder="完成时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !filter.completedRange }]"
+          @change="onSearch"
+        />
+      </div>
       <el-select
         v-model="filter.statusId"
         placeholder="状态"
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.statusId != null ? `状态：${statusOptions.find(s => s.id === filter.statusId)?.label ?? ''}` : '', '状态')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.statusId != null">状态：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="s in statusOptions" :key="s.id" :label="s.label" :value="s.id" />
       </el-select>
       <el-select
@@ -58,8 +75,13 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.collaborationTypeId != null ? `合作方式：${collaborationOptions.find(o => o.id === filter.collaborationTypeId)?.value ?? ''}` : '', '合作方式')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.collaborationTypeId != null">合作方式：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="opt in collaborationOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
       <el-select
@@ -68,8 +90,13 @@
         clearable
         size="large"
         class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.orderTypeId != null ? `订单类型：${orderTypeOptions.find(o => o.id === filter.orderTypeId)?.value ?? ''}` : '', '订单类型')"
         @change="onSearch"
       >
+        <template #label="{ label }">
+          <span v-if="filter.orderTypeId != null">订单类型：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
         <el-option v-for="opt in orderTypeOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
 
@@ -285,6 +312,15 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
+import {
+  ACTIVE_FILTER_COLOR,
+  getAdaptiveSelectStyle,
+  getFilterRangeStyle as getStandardFilterRangeStyle,
+} from '@/composables/useFilterBarHelpers'
+
+function getSlaFilterRangeStyle(v: [string, string] | null | undefined, placeholder: string) {
+  return getStandardFilterRangeStyle(v as [string, string] | [] | null | undefined, placeholder)
+}
 
 const {
   loading,

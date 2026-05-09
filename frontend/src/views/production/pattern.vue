@@ -52,7 +52,7 @@
         filterable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.patternMaster ? `纸样师：${filter.patternMaster}` : undefined)"
+        :style="getAdaptiveSelectStyle(filter.patternMaster ? `纸样师：${filter.patternMaster}` : '', '纸样师')"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -68,33 +68,32 @@
         filterable
         size="large"
         class="filter-bar-item"
-        :style="getFilterSelectAutoWidthStyle(filter.sampleMaker ? `车版师：${filter.sampleMaker}` : undefined)"
+        :style="getAdaptiveSelectStyle(filter.sampleMaker ? `车版师：${filter.sampleMaker}` : '', '车版师')"
         @change="onSearch"
       >
         <template #label="{ label }">
           <span v-if="filter.sampleMaker">车版师：{{ label }}</span>
           <span v-else>{{ label }}</span>
         </template>
-      <el-option v-for="e in sampleMakerOptions" :key="e.id" :label="e.name" :value="e.name" />
+        <el-option v-for="e in sampleMakerOptions" :key="e.id" :label="e.name" :value="e.name" />
       </el-select>
       <el-tree-select
         v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"
         placeholder="订单类型"
+        popper-class="pattern-order-type-tree-popper"
         filterable
         clearable
+        check-strictly
         default-expand-all
         :render-after-expand="false"
         node-key="value"
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         size="large"
         class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`,
-          )
-        "
+        :style="getAdaptiveSelectStyle(filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`, '订单类型')"
         @change="onSearch"
+        @visible-change="(v: boolean) => v && adjustTreePopperWidth('pattern-order-type-tree-popper')"
       >
         <template #prefix>
           <span v-if="filter.orderTypeId" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
@@ -107,11 +106,7 @@
         clearable
         size="large"
         class="filter-bar-item"
-        :style="
-          getFilterSelectAutoWidthStyle(
-            filter.collaborationTypeId && `合作方式：${findCollaborationLabelById(filter.collaborationTypeId)}`,
-          )
-        "
+        :style="getAdaptiveSelectStyle(filter.collaborationTypeId && `合作方式：${findCollaborationLabelById(filter.collaborationTypeId)}`, '合作方式')"
         @change="onSearch"
       >
         <template #label="{ label }">
@@ -120,37 +115,50 @@
         </template>
         <el-option v-for="opt in collaborationOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
       </el-select>
-      <el-date-picker
-        v-model="orderDateRange"
-        type="daterange"
-        :name="['patternOrderDateStart', 'patternOrderDateEnd']"
-        range-separator=""
-        start-placeholder="下单时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        size="large"
-        class="filter-bar-item"
-        :style="getFilterRangeStyle(orderDateRange)"
-        @change="onSearch"
-      />
-      <el-date-picker
-        v-model="completedRange"
-        type="daterange"
-        :name="['patternCompletedDateStart', 'patternCompletedDateEnd']"
-        range-separator=""
-        start-placeholder="完成时间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        size="large"
-        :class="['filter-bar-item', 'filter-range', { 'range-single': !completedRange }]"
-        :style="getFilterRangeStyle(completedRange)"
-        @change="onSearch"
-      />
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': orderDateRange }"
+        :style="getFilterRangeStyle(orderDateRange, '下单时间')"
+      >
+        <span v-if="orderDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">下单时间：</span>
+        <el-date-picker
+          v-model="orderDateRange"
+          type="daterange"
+          :name="['patternOrderDateStart', 'patternOrderDateEnd']"
+          :range-separator="orderDateRange ? '~' : ''"
+          start-placeholder="下单时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !orderDateRange }]"
+          @change="onSearch"
+        />
+      </div>
+      <div
+        class="filter-bar-item filter-date-box"
+        :class="{ 'is-active': completedRange }"
+        :style="getFilterRangeStyle(completedRange, '完成时间')"
+      >
+        <span v-if="completedRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">完成时间：</span>
+        <el-date-picker
+          v-model="completedRange"
+          type="daterange"
+          :name="['patternCompletedDateStart', 'patternCompletedDateEnd']"
+          :range-separator="completedRange ? '~' : ''"
+          start-placeholder="完成时间"
+          end-placeholder=""
+          value-format="YYYY-MM-DD"
+          :shortcuts="rangeShortcuts"
+          unlink-panels
+          clearable
+          size="large"
+          :class="['filter-range', { 'range-single': !completedRange }]"
+          @change="onSearch"
+        />
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
@@ -445,7 +453,9 @@ import {
   getOrderNoFilterStyle,
   getSkuCodeFilterStyle,
   getFilterRangeStyle,
+  getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
+import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
@@ -462,6 +472,8 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 const authStore = useAuthStore()
 const canAssignPattern = computed(() => authStore.hasPermission('production_pattern_assign'))
 const canCompletePattern = computed(() => authStore.hasPermission('production_pattern_complete'))
+
+const { adjustTreePopperWidth } = useTreeSelectAdjust()
 
 const patternTableRef = ref<{ getTableRef?: () => unknown } | null>(null)
 const tableShellRef = ref<HTMLElement | null>(null)
@@ -494,7 +506,6 @@ const {
   collaborationOptions,
   findOrderTypeLabelById,
   findCollaborationLabelById,
-  getFilterSelectAutoWidthStyle,
   getTabLabel,
   load: loadList,
   loadTabCounts,
@@ -587,3 +598,9 @@ onMounted(() => {
 </script>
 
 <style scoped src="./pattern.css"></style>
+
+<style>
+.pattern-order-type-tree-popper.el-popper {
+  max-width: 440px;
+}
+</style>
