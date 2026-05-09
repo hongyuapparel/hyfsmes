@@ -17,16 +17,16 @@
       </el-input>
       <el-input
         v-model="outboundFilter.skuCode"
-        placeholder="SKU"
+        placeholder="SKU编号"
         clearable
         size="large"
         class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(outboundFilter.skuCode ? `SKU：${outboundFilter.skuCode}` : '', 'SKU')"
+        :style="getAdaptiveSelectStyle(outboundFilter.skuCode ? `SKU编号：${outboundFilter.skuCode}` : '', 'SKU编号')"
         :input-style="getFilterInputStyle(outboundFilter.skuCode)"
         @keyup.enter="emit('search', true)"
       >
         <template #prefix>
-          <span v-if="outboundFilter.skuCode" :style="{ color: ACTIVE_FILTER_COLOR }">SKU：</span>
+          <span v-if="outboundFilter.skuCode" :style="{ color: ACTIVE_FILTER_COLOR }">SKU编号：</span>
         </template>
       </el-input>
       <el-select

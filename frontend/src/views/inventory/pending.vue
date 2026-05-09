@@ -28,7 +28,7 @@
       </el-input>
       <el-input
         v-model="filter.skuCode"
-        placeholder="SKU"
+        placeholder="SKU编号"
         clearable
         size="large"
         class="filter-bar-item"
@@ -42,7 +42,7 @@
             v-if="filter.skuCode && skuCodeLabelVisible"
             :style="{ color: ACTIVE_FILTER_COLOR }"
           >
-            SKU：
+            SKU编号：
           </span>
         </template>
       </el-input>

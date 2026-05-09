@@ -3,7 +3,7 @@
     <div class="filter-bar">
       <el-input
         v-model="filter.skuCode"
-        placeholder="SKU"
+        placeholder="SKU编号"
         clearable
         size="large"
         class="filter-bar-item"
@@ -13,7 +13,7 @@
         @keyup.enter="emit('search', true)"
       >
         <template #prefix>
-          <span v-if="filter.skuCode && skuCodeLabelVisible" :style="{ color: activeFilterColor }">SKU：</span>
+          <span v-if="filter.skuCode && skuCodeLabelVisible" :style="{ color: activeFilterColor }">SKU编号：</span>
         </template>
       </el-input>
       <el-select

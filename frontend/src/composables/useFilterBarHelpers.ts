@@ -66,7 +66,7 @@ export function getOrderNoFilterStyle(orderNo: unknown, showLabel: boolean) {
 }
 
 export function getSkuCodeFilterStyle(skuCode: unknown, showLabel: boolean) {
-  return getTextFilterStyle('SKU：', skuCode, showLabel)
+  return getTextFilterStyle('SKU编号：', skuCode, showLabel)
 }
 
 /**
