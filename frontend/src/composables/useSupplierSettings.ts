@@ -1,23 +1,25 @@
 import { nextTick, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox, type TableInstance } from 'element-plus'
 import {
-  getSystemOptionsRoots,
-  getSystemOptionsChildren,
   getSystemOptionsTree,
   createSystemOption,
   updateSystemOption,
   deleteSystemOption,
   batchUpdateSystemOptionOrder,
-  type SystemOptionLazyNode,
   type SystemOptionTreeNode,
 } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const OPTION_TYPE = 'supplier_types'
 
-export interface SupplierSettingsTreeRow extends SystemOptionLazyNode {
-  level: number
+export interface SupplierSettingsTreeRow {
+  id: number
+  optionType: string
+  value: string
+  sortOrder: number
   parentId?: number
+  level: number
+  hasChildren: boolean
   children?: SupplierSettingsTreeRow[]
 }
 
@@ -38,30 +40,58 @@ export function useSupplierSettings() {
   const editSupplierTypeOptions = ref<{ id: number; label: string }[]>([])
   const editParentGroupOptions = ref<{ id: number; label: string }[]>([])
 
-  async function loadRoots() {
+  function mapTreeNode(
+    node: SystemOptionTreeNode,
+    level: number,
+    pid: number | undefined,
+  ): SupplierSettingsTreeRow {
+    const children = (node.children ?? []).map((c) => mapTreeNode(c, level + 1, node.id))
+    const row: SupplierSettingsTreeRow = {
+      id: node.id,
+      optionType: node.optionType,
+      value: node.value,
+      sortOrder: node.sortOrder,
+      parentId: pid,
+      level,
+      hasChildren: children.length > 0,
+    }
+    if (children.length > 0) row.children = children
+    return row
+  }
+
+  function collectAllIds(rows: SupplierSettingsTreeRow[], out: Set<number> = new Set()): Set<number> {
+    for (const row of rows) {
+      out.add(row.id)
+      if (row.children?.length) collectAllIds(row.children, out)
+    }
+    return out
+  }
+
+  async function loadTree(extraExpandIds: number[] = []) {
     try {
-      const res = await getSystemOptionsRoots(OPTION_TYPE)
-      const list = res.data ?? []
-      treeData.value = list.map((o) => ({
-        ...o,
-        level: 0 as const,
-        hasChildren: o.hasChildren,
-      }))
+      const res = await getSystemOptionsTree(OPTION_TYPE)
+      const tree = res.data ?? []
+      treeData.value = tree.map((root) => mapTreeNode(root, 0, undefined))
+      const validIds = collectAllIds(treeData.value)
+      const next = new Set<number>()
+      for (const id of expandedIds.value) if (validIds.has(id)) next.add(id)
+      for (const id of extraExpandIds) if (validIds.has(id)) next.add(id)
+      expandedIds.value = next
+      await nextTick()
+      applyExpansion()
     } catch {
       treeData.value = []
+      expandedIds.value = new Set()
     }
   }
 
-  function mapChildren(
-    list: SystemOptionLazyNode[],
-    parent: SupplierSettingsTreeRow,
-  ): SupplierSettingsTreeRow[] {
-    return list.map((o) => ({
-      ...o,
-      level: parent.level + 1,
-      parentId: parent.id,
-      hasChildren: o.hasChildren,
-    }))
+  function applyExpansion() {
+    const tbl = tableRef.value
+    if (!tbl) return
+    for (const id of expandedIds.value) {
+      const row = findNodeById(id)
+      if (row) tbl.toggleRowExpansion(row, true)
+    }
   }
 
   function getRowClassName({ row }: { row: SupplierSettingsTreeRow }) {
@@ -76,41 +106,18 @@ export function useSupplierSettings() {
     const id = Number(row.id)
     const willExpand = !expandedIds.value.has(id)
     tableRef.value?.toggleRowExpansion(row, willExpand)
-    if (willExpand) expandedIds.value.add(id)
-    else expandedIds.value.delete(id)
+    const next = new Set(expandedIds.value)
+    if (willExpand) next.add(id)
+    else next.delete(id)
+    expandedIds.value = next
   }
 
-  function syncParentChildren(parent: SupplierSettingsTreeRow, list: SystemOptionLazyNode[]) {
-    const rows = mapChildren(list, parent)
-    parent.children = rows
-    parent.hasChildren = rows.length > 0
-    ;(
-      tableRef.value as TableInstance & {
-        updateKeyChildren?: (key: number, rows: SupplierSettingsTreeRow[]) => void
-      }
-    )?.updateKeyChildren?.(parent.id, rows)
-    treeData.value = [...treeData.value]
-  }
-
-  async function loadChildren(
-    row: SupplierSettingsTreeRow,
-    _treeNode: { level: number; expanded: boolean },
-    resolve: (rows: SupplierSettingsTreeRow[]) => void,
-  ) {
-    if (row.level >= 2) {
-      resolve([])
-      return
-    }
-    try {
-      const res = await getSystemOptionsChildren(OPTION_TYPE, row.id)
-      const list = res.data ?? []
-      const rows = mapChildren(list, row)
-      row.children = rows
-      row.hasChildren = rows.length > 0
-      resolve(rows)
-    } catch {
-      resolve([])
-    }
+  function onExpandChange(row: SupplierSettingsTreeRow, expanded: boolean) {
+    const id = Number(row.id)
+    const next = new Set(expandedIds.value)
+    if (expanded) next.add(id)
+    else next.delete(id)
+    expandedIds.value = next
   }
 
   function findNodeById(
@@ -239,54 +246,6 @@ export function useSupplierSettings() {
     editSupplierTypeOptions.value = []
     editParentGroupOptions.value = []
     editTree.value = []
-  }
-
-  async function reloadSupplierTree(options?: { anchorIds?: number[] }) {
-    const anchorIds = options?.anchorIds ?? []
-    const keepExpanded = new Set<number>([
-      ...expandedIds.value,
-      ...anchorIds.filter((n) => !Number.isNaN(n)),
-    ])
-    const tableWrap = tableRef.value?.$el?.querySelector?.(
-      '.el-scrollbar__wrap',
-    ) as HTMLElement | undefined
-    const prevScrollTop = tableWrap?.scrollTop ?? 0
-
-    await loadRoots()
-    await nextTick()
-
-    const nextExpanded = new Set<number>()
-
-    for (const id of keepExpanded) {
-      const rootRow = findNodeById(id)
-      if (!rootRow || rootRow.level !== 0) continue
-      tableRef.value?.toggleRowExpansion(rootRow, true)
-      nextExpanded.add(Number(rootRow.id))
-      const res = await getSystemOptionsChildren(OPTION_TYPE, rootRow.id)
-      syncParentChildren(rootRow, res.data ?? [])
-    }
-
-    for (const id of keepExpanded) {
-      const row = findNodeById(id)
-      if (!row || row.level !== 1 || !row.hasChildren) continue
-      const parent = row.parentId != null ? findNodeById(row.parentId) : null
-      if (parent) {
-        tableRef.value?.toggleRowExpansion(parent, true)
-        nextExpanded.add(Number(parent.id))
-        if (!parent.children?.length) {
-          const parentRes = await getSystemOptionsChildren(OPTION_TYPE, parent.id)
-          syncParentChildren(parent, parentRes.data ?? [])
-        }
-      }
-      tableRef.value?.toggleRowExpansion(row, true)
-      nextExpanded.add(Number(row.id))
-      const childRes = await getSystemOptionsChildren(OPTION_TYPE, row.id)
-      syncParentChildren(row, childRes.data ?? [])
-    }
-
-    expandedIds.value = nextExpanded
-    await nextTick()
-    if (tableWrap) tableWrap.scrollTop = prevScrollTop
   }
 
   function collectDescendants(nodes: SystemOptionTreeNode[]): SystemOptionTreeNode[] {
@@ -420,8 +379,8 @@ export function useSupplierSettings() {
       } else {
         let sortOrder: number
         if (parentId.value != null) {
-          const res = await getSystemOptionsChildren(OPTION_TYPE, parentId.value)
-          sortOrder = (res.data ?? []).length
+          const parent = findNodeById(parentId.value)
+          sortOrder = parent?.children?.length ?? 0
         } else {
           sortOrder = treeData.value.length
         }
@@ -441,8 +400,7 @@ export function useSupplierSettings() {
       } else if (parentId.value != null) {
         anchors.push(parentId.value)
       }
-      await reloadSupplierTree({ anchorIds: anchors })
-      await nextTick()
+      await loadTree(anchors)
       dialogVisible.value = false
       ElMessage.success(successText)
     } catch (e: unknown) {
@@ -462,8 +420,7 @@ export function useSupplierSettings() {
       await deleteSystemOption(row.id)
       const anchors: number[] = []
       if (row.parentId != null) anchors.push(row.parentId)
-      await reloadSupplierTree({ anchorIds: anchors })
-      await nextTick()
+      await loadTree(anchors)
       ElMessage.success('已删除')
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
@@ -485,20 +442,20 @@ export function useSupplierSettings() {
       const anchors: number[] = []
       if (row.level === 0) anchors.push(row.id)
       if (row.parentId != null) anchors.push(row.parentId)
-      await reloadSupplierTree({ anchorIds: anchors })
-      await nextTick()
+      await loadTree(anchors)
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     }
   }
 
   onMounted(() => {
-    void loadRoots()
+    void loadTree()
   })
 
   return {
     treeData,
     tableRef,
+    expandedIds,
     dialogVisible,
     isEdit,
     addLevel,
@@ -508,10 +465,10 @@ export function useSupplierSettings() {
     editParentGroupId,
     editSupplierTypeOptions,
     editParentGroupOptions,
-    loadChildren,
     getRowClassName,
     isExpanded,
     toggleScopeExpand,
+    onExpandChange,
     canMoveUp,
     canMoveDown,
     getAddLabel,
@@ -523,5 +480,6 @@ export function useSupplierSettings() {
     submit,
     remove,
     moveRow,
+    loadTree,
   }
 }

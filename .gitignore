@@ -21,6 +21,9 @@ frontend/.env.development
 # IDE
 .idea/
 .vscode/
+.cursor/mcp-tools/
+.cursor/mcp.json
+.codex-audit/
 *.swp
 *.swo
 

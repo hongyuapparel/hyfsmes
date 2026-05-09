@@ -11,10 +11,9 @@
       row-key="id"
       border
       class="option-table"
-      lazy
-      :load="loadChildren"
       :row-class-name="getRowClassName"
-      :tree-props="{ hasChildren: 'hasChildren', children: 'children' }"
+      :tree-props="{ children: 'children' }"
+      @expand-change="onExpandChange"
     >
       <el-table-column label="供应商类型" min-width="200">
         <template #default="{ row }">
@@ -136,10 +135,10 @@ const {
   editParentGroupId,
   editSupplierTypeOptions,
   editParentGroupOptions,
-  loadChildren,
   getRowClassName,
   isExpanded,
   toggleScopeExpand,
+  onExpandChange,
   canMoveUp,
   canMoveDown,
   getAddLabel,
