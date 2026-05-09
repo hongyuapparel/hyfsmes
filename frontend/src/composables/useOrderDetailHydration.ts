@@ -120,7 +120,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     params.processItems.value = (d.processItems ?? []).map((p) => ({
       processName: p.processName ?? '',
       supplierName: p.supplierName ?? '',
-      part: '',
+      part: p.part ?? '',
       remark: p.remark ?? '',
     }))
     params.productionRequirement.value = d.productionRequirement ?? ''

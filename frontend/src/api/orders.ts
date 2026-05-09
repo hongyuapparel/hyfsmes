@@ -184,6 +184,7 @@ export interface OrderFormPayload {
   processItems?: Array<{
     processName?: string
     supplierName?: string
+    part?: string
     remark?: string
   }>
   /** F 区：生产要求 */
