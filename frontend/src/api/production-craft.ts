@@ -59,7 +59,11 @@ export interface CraftListQuery {
 }
 
 export function getCraftTabCounts(params?: Omit<CraftListQuery, 'tab' | 'page' | 'pageSize'>) {
-  return request.get<Record<string, number>>('/production/process/tab-counts', { params })
+  // tab-counts 是非关键增强接口，后端缺这条路由（如旧版本未升级）时不应弹全局 toast
+  return request.get<Record<string, number>>('/production/process/tab-counts', {
+    params,
+    skipGlobalErrorHandler: true,
+  })
 }
 
 export function getCraftItems(params?: CraftListQuery) {

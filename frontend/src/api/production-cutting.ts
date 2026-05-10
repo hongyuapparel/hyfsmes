@@ -42,7 +42,11 @@ export interface CuttingListQuery {
 }
 
 export function getCuttingTabCounts(params?: Omit<CuttingListQuery, 'tab' | 'page' | 'pageSize'>) {
-  return request.get<Record<string, number>>('/production/cutting/tab-counts', { params })
+  // tab-counts 是非关键增强接口，后端缺这条路由（如旧版本未升级）时不应弹全局 toast
+  return request.get<Record<string, number>>('/production/cutting/tab-counts', {
+    params,
+    skipGlobalErrorHandler: true,
+  })
 }
 
 export function getCuttingItems(params?: CuttingListQuery) {

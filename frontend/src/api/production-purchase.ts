@@ -61,7 +61,11 @@ export interface PurchaseListQuery {
 }
 
 export function getPurchaseTabCounts(params?: Omit<PurchaseListQuery, 'tab' | 'page' | 'pageSize'>) {
-  return request.get<Record<string, number>>('/production/purchase/tab-counts', { params })
+  // tab-counts 是非关键增强接口，后端缺这条路由（如旧版本未升级）时不应弹全局 toast
+  return request.get<Record<string, number>>('/production/purchase/tab-counts', {
+    params,
+    skipGlobalErrorHandler: true,
+  })
 }
 
 export function getPurchaseItems(params?: PurchaseListQuery) {
