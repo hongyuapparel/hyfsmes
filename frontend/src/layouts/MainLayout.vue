@@ -79,16 +79,11 @@
           <router-view v-slot="{ Component, route }">
             <keep-alive :max="OUTER_ROUTE_CACHE_MAX">
               <component
-                v-if="Component && shouldUseOuterKeepAlive(route)"
+                v-if="Component"
                 :is="Component"
                 :key="getOuterRouteCacheKey(route)"
               />
             </keep-alive>
-            <component
-              v-if="Component && !shouldUseOuterKeepAlive(route)"
-              :is="Component"
-              :key="getOuterRouteCacheKey(route)"
-            />
           </router-view>
         </main>
       </div>
@@ -225,10 +220,6 @@ function queueRestoreLayoutScroll(key: string) {
       }, 50)
     })
   })
-}
-
-function shouldUseOuterKeepAlive(r: RouteLocationNormalizedLoaded): boolean {
-  return !Boolean(r.matched[1]?.meta?.useInnerKeepAlive)
 }
 
 function handleLogout() {
