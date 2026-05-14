@@ -279,7 +279,7 @@
       </template>
     </el-dialog>
 
-    <!-- 登记包装完成弹窗：默认全部入库，生成待入库并完成订单 -->
+    <!-- 登记入库弹窗：支持「部分入库」分批登记 /「全部入库」补齐剩余；amend 模式为覆盖式修正 -->
     <el-dialog
       v-model="packagingCompleteDialog.visible"
       :title="packagingCompleteDialog.mode === 'amend' ? '修改入库/次品' : '登记入库'"
