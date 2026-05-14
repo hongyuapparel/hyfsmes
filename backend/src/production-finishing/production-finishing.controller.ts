@@ -142,7 +142,7 @@ export class ProductionFinishingController {
   @RequirePermission('production_finishing_packaging')
   registerPackagingComplete(
     @Body('orderId') orderId: number,
-    @Body('tailShippedQty') tailShippedQty: number,
+    @Body('mode') mode: string,
     @Body('tailInboundQty') tailInboundQty: number,
     @Body('defectQuantity') defectQuantity: number,
     @Body('remark') remark?: string,
@@ -150,13 +150,15 @@ export class ProductionFinishingController {
     @Body('defectQuantities') defectQuantities?: number[],
     @CurrentUser() user?: { userId: number; username: string },
   ) {
+    const normalizedMode: 'partial' | 'full' = mode === 'partial' ? 'partial' : 'full';
     return this.finishingMutationService.registerPackagingComplete(
       Number(orderId),
-      Number(tailShippedQty ?? 0),
+      normalizedMode,
       Number(tailInboundQty ?? 0),
       Number(defectQuantity ?? 0),
       remark ?? null,
       user?.userId,
+      user?.username,
       Array.isArray(tailInboundQuantities) ? tailInboundQuantities : null,
       Array.isArray(defectQuantities) ? defectQuantities : null,
     );

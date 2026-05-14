@@ -70,6 +70,58 @@ export class ProductionFinishingMutationService {
     }
   }
 
+  private async fetchTailInboundQtyRow(orderId: number): Promise<number[] | null> {
+    if (!(await this.hasPackagingQtyRows())) return null;
+    try {
+      const rows = await this.finishingRepo.query(
+        'SELECT tail_inbound_qty_row AS tailInboundQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { tailInboundQtyRow?: unknown }).tailInboundQtyRow : null;
+      if (raw == null) return null;
+      if (Array.isArray(raw)) return raw as number[];
+      if (typeof raw === 'string') {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? (parsed as number[]) : null;
+      }
+      if (typeof raw === 'object') return Array.isArray(raw) ? (raw as number[]) : null;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  private async fetchDefectQuantityRow(orderId: number): Promise<number[] | null> {
+    if (!(await this.hasPackagingQtyRows())) return null;
+    try {
+      const rows = await this.finishingRepo.query(
+        'SELECT defect_quantity_row AS defectQuantityRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { defectQuantityRow?: unknown }).defectQuantityRow : null;
+      if (raw == null) return null;
+      if (Array.isArray(raw)) return raw as number[];
+      if (typeof raw === 'string') {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? (parsed as number[]) : null;
+      }
+      if (typeof raw === 'object') return Array.isArray(raw) ? (raw as number[]) : null;
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** 取该订单下一个批次序号；现有最大值 + 1，从 1 起算 */
+  private async nextBatchNo(orderId: number): Promise<number> {
+    const rows = await this.inboundPendingRepo.query(
+      'SELECT COALESCE(MAX(batch_no), 0) AS m FROM inbound_pending WHERE order_id = ?',
+      [orderId],
+    );
+    const max = Number((rows as { m?: number | string }[])?.[0]?.m ?? 0) || 0;
+    return max + 1;
+  }
+
   private async assertCanAmendPackagingPending(orderId: number, finishing: OrderFinishing): Promise<void> {
     const all = await this.inboundPendingRepo.find({ where: { orderId } });
     const hasCompleted = all.some((p) => (p.status ?? '') === 'completed');
@@ -141,13 +193,14 @@ export class ProductionFinishingMutationService {
 
   async registerPackagingComplete(
     orderId: number,
-    tailShippedQty: number,
-    tailInboundQty: number,
-    defectQuantity: number,
+    mode: 'partial' | 'full',
+    tailInboundQtyThisBatch: number,
+    defectQuantityThisBatch: number,
     remark?: string | null,
     actorUserId?: number,
-    tailInboundQuantities?: number[] | null,
-    defectQuantities?: number[] | null,
+    actorUsername?: string,
+    tailInboundQuantitiesThisBatch?: number[] | null,
+    defectQuantitiesThisBatch?: number[] | null,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
@@ -156,13 +209,162 @@ export class ProductionFinishingMutationService {
 
     const received = Number(finishing.tailReceivedQty) || 0;
     if (received <= 0) throw new NotFoundException('尾部收货数无效，请先登记收货');
-    const isFirstRegister = finishing.status === 'pending_assign';
-    const isAmend = finishing.status === 'inbound';
-    if (!isFirstRegister && !isAmend) {
-      throw new NotFoundException('仅「尾部中」待登记包装或「尾部完成」且待仓未处理的订单可操作');
+
+    const alreadyInbound = Number(finishing.tailInboundQty) || 0;
+    const alreadyDefect = Number(finishing.defectQuantity) || 0;
+    const remaining = received - alreadyInbound - alreadyDefect;
+
+    // 已完成订单（status='inbound'）走 amend 分支，沿用旧语义
+    if (finishing.status === 'inbound') {
+      await this.amendPackagingComplete(
+        order,
+        finishing,
+        tailInboundQtyThisBatch,
+        defectQuantityThisBatch,
+        remark,
+        tailInboundQuantitiesThisBatch,
+        defectQuantitiesThisBatch,
+      );
+      return;
     }
-    const ship = 0;
-    void tailShippedQty;
+
+    if (finishing.status !== 'pending_assign') {
+      throw new BadRequestException('仅「待登记包装」或「尾部完成且待仓未处理」的订单可操作');
+    }
+
+    const inboundThis = Number(tailInboundQtyThisBatch) || 0;
+    const defectThis = Number(defectQuantityThisBatch) || 0;
+    if (inboundThis < 0 || defectThis < 0) {
+      throw new BadRequestException('入库数 / 次品数不可为负');
+    }
+    const sumThis = inboundThis + defectThis;
+    if (sumThis <= 0) throw new BadRequestException('本次入库数 + 次品数必须大于 0');
+    if (sumThis > remaining) {
+      throw new BadRequestException(`本次入库数 + 次品数(${sumThis}) 超过剩余可登记数(${remaining})`);
+    }
+    if (mode === 'full' && sumThis !== remaining) {
+      throw new BadRequestException(`「全部入库」需要填满剩余 ${remaining} 件，当前差 ${remaining - sumThis} 件`);
+    }
+
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const headers =
+      Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
+        ? [...ext.colorSizeHeaders, '合计']
+        : ['合计'];
+    const sizeCount = headers.length > 1 ? headers.length - 1 : 1;
+
+    // 计算按尺码累加后的行（若提供本批按尺码）
+    if (await this.hasPackagingQtyRows()) {
+      const tin = tailInboundQuantitiesThisBatch;
+      const tdq = defectQuantitiesThisBatch;
+      if (Array.isArray(tin) && Array.isArray(tdq) && tin.length >= sizeCount && tdq.length >= sizeCount) {
+        const perInThis = tin.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
+        const perDefThis = tdq.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
+        const sumIn = perInThis.reduce((a, b) => a + b, 0);
+        const sumDef = perDefThis.reduce((a, b) => a + b, 0);
+        if (sumIn !== inboundThis || sumDef !== defectThis) {
+          throw new BadRequestException('按尺码填写的入库数 / 次品数合计与汇总不一致');
+        }
+        // 累加现有 inboundRow / defectRow
+        const oldInRow = await this.fetchTailInboundQtyRow(orderId);
+        const oldDefRow = await this.fetchDefectQuantityRow(orderId);
+        const newInRow: number[] = [];
+        const newDefRow: number[] = [];
+        for (let i = 0; i < sizeCount; i++) {
+          newInRow.push((Number(oldInRow?.[i]) || 0) + perInThis[i]);
+          newDefRow.push((Number(oldDefRow?.[i]) || 0) + perDefThis[i]);
+        }
+        const newInTotal = alreadyInbound + inboundThis;
+        const newDefTotal = alreadyDefect + defectThis;
+        const tailInboundQtyRow = headers.length === 1 ? [newInTotal] : [...newInRow, newInTotal];
+        const defectQuantityRow = headers.length === 1 ? [newDefTotal] : [...newDefRow, newDefTotal];
+        (finishing as { tailInboundQtyRow?: number[] }).tailInboundQtyRow = tailInboundQtyRow;
+        (finishing as { defectQuantityRow?: number[] }).defectQuantityRow = defectQuantityRow;
+      }
+    }
+
+    const newInboundTotal = alreadyInbound + inboundThis;
+    const newDefectTotal = alreadyDefect + defectThis;
+    const willComplete = newInboundTotal + newDefectTotal === received;
+
+    let nextStatus: string | null = null;
+    if (willComplete) {
+      nextStatus = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'tailing_inbound_completed',
+        actorUserId: actorUserId ?? 0,
+      });
+      if (!nextStatus) {
+        throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
+      }
+    }
+
+    finishing.tailShippedQty = 0;
+    finishing.tailInboundQty = newInboundTotal;
+    finishing.defectQuantity = newDefectTotal;
+    if (remark !== undefined) finishing.remark = remark?.trim() || null;
+
+    if (willComplete) {
+      finishing.completedAt = new Date();
+      finishing.status = 'inbound';
+    }
+    await this.finishingRepo.save(finishing);
+
+    if (willComplete && nextStatus && nextStatus !== order.status) {
+      order.status = nextStatus;
+      order.statusTime = new Date();
+      await this.orderRepo.save(order);
+    }
+
+    // INSERT 本次 pending 记录（本次量，不是累加量）
+    const nextBatchNo = await this.nextBatchNo(order.id);
+    const opUser = (actorUsername ?? '').trim();
+    const pendingRows: InboundPending[] = [];
+    if (inboundThis > 0) {
+      pendingRows.push(
+        this.inboundPendingRepo.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity: inboundThis,
+          sourceType: 'normal',
+          status: 'pending',
+          batchNo: nextBatchNo,
+          operatorUsername: opUser,
+        }),
+      );
+    }
+    if (defectThis > 0) {
+      pendingRows.push(
+        this.inboundPendingRepo.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity: defectThis,
+          sourceType: 'defect',
+          status: 'pending',
+          batchNo: nextBatchNo,
+          operatorUsername: opUser,
+        }),
+      );
+    }
+    if (pendingRows.length) await this.inboundPendingRepo.save(pendingRows);
+  }
+
+  /**
+   * 修订已完成（status='inbound'）订单的尾部入库 / 次品数。
+   * 此处 tailInboundQty / defectQuantity 为目标累计值（覆盖式），沿用旧的
+   * 「入库数 + 次品数 === 尾部收货数」校验，不支持分批。
+   */
+  private async amendPackagingComplete(
+    order: Order,
+    finishing: OrderFinishing,
+    tailInboundQty: number,
+    defectQuantity: number,
+    remark?: string | null,
+    tailInboundQuantities?: number[] | null,
+    defectQuantities?: number[] | null,
+  ): Promise<void> {
+    const orderId = order.id;
+    const received = Number(finishing.tailReceivedQty) || 0;
     const inbound = Number(tailInboundQty) || 0;
     const defect = Number(defectQuantity) || 0;
     if (inbound < 0 || defect < 0) throw new NotFoundException('入库数/次品数不可为负数');
@@ -170,7 +372,7 @@ export class ProductionFinishingMutationService {
       throw new NotFoundException(`入库数(${inbound})+次品数(${defect}) 须等于尾部收货数(${received})`);
     }
 
-    if (isAmend) await this.assertCanAmendPackagingPending(orderId, finishing);
+    await this.assertCanAmendPackagingPending(orderId, finishing);
 
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const headers =
@@ -217,36 +419,14 @@ export class ProductionFinishingMutationService {
       }
     }
 
-    let nextStatus: string | null = null;
-    if (isFirstRegister) {
-      nextStatus = await this.orderWorkflowService.resolveNextStatus({
-        order,
-        triggerCode: 'tailing_inbound_completed',
-        actorUserId: actorUserId ?? 0,
-      });
-      if (!nextStatus) {
-        throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
-      }
-    }
-
-    finishing.tailShippedQty = ship;
+    finishing.tailShippedQty = 0;
     finishing.tailInboundQty = inbound;
     finishing.defectQuantity = defect;
     finishing.remark = remark?.trim() || null;
-    if (isFirstRegister) {
-      finishing.completedAt = new Date();
-      finishing.status = 'inbound';
-      await this.finishingRepo.save(finishing);
-      if (nextStatus && nextStatus !== order.status) {
-        order.status = nextStatus;
-        order.statusTime = new Date();
-        await this.orderRepo.save(order);
-      }
-    } else {
-      await this.finishingRepo.save(finishing);
-      await this.inboundPendingRepo.delete({ orderId: order.id, status: 'pending' });
-    }
+    await this.finishingRepo.save(finishing);
+    await this.inboundPendingRepo.delete({ orderId: order.id, status: 'pending' });
 
+    const nextBatchNo = await this.nextBatchNo(order.id);
     const pendingRows: InboundPending[] = [];
     if (inbound > 0) {
       pendingRows.push(
@@ -256,6 +436,8 @@ export class ProductionFinishingMutationService {
           quantity: inbound,
           sourceType: 'normal',
           status: 'pending',
+          batchNo: nextBatchNo,
+          operatorUsername: '',
         }),
       );
     }
@@ -267,6 +449,8 @@ export class ProductionFinishingMutationService {
           quantity: defect,
           sourceType: 'defect',
           status: 'pending',
+          batchNo: nextBatchNo,
+          operatorUsername: '',
         }),
       );
     }

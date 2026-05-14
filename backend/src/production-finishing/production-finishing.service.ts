@@ -44,21 +44,23 @@ export class ProductionFinishingService {
 
   registerPackagingComplete(
     orderId: number,
-    tailShippedQty: number,
+    mode: 'partial' | 'full',
     tailInboundQty: number,
     defectQuantity: number,
     remark?: string | null,
     actorUserId?: number,
+    actorUsername?: string,
     tailInboundQuantities?: number[] | null,
     defectQuantities?: number[] | null,
   ): Promise<void> {
     return this.mutationService.registerPackagingComplete(
       orderId,
-      tailShippedQty,
+      mode,
       tailInboundQty,
       defectQuantity,
       remark,
       actorUserId,
+      actorUsername,
       tailInboundQuantities,
       defectQuantities,
     );
