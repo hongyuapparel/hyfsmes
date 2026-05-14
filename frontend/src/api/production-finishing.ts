@@ -92,17 +92,20 @@ export function registerFinishingReceive(payload: {
   return request.post<void>('/production/finishing/items/register-receive', payload)
 }
 
-/** 尾部：登记包装完成（发货数、入库数、次品数、备注，三者之和=尾部收货数） */
-export function registerFinishingPackagingComplete(payload: {
+/** 尾部：登记包装完成（入库数、次品数、备注；mode 区分分批/完结） */
+export interface RegisterFinishingPackagingCompletePayload {
   orderId: number
-  tailShippedQty: number
+  /** partial=分批入库；full=本次入库后完结 */
+  mode: 'partial' | 'full'
   tailInboundQty: number
   defectQuantity: number
   remark?: string
   /** 与登记弹窗尺码列一致（不含合计列），有 DB 列时后端会持久化 */
   tailInboundQuantities?: number[]
   defectQuantities?: number[]
-}) {
+}
+
+export function registerFinishingPackagingComplete(payload: RegisterFinishingPackagingCompletePayload) {
   return request.post<void>('/production/finishing/items/register-packaging-complete', payload)
 }
 
@@ -116,4 +119,23 @@ export function registerFinishingPackaging(payload: {
 
 export function inboundFinishingOrder(orderId: number, quantity: number) {
   return request.post<void>('/production/finishing/items/inbound', { orderId, quantity })
+}
+
+/** 尾部分批事件类型：收货 / 入库 / 出库 */
+export type FinishingBatchEventType = 'receive' | 'inbound' | 'outbound'
+
+/** 尾部分批事件时间线条目 */
+export interface FinishingBatchEvent {
+  type: FinishingBatchEventType
+  batchNo: number | null
+  quantity: number
+  sourceType: 'normal' | 'defect' | null
+  operatorUsername: string
+  pickupUserName: string
+  remark: string
+  occurredAt: string
+}
+
+export function fetchFinishingBatches(orderId: number) {
+  return request.get<FinishingBatchEvent[]>(`/production/finishing/items/${orderId}/batches`)
 }
