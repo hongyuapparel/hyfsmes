@@ -4,7 +4,7 @@
     <el-empty v-else-if="!events.length" description="暂无批次记录" />
     <el-table v-else :data="events" size="small" border>
       <el-table-column label="时间" width="170">
-        <template #default="{ row }">{{ formatTime(row.occurredAt) }}</template>
+        <template #default="{ row }">{{ formatDateTime(row.occurredAt) }}</template>
       </el-table-column>
       <el-table-column label="动作" width="120">
         <template #default="{ row }">
@@ -36,12 +36,13 @@
 import { watch } from 'vue'
 import type { FinishingBatchEvent } from '@/api/production-finishing'
 import { useFinishingBatchTimeline } from '@/composables/useFinishingBatchTimeline'
+import { formatDateTime } from '@/utils/date-format'
 
 const props = defineProps<{ orderId: number | null; active: boolean }>()
 const { events, loading, load } = useFinishingBatchTimeline()
 
 watch(
-  () => [props.orderId, props.active],
+  [() => props.orderId, () => props.active],
   () => {
     if (props.active && props.orderId != null) {
       void load(props.orderId)
@@ -60,11 +61,6 @@ function actionTagType(type: FinishingBatchEvent['type']): 'success' | 'warning'
   if (type === 'inbound') return 'success'
   if (type === 'outbound') return 'warning'
   return 'info'
-}
-
-function formatTime(iso: string): string {
-  if (!iso) return ''
-  return new Date(iso).toLocaleString('zh-CN', { hour12: false })
 }
 </script>
 
