@@ -97,7 +97,7 @@
           size="large"
           @click="openPackagingCompleteDialog"
         >
-          登记包装完成
+          登记入库
         </el-button>
         <el-button
           v-if="hasSelection && canAmendPackagingSelection && canPackagingAction"
@@ -276,13 +276,13 @@
     <!-- 登记包装完成弹窗：默认全部入库，生成待入库并完成订单 -->
     <el-dialog
       v-model="packagingCompleteDialog.visible"
-      :title="packagingCompleteDialog.mode === 'amend' ? '修改入库/次品' : '登记包装完成'"
+      :title="packagingCompleteDialog.mode === 'amend' ? '修改入库/次品' : '登记入库'"
       width="800"
       destroy-on-close
       @close="resetPackagingCompleteDialog"
     >
       <p v-if="packagingCompleteDialog.mode === 'register'" class="dialog-tip">
-        登记包装完成后将默认“全部入库”，自动生成一条仓库「待仓处理」记录，同时订单状态变为「订单完成」。后续发货/入库等由仓库模块处理。
+        可分多次登记。「部分入库」保留在「尾部中」等待下一批；「全部入库」补齐剩余并推进到「尾部完成」。
       </p>
       <p v-else class="dialog-tip">
         在仓库尚未对「待仓处理」记录完成入库或发货前，可修正入库数与次品数；保存后将按新数量重建待仓记录。若待仓已处理，请改走仓库调整流程。
@@ -298,6 +298,13 @@
             <div>订单号：{{ item.row.orderNo }}</div>
             <div>SKU：{{ item.row.skuCode }}</div>
             <div>尾部收货数合计：{{ formatDisplayNumber(item.row.tailReceivedQty ?? 0) }}</div>
+            <template v-if="packagingCompleteDialog.mode === 'register'">
+              <div v-if="alreadyInboundQty(item) > 0">
+                已登记入库：{{ formatDisplayNumber(alreadyInboundQty(item)) }}
+                <el-tag size="small" type="warning">本次为分批续登</el-tag>
+              </div>
+              <div>剩余可登记：{{ formatDisplayNumber(remainingQty(item)) }}</div>
+            </template>
           </div>
           <template v-if="item.headers?.length">
             <div class="register-qty-title">尾部收货数 / 入库数</div>
@@ -369,9 +376,30 @@
       </template>
       <template #footer>
         <el-button @click="packagingCompleteDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="packagingCompleteDialog.submitting" @click="submitPackagingComplete">
-          {{ packagingCompleteDialog.mode === 'amend' ? '保存修改' : '确定' }}
-        </el-button>
+        <template v-if="packagingCompleteDialog.mode === 'amend'">
+          <el-button
+            type="primary"
+            :loading="packagingCompleteDialog.submitting"
+            @click="submitPackagingComplete('full')"
+          >
+            保存修改
+          </el-button>
+        </template>
+        <template v-else>
+          <el-button
+            :loading="packagingCompleteDialog.submitting"
+            @click="submitPackagingComplete('partial')"
+          >
+            部分入库
+          </el-button>
+          <el-button
+            type="primary"
+            :loading="packagingCompleteDialog.submitting"
+            @click="submitPackagingComplete('full')"
+          >
+            全部入库
+          </el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -522,6 +550,8 @@ const {
   packagingSetInboundToReceived,
   maxPackagingQtyForSize,
   maxDefectQtyForSize,
+  alreadyInboundQty,
+  remainingQty,
   openPackagingCompleteDialog,
   openPackagingAmendDialog,
   submitPackagingComplete,
