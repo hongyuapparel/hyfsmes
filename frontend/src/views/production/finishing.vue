@@ -213,6 +213,12 @@
             </el-descriptions-item>
           </el-descriptions>
         </ProductionDetailSection>
+        <ProductionDetailSection title="批次记录">
+          <BatchTimelineSection
+            :order-id="finishingBriefDrawer.row.orderId"
+            :active="finishingBriefDrawer.visible"
+          />
+        </ProductionDetailSection>
       </template>
     </ProductionDetailDrawerShell>
 
@@ -431,6 +437,7 @@ import ProductionOrderBriefPanel, {
   type ProductionOrderBriefModel,
 } from '@/components/production/ProductionOrderBriefPanel.vue'
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
+import BatchTimelineSection from '@/components/production/BatchTimelineSection.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import FinishingTable from '@/components/production/FinishingTable.vue'
 import { useAuthStore } from '@/stores/auth'
