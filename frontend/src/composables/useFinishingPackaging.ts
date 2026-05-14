@@ -255,14 +255,15 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     if (packagingCompleteDialog.items.length === 0) return
     const isAmend = packagingCompleteDialog.mode === 'amend'
     for (const item of packagingCompleteDialog.items) {
-      const perMsg = assertPackagingPerSize(item)
-      if (perMsg) {
-        ElMessage.warning(perMsg)
-        return
-      }
       const sumInbound = inboundTotal(item)
       const defect = defectTotal(item)
       if (isAmend) {
+        // 修正模式：维持原校验——按尺码须等于该码尾部收货数（覆盖式）
+        const perMsg = assertPackagingPerSize(item)
+        if (perMsg) {
+          ElMessage.warning(perMsg)
+          return
+        }
         // 修正模式：维持原校验——入库数+次品数须等于尾部收货数（覆盖式）
         const received = item.row.tailReceivedQty ?? 0
         if (sumInbound + defect !== received) {

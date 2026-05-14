@@ -125,6 +125,7 @@ export class ProductionFinishingController {
   }
 
   @Get('items/:orderId/batches')
+  @RequirePermission('/production/finishing')
   getBatches(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.finishingQueryService.getBatches(orderId);
   }
