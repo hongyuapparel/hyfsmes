@@ -365,7 +365,6 @@ export class OrderMutationService {
     if (shouldRebaseWorkflow) {
       saved = (await this.orderStatusService.rebaseWorkflowStatusAfterOrderEdit(id, actor)) ?? saved;
     }
-    await this.syncCostSnapshotFromOrder(id, { keepExistingPricing: true });
     return saved;
   }
 
@@ -392,7 +391,6 @@ export class OrderMutationService {
       await this.orderStatusService.appendStatusHistory(saved.id, saved.status);
     }
     await this.touchSuppliersActiveByOrderId(saved.id);
-    await this.syncCostSnapshotFromOrder(id, { keepExistingPricing: true });
     return saved;
   }
 
@@ -443,7 +441,7 @@ export class OrderMutationService {
         salePrice: this.normalizeDecimalInput(src.salePrice),
         orderTypeId: src.orderTypeId ?? null,
         processItem: src.processItem?.trim() || '',
-        orderDate: src.orderDate ?? now,
+        orderDate: now,
         customerDueDate: src.customerDueDate ?? null,
         factoryName: '',
         imageUrl: src.imageUrl?.trim() || '',
@@ -480,7 +478,7 @@ export class OrderMutationService {
           this.orderCostSnapshotRepo.create({ orderId: saved.id, snapshot: srcSnapshot ?? srcCost.snapshot }),
         );
       } else {
-        await this.syncCostSnapshotFromOrder(saved.id, { keepExistingPricing: true });
+        await this.syncCostSnapshotFromOrder(saved.id);
       }
       created.push(saved);
       await this.orderStatusService.addLog(saved, actor, 'copy_to_draft', `从订单 ${src.orderNo} 复制为草稿`);
@@ -503,37 +501,6 @@ export class OrderMutationService {
     return this.orderRemarkRepo.save(remark);
   }
 
-  private isSameMaterialCostRow(a: any, b: any): boolean {
-    const key = (r: any) =>
-      [String(r?.materialTypeId ?? ''), String(r?.supplierName ?? ''), String(r?.materialName ?? ''), String(r?.color ?? ''), String(r?.fabricWidth ?? '')].join('|');
-    return key(a) === key(b);
-  }
-  private isSameProcessItemCostRow(a: any, b: any): boolean {
-    const key = (r: any) => [String(r?.processName ?? ''), String(r?.supplierName ?? ''), String(r?.part ?? '')].join('|');
-    return key(a) === key(b);
-  }
-  private findBestMaterialCostRow(existingRows: any[], row: any, index: number): any | null {
-    if (!existingRows.length) return null;
-    return (
-      existingRows.find((r) => this.isSameMaterialCostRow(r, row)) ??
-      existingRows.find(
-        (r) =>
-          String(r?.materialTypeId ?? '') === String(row?.materialTypeId ?? '') &&
-          String(r?.materialName ?? '') === String(row?.materialName ?? ''),
-      ) ??
-      existingRows[index] ??
-      null
-    );
-  }
-  private findBestProcessItemCostRow(existingRows: any[], row: any, index: number): any | null {
-    if (!existingRows.length) return null;
-    return (
-      existingRows.find((r) => this.isSameProcessItemCostRow(r, row)) ??
-      existingRows.find((r) => String(r?.processName ?? '') === String(row?.processName ?? '')) ??
-      existingRows[index] ??
-      null
-    );
-  }
   private normalizeProductionCostMultiplier(v: unknown): number {
     const n = typeof v === 'number' ? v : Number(v);
     if (!Number.isFinite(n) || n < 0) return 2;
@@ -576,8 +543,11 @@ export class OrderMutationService {
     };
   }
 
-  async syncCostSnapshotFromOrder(orderId: number, options?: { keepExistingPricing?: boolean }): Promise<void> {
-    const keepPricing = options?.keepExistingPricing !== false;
+  // 仅在订单尚无成本快照时，用订单的物料/工艺项目初始化一份零单价的快照。
+  // 已存在的快照绝不在此覆盖：成本快照是单价的唯一数据源，订单编辑不得回写它。
+  async syncCostSnapshotFromOrder(orderId: number): Promise<void> {
+    const existing = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    if (existing?.snapshot && typeof existing.snapshot === 'object') return;
     const [order, ext] = await Promise.all([
       this.orderRepo.findOne({ where: { id: orderId } }),
       this.orderExtRepo.findOne({ where: { orderId } }),
@@ -585,7 +555,8 @@ export class OrderMutationService {
     if (!order) return;
     const sourceMaterials = Array.isArray((ext as any)?.materials) ? ((ext as any).materials as any[]) : [];
     const sourceProcessItems = Array.isArray((ext as any)?.processItems) ? ((ext as any).processItems as any[]) : [];
-    const nextMaterialRows = sourceMaterials.map((m) => ({
+    const defaultProcessItemQty = 1;
+    const materialRows = sourceMaterials.map((m) => ({
       materialTypeId: m?.materialTypeId ?? null,
       supplierName: m?.supplierName ?? '',
       materialName: m?.materialName ?? '',
@@ -599,8 +570,7 @@ export class OrderMutationService {
       remark: m?.remark ?? '',
       unitPrice: 0,
     }));
-    const defaultProcessItemQty = 1;
-    const nextProcessItemRows = sourceProcessItems.map((p) => ({
+    const processItemRows = sourceProcessItems.map((p) => ({
       processName: p?.processName ?? '',
       supplierName: p?.supplierName ?? '',
       part: p?.part ?? '',
@@ -608,34 +578,12 @@ export class OrderMutationService {
       unitPrice: 0,
       quantity: defaultProcessItemQty,
     }));
-    const existing = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    const existingSnapshot = existing?.snapshot && typeof existing.snapshot === 'object' ? (existing.snapshot as any) : null;
-    const existingMaterialRows = Array.isArray(existingSnapshot?.materialRows) ? (existingSnapshot.materialRows as any[]) : [];
-    const mergedMaterialRows = keepPricing
-      ? nextMaterialRows.map((row, index) => {
-          const found = this.findBestMaterialCostRow(existingMaterialRows, row, index);
-          return found ? { ...row, unitPrice: Number(found.unitPrice) || 0 } : row;
-        })
-      : nextMaterialRows;
-    const existingProcessItemRows = Array.isArray(existingSnapshot?.processItemRows) ? (existingSnapshot.processItemRows as any[]) : [];
-    const mergedProcessItemRows = keepPricing
-      ? nextProcessItemRows.map((row, index) => {
-          const found = this.findBestProcessItemCostRow(existingProcessItemRows, row, index);
-          return found
-            ? {
-                ...row,
-                unitPrice: Number(found.unitPrice) || 0,
-                quantity: typeof found.quantity === 'number' && Number.isFinite(found.quantity) ? found.quantity : row.quantity,
-              }
-            : row;
-        })
-      : nextProcessItemRows;
     const nextSnapshot: Record<string, unknown> = {
-      materialRows: mergedMaterialRows.length ? mergedMaterialRows : [{ unitPrice: 0 } as any],
-      processItemRows: mergedProcessItemRows.length ? mergedProcessItemRows : [{ unitPrice: 0, quantity: defaultProcessItemQty } as any],
-      productionRows: Array.isArray(existingSnapshot?.productionRows) ? existingSnapshot.productionRows : [],
-      productionCostMultiplier: this.normalizeProductionCostMultiplier(existingSnapshot?.productionCostMultiplier),
-      profitMargin: this.normalizeProfitMargin(existingSnapshot?.profitMargin),
+      materialRows: materialRows.length ? materialRows : [{ unitPrice: 0 } as any],
+      processItemRows: processItemRows.length ? processItemRows : [{ unitPrice: 0, quantity: defaultProcessItemQty } as any],
+      productionRows: [],
+      productionCostMultiplier: this.normalizeProductionCostMultiplier(undefined),
+      profitMargin: this.normalizeProfitMargin(undefined),
     };
     if (existing) {
       existing.snapshot = nextSnapshot;

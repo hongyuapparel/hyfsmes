@@ -1,7 +1,7 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getCraftItems, getCraftTabCounts, completeCraft, exportCraftItems, type CraftListItem, type CraftListQuery } from '@/api/production-craft'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getErrorMessage, isErrorHandled, isRequestCanceled } from '@/api/request'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
@@ -22,11 +22,14 @@ interface DictItem {
 
 function toOrderTypeTreeSelect(
   nodes: SystemOptionTreeNode[],
-): { label: string; value: number; children?: unknown[]; disabled?: boolean }[] {
+): { label: string; value: number; children?: unknown[] }[] {
   return nodes.map((n) => {
     const children = n.children?.length ? toOrderTypeTreeSelect(n.children) : []
-    const hasChildren = children.length > 0
-    return { label: n.value, value: n.id, children: hasChildren ? children : undefined, disabled: hasChildren }
+    return {
+      label: n.value,
+      value: n.id,
+      children: children.length ? children : undefined,
+    }
   })
 }
 
@@ -104,21 +107,38 @@ export function useProductionProcessPage() {
     return q
   }
 
+  let listReqId = 0
+  let listAbortController: AbortController | null = null
+  let tabCountsReqId = 0
+  let tabCountsAbortController: AbortController | null = null
+
   async function loadTabCounts() {
+    tabCountsAbortController?.abort()
+    const controller = new AbortController()
+    tabCountsAbortController = controller
+    const currentReqId = ++tabCountsReqId
     try {
-      const res = await getCraftTabCounts(buildQuery())
+      const res = await getCraftTabCounts(buildQuery(), { signal: controller.signal })
+      if (currentReqId !== tabCountsReqId) return
       const counts = res.data ?? {}
       tabCounts.value = counts
       tabTotal.value = counts.all ?? 0
-    } catch {
+    } catch (e: unknown) {
+      if (currentReqId !== tabCountsReqId) return
+      if (isRequestCanceled(e)) return
       // keep existing counts on error
     }
   }
 
   async function load() {
+    listAbortController?.abort()
+    const controller = new AbortController()
+    listAbortController = controller
+    const currentReqId = ++listReqId
     loading.value = true
     try {
-      const res = await getCraftItems(buildQuery())
+      const res = await getCraftItems(buildQuery(), { signal: controller.signal })
+      if (currentReqId !== listReqId) return
       const data = res.data
       if (data) {
         list.value = data.list ?? []
@@ -126,9 +146,11 @@ export function useProductionProcessPage() {
         totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       }
     } catch (e: unknown) {
+      if (currentReqId !== listReqId) return
+      if (isRequestCanceled(e)) return
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      loading.value = false
+      if (currentReqId === listReqId) loading.value = false
     }
   }
 

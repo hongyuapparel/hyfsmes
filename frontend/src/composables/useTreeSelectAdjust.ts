@@ -13,21 +13,60 @@ import { onUnmounted } from 'vue'
  * El Plus 还会把触发器的 inline style（含 ACTIVE_SELECT_STYLE 注入的
  * --el-text-color-regular: var(--el-color-primary)）镜像给 .el-tree，
  * 导致所有下拉选项继承主色变蓝；在 applyTreeWidth 中一并移除该变量。
+ *
+ * 重要：必须保证同一 popperClass 同时只有一个 MutationObserver 在工作。
+ * 连续快速开关下拉时，每次 visible-change 都会重新计算 targetTree（选中值文字
+ * 宽度不同 → 目标宽度不同）。若旧 observer 未彻底清理，多个 observer 会以各自不同
+ * 的 targetTree 互相覆盖 .el-tree 的 inline width，触发无限 mutation 循环，主线程卡死。
+ * 因此每次调用都要把上一轮的「初始 setTimeout / observer / 2 秒清理 setTimeout」全部取消。
+ * applyTreeWidth 另加单轮还原次数上限作为兜底，避免任何极端情况下的死循环。
  */
+interface TreeAdjustState {
+  initialTimer: ReturnType<typeof setTimeout> | null
+  cleanupTimer: ReturnType<typeof setTimeout> | null
+  observer: MutationObserver | null
+}
+
+/** 单轮内 observer 还原 .el-tree 宽度的次数上限，纯兜底，正常只需 1~2 次 */
+const MAX_REVERT_PER_ROUND = 30
+
 export function useTreeSelectAdjust() {
-  const activeTreeObservers = new Map<string, MutationObserver>()
+  const stateMap = new Map<string, TreeAdjustState>()
+
+  function teardown(popperClass: string) {
+    const state = stateMap.get(popperClass)
+    if (!state) return
+    if (state.initialTimer) clearTimeout(state.initialTimer)
+    if (state.cleanupTimer) clearTimeout(state.cleanupTimer)
+    state.observer?.disconnect()
+    stateMap.delete(popperClass)
+  }
 
   function adjustTreePopperWidth(popperClass: string) {
-    activeTreeObservers.get(popperClass)?.disconnect()
-    activeTreeObservers.delete(popperClass)
+    // 彻底清理上一轮，保证同一时刻只有一个 observer 在工作
+    teardown(popperClass)
 
-    setTimeout(() => {
+    const state: TreeAdjustState = { initialTimer: null, cleanupTimer: null, observer: null }
+    stateMap.set(popperClass, state)
+
+    state.initialTimer = setTimeout(() => {
+      state.initialTimer = null
+
       const popper = document.querySelector<HTMLElement>(`.${popperClass}.el-popper`)
-      if (!popper) return
+      if (!popper) {
+        stateMap.delete(popperClass)
+        return
+      }
       const tree = popper.querySelector<HTMLElement>('.el-tree')
-      if (!tree) return
+      if (!tree) {
+        stateMap.delete(popperClass)
+        return
+      }
       const nodes = [...popper.querySelectorAll<HTMLElement>('.el-tree-node__content')]
-      if (!nodes.length) return
+      if (!nodes.length) {
+        stateMap.delete(popperClass)
+        return
+      }
 
       let structuralOverhead = 0
       let ancestor: HTMLElement | null = tree.parentElement
@@ -76,22 +115,30 @@ export function useTreeSelectAdjust() {
       }
       applyTreeWidth()
 
+      let revertCount = 0
       const observer = new MutationObserver(() => {
-        if (tree.style.width !== `${targetTree}px`) applyTreeWidth()
+        if (tree.style.width === `${targetTree}px`) return
+        if (revertCount >= MAX_REVERT_PER_ROUND) {
+          // 兜底：异常情况下停止还原，宁可宽度不完美也不卡死主线程
+          observer.disconnect()
+          return
+        }
+        revertCount += 1
+        applyTreeWidth()
       })
-      activeTreeObservers.set(popperClass, observer)
+      state.observer = observer
       observer.observe(tree, { attributes: true, attributeFilter: ['style'] })
 
-      setTimeout(() => {
-        observer.disconnect()
-        activeTreeObservers.delete(popperClass)
+      state.cleanupTimer = setTimeout(() => {
+        teardown(popperClass)
       }, 2000)
     }, 0)
   }
 
   onUnmounted(() => {
-    activeTreeObservers.forEach((obs) => obs.disconnect())
-    activeTreeObservers.clear()
+    for (const popperClass of [...stateMap.keys()]) {
+      teardown(popperClass)
+    }
   })
 
   return { adjustTreePopperWidth }

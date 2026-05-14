@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 
 export interface CraftProcessItemRow {
   processName?: string
@@ -58,16 +59,20 @@ export interface CraftListQuery {
   pageSize?: number
 }
 
-export function getCraftTabCounts(params?: Omit<CraftListQuery, 'tab' | 'page' | 'pageSize'>) {
+export function getCraftTabCounts(
+  params?: Omit<CraftListQuery, 'tab' | 'page' | 'pageSize'>,
+  config?: AxiosRequestConfig,
+) {
   // tab-counts 是非关键增强接口，后端缺这条路由（如旧版本未升级）时不应弹全局 toast
   return request.get<Record<string, number>>('/production/process/tab-counts', {
+    ...config,
     params,
     skipGlobalErrorHandler: true,
   })
 }
 
-export function getCraftItems(params?: CraftListQuery) {
-  return request.get<CraftListRes>('/production/process/items', { params })
+export function getCraftItems(params?: CraftListQuery, config?: AxiosRequestConfig) {
+  return request.get<CraftListRes>('/production/process/items', { ...config, params })
 }
 
 export function exportCraftItems(params?: Omit<CraftListQuery, 'page' | 'pageSize'>) {

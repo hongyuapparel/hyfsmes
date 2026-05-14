@@ -66,6 +66,7 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     getJobTypeLabel,
     loadOrder,
     loadCostSnapshot,
+    initializeCostRowsFromOrder,
     loadProcesses,
     loadMaterialTypes,
     syncMaterialTypeIdsFromLabel,
@@ -226,9 +227,10 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     w.__ordersCostMountCount = (w.__ordersCostMountCount ?? 0) + 1
     logPerf('页面 mount 次数', { mountCount: w.__ordersCostMountCount })
     suppressDirtyTracking.value = true
-    await Promise.all([loadOrder(), loadCostSnapshot()])
+    const [, hasCostSnapshot] = await Promise.all([loadOrder(), loadCostSnapshot()])
     if (!order.value) { await waitMs(LOAD_RETRY_DELAY_MS); await loadOrder() }
-    if (!materialRows.value.length && !processItemRows.value.length) { await waitMs(LOAD_RETRY_DELAY_MS); await loadCostSnapshot() }
+    if (!hasCostSnapshot && order.value) initializeCostRowsFromOrder(order.value)
+    if (!hasCostSnapshot && !materialRows.value.length && !processItemRows.value.length) { await waitMs(LOAD_RETRY_DELAY_MS); await loadCostSnapshot() }
     await loadProcesses()
     syncProductionIdsFromName()
     await loadMaterialTypes()

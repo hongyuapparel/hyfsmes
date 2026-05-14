@@ -39,6 +39,17 @@ interface ImportOrderDialogState {
   selectedId: number | null
 }
 
+interface CostSnapshotPayload {
+  materialRows?: unknown
+  processItemRows?: unknown
+  productionRows?: unknown
+  productionCostMultiplier?: unknown
+  profitMargin?: unknown
+  quoteConfirmedAt?: unknown
+  quoteConfirmedBy?: unknown
+  quoteNeedsReconfirm?: unknown
+}
+
 const IMPORT_ORDER_SEARCH_PAGE_SIZE = 20
 const IMPORT_ORDER_SEARCH_DEBOUNCE_MS = 350
 
@@ -194,8 +205,8 @@ export function useOrderCostData(orderId: number) {
   function addProcessItemRow() { processItemRows.value.push({ unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY } as ProcessItemRow) }
   function removeProcessItemRow(index: number) { processItemRows.value.splice(index, 1) }
 
-  function syncFromOrder(detail: OrderDetail) {
-    materialRows.value = (detail.materials ?? []).map((item: any) => ({ ...item, unitPrice: 0, includeInCost: true })) as MaterialRow[]
+  function initializeCostRowsFromOrder(detail: OrderDetail) {
+    materialRows.value = (detail.materials ?? []).map((item) => ({ ...item, unitPrice: 0, includeInCost: true })) as MaterialRow[]
     processItemRows.value = (detail.processItems ?? []).map((item) => ({ ...item, unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY })) as ProcessItemRow[]
     const base = ensureBaseCostRows(materialRows.value, processItemRows.value)
     materialRows.value = base.materialRows
@@ -207,23 +218,27 @@ export function useOrderCostData(orderId: number) {
     try {
       const res = await getOrderDetail(orderId)
       order.value = res.data
-      if (order.value) syncFromOrder(order.value)
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载订单失败'))
     }
   }
 
-  async function loadCostSnapshot() {
-    if (!orderId) return
+  async function loadCostSnapshot(): Promise<boolean> {
+    if (!orderId) return false
     try {
       const res = await getOrderCost(orderId)
-      const s = (res.data?.snapshot ?? {}) as any
-      if (Array.isArray(s.materialRows) && s.materialRows.length) {
-        materialRows.value = s.materialRows.map((item: MaterialRow) => ({ ...item, includeInCost: item.includeInCost !== false }))
+      const snapshot = res.data?.snapshot
+      const hasSnapshot = !!snapshot && typeof snapshot === 'object'
+      const s = (hasSnapshot ? snapshot : {}) as CostSnapshotPayload
+      const snapshotMaterialRows = Array.isArray(s.materialRows) ? (s.materialRows as MaterialRow[]) : []
+      const snapshotProcessItemRows = Array.isArray(s.processItemRows) ? (s.processItemRows as ProcessItemRow[]) : []
+      const snapshotProductionRows = Array.isArray(s.productionRows) ? (s.productionRows as ProductionRow[]) : []
+      if (snapshotMaterialRows.length) {
+        materialRows.value = snapshotMaterialRows.map((item) => ({ ...item, includeInCost: item.includeInCost !== false }))
       }
-      if (Array.isArray(s.processItemRows) && s.processItemRows.length) processItemRows.value = s.processItemRows
-      if (Array.isArray(s.productionRows) && s.productionRows.length) {
-        productionRows.value = s.productionRows.map((item: ProductionRow) => {
+      if (snapshotProcessItemRows.length) processItemRows.value = snapshotProcessItemRows
+      if (snapshotProductionRows.length) {
+        productionRows.value = snapshotProductionRows.map((item) => {
           const n = Number(item.quantity)
           return { ...item, quantity: Number.isFinite(n) && n >= 0 ? n : DEFAULT_PRODUCTION_PROCESS_QTY }
         })
@@ -233,8 +248,10 @@ export function useOrderCostData(orderId: number) {
       quoteConfirmedAt.value = typeof s.quoteConfirmedAt === 'string' ? s.quoteConfirmedAt : ''
       quoteConfirmedBy.value = typeof s.quoteConfirmedBy === 'string' ? s.quoteConfirmedBy : ''
       quoteNeedsReconfirm.value = Boolean(s.quoteNeedsReconfirm)
+      return hasSnapshot
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
+      return false
     }
   }
 
@@ -540,6 +557,7 @@ export function useOrderCostData(orderId: number) {
     ...calculations,
     loadOrder,
     loadCostSnapshot,
+    initializeCostRowsFromOrder,
     loadProcesses,
     loadMaterialTypes,
     syncMaterialTypeIdsFromLabel,

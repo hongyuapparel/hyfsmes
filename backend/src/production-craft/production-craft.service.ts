@@ -6,6 +6,7 @@ import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
+import { SystemOptionsService } from '../system-options/system-options.service';
 
 /** 列表返回：工艺项目行（与 order_ext.process_items 一致） */
 export type CraftProcessItemRow = Pick<ProcessRow, 'processName' | 'supplierName' | 'part' | 'remark'>;
@@ -64,7 +65,32 @@ export class ProductionCraftService {
     private readonly orderExtRepo: Repository<OrderExt>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly orderStatusConfigService: OrderStatusConfigService,
+    private readonly systemOptionsService: SystemOptionsService,
   ) {}
+
+  private async resolveOrderTypeFilterIds(orderTypeId: number): Promise<number[]> {
+    const all = await this.systemOptionsService.findAllByType('order_types');
+    if (!all.length) return [orderTypeId];
+    const byParent = new Map<number, number[]>();
+    for (const item of all) {
+      if (item.parentId == null) continue;
+      const list = byParent.get(item.parentId) ?? [];
+      list.push(item.id);
+      byParent.set(item.parentId, list);
+    }
+    const result = new Set<number>([orderTypeId]);
+    const queue: number[] = [orderTypeId];
+    while (queue.length) {
+      const cur = queue.shift() as number;
+      const children = byParent.get(cur) ?? [];
+      for (const childId of children) {
+        if (result.has(childId)) continue;
+        result.add(childId);
+        queue.push(childId);
+      }
+    }
+    return Array.from(result);
+  }
 
   private toDateOnlyLocalString(v: Date | string | null | undefined): string | null {
     if (v == null) return null;
@@ -210,7 +236,8 @@ export class ProductionCraftService {
       .andWhere('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review'] });
 
     if (typeof orderTypeId === 'number') {
-      qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId });
+      const orderTypeIds = await this.resolveOrderTypeFilterIds(orderTypeId);
+      qb.andWhere('o.order_type_id IN (:...orderTypeIds)', { orderTypeIds });
     }
     if (typeof collaborationTypeId === 'number') {
       qb.andWhere('o.collaboration_type_id = :collaborationTypeId', {
