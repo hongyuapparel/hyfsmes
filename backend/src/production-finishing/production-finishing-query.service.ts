@@ -6,8 +6,10 @@ import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entit
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
+import { InboundPending } from '../entities/inbound-pending.entity';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 import type { FinishingListItem, FinishingListQuery } from './production-finishing.types';
+import type { FinishingBatchEvent } from './finishing-batch.types';
 
 @Injectable()
 export class ProductionFinishingQueryService {
@@ -25,6 +27,8 @@ export class ProductionFinishingQueryService {
     private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(OrderSewing)
     private readonly sewingRepo: Repository<OrderSewing>,
+    @InjectRepository(InboundPending)
+    private readonly pendingRepo: Repository<InboundPending>,
     private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
@@ -380,5 +384,78 @@ export class ProductionFinishingQueryService {
       tailInboundRow,
       defectRow,
     };
+  }
+
+  async getBatches(orderId: number): Promise<FinishingBatchEvent[]> {
+    if (!Number.isInteger(orderId) || orderId <= 0) return [];
+    const events: FinishingBatchEvent[] = [];
+
+    const finishing = await this.finishingRepo.findOne({ where: { orderId } });
+    if (finishing?.arrivedAt && (finishing.tailReceivedQty ?? 0) > 0) {
+      events.push({
+        type: 'receive',
+        batchNo: null,
+        quantity: finishing.tailReceivedQty ?? 0,
+        sourceType: null,
+        operatorUsername: '',
+        pickupUserName: '',
+        remark: '',
+        occurredAt: new Date(finishing.arrivedAt).toISOString(),
+      });
+    }
+
+    const pendings = await this.pendingRepo.find({
+      where: { orderId },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    for (const p of pendings) {
+      events.push({
+        type: 'inbound',
+        batchNo: p.batchNo ?? null,
+        quantity: p.quantity ?? 0,
+        sourceType: p.sourceType === 'defect' ? 'defect' : 'normal',
+        operatorUsername: p.operatorUsername ?? '',
+        pickupUserName: '',
+        remark: '',
+        occurredAt: new Date(p.createdAt).toISOString(),
+      });
+    }
+
+    const outboundRows = await this.pendingRepo.manager
+      .createQueryBuilder()
+      .from('finished_goods_outbound', 'fo')
+      .where('fo.order_id = :orderId', { orderId })
+      .orderBy('fo.created_at', 'ASC')
+      .select([
+        'fo.id AS id',
+        'fo.quantity AS quantity',
+        'fo.pickup_user_name AS pickupUserName',
+        'fo.operator_username AS operatorUsername',
+        'fo.remark AS remark',
+        'fo.created_at AS createdAt',
+      ])
+      .getRawMany<{
+        id: number;
+        quantity: number | string;
+        pickupUserName: string | null;
+        operatorUsername: string | null;
+        remark: string | null;
+        createdAt: Date | string;
+      }>();
+    outboundRows.forEach((row, idx) => {
+      events.push({
+        type: 'outbound',
+        batchNo: idx + 1,
+        quantity: Number(row.quantity) || 0,
+        sourceType: null,
+        operatorUsername: row.operatorUsername ?? '',
+        pickupUserName: row.pickupUserName ?? '',
+        remark: row.remark ?? '',
+        occurredAt: new Date(row.createdAt).toISOString(),
+      });
+    });
+
+    events.sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+    return events.reverse(); // 倒序：最近事件在前
   }
 }
