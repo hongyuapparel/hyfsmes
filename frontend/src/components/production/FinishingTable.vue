@@ -112,7 +112,7 @@
         </QtyTracePopover>
       </template>
     </el-table-column>
-    <el-table-column label="尾部入库数" width="100" align="right">
+    <el-table-column label="尾部入库数" width="140" align="right">
       <template #default="{ row }">
         <QtyTracePopover
           :order-id="row.orderId"
@@ -128,6 +128,13 @@
             }}</span>
           </template>
         </QtyTracePopover>
+        <el-tag
+          v-if="isPartialBatch(row)"
+          size="small"
+          type="warning"
+          effect="light"
+          style="margin-left: 6px"
+        >部分入库</el-tag>
       </template>
     </el-table-column>
     <el-table-column label="次品数" width="80" align="right">
@@ -186,6 +193,14 @@ const emit = defineEmits<{
 
 const tableRef = ref()
 const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('production-finishing-main')
+
+function isPartialBatch(row: FinishingListItem): boolean {
+  const received = Number(row.tailReceivedQty ?? 0)
+  if (received <= 0) return false
+  const inb = Number(row.tailInboundQty ?? 0)
+  const def = Number(row.defectQuantity ?? 0)
+  return inb + def > 0 && inb + def < received
+}
 
 watch(
   () => props.list,
