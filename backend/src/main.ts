@@ -12,6 +12,7 @@ import { seedFieldDefinitions } from './database/seed-field-definitions';
 import { seedOrderCostSnapshotsTable } from './database/seed-order-cost-snapshots';
 import { seedOrderSewingFactoryDueDate } from './database/seed-order-sewing-factory-due-date';
 import { seedOrderSewingQuantityRow } from './database/seed-order-sewing-quantity-row';
+import { seedInboundPendingBatchColumns } from './database/seed-inbound-pending-batch-columns';
 
 async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
   const rows: Array<{ cnt: number }> = await dataSource.query(
@@ -232,6 +233,7 @@ async function bootstrap() {
     await seedOrderCostSnapshotsTable(dataSource);
     await seedOrderSewingFactoryDueDate(dataSource);
     await seedOrderSewingQuantityRow(dataSource);
+    await seedInboundPendingBatchColumns(dataSource);
   } catch (err) {
     console.error('[Seed] Failed:', err);
   }

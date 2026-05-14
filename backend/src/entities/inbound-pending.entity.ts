@@ -23,6 +23,12 @@ export class InboundPending {
   @Column({ name: 'status', length: 32, default: 'pending' })
   status: string;
 
+  @Column({ name: 'operator_username', length: 128, default: '' })
+  operatorUsername: string;
+
+  @Column({ name: 'batch_no', type: 'int', nullable: true })
+  batchNo: number | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }
