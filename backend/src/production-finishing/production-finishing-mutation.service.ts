@@ -49,67 +49,42 @@ export class ProductionFinishingMutationService {
     }
   }
 
-  private async fetchTailReceivedQtyRow(orderId: number): Promise<number[] | null> {
-    if (!(await this.hasTailReceivedQtyRow())) return null;
+  /**
+   * 读取 `order_finishing` 表中某个 JSON 数字数组列（按尺码细数行）。
+   * column 为代码内固定字面量（非外部输入），无注入风险。
+   */
+  private async fetchJsonNumberRow(orderId: number, column: string): Promise<number[] | null> {
     try {
       const rows = await this.finishingRepo.query(
-        'SELECT tail_received_qty_row AS tailReceivedQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        `SELECT \`${column}\` AS value FROM \`order_finishing\` WHERE order_id = ? LIMIT 1`,
         [orderId],
       );
-      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { tailReceivedQtyRow?: unknown }).tailReceivedQtyRow : null;
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { value?: unknown }).value : null;
       if (raw == null) return null;
       if (Array.isArray(raw)) return raw as number[];
       if (typeof raw === 'string') {
-        const parsed = JSON.parse(raw);
+        const parsed: unknown = JSON.parse(raw);
         return Array.isArray(parsed) ? (parsed as number[]) : null;
       }
-      if (typeof raw === 'object') return Array.isArray(raw) ? (raw as number[]) : null;
       return null;
     } catch {
       return null;
     }
+  }
+
+  private async fetchTailReceivedQtyRow(orderId: number): Promise<number[] | null> {
+    if (!(await this.hasTailReceivedQtyRow())) return null;
+    return this.fetchJsonNumberRow(orderId, 'tail_received_qty_row');
   }
 
   private async fetchTailInboundQtyRow(orderId: number): Promise<number[] | null> {
     if (!(await this.hasPackagingQtyRows())) return null;
-    try {
-      const rows = await this.finishingRepo.query(
-        'SELECT tail_inbound_qty_row AS tailInboundQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
-        [orderId],
-      );
-      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { tailInboundQtyRow?: unknown }).tailInboundQtyRow : null;
-      if (raw == null) return null;
-      if (Array.isArray(raw)) return raw as number[];
-      if (typeof raw === 'string') {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? (parsed as number[]) : null;
-      }
-      if (typeof raw === 'object') return Array.isArray(raw) ? (raw as number[]) : null;
-      return null;
-    } catch {
-      return null;
-    }
+    return this.fetchJsonNumberRow(orderId, 'tail_inbound_qty_row');
   }
 
   private async fetchDefectQuantityRow(orderId: number): Promise<number[] | null> {
     if (!(await this.hasPackagingQtyRows())) return null;
-    try {
-      const rows = await this.finishingRepo.query(
-        'SELECT defect_quantity_row AS defectQuantityRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
-        [orderId],
-      );
-      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { defectQuantityRow?: unknown }).defectQuantityRow : null;
-      if (raw == null) return null;
-      if (Array.isArray(raw)) return raw as number[];
-      if (typeof raw === 'string') {
-        const parsed = JSON.parse(raw);
-        return Array.isArray(parsed) ? (parsed as number[]) : null;
-      }
-      if (typeof raw === 'object') return Array.isArray(raw) ? (raw as number[]) : null;
-      return null;
-    } catch {
-      return null;
-    }
+    return this.fetchJsonNumberRow(orderId, 'defect_quantity_row');
   }
 
   /** 取该订单下一个批次序号；现有最大值 + 1，从 1 起算 */
