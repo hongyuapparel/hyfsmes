@@ -124,6 +124,11 @@ export class ProductionFinishingController {
     return this.finishingQueryService.getRegisterFormData(orderId);
   }
 
+  @Get('items/:orderId/batches')
+  getBatches(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.finishingQueryService.getBatches(orderId);
+  }
+
   @Post('items/register-receive')
   @RequirePermission('production_finishing_receive')
   registerReceive(
