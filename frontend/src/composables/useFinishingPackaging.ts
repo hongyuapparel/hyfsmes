@@ -45,6 +45,25 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     return (item.defectQuantities ?? []).reduce((a, b) => a + (Number(b) || 0), 0)
   }
 
+  function inboundTotal(item: PackagingCompleteItem): number {
+    return (item.inboundQuantities ?? []).reduce((a, b) => a + (Number(b) || 0), 0)
+  }
+
+  /** 该订单此前已登记的入库数 */
+  function alreadyInboundQty(item: PackagingCompleteItem): number {
+    return Number(item.row.tailInboundQty ?? 0)
+  }
+
+  /** 该订单此前已登记的次品数 */
+  function alreadyDefectQty(item: PackagingCompleteItem): number {
+    return Number(item.row.defectQuantity ?? 0)
+  }
+
+  /** 尾部收货数减去已登记入库/次品后，剩余可登记数 */
+  function remainingQty(item: PackagingCompleteItem): number {
+    return Number(item.row.tailReceivedQty ?? 0) - alreadyInboundQty(item) - alreadyDefectQty(item)
+  }
+
   function packagingSizeTableRows(item: PackagingCompleteItem) {
     const received = item.row.tailReceivedQty ?? 0
     const i = item.inboundQuantities
@@ -179,7 +198,8 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
           defectQuantities: Array(sizeCount).fill(0),
           remark: '',
         }
-        packagingSetInboundToReceived(item)
+        // 分批入库：首次打开从 0 开始，由用户显式填入本批数量
+        packagingSetZero(item)
         packagingCompleteDialog.items.push(item)
       }
     } catch (e: unknown) {
@@ -231,30 +251,49 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     }
   }
 
-  async function submitPackagingComplete() {
+  async function submitPackagingComplete(mode: 'partial' | 'full') {
     if (packagingCompleteDialog.items.length === 0) return
+    const isAmend = packagingCompleteDialog.mode === 'amend'
     for (const item of packagingCompleteDialog.items) {
       const perMsg = assertPackagingPerSize(item)
       if (perMsg) {
         ElMessage.warning(perMsg)
         return
       }
-      const received = item.row.tailReceivedQty ?? 0
-      const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
+      const sumInbound = inboundTotal(item)
       const defect = defectTotal(item)
-      if (sumInbound + defect !== received) {
-        ElMessage.warning(`订单 ${item.row.orderNo}：入库数合计(${sumInbound})+次品数(${defect}) 须等于尾部收货数(${received})`)
-        return
+      if (isAmend) {
+        // 修正模式：维持原校验——入库数+次品数须等于尾部收货数（覆盖式）
+        const received = item.row.tailReceivedQty ?? 0
+        if (sumInbound + defect !== received) {
+          ElMessage.warning(`订单 ${item.row.orderNo}：入库数合计(${sumInbound})+次品数(${defect}) 须等于尾部收货数(${received})`)
+          return
+        }
+      } else {
+        const remaining = remainingQty(item)
+        const sumThis = sumInbound + defect
+        if (sumThis <= 0) {
+          ElMessage.warning(`订单 ${item.row.orderNo}：本次入库数 + 次品数必须大于 0`)
+          return
+        }
+        if (sumThis > remaining) {
+          ElMessage.warning(`订单 ${item.row.orderNo}：本次合计(${sumThis})超过剩余可登记数(${remaining})`)
+          return
+        }
+        if (mode === 'full' && sumThis !== remaining) {
+          ElMessage.warning(`订单 ${item.row.orderNo}：「全部入库」需要填满剩余 ${remaining} 件，当前差 ${remaining - sumThis} 件`)
+          return
+        }
       }
     }
     packagingCompleteDialog.submitting = true
     try {
       for (const item of packagingCompleteDialog.items) {
-        const sumInbound = item.inboundQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
+        const sumInbound = inboundTotal(item)
         const defect = defectTotal(item)
         await registerFinishingPackagingComplete({
           orderId: item.row.orderId,
-          tailShippedQty: 0,
+          mode: isAmend ? 'full' : mode,
           tailInboundQty: sumInbound,
           defectQuantity: defect,
           remark: item.remark?.trim() || undefined,
@@ -263,9 +302,11 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
         })
       }
       ElMessage.success(
-        packagingCompleteDialog.mode === 'amend'
-          ? '已更新入库/次品登记，待仓处理记录已按新数量重建'
-          : '登记包装完成：已生成待仓处理记录，订单已完成',
+        isAmend
+          ? '已更新入库/次品登记'
+          : mode === 'full'
+            ? '已登记全部入库，订单进入下一阶段'
+            : '已登记本次入库，订单保留在「尾部中」继续等待下一批',
       )
       packagingCompleteDialog.visible = false
       resetPackagingCompleteDialog()
@@ -283,6 +324,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     resetPackagingCompleteDialog,
     packagingSizeTableRows,
     defectTotal,
+    inboundTotal,
+    alreadyInboundQty,
+    alreadyDefectQty,
+    remainingQty,
     packagingSetZero,
     packagingSetInboundToReceived,
     maxPackagingQtyForSize,
