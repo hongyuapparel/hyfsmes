@@ -461,7 +461,7 @@ export class ProductionFinishingMutationService {
     await this.finishingRepo.save(finishing);
   }
 
-  async inbound(orderId: number, quantity: number, actorUserId?: number): Promise<void> {
+  async inbound(orderId: number, quantity: number, actorUserId?: number, actorUsername?: string): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
     const finishing = await this.finishingRepo.findOne({ where: { orderId } });
@@ -480,6 +480,20 @@ export class ProductionFinishingMutationService {
 
     finishing.tailInboundQty = newInbound;
     const total = shipped + newInbound + defect;
+
+    // INSERT 本次 pending 记录（本次量，不是累加量）；每次调用都登记，含分批
+    const nextBatchNo = await this.nextBatchNo(order.id);
+    const pending = this.inboundPendingRepo.create({
+      orderId: order.id,
+      skuCode: order.skuCode ?? '',
+      quantity: qty,
+      sourceType: 'normal',
+      status: 'pending',
+      batchNo: nextBatchNo,
+      operatorUsername: (actorUsername ?? '').trim(),
+    });
+    await this.inboundPendingRepo.save(pending);
+
     if (total === received) {
       const next = await this.orderWorkflowService.resolveNextStatus({
         order,
@@ -496,14 +510,6 @@ export class ProductionFinishingMutationService {
         order.statusTime = new Date();
         await this.orderRepo.save(order);
       }
-      const pending = this.inboundPendingRepo.create({
-        orderId: order.id,
-        skuCode: order.skuCode ?? '',
-        quantity: finishing.tailInboundQty ?? 0,
-        sourceType: 'normal',
-        status: 'pending',
-      });
-      await this.inboundPendingRepo.save(pending);
     } else {
       await this.finishingRepo.save(finishing);
     }

@@ -185,6 +185,6 @@ export class ProductionFinishingController {
     @Body('quantity') quantity: number,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.finishingMutationService.inbound(Number(orderId), Number(quantity ?? 0), user?.userId);
+    return this.finishingMutationService.inbound(Number(orderId), Number(quantity ?? 0), user?.userId, user?.username);
   }
 }

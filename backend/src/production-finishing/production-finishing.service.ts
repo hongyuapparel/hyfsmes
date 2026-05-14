@@ -70,7 +70,7 @@ export class ProductionFinishingService {
     return this.mutationService.registerPackaging(orderId, tailReceivedQty, defectQuantity);
   }
 
-  inbound(orderId: number, quantity: number, actorUserId?: number): Promise<void> {
-    return this.mutationService.inbound(orderId, quantity, actorUserId);
+  inbound(orderId: number, quantity: number, actorUserId?: number, actorUsername?: string): Promise<void> {
+    return this.mutationService.inbound(orderId, quantity, actorUserId, actorUsername);
   }
 }
