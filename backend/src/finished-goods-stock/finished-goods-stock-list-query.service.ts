@@ -208,7 +208,17 @@ export class FinishedGoodsStockListQueryService {
   private async buildStoredRowsWithDetails(storedRows: StoredStockRawRow[]): Promise<FinishedStockRow[]> {
     const storedList: FinishedStockRow[] = await Promise.all(storedRows.map(async (r) => {
       const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
-      let sizeBreakdown = storedBreakdown;
+      // 仅信任与总数量一致的存储快照；历史脏数据回退订单回溯重建，避免列表/出库弹窗展示错误明细。
+      const safeQuantity = Math.max(0, Math.trunc(Number(r.quantity) || 0));
+      const storedBreakdownTotal = storedBreakdown
+        ? storedBreakdown.rows.reduce(
+            (sum, row) =>
+              sum + row.values.reduce((rowSum, value) => rowSum + Math.max(0, Math.trunc(Number(value) || 0)), 0),
+            0,
+          )
+        : 0;
+      let sizeBreakdown =
+        storedBreakdown && storedBreakdownTotal === safeQuantity ? storedBreakdown : null;
       if (!sizeBreakdown && r.orderId != null) {
         const stock = this.stockRepo.create({
           id: r.id,

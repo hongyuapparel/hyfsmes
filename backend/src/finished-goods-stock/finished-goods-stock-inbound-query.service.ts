@@ -358,7 +358,10 @@ export class FinishedGoodsStockInboundQueryService {
 
   async buildCurrentStockSnapshot(stock: FinishedGoodsStock): Promise<ColorSizeSnapshot | null> {
     const snapshot = this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot);
-    if (snapshot) return snapshot;
+    // 仅信任与总数量一致的存储快照；历史脏数据（快照合计 ≠ quantity）一律忽略并回退订单回溯，
+    // 让此前已被写坏的库存记录在下次读取/出库时自愈。
+    const safeQuantity = Math.max(0, Math.trunc(Number(stock.quantity) || 0));
+    if (snapshot && this.getColorSizeSnapshotTotal(snapshot) === safeQuantity) return snapshot;
     if (stock.orderId == null) return null;
     const outboundRows = await this.stockRepo.manager.query(
       'SELECT quantity, size_breakdown AS sizeBreakdown FROM finished_goods_outbound WHERE finished_stock_id = ? ORDER BY created_at ASC, id ASC',

@@ -306,6 +306,11 @@ export class FinishedGoodsStockInboundService {
         const mergedSnapshot = this.inboundQueryService.mergeColorSizeSnapshots(currentSnapshot, snapshot);
         this.inboundQueryService.assertColorSizeSnapshotTotal(mergedSnapshot, totalQty, '合并后的尺码明细与总数量不一致');
         existing.colorSizeSnapshot = mergedSnapshot;
+      } else {
+        // 本次入库无法解析尺码明细：必须把快照与 quantity 同步置空，
+        // 否则 quantity 增加而旧快照滞留，会写出「快照合计 ≠ 总数量」的脏数据导致出库被永久拦截。
+        // 置空后出库时由 buildCurrentStockSnapshot 从订单回溯重建。
+        existing.colorSizeSnapshot = null;
       }
       try {
         const saved = await this.stockRepo.save(existing);
