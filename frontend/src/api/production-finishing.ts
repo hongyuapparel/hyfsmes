@@ -136,6 +136,7 @@ export interface FinishingBatchEvent {
   occurredAt: string
 }
 
-export function fetchFinishingBatches(orderId: number) {
+/** 获取某订单的尾部分批事件时间线（倒序） */
+export function getFinishingBatches(orderId: number) {
   return request.get<FinishingBatchEvent[]>(`/production/finishing/items/${orderId}/batches`)
 }
