@@ -161,7 +161,7 @@
       :row-selectable="isPurchaseRowSelectable"
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
-      @open-brief="openPurchaseBriefDrawer"
+      @open-detail="openPurchaseBriefDrawer"
     />
 
     <AppPaginationBar
@@ -275,6 +275,9 @@
             </el-descriptions-item>
           </el-descriptions>
         </ProductionDetailSection>
+        <ProductionDetailSection>
+          <OperationLogsSection :logs="purchaseDrawerLogs" />
+        </ProductionDetailSection>
       </template>
     </ProductionDetailDrawerShell>
 
@@ -307,7 +310,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -325,6 +328,9 @@ import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
 import { PURCHASE_TABS, usePurchaseList } from '@/composables/usePurchaseList'
 import { usePurchaseDialogs } from '@/composables/usePurchaseDialogs'
+import type { PurchaseItemRow } from '@/api/production-purchase'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import PurchaseTable from '@/components/production/PurchaseTable.vue'
 import PurchaseRegisterDialog from '@/components/production/PurchaseRegisterDialog.vue'
@@ -405,6 +411,28 @@ const {
     selectedRows.value = []
   },
 })
+
+const purchaseDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+
+async function loadPurchaseDrawerLogs(row: PurchaseItemRow | null) {
+  if (!row) {
+    purchaseDrawerLogs.value = []
+    return
+  }
+  const logs = await fetchOrderOperationLogs(row.orderId, {
+    module: 'production_purchase',
+    targetType: 'purchase_item',
+    targetRef: `${row.orderId}_${row.materialIndex}`,
+  })
+  purchaseDrawerLogs.value = toLogSectionItems(logs)
+}
+
+watch(
+  () => purchaseBriefDrawer.row,
+  (row) => {
+    void loadPurchaseDrawerLogs(row)
+  },
+)
 
 onMounted(() => {
   void loadOptions()

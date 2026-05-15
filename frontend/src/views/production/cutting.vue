@@ -295,13 +295,16 @@
             </el-descriptions>
           </ProductionDetailSection>
         </template>
+        <ProductionDetailSection v-if="detailDrawer.row">
+          <OperationLogsSection :logs="cuttingDrawerLogs" />
+        </ProductionDetailSection>
       </div>
     </ProductionDetailDrawerShell>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { type CuttingListItem } from '@/api/production-cutting'
 import CuttingBasicInfoBar from '@/components/production-cutting/CuttingBasicInfoBar.vue'
 import CuttingQuantityMatrix from '@/components/production-cutting/CuttingQuantityMatrix.vue'
@@ -320,6 +323,8 @@ import { useCuttingSelection } from '@/composables/useCuttingSelection'
 import { useCuttingSizePopover } from '@/composables/useCuttingSizePopover'
 import { useCuttingDetail } from '@/composables/useCuttingDetail'
 import { useCuttingRegister } from '@/composables/useCuttingRegister'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -425,6 +430,24 @@ const {
   reloadList: load,
   reloadTabCounts: loadTabCounts,
 })
+
+const cuttingDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+
+async function loadCuttingDrawerLogs(row: CuttingListItem | null) {
+  if (!row) {
+    cuttingDrawerLogs.value = []
+    return
+  }
+  const logs = await fetchOrderOperationLogs(row.orderId, { module: 'production_cutting' })
+  cuttingDrawerLogs.value = toLogSectionItems(logs)
+}
+
+watch(
+  () => detailDrawer.row,
+  (row) => {
+    void loadCuttingDrawerLogs(row)
+  },
+)
 
 function getTabLabel(tab: CuttingTabConfig): string {
   const counts = tabCounts.value

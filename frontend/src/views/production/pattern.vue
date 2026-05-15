@@ -352,6 +352,9 @@
             </el-button>
           </div>
         </ProductionDetailSection>
+        <ProductionDetailSection>
+          <OperationLogsSection :logs="patternDrawerLogs" />
+        </ProductionDetailSection>
       </template>
     </ProductionDetailDrawerShell>
 
@@ -444,7 +447,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
 import {
@@ -461,6 +464,9 @@ import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
+import type { PatternListItem } from '@/api/production-pattern'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import PatternTable from '@/components/production/PatternTable.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
@@ -584,6 +590,24 @@ const {
   selectedRows,
   { reloadList: load, reloadTabCounts: loadTabCounts },
   { findOrderTypeLabelById, findCollaborationLabelById },
+)
+
+const patternDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+
+async function loadPatternDrawerLogs(row: PatternListItem | null) {
+  if (!row) {
+    patternDrawerLogs.value = []
+    return
+  }
+  const logs = await fetchOrderOperationLogs(row.orderId, { module: 'production_pattern' })
+  patternDrawerLogs.value = toLogSectionItems(logs)
+}
+
+watch(
+  () => detailDrawer.row,
+  (row) => {
+    void loadPatternDrawerLogs(row)
+  },
 )
 
 onMounted(() => {

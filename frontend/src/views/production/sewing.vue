@@ -108,7 +108,7 @@
         @header-dragend="onHeaderDragEnd"
         @selection-change="onSelectionChange"
         @show-qty-popover="onShowQtyPopover"
-        @open-brief="openSewingBriefDrawer"
+        @open-detail="openSewingBriefDrawer"
       />
     </div>
 
@@ -289,13 +289,16 @@
             </el-descriptions-item>
           </el-descriptions>
         </ProductionDetailSection>
+        <ProductionDetailSection>
+          <OperationLogsSection :logs="sewingDrawerLogs" />
+        </ProductionDetailSection>
       </template>
     </ProductionDetailDrawerShell>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, onMounted } from 'vue'
+import { computed, reactive, onMounted, ref, watch } from 'vue'
 import { type SewingListItem } from '@/api/production-sewing'
 import {
   ACTIVE_FILTER_COLOR,
@@ -309,6 +312,8 @@ import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useSewingList } from '@/composables/useSewingList'
 import { useSewingDialogs } from '@/composables/useSewingDialogs'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import SewingTable from '@/components/production/SewingTable.vue'
 import ProductionOrderBriefPanel, {
@@ -398,6 +403,24 @@ function openSewingBriefDrawer(row: SewingListItem) {
   sewingBriefDrawer.row = row
   sewingBriefDrawer.visible = true
 }
+
+const sewingDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+
+async function loadSewingDrawerLogs(row: SewingListItem | null) {
+  if (!row) {
+    sewingDrawerLogs.value = []
+    return
+  }
+  const logs = await fetchOrderOperationLogs(row.orderId, { module: 'production_sewing' })
+  sewingDrawerLogs.value = toLogSectionItems(logs)
+}
+
+watch(
+  () => sewingBriefDrawer.row,
+  (row) => {
+    void loadSewingDrawerLogs(row)
+  },
+)
 
 function sewingBriefFromRow(row: SewingListItem): ProductionOrderBriefModel {
   return {

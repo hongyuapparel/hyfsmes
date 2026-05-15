@@ -130,7 +130,7 @@
         :qty-popover-blocks="qtyPopoverBlocks"
         @selection-change="onSelectionChange"
         @show-qty-popover="onShowQtyPopover"
-        @open-brief="openFinishingBriefDrawer"
+        @open-detail="openFinishingBriefDrawer"
       />
     </div>
 
@@ -218,6 +218,9 @@
             :order-id="finishingBriefDrawer.row.orderId"
             :active="finishingBriefDrawer.visible"
           />
+        </ProductionDetailSection>
+        <ProductionDetailSection>
+          <OperationLogsSection :logs="finishingDrawerLogs" />
         </ProductionDetailSection>
       </template>
     </ProductionDetailDrawerShell>
@@ -413,7 +416,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { type FinishingListItem } from '@/api/production-finishing'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
@@ -429,6 +432,8 @@ import { useFinishingSelection } from '@/composables/useFinishingSelection'
 import { useFinishingSizePopover } from '@/composables/useFinishingSizePopover'
 import { useFinishingReceive } from '@/composables/useFinishingReceive'
 import { useFinishingPackaging } from '@/composables/useFinishingPackaging'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -465,6 +470,24 @@ function openFinishingBriefDrawer(row: FinishingListItem) {
   finishingBriefDrawer.row = row
   finishingBriefDrawer.visible = true
 }
+
+const finishingDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+
+async function loadFinishingDrawerLogs(row: FinishingListItem | null) {
+  if (!row) {
+    finishingDrawerLogs.value = []
+    return
+  }
+  const logs = await fetchOrderOperationLogs(row.orderId, { module: 'production_finishing' })
+  finishingDrawerLogs.value = toLogSectionItems(logs)
+}
+
+watch(
+  () => finishingBriefDrawer.row,
+  (row) => {
+    void loadFinishingDrawerLogs(row)
+  },
+)
 
 function finishingBriefFromRow(row: FinishingListItem): ProductionOrderBriefModel {
   return {
