@@ -7,6 +7,9 @@ import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/or
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
+import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 /** 列表返回：工艺项目行（与 order_ext.process_items 一致） */
 export type CraftProcessItemRow = Pick<ProcessRow, 'processName' | 'supplierName' | 'part' | 'remark'>;
@@ -63,6 +66,10 @@ export class ProductionCraftService {
     private readonly craftRepo: Repository<OrderCraft>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly orderStatusConfigService: OrderStatusConfigService,
     private readonly systemOptionsService: SystemOptionsService,
@@ -442,6 +449,26 @@ export class ProductionCraftService {
       order.status = nextStatus;
       order.statusTime = now;
       await this.orderRepo.save(order);
+    }
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, { userId: actorUserId, username: '' });
+      const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+      const processRows = (Array.isArray(ext?.processItems) ? ext.processItems : []) as ProcessRow[];
+      const summary = processRows.map((i) => i.processName ?? '-').filter(Boolean).join(' / ') || '无';
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_process_complete',
+          detail: `工艺完成：${summary}`,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[craft] write operation log failed:', err);
     }
   }
 }

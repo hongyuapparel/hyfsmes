@@ -572,11 +572,11 @@ git commit -m "feat(production-pattern): 保存/修改用量落操作日志
 
 **目的：** 工艺完成时落 `production_process_complete` 日志，targetType=`order`。
 
-- [ ] **Step 1: 注入仓库**
+- [x] **Step 1: 注入仓库**
 
 同 Task 4 Step 1。同时确认 `production-craft.module.ts` 注入 `OrderOperationLog` 和 `User`。
 
-- [ ] **Step 2: 在 `completeCraft` 写入完成后追加日志**
+- [x] **Step 2: 在 `completeCraft` 写入完成后追加日志**
 
 定位 `completeCraft(orderId: number, userId: number)` 方法（从 controller 路由反向追踪）。在所有业务写入完成后，方法返回前追加：
 
@@ -604,7 +604,7 @@ git commit -m "feat(production-pattern): 保存/修改用量落操作日志
 
 `processItems` 字段路径需以 `production-craft.service.ts` 中现有读取方式为准（可能是从 order-ext 或 order 表 JSON 字段读）。
 
-- [ ] **Step 3: 重启 + 端到端验证**
+- [x] **Step 3: 重启 + 端到端验证**
 
 ```bash
 curl -X POST -H "Authorization: Bearer <TOKEN>" -H "Content-Type: application/json" \
@@ -617,7 +617,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
 
 期望：返回 1 条 `production_process_complete` 日志。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/production-craft
