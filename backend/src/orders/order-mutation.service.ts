@@ -12,6 +12,7 @@ import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
 import { type OrderActor, type OrderEditPayload } from './order.types';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 @Injectable()
 export class OrderMutationService {
@@ -488,13 +489,7 @@ export class OrderMutationService {
 
   async addRemark(orderId: number, actor: OrderActor, content: string) {
     const order = await this.orderQueryService.findOne(orderId);
-    let operatorUsername = actor.username;
-    try {
-      const user = await this.userRepo.findOne({ where: { id: actor.userId } });
-      if (user) operatorUsername = (user.displayName && user.displayName.trim()) || user.username || actor.username;
-    } catch {
-      operatorUsername = actor.username;
-    }
+    const operatorUsername = await resolveOperatorDisplayName(this.userRepo, actor);
     const trimmed = (content ?? '').trim();
     if (!trimmed) throw new Error('备注内容不能为空');
     const remark = this.orderRemarkRepo.create({ orderId: order.id, order, operatorUsername, content: trimmed });

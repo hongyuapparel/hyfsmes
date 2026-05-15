@@ -9,6 +9,7 @@ import { InventoryAccessoriesService } from '../inventory-accessories/inventory-
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusService } from './order-status.service';
 import { type OrderActor } from './order.types';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 @Injectable()
 export class OrderLifecycleService {
@@ -145,13 +146,7 @@ export class OrderLifecycleService {
   private async addRemark(orderId: number, actor: OrderActor, content: string): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) return;
-    let operatorUsername = actor.username;
-    try {
-      const user = await this.userRepo.findOne({ where: { id: actor.userId } });
-      if (user) operatorUsername = (user.displayName && user.displayName.trim()) || user.username || actor.username;
-    } catch {
-      operatorUsername = actor.username;
-    }
+    const operatorUsername = await resolveOperatorDisplayName(this.userRepo, actor);
     const trimmed = (content ?? '').trim();
     if (!trimmed) return;
     const remark = this.orderRemarkRepo.create({ orderId: order.id, order, operatorUsername, content: trimmed });

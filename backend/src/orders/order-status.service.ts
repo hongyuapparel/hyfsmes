@@ -19,6 +19,7 @@ import { UserRole } from '../entities/user-role.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { ORDER_STATUS_LABEL_MAP, type OrderActor, type OrderEditPayload } from './order.types';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 @Injectable()
 export class OrderStatusService {
@@ -95,15 +96,7 @@ export class OrderStatusService {
   async addLog(order: Order, actor: OrderActor, action: string, detail: string, manager?: EntityManager): Promise<void> {
     const userRepo = manager?.getRepository(User) ?? this.userRepo;
     const orderLogRepo = manager?.getRepository(OrderOperationLog) ?? this.orderLogRepo;
-    let operatorUsername = actor.username;
-    try {
-      const user = await userRepo.findOne({ where: { id: actor.userId } });
-      if (user) {
-        operatorUsername = (user.displayName && user.displayName.trim()) || user.username || actor.username;
-      }
-    } catch {
-      operatorUsername = actor.username;
-    }
+    const operatorUsername = await resolveOperatorDisplayName(userRepo, actor);
 
     const normalizedDetail = this.formatLogDetail(detail);
     if (!normalizedDetail?.trim()) return;

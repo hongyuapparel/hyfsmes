@@ -12,6 +12,7 @@ import { FabricStockService } from '../fabric-stock/fabric-stock.service';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
 import { User } from '../entities/user.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 interface RegisterPurchaseBatchItem {
   orderId: number;
@@ -112,13 +113,6 @@ export class ProductionPurchaseService {
       return (material.purchaseStatus ?? 'pending').toLowerCase() === 'completed';
     }
     return (material.pickStatus ?? 'pending').toLowerCase() === 'completed';
-  }
-
-  private async resolveOperatorName(userId: number | undefined, fallback = ''): Promise<string> {
-    const fb = (fallback ?? '').trim();
-    if (!userId) return fb;
-    const user = await this.userRepo.findOne({ where: { id: userId } });
-    return (user?.displayName ?? '').trim() || (user?.username ?? '').trim() || fb;
   }
 
   async registerPurchase(
@@ -364,7 +358,10 @@ export class ProductionPurchaseService {
       }
     }
 
-    const operatorName = await this.resolveOperatorName(params.actorUserId, params.actorUsername ?? '');
+    const operatorName = await resolveOperatorDisplayName(this.userRepo, {
+      userId: params.actorUserId,
+      username: params.actorUsername ?? '',
+    });
     const remark = (params.remark ?? '').trim();
     const inventorySourceType = params.inventorySourceType ?? null;
     const inventoryId = params.inventoryId != null ? Number(params.inventoryId) : null;
