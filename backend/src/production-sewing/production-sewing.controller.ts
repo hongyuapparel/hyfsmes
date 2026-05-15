@@ -119,6 +119,7 @@ export class ProductionSewingController {
     @Body('factoryDueDate') factoryDueDate: string,
     @Body('factoryName') factoryName: string,
     @Body('sewingFee') sewingFee: string,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     const at = distributedAt ? new Date(distributedAt) : new Date();
     const due = factoryDueDate ? new Date(factoryDueDate) : null;
@@ -128,6 +129,7 @@ export class ProductionSewingController {
       due,
       factoryName ?? '',
       sewingFee ?? '0',
+      user ? { userId: user.userId, username: user.username } : undefined,
     );
   }
 
@@ -147,7 +149,7 @@ export class ProductionSewingController {
       Number(defectQuantity ?? 0),
       defectReason ?? '',
       Array.isArray(sewingQuantities) ? sewingQuantities : undefined,
-      user?.userId,
+      user ? { userId: user.userId, username: user.username } : undefined,
     );
   }
 }

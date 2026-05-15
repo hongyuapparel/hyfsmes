@@ -5,6 +5,7 @@ import { OrderCutting } from '../entities/order-cutting.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
@@ -14,7 +15,7 @@ import { ProductionSewingService } from './production-sewing.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderSewing, OrderCutting, OrderExt, User, RolePermission]),
+    TypeOrmModule.forFeature([Order, OrderSewing, OrderCutting, OrderExt, User, RolePermission, OrderOperationLog]),
     AuthModule,
     OrderWorkflowModule,
     OrderStatusConfigModule,

@@ -7,6 +7,9 @@ import { OrderExt } from '../entities/order-ext.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
+import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 export interface SewingListItem {
   orderId: number;
@@ -60,6 +63,10 @@ export class ProductionSewingService {
     private readonly cuttingRepo: Repository<OrderCutting>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
@@ -294,6 +301,26 @@ export class ProductionSewingService {
     return this.buildSewingRows(query);
   }
 
+  private buildSewingLogDetail(
+    sewingQuantity: number,
+    sewingQuantities: number[] | null | undefined,
+    ext: OrderExt | null,
+  ): string {
+    const qtys = Array.isArray(sewingQuantities) && sewingQuantities.length ? sewingQuantities : null;
+    if (!qtys) {
+      return `车缝登记：合计 ${sewingQuantity} 件`;
+    }
+    const headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
+    const parts: string[] = [];
+    for (let i = 0; i < Math.min(headers.length, qtys.length); i++) {
+      const q = Number(qtys[i]) || 0;
+      if (q > 0) parts.push(`${headers[i]} ${q} 件`);
+    }
+    const total = qtys.reduce((a, b) => a + (Number(b) || 0), 0);
+    if (!parts.length) return `车缝登记：合计 ${total} 件`;
+    return `车缝登记：${parts.join(' / ')}`;
+  }
+
   /** 分单/补录分单：记录分单时间、加工供应商交期、加工供应商名称（写入订单）、车缝加工费 */
   async assignSewing(
     orderId: number,
@@ -301,6 +328,7 @@ export class ProductionSewingService {
     factoryDueDate: Date | null,
     factoryName: string,
     sewingFee: string,
+    actor?: { userId?: number; username?: string },
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -329,6 +357,24 @@ export class ProductionSewingService {
       sewing.sewingFee = sewingFee ?? '0';
     }
     await this.sewingRepo.save(sewing);
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      const nameForLog = (order.factoryName ?? (factoryName ?? '').trim()) || '-';
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_sewing_register',
+          detail: `车缝分配：${nameForLog}`,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[sewing assign] write operation log failed:', err);
+    }
   }
 
   /** 车缝登记完成：写入车缝数量（可按尺码）、次品数量、次品说明，订单状态改为待尾部 */
@@ -338,7 +384,7 @@ export class ProductionSewingService {
     defectQuantity: number,
     defectReason: string,
     sewingQuantities?: number[] | null,
-    actorUserId?: number,
+    actor?: { userId?: number; username?: string },
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -348,6 +394,7 @@ export class ProductionSewingService {
       throw new NotFoundException('仅待车缝订单可完成登记');
     }
 
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const now = new Date();
     const arrivedAt = order.statusTime ?? now;
     const totalQty =
@@ -360,7 +407,7 @@ export class ProductionSewingService {
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
       triggerCode: 'sewing_completed',
-      actorUserId: actorUserId ?? 0,
+      actorUserId: actor?.userId ?? 0,
     });
     if (!next) {
       throw new BadRequestException('未匹配到“车缝完成”流转规则，请先在订单设置中检查流程链路配置');
@@ -393,6 +440,24 @@ export class ProductionSewingService {
       order.status = next;
       order.statusTime = now;
       await this.orderRepo.save(order);
+    }
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      const detail = this.buildSewingLogDetail(sewingQuantity, sewingQuantities ?? null, ext);
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_sewing_register',
+          detail,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[sewing complete] write operation log failed:', err);
     }
   }
 }
