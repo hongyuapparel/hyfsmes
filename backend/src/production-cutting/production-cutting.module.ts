@@ -6,6 +6,7 @@ import { OrderExt } from '../entities/order-ext.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
@@ -19,7 +20,16 @@ import { ProductionCuttingMutationService } from './production-cutting-mutation.
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderCutting, OrderExt, OrderStatus, OrderStatusHistory, User, RolePermission]),
+    TypeOrmModule.forFeature([
+      Order,
+      OrderCutting,
+      OrderExt,
+      OrderStatus,
+      OrderStatusHistory,
+      User,
+      RolePermission,
+      OrderOperationLog,
+    ]),
     AuthModule,
     OrderWorkflowModule,
     SystemOptionsModule,

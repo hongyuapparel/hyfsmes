@@ -3,19 +3,16 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
+import type { CuttingMaterialUsageRow } from '../entities/order-cutting.entity';
 import { type CuttingListQuery } from './production-cutting.service';
 import { ProductionCuttingService } from './production-cutting.service';
-import { ProductionCuttingMutationService } from './production-cutting-mutation.service';
 import type { Response } from 'express';
 
 @Controller('production/cutting')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/production/cutting')
 export class ProductionCuttingController {
-  constructor(
-    private readonly cuttingService: ProductionCuttingService,
-    private readonly cuttingMutationService: ProductionCuttingMutationService,
-  ) {}
+  constructor(private readonly cuttingService: ProductionCuttingService) {}
 
   @Get('tab-counts')
   getTabCounts(
@@ -150,7 +147,7 @@ export class ProductionCuttingController {
     @Body('materialUsage') materialUsage?: unknown,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
-    return this.cuttingMutationService.completeCutting(
+    return this.cuttingService.completeCutting(
       Number(orderId),
       Array.isArray(actualCutRows) ? actualCutRows : [],
       cuttingDepartment ?? null,
@@ -159,9 +156,9 @@ export class ProductionCuttingController {
         cuttingUnitPrice: cuttingUnitPrice ?? null,
         cuttingTotalCost: cuttingTotalCost ?? null,
         cuttingCostLegacy: cuttingCostLegacy ?? null,
-        materialUsage: Array.isArray(materialUsage) ? (materialUsage as any) : null,
+        materialUsage: Array.isArray(materialUsage) ? (materialUsage as CuttingMaterialUsageRow[]) : null,
       },
-      user?.userId,
+      user ? { userId: user.userId, username: user.username } : undefined,
     );
   }
 }

@@ -9,6 +9,9 @@ import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
+import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 import { CUTTING_ABNORMAL_REASONS } from './production-cutting.types';
 
 const ALLOWED_MATERIAL_CATEGORY_VALUES = new Set(['主布', '里布', '配布', '衬布']);
@@ -26,6 +29,10 @@ export class ProductionCuttingMutationService {
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly systemOptionsService: SystemOptionsService,
   ) {}
@@ -250,6 +257,17 @@ export class ProductionCuttingMutationService {
     return { normalized, fabricNetSum };
   }
 
+  private buildCuttingLogDetail(rows: ActualCutRow[]): string {
+    if (!rows.length) return '裁床登记：已完成';
+    const segments = rows.map((row) => {
+      const color = (row.colorName ?? '-').trim() || '-';
+      const qtys = Array.isArray(row.quantities) ? row.quantities : [];
+      const sum = qtys.reduce((acc, q) => acc + (Number.isFinite(Number(q)) ? Number(q) : 0), 0);
+      return `${color} ${sum} 件`;
+    });
+    return `裁床登记：${segments.join(' / ')}`;
+  }
+
   async completeCutting(
     orderId: number,
     actualCutRows: ActualCutRow[],
@@ -261,7 +279,7 @@ export class ProductionCuttingMutationService {
       cuttingCostLegacy?: string | null;
       materialUsage?: CuttingMaterialUsageRow[] | null;
     },
-    actorUserId?: number,
+    actor?: { userId?: number; username?: string },
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
@@ -365,7 +383,7 @@ export class ProductionCuttingMutationService {
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
       triggerCode: 'cutting_completed',
-      actorUserId: actorUserId ?? 0,
+      actorUserId: actor?.userId ?? 0,
     });
     if (!next) {
       throw new BadRequestException('未匹配到“裁床完成”流转规则，请先在订单设置中检查流程链路配置');
@@ -379,6 +397,24 @@ export class ProductionCuttingMutationService {
       order.statusTime = now;
       await this.orderRepo.save(order);
       await this.appendStatusHistory(order.id, next);
+    }
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      const detail = this.buildCuttingLogDetail(rowsIn);
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_cutting_register',
+          detail,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[cutting] write operation log failed:', err);
     }
   }
 }

@@ -78,7 +78,7 @@ export class ProductionCuttingService {
       cuttingCostLegacy?: string | null;
       materialUsage?: CuttingMaterialUsageRow[] | null;
     },
-    actorUserId?: number,
+    actor?: { userId?: number; username?: string },
   ): Promise<void> {
     return this.mutationService.completeCutting(
       orderId,
@@ -86,7 +86,7 @@ export class ProductionCuttingService {
       cuttingDepartment,
       cutterName,
       body,
-      actorUserId,
+      actor,
     );
   }
 }

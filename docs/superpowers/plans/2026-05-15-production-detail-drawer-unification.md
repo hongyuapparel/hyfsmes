@@ -636,11 +636,11 @@ git commit -m "feat(production-craft): 工艺完成落操作日志
 
 **目的：** 裁床完成（`completeCutting`）落 `production_cutting_register` 日志。
 
-- [ ] **Step 1: 注入仓库**
+- [x] **Step 1: 注入仓库**
 
 同 Task 4 Step 1。`production-cutting.module.ts` 注入 `OrderOperationLog` 和 `User`。
 
-- [ ] **Step 2: 在 `completeCutting` 末尾追加日志**
+- [x] **Step 2: 在 `completeCutting` 末尾追加日志**
 
 定位 `completeCutting`（[production-cutting-mutation.service.ts:253](backend/src/production-cutting/production-cutting-mutation.service.ts) 附近）。在业务写入完成后追加：
 
@@ -668,7 +668,7 @@ git commit -m "feat(production-craft): 工艺完成落操作日志
 
 `actor` 参数：如 controller 没传，需要在 controller 层加 `@CurrentUser()` 提取并传入；service 方法签名追加 `actor?: { userId?: number; username?: string }`。
 
-- [ ] **Step 3: 重启 + 验证**
+- [x] **Step 3: 重启 + 验证**
 
 操作"裁床登记"，验证：
 
@@ -677,7 +677,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
   "http://localhost:3000/orders/<orderId>/operation-logs?module=production_cutting"
 ```
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/production-cutting
@@ -696,11 +696,11 @@ git commit -m "feat(production-cutting): 裁床登记落操作日志
 
 **目的：** 车缝分配和完成各落一条日志。
 
-- [ ] **Step 1: 注入仓库**
+- [x] **Step 1: 注入仓库**
 
 同 Task 4。
 
-- [ ] **Step 2: 在 `assignSewing` 末尾追加日志**
+- [x] **Step 2: 在 `assignSewing` 末尾追加日志**
 
 ```typescript
     try {
@@ -721,7 +721,7 @@ git commit -m "feat(production-cutting): 裁床登记落操作日志
     }
 ```
 
-- [ ] **Step 3: 在 `completeSewing` 末尾追加日志**
+- [x] **Step 3: 在 `completeSewing` 末尾追加日志**
 
 ```typescript
     try {
@@ -745,7 +745,7 @@ git commit -m "feat(production-cutting): 裁床登记落操作日志
 
 `actor` 参数与 Task 7 一致：controller 层加 `@CurrentUser()` 透传。
 
-- [ ] **Step 4: 重启 + 验证**
+- [x] **Step 4: 重启 + 验证**
 
 操作"车缝登记"后：
 
@@ -754,7 +754,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
   "http://localhost:3000/orders/<orderId>/operation-logs?module=production_sewing"
 ```
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add backend/src/production-sewing
@@ -773,11 +773,11 @@ git commit -m "feat(production-sewing): 车缝分配 / 完成落操作日志
 
 **目的：** 尾部登记入库时落 `production_finishing_inbound` 日志。批次信息已在 `inbound` 方法签名中可见。
 
-- [ ] **Step 1: 注入仓库**
+- [x] **Step 1: 注入仓库**
 
 同 Task 4。`production-finishing.module.ts` 注入 `OrderOperationLog`。
 
-- [ ] **Step 2: 在 `inbound` 方法末尾追加日志**
+- [x] **Step 2: 在 `inbound` 方法末尾追加日志**
 
 ```typescript
     try {
@@ -806,7 +806,7 @@ git commit -m "feat(production-sewing): 车缝分配 / 完成落操作日志
 
 `batchNo` / `isPartial` 取自 `inbound` 方法内已经计算的变量名（参照 [production-finishing-mutation.service.ts:91](backend/src/production-finishing/production-finishing-mutation.service.ts) `nextBatchNo` 和入库判断逻辑）。
 
-- [ ] **Step 3: 重启 + 验证**
+- [x] **Step 3: 重启 + 验证**
 
 操作"尾部登记入库"后：
 
@@ -815,7 +815,7 @@ curl -H "Authorization: Bearer <TOKEN>" \
   "http://localhost:3000/orders/<orderId>/operation-logs?module=production_finishing"
 ```
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/production-finishing
