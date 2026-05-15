@@ -13,6 +13,7 @@ import { seedOrderCostSnapshotsTable } from './database/seed-order-cost-snapshot
 import { seedOrderSewingFactoryDueDate } from './database/seed-order-sewing-factory-due-date';
 import { seedOrderSewingQuantityRow } from './database/seed-order-sewing-quantity-row';
 import { seedInboundPendingBatchColumns } from './database/seed-inbound-pending-batch-columns';
+import { ensureOrderOperationLogTargetColumns } from './database/ensure-order-operation-log-target-columns';
 
 async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
   const rows: Array<{ cnt: number }> = await dataSource.query(
@@ -225,6 +226,7 @@ async function bootstrap() {
     await dropSupplierCooperationDateColumn(dataSource);
     await ensureSupplierRemarkColumn(dataSource);
     await ensureInventoryOperationLogTables(dataSource);
+    await ensureOrderOperationLogTargetColumns(dataSource);
     await ensureOrderFinishingQtyRowColumns(dataSource);
     await ensureOrderSoftDeleteColumns(dataSource);
     await seedPermissions(dataSource);

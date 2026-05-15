@@ -37,6 +37,14 @@ export class OrderOperationLog {
   @Column({ type: 'text' })
   detail: string;
 
+  /** 子对象类型：order / purchase_item 等；订单维度留 NULL */
+  @Column({ name: 'target_type', type: 'varchar', length: 32, nullable: true })
+  targetType: string | null;
+
+  /** 子对象唯一定位串，如 `${orderId}_${materialIndex}`；订单维度留 NULL */
+  @Column({ name: 'target_ref', type: 'varchar', length: 64, nullable: true })
+  targetRef: string | null;
+
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;
 }

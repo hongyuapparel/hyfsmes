@@ -46,7 +46,7 @@ powershell -ExecutionPolicy Bypass -File scripts/check.ps1
 
 **目的：** 给现有表加 `target_type VARCHAR(32) NULL` 和 `target_ref VARCHAR(64) NULL`，让后续 mutation 可携带子对象定位信息。订单模块现有 3 处写入留 NULL，行为零影响。
 
-- [ ] **Step 1: 在 entity 文件追加字段**
+- [x] **Step 1: 在 entity 文件追加字段**
 
 打开 `backend/src/entities/order-operation-log.entity.ts`，在 `createdAt` 字段**之前**追加：
 
@@ -60,7 +60,7 @@ powershell -ExecutionPolicy Bypass -File scripts/check.ps1
   targetRef: string | null;
 ```
 
-- [ ] **Step 2: 写 ensure-脚本**
+- [x] **Step 2: 写 ensure-脚本**
 
 创建 `backend/src/database/ensure-order-operation-log-target-columns.ts`：
 
@@ -89,7 +89,7 @@ export async function ensureOrderOperationLogTargetColumns(dataSource: DataSourc
 }
 ```
 
-- [ ] **Step 3: 在 main.ts 注册 ensure-脚本**
+- [x] **Step 3: 在 main.ts 注册 ensure-脚本**
 
 在 `backend/src/main.ts:227` 附近（紧邻 `ensureInventoryOperationLogTables(dataSource);` 之后），加一行：
 
@@ -103,7 +103,7 @@ export async function ensureOrderOperationLogTargetColumns(dataSource: DataSourc
 import { ensureOrderOperationLogTargetColumns } from './database/ensure-order-operation-log-target-columns';
 ```
 
-- [ ] **Step 4: 重启后端，验证列已添加**
+- [x] **Step 4: 重启后端，验证列已添加**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/restart.ps1
@@ -121,7 +121,7 @@ DESCRIBE order_operation_logs;
 
 期望看到 `target_type VARCHAR(32) YES NULL` 和 `target_ref VARCHAR(64) YES NULL`。
 
-- [ ] **Step 5: 提交**
+- [x] **Step 5: 提交**
 
 ```bash
 git add backend/src/entities/order-operation-log.entity.ts backend/src/database/ensure-order-operation-log-target-columns.ts backend/src/main.ts
