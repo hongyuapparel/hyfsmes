@@ -8,6 +8,9 @@ import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
+import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 export interface PatternListItem {
   orderId: number;
@@ -81,6 +84,10 @@ export class ProductionPatternService {
     private readonly orderStatusRepo: Repository<OrderStatus>,
     @InjectRepository(OrderStatusHistory)
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
@@ -261,7 +268,12 @@ export class ProductionPatternService {
     return { materials, remark };
   }
 
-  async savePatternMaterials(orderId: number, materials: PatternMaterialRow[], remark?: string | null): Promise<void> {
+  async savePatternMaterials(
+    orderId: number,
+    materials: PatternMaterialRow[],
+    remark?: string | null,
+    actor?: { userId?: number; username?: string },
+  ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
     const colsReady = await this.hasPatternMaterialsColumns();
@@ -269,12 +281,40 @@ export class ProductionPatternService {
       throw new BadRequestException('数据库缺少纸样物料字段，请先执行脚本：backend/scripts/add-order-pattern-materials-json.sql');
     }
     let pattern = await this.patternRepo.findOne({ where: { orderId } });
+    const materialsBeforeSave = pattern?.materialsJson;
+    const hadUsageBefore =
+      Array.isArray(materialsBeforeSave) &&
+      (materialsBeforeSave as PatternMaterialRow[]).some((m) => {
+        const u = m.usagePerPiece;
+        return u != null && Number.isFinite(Number(u));
+      });
     if (!pattern) {
       pattern = this.patternRepo.create({ orderId, status: 'pending_assign' });
     }
     pattern.materialsJson = Array.isArray(materials) ? (materials as unknown as typeof pattern.materialsJson) : [];
     pattern.materialsRemark = remark?.trim() || null;
     await this.patternRepo.save(pattern);
+
+    const isFirstSave = !hadUsageBefore;
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      const summary = materials.map((m) => `${m.materialName ?? '-'} ${m.usagePerPiece ?? '-'}`).join(' / ');
+      const action = isFirstSave ? 'production_pattern_save' : 'production_pattern_update';
+      const verbCN = isFirstSave ? '保存' : '修改';
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action,
+          detail: `${verbCN}用量：${summary}`,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[pattern] write operation log failed:', err);
+    }
   }
 
   private async buildPatternRows(baseQuery: PatternListQuery): Promise<PatternListItem[]> {

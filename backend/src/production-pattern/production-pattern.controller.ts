@@ -2,7 +2,7 @@ import { Body, Controller, Get, Param, ParseIntPipe, Post, Query, Res, UseGuards
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
-import { ProductionPatternService, PatternListQuery } from './production-pattern.service';
+import { ProductionPatternService, PatternListQuery, type PatternMaterialRow } from './production-pattern.service';
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { Response } from 'express';
 
@@ -187,9 +187,15 @@ export class ProductionPatternController {
   @RequirePermission('production_pattern_materials')
   saveMaterials(
     @Param('orderId', ParseIntPipe) orderId: number,
-    @Body('materials') materials: any[],
+    @CurrentUser() user: { userId: number; username: string },
+    @Body('materials') materials: unknown[],
     @Body('remark') remark?: string,
   ) {
-    return this.patternService.savePatternMaterials(orderId, Array.isArray(materials) ? materials : [], remark ?? null);
+    return this.patternService.savePatternMaterials(
+      orderId,
+      Array.isArray(materials) ? (materials as PatternMaterialRow[]) : [],
+      remark ?? null,
+      { userId: user.userId, username: user.username },
+    );
   }
 }
