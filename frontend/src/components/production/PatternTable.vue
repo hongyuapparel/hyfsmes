@@ -57,7 +57,7 @@
     </el-table-column>
     <el-table-column prop="patternMaster" label="纸样师" width="90" />
     <el-table-column prop="sampleMaker" label="车版师" width="90" />
-    <el-table-column label="详情" width="84" align="center" fixed="right">
+    <el-table-column label="详情" width="72" align="center" fixed="right">
       <template #default="{ row }">
         <el-button link type="primary" size="small" @click.stop="emit('open-detail', row)">
           查看

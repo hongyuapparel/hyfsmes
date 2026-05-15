@@ -122,7 +122,7 @@
         }}
       </template>
     </el-table-column>
-    <el-table-column label="操作" width="72" align="center" fixed="right">
+    <el-table-column label="详情" width="72" align="center" fixed="right">
       <template #default="{ row }">
         <el-button link type="primary" @click.stop="emit('open-detail', row)">查看</el-button>
       </template>

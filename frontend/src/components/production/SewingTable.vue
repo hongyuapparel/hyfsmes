@@ -228,9 +228,9 @@
           </el-popover>
         </template>
       </el-table-column>
-      <el-table-column label="概要" width="64" align="center" fixed="right">
+      <el-table-column label="详情" width="72" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click.stop="emit('open-brief', row)">查看</el-button>
+          <el-button link type="primary" @click.stop="emit('open-detail', row)">查看</el-button>
         </template>
       </el-table-column>
   </el-table>
@@ -273,7 +273,7 @@ const emit = defineEmits<{
   (e: 'header-dragend', ...args: HeaderDragEndArgs): void
   (e: 'selection-change', rows: SewingListItem[]): void
   (e: 'show-qty-popover', row: SewingListItem): void
-  (e: 'open-brief', row: SewingListItem): void
+  (e: 'open-detail', row: SewingListItem): void
 }>()
 
 const tableRef = ref()

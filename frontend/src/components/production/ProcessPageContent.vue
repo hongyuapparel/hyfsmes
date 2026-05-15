@@ -206,9 +206,9 @@
             <div class="text-muted craft-sub-attr">{{ collaborationDisplay(row) }}</div>
           </template>
         </el-table-column>
-        <el-table-column label="明细" width="72" align="center" fixed="right">
+        <el-table-column label="详情" width="72" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" @click.stop="openCraftDetailDrawer(row)">明细</el-button>
+            <el-button link type="primary" @click.stop="openCraftDetailDrawer(row)">查看</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -269,13 +269,16 @@
             <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
           </el-table>
         </ProductionDetailSection>
+        <ProductionDetailSection>
+          <OperationLogsSection :logs="craftDrawerLogs" />
+        </ProductionDetailSection>
       </template>
     </ProductionDetailDrawerShell>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watchEffect } from 'vue'
+import { computed, ref, watch, watchEffect } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
@@ -294,6 +297,9 @@ import ProductionDetailDrawerShell from '@/components/production/ProductionDetai
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import { useProductionProcessPage } from '@/composables/useProductionProcessPage'
+import type { CraftListItem } from '@/api/production-craft'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import { useAuthStore } from '@/stores/auth'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
@@ -349,6 +355,24 @@ const {
   craftBriefFromRow,
   load,
 } = useProductionProcessPage()
+
+const craftDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+
+async function loadCraftDrawerLogs(row: CraftListItem | null) {
+  if (!row) {
+    craftDrawerLogs.value = []
+    return
+  }
+  const logs = await fetchOrderOperationLogs(row.orderId, { module: 'production_process' })
+  craftDrawerLogs.value = toLogSectionItems(logs)
+}
+
+watch(
+  () => craftDetailDrawer.row,
+  (row) => {
+    void loadCraftDrawerLogs(row)
+  },
+)
 
 function restoreCurrentColumnWidths() {
   restoreColumnWidths(craftTableRef.value)
