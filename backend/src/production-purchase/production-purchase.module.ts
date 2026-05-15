@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../entities/order.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
@@ -20,7 +21,7 @@ import { ProductionPurchaseQueryService } from './production-purchase-query.serv
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderExt, OrderStatus, OrderStatusHistory, User, RolePermission]),
+    TypeOrmModule.forFeature([Order, OrderExt, OrderStatus, OrderStatusHistory, User, RolePermission, OrderOperationLog]),
     AuthModule,
     OrderWorkflowModule,
     SuppliersModule,

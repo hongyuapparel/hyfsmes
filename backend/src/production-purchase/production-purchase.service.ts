@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatus } from '../entities/order-status.entity';
@@ -38,6 +39,8 @@ export class ProductionPurchaseService {
     private readonly orderStatusHistoryRepo: Repository<OrderStatusHistory>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
     private readonly suppliersService: SuppliersService,
     private readonly systemOptionsService: SystemOptionsService,
@@ -189,6 +192,28 @@ export class ProductionPurchaseService {
       await this.orderRepo.save(order);
       await this.appendStatusHistory(order.id, nextStatus);
     }
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, {
+        userId: actorUserId,
+        username: '',
+      });
+      const detail =
+        `采购登记：${row.materialName ?? '-'}${row.color ? ` ${row.color}` : ''}` + ` ${normalizedQty}`;
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId: order.id,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_purchase_register',
+          detail,
+          targetType: 'purchase_item',
+          targetRef: `${order.id}_${materialIndex}`,
+        }),
+      );
+    } catch (err) {
+      console.warn('[purchase] write operation log failed:', err);
+    }
   }
 
   async registerPurchaseBatch(params: {
@@ -207,6 +232,15 @@ export class ProductionPurchaseService {
     const completedAt = this.toDateTimeLocalString(new Date());
     const remark = (params.remark ?? '').trim() || null;
     const imageUrl = (params.imageUrl ?? '').trim() || null;
+
+    const purchaseBatchLogEntries: Array<{
+      orderId: number;
+      orderNo: string;
+      materialIndex: number;
+      materialName: string;
+      color: string;
+      qty: number;
+    }> = [];
 
     await this.orderRepo.manager.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
@@ -275,6 +309,14 @@ export class ProductionPurchaseService {
             purchaseImageUrl: itemImageUrl,
           };
           touchedSupplierNames.add(supplierName);
+          purchaseBatchLogEntries.push({
+            orderId: order.id,
+            orderNo: order.orderNo,
+            materialIndex: item.materialIndex,
+            materialName: row.materialName ?? '-',
+            color: (row.color ?? '').trim(),
+            qty: normalizedQty,
+          });
         }
 
         let nextStatus: string | null = null;
@@ -306,6 +348,30 @@ export class ProductionPurchaseService {
         }
       }
     });
+
+    for (const entry of purchaseBatchLogEntries) {
+      try {
+        const operator = await resolveOperatorDisplayName(this.userRepo, {
+          userId: params.actorUserId,
+          username: '',
+        });
+        const colorPart = entry.color ? ` ${entry.color}` : '';
+        const detail = `采购登记（批量）：${entry.materialName}${colorPart} ${entry.qty}`;
+        await this.orderLogRepo.save(
+          this.orderLogRepo.create({
+            orderId: entry.orderId,
+            orderNo: entry.orderNo,
+            operatorUsername: operator,
+            action: 'production_purchase_register',
+            detail,
+            targetType: 'purchase_item',
+            targetRef: `${entry.orderId}_${entry.materialIndex}`,
+          }),
+        );
+      } catch (err) {
+        console.warn('[purchase batch] write operation log failed:', err);
+      }
+    }
 
     await this.suppliersService.touchLastActiveByNames([...touchedSupplierNames]);
   }
