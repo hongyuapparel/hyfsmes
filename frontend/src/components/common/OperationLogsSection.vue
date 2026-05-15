@@ -17,7 +17,7 @@
 <script setup lang="ts">
 defineProps<{
   logs: Array<{
-    id: string
+    id: string | number
     operatorUsername: string
     createdAt: string
     summary: string

@@ -51,7 +51,7 @@
           </el-tab-pane>
 
           <el-tab-pane label="操作记录" name="logs">
-            <FinishedDetailLogsSection :logs="adjustLogs" />
+            <OperationLogsSection :logs="adjustLogs" />
           </el-tab-pane>
         </el-tabs>
       </div>
@@ -71,7 +71,7 @@ import type { FinishedCreateRowMetaField } from '@/composables/useFinishedCreate
 import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTableUtils'
 import FinishedDetailBasicInfoSection from '@/components/inventory/finished-detail/FinishedDetailBasicInfoSection.vue'
 import FinishedDetailColorSizeSection from '@/components/inventory/finished-detail/FinishedDetailColorSizeSection.vue'
-import FinishedDetailLogsSection from '@/components/inventory/finished-detail/FinishedDetailLogsSection.vue'
+import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 
 const props = withDefaults(
   defineProps<{
