@@ -96,7 +96,7 @@
 约束：
 - 两列均为可空，订单模块现有 3 处写入留 NULL，行为不变。
 - 不加索引（按 orderId 已有索引足以；本期数据量小）。
-- 仅 ADD COLUMN 的 schema 变更，TypeORM migration 单步可上 / 可回滚。
+- 项目当前无 migrations 体系；schema 落地采用现有惯例：在 `OrderOperationLog` entity 加 `@Column` 装饰器（dev 环境 `TYPEORM_SYNCHRONIZE=true` 自动生效），并在 `backend/src/database/` 下新增一段 ensure-脚本（沿用 `seed-order-cost-snapshots.ts` 的"未启用 migrations 时手动 ALTER"模式），生产部署时一次性执行。
 
 #### 4.4.1 action 命名规范（`production_<模块>_<动作>`）
 
@@ -105,7 +105,7 @@
 | 采购 | `production_purchase_register` | 采购登记接口成功后 | `purchase_item` | `${orderId}_${materialIndex}` |
 | 纸样 | `production_pattern_save` | 首次保存用量/图片 | `order` | NULL |
 | 纸样 | `production_pattern_update` | 修改用量/图片 | `order` | NULL |
-| 工艺 | `production_process_save` | 保存工艺 | `craft_item` | `${orderId}_${processItemId}` |
+| 工艺 | `production_process_complete` | 工艺完成（订单级一次性动作） | `order` | NULL |
 | 裁床 | `production_cutting_register` | 裁床登记成功后 | `order` | NULL |
 | 车缝 | `production_sewing_register` | 车缝登记成功后 | `order` | NULL |
 | 尾部 | `production_finishing_inbound` | 尾部登记入库（含批次） | `order` | NULL |
@@ -113,15 +113,14 @@
 注：
 - 6 个模块除纸样外均「登记一次后只可查看」，无修改 / 删除动作，故 action 列表无 update/delete 变体。
 - 纸样虽然有 save/update 两个 action，但纸样列表 row 是订单维度（非展开），targetType 用 `order`。
-- 工艺的 `processItemId` 取自 row 的工艺项目记录主键（写入前由 Service 解析当前操作所属工艺项目 ID）。
+- 工艺管理虽然列表 row 按"订单 × 工艺项目"展开，但写动作 `completeCraft(orderId)` 是订单级一次性完成，所以 targetType=`order`，所有工艺项目行的抽屉显示同一条日志，可接受。
 
 #### 4.4.2 target_ref 格式约定
 
 | targetType | targetRef 格式 | 说明 |
 |---|---|---|
-| `order` | NULL | 订单维度，无子对象 |
-| `purchase_item` | `${orderId}_${materialIndex}` | materialIndex 为 0-based |
-| `craft_item` | `${orderId}_${processItemId}` | processItemId 为后端工艺项目记录主键 |
+| `order` | NULL | 订单维度（纸样 / 工艺 / 裁床 / 车缝 / 尾部 / 订单本身） |
+| `purchase_item` | `${orderId}_${materialIndex}` | 仅采购用；materialIndex 为 0-based |
 
 未来若新增子对象维度，沿用 `${orderId}_${subId}` 模式。
 
@@ -156,7 +155,7 @@
 |---|---|
 | 采购 | `module=production_purchase&targetType=purchase_item&targetRef=${orderId}_${materialIndex}` |
 | 纸样 | `module=production_pattern` |
-| 工艺 | `module=production_process&targetType=craft_item&targetRef=${orderId}_${processItemId}` |
+| 工艺 | `module=production_process` |
 | 裁床 | `module=production_cutting` |
 | 车缝 | `module=production_sewing` |
 | 尾部 | `module=production_finishing` |
@@ -177,7 +176,7 @@
 
 ### 4.6 后端 helper 抽取
 
-现状：`order-mutation.service.ts:491-497` / `order-lifecycle.service.ts:148-154` / `order-status.service.ts:98-103` 三处重复同一段「displayName 优先回退 username」逻辑。新增 6 个生产 mutation 若不抽取，则同段代码扩散至 9 处。
+现状：`order-mutation.service.ts:491-497` / `order-lifecycle.service.ts:148-154` / `order-status.service.ts:98-103` / `production-purchase.service.ts:117-122`（采购模块的私有 `resolveOperatorName`）四处重复同一段「displayName 优先回退 username」逻辑。新增 5 个生产 mutation（除采购外）若不抽取，则同段代码扩散至 9 处。
 
 抽取方案：
 - 新增 `backend/src/common/operator.util.ts`，提供 `resolveOperatorDisplayName(userRepo, actor): Promise<string>`。
@@ -190,7 +189,7 @@
 |---|---|---|---|
 | 采购 | `production-purchase.service.ts`（或 query/mutation 拆分后的对应文件） | `OrderOperationLog` repo + helper | 采购登记接口成功提交事务后 |
 | 纸样 | `production-pattern.service.ts` | 同上 | 用量/图片 save / update 成功后 |
-| 工艺 | `production-craft.service.ts` 或 `production-processes.service.ts` | 同上 | 工艺保存成功后 |
+| 工艺 | `production-craft.service.ts` 的 `completeCraft(orderId, userId)` | 同上 | 工艺完成接口成功后 |
 | 裁床 | `production-cutting-mutation.service.ts` | 同上 | 裁床登记成功后 |
 | 车缝 | `production-sewing.service.ts` | 同上 | 车缝登记成功后 |
 | 尾部 | `production-finishing-mutation.service.ts` | 同上 | 登记入库（含批次）成功后 |
