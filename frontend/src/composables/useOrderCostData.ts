@@ -15,6 +15,8 @@ import {
   ensureBaseCostRows,
   formatProductionProcessSelectLabel,
   getJobTypeLabel,
+  mergeMaterialRowsFromOrder,
+  mergeProcessItemRowsFromOrder,
   normalizeProductionCostMultiplier,
   normalizeProfitMargin,
   type MaterialRow,
@@ -48,6 +50,7 @@ interface CostSnapshotPayload {
   quoteConfirmedAt?: unknown
   quoteConfirmedBy?: unknown
   quoteNeedsReconfirm?: unknown
+  quoteDraftUpdatedAt?: unknown
 }
 
 const IMPORT_ORDER_SEARCH_PAGE_SIZE = 20
@@ -205,12 +208,27 @@ export function useOrderCostData(orderId: number) {
   function addProcessItemRow() { processItemRows.value.push({ unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY } as ProcessItemRow) }
   function removeProcessItemRow(index: number) { processItemRows.value.splice(index, 1) }
 
-  function initializeCostRowsFromOrder(detail: OrderDetail) {
-    materialRows.value = (detail.materials ?? []).map((item) => ({ ...item, unitPrice: 0, includeInCost: true })) as MaterialRow[]
-    processItemRows.value = (detail.processItems ?? []).map((item) => ({ ...item, unitPrice: 0, quantity: DEFAULT_PROCESS_ITEM_QTY })) as ProcessItemRow[]
+  function ensureCostRowsBase() {
     const base = ensureBaseCostRows(materialRows.value, processItemRows.value)
     materialRows.value = base.materialRows
     processItemRows.value = base.processItemRows
+  }
+
+  /**
+   * 仅在“订单尚未被人工成本核算过”时调用:用订单当前的物料/工艺项目结构导入成本行打底。
+   * 若内存中已有快照单价(占位快照),按行身份回填;匹配不上的按单价 0 呈现。
+   * 一旦用户在成本页保存/提交过,该快照即为权威,不再走此自动导入(见 onMounted)。
+   */
+  function reconcileCostRowsFromOrder(detail: OrderDetail) {
+    const orderMaterials = Array.isArray(detail.materials) ? detail.materials : []
+    const orderProcessItems = Array.isArray(detail.processItems) ? detail.processItems : []
+    if (orderMaterials.length) {
+      materialRows.value = mergeMaterialRowsFromOrder(orderMaterials, materialRows.value)
+    }
+    if (orderProcessItems.length) {
+      processItemRows.value = mergeProcessItemRowsFromOrder(orderProcessItems, processItemRows.value)
+    }
+    ensureCostRowsBase()
   }
 
   async function loadOrder() {
@@ -223,6 +241,11 @@ export function useOrderCostData(orderId: number) {
     }
   }
 
+  /**
+   * 加载成本快照。返回值表示该快照是否“被用户在成本页保存/提交过”:
+   * 保存草稿与确认报价都会写入 quoteDraftUpdatedAt / quoteConfirmedAt 元数据,
+   * 据此区分“人工核算过的权威快照”与“系统占位/空快照”。
+   */
   async function loadCostSnapshot(): Promise<boolean> {
     if (!orderId) return false
     try {
@@ -248,7 +271,9 @@ export function useOrderCostData(orderId: number) {
       quoteConfirmedAt.value = typeof s.quoteConfirmedAt === 'string' ? s.quoteConfirmedAt : ''
       quoteConfirmedBy.value = typeof s.quoteConfirmedBy === 'string' ? s.quoteConfirmedBy : ''
       quoteNeedsReconfirm.value = Boolean(s.quoteNeedsReconfirm)
-      return hasSnapshot
+      const draftUpdatedAt = typeof s.quoteDraftUpdatedAt === 'string' ? s.quoteDraftUpdatedAt : ''
+      const isUserSavedSnapshot = hasSnapshot && (!!draftUpdatedAt || !!quoteConfirmedAt.value)
+      return isUserSavedSnapshot
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
       return false
@@ -557,7 +582,8 @@ export function useOrderCostData(orderId: number) {
     ...calculations,
     loadOrder,
     loadCostSnapshot,
-    initializeCostRowsFromOrder,
+    reconcileCostRowsFromOrder,
+    ensureCostRowsBase,
     loadProcesses,
     loadMaterialTypes,
     syncMaterialTypeIdsFromLabel,

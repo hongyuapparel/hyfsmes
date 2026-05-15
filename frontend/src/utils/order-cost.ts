@@ -158,6 +158,95 @@ export function ensureBaseCostRows(materialRows: MaterialRow[], processRows: Pro
   return { materialRows: nextMaterials, processItemRows: nextProcessItems }
 }
 
+function materialIdentityKey(row: Partial<MaterialRow>): string {
+  return [
+    row.materialTypeId == null ? '' : String(row.materialTypeId),
+    String(row.supplierName ?? '').trim(),
+    String(row.materialName ?? '').trim(),
+    String(row.color ?? '').trim(),
+    String(row.fabricWidth ?? '').trim(),
+  ].join('|')
+}
+
+function processItemIdentityKey(row: Partial<ProcessItemRow>): string {
+  return [
+    String(row.processName ?? '').trim(),
+    String(row.supplierName ?? '').trim(),
+    String(row.part ?? '').trim(),
+  ].join('|')
+}
+
+function buildBuckets<T>(rows: T[], keyOf: (row: T) => string): Map<string, T[]> {
+  const buckets = new Map<string, T[]>()
+  rows.forEach((row) => {
+    const key = keyOf(row)
+    if (!key) return
+    const bucket = buckets.get(key)
+    if (bucket) bucket.push(row)
+    else buckets.set(key, [row])
+  })
+  return buckets
+}
+
+function pickOnce<T>(buckets: Map<string, T[]>, key: string, used: Set<T>): T | null {
+  if (!key) return null
+  const bucket = buckets.get(key)
+  if (!bucket) return null
+  for (const candidate of bucket) {
+    if (!used.has(candidate)) {
+      used.add(candidate)
+      return candidate
+    }
+  }
+  return null
+}
+
+/**
+ * 用订单的物料结构重建成本物料行,并保留成本快照里已填写的单价与"计入成本"。
+ * 订单是物料结构来源,成本快照是单价来源,二者互不清空;匹配不上的订单物料按单价 0 呈现。
+ */
+export function mergeMaterialRowsFromOrder(
+  orderMaterials: Array<Partial<MaterialRow>>,
+  pricedRows: MaterialRow[],
+): MaterialRow[] {
+  const exactBuckets = buildBuckets(pricedRows, materialIdentityKey)
+  const nameBuckets = buildBuckets(pricedRows, (row) => String(row.materialName ?? '').trim())
+  const used = new Set<MaterialRow>()
+  return orderMaterials.map((src) => {
+    const matched =
+      pickOnce(exactBuckets, materialIdentityKey(src), used) ??
+      pickOnce(nameBuckets, String(src.materialName ?? '').trim(), used)
+    return {
+      ...src,
+      unitPrice: matched ? Number(matched.unitPrice) || 0 : 0,
+      includeInCost: matched ? matched.includeInCost !== false : true,
+    }
+  })
+}
+
+/**
+ * 用订单的工艺项目结构重建成本工艺行,并保留成本快照里已填写的单价与数量。
+ */
+export function mergeProcessItemRowsFromOrder(
+  orderProcessItems: Array<Partial<ProcessItemRow>>,
+  pricedRows: ProcessItemRow[],
+): ProcessItemRow[] {
+  const exactBuckets = buildBuckets(pricedRows, processItemIdentityKey)
+  const nameBuckets = buildBuckets(pricedRows, (row) => String(row.processName ?? '').trim())
+  const used = new Set<ProcessItemRow>()
+  return orderProcessItems.map((src) => {
+    const matched =
+      pickOnce(exactBuckets, processItemIdentityKey(src), used) ??
+      pickOnce(nameBuckets, String(src.processName ?? '').trim(), used)
+    const quantity = matched ? Number(matched.quantity) : Number.NaN
+    return {
+      ...src,
+      unitPrice: matched ? Number(matched.unitPrice) || 0 : 0,
+      quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : DEFAULT_PROCESS_ITEM_QTY,
+    }
+  })
+}
+
 export function buildSnapshotPayload(params: {
   materialRows: MaterialRow[]
   processItemRows: ProcessItemRow[]

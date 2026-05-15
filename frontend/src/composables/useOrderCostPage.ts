@@ -66,7 +66,8 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     getJobTypeLabel,
     loadOrder,
     loadCostSnapshot,
-    initializeCostRowsFromOrder,
+    reconcileCostRowsFromOrder,
+    ensureCostRowsBase,
     loadProcesses,
     loadMaterialTypes,
     syncMaterialTypeIdsFromLabel,
@@ -227,10 +228,17 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     w.__ordersCostMountCount = (w.__ordersCostMountCount ?? 0) + 1
     logPerf('页面 mount 次数', { mountCount: w.__ordersCostMountCount })
     suppressDirtyTracking.value = true
-    const [, hasCostSnapshot] = await Promise.all([loadOrder(), loadCostSnapshot()])
+    const [, hasUserSavedSnapshot] = await Promise.all([loadOrder(), loadCostSnapshot()])
     if (!order.value) { await waitMs(LOAD_RETRY_DELAY_MS); await loadOrder() }
-    if (!hasCostSnapshot && order.value) initializeCostRowsFromOrder(order.value)
-    if (!hasCostSnapshot && !materialRows.value.length && !processItemRows.value.length) { await waitMs(LOAD_RETRY_DELAY_MS); await loadCostSnapshot() }
+    let savedSnapshot = hasUserSavedSnapshot
+    if (!savedSnapshot && !materialRows.value.length && !processItemRows.value.length) {
+      await waitMs(LOAD_RETRY_DELAY_MS)
+      savedSnapshot = await loadCostSnapshot()
+    }
+    // 人工保存/提交过的成本快照即为权威,完全冻结,不再用订单自动同步覆盖;
+    // 仅在订单从未被成本核算过时,才用订单的物料/工艺自动导入打底。
+    if (!savedSnapshot && order.value) reconcileCostRowsFromOrder(order.value)
+    else ensureCostRowsBase()
     await loadProcesses()
     syncProductionIdsFromName()
     await loadMaterialTypes()
