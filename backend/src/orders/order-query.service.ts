@@ -494,6 +494,27 @@ export class OrderQueryService {
     return logs.map((log) => ({ ...log, detail: this.orderStatusService.formatLogDetail(log.detail) }));
   }
 
+  async getOperationLogs(
+    orderId: number,
+    module?: string | null,
+    targetType?: string | null,
+    targetRef?: string | null,
+  ): Promise<OrderOperationLog[]> {
+    const qb = this.orderLogRepo
+      .createQueryBuilder('log')
+      .where('log.orderId = :orderId', { orderId });
+    if (module) {
+      qb.andWhere('log.action LIKE :prefix', { prefix: `${module}_%` });
+    }
+    if (targetType) {
+      qb.andWhere('log.targetType = :targetType', { targetType });
+    }
+    if (targetRef) {
+      qb.andWhere('log.targetRef = :targetRef', { targetRef });
+    }
+    return qb.orderBy('log.createdAt', 'DESC').limit(200).getMany();
+  }
+
   async getRemarks(orderId: number) {
     await this.findOne(orderId);
     return this.orderRemarkRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });

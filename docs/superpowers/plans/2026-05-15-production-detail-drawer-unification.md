@@ -272,7 +272,7 @@ git commit -m "refactor(common): 抽取 resolveOperatorDisplayName 公共 helper
 
 **目的：** 让前端按 `orderId + module + targetType + targetRef` 拉取日志。
 
-- [ ] **Step 1: 在 `order-query.service.ts` 追加方法**
+- [x] **Step 1: 在 `order-query.service.ts` 追加方法**
 
 注意：`OrderOperationLog` 仓库应该已经在 orders.module 注入。先 `git grep "OrderOperationLog" backend/src/orders/` 确认。
 
@@ -315,7 +315,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 ```
 
-- [ ] **Step 2: 在 controller 追加路由**
+- [x] **Step 2: 在 controller 追加路由**
 
 在 `backend/src/orders/orders.controller.ts` 内添加：
 
@@ -339,7 +339,7 @@ import { Repository } from 'typeorm';
 
 权限点 `orders_read` 用现有"查看订单"权限——若实际权限点名不同，请用 `git grep "RequirePermission.*orders" backend/src/orders/orders.controller.ts` 找出该 controller 用的最相近权限点（通常是"查看订单列表"对应的那个）替换。
 
-- [ ] **Step 3: 重启 + curl 验证**
+- [x] **Step 3: 重启 + curl 验证**
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts/restart.ps1
@@ -361,7 +361,7 @@ curl -H "Authorization: Bearer <TOKEN>" "http://localhost:3000/orders/1/operatio
 
 期望：仅 `action LIKE 'order_%'` 的日志（如 `order_create` / `order_update`）。
 
-- [ ] **Step 4: 提交**
+- [x] **Step 4: 提交**
 
 ```bash
 git add backend/src/orders/order-query.service.ts backend/src/orders/orders.controller.ts

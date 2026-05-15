@@ -276,6 +276,21 @@ export class OrdersController {
     return this.orderMutationService.copyManyToDraft(ids ?? [], actor);
   }
 
+  @Get(':id/operation-logs')
+  getOperationLogs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('module') module?: string,
+    @Query('targetType') targetType?: string,
+    @Query('targetRef') targetRef?: string,
+  ) {
+    return this.orderQueryService.getOperationLogs(
+      id,
+      module ?? null,
+      targetType ?? null,
+      targetRef ?? null,
+    );
+  }
+
   /**
    * 获取订单操作记录
    * GET /orders/:id/logs
