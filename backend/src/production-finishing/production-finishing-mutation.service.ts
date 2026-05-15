@@ -6,6 +6,9 @@ import { OrderExt } from '../entities/order-ext.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
+import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 
 @Injectable()
 export class ProductionFinishingMutationService {
@@ -21,6 +24,10 @@ export class ProductionFinishingMutationService {
     private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(InboundPending)
     private readonly inboundPendingRepo: Repository<InboundPending>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
   ) {}
 
@@ -473,7 +480,10 @@ export class ProductionFinishingMutationService {
     const received = finishing.tailReceivedQty ?? 0;
     const shipped = finishing.tailShippedQty ?? 0;
     const defect = finishing.defectQuantity ?? 0;
-    const newInbound = (finishing.tailInboundQty ?? 0) + qty;
+    const prevInbound = finishing.tailInboundQty ?? 0;
+    const remainingSpace = received - shipped - prevInbound - defect;
+    const isPartial = remainingSpace > 0 && qty < remainingSpace;
+    const newInbound = prevInbound + qty;
     if (shipped + newInbound + defect > received) {
       throw new NotFoundException(`出货数(${shipped})+入库数+次品数(${defect})不能超过尾部收货数(${received})`);
     }
@@ -512,6 +522,27 @@ export class ProductionFinishingMutationService {
       }
     } else {
       await this.finishingRepo.save(finishing);
+    }
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, {
+        userId: actorUserId,
+        username: actorUsername ?? '',
+      });
+      const detail = `尾部入库：第 ${nextBatchNo} 批次 ${qty} 件${isPartial ? '（部分入库）' : ''}`;
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_finishing_inbound',
+          detail,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[finishing inbound] write operation log failed:', err);
     }
   }
 }

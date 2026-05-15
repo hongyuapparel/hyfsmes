@@ -7,6 +7,7 @@ import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { User } from '../entities/user.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { OrderWorkflowModule } from '../order-workflow/order-workflow.module';
@@ -18,7 +19,17 @@ import { ProductionFinishingMutationService } from './production-finishing-mutat
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, OrderFinishing, OrderCutting, OrderExt, OrderSewing, InboundPending, User, RolePermission]),
+    TypeOrmModule.forFeature([
+      Order,
+      OrderFinishing,
+      OrderCutting,
+      OrderExt,
+      OrderSewing,
+      InboundPending,
+      User,
+      RolePermission,
+      OrderOperationLog,
+    ]),
     AuthModule,
     OrderWorkflowModule,
     OrderStatusConfigModule,
