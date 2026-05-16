@@ -363,7 +363,7 @@
             <el-input
               v-model="materialsForm.remark"
               type="textarea"
-              :rows="3"
+              :autosize="{ minRows: 1, maxRows: 8 }"
               placeholder="可选"
               :disabled="!canEditPatternMaterials || !materialsEditMode"
             />
