@@ -1,28 +1,37 @@
 <template>
-  <el-drawer
+  <AppDrawer
     :model-value="modelValue"
     :title="title"
-    direction="rtl"
     :size="size"
-    destroy-on-close
+    :min-size="minSize"
+    :max-size="maxSize"
+    :resizable="resizable"
     @update:model-value="emit('update:modelValue', $event)"
     @closed="emit('closed')"
   >
     <div class="production-detail-drawer-shell">
       <slot />
     </div>
-  </el-drawer>
+  </AppDrawer>
 </template>
 
 <script setup lang="ts">
+import AppDrawer from '@/components/AppDrawer.vue'
+
 withDefaults(
   defineProps<{
     modelValue: boolean
     title: string
-    size?: string | number
+    size?: number
+    minSize?: number
+    maxSize?: number
+    resizable?: boolean
   }>(),
   {
-    size: '460px',
+    size: 760,
+    minSize: 680,
+    maxSize: 1200,
+    resizable: true,
   },
 )
 
