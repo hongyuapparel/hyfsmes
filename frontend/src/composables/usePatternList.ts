@@ -13,6 +13,20 @@ export const PATTERN_TABS = [
   { label: '样品完成', value: 'completed' },
 ] as const
 
+const PATTERN_STATUS_LABEL: Record<string, string> = PATTERN_TABS.reduce(
+  (acc, tab) => {
+    if (tab.value !== 'all') acc[tab.value] = tab.label
+    return acc
+  },
+  {} as Record<string, string>,
+)
+
+export function patternStatusLabel(status: string | null | undefined): string {
+  const key = (status ?? '').trim()
+  if (!key) return '—'
+  return PATTERN_STATUS_LABEL[key] ?? key
+}
+
 export type PatternTabConfig = (typeof PATTERN_TABS)[number]
 
 export function usePatternList() {

@@ -230,7 +230,7 @@
               {{ (detailDrawer.row.sampleMaker ?? '').trim() || '—' }}
             </el-descriptions-item>
             <el-descriptions-item label="纸样状态">
-              {{ detailDrawer.row.patternStatus }}
+              {{ patternStatusLabel(detailDrawer.row.patternStatus) }}
             </el-descriptions-item>
           </el-descriptions>
         </ProductionDetailSection>
@@ -483,7 +483,7 @@ import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
-import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
+import { PATTERN_TABS, patternStatusLabel, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
 import { Edit, Plus } from '@element-plus/icons-vue'
 import type { PatternListItem, PatternMaterialRow } from '@/api/production-pattern'
