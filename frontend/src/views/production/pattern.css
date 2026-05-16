@@ -112,6 +112,12 @@
   pointer-events: none;
 }
 
+.materials-head-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
 .materials-actions {
   display: flex;
   align-items: center;

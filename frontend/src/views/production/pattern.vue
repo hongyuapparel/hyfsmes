@@ -248,28 +248,20 @@
           </el-descriptions>
         </ProductionDetailSection>
         <ProductionDetailSection title="纸样物料/裁片清单">
-          <div class="materials-actions">
-            <template v-if="!materialsEditMode">
-              <el-button
-                v-if="canEditPatternMaterials"
-                type="primary"
-                size="small"
-                :disabled="detailDrawer.loading"
-                @click="enterMaterialsEdit"
-              >
-                编辑
-              </el-button>
-            </template>
-            <template v-else>
-              <el-button
-                link
-                type="primary"
-                size="small"
-                :disabled="detailDrawer.loading"
-                @click="addMaterialRow"
-              >
-                新增
-              </el-button>
+          <template #actions>
+            <el-button
+              v-if="!materialsEditMode && canEditPatternMaterials"
+              size="small"
+              text
+              type="primary"
+              class="materials-head-btn"
+              :disabled="detailDrawer.loading"
+              @click="enterMaterialsEdit"
+            >
+              <el-icon><Edit /></el-icon>
+              <span>编辑</span>
+            </el-button>
+            <template v-if="materialsEditMode">
               <el-button
                 size="small"
                 :disabled="detailDrawer.saving"
@@ -287,6 +279,18 @@
                 保存
               </el-button>
             </template>
+          </template>
+
+          <div v-if="materialsEditMode" class="materials-actions">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              :disabled="detailDrawer.loading"
+              @click="addMaterialRow"
+            >
+              新增
+            </el-button>
           </div>
 
           <el-table v-loading="detailDrawer.loading" :data="materialsForm.materials" border size="small" class="materials-table">
@@ -478,6 +482,7 @@ import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
+import { Edit } from '@element-plus/icons-vue'
 import type { PatternListItem, PatternMaterialRow } from '@/api/production-pattern'
 import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
