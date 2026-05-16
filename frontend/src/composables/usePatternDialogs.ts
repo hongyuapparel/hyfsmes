@@ -123,17 +123,15 @@ export function usePatternDialogs(
       const data = res.data
       materialsForm.materials = (data?.materials ?? []).map(normalizePatternMaterialRow)
       materialsForm.remark = data?.remark ?? ''
-      if (!materialsForm.materials.length && canEditPatternMaterials.value) addMaterialRow()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载失败'))
-      if (!materialsForm.materials.length && canEditPatternMaterials.value) addMaterialRow()
     } finally {
       detailDrawer.loading = false
     }
   }
 
-  async function submitMaterials() {
-    if (!detailDrawer.row) return
+  async function submitMaterials(): Promise<boolean> {
+    if (!detailDrawer.row) return false
     const payloadMaterials = (materialsForm.materials ?? [])
       .map(normalizePatternMaterialRow)
       .filter((row) => row.materialTypeId != null || (row.materialName ?? '').trim().length > 0)
@@ -144,8 +142,10 @@ export function usePatternDialogs(
         remark: materialsForm.remark ?? '',
       })
       ElMessage.success('已保存')
+      return true
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '保存失败'))
+      return false
     } finally {
       detailDrawer.saving = false
     }
