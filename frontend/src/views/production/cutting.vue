@@ -221,7 +221,8 @@
     <ProductionDetailDrawerShell
       v-model="detailDrawer.visible"
       title="裁床详情"
-      :size="cuttingDetailDrawerSize"
+      :size="760"
+      :resizable="true"
       @closed="onDetailDrawerClosed"
     >
       <div v-loading="detailDrawer.loading" class="cutting-detail-drawer__body">
@@ -400,7 +401,6 @@ const {
   detailPayload,
   cuttingBriefFromRow,
   detailGrandPieces,
-  cuttingDetailDrawerSize,
   onDetailDrawerClosed,
   displayDash,
   moneyDisplay,

@@ -176,6 +176,8 @@
     <ProductionDetailDrawerShell
       v-model="purchaseBriefDrawer.visible"
       title="订单与物料概要"
+      :size="760"
+      :resizable="true"
       @closed="purchaseBriefDrawer.row = null"
     >
       <template v-if="purchaseBriefDrawer.row">

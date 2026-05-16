@@ -35,10 +35,6 @@ export function useCuttingDetail() {
     )
   })
 
-  const cuttingDetailDrawerSize = computed(() =>
-    detailDrawer.row?.cuttingStatus === 'completed' ? 940 : '460px',
-  )
-
   function onDetailDrawerClosed() {
     detailPayload.value = null
     detailDrawer.row = null
@@ -81,7 +77,6 @@ export function useCuttingDetail() {
     detailPayload,
     cuttingBriefFromRow,
     detailGrandPieces,
-    cuttingDetailDrawerSize,
     onDetailDrawerClosed,
     displayDash,
     moneyDisplay,

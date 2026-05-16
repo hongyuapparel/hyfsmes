@@ -149,6 +149,8 @@
     <ProductionDetailDrawerShell
       v-model="finishingBriefDrawer.visible"
       title="尾部进度概要"
+      :size="760"
+      :resizable="true"
       @closed="finishingBriefDrawer.row = null"
     >
       <template v-if="finishingBriefDrawer.row">

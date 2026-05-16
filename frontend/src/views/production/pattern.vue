@@ -213,7 +213,8 @@
     <ProductionDetailDrawerShell
       v-model="detailDrawer.visible"
       title="纸样详情"
-      size="760px"
+      :size="760"
+      :resizable="true"
       @closed="onDetailDrawerClosed"
     >
       <template v-if="detailDrawer.row">

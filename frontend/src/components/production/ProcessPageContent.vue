@@ -229,7 +229,8 @@
     <ProductionDetailDrawerShell
       v-model="craftDetailDrawer.visible"
       title="工艺明细"
-      size="520px"
+      :size="760"
+      :resizable="true"
       @closed="craftDetailDrawer.row = null"
     >
       <template v-if="craftDetailDrawer.row">

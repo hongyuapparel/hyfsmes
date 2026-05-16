@@ -249,7 +249,8 @@
     <ProductionDetailDrawerShell
       v-model="sewingBriefDrawer.visible"
       title="车缝外发概要"
-      size="460px"
+      :size="760"
+      :resizable="true"
       @closed="sewingBriefDrawer.row = null"
     >
       <template v-if="sewingBriefDrawer.row">
