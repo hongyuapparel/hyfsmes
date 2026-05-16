@@ -118,13 +118,20 @@
   gap: 4px;
 }
 
-.materials-actions {
+.materials-add-row {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  justify-content: flex-end;
-  margin-bottom: var(--space-sm);
-  font-size: var(--el-font-size-base);
+  justify-content: center;
+  padding: 4px 0;
+  border: 1px dashed var(--el-border-color-lighter);
+  border-radius: 6px;
+  background: var(--el-fill-color-blank);
+}
+
+.materials-add-row .el-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .materials-table :deep(.el-input-number) {
@@ -150,12 +157,22 @@
 
 .materials-remark {
   margin-top: var(--space-sm);
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .materials-remark-label {
-  margin-bottom: 6px;
+  flex: 0 0 auto;
+  width: 72px;
+  padding-top: 6px;
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-base);
+}
+
+.materials-remark-field {
+  flex: 1;
+  min-width: 0;
 }
 
 .materials-remark :deep(.el-textarea__inner) {

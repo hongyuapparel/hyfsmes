@@ -281,18 +281,6 @@
             </template>
           </template>
 
-          <div v-if="materialsEditMode" class="materials-actions">
-            <el-button
-              link
-              type="primary"
-              size="small"
-              :disabled="detailDrawer.loading"
-              @click="addMaterialRow"
-            >
-              新增
-            </el-button>
-          </div>
-
           <el-table v-loading="detailDrawer.loading" :data="materialsForm.materials" border size="small" class="materials-table">
             <el-table-column label="物料类型" min-width="110" align="center">
               <template #default="{ row }">
@@ -358,15 +346,30 @@
             </el-table-column>
           </el-table>
 
+          <div v-if="materialsEditMode" class="materials-add-row">
+            <el-button
+              link
+              type="primary"
+              size="small"
+              :disabled="detailDrawer.loading"
+              @click="addMaterialRow"
+            >
+              <el-icon><Plus /></el-icon>
+              <span>新增一行</span>
+            </el-button>
+          </div>
+
           <div class="materials-remark">
             <div class="materials-remark-label">总体备注</div>
-            <el-input
-              v-model="materialsForm.remark"
-              type="textarea"
-              :autosize="{ minRows: 1, maxRows: 8 }"
-              placeholder="可选"
-              :disabled="!canEditPatternMaterials || !materialsEditMode"
-            />
+            <div class="materials-remark-field">
+              <el-input
+                v-model="materialsForm.remark"
+                type="textarea"
+                :autosize="{ minRows: 1, maxRows: 8 }"
+                placeholder="可选"
+                :disabled="!canEditPatternMaterials || !materialsEditMode"
+              />
+            </div>
           </div>
 
         </ProductionDetailSection>
@@ -482,7 +485,7 @@ import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
-import { Edit } from '@element-plus/icons-vue'
+import { Edit, Plus } from '@element-plus/icons-vue'
 import type { PatternListItem, PatternMaterialRow } from '@/api/production-pattern'
 import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
