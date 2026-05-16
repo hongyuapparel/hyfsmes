@@ -112,18 +112,6 @@
   pointer-events: none;
 }
 
-.materials-brief {
-  margin-bottom: var(--space-sm);
-  padding: var(--space-sm);
-  background: var(--el-fill-color-light);
-  border-radius: var(--radius);
-  font-size: var(--el-font-size-base);
-}
-
-.materials-brief > div + div {
-  margin-top: 4px;
-}
-
 .materials-actions {
   display: flex;
   align-items: center;
@@ -166,12 +154,6 @@
 
 .materials-remark :deep(.el-textarea__inner) {
   font-size: var(--el-font-size-base);
-}
-
-.detail-drawer-footer {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: var(--space-sm);
 }
 
 .pattern-sub-attr {

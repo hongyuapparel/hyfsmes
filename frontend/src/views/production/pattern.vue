@@ -222,7 +222,7 @@
           <ProductionOrderBriefPanel :brief="patternBriefFromRow(detailDrawer.row)" />
         </ProductionDetailSection>
         <ProductionDetailSection title="业务扩展信息">
-          <el-descriptions :column="1" border size="small" class="pattern-brief-extra">
+          <el-descriptions :column="2" border size="small" class="pattern-brief-extra">
             <el-descriptions-item label="纸样师">
               {{ (detailDrawer.row.patternMaster ?? '').trim() || '—' }}
             </el-descriptions-item>
@@ -235,7 +235,7 @@
           </el-descriptions>
         </ProductionDetailSection>
         <ProductionDetailSection title="时效与节点">
-          <el-descriptions :column="1" border size="small" class="pattern-brief-extra">
+          <el-descriptions :column="2" border size="small" class="pattern-brief-extra">
             <el-descriptions-item label="到纸样时间">
               {{ formatDateTime(detailDrawer.row.arrivedAtPattern) }}
             </el-descriptions-item>
@@ -248,21 +248,45 @@
           </el-descriptions>
         </ProductionDetailSection>
         <ProductionDetailSection title="纸样物料/裁片清单">
-          <div class="materials-brief">
-            <div>订单号：{{ detailDrawer.row.orderNo }}</div>
-            <div>SKU：{{ detailDrawer.row.skuCode }}</div>
-          </div>
-
           <div class="materials-actions">
-            <el-button
-              link
-              type="primary"
-              size="small"
-              :disabled="detailDrawer.loading || !canEditPatternMaterials"
-              @click="addMaterialRow"
-            >
-              新增
-            </el-button>
+            <template v-if="!materialsEditMode">
+              <el-button
+                v-if="canEditPatternMaterials"
+                type="primary"
+                size="small"
+                :disabled="detailDrawer.loading"
+                @click="enterMaterialsEdit"
+              >
+                编辑
+              </el-button>
+            </template>
+            <template v-else>
+              <el-button
+                link
+                type="primary"
+                size="small"
+                :disabled="detailDrawer.loading"
+                @click="addMaterialRow"
+              >
+                新增
+              </el-button>
+              <el-button
+                size="small"
+                :disabled="detailDrawer.saving"
+                @click="cancelMaterialsEdit"
+              >
+                取消
+              </el-button>
+              <el-button
+                type="primary"
+                size="small"
+                :loading="detailDrawer.saving"
+                :disabled="detailDrawer.loading"
+                @click="handleSubmitMaterials"
+              >
+                保存
+              </el-button>
+            </template>
           </div>
 
           <el-table v-loading="detailDrawer.loading" :data="materialsForm.materials" border size="small" class="materials-table">
@@ -275,7 +299,7 @@
                   clearable
                   size="small"
                   style="width: 100%"
-                  :disabled="!canEditPatternMaterials"
+                  :disabled="!canEditPatternMaterials || !materialsEditMode"
                 >
                   <el-option v-for="opt in materialTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
                 </el-select>
@@ -283,7 +307,7 @@
             </el-table-column>
             <el-table-column label="物料名称" min-width="180" align="center">
               <template #default="{ row }">
-                <el-input v-model="row.materialName" size="small" :disabled="!canEditPatternMaterials" />
+                <el-input v-model="row.materialName" size="small" :disabled="!canEditPatternMaterials || !materialsEditMode" />
               </template>
             </el-table-column>
             <el-table-column label="幅宽(cm)" width="120" align="center">
@@ -292,7 +316,7 @@
                   v-model="row.fabricWidth"
                   size="small"
                   placeholder="如 183cm"
-                  :disabled="!canEditPatternMaterials"
+                  :disabled="!canEditPatternMaterials || !materialsEditMode"
                 />
               </template>
             </el-table-column>
@@ -303,7 +327,7 @@
                   :min="0"
                   :controls="false"
                   size="small"
-                  :disabled="!canEditPatternMaterials"
+                  :disabled="!canEditPatternMaterials || !materialsEditMode"
                 />
               </template>
             </el-table-column>
@@ -314,16 +338,16 @@
                   :min="0"
                   :controls="false"
                   size="small"
-                  :disabled="!canEditPatternMaterials"
+                  :disabled="!canEditPatternMaterials || !materialsEditMode"
                 />
               </template>
             </el-table-column>
             <el-table-column label="备注" min-width="200" align="center">
               <template #default="{ row }">
-                <el-input v-model="row.remark" size="small" :disabled="!canEditPatternMaterials" />
+                <el-input v-model="row.remark" size="small" :disabled="!canEditPatternMaterials || !materialsEditMode" />
               </template>
             </el-table-column>
-            <el-table-column v-if="canEditPatternMaterials" label="操作" width="70" fixed="right" align="center">
+            <el-table-column v-if="canEditPatternMaterials && materialsEditMode" label="操作" width="70" fixed="right" align="center">
               <template #default="{ $index }">
                 <el-button link type="danger" size="small" @click="removeMaterialRow($index)">删除</el-button>
               </template>
@@ -337,21 +361,10 @@
               type="textarea"
               :rows="3"
               placeholder="可选"
-              :disabled="!canEditPatternMaterials"
+              :disabled="!canEditPatternMaterials || !materialsEditMode"
             />
           </div>
 
-          <div class="detail-drawer-footer">
-            <el-button
-              v-if="canEditPatternMaterials"
-              type="primary"
-              :loading="detailDrawer.saving"
-              :disabled="detailDrawer.loading"
-              @click="submitMaterials"
-            >
-              保存
-            </el-button>
-          </div>
         </ProductionDetailSection>
         <ProductionDetailSection>
           <OperationLogsSection :logs="patternDrawerLogs" />
@@ -465,7 +478,7 @@ import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
-import type { PatternListItem } from '@/api/production-pattern'
+import type { PatternListItem, PatternMaterialRow } from '@/api/production-pattern'
 import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import PatternTable from '@/components/production/PatternTable.vue'
@@ -591,6 +604,48 @@ const {
   selectedRows,
   { reloadList: load, reloadTabCounts: loadTabCounts },
   { findOrderTypeLabelById, findCollaborationLabelById },
+)
+
+const materialsEditMode = ref(false)
+let materialsSnapshot: { materials: PatternMaterialRow[]; remark: string } | null = null
+
+function enterMaterialsEdit() {
+  materialsSnapshot = {
+    materials: JSON.parse(JSON.stringify(materialsForm.materials)) as PatternMaterialRow[],
+    remark: materialsForm.remark,
+  }
+  if (!materialsForm.materials.length) {
+    addMaterialRow()
+  }
+  materialsEditMode.value = true
+}
+
+function cancelMaterialsEdit() {
+  if (materialsSnapshot) {
+    materialsForm.materials = materialsSnapshot.materials
+    materialsForm.remark = materialsSnapshot.remark
+  }
+  materialsSnapshot = null
+  materialsEditMode.value = false
+}
+
+async function handleSubmitMaterials() {
+  if (detailDrawer.saving) return
+  const ok = await submitMaterials()
+  if (ok) {
+    materialsSnapshot = null
+    materialsEditMode.value = false
+  }
+}
+
+watch(
+  () => detailDrawer.visible,
+  (visible) => {
+    if (!visible) {
+      materialsEditMode.value = false
+      materialsSnapshot = null
+    }
+  },
 )
 
 const patternDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
