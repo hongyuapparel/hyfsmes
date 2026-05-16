@@ -164,8 +164,8 @@
 
 .materials-remark-label {
   flex: 0 0 auto;
-  width: 72px;
-  padding-top: 6px;
+  width: 48px;
+  padding-top: 4px;
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-base);
 }
@@ -175,8 +175,8 @@
   min-width: 0;
 }
 
-.materials-remark :deep(.el-textarea__inner) {
-  font-size: var(--el-font-size-base);
+.materials-remark-field :deep(.el-textarea__inner) {
+  min-height: 24px;
 }
 
 .pattern-sub-attr {

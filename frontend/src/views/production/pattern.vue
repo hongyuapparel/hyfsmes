@@ -360,11 +360,12 @@
           </div>
 
           <div class="materials-remark">
-            <div class="materials-remark-label">总体备注</div>
+            <div class="materials-remark-label">备注</div>
             <div class="materials-remark-field">
               <el-input
                 v-model="materialsForm.remark"
                 type="textarea"
+                size="small"
                 :autosize="{ minRows: 1, maxRows: 8 }"
                 placeholder="可选"
                 :disabled="!canEditPatternMaterials || !materialsEditMode"
