@@ -50,3 +50,6 @@ backend/uploads/
 
 # Cursor / agentic worker 临时端到端测试目录（含 node_modules，本地保留不提交）
 .e2e-tmp/
+
+# Git worktrees
+.worktrees/
