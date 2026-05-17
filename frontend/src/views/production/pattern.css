@@ -177,6 +177,9 @@
 
 .materials-remark-field :deep(.el-textarea__inner) {
   min-height: 24px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  line-height: 22px;
 }
 
 .pattern-sub-attr {
