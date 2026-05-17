@@ -156,18 +156,17 @@
 }
 
 .materials-remark {
-  margin-top: var(--space-sm);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
 }
 
 .materials-remark-label {
   flex: 0 0 auto;
   width: 48px;
-  padding-top: 4px;
   color: var(--el-text-color-secondary);
   font-size: var(--el-font-size-base);
+  line-height: 24px;
 }
 
 .materials-remark-field {
