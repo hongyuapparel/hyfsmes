@@ -644,6 +644,7 @@ async function handleSubmitMaterials() {
   if (ok) {
     materialsSnapshot = null
     materialsEditMode.value = false
+    await loadPatternDrawerLogs(detailDrawer.row)
   }
 }
 
