@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     v-model="dialogVisible"
     title="面料出库"
     width="500"
@@ -66,7 +66,7 @@
         确定出库
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

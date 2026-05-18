@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card page-card--fill cutting-page">
     <!-- Tab：全部 / 等待裁床 / 裁床完成 -->
     <div class="status-tabs">
@@ -131,7 +131,7 @@
     />
 
     <!-- 裁床登记弹窗 -->
-    <el-dialog
+    <AppDialog
       v-model="registerDialog.visible"
       title="裁床登记"
       class="cutting-register-dialog"
@@ -216,7 +216,7 @@
           完成
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <ProductionDetailDrawerShell
       v-model="detailDrawer.visible"

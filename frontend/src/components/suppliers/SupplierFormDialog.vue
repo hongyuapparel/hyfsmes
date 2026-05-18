@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="visible"
     :title="isEdit ? '编辑供应商' : '新建供应商'"
     width="560"
@@ -78,7 +78,7 @@
       <el-button @click="onVisibleChange(false)">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="emit('submit')">确定</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

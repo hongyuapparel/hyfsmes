@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="visible"
     title="入库"
     width="440"
@@ -110,7 +110,7 @@
         确定入库
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

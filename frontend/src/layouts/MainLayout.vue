@@ -157,13 +157,22 @@ const iconMap = {
   Setting,
 } as const
 
+const isSuperAdmin = computed(() => {
+  const u = authStore.user
+  if (!u) return false
+  return u.roleCode === 'admin' || u.roleCodes?.includes('admin') === true
+})
+
 const allowedMenus = computed(() => {
   const allowed = authStore.permissionRoutes
   if (!allowed.length) return []
   return menuConfig
     .map((item) => {
       if (item.children) {
-        const children = item.children.filter((c) => allowed.includes(c.path))
+        const children = item.children.filter((c) => {
+          if (c.adminOnly && !isSuperAdmin.value) return false
+          return allowed.includes(c.path) || (c.adminOnly && isSuperAdmin.value)
+        })
         if (!children.length && !allowed.includes(item.path)) return null
         return { ...item, children }
       }

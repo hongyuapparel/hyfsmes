@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card page-card--fill sewing-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -124,7 +124,7 @@
       @size-change="onPageSizeChange"
     />
 
-    <el-dialog v-model="assignDialog.visible" title="分单" width="460" destroy-on-close @close="resetAssignForm">
+    <AppDialog v-model="assignDialog.visible" title="分单" width="460" destroy-on-close @close="resetAssignForm">
       <el-form ref="assignFormRef" :model="assignForm" :rules="assignRules" label-width="100px" class="assign-form">
         <el-form-item label="分单时间" prop="distributedAt">
           <el-date-picker
@@ -161,9 +161,9 @@
         <el-button @click="assignDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="assignDialog.submitting" @click="submitAssign">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog
+    <AppDialog
       v-model="registerDialog.visible"
       title="登记车缝完成"
       width="720"
@@ -244,7 +244,7 @@
         <el-button @click="registerDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="registerDialog.submitting" @click="submitRegister">完成</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <ProductionDetailDrawerShell
       v-model="sewingBriefDrawer.visible"

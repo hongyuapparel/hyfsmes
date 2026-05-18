@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <el-card class="block-card table-card" shadow="never">
     <template #header>
       <div class="block-header">
@@ -151,7 +151,7 @@
       </span>
     </div>
 
-    <el-dialog
+    <AppDialog
       :model-value="importDialogVisible"
       title="导入工序模板"
       width="400px"
@@ -180,9 +180,9 @@
           确定导入
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog
+    <AppDialog
       :model-value="importOrderDialogVisible"
       title="从订单导入生产工序成本"
       width="760px"
@@ -254,9 +254,9 @@
           确定导入
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog
+    <AppDialog
       :model-value="saveDialogVisible"
       title="保存为工序报价模板"
       width="420px"
@@ -281,7 +281,7 @@
           保存
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <ProductionProcessPickerDialog
       :model-value="productionPickerVisible"

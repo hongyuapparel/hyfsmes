@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div>
     <input
       ref="imageFileInputRef"
@@ -7,7 +7,7 @@
       class="image-file-input-hidden"
       @change="onImageFileChange"
     />
-    <el-dialog
+    <AppDialog
       v-model="dialogVisible"
       :title="isEdit ? '编辑产品' : '新建SKU'"
       width="520"
@@ -98,7 +98,7 @@
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="submit">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

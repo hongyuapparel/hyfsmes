@@ -2,6 +2,8 @@ export interface MenuItem {
   path: string
   title: string
   icon?: string
+  /** 仅超级管理员（role code admin）可见 */
+  adminOnly?: boolean
   children?: MenuItem[]
 }
 
@@ -67,6 +69,7 @@ export const menuConfig: MenuItem[] = [
       { path: '/settings/inventory', title: '库存设置' },
       { path: '/settings/hr', title: '组织与人事' },
       { path: '/settings/finance', title: '财务设置' },
+      { path: '/settings/image-cleanup', title: '图片清理', adminOnly: true },
     ],
   },
 ]

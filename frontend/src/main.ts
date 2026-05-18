@@ -7,9 +7,11 @@ import './styles/design-system.css'
 import App from './App.vue'
 import router from './router'
 import AppImageThumb from './components/AppImageThumb.vue'
+import AppDialog from './components/AppDialog.vue'
 
 const app = createApp(App)
 app.component('AppImageThumb', AppImageThumb)
+app.component('AppDialog', AppDialog)
 app.use(createPinia())
 app.use(router)
 app.use(ElementPlus, { locale: zhCn })

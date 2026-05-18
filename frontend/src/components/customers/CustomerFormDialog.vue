@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     v-model="visibleModel"
     :title="isEdit ? '编辑客户' : '新建客户'"
     width="520"
@@ -81,7 +81,7 @@
       <el-button @click="visibleModel = false">取消</el-button>
       <el-button type="primary" :loading="submitLoading" @click="handleSubmit">确定</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

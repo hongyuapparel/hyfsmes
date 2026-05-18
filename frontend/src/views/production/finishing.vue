@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card page-card--fill finishing-page">
     <!-- Tab：全部 / 尾部完成 -->
     <div class="status-tabs">
@@ -228,7 +228,7 @@
     </ProductionDetailDrawerShell>
 
     <!-- 登记收货弹窗：待尾部 tab 使用，支持按尺码填写收货数量 -->
-    <el-dialog
+    <AppDialog
       v-model="receiveDialog.visible"
       title="登记收货"
       width="720"
@@ -282,10 +282,10 @@
           确定
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <!-- 登记入库弹窗：支持「部分入库」分批登记 /「全部入库」补齐剩余；amend 模式为覆盖式修正 -->
-    <el-dialog
+    <AppDialog
       v-model="packagingCompleteDialog.visible"
       :title="packagingCompleteDialog.mode === 'amend' ? '修改入库/次品' : '登记入库'"
       width="800"
@@ -412,7 +412,7 @@
           </el-button>
         </template>
       </template>
-    </el-dialog>
+    </AppDialog>
 
   </div>
 </template>

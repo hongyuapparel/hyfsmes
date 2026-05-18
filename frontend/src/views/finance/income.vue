@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card finance-page">
     <div class="filter-bar">
       <div
@@ -131,7 +131,7 @@
       />
     </div>
 
-    <el-dialog
+    <AppDialog
       v-model="dialog.visible"
       :title="dialog.isEdit ? '编辑收入' : '登记收入'"
       width="560"
@@ -215,9 +215,9 @@
         <el-button @click="dialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="dialog.submitting" @click="submitForm">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-model="previewDialog.visible" title="附件预览" width="700">
+    <AppDialog v-model="previewDialog.visible" title="附件预览" width="700">
       <div class="preview-grid">
         <el-image
           v-for="(url, i) in previewDialog.urls"
@@ -229,13 +229,14 @@
           :initial-index="i"
         />
       </div>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { appConfirm } from '@/utils/message-box'
 import {
   createIncome,
   deleteIncome,
@@ -474,7 +475,7 @@ async function submitForm() {
 
 async function onDelete(row: IncomeRecordItem) {
   try {
-    await ElMessageBox.confirm('确定删除这条收入记录吗？', '提示', { type: 'warning' })
+    await appConfirm('确定删除这条收入记录吗？', '提示', { type: 'warning' })
     await deleteIncome(row.id)
     ElMessage.success('已删除')
     load()

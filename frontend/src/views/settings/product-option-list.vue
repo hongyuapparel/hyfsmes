@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="option-list">
     <div v-if="!hideTopLevelButton" class="option-toolbar">
       <el-button type="primary" size="small" @click="openAdd(null)">添加顶级分组</el-button>
@@ -43,7 +43,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑' : (parentId ? '新建下级分组' : '添加顶级分组')" width="400" @close="form.value = ''">
+    <AppDialog v-model="dialogVisible" :title="isEdit ? '编辑' : (parentId ? '新建下级分组' : '添加顶级分组')" width="400" @close="form.value = ''">
       <el-form label-width="80">
         <el-form-item :label="label">
           <el-input v-model="form.value" :placeholder="`请输入${label}`" />
@@ -53,13 +53,14 @@
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="submit">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, watch, computed, nextTick, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { appConfirm } from '@/utils/message-box'
 import Sortable from 'sortablejs'
 import {
   getSystemOptionsTree,
@@ -251,7 +252,7 @@ async function submit() {
 
 async function remove(node: SystemOptionTreeNode) {
   try {
-    await ElMessageBox.confirm(
+    await appConfirm(
       node.children?.length
         ? `确定删除「${node.value}」及其下级分组？`
         : `确定删除「${node.value}」？`,

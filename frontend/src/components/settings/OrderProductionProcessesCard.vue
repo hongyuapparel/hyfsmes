@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-show="active">
     <h3 class="section-title">生产工序</h3>
     <p class="section-desc">部门为固定根（裁床、车缝、尾部），在其下维护工种及多级子分组；展开工种可维护具体工序与单价。同一层级不重复展示部门/工种名称。</p>
@@ -37,7 +37,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="jobTypeDialog.visible" :title="jobTypeDialogTitle()" width="440px" @close="onJobTypeDialogClose">
+    <AppDialog v-model="jobTypeDialog.visible" :title="jobTypeDialogTitle()" width="440px" @close="onJobTypeDialogClose">
       <el-form :model="jobTypeForm" label-width="80px" size="default">
         <el-form-item v-if="jobTypeDialog.mode === 'edit'" label="部门">
           <el-select v-model="jobTypeForm.parentId" placeholder="选择部门" filterable style="width: 100%">
@@ -47,9 +47,9 @@
         <el-form-item label="名称"><el-input v-model="jobTypeForm.value" placeholder="请输入工种或分组名称" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="jobTypeDialog.visible = false">取消</el-button><el-button type="primary" :loading="jobTypeSubmitLoading" @click="submitJobType">确定</el-button></template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-model="processDialog.visible" :title="processDialog.id ? '编辑工序' : '新增工序'" width="440px" @close="processDialog.id = undefined">
+    <AppDialog v-model="processDialog.visible" :title="processDialog.id ? '编辑工序' : '新增工序'" width="440px" @close="processDialog.id = undefined">
       <el-form :model="processForm" label-width="90px" size="default">
         <el-form-item label="部门">
           <el-select v-model="processForm.department" placeholder="选择部门" clearable style="width: 100%" @change="onProcessDepartmentChange">
@@ -61,7 +61,7 @@
         <el-form-item label="单价(元)"><el-input-number v-model="processForm.unitPrice" :min="0" :precision="2" :controls="false" style="width: 100%" /></el-form-item>
       </el-form>
       <template #footer><el-button @click="processDialog.visible = false">取消</el-button><el-button type="primary" @click="submitProcess">确定</el-button></template>
-    </el-dialog>
+    </AppDialog>
 
     <h4 class="subsection-title">服装类型报价模板</h4>
     <p class="section-desc">配置如 T恤、连衣裙等服装类型常用的工序组合，订单成本页可一键导入后再按款式微调。</p>
@@ -91,12 +91,12 @@
       </el-collapse-item>
     </el-collapse>
 
-    <el-dialog v-model="quoteTemplateDialog.visible" :title="quoteTemplateDialog.id ? '编辑模板' : '新增模板'" width="400px" @close="quoteTemplateDialog.id = undefined">
+    <AppDialog v-model="quoteTemplateDialog.visible" :title="quoteTemplateDialog.id ? '编辑模板' : '新增模板'" width="400px" @close="quoteTemplateDialog.id = undefined">
       <el-form :model="quoteTemplateForm" label-width="90px" size="default"><el-form-item label="模板名称"><el-input v-model="quoteTemplateForm.name" placeholder="如：T恤、连衣裙" /></el-form-item></el-form>
       <template #footer><el-button @click="quoteTemplateDialog.visible = false">取消</el-button><el-button type="primary" @click="submitQuoteTemplate">确定</el-button></template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-model="quoteTemplateItemsDialog.visible" :title="`编辑工序：${quoteTemplateItemsDialog.name ?? ''}`" width="560px" @close="quoteTemplateItemsDialog.templateId = undefined">
+    <AppDialog v-model="quoteTemplateItemsDialog.visible" :title="`编辑工序：${quoteTemplateItemsDialog.name ?? ''}`" width="560px" @close="quoteTemplateItemsDialog.templateId = undefined">
       <div v-loading="quoteTemplateItemsDialogLoading" class="quote-template-items-body">
       <div class="quote-template-items-actions">
         <el-select
@@ -126,7 +126,7 @@
       </el-table>
       </div>
       <template #footer><el-button @click="quoteTemplateItemsDialog.visible = false">取消</el-button><el-button type="primary" @click="submitQuoteTemplateItems">保存</el-button></template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

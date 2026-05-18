@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card page-card--fill pattern-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -380,7 +380,7 @@
       </template>
     </ProductionDetailDrawerShell>
 
-    <el-dialog
+    <AppDialog
       v-model="assignDialog.visible"
       title="分配纸样师和车版师"
       width="420"
@@ -417,9 +417,9 @@
           确定
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog
+    <AppDialog
       v-model="completeDialog.visible"
       title="确认完成"
       width="480"
@@ -464,7 +464,7 @@
           完成纸样
         </el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     v-model="dialogVisible"
     :title="isEdit ? '编辑面料' : '新增面料'"
     width="560"
@@ -89,7 +89,7 @@
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="emit('confirm')">确定</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

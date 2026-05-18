@@ -1,10 +1,9 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="modelValue"
     title="批量添加工序"
     width="760px"
     class="production-picker-dialog"
-    :close-on-click-modal="false"
     destroy-on-close
     @update:model-value="emit('update:modelValue', $event)"
   >
@@ -62,7 +61,7 @@
         添加所选（{{ selectedIds.length }}）
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card">
     <h3 class="section-title">角色列表</h3>
     <div class="toolbar">
@@ -51,7 +51,7 @@
     />
 
     <!-- 操作权限弹窗：仅展示当前页面的操作权限勾选 -->
-    <el-dialog
+    <AppDialog
       v-model="actionDialogVisible"
       :title="actionDialogTitle"
       width="420px"
@@ -91,9 +91,9 @@
         <el-button @click="actionDialogVisible = false">取消</el-button>
         <el-button type="primary" @click="confirmActionDialog">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑角色' : '新增角色'" width="400" @close="resetForm">
+    <AppDialog v-model="dialogVisible" :title="isEdit ? '编辑角色' : '新增角色'" width="400" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80">
         <el-form-item label="编码" prop="code">
           <el-input
@@ -110,7 +110,7 @@
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="submitRole">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

@@ -1,5 +1,5 @@
-<template>
-  <el-dialog v-model="visible" title="选择辅料" width="720px">
+﻿<template>
+  <AppDialog v-model="visible" title="选择辅料" width="720px">
     <div class="accessory-dialog-filter">
       <el-input
         v-model="keyword"
@@ -33,7 +33,7 @@
     <template #footer>
       <el-button @click="visible = false">关闭</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

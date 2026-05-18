@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="modelValue"
     title="订单详情（只读）"
     width="720"
@@ -11,7 +11,7 @@
     <template #footer>
       <el-button @click="closeDialog">关闭</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

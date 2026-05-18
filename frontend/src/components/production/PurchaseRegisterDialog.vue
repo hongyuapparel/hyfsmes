@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     v-model="dialogVisible"
     title="登记实际采购"
     width="1300"
@@ -92,7 +92,7 @@
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="emit('submit')">确定</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

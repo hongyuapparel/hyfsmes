@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card">
     <p class="settings-hint">
       配置财务相关下拉选项：资金账户（公账/私账/微信/支付宝等）、收入类型、支出类型。
@@ -92,7 +92,7 @@
     </div>
 
     <!-- 资金账户弹窗 -->
-    <el-dialog v-model="accountDialog.visible" :title="accountDialog.isEdit ? '编辑账户' : '新增账户'" width="440" destroy-on-close>
+    <AppDialog v-model="accountDialog.visible" :title="accountDialog.isEdit ? '编辑账户' : '新增账户'" width="440" destroy-on-close>
       <el-form :model="accountForm" label-width="90px">
         <el-form-item label="账户名称" required>
           <el-input v-model="accountForm.name" placeholder="如：公司主账户" clearable />
@@ -116,10 +116,10 @@
         <el-button @click="accountDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="accountDialog.submitting" @click="submitAccount">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
     <!-- 类型弹窗（收入/支出通用） -->
-    <el-dialog v-model="typeDialog.visible" :title="typeDialog.isEdit ? '编辑类型' : '新增类型'" width="380" destroy-on-close>
+    <AppDialog v-model="typeDialog.visible" :title="typeDialog.isEdit ? '编辑类型' : '新增类型'" width="380" destroy-on-close>
       <el-form :model="typeForm" label-width="80px">
         <el-form-item label="类型名称" required>
           <el-input v-model="typeForm.name" placeholder="请输入类型名称" clearable />
@@ -135,13 +135,14 @@
         <el-button @click="typeDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="typeDialog.submitting" @click="submitType">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
+import { appConfirm } from '@/utils/message-box'
 import {
   getFundAccounts, createFundAccount, updateFundAccount, deleteFundAccount,
   getIncomeTypes, createIncomeType, updateIncomeType, deleteIncomeType,
@@ -218,7 +219,7 @@ async function submitAccount() {
 
 async function removeAccount(row: FinanceFundAccount) {
   try {
-    await ElMessageBox.confirm(`确定删除账户「${row.name}」？`, '提示', { type: 'warning' })
+    await appConfirm(`确定删除账户「${row.name}」？`, '提示', { type: 'warning' })
     await deleteFundAccount(row.id)
     ElMessage.success('已删除')
     loadFundAccounts()
@@ -263,7 +264,7 @@ async function submitType() {
 
 async function removeType(category: 'income' | 'expense', row: FinanceIncomeType | FinanceExpenseType) {
   try {
-    await ElMessageBox.confirm(`确定删除「${row.name}」？删除后该类型将不再出现在下拉选项中（历史记录不受影响）`, '提示', { type: 'warning' })
+    await appConfirm(`确定删除「${row.name}」？删除后该类型将不再出现在下拉选项中（历史记录不受影响）`, '提示', { type: 'warning' })
     category === 'income' ? await deleteIncomeType(row.id) : await deleteExpenseType(row.id)
     ElMessage.success('已删除')
     category === 'income' ? loadIncomeTypes() : loadExpenseTypes()

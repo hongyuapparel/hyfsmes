@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="modelValue"
     title="出库"
     width="920"
@@ -94,7 +94,7 @@
       <el-button @click="closeDialog">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="submitOutbound">确定出库</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

@@ -1,5 +1,5 @@
-<template>
-  <el-dialog v-model="dialogVisible" title="列设置" width="480" class="column-config-dialog">
+﻿<template>
+  <AppDialog v-model="dialogVisible" title="列设置" width="480" class="column-config-dialog">
     <p class="column-config-hint">可调整列顺序与显示/隐藏，修改后立即生效。</p>
     <div class="column-config-list">
       <div v-for="(f, idx) in list" :key="`${f.id}-${f.code}`" class="column-config-item">
@@ -13,7 +13,7 @@
     <template #footer>
       <el-button @click="dialogVisible = false">关闭</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

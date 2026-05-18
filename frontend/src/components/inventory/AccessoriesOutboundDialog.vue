@@ -1,5 +1,5 @@
-<template>
-  <el-dialog v-model="dialogVisible" title="辅料出库" width="480" destroy-on-close @close="onClose">
+﻿<template>
+  <AppDialog v-model="dialogVisible" title="辅料出库" width="480" destroy-on-close @close="onClose">
     <el-form ref="formRef" :model="form" :rules="outboundRules" label-width="90px">
       <el-form-item label="辅料" prop="accessoryName">
         <el-input v-model="form.accessoryName" disabled />
@@ -33,7 +33,7 @@
       <el-button @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="emit('confirm')">确定出库</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

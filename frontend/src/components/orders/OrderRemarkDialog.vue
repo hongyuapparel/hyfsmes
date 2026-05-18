@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="modelValue"
     title="订单备注"
     width="640"
@@ -37,7 +37,7 @@
         提交备注
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

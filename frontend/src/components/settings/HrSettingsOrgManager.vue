@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="settings-body">
     <div class="org-tree-wrap">
       <h3 class="section-title">
@@ -90,7 +90,7 @@
     </div>
   </div>
 
-  <el-dialog v-model="deptDialog.visible" :title="deptDialogTitle" width="400px" @close="resetDeptDialog">
+  <AppDialog v-model="deptDialog.visible" :title="deptDialogTitle" width="400px" @close="resetDeptDialog">
     <el-form :model="deptForm" label-width="80px" size="default">
       <el-form-item label="部门名称">
         <el-input v-model="deptForm.label" placeholder="如：生产部 / 外贸部" />
@@ -102,9 +102,9 @@
         确定
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 
-  <el-dialog v-model="jobDialog.visible" :title="jobDialogTitle" width="400px" @close="resetJobDialog">
+  <AppDialog v-model="jobDialog.visible" :title="jobDialogTitle" width="400px" @close="resetJobDialog">
     <el-form :model="jobForm" label-width="80px" size="default">
       <el-form-item label="岗位名称">
         <el-input v-model="jobForm.label" placeholder="如：版师 / 业务员 / 车缝工" />
@@ -124,7 +124,7 @@
         确定
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

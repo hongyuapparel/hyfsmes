@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="settings-body">
     <div class="option-toolbar">
       <el-button type="primary" size="small" @click="openAdd(null)">添加供应商类型</el-button>
@@ -65,7 +65,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog
+    <AppDialog
       v-model="dialogVisible"
       :title="isEdit ? '编辑' : getAddTitle()"
       width="400"
@@ -115,7 +115,7 @@
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="submit">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

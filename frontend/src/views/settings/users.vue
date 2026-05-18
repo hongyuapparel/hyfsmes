@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div class="page-card page-card--fill">
     <div class="filter-bar">
       <el-input
@@ -82,7 +82,7 @@
     </el-table>
     </div>
 
-    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="400" @close="resetForm">
+    <AppDialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="400" @close="resetForm">
       <el-form ref="formRef" :model="form" :rules="rules" label-width="80">
         <el-form-item label="登录账号" prop="username">
           <el-input v-model="form.username" placeholder="登录账号（建议手机号）" />
@@ -106,9 +106,9 @@
         <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitLoading" @click="submitUser">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-model="pwdDialogVisible" title="重置密码" width="360" @close="pwdForm.password = ''">
+    <AppDialog v-model="pwdDialogVisible" title="重置密码" width="360" @close="pwdForm.password = ''">
       <el-form :model="pwdForm" :rules="pwdRules" label-width="80">
         <el-form-item label="新密码" prop="password">
           <el-input v-model="pwdForm.password" type="password" placeholder="请输入新密码" show-password />
@@ -118,7 +118,7 @@
         <el-button @click="pwdDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="pwdLoading" @click="submitResetPwd">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

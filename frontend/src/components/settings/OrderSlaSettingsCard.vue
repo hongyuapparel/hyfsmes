@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-show="active">
     <h3 class="section-title">订单时效配置</h3>
     <p class="section-desc">
@@ -28,7 +28,7 @@
       </el-table-column>
     </el-table>
 
-    <el-dialog v-model="slaDialog.visible" :title="slaDialog.id ? '编辑时效配置' : '新增时效配置'" width="400px" @close="slaDialog.id = undefined">
+    <AppDialog v-model="slaDialog.visible" :title="slaDialog.id ? '编辑时效配置' : '新增时效配置'" width="400px" @close="slaDialog.id = undefined">
       <el-form :model="slaForm" label-width="120px" size="default">
         <el-form-item label="订单状态">
           <el-select v-model="slaForm.orderStatusId" placeholder="选择状态" style="width: 100%" :disabled="!!slaDialog.id">
@@ -46,7 +46,7 @@
         <el-button @click="slaDialog.visible = false">取消</el-button>
         <el-button type="primary" @click="submitSla">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

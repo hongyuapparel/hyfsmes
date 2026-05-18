@@ -251,6 +251,12 @@ const routes: RouteRecordRaw[] = [
             component: () => import('@/views/settings/finance-settings.vue'),
             meta: { title: '财务设置', permissionPath: '/settings/finance' },
           },
+          {
+            path: 'image-cleanup',
+            name: 'SettingsImageCleanup',
+            component: () => import('@/views/settings/image-cleanup.vue'),
+            meta: { title: '图片清理', adminOnly: true },
+          },
         ],
       },
       {
@@ -290,6 +296,12 @@ router.beforeEach(async (to, _from, next) => {
   }
   const leaf = to.matched[to.matched.length - 1]
   if (leaf?.meta?.skipRoutePermissionCheck) return next()
+  if (leaf?.meta?.adminOnly) {
+    const u = auth.user
+    const isAdmin = u?.roleCode === 'admin' || u?.roleCodes?.includes('admin') === true
+    if (!isAdmin) return next('/no-permission')
+    return next()
+  }
   const permissionPath = (leaf?.meta?.permissionPath as string) || (to.meta?.permissionPath as string)
   if (permissionPath && !auth.hasRoutePermission(permissionPath)) {
     // 权限不存在时重新拉取一次用户信息，兜底"后端权限已更新但前端缓存旧"的场景

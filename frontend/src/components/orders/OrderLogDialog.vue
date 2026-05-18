@@ -1,5 +1,5 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     :model-value="modelValue"
     title="操作记录"
     width="640"
@@ -31,7 +31,7 @@
     <template #footer>
       <el-button @click="closeDialog">关闭</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

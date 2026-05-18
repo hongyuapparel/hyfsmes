@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <AppDrawer
     :model-value="modelValue"
     :title="quickAddSource ? '新增库存数量' : '新增库存'"
@@ -108,7 +108,7 @@
     </template>
   </AppDrawer>
 
-  <el-dialog v-model="createSkuDialogVisible" title="选择 SKU" width="760px" destroy-on-close>
+  <AppDialog v-model="createSkuDialogVisible" title="选择 SKU" width="760px" destroy-on-close>
     <el-input
       v-model="createSkuKeyword"
       placeholder="输入 SKU 或客户搜索"
@@ -142,7 +142,7 @@
     <template #footer>
       <el-button @click="createSkuDialogVisible = false">关闭</el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

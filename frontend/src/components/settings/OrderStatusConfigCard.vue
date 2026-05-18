@@ -1,4 +1,4 @@
-<template>
+﻿<template>
   <div v-show="active">
     <h3 class="section-title">订单流转规则</h3>
     <p class="section-desc">在这里维护销售订单从草稿到完成的各个状态，以及在不同状态下通过按钮或自动事件流转到下一状态的规则。仅影响配置，不会自动修改历史订单。</p>
@@ -57,7 +57,7 @@
       </div>
     </div>
 
-    <el-dialog v-model="state.statusDialog.visible" :title="state.statusDialog.isEdit ? '编辑状态' : '新增状态'" width="420px">
+    <AppDialog v-model="state.statusDialog.visible" :title="state.statusDialog.isEdit ? '编辑状态' : '新增状态'" width="420px">
       <el-form :model="state.statusForm" label-width="100px" size="default">
         <el-form-item label="名称"><el-input v-model="state.statusForm.label" placeholder="如 草稿、待审单" /></el-form-item>
         <el-form-item label="排序"><el-input-number v-model="state.statusForm.sortOrder" :min="0" :controls="false" style="width: 100%" /></el-form-item>
@@ -67,9 +67,9 @@
         <el-button @click="state.statusDialog.visible = false">取消</el-button>
         <el-button type="primary" @click="state.submitStatus">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-if="false" v-model="state.transitionDialog.visible" :title="state.transitionDialog.isEdit ? '编辑流转规则' : '新增流转规则'" width="520px">
+    <AppDialog v-if="false" v-model="state.transitionDialog.visible" :title="state.transitionDialog.isEdit ? '编辑流转规则' : '新增流转规则'" width="520px">
       <el-form :model="state.transitionForm" label-width="120px" size="default">
         <el-form-item label="当前订单状态"><el-input :model-value="state.getStatusLabel(state.transitionForm.fromStatus)" disabled /></el-form-item>
         <el-form-item label="流转到哪个状态">
@@ -82,9 +82,9 @@
         <el-button @click="state.transitionDialog.visible = false">取消</el-button>
         <el-button type="primary" @click="state.submitTransition">确定</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
 
-    <el-dialog v-model="state.chainDialog.visible" :title="state.chainEdit.id ? '编辑流程链路' : '新增流程链路'" width="900px" destroy-on-close>
+    <AppDialog v-model="state.chainDialog.visible" :title="state.chainEdit.id ? '编辑流程链路' : '新增流程链路'" width="900px" destroy-on-close>
       <p class="section-desc">按顺序配置每一步：从哪个状态、通过什么动作、到哪个状态。</p>
       <el-form label-width="120px" size="default">
         <el-form-item label="链路名称"><el-input v-model="state.chainForm.name" placeholder="如：默认主流程" /></el-form-item>
@@ -133,7 +133,7 @@
         <el-button @click="state.chainDialog.visible = false">取消</el-button>
         <el-button type="primary" @click="state.submitChain">确定（保存整条链路）</el-button>
       </template>
-    </el-dialog>
+    </AppDialog>
   </div>
 </template>
 

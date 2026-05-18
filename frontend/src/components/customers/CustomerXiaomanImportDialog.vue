@@ -1,10 +1,9 @@
-<template>
-  <el-dialog
+﻿<template>
+  <AppDialog
     v-model="visibleModel"
     title="从小满导入客户"
     width="720"
     class="xiaoman-import-dialog"
-    :close-on-click-modal="false"
     @open="$emit('open')"
     @close="$emit('close')"
   >
@@ -81,7 +80,7 @@
         导入选中 ({{ selectedCount }})
       </el-button>
     </template>
-  </el-dialog>
+  </AppDialog>
 </template>
 
 <script setup lang="ts">

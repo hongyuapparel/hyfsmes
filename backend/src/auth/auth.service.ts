@@ -51,8 +51,10 @@ export class AuthService {
     displayName: string;
     roleId: number;
     roleName: string;
+    roleCode: string;
     roleIds: number[];
     roleNames: string[];
+    roleCodes: string[];
     permissions: Permission[];
     orderPolicies: {
       edit: string[];
@@ -89,6 +91,7 @@ export class AuthService {
     const permissions = Array.from(permissionMap.values());
     const roleIds = roleList.map((r) => r.id);
     const roleNames = roleList.map((r) => r.name);
+    const roleCodes = roleList.map((r) => r.code).filter((c): c is string => !!c);
     const policyRows = await this.roleOrderPolicyRepo.find({
       where: { roleId: In(roleIds.length ? roleIds : [user.roleId]) },
       select: ['action', 'statusCode'],
@@ -105,8 +108,10 @@ export class AuthService {
       displayName: user.displayName,
       roleId: user.roleId,
       roleName: user.role?.name ?? '',
+      roleCode: user.role?.code ?? '',
       roleIds,
       roleNames,
+      roleCodes,
       permissions,
       orderPolicies,
     };
