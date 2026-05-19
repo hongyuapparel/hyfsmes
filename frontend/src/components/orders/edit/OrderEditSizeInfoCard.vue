@@ -11,7 +11,7 @@
       </div>
     </template>
     <el-table
-      :ref="sizeInfoTableRef"
+      :ref="setSizeInfoTableRef"
       :data="sizeInfoRows"
       row-key="__rowKey"
       border
@@ -101,9 +101,11 @@
 <script setup lang="ts">
 import { Delete, CircleClose } from '@element-plus/icons-vue'
 
+import type { SizeInfoRow } from '@/composables/useOrderSizeInfo'
+
 defineProps<{
-  sizeInfoTableRef: any
-  sizeInfoRows: any[]
+  setSizeInfoTableRef: (el: unknown) => void
+  sizeInfoRows: SizeInfoRow[]
   sizeMetaHeaders: string[]
   sizeHeaders: string[]
   setSizeGridCellRef: (el: unknown, rowIndex: number, colIndex: number) => void

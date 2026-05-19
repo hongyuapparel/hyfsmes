@@ -23,6 +23,14 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
   const sizeInfoRows = ref<SizeInfoRow[]>([])
   const sizeInfoTableRef = ref<{ $el?: HTMLElement } | undefined>(undefined)
   const sizeGridRefs = ref<InputComponentInstance[][]>([])
+
+  function setSizeInfoTableRef(el: unknown) {
+    if (el && typeof el === 'object' && '$el' in (el as Record<string, unknown>)) {
+      sizeInfoTableRef.value = el as { $el?: HTMLElement }
+    } else {
+      sizeInfoTableRef.value = undefined
+    }
+  }
   let sizeInfoSortable: Sortable | null = null
   let sizeInfoRowKeySeed = 0
 
@@ -273,6 +281,7 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     sizeMetaHeaders,
     sizeInfoRows,
     sizeInfoTableRef,
+    setSizeInfoTableRef,
     sizeGridRefs,
     setSizeGridCellRef,
     focusSizeGridCell,
