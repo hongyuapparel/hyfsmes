@@ -13,11 +13,14 @@ export interface FabricItem {
   createdAt: string
   supplierId?: number | null
   warehouseId?: number | null
+  inventoryTypeId?: number | null
   storageLocation?: string
   /** 仅展示：由 supplierId 解析 */
   supplierName?: string
   /** 仅展示：由 warehouseId 解析 */
   warehouseLabel?: string
+  /** 仅展示：由 inventoryTypeId 解析 */
+  inventoryTypeLabel?: string
 }
 
 export interface FabricSupplierOption {
@@ -44,6 +47,7 @@ export function getFabricList(params?: {
   customerName?: string
   startDate?: string
   endDate?: string
+  inventoryTypeId?: number | null
   skipTotal?: boolean
   page?: number
   pageSize?: number
@@ -67,6 +71,7 @@ export function createFabric(body: {
   imageUrl?: string
   supplierId?: number | null
   warehouseId?: number | null
+  inventoryTypeId?: number | null
   storageLocation?: string
 }) {
   return request.post<FabricItem>('/inventory/fabric/items', body)
@@ -83,6 +88,7 @@ export function updateFabric(
     imageUrl?: string
     supplierId?: number | null
     warehouseId?: number | null
+    inventoryTypeId?: number | null
     storageLocation?: string
   }
 ) {

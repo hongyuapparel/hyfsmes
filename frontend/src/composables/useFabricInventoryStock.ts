@@ -18,7 +18,11 @@ import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPer
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 export function useFabricInventoryStock() {
-  const filter = reactive({ name: '', customerName: '' })
+  const filter = reactive<{ name: string; customerName: string; inventoryTypeId: number | null }>({
+    name: '',
+    customerName: '',
+    inventoryTypeId: null,
+  })
   const inboundDateRange = ref<[string, string] | null>(null)
   const nameLabelVisible = ref(false)
   const list = ref<FabricItem[]>([])
@@ -31,6 +35,7 @@ export function useFabricInventoryStock() {
   const fabricSupplierSelectKey = ref(0)
   const fabricSupplierOptionsLoading = ref(false)
   const warehouseOptions = ref<{ id: number; label: string }[]>([])
+  const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
 
   const fabricStockTableRef = ref()
   const fabricStockShellRef = ref<HTMLElement | null>(null)
@@ -55,6 +60,7 @@ export function useFabricInventoryStock() {
     customerName: '',
     supplierId: null as number | null,
     warehouseId: null as number | null,
+    inventoryTypeId: null as number | null,
     storageLocation: '',
     imageUrl: '',
     remark: '',
@@ -78,6 +84,7 @@ export function useFabricInventoryStock() {
       const res = await getFabricList({
         name: filter.name || undefined,
         customerName: filter.customerName || undefined,
+        inventoryTypeId: filter.inventoryTypeId ?? undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
         page: pagination.page,
@@ -115,6 +122,7 @@ export function useFabricInventoryStock() {
     nameLabelVisible.value = false
     filter.name = ''
     filter.customerName = ''
+    filter.inventoryTypeId = null
     inboundDateRange.value = null
     pagination.page = 1
     load()
@@ -165,6 +173,16 @@ export function useFabricInventoryStock() {
     }
   }
 
+  async function loadInventoryTypeOptions() {
+    try {
+      const res = await getDictItems('inventory_types')
+      const list = (res.data ?? []) as SystemOptionItem[]
+      inventoryTypeOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
+    } catch {
+      inventoryTypeOptions.value = []
+    }
+  }
+
   async function openForm(row: FabricItem | null) {
     quickAddSource.value = null
     formDialog.isEdit = !!row
@@ -176,6 +194,7 @@ export function useFabricInventoryStock() {
       form.customerName = seed.customerName ?? ''
       form.supplierId = seed.supplierId != null && seed.supplierId > 0 ? seed.supplierId : null
       form.warehouseId = seed.warehouseId != null && seed.warehouseId > 0 ? seed.warehouseId : null
+      form.inventoryTypeId = seed.inventoryTypeId != null && seed.inventoryTypeId > 0 ? seed.inventoryTypeId : null
       form.storageLocation = seed.storageLocation ?? ''
       form.imageUrl = seed.imageUrl ?? ''
       form.remark = seed.remark ?? ''
@@ -192,6 +211,7 @@ export function useFabricInventoryStock() {
       form.customerName = ''
       form.supplierId = null
       form.warehouseId = null
+      form.inventoryTypeId = null
       form.storageLocation = ''
       form.imageUrl = ''
       form.remark = ''
@@ -220,6 +240,7 @@ export function useFabricInventoryStock() {
           remark: form.remark,
           supplierId: form.supplierId,
           warehouseId: form.warehouseId,
+          inventoryTypeId: form.inventoryTypeId,
           storageLocation: form.storageLocation,
         })
         ElMessage.success('保存成功')
@@ -239,6 +260,7 @@ export function useFabricInventoryStock() {
             remark: form.remark,
             supplierId: form.supplierId,
             warehouseId: form.warehouseId,
+            inventoryTypeId: form.inventoryTypeId,
             storageLocation: form.storageLocation,
           })
           ElMessage.success('库存增加成功')
@@ -252,6 +274,7 @@ export function useFabricInventoryStock() {
             remark: form.remark,
             supplierId: form.supplierId,
             warehouseId: form.warehouseId,
+            inventoryTypeId: form.inventoryTypeId,
             storageLocation: form.storageLocation,
           })
           ElMessage.success('新增成功')
@@ -303,6 +326,7 @@ export function useFabricInventoryStock() {
     fabricSupplierSelectKey,
     fabricSupplierOptionsLoading,
     warehouseOptions,
+    inventoryTypeOptions,
     fabricStockTableRef,
     fabricStockShellRef,
     fabricStockTableHeight,
@@ -322,6 +346,7 @@ export function useFabricInventoryStock() {
     loadCustomerOptions,
     loadFabricSupplierOptions,
     loadWarehouseOptions,
+    loadInventoryTypeOptions,
     openForm,
     resetForm,
     submitForm,

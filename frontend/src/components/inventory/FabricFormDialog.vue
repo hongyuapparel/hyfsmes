@@ -65,6 +65,16 @@
           />
         </el-select>
       </el-form-item>
+      <el-form-item label="库存类型">
+        <el-select v-model="form.inventoryTypeId" placeholder="库存类型（可选）" filterable clearable :disabled="Boolean(quickAddSource)">
+          <el-option
+            v-for="opt in inventoryTypeOptions"
+            :key="opt.id"
+            :label="opt.label"
+            :value="opt.id"
+          />
+        </el-select>
+      </el-form-item>
       <el-form-item label="仓库">
         <el-select v-model="form.warehouseId" placeholder="仓库（可选）" filterable clearable :disabled="Boolean(quickAddSource)">
           <el-option
@@ -105,6 +115,7 @@ interface FabricFormModel {
   customerName: string
   supplierId: number | null
   warehouseId: number | null
+  inventoryTypeId: number | null
   storageLocation: string
   imageUrl: string
   remark: string
@@ -122,6 +133,7 @@ const props = defineProps<{
   fabricSupplierSelectKey: number
   fabricSupplierOptionsLoading: boolean
   warehouseOptions: Array<{ id: number; label: string }>
+  inventoryTypeOptions: Array<{ id: number; label: string }>
 }>()
 
 const emit = defineEmits<{

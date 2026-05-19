@@ -45,6 +45,27 @@
               :value="opt.value"
             />
           </el-select>
+          <el-select
+            v-model="filter.inventoryTypeId"
+            placeholder="库存类型"
+            filterable
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getAdaptiveSelectStyle(filter.inventoryTypeId ? `库存类型：${selectedInventoryTypeLabel}` : '', '库存类型', 42)"
+            @change="onSearch(true)"
+          >
+            <template #label="{ label }">
+              <span v-if="filter.inventoryTypeId">库存类型：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
+            <el-option
+              v-for="opt in inventoryTypeOptions"
+              :key="opt.id"
+              :label="opt.label"
+              :value="opt.id"
+            />
+          </el-select>
           <div
             class="filter-bar-item filter-date-box"
             :class="{ 'is-active': inboundDateRange }"
@@ -113,6 +134,7 @@
           <el-table-column prop="name" label="面料名称" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="supplierName" label="供应商" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+          <el-table-column prop="inventoryTypeLabel" label="库存类型" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="warehouseLabel" label="仓库" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="storageLocation" label="存放地址" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="数量" width="100" align="center" header-align="center">
@@ -233,6 +255,7 @@
       :fabric-supplier-select-key="fabricSupplierSelectKey"
       :fabric-supplier-options-loading="fabricSupplierOptionsLoading"
       :warehouse-options="warehouseOptions"
+      :inventory-type-options="inventoryTypeOptions"
       @update:visible="formDialog.visible = $event"
       @confirm="submitForm"
       @close="resetForm"
@@ -306,6 +329,7 @@ const {
   fabricSupplierSelectKey,
   fabricSupplierOptionsLoading,
   warehouseOptions,
+  inventoryTypeOptions,
   fabricStockTableRef,
   fabricStockShellRef,
   fabricStockTableHeight,
@@ -324,6 +348,7 @@ const {
   loadCustomerOptions,
   loadFabricSupplierOptions,
   loadWarehouseOptions,
+  loadInventoryTypeOptions,
   openForm,
   resetForm,
   submitForm,
@@ -356,6 +381,11 @@ const {
 } = outbound
 
 const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+const selectedInventoryTypeLabel = computed(() => {
+  const id = filter.inventoryTypeId
+  if (id == null) return ''
+  return inventoryTypeOptions.value.find((o) => o.id === id)?.label ?? ''
+})
 const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 
 function onPageTabChange() {
@@ -369,6 +399,7 @@ onMounted(() => {
   loadCustomerOptions()
   loadFabricSupplierOptions()
   loadWarehouseOptions()
+  loadInventoryTypeOptions()
   loadFabricPickupUserOptions()
   load()
 })

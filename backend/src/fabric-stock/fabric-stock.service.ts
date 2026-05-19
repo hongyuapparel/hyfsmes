@@ -14,6 +14,7 @@ const FABRIC_SUPPLIER_TYPE_VALUE = '面料供应商';
 export type FabricStockListRow = FabricStock & {
   supplierName: string;
   warehouseLabel: string;
+  inventoryTypeLabel: string;
 };
 
 @Injectable()
@@ -43,6 +44,7 @@ export class FabricStockService {
       customerName: item.customerName,
       supplierId: item.supplierId,
       warehouseId: item.warehouseId,
+      inventoryTypeId: item.inventoryTypeId,
       storageLocation: item.storageLocation,
       imageUrl: item.imageUrl,
       remark: item.remark,
@@ -74,6 +76,8 @@ export class FabricStockService {
     const warehouseOpts = await this.systemOptionsService.findAllByType('warehouses');
     const whMap = this.buildWarehouseIdToLabelMap(warehouseOpts);
     const whIdSet = new Set(warehouseOpts.map((o) => o.id));
+    const inventoryTypeOpts = await this.systemOptionsService.findAllByType('inventory_types');
+    const invTypeMap = new Map(inventoryTypeOpts.map((o) => [o.id, o.value]));
     const suppliers =
       supplierIds.length > 0
         ? await this.supplierRepo.find({ where: { id: In(supplierIds) } })
@@ -88,6 +92,10 @@ export class FabricStockService {
       warehouseLabel:
         item.warehouseId != null && item.warehouseId > 0 && whIdSet.has(item.warehouseId)
           ? (whMap.get(item.warehouseId) ?? '')
+          : '',
+      inventoryTypeLabel:
+        item.inventoryTypeId != null && item.inventoryTypeId > 0
+          ? (invTypeMap.get(item.inventoryTypeId) ?? '')
           : '',
     }));
   }
@@ -211,11 +219,12 @@ export class FabricStockService {
     customerName?: string;
     startDate?: string;
     endDate?: string;
+    inventoryTypeId?: number | null;
     skipTotal?: boolean;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: FabricStockListRow[]; total: number; page: number; pageSize: number }> {
-    const { name, customerName, startDate, endDate, skipTotal = false, page = 1, pageSize = 20 } = params;
+    const { name, customerName, startDate, endDate, inventoryTypeId, skipTotal = false, page = 1, pageSize = 20 } = params;
     const qb = this.stockRepo.createQueryBuilder('s');
     if (name?.trim()) {
       qb.andWhere('s.name LIKE :name', { name: `%${name.trim()}%` });
@@ -224,6 +233,9 @@ export class FabricStockService {
       qb.andWhere('s.customer_name LIKE :customerName', {
         customerName: `%${customerName.trim()}%`,
       });
+    }
+    if (inventoryTypeId != null) {
+      qb.andWhere('s.inventory_type_id = :inventoryTypeId', { inventoryTypeId });
     }
     if (startDate?.trim()) {
       qb.andWhere('s.created_at >= :inboundStart', { inboundStart: `${startDate.trim()} 00:00:00` });
@@ -257,6 +269,7 @@ export class FabricStockService {
     imageUrl?: string;
     supplierId?: unknown;
     warehouseId?: unknown;
+    inventoryTypeId?: unknown;
     storageLocation?: string;
     operatorUsername?: string;
   }): Promise<FabricStockListRow> {
@@ -268,6 +281,7 @@ export class FabricStockService {
     }
     const supplierId = this.normalizeOptionalPositiveInt(dto.supplierId);
     const warehouseId = this.normalizeOptionalPositiveInt(dto.warehouseId);
+    const inventoryTypeId = this.normalizeOptionalPositiveInt(dto.inventoryTypeId);
     if (supplierId != null) await this.assertFabricSupplierId(supplierId);
     if (warehouseId != null) await this.assertWarehouseId(warehouseId);
     const existing = await this.findByName(name);
@@ -278,6 +292,7 @@ export class FabricStockService {
       if (!existing.customerName && dto.customerName) existing.customerName = dto.customerName.trim();
       if (existing.supplierId == null) existing.supplierId = supplierId;
       if (existing.warehouseId == null) existing.warehouseId = warehouseId;
+      if (existing.inventoryTypeId == null) existing.inventoryTypeId = inventoryTypeId;
       if (!existing.storageLocation && dto.storageLocation) existing.storageLocation = dto.storageLocation.trim();
       if (!existing.imageUrl && dto.imageUrl) existing.imageUrl = dto.imageUrl.trim();
       const savedExisting = await this.stockRepo.save(existing);
@@ -299,6 +314,7 @@ export class FabricStockService {
       customerName: dto.customerName?.trim() ?? '',
       supplierId,
       warehouseId,
+      inventoryTypeId,
       storageLocation: (dto.storageLocation ?? '').trim(),
       remark: dto.remark?.trim() ?? '',
       imageUrl: dto.imageUrl?.trim() ?? '',
@@ -326,6 +342,7 @@ export class FabricStockService {
       imageUrl?: string;
       supplierId?: unknown;
       warehouseId?: unknown;
+      inventoryTypeId?: unknown;
       storageLocation?: string;
       operatorUsername?: string;
     },
@@ -355,6 +372,9 @@ export class FabricStockService {
       const wid = this.normalizeOptionalPositiveInt(dto.warehouseId);
       if (wid != null) await this.assertWarehouseId(wid);
       item.warehouseId = wid;
+    }
+    if (dto.inventoryTypeId !== undefined) {
+      item.inventoryTypeId = this.normalizeOptionalPositiveInt(dto.inventoryTypeId);
     }
     if (dto.storageLocation !== undefined) item.storageLocation = (dto.storageLocation ?? '').trim();
     const saved = await this.stockRepo.save(item);

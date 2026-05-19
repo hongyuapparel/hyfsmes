@@ -22,6 +22,10 @@ export class FabricStock {
   @Column({ name: 'warehouse_id', type: 'int', nullable: true })
   warehouseId: number | null;
 
+  /** 库存类型 system_options.id（option_type = inventory_types），可选 */
+  @Column({ name: 'inventory_type_id', type: 'int', nullable: true })
+  inventoryTypeId: number | null;
+
   /** 存放地址（自由文本） */
   @Column({ name: 'storage_location', length: 255, default: '' })
   storageLocation: string;

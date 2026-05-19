@@ -38,15 +38,21 @@ export class FabricStockController {
     @Query('customerName') customerName?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('inventoryTypeId') inventoryTypeIdStr?: string,
     @Query('skipTotal') skipTotal?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
+    const inventoryTypeId =
+      inventoryTypeIdStr != null && inventoryTypeIdStr !== ''
+        ? Number(inventoryTypeIdStr)
+        : null;
     return this.service.getList({
       name,
       customerName,
       startDate,
       endDate,
+      inventoryTypeId: Number.isFinite(inventoryTypeId) && (inventoryTypeId ?? 0) > 0 ? inventoryTypeId : null,
       skipTotal: skipTotal === 'true' || skipTotal === '1',
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
@@ -68,6 +74,7 @@ export class FabricStockController {
     @Body('imageUrl') imageUrl?: string,
     @Body('supplierId') supplierId?: unknown,
     @Body('warehouseId') warehouseId?: unknown,
+    @Body('inventoryTypeId') inventoryTypeId?: unknown,
     @Body('storageLocation') storageLocation?: string,
     @CurrentUser() user?: { username?: string },
   ) {
@@ -80,6 +87,7 @@ export class FabricStockController {
       imageUrl,
       supplierId,
       warehouseId,
+      inventoryTypeId,
       storageLocation,
       operatorUsername: user?.username ?? '',
     });
@@ -96,6 +104,7 @@ export class FabricStockController {
     @Body('imageUrl') imageUrl?: string,
     @Body('supplierId') supplierId?: unknown,
     @Body('warehouseId') warehouseId?: unknown,
+    @Body('inventoryTypeId') inventoryTypeId?: unknown,
     @Body('storageLocation') storageLocation?: string,
     @CurrentUser() user?: { username?: string },
   ) {
@@ -108,6 +117,7 @@ export class FabricStockController {
       imageUrl,
       supplierId,
       warehouseId,
+      inventoryTypeId,
       storageLocation,
       operatorUsername: user?.username ?? '',
     });

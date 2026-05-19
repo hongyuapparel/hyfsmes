@@ -38,6 +38,7 @@ const fields = computed<DetailField[]>(() => {
     { label: '名称', value: row.name || '-' },
     { label: '客户', value: row.customerName || '-' },
     { label: '供应商', value: row.supplierName || '-' },
+    { label: '库存类型', value: row.inventoryTypeLabel || '-' },
     { label: '仓库', value: row.warehouseLabel || '-' },
     { label: '存放地址', value: row.storageLocation || '-' },
     { label: '当前库存', value: `${formatDisplayNumber(row.quantity)} ${row.unit || ''}`.trim() },
