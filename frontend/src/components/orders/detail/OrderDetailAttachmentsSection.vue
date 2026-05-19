@@ -6,18 +6,42 @@
         v-for="(url, index) in attachmentsForView"
         :key="url + index"
         class="attachment-item"
+        :style="itemStyles[index]"
       >
-        <el-image :src="url" fit="contain" />
+        <el-image
+          :src="url"
+          fit="contain"
+          :preview-src-list="attachmentsForView"
+          :initial-index="index"
+          :preview-teleported="true"
+          hide-on-click-modal
+          @load="(event) => handleImageLoad(event, index)"
+        />
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
+import { reactive } from 'vue'
+
+const ATTACHMENT_HEIGHT_PX = 200
+
 defineProps<{
   hasAttachments: boolean
   attachmentsForView: string[]
 }>()
+
+const itemStyles = reactive<Record<number, { width: string }>>({})
+
+function handleImageLoad(event: Event, index: number): void {
+  const img = event.target
+  if (!(img instanceof HTMLImageElement)) return
+  const { naturalWidth, naturalHeight } = img
+  if (naturalWidth <= 0 || naturalHeight <= 0) return
+  const widthPx = Math.round((ATTACHMENT_HEIGHT_PX * naturalWidth) / naturalHeight)
+  itemStyles[index] = { width: `${widthPx}px` }
+}
 </script>
 
 <style scoped>
@@ -36,14 +60,14 @@ defineProps<{
 }
 
 .attachments-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
 .attachment-item {
-  width: 100%;
   height: 200px;
+  flex-shrink: 0;
   position: relative;
   border: 1px solid #dcdfe6;
   border-radius: 2px;
@@ -51,9 +75,13 @@ defineProps<{
 }
 
 .attachment-item :deep(.el-image) {
-  position: absolute;
-  inset: 0;
+  display: block;
   width: 100%;
   height: 100%;
+}
+
+.attachment-item :deep(.el-image__inner) {
+  object-fit: contain;
+  cursor: zoom-in;
 }
 </style>

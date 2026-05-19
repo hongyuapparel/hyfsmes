@@ -20,7 +20,13 @@
       <div class="block block-ab-layout">
         <div class="ab-left">
           <div v-if="detail.imageUrl" class="main-image">
-            <el-image :src="detail.imageUrl" fit="contain" />
+            <el-image
+              :src="detail.imageUrl"
+              fit="contain"
+              :preview-src-list="[detail.imageUrl]"
+              :preview-teleported="true"
+              hide-on-click-modal
+            />
           </div>
           <div v-else class="main-image placeholder">
             无主图
@@ -133,7 +139,14 @@
               {{ cell.description }}
             </div>
             <div v-if="cell.imageUrl" class="packaging-image-wrap">
-              <el-image :src="cell.imageUrl" fit="contain" />
+              <el-image
+                :src="cell.imageUrl"
+                fit="contain"
+                :preview-src-list="packagingImageList"
+                :initial-index="packagingPreviewIndex(cell.imageUrl)"
+                :preview-teleported="true"
+                hide-on-click-modal
+              />
             </div>
           </div>
         </div>
@@ -151,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted } from 'vue'
+import { computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -207,6 +220,16 @@ const {
   findMaterialTypeLabelById,
 })
 
+const packagingImageList = computed(() =>
+  packagingCellsForView.value
+    .map((cell) => cell.imageUrl)
+    .filter((url): url is string => !!url),
+)
+
+function packagingPreviewIndex(imageUrl: string): number {
+  return packagingImageList.value.indexOf(imageUrl)
+}
+
 function goBack() {
   void router.push({ name: 'OrdersList' })
 }
@@ -226,3 +249,10 @@ onMounted(async () => {
 </script>
 
 <style src="./detail.css"></style>
+
+<style scoped>
+.main-image :deep(.el-image__inner),
+.packaging-image-wrap :deep(.el-image__inner) {
+  cursor: zoom-in;
+}
+</style>

@@ -304,10 +304,9 @@ export function useOrderDetailView({
         }
       })
       .filter((item) => {
-        const header = String(item.header || '').trim()
-        const hasText = header || item.accessoryName || item.description
+        const hasDesc = !!String(item.description || '').trim()
         const hasImage = !!item.imageUrl
-        return hasText || hasImage
+        return hasDesc || hasImage
       })
   })
 
