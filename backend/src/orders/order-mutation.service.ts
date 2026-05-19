@@ -523,18 +523,19 @@ export class OrderMutationService {
     return Number.isFinite(exFactory) ? Number(exFactory.toFixed(2)) : 0;
   }
 
-  private withDraftMetadata(snapshot: Record<string, unknown>, actor: OrderActor): Record<string, unknown> {
-    return { ...snapshot, quoteNeedsReconfirm: true, quoteDraftUpdatedAt: new Date().toISOString(), quoteDraftUpdatedBy: actor.username };
+  // 报价元数据里的“操作人”一律写显示名(displayName),保证订单成本页上「确认报价人」前后一致。
+  private withDraftMetadata(snapshot: Record<string, unknown>, operatorName: string): Record<string, unknown> {
+    return { ...snapshot, quoteNeedsReconfirm: true, quoteDraftUpdatedAt: new Date().toISOString(), quoteDraftUpdatedBy: operatorName };
   }
-  private withConfirmedMetadata(snapshot: Record<string, unknown>, actor: OrderActor, exFactoryPrice: string): Record<string, unknown> {
+  private withConfirmedMetadata(snapshot: Record<string, unknown>, operatorName: string, exFactoryPrice: string): Record<string, unknown> {
     return {
       ...snapshot,
       quoteNeedsReconfirm: false,
       quoteConfirmedAt: new Date().toISOString(),
-      quoteConfirmedBy: actor.username,
+      quoteConfirmedBy: operatorName,
       quoteConfirmedExFactoryPrice: exFactoryPrice,
       quoteDraftUpdatedAt: new Date().toISOString(),
-      quoteDraftUpdatedBy: actor.username,
+      quoteDraftUpdatedBy: operatorName,
     };
   }
 
@@ -590,7 +591,8 @@ export class OrderMutationService {
 
   async saveCostSnapshot(orderId: number, payload: { snapshot: Record<string, unknown> }, actor?: OrderActor): Promise<OrderCostSnapshot> {
     const order = await this.orderQueryService.findOne(orderId);
-    const snapshot = this.withDraftMetadata(payload.snapshot ?? {}, actor ?? { userId: 0, username: '系统' });
+    const operatorName = actor ? await resolveOperatorDisplayName(this.userRepo, actor) : '系统';
+    const snapshot = this.withDraftMetadata(payload.snapshot ?? {}, operatorName);
     let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
     if (row) row.snapshot = snapshot;
     else row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
@@ -604,7 +606,8 @@ export class OrderMutationService {
     const oldExFactory = this.normalizeDecimalInput(order.exFactoryPrice);
     const computed = this.calculateExFactoryPriceFromSnapshot(payload.snapshot ?? {});
     const nextExFactory = this.normalizeDecimalInput(computed.toFixed(2));
-    const snapshot = this.withConfirmedMetadata(payload.snapshot ?? {}, actor, nextExFactory);
+    const operatorName = await resolveOperatorDisplayName(this.userRepo, actor);
+    const snapshot = this.withConfirmedMetadata(payload.snapshot ?? {}, operatorName, nextExFactory);
     let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
     if (row) row.snapshot = snapshot;
     else row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
