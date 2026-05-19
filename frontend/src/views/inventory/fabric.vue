@@ -169,25 +169,54 @@
       <el-tab-pane label="出库记录" name="outbounds">
         <div class="tab-pane-scroll">
         <el-form class="filter-bar" @submit.prevent>
-          <el-input v-model="outboundFilter.name" placeholder="面料名称" clearable size="large" class="filter-bar-item" @keyup.enter="onOutboundSearch(true)" />
-          <el-select v-model="outboundFilter.customerName" placeholder="客户" filterable clearable size="large" class="filter-bar-item" @change="onOutboundSearch(true)">
+          <el-input
+            v-model="outboundFilter.name"
+            placeholder="面料名称"
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getTextFilterStyle('面料名称', outboundFilter.name, false)"
+            :input-style="getFilterInputStyle(outboundFilter.name)"
+            @keyup.enter="onOutboundSearch(true)"
+          />
+          <el-select
+            v-model="outboundFilter.customerName"
+            placeholder="客户"
+            filterable
+            clearable
+            size="large"
+            class="filter-bar-item"
+            :style="getAdaptiveSelectStyle(outboundFilter.customerName ? `客户：${outboundFilter.customerName}` : '', '客户', 42)"
+            @change="onOutboundSearch(true)"
+          >
+            <template #label="{ label }">
+              <span v-if="outboundFilter.customerName">客户：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
             <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
           </el-select>
-          <el-date-picker
-            v-model="outboundFilter.dateRange"
-            type="daterange"
-            :name="['fabricOutboundDateStart', 'fabricOutboundDateEnd']"
-            start-placeholder="出库时间"
-            end-placeholder=""
-            range-separator=""
-            unlink-panels
-            value-format="YYYY-MM-DD"
-            :shortcuts="rangeShortcuts"
-            size="large"
-            :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-            :style="getInventoryOutboundRangeStyle(outboundFilter.dateRange)"
-            @change="onOutboundSearch(true)"
-          />
+          <div
+            class="filter-bar-item filter-date-box"
+            :class="{ 'is-active': outboundFilter.dateRange && outboundFilter.dateRange.length === 2 }"
+            :style="getFilterRangeStyle(outboundFilter.dateRange as [string, string] | [], '出库时间')"
+          >
+            <span v-if="outboundFilter.dateRange && outboundFilter.dateRange.length === 2" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">出库时间：</span>
+            <el-date-picker
+              v-model="outboundFilter.dateRange"
+              type="daterange"
+              :name="['fabricOutboundDateStart', 'fabricOutboundDateEnd']"
+              :range-separator="outboundFilter.dateRange && outboundFilter.dateRange.length === 2 ? '~' : ''"
+              start-placeholder="出库时间"
+              end-placeholder=""
+              unlink-panels
+              clearable
+              value-format="YYYY-MM-DD"
+              :shortcuts="rangeShortcuts"
+              size="large"
+              :class="['filter-range', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
+              @change="onOutboundSearch(true)"
+            />
+          </div>
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
             <el-button size="large" @click="onOutboundReset">清空</el-button>
@@ -369,7 +398,6 @@ const {
   outboundRules,
   outboundMaxQty,
   fabricPickupUserOptions,
-  getInventoryOutboundRangeStyle,
   loadOutbounds,
   onOutboundSearch,
   onOutboundReset,

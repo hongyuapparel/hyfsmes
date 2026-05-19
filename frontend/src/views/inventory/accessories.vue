@@ -175,6 +175,8 @@
             clearable
             size="large"
             class="filter-bar-item"
+            :style="getTextFilterStyle('订单号（自动出库）', outboundFilter.orderNo, false)"
+            :input-style="getFilterInputStyle(outboundFilter.orderNo)"
             @keyup.enter="onOutboundSearch(true)"
           />
           <el-select
@@ -183,26 +185,38 @@
             clearable
             size="large"
             class="filter-bar-item"
+            :style="getAdaptiveSelectStyle(outboundFilter.outboundType ? `出库类型：${outboundFilter.outboundType === 'order_auto' ? '订单自动出库' : '手动出库'}` : '', '出库类型')"
             @change="onOutboundSearch(true)"
           >
+            <template #label="{ label }">
+              <span v-if="outboundFilter.outboundType">出库类型：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
             <el-option label="订单自动出库" value="order_auto" />
             <el-option label="手动出库" value="manual" />
           </el-select>
-          <el-date-picker
-            v-model="outboundFilter.dateRange"
-            type="daterange"
-            :name="['accessoriesOutboundDateStart', 'accessoriesOutboundDateEnd']"
-            start-placeholder="出库时间"
-            end-placeholder=""
-            range-separator=""
-            unlink-panels
-            value-format="YYYY-MM-DD"
-            :shortcuts="rangeShortcuts"
-            size="large"
-            :class="['filter-bar-item', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-            :style="getInventoryOutboundRangeStyle(outboundFilter.dateRange)"
-            @change="onOutboundSearch(true)"
-          />
+          <div
+            class="filter-bar-item filter-date-box"
+            :class="{ 'is-active': outboundFilter.dateRange && outboundFilter.dateRange.length === 2 }"
+            :style="getFilterRangeStyle(outboundFilter.dateRange as [string, string] | [], '出库时间')"
+          >
+            <span v-if="outboundFilter.dateRange && outboundFilter.dateRange.length === 2" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">出库时间：</span>
+            <el-date-picker
+              v-model="outboundFilter.dateRange"
+              type="daterange"
+              :name="['accessoriesOutboundDateStart', 'accessoriesOutboundDateEnd']"
+              :range-separator="outboundFilter.dateRange && outboundFilter.dateRange.length === 2 ? '~' : ''"
+              start-placeholder="出库时间"
+              end-placeholder=""
+              unlink-panels
+              clearable
+              value-format="YYYY-MM-DD"
+              :shortcuts="rangeShortcuts"
+              size="large"
+              :class="['filter-range', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
+              @change="onOutboundSearch(true)"
+            />
+          </div>
           <div class="filter-bar-actions">
             <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
             <el-button size="large" @click="onOutboundReset">清空</el-button>
@@ -374,13 +388,6 @@ const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOu
 
 const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
-
-function getInventoryOutboundRangeStyle(v: [string, string] | []) {
-  const hasValue = Array.isArray(v) && v.length === 2
-  if (!hasValue) return getFilterRangeStyle(v)
-  const width = '240px'
-  return { ...getFilterRangeStyle(v), width, minWidth: width, flex: `0 0 ${width}` }
-}
 
 async function load() {
   loading.value = true
