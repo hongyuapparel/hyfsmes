@@ -100,7 +100,6 @@
 
 <script setup lang="ts">
 import { Delete, CircleClose } from '@element-plus/icons-vue'
-
 import type { SizeInfoRow } from '@/composables/useOrderSizeInfo'
 
 defineProps<{

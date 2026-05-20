@@ -304,7 +304,9 @@
       <el-input
         v-model="productionRequirement"
         type="textarea"
-        :rows="4"
+        :autosize="{ minRows: 1, maxRows: 12 }"
+        :input-style="{ padding: '5px 11px' }"
+        resize="none"
         placeholder="填写文案、缝制难点、包装出货方式、分批出货、备注等生产要求"
       />
     </el-card>

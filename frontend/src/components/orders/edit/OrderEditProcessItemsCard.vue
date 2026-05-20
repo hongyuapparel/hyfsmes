@@ -41,7 +41,8 @@
           <el-input
             v-model="row.part"
             type="textarea"
-            :autosize="{ minRows: 2, maxRows: 6 }"
+            :autosize="{ minRows: 1, maxRows: 6 }"
+            :input-style="processTextareaInputStyle"
             resize="none"
             placeholder="如：前幅 / 后幅 / 袖子"
           />
@@ -52,7 +53,8 @@
           <el-input
             v-model="row.remark"
             type="textarea"
-            :autosize="{ minRows: 2, maxRows: 8 }"
+            :autosize="{ minRows: 1, maxRows: 8 }"
+            :input-style="processTextareaInputStyle"
             resize="none"
             placeholder="说明 / 备注"
           />
@@ -80,10 +82,28 @@
 
 <script setup lang="ts">
 import { Delete } from '@element-plus/icons-vue'
+import type { CSSProperties } from 'vue'
+
+interface ProcessItemRow {
+  processName?: string
+  supplierName?: string
+  part?: string
+  remark?: string
+}
+
+interface ProcessOption {
+  label: string
+  value: string
+  children?: ProcessOption[]
+}
+
+const processTextareaInputStyle = {
+  padding: '5px 11px',
+} satisfies CSSProperties
 
 defineProps<{
-  processItems: any[]
-  processOptions: any[]
+  processItems: ProcessItemRow[]
+  processOptions: ProcessOption[]
   supplierOptions: Array<{ id: number; name: string }>
   supplierLoading: boolean
   addProcessRow: () => void

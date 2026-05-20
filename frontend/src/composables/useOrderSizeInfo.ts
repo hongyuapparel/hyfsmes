@@ -4,6 +4,7 @@ import { ElMessage } from 'element-plus'
 import Sortable from 'sortablejs'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
+type TableComponentInstance = HTMLElement | { $el?: HTMLElement } | null
 
 export interface SizeInfoRow {
   __rowKey: string
@@ -21,16 +22,8 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
   const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
   const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
   const sizeInfoRows = ref<SizeInfoRow[]>([])
-  const sizeInfoTableRef = ref<{ $el?: HTMLElement } | undefined>(undefined)
+  const sizeInfoTableRef = ref<TableComponentInstance>(null)
   const sizeGridRefs = ref<InputComponentInstance[][]>([])
-
-  function setSizeInfoTableRef(el: unknown) {
-    if (el && typeof el === 'object' && '$el' in (el as Record<string, unknown>)) {
-      sizeInfoTableRef.value = el as { $el?: HTMLElement }
-    } else {
-      sizeInfoTableRef.value = undefined
-    }
-  }
   let sizeInfoSortable: Sortable | null = null
   let sizeInfoRowKeySeed = 0
 
@@ -172,9 +165,23 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     sizeInfoRows.value.splice(index, 1)
   }
 
+  function setSizeInfoTableRef(el: unknown) {
+    if (el instanceof HTMLElement || el === null) {
+      sizeInfoTableRef.value = el
+      return
+    }
+    if (el && typeof el === 'object' && '$el' in el) {
+      const maybeTable = el as { $el?: HTMLElement }
+      sizeInfoTableRef.value = maybeTable.$el ? maybeTable : null
+      return
+    }
+    sizeInfoTableRef.value = null
+  }
+
   function initSizeInfoSortable() {
     nextTick(() => {
-      const root = sizeInfoTableRef.value?.$el as HTMLElement | undefined
+      const tableRef = sizeInfoTableRef.value
+      const root = tableRef instanceof HTMLElement ? tableRef : tableRef?.$el
       const tbody = root?.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
       if (!tbody) return
 
