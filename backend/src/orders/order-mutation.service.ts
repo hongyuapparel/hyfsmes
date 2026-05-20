@@ -470,13 +470,13 @@ export class OrderMutationService {
         await this.orderExtRepo.save(newExt);
       }
       const srcCost = costMap.get(src.id) ?? null;
-      if (srcCost?.snapshot != null) {
-        const srcSnapshot = srcCost.snapshot && typeof srcCost.snapshot === 'object' ? ({ ...(srcCost.snapshot as any) } as any) : null;
-        if (srcSnapshot && Object.prototype.hasOwnProperty.call(srcSnapshot, 'profitMargin')) {
+      if (srcCost?.snapshot != null && typeof srcCost.snapshot === 'object') {
+        const srcSnapshot = this.stripQuoteMetadataFromSnapshot({ ...(srcCost.snapshot as Record<string, unknown>) });
+        if (Object.prototype.hasOwnProperty.call(srcSnapshot, 'profitMargin')) {
           srcSnapshot.profitMargin = this.normalizeProfitMargin(srcSnapshot.profitMargin);
         }
         await this.orderCostSnapshotRepo.save(
-          this.orderCostSnapshotRepo.create({ orderId: saved.id, snapshot: srcSnapshot ?? srcCost.snapshot }),
+          this.orderCostSnapshotRepo.create({ orderId: saved.id, snapshot: srcSnapshot }),
         );
       } else {
         await this.syncCostSnapshotFromOrder(saved.id);
@@ -501,6 +501,13 @@ export class OrderMutationService {
     if (!Number.isFinite(n) || n < 0) return 2;
     return n;
   }
+  // 生产工序行数量：与前端 productionLineQuantity 保持一致，缺省/非法/负数一律按 1 计。
+  private normalizeProductionLineQuantity(v: unknown): number {
+    if (v == null) return 1;
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return 1;
+    return n;
+  }
   private calculateExFactoryPriceFromSnapshot(snapshot: Record<string, unknown> | null | undefined): number {
     if (!snapshot || typeof snapshot !== 'object') return 0;
     const materialRows = Array.isArray(snapshot.materialRows) ? (snapshot.materialRows as any[]) : [];
@@ -515,7 +522,10 @@ export class OrderMutationService {
       return sum + usage * (1 + lossPercent / 100) * unitPrice;
     }, 0);
     const processItemTotal = processItemRows.reduce((sum, row) => sum + (Number(row?.quantity) || 0) * (Number(row?.unitPrice) || 0), 0);
-    const productionBaseTotal = productionRows.reduce((sum, row) => sum + (Number(row?.unitPrice) || 0), 0);
+    const productionBaseTotal = productionRows.reduce(
+      (sum, row) => sum + (Number(row?.unitPrice) || 0) * this.normalizeProductionLineQuantity(row?.quantity),
+      0,
+    );
     const productionTotal = productionBaseTotal * this.normalizeProductionCostMultiplier(snapshot.productionCostMultiplier);
     const totalCost = materialTotal + processItemTotal + productionTotal;
     const margin = this.normalizeProfitMargin(snapshot.profitMargin);
@@ -537,6 +547,20 @@ export class OrderMutationService {
       quoteDraftUpdatedAt: new Date().toISOString(),
       quoteDraftUpdatedBy: operatorName,
     };
+  }
+  // 复制订单为新草稿时，剥离报价确认/草稿元数据：新订单从未确认过报价，
+  // 不能继承源订单的「最近一次确认报价」，否则成本页会显示从未发生过的确认记录。
+  private stripQuoteMetadataFromSnapshot(snapshot: Record<string, unknown>): Record<string, unknown> {
+    const {
+      quoteNeedsReconfirm: _quoteNeedsReconfirm,
+      quoteConfirmedAt: _quoteConfirmedAt,
+      quoteConfirmedBy: _quoteConfirmedBy,
+      quoteConfirmedExFactoryPrice: _quoteConfirmedExFactoryPrice,
+      quoteDraftUpdatedAt: _quoteDraftUpdatedAt,
+      quoteDraftUpdatedBy: _quoteDraftUpdatedBy,
+      ...rest
+    } = snapshot;
+    return rest;
   }
 
   // 仅在订单尚无成本快照时，用订单的物料/工艺项目初始化一份零单价的快照。
