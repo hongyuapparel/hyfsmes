@@ -48,10 +48,9 @@ export class UploadCleanupService {
       return { orphans: [], totalSize: 0, totalCount: 0, scanDurationMs: Date.now() - started };
     }
 
-    const columns = await this.getTextColumns();
     const cutoff = Date.now() - ORPHAN_AGE_MS;
     const entries = readdirSync(UPLOAD_DIR);
-    const orphans: OrphanImageItem[] = [];
+    const candidates: OrphanImageItem[] = [];
 
     for (const filename of entries) {
       if (filename.startsWith(SMALL_PREFIX)) continue;
@@ -65,18 +64,20 @@ export class UploadCleanupService {
       if (!stat.isFile()) continue;
       if (stat.mtime.getTime() > cutoff) continue;
 
-      const referenced = await this.isFileReferenced(filename, columns);
-      if (referenced) continue;
-
-      const thumbName = `${SMALL_PREFIX}${filename}`;
-      orphans.push({
+      candidates.push({
         filename,
         sizeBytes: stat.size,
         mtime: stat.mtime.toISOString(),
-        hasThumbnail: existsSync(join(UPLOAD_DIR, thumbName)),
+        hasThumbnail: existsSync(join(UPLOAD_DIR, `${SMALL_PREFIX}${filename}`)),
       });
     }
 
+    if (candidates.length === 0) {
+      return { orphans: [], totalSize: 0, totalCount: 0, scanDurationMs: Date.now() - started };
+    }
+
+    const referenced = await this.collectReferencedFilenames();
+    const orphans = candidates.filter((c) => !referenced.has(c.filename));
     const totalSize = orphans.reduce((sum, o) => sum + o.sizeBytes, 0);
     return {
       orphans,
@@ -87,9 +88,9 @@ export class UploadCleanupService {
   }
 
   async deleteOrphans(filenames: string[]): Promise<DeleteOrphansResult> {
-    const columns = await this.getTextColumns();
     const deleted: string[] = [];
     const skipped: { filename: string; reason: string }[] = [];
+    let referenced: Set<string> | null = null;
 
     for (const raw of filenames) {
       const filename = raw.trim();
@@ -100,8 +101,8 @@ export class UploadCleanupService {
           skipped.push({ filename, reason: '文件不存在' });
           continue;
         }
-        const referenced = await this.isFileReferenced(filename, columns);
-        if (referenced) {
+        if (!referenced) referenced = await this.collectReferencedFilenames();
+        if (referenced.has(filename)) {
           skipped.push({ filename, reason: '数据库仍有引用' });
           continue;
         }
@@ -122,6 +123,38 @@ export class UploadCleanupService {
     return { deleted, skipped };
   }
 
+  private async collectReferencedFilenames(): Promise<Set<string>> {
+    const columns = await this.getTextColumns();
+    const referenced = new Set<string>();
+    const filenameRegex = /\/uploads\/([\w.\-]+)/g;
+
+    for (const { tableName, columnName } of columns) {
+      let rows: Array<{ v: unknown }>;
+      try {
+        rows = await this.dataSource.query(
+          `SELECT \`${columnName}\` AS v FROM \`${tableName}\` WHERE \`${columnName}\` LIKE '%/uploads/%'`,
+        );
+      } catch (err) {
+        this.logger.warn(
+          `扫描列失败 ${tableName}.${columnName}: ${err instanceof Error ? err.message : String(err)}`,
+        );
+        continue;
+      }
+      for (const row of rows) {
+        const text = typeof row.v === 'string' ? row.v : JSON.stringify(row.v);
+        if (!text) continue;
+        filenameRegex.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = filenameRegex.exec(text)) !== null) {
+          const name = match[1];
+          if (!name.startsWith(SMALL_PREFIX)) referenced.add(name);
+        }
+      }
+    }
+
+    return referenced;
+  }
+
   private async getTextColumns(): Promise<TextColumnRef[]> {
     if (this.textColumnsCache) return this.textColumnsCache;
     const rows: Array<{ TABLE_NAME: string; COLUMN_NAME: string }> = await this.dataSource.query(
@@ -134,19 +167,6 @@ export class UploadCleanupService {
       .filter((r) => this.isSafeIdentifier(r.TABLE_NAME) && this.isSafeIdentifier(r.COLUMN_NAME))
       .map((r) => ({ tableName: r.TABLE_NAME, columnName: r.COLUMN_NAME }));
     return this.textColumnsCache;
-  }
-
-  private async isFileReferenced(
-    filename: string,
-    columns: TextColumnRef[],
-  ): Promise<boolean> {
-    const pattern = `%${filename}%`;
-    for (const { tableName, columnName } of columns) {
-      const sql = `SELECT 1 AS hit FROM \`${tableName}\` WHERE \`${columnName}\` LIKE ? LIMIT 1`;
-      const rows: Array<{ hit: number }> = await this.dataSource.query(sql, [pattern]);
-      if (rows.length > 0) return true;
-    }
-    return false;
   }
 
   private assertSafeFilename(filename: string): void {
