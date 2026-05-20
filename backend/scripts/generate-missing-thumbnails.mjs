@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * 扫描 uploads 下指定目录，为「原图」补全同目录 small_ 缩略图（与线上一致命名规则）。
- * 幂等：已存在 small_ 则跳过，不覆盖。
+ * 默认幂等：已存在 small_ 则跳过，不覆盖。
  *
  * 依赖：在后端目录已安装 sharp（npm install）
  *
@@ -9,7 +9,13 @@
  *   cd /path/to/backend
  *   npm run thumbs:migration-old
  *   node scripts/generate-missing-thumbnails.mjs --root uploads/migration-old
+ *   node scripts/generate-missing-thumbnails.mjs --root uploads --force --ext png  # 重建 png 原图的缩略图（webp 内容）
  *   SKIP_THUMB_CONFIRM=1 node scripts/generate-missing-thumbnails.mjs   # 跳过确认（仅自动化场景）
+ *
+ * 参数：
+ *   --root <dir>   扫描根目录，默认 uploads/migration-old
+ *   --force        覆盖已存在的 small_ 缩略图（用于按新编码规则重建，如 png→webp 提速）
+ *   --ext <list>   仅处理指定原图扩展名，逗号分隔，如 --ext png 或 --ext png,jpg
  */
 
 import { access, readdir, stat } from 'fs/promises'
@@ -22,13 +28,25 @@ const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif'])
 
 function parseArgs(argv) {
   let root = join(process.cwd(), 'uploads', 'migration-old')
+  let force = false
+  let extFilter = null
   for (let i = 2; i < argv.length; i += 1) {
     if (argv[i] === '--root' && argv[i + 1]) {
       root = resolve(process.cwd(), argv[i + 1])
       i += 1
+    } else if (argv[i] === '--force') {
+      force = true
+    } else if (argv[i] === '--ext' && argv[i + 1]) {
+      extFilter = new Set(
+        argv[i + 1]
+          .split(',')
+          .map((s) => `.${s.trim().replace(/^\./, '').toLowerCase()}`)
+          .filter((s) => s !== '.'),
+      )
+      i += 1
     }
   }
-  return { root }
+  return { root, force, extFilter }
 }
 
 async function pathExists(p) {
@@ -53,22 +71,25 @@ async function walkFiles(dir, out = []) {
   return out
 }
 
-async function generateBeside(originalAbsPath) {
+async function generateBeside(originalAbsPath, { force = false, extFilter = null } = {}) {
   const base = basename(originalAbsPath)
   if (/^small_/i.test(base)) return { status: 'skip_small_prefix' }
   const ext = extname(base)
-  if (!ALLOWED_EXT.has(ext.toLowerCase())) return { status: 'skip_ext' }
+  const low = ext.toLowerCase()
+  if (!ALLOWED_EXT.has(low)) return { status: 'skip_ext' }
+  if (extFilter && !extFilter.has(low)) return { status: 'skip_ext_filter' }
 
   const out = join(dirname(originalAbsPath), `small_${base}`)
-  if (await pathExists(out)) return { status: 'exists' }
+  if (!force && (await pathExists(out))) return { status: 'exists' }
 
   const pipeline = sharp(originalAbsPath)
     .rotate()
     .resize(MAX_THUMB_WIDTH, null, { withoutEnlargement: true })
 
-  const low = ext.toLowerCase()
   if (low === '.png') {
-    await pipeline.png({ compressionLevel: 9 }).toFile(out)
+    // 与 src/uploads/thumbnail.util.ts 一致：png 原图缩略图改用 webp 编码（体积小一个数量级），
+    // 文件名仍保持 small_xxx.png，浏览器按内容嗅探可正常渲染，前端无需改动。
+    await pipeline.webp({ quality: 82 }).toFile(out)
   } else if (low === '.webp') {
     await pipeline.webp({ quality: 82 }).toFile(out)
   } else if (low === '.gif') {
@@ -79,13 +100,17 @@ async function generateBeside(originalAbsPath) {
   return { status: 'created', out }
 }
 
-function promptBackup() {
+function promptBackup(force) {
   if (process.env.SKIP_THUMB_CONFIRM === '1') return Promise.resolve(true)
   return new Promise((resolvePromise) => {
     const rl = createInterface({ input: process.stdin, output: process.stdout })
     console.log('\n========================================')
     console.log('【重要】执行前请先完整备份目标目录（含 migration-old）')
-    console.log('本脚本会新增 small_ 文件；已存在的 small_ 不会被覆盖。')
+    if (force) {
+      console.log('当前为 --force 模式：会【覆盖】已存在的 small_ 缩略图。')
+    } else {
+      console.log('本脚本会新增 small_ 文件；已存在的 small_ 不会被覆盖。')
+    }
     console.log('========================================\n')
     rl.question('已备份并确认继续？(yes 回车) ', (line) => {
       rl.close()
@@ -95,8 +120,8 @@ function promptBackup() {
 }
 
 async function main() {
-  const { root } = parseArgs(process.argv)
-  const ok = await promptBackup()
+  const { root, force, extFilter } = parseArgs(process.argv)
+  const ok = await promptBackup(force)
   if (!ok) {
     console.log('已取消。')
     process.exit(0)
@@ -117,10 +142,10 @@ async function main() {
     const st = await stat(abs)
     if (!st.isFile()) continue
     try {
-      const r = await generateBeside(abs)
+      const r = await generateBeside(abs, { force, extFilter })
       if (r.status === 'created') {
         created += 1
-        if (created <= 20 || created % 200 === 0) console.log('生成:', r.out)
+        if (created <= 20 || created % 200 === 0) console.log(force ? '重建:' : '生成:', r.out)
       } else if (r.status === 'exists') skippedExists += 1
       else skippedOther += 1
     } catch (e) {
@@ -130,9 +155,9 @@ async function main() {
   }
 
   console.log('\n完成。')
-  console.log('  新建缩略图:', created)
+  console.log(force ? '  重建缩略图:' : '  新建缩略图:', created)
   console.log('  已有 small_ 跳过:', skippedExists)
-  console.log('  其它跳过(扩展名/small_原图等):', skippedOther)
+  console.log('  其它跳过(扩展名/过滤/small_原图等):', skippedOther)
   console.log('  失败:', failed)
 }
 

@@ -16,7 +16,8 @@
           </el-descriptions>
           <div class="simple-detail-image">
             <div class="simple-detail-image-label">图片</div>
-            <AppImageThumb v-if="imageUrl" :raw-url="imageUrl" variant="dialog" />
+            <!-- 详情仅一张图，关闭懒加载：抽屉(el-drawer)内 el-image 的 IntersectionObserver 挂载时判定不可见，会卡在 placeholder 不发起请求 -->
+            <AppImageThumb v-if="imageUrl" :raw-url="imageUrl" variant="dialog" :lazy="false" />
             <span v-else class="text-placeholder">-</span>
           </div>
         </div>

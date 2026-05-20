@@ -25,7 +25,10 @@ export async function generateSmallThumbnailBeside(originalAbsPath: string): Pro
 
   const low = ext.toLowerCase()
   if (low === '.png') {
-    await pipeline.png({ compressionLevel: 9 }).toFile(out)
+    // PNG 原图多为产品/面料照片，无损 PNG 缩略图体积巨大（实测均约 300KB，列表加载慢）。
+    // 改用 WebP 编码：体积小一个数量级且保留透明通道。文件名仍保持 small_xxx.png，
+    // 由于服务器未设置 X-Content-Type-Options:nosniff，浏览器按内容嗅探即可正常渲染，前端无需改动。
+    await pipeline.webp({ quality: 82 }).toFile(out)
   } else if (low === '.webp') {
     await pipeline.webp({ quality: 82 }).toFile(out)
   } else if (low === '.gif') {
