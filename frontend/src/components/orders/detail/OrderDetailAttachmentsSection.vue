@@ -32,15 +32,24 @@ defineProps<{
   attachmentsForView: string[]
 }>()
 
-const itemStyles = reactive<Record<number, { width: string }>>({})
+const itemStyles = reactive<Record<number, { width: string; height: string }>>({})
 
 function handleImageLoad(event: Event, index: number): void {
   const img = event.target
   if (!(img instanceof HTMLImageElement)) return
   const { naturalWidth, naturalHeight } = img
   if (naturalWidth <= 0 || naturalHeight <= 0) return
-  const widthPx = Math.round((ATTACHMENT_HEIGHT_PX * naturalWidth) / naturalHeight)
-  itemStyles[index] = { width: `${widthPx}px` }
+  const ratio = naturalWidth / naturalHeight
+  let width = ATTACHMENT_HEIGHT_PX * ratio
+  let height = ATTACHMENT_HEIGHT_PX
+  // 超宽图（如横幅 logo）按行宽封顶，并相应降低高度保持比例，避免撑爆容器导致打印整页缩放。
+  const grid = img.closest('.attachments-grid')
+  const maxWidth = grid instanceof HTMLElement ? grid.clientWidth : 0
+  if (maxWidth > 0 && width > maxWidth) {
+    width = maxWidth
+    height = maxWidth / ratio
+  }
+  itemStyles[index] = { width: `${Math.round(width)}px`, height: `${Math.round(height)}px` }
 }
 </script>
 
@@ -67,6 +76,8 @@ function handleImageLoad(event: Event, index: number): void {
 
 .attachment-item {
   height: 200px;
+  max-width: 100%;
+  box-sizing: border-box;
   flex-shrink: 0;
   position: relative;
   border: 1px solid #dcdfe6;
