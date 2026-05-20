@@ -436,7 +436,9 @@ onActivated(() => {
 })
 
 onDeactivated(() => {
-  cardScrollTop.value = cardScrollRef.value?.scrollTop ?? cardScrollTop.value
+  // keep-alive 把 DOM 移入缓存容器时浏览器会重置 scrollTop=0，
+  // 此处不能再读 scrollTop（会用 0 覆盖正确值）。
+  // onCardScroll 已在用户滚动时实时写入 cardScrollTop，足够作为恢复来源。
   persistFilterState()
   abortListRequest()
   abortStatusCounts()
