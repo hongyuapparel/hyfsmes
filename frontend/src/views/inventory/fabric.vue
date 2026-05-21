@@ -457,5 +457,11 @@ onMounted(() => {
   line-height: 20px;
 }
 
+/* 统一行高：compactRowStyle 的 min-height 对 <tr> 无效，改在 td 上固定高度，
+   避免「有照片行被缩略图撑高、无照片行很矮」造成的行高参差 */
+.fabric-table :deep(td.el-table__cell) {
+  height: 52px;
+}
+
 
 </style>

@@ -498,9 +498,11 @@ export class FabricStockService {
 
     qb.orderBy('o.created_at', 'DESC');
     const total = await qb.getCount();
+    // 原始查询(getRawMany)分页必须用 offset/limit；skip/take 仅对实体查询(getMany)生效，
+    // 用在 getRawMany 上会被忽略导致返回全部行（分页失效）。
     const rows = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
+      .offset((page - 1) * pageSize)
+      .limit(pageSize)
       .getRawMany<{
         id: number;
         fabricStockId: number;
