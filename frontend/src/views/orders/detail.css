@@ -199,7 +199,7 @@
   flex: 0 0 auto;
   width: fit-content;
   min-width: 96px;
-  max-width: 240px;
+  max-width: 300px;
   border: 1px solid #dcdfe6;
   border-radius: 2px;
   padding: 6px 8px;
@@ -221,9 +221,10 @@
   word-break: break-word;
 }
 
-/* 图片按自身比例：固定高 100px、宽随比例（A 方案），最大 220px，过窄/过宽都不撑乱格子 */
+/* 图片按自身比例：固定高 150px（略矮于 H 区 200px，保持主次）、宽随比例（A 方案），
+   最大 300px，过窄/过宽都不撑乱格子 */
 .packaging-image-wrap {
-  height: 100px;
+  height: 150px;
   max-width: 100%;
   border-radius: 2px;
   border: 1px solid #dcdfe6;
@@ -234,14 +235,14 @@
 
 .packaging-image-wrap .el-image {
   display: block;
-  height: 100px;
+  height: 150px;
   width: auto;
 }
 
 .packaging-image-wrap .el-image__inner {
-  height: 100px;
+  height: 150px;
   width: auto;
-  max-width: 220px;
+  max-width: 280px;
   object-fit: contain;
 }
 
