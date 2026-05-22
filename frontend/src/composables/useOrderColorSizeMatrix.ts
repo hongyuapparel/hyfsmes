@@ -1,4 +1,5 @@
 import { computed, nextTick, ref } from 'vue'
+import { nextSizeLabel } from '@/utils/size-label'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 type BEditCol = number | 'color' | 'remark'
@@ -193,7 +194,7 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
   }
 
   function addSizeColumn() {
-    sizeHeaders.value.push(`尺码${sizeHeaders.value.length + 1}`)
+    sizeHeaders.value.push(nextSizeLabel(sizeHeaders.value))
     normalizeColorRows()
     syncLinkedSizeInfo()
   }
