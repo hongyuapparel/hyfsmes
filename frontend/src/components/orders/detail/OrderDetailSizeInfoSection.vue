@@ -4,7 +4,7 @@
     <div class="block-body">
       <!-- 原生表格 + table-layout:auto：列按内容自适应，能放下则单行，
            放不下则压缩换行铺满，屏幕与打印都不裁切、不横向滚动。 -->
-      <table class="detail-grid-table">
+      <table class="detail-grid-table is-centered">
         <thead>
           <tr>
             <th v-for="(header, index) in sizeMetaHeadersForView" :key="'meta-' + index">

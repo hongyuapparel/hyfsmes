@@ -44,7 +44,7 @@
             <div class="block-title">B 颜色 / 数量</div>
             <div class="block-body">
               <!-- 原生表格自适应列宽：保证 “合计” 等所有列都显示，不裁切。 -->
-              <table class="detail-grid-table">
+              <table class="detail-grid-table is-centered">
                 <thead>
                   <tr>
                     <th>颜色</th>
@@ -88,25 +88,23 @@
       <section v-if="hasProcessItems" class="block">
         <div class="block-title">E 工艺项目</div>
         <div class="block-body">
-          <el-table
-            :data="processItemsForView"
-            border
-            size="small"
-            class="compact-table table-full process-table-view"
-          >
-            <el-table-column
-              v-for="col in processColumns"
-              :key="`process-col-${col.key}`"
-              :prop="col.key"
-              :label="col.label"
-              :min-width="col.minWidth"
-              :show-overflow-tooltip="col.showOverflowTooltip"
-            >
-              <template #default="{ row }">
-                {{ formatDetailProcessCell(row, col.key) }}
-              </template>
-            </el-table-column>
-          </el-table>
+          <!-- 原生表格自适应；备注多行用 is-prewrap 保留换行。 -->
+          <table class="detail-grid-table is-centered is-prewrap">
+            <thead>
+              <tr>
+                <th v-for="col in processColumns" :key="`process-col-${col.key}`">
+                  {{ col.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, rowIndex) in processItemsForView" :key="rowIndex">
+                <td v-for="col in processColumns" :key="`process-col-${col.key}`">
+                  {{ formatDetailProcessCell(row, col.key) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
