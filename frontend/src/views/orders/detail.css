@@ -126,8 +126,28 @@
   color: #303133;
 }
 
-.block-color-qty .compact-table .el-table {
-  table-layout: fixed;
+/* B 颜色/数量、D 尺寸信息改用原生表格 + table-layout:auto：列宽随内容自适应，
+   能放下则单行、放不下则压缩换行铺满，屏幕与打印都不裁切、不横向滚动。 */
+.detail-grid-table {
+  width: 100%;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.3;
+  color: #303133;
+}
+
+.detail-grid-table th,
+.detail-grid-table td {
+  border: 1px solid #dcdfe6;
+  padding: 2px 6px;
+  text-align: center;
+  vertical-align: middle;
+  word-break: break-word;
+}
+
+.detail-grid-table th {
+  font-weight: 600;
 }
 
 .process-table-view .el-table__body .el-table__cell {
@@ -259,6 +279,16 @@
 
   .compact-table .el-table__header-wrapper table thead {
     display: table-header-group;
+  }
+
+  /* 原生尺寸/数量表：打印时表头每页重复，单行不被跨页截断。 */
+  .detail-grid-table thead {
+    display: table-header-group;
+  }
+
+  .detail-grid-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .compact-table .el-table__body-wrapper table tr {

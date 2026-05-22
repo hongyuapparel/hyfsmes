@@ -227,20 +227,6 @@ export function useOrderDetailView({
     return headers.length ? headers : []
   })
 
-  const sizeMetaColWidth = computed(() => {
-    const sizeCount = sizeHeadersForView.value.length
-    if (sizeCount >= 8) return 56
-    if (sizeCount >= 6) return 62
-    return 72
-  })
-
-  const sizeValueColWidth = computed(() => {
-    const sizeCount = sizeHeadersForView.value.length
-    if (sizeCount >= 8) return 34
-    if (sizeCount >= 6) return 40
-    return 52
-  })
-
   const sizeInfoRowsForView = computed(() => {
     const metaLength = sizeMetaHeadersForView.value.length
     const sizeLength = sizeHeadersForView.value.length
@@ -334,8 +320,6 @@ export function useOrderDetailView({
     materialColumns,
     sizeMetaHeadersForView,
     sizeHeadersForView,
-    sizeMetaColWidth,
-    sizeValueColWidth,
     sizeInfoRowsForView,
     hasSizeInfo,
     processItemsForView,
