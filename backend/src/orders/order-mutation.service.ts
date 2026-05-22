@@ -438,7 +438,7 @@ export class OrderMutationService {
         salesperson: src.salesperson?.trim() || '',
         merchandiser: src.merchandiser?.trim() || '',
         quantity: src.quantity ?? 0,
-        exFactoryPrice: this.normalizeDecimalInput(src.exFactoryPrice),
+        exFactoryPrice: this.normalizeDecimalInput(0),
         salePrice: this.normalizeDecimalInput(src.salePrice),
         orderTypeId: src.orderTypeId ?? null,
         processItem: src.processItem?.trim() || '',
