@@ -57,6 +57,7 @@ alwaysApply: true
 ## 7. 代码健康
 
 - 目标是项目不出现 `any` 和新增技术债；所有新代码、本次触碰代码禁止 `: any`、`as any`、`any[]`、`Record<string, any>`、`Promise<any>` 等写法，必须使用具体类型或 `unknown` + 类型守卫。
+- 涉及类型或逻辑的代码改动，完成前必须在本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）并通过才算完成；`npm run dev`/dev 服务器不做类型检查、不能替代，消除 `any`、改类型后尤其要跑。
 - 交付结果不得新增技术债：不留下临时兜底、重复逻辑、补丁式覆盖、超长文件/函数、未验证的 TODO 或“以后再处理”的半成品。
 - 如正确方案超出本次范围，先说明影响和拆分方案，获得确认后再做；不得用错误但省事的方案交付。
 - 页面 `views` 只做编排；组件只处理 UI 交互并通过 props/emit 通信；业务逻辑进 `composables`；API 层只做 HTTP 封装。

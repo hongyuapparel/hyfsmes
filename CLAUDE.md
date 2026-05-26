@@ -53,6 +53,8 @@
 
 **TypeScript**：禁止 `: any`、`as any`、`any[]`、`Record<string, any>`、`Promise<any>`，用具体类型或 `unknown` + 类型守卫。`props` 用 `defineProps<{...}>()`，`emit` 用 `defineEmits<{...}>()`，Pinia state 显式声明类型。
 
+**构建验证**：涉及类型或逻辑的改动，完成前必须本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）并通过才算完成；`npm run dev` 不做类型检查、不能替代，消除 `any`/改类型后尤其要跑。
+
 **分层职责**：
 - `views`：只做编排（路由参数 + 调用 composable + 组合子组件），不写业务计算
 - `components`：只处理 UI 交互，通过 props/emit 通信，不直接调 API 或 store
