@@ -467,6 +467,19 @@ onBeforeUnmount(() => cleanup())
   gap: var(--space-xs);
   min-height: 0;
 }
+
+/* 手机端（≤768px）：左右两栏改上下堆叠，避免分组树吃掉宽度把表格挤成细缝。
+   电脑端保持原有左右布局，不受影响。 */
+@media (max-width: 768px) {
+  .products-layout {
+    flex-direction: column;
+  }
+  .products-sidebar,
+  .products-sidebar.sidebar-collapsed {
+    width: 100%;
+    max-height: 28vh;
+  }
+}
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);

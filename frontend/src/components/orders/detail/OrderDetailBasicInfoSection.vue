@@ -69,6 +69,13 @@ defineProps<{
   gap: 2px 8px;
 }
 
+/* 手机端（仅屏幕）：4 列太挤会叠字，改 2 列；打印保持 4 列。 */
+@media screen and (max-width: 768px) {
+  .kv-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 .kv-item {
   display: flex;
   gap: 4px;

@@ -53,3 +53,6 @@ backend/uploads/
 
 # Git worktrees
 .worktrees/
+
+# 本地开发用截图工具（playwright-core 驱动本机 Chrome，不入库）
+tools/

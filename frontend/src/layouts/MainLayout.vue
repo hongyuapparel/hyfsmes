@@ -1,9 +1,18 @@
 <template>
-  <div class="main-layout">
+  <div class="main-layout" :class="{ 'is-mobile': isMobile }">
     <div class="layout-body">
       <div
+        v-if="isMobile && mobileSidebarOpen"
+        class="mobile-sidebar-backdrop"
+        @click="closeMobileSidebar"
+      />
+      <div
         class="sidebar-wrapper"
-        :class="{ collapsed: appStore.sidebarCollapsed }"
+        :class="{
+          collapsed: !isMobile && appStore.sidebarCollapsed,
+          'mobile-drawer': isMobile,
+          'mobile-open': isMobile && mobileSidebarOpen,
+        }"
       >
         <div class="sidebar-brand">
           <div class="brand-logo">
@@ -13,7 +22,7 @@
         </div>
         <el-menu
           :default-active="activeMenu"
-          :collapse="appStore.sidebarCollapsed"
+          :collapse="!isMobile && appStore.sidebarCollapsed"
           :collapse-transition="false"
           :unique-opened="true"
           :show-timeout="0"
@@ -60,12 +69,12 @@
         <header class="layout-header">
           <div class="header-left-section">
             <el-button
-              :icon="appStore.sidebarCollapsed ? Expand : Fold"
+              :icon="sidebarToggleIcon"
               class="header-toggle"
               :aria-label="sidebarToggleLabel"
               :title="sidebarToggleLabel"
               text
-              @click="appStore.toggleSidebar"
+              @click="handleSidebarToggle"
             />
             <AppTabs v-if="showHeaderTabs" />
           </div>
@@ -117,12 +126,15 @@ import { getHealth } from '@/api/health'
 import type { MenuItem } from '@/router/menu'
 import brandLogoUrl from '@/assets/brand-logo.svg'
 import { OUTER_ROUTE_CACHE_MAX, getOuterRouteCacheKey } from '@/composables/useRouteCacheControl'
+import { useIsMobile } from '@/composables/useIsMobile'
 
 const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
 const healthStatus = ref('')
+const { isMobile } = useIsMobile()
+const mobileSidebarOpen = ref(false)
 const layoutMainRef = ref<HTMLElement | null>(null)
 
 interface RouteScrollSnapshot {
@@ -142,6 +154,22 @@ let restoreTimer: number | undefined
 
 const showHeaderTabs = computed(() => route.path !== '/')
 const sidebarToggleLabel = computed(() => (appStore.sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'))
+const sidebarToggleIcon = computed(() => {
+  if (isMobile.value) return mobileSidebarOpen.value ? Fold : Expand
+  return appStore.sidebarCollapsed ? Expand : Fold
+})
+
+function handleSidebarToggle() {
+  if (isMobile.value) {
+    mobileSidebarOpen.value = !mobileSidebarOpen.value
+    return
+  }
+  appStore.toggleSidebar()
+}
+
+function closeMobileSidebar() {
+  mobileSidebarOpen.value = false
+}
 
 const iconMap = {
   HomeFilled,
@@ -248,6 +276,7 @@ onMounted(async () => {
 watch(
   () => getRouteScrollSnapshot(route),
   (nextRoute, previousRoute) => {
+    closeMobileSidebar()
     saveLayoutScroll(getRouteScrollKey(previousRoute))
     queueRestoreLayoutScroll(getRouteScrollKey(nextRoute))
   },
@@ -488,6 +517,64 @@ onBeforeUnmount(() => {
 
 .menu-title {
   font-size: var(--font-size-body);
+}
+
+/* ========== 移动端（≤768px）：仅手机生效，桌面端不受影响 ========== */
+@media (max-width: 768px) {
+  /* 侧边栏改为滑入式抽屉：默认离屏，点汉堡滑入，遮罩点击关闭 */
+  .main-layout.is-mobile .sidebar-wrapper.mobile-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 220px;
+    z-index: 2000;
+    transform: translateX(-100%);
+    transition: transform 0.25s ease;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.25);
+  }
+
+  .main-layout.is-mobile .sidebar-wrapper.mobile-drawer.mobile-open {
+    transform: translateX(0);
+  }
+
+  .mobile-sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 1999;
+  }
+
+  /* 头部塞得下：缩间距、隐藏后端状态标签、用户名截断不换行 */
+  .layout-header {
+    padding: 0 8px;
+    gap: 4px;
+  }
+
+  .header-left-section {
+    gap: 6px;
+    min-width: 0;
+  }
+
+  .header-actions {
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .health-status-tag {
+    display: none;
+  }
+
+  .user-name {
+    max-width: 72px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .layout-main {
+    padding: var(--space-xs);
+  }
 }
 </style>
 

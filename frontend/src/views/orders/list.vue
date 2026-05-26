@@ -518,6 +518,21 @@ watchEffect(() => {
   margin-left: auto;
 }
 
+/* 手机端：标签条/筛选区更紧凑，把垂直空间让给订单卡片 */
+@media (max-width: 768px) {
+  .status-tabs {
+    margin-bottom: var(--space-xs);
+  }
+  .filter-bar {
+    gap: var(--space-xs);
+    padding: var(--space-xs);
+    margin-bottom: var(--space-sm);
+  }
+  .filter-bar-actions {
+    gap: var(--space-xs);
+  }
+}
+
 .orders-card-scroll {
   flex: 1;
   min-height: 0;

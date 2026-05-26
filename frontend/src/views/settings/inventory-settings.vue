@@ -6,7 +6,7 @@
     </p>
 
     <div class="settings-body">
-      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs">
+      <el-tabs v-model="activeTab" :tab-position="isMobile ? 'top' : 'left'" class="settings-tabs">
         <el-tab-pane label="仓库设置" name="warehouses" />
         <el-tab-pane label="库存类型" name="inventoryTypes" />
       </el-tabs>
@@ -37,6 +37,9 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import OptionList from './product-option-list.vue'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 type InventoryTab = 'warehouses' | 'inventoryTypes'
 const activeTab = ref<InventoryTab>('warehouses')
@@ -62,6 +65,19 @@ const activeTab = ref<InventoryTab>('warehouses')
 
 .settings-content {
   flex: 1;
+  min-width: 0;
+}
+
+/* 手机端：左侧竖标签改顶部横标签，上下堆叠，内容拿到整宽。电脑端不变。 */
+@media (max-width: 768px) {
+  .settings-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .settings-tabs {
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 .section-title {

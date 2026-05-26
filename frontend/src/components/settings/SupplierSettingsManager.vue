@@ -37,7 +37,7 @@
           </span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="320" fixed="right">
+      <el-table-column label="操作" :width="isMobile ? 168 : 320" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
           <el-button v-if="row.level < 2" link type="primary" size="small" @click="openAdd(row.id, row.level)">
@@ -122,6 +122,9 @@
 <script setup lang="ts">
 import { ArrowRight, Delete } from '@element-plus/icons-vue'
 import { useSupplierSettings } from '@/composables/useSupplierSettings'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 const {
   treeData,

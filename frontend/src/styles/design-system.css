@@ -846,3 +846,91 @@ a:hover {
   max-width: 95vw;
   max-height: 95vh;
 }
+
+/* ================================================================
+   移动端全局适配（≤768px）
+   仅在手机断点生效，桌面端完全不受影响。
+   原则：用 max-width / CSS 变量约束 Element 组件的「固定像素宽度」，
+   尽量少用 !important（仅在 Element 用内联宽度、无法用 max-width 兜住时使用）。
+================================================================ */
+@media (max-width: 768px) {
+  /* 抽屉：左右方向的抽屉一律收进视口（原本 560~1200px 会超出手机屏） */
+  .el-drawer.rtl,
+  .el-drawer.ltr {
+    max-width: 96vw;
+  }
+  .el-drawer.ttb,
+  .el-drawer.btt {
+    max-height: 90vh;
+  }
+  /* AppDrawer 可拖拽手柄在手机上无意义，避免误触 */
+  .app-drawer__resizer {
+    display: none;
+  }
+
+  /* 弹窗：贴边显示、内容过高时可滚动看全 */
+  .el-dialog {
+    --el-dialog-margin-top: 6vh;
+    max-width: 94vw;
+  }
+  .el-dialog__body {
+    max-height: 74vh;
+    overflow: auto;
+  }
+  /* AppDialog 手机上取消拖拽缩放与 320 最小宽度（否则窄屏被撑出横向滚动） */
+  .app-dialog.el-dialog {
+    resize: none;
+    min-width: 0;
+  }
+  /* 确认框 / 消息框 贴边 */
+  .el-message-box {
+    width: 90vw;
+    max-width: 90vw;
+  }
+
+  /* 各类弹层（下拉、级联、日期、气泡）不超出屏幕 */
+  .el-select-dropdown,
+  .el-cascader__dropdown,
+  .el-picker__popper,
+  .el-popper.is-light,
+  .el-popper.is-dark {
+    max-width: 94vw;
+  }
+
+  /* 共享页头（左标题 + 右操作按钮）：窄屏换行，按钮整排完整可见、不被裁 */
+  .page-header {
+    flex-wrap: wrap;
+    row-gap: var(--space-xs);
+  }
+  .page-header .right {
+    flex-wrap: wrap;
+  }
+
+  /* 状态标签条：窄屏改「单行横向滚动 + 更矮」，省垂直空间、不撑破整页，
+     给列表/卡片让出位置。覆盖订单列表(flex:1 会换行) 与 生产各页(flex-shrink:0 会溢出)。 */
+  .status-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    --el-component-size-large: 32px;
+    margin-bottom: var(--space-sm);
+  }
+  .status-tabs-left {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+  .status-tabs-left .el-radio-group {
+    flex-wrap: nowrap;
+  }
+
+  /* 筛选区整体更紧凑：缩小 large 输入高度(40→34) 与间距/内边距，给内容腾空间。 */
+  .filter-bar {
+    --el-component-size-large: 34px;
+    gap: var(--space-xs);
+    padding: var(--space-xs) var(--space-sm);
+    margin-bottom: var(--space-sm);
+  }
+  .filter-date-box {
+    height: 34px;
+  }
+}

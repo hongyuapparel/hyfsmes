@@ -5,7 +5,7 @@
     </p>
 
     <div class="settings-body">
-      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs" :class="{ 'no-bar-transition': suppressTabTransition }">
+      <el-tabs v-model="activeTab" :tab-position="isMobile ? 'top' : 'left'" class="settings-tabs" :class="{ 'no-bar-transition': suppressTabTransition }">
         <el-tab-pane label="订单类型" name="orderTypes" />
         <el-tab-pane label="合作方式" name="collaboration" />
         <el-tab-pane label="产品分组" name="productGroups" />
@@ -70,7 +70,9 @@ import OrderProductionProcessesCard from '@/components/settings/OrderProductionP
 import OrderSlaSettingsCard from '@/components/settings/OrderSlaSettingsCard.vue'
 import OrderStatusConfigCard from '@/components/settings/OrderStatusConfigCard.vue'
 import { useOrderSettingsStatus } from '@/composables/useOrderSettingsStatus'
+import { useIsMobile } from '@/composables/useIsMobile'
 
+const { isMobile } = useIsMobile()
 const suppressTabTransition = ref(false)
 
 onActivated(() => {
@@ -122,6 +124,19 @@ async function ensureStatusesLoaded() {
 .settings-content {
   flex: 1;
   min-width: 0;
+}
+
+/* 手机端：竖向左侧标签改顶部横向标签，上下堆叠，内容拿到整宽。电脑端不变。 */
+@media (max-width: 768px) {
+  .settings-body {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .settings-tabs {
+    width: 100%;
+    margin-right: 0;
+    margin-bottom: var(--space-sm);
+  }
 }
 
 .section-title {

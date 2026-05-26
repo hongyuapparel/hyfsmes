@@ -371,5 +371,8 @@ onMounted(load)
   .content-grid { grid-template-columns: 1fr; }
   .filter-range { margin-left: 0; width: 100%; }
   .full { grid-column: auto; }
+  /* 防止区块内 el-table 的列最小宽把 grid 轨道撑破（grid blowout），
+     min-width:0 让区块可收窄、表格在区块内横向滚动。 */
+  .section { min-width: 0; }
 }
 </style>

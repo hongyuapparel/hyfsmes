@@ -204,6 +204,25 @@
   /* hidden while printing */
 }
 
+/* 手机端（≤768px，仅屏幕）：A4 固定宽(210mm) 改为按屏宽自适应，
+   内部宽表(颜色/物料/尺寸/工艺)走 el-table 自身横向滚动，整页不再被撑宽。
+   打印另有 @media print 规则，互不影响。 */
+@media screen and (max-width: 768px) {
+  .order-detail-page {
+    padding: var(--space-xs);
+  }
+
+  .a4-sheet {
+    width: 100%;
+    min-height: 0;
+    padding: 12px;
+  }
+
+  .packaging-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media print {
   :host,
   .order-detail-page {

@@ -6,7 +6,7 @@
     </p>
 
     <div class="settings-body">
-      <el-tabs v-model="activeTab" tab-position="left" class="settings-tabs">
+      <el-tabs v-model="activeTab" :tab-position="isMobile ? 'top' : 'left'" class="settings-tabs">
         <el-tab-pane label="资金账户" name="fundAccounts" />
         <el-tab-pane label="收入类型" name="incomeTypes" />
         <el-tab-pane label="支出类型" name="expenseTypes" />
@@ -141,6 +141,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, watch } from 'vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import { ElMessage } from 'element-plus'
 import { appConfirm } from '@/utils/message-box'
 import {
@@ -150,6 +151,8 @@ import {
   type FinanceFundAccount, type FinanceIncomeType, type FinanceExpenseType,
 } from '@/api/finance'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+
+const { isMobile } = useIsMobile()
 
 type TabName = 'fundAccounts' | 'incomeTypes' | 'expenseTypes'
 const activeTab = ref<TabName>('fundAccounts')
@@ -280,7 +283,12 @@ onMounted(loadFundAccounts)
 .settings-hint { color: var(--color-text-muted); font-size: var(--font-size-caption); margin-bottom: var(--space-md); line-height: 1.6; }
 .settings-body { display: flex; align-items: flex-start; gap: var(--space-lg); }
 .settings-tabs { min-width: 120px; }
-.settings-content { flex: 1; }
+.settings-content { flex: 1; min-width: 0; }
+/* 手机端：左侧竖标签改顶部横标签，上下堆叠，内容拿到整宽。电脑端不变。 */
+@media (max-width: 768px) {
+  .settings-body { flex-direction: column; align-items: stretch; }
+  .settings-tabs { width: 100%; min-width: 0; }
+}
 .section-title { font-size: var(--font-size-subtitle); margin-bottom: var(--space-xs); }
 .section-desc { font-size: var(--font-size-caption); color: var(--color-text-muted); margin-bottom: var(--space-sm); }
 .option-toolbar { margin-bottom: var(--space-sm); }
