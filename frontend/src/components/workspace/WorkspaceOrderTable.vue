@@ -31,7 +31,7 @@
             <el-tag size="small" type="info">手动</el-tag>
           </template>
           <template v-else>
-            <el-link type="primary" @click="emit('orderClick', row.orderId)">{{ row.orderNo }}</el-link>
+            <el-link type="primary" @click="handleOrderClick(row)">{{ row.orderNo }}</el-link>
           </template>
         </template>
       </el-table-column>
@@ -244,12 +244,17 @@ function followDateClass(date: string | null): string {
   return ''
 }
 
+function handleOrderClick(row: TableRow | ManualRow) {
+  if (row.isManual) return
+  emit('orderClick', (row as TableRow).orderId)
+}
+
 function onFollowDateChange(row: TableRow | ManualRow, v: string | null) {
   if (row.isManual) {
     const task = props.manualTasks.find((t) => t.id === row.taskId)
     if (task) emit('saveManualDate', task, v)
   } else {
-    const order = props.orders.find((o) => o.id === row.orderId)
+    const order = props.orders.find((o) => o.id === (row as TableRow).orderId)
     if (order) emit('saveFollowDate', order, v)
   }
 }
@@ -259,7 +264,7 @@ function onFollowActionChange(row: TableRow | ManualRow, v: string | null) {
     const task = props.manualTasks.find((t) => t.id === row.taskId)
     if (task) emit('saveManualNote', task, v)
   } else {
-    const order = props.orders.find((o) => o.id === row.orderId)
+    const order = props.orders.find((o) => o.id === (row as TableRow).orderId)
     if (order) emit('saveFollowAction', order, v)
   }
 }
