@@ -367,9 +367,9 @@ export class OrderQueryService {
       if (!rows || rows.length === 0 || headers.length <= 1) return null;
       const sLen = headers.length - 1;
       const sums = Array(sLen).fill(0) as number[];
-      rows.forEach((row: any) => {
+      rows.forEach((row: ColorSizeRow | ActualCutRow) => {
         if (!Array.isArray(row.quantities)) return;
-        row.quantities.forEach((q: any, idx: number) => {
+        row.quantities.forEach((q: number, idx: number) => {
           if (idx >= sLen) return;
           const n = Number(q);
           if (!Number.isNaN(n)) sums[idx] += n;
@@ -379,7 +379,7 @@ export class OrderQueryService {
       return [...sums, total];
     };
 
-    const orderPerSize = buildPerSizeFromRows((ext as any)?.colorSizeRows ?? null);
+    const orderPerSize = buildPerSizeFromRows(ext?.colorSizeRows ?? null);
     const cutPerSize = buildPerSizeFromRows(cutting?.actualCutRows ?? null);
 
     let sewingRow: (number | null)[] | null = null;
@@ -404,10 +404,10 @@ export class OrderQueryService {
           'SELECT tail_received_qty_row AS tailReceivedQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
           [orderId],
         );
-        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as any).tailReceivedQtyRow : null;
+        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as Record<string, unknown>).tailReceivedQtyRow : null;
         if (raw != null) {
           const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          if (Array.isArray(parsed)) receivedQtyRow = parsed.map((n: any) => Number(n) || 0);
+          if (Array.isArray(parsed)) receivedQtyRow = parsed.map((n: unknown) => Number(n) || 0);
         }
       } catch {
         // ignore
@@ -438,7 +438,7 @@ export class OrderQueryService {
     if (sewingRow) rows.push({ label: '车缝数量', values: sewingRow });
     if (inboundRow) rows.push({ label: '尾部入库数', values: inboundRow });
 
-    const colorSizeRowsList = Array.isArray((ext as any)?.colorSizeRows) ? ((ext as any).colorSizeRows as ColorSizeRow[]) : [];
+    const colorSizeRowsList = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
     let orderAllNumeric: number[] = [];
     if (orderPerSize && orderPerSize.length === headers.length) {
       orderAllNumeric = orderPerSize.map((x) => Number(x) || 0);
@@ -480,7 +480,7 @@ export class OrderQueryService {
     const headers = Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0 ? ext.colorSizeHeaders : [];
     const baseRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
     if (!headers.length || !baseRows.length) return { headers: [], rows: [] };
-    const rows = baseRows.map((r: any) => {
+    const rows = baseRows.map((r: ColorSizeRow) => {
       const quantities = Array.isArray(r?.quantities) ? r.quantities : [];
       const values = headers.map((_, idx) => Math.max(0, Number(quantities[idx]) || 0));
       const total = values.reduce((a, b) => a + b, 0);

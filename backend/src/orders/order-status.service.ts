@@ -181,8 +181,8 @@ export class OrderStatusService {
           ? before.materials ?? []
           : key === 'processItems'
             ? before.processItems ?? []
-            : (before as any)[key];
-      const nextValue = (payload as any)[key];
+            : (before as Order)[key as keyof Order];
+      const nextValue = (payload as OrderEditPayload)[key];
       if (
         JSON.stringify(this.normalizeWorkflowPayloadValue(key, beforeValue)) !==
         JSON.stringify(this.normalizeWorkflowPayloadValue(key, nextValue))
@@ -412,7 +412,7 @@ export class OrderStatusService {
     if (!['edit', 'review', 'delete'].includes(actionKey)) return;
 
     const rows = await this.roleOrderPolicyRepo.find({
-      where: { roleId: In(roleIds), action: actionKey as any },
+      where: { roleId: In(roleIds), action: actionKey as 'edit' | 'review' | 'delete' },
       select: ['statusCode'],
     });
     if (!rows.length) throw new ForbiddenException('该操作未配置可操作状态');

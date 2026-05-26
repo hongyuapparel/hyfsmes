@@ -73,10 +73,11 @@ export class OrderWorkflowService {
       if (Array.isArray(extItems)) {
         hasProcessItem = extItems.some((it) => {
           if (!it || typeof it !== 'object') return false;
-          const processName = String((it as any).processName ?? '').trim();
-          const supplierName = String((it as any).supplierName ?? '').trim();
-          const part = String((it as any).part ?? '').trim();
-          const remark = String((it as any).remark ?? '').trim();
+          const itObj = it as { processName?: unknown; supplierName?: unknown; part?: unknown; remark?: unknown };
+          const processName = String(itObj.processName ?? '').trim();
+          const supplierName = String(itObj.supplierName ?? '').trim();
+          const part = String(itObj.part ?? '').trim();
+          const remark = String(itObj.remark ?? '').trim();
           return !!(processName || supplierName || part || remark);
         });
       }

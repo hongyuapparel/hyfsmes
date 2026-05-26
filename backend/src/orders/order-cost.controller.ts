@@ -4,7 +4,7 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { OrderQueryService } from './order-query.service';
-import { OrderMutationService } from './order-mutation.service';
+import { OrderCostSnapshotService } from './order-cost-snapshot.service';
 
 /**
  * 订单成本快照子资源：GET/PUT /orders/:orderId/cost
@@ -15,7 +15,7 @@ import { OrderMutationService } from './order-mutation.service';
 export class OrderCostController {
   constructor(
     private readonly orderQueryService: OrderQueryService,
-    private readonly orderMutationService: OrderMutationService,
+    private readonly orderCostSnapshotService: OrderCostSnapshotService,
   ) {}
 
   @Get()
@@ -32,7 +32,7 @@ export class OrderCostController {
     @Body() body: { snapshot: Record<string, unknown> },
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.orderMutationService.saveCostSnapshot(orderId, body, user);
+    return this.orderCostSnapshotService.saveCostSnapshot(orderId, body, user);
   }
 
   /** 确认报价：保存快照并同步订单卡片出厂价（同上，不按订单 edit 状态拦截） */
@@ -43,6 +43,6 @@ export class OrderCostController {
     @Body() body: { snapshot: Record<string, unknown> },
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.orderMutationService.confirmCostQuote(orderId, body, user);
+    return this.orderCostSnapshotService.confirmCostQuote(orderId, body, user);
   }
 }

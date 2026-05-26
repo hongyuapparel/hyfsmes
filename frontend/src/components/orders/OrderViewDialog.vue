@@ -15,9 +15,11 @@
 </template>
 
 <script setup lang="ts">
+import type { OrderListItem } from '@/api/orders'
+
 const props = defineProps<{
   modelValue: boolean
-  order: any
+  order: OrderListItem | null
 }>()
 
 const emit = defineEmits<{

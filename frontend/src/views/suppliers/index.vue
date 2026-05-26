@@ -122,14 +122,12 @@
 
     <SupplierDetailDrawer
       :visible="detailDrawer.visible"
-      :width="detailDrawerWidth"
       :loading="detailDrawer.loading"
       :data="detailDrawer.data"
       :recent-records="detailDrawer.recentRecords"
       :find-supplier-type-label-by-id="findSupplierTypeLabelById"
       :get-scope-labels="getScopeLabels"
       @update:visible="(value) => (detailDrawer.visible = value)"
-      @start-resize="startResizeDetailDrawer"
     />
   </div>
 </template>
@@ -172,7 +170,7 @@ const { formDialog, formRef, form, formRules, businessScopeOptions, resetForm, o
     onSubmitSuccess: load,
   })
 
-const { detailDrawer, detailDrawerWidth, startResizeDetailDrawer, openDetailDrawer } = useSupplierDetailDrawer()
+const { detailDrawer, openDetailDrawer } = useSupplierDetailDrawer()
 
 onMounted(async () => {
   await loadSupplierOptions()

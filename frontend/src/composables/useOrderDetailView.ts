@@ -120,29 +120,32 @@ export function useOrderDetailView({
   })
 
   const orderTypeDisplay = computed(() => {
-    const id = (detail.value as any)?.orderTypeId as number | null | undefined
+    const id = detail.value?.orderTypeId
     if (id) {
       const label = findOrderTypeLabelById(id)
       if (label) return label
     }
-    const legacy = (detail.value as any)?.orderType ?? detail.value?.label
+    // legacy 字符串字段不在 OrderDetail 类型中，通过 unknown 缩窄后安全读取
+    const raw = detail.value as unknown as Record<string, unknown>
+    const legacy = raw?.['orderType'] ?? detail.value?.label
     return legacy ? String(legacy).trim() : ''
   })
 
   const collaborationDisplay = computed(() => {
-    const id = (detail.value as any)?.collaborationTypeId as number | null | undefined
+    const id = detail.value?.collaborationTypeId
     if (id) {
       const label = findCollaborationLabelById(id)
       if (label) return label
     }
-    const legacy = (detail.value as any)?.collaborationType
+    const raw = detail.value as unknown as Record<string, unknown>
+    const legacy = raw?.['collaborationType']
     return legacy ? String(legacy).trim() : ''
   })
 
   const headerMetaValues = computed(() => {
     return [
-      toLeafOptionLabel((detail.value as any)?.productGroupName),
-      String((detail.value as any)?.applicablePeopleName ?? '').trim(),
+      toLeafOptionLabel(detail.value?.productGroupName),
+      String(detail.value?.applicablePeopleName ?? '').trim(),
     ].filter(Boolean)
   })
 
@@ -174,8 +177,8 @@ export function useOrderDetailView({
   })
 
   const materialsForView = computed(() => {
-    const list = (detail.value?.materials ?? []).map((material: any) => {
-      const materialTypeId = material.materialTypeId as number | null | undefined
+    const list = (detail.value?.materials ?? []).map((material) => {
+      const materialTypeId = material.materialTypeId
       const labelFromId = materialTypeId ? findMaterialTypeLabelById(materialTypeId) : ''
       const fallback = material.materialType ?? ''
       return {
@@ -245,11 +248,11 @@ export function useOrderDetailView({
   const hasSizeInfo = computed(() => sizeInfoRowsForView.value.length > 0)
 
   const processItemsForView = computed(() => {
-    const list = (detail.value?.processItems ?? []).map((processItem: any) => {
+    const list = (detail.value?.processItems ?? []).map((processItem) => {
       const extras = Object.entries(processItem ?? {}).reduce((acc, [key, value]) => {
         if (['processName', 'supplierName', 'part', 'remark'].includes(key)) return acc
         if (key === 'id' || key.endsWith('Id') || key === 'createdAt' || key === 'updatedAt') return acc
-        ;(acc as any)[key] = value
+        acc[key] = value as unknown
         return acc
       }, {} as Record<string, unknown>)
       return {
@@ -281,7 +284,12 @@ export function useOrderDetailView({
     const cells = detail.value?.packagingCells ?? []
     return headers
       .map((header, index) => {
-        const cell = cells[index] ?? ({} as any)
+        const cell: NonNullable<(typeof cells)[number]> = cells[index] ?? {
+          header: '',
+          imageUrl: '',
+          accessoryName: '',
+          description: '',
+        }
         return {
           header,
           imageUrl: cell.imageUrl ?? '',

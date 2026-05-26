@@ -291,3 +291,34 @@ export function buildSnapshotPayload(params: {
     profitMargin: params.profitMargin,
   }
 }
+
+/** 将来源订单快照中的单条工序行规范化为 ProductionRow */
+export function normalizeImportedProductionRow(item: Partial<ProductionRow>): ProductionRow {
+  const processId = Number(item.processId)
+  const unitPrice = Number(item.unitPrice)
+  const quantity = Number(item.quantity)
+  return {
+    processId: Number.isInteger(processId) && processId > 0 ? processId : null,
+    department: String(item.department ?? ''),
+    jobType: String(item.jobType ?? ''),
+    processName: String(item.processName ?? ''),
+    unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+    quantity: Number.isFinite(quantity) && quantity >= 0 ? quantity : DEFAULT_PRODUCTION_PROCESS_QTY,
+    remark: String(item.remark ?? ''),
+  }
+}
+
+/** 从快照 unknown 值中解析出有效的 ProductionRow 列表 */
+export function mapImportedProductionRows(value: unknown): ProductionRow[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => normalizeImportedProductionRow((item ?? {}) as Partial<ProductionRow>))
+    .filter((row) => Boolean(
+      row.processId ||
+      row.department?.trim() ||
+      row.jobType?.trim() ||
+      row.processName?.trim() ||
+      row.remark?.trim() ||
+      Number(row.unitPrice) > 0,
+    ))
+}

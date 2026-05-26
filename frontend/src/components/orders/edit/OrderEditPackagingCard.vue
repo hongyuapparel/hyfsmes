@@ -60,10 +60,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
+import type { PackagingCell } from '@/composables/useOrderPackaging'
 
 const props = defineProps<{
   packagingHeaders: string[]
-  packagingCells: any[]
+  packagingCells: PackagingCell[]
   packagingMethod: string
   addPackagingHeader: () => void
   removePackagingHeader: (index: number) => void

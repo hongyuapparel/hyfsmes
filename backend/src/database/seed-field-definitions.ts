@@ -54,7 +54,7 @@ export async function seedFieldDefinitions(dataSource: DataSource): Promise<void
         .select('MAX(f.order)', 'maxOrder')
         .where('f.module = :m', { m: 'products' })
         .getRawOne<{ maxOrder?: string | number }>();
-      const baseOrder = Number((maxOrderRow as any)?.maxOrder ?? 7) || 7;
+      const baseOrder = Number(maxOrderRow?.maxOrder ?? 7) || 7;
       await repo.save(
         repo.create({
           module: 'products',

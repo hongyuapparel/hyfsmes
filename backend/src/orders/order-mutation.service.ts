@@ -11,6 +11,7 @@ import { SuppliersService } from '../suppliers/suppliers.service';
 import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
+import { OrderCostSnapshotService } from './order-cost-snapshot.service';
 import { type OrderActor, type OrderEditPayload } from './order.types';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 
@@ -32,6 +33,7 @@ export class OrderMutationService {
     private readonly orderQueryService: OrderQueryService,
     private readonly orderStatusService: OrderStatusService,
     private readonly orderLifecycleService: OrderLifecycleService,
+    private readonly orderCostSnapshotService: OrderCostSnapshotService,
   ) {}
 
   private normalizeMaterialRows(rows: OrderMaterialRow[]): OrderMaterialRow[] {
@@ -411,13 +413,6 @@ export class OrderMutationService {
     return this.orderLifecycleService.restoreMany(ids, actor);
   }
 
-  private normalizeProfitMargin(v: unknown): number {
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n) || n < 0) return 0.1;
-    if (Math.abs(n - 0.15) < 1e-9) return 0.1;
-    return n;
-  }
-
   async copyManyToDraft(ids: number[], actor: OrderActor): Promise<Order[]> {
     if (!ids?.length) return [];
     const now = new Date();
@@ -471,15 +466,15 @@ export class OrderMutationService {
       }
       const srcCost = costMap.get(src.id) ?? null;
       if (srcCost?.snapshot != null && typeof srcCost.snapshot === 'object') {
-        const srcSnapshot = this.stripQuoteMetadataFromSnapshot({ ...(srcCost.snapshot as Record<string, unknown>) });
+        const srcSnapshot = this.orderCostSnapshotService.stripQuoteMetadataFromSnapshot({ ...(srcCost.snapshot as Record<string, unknown>) });
         if (Object.prototype.hasOwnProperty.call(srcSnapshot, 'profitMargin')) {
-          srcSnapshot.profitMargin = this.normalizeProfitMargin(srcSnapshot.profitMargin);
+          srcSnapshot.profitMargin = this.orderCostSnapshotService.normalizeProfitMargin(srcSnapshot.profitMargin);
         }
         await this.orderCostSnapshotRepo.save(
           this.orderCostSnapshotRepo.create({ orderId: saved.id, snapshot: srcSnapshot }),
         );
       } else {
-        await this.syncCostSnapshotFromOrder(saved.id);
+        await this.orderCostSnapshotService.syncCostSnapshotFromOrder(saved.id);
       }
       created.push(saved);
       await this.orderStatusService.addLog(saved, actor, 'copy_to_draft', `从订单 ${src.orderNo} 复制为草稿`);
@@ -496,149 +491,4 @@ export class OrderMutationService {
     return this.orderRemarkRepo.save(remark);
   }
 
-  private normalizeProductionCostMultiplier(v: unknown): number {
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n) || n < 0) return 2;
-    return n;
-  }
-  // 生产工序行数量：与前端 productionLineQuantity 保持一致，缺省/非法/负数一律按 1 计。
-  private normalizeProductionLineQuantity(v: unknown): number {
-    if (v == null) return 1;
-    const n = Number(v);
-    if (!Number.isFinite(n) || n < 0) return 1;
-    return n;
-  }
-  private calculateExFactoryPriceFromSnapshot(snapshot: Record<string, unknown> | null | undefined): number {
-    if (!snapshot || typeof snapshot !== 'object') return 0;
-    const materialRows = Array.isArray(snapshot.materialRows) ? (snapshot.materialRows as any[]) : [];
-    const processItemRows = Array.isArray(snapshot.processItemRows) ? (snapshot.processItemRows as any[]) : [];
-    const productionRows = Array.isArray(snapshot.productionRows) ? (snapshot.productionRows as any[]) : [];
-    const materialTotal = materialRows.reduce((sum, row) => {
-      const includeInCost = row?.includeInCost !== false;
-      if (!includeInCost) return sum;
-      const usage = Number(row?.usagePerPiece) || 0;
-      const lossPercent = Number(row?.lossPercent) || 0;
-      const unitPrice = Number(row?.unitPrice) || 0;
-      return sum + usage * (1 + lossPercent / 100) * unitPrice;
-    }, 0);
-    const processItemTotal = processItemRows.reduce((sum, row) => sum + (Number(row?.quantity) || 0) * (Number(row?.unitPrice) || 0), 0);
-    const productionBaseTotal = productionRows.reduce(
-      (sum, row) => sum + (Number(row?.unitPrice) || 0) * this.normalizeProductionLineQuantity(row?.quantity),
-      0,
-    );
-    const productionTotal = productionBaseTotal * this.normalizeProductionCostMultiplier(snapshot.productionCostMultiplier);
-    const totalCost = materialTotal + processItemTotal + productionTotal;
-    const margin = this.normalizeProfitMargin(snapshot.profitMargin);
-    const exFactory = margin >= 1 ? totalCost : totalCost / (1 - margin);
-    return Number.isFinite(exFactory) ? Number(exFactory.toFixed(2)) : 0;
-  }
-
-  // 报价元数据里的“操作人”一律写显示名(displayName),保证订单成本页上「确认报价人」前后一致。
-  private withDraftMetadata(snapshot: Record<string, unknown>, operatorName: string): Record<string, unknown> {
-    return { ...snapshot, quoteNeedsReconfirm: true, quoteDraftUpdatedAt: new Date().toISOString(), quoteDraftUpdatedBy: operatorName };
-  }
-  private withConfirmedMetadata(snapshot: Record<string, unknown>, operatorName: string, exFactoryPrice: string): Record<string, unknown> {
-    return {
-      ...snapshot,
-      quoteNeedsReconfirm: false,
-      quoteConfirmedAt: new Date().toISOString(),
-      quoteConfirmedBy: operatorName,
-      quoteConfirmedExFactoryPrice: exFactoryPrice,
-      quoteDraftUpdatedAt: new Date().toISOString(),
-      quoteDraftUpdatedBy: operatorName,
-    };
-  }
-  // 复制订单为新草稿时，剥离报价确认/草稿元数据：新订单从未确认过报价，
-  // 不能继承源订单的「最近一次确认报价」，否则成本页会显示从未发生过的确认记录。
-  private stripQuoteMetadataFromSnapshot(snapshot: Record<string, unknown>): Record<string, unknown> {
-    const {
-      quoteNeedsReconfirm: _quoteNeedsReconfirm,
-      quoteConfirmedAt: _quoteConfirmedAt,
-      quoteConfirmedBy: _quoteConfirmedBy,
-      quoteConfirmedExFactoryPrice: _quoteConfirmedExFactoryPrice,
-      quoteDraftUpdatedAt: _quoteDraftUpdatedAt,
-      quoteDraftUpdatedBy: _quoteDraftUpdatedBy,
-      ...rest
-    } = snapshot;
-    return rest;
-  }
-
-  // 仅在订单尚无成本快照时，用订单的物料/工艺项目初始化一份零单价的快照。
-  // 已存在的快照绝不在此覆盖：成本快照是单价的唯一数据源，订单编辑不得回写它。
-  async syncCostSnapshotFromOrder(orderId: number): Promise<void> {
-    const existing = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    if (existing?.snapshot && typeof existing.snapshot === 'object') return;
-    const [order, ext] = await Promise.all([
-      this.orderRepo.findOne({ where: { id: orderId } }),
-      this.orderExtRepo.findOne({ where: { orderId } }),
-    ]);
-    if (!order) return;
-    const sourceMaterials = Array.isArray((ext as any)?.materials) ? ((ext as any).materials as any[]) : [];
-    const sourceProcessItems = Array.isArray((ext as any)?.processItems) ? ((ext as any).processItems as any[]) : [];
-    const defaultProcessItemQty = 1;
-    const materialRows = sourceMaterials.map((m) => ({
-      materialTypeId: m?.materialTypeId ?? null,
-      supplierName: m?.supplierName ?? '',
-      materialName: m?.materialName ?? '',
-      color: m?.color ?? '',
-      fabricWidth: m?.fabricWidth ?? '',
-      usagePerPiece: m?.usagePerPiece ?? null,
-      lossPercent: m?.lossPercent ?? null,
-      orderPieces: m?.orderPieces ?? null,
-      purchaseQuantity: m?.purchaseQuantity ?? null,
-      cuttingQuantity: m?.cuttingQuantity ?? null,
-      remark: m?.remark ?? '',
-      unitPrice: 0,
-    }));
-    const processItemRows = sourceProcessItems.map((p) => ({
-      processName: p?.processName ?? '',
-      supplierName: p?.supplierName ?? '',
-      part: p?.part ?? '',
-      remark: p?.remark ?? '',
-      unitPrice: 0,
-      quantity: defaultProcessItemQty,
-    }));
-    const nextSnapshot: Record<string, unknown> = {
-      materialRows: materialRows.length ? materialRows : [{ unitPrice: 0 } as any],
-      processItemRows: processItemRows.length ? processItemRows : [{ unitPrice: 0, quantity: defaultProcessItemQty } as any],
-      productionRows: [],
-      productionCostMultiplier: this.normalizeProductionCostMultiplier(undefined),
-      profitMargin: this.normalizeProfitMargin(undefined),
-    };
-    if (existing) {
-      existing.snapshot = nextSnapshot;
-      await this.orderCostSnapshotRepo.save(existing);
-    } else {
-      await this.orderCostSnapshotRepo.save(this.orderCostSnapshotRepo.create({ orderId, snapshot: nextSnapshot }));
-    }
-  }
-
-  async saveCostSnapshot(orderId: number, payload: { snapshot: Record<string, unknown> }, actor?: OrderActor): Promise<OrderCostSnapshot> {
-    const order = await this.orderQueryService.findOne(orderId);
-    const operatorName = actor ? await resolveOperatorDisplayName(this.userRepo, actor) : '系统';
-    const snapshot = this.withDraftMetadata(payload.snapshot ?? {}, operatorName);
-    let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    if (row) row.snapshot = snapshot;
-    else row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
-    const saved = await this.orderCostSnapshotRepo.save(row);
-    if (actor) await this.orderStatusService.addLog(order, actor, 'cost_draft', '保存成本草稿（未同步订单卡片出厂价）');
-    return saved;
-  }
-
-  async confirmCostQuote(orderId: number, payload: { snapshot: Record<string, unknown> }, actor: OrderActor): Promise<OrderCostSnapshot> {
-    const order = await this.orderQueryService.findOne(orderId);
-    const oldExFactory = this.normalizeDecimalInput(order.exFactoryPrice);
-    const computed = this.calculateExFactoryPriceFromSnapshot(payload.snapshot ?? {});
-    const nextExFactory = this.normalizeDecimalInput(computed.toFixed(2));
-    const operatorName = await resolveOperatorDisplayName(this.userRepo, actor);
-    const snapshot = this.withConfirmedMetadata(payload.snapshot ?? {}, operatorName, nextExFactory);
-    let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    if (row) row.snapshot = snapshot;
-    else row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
-    const saved = await this.orderCostSnapshotRepo.save(row);
-    order.exFactoryPrice = nextExFactory;
-    await this.orderRepo.save(order);
-    await this.orderStatusService.addLog(order, actor, 'cost_confirm', `确认报价并同步出厂价: ${oldExFactory} -> ${nextExFactory}`);
-    return saved;
-  }
 }

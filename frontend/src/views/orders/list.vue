@@ -120,9 +120,7 @@
 <script setup lang="ts">
 import { ref, watchEffect, nextTick, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { formatDisplayNumber } from '@/utils/display-number'
-import { useRouter, useRoute } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { type OrderListItem } from '@/api/orders'
+import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderListOptions } from '@/composables/useOrderListOptions'
 import { useOrderListData } from '@/composables/useOrderListData'
@@ -132,6 +130,7 @@ import { useOrderListStatusCounts } from '@/composables/useOrderListStatusCounts
 import { useOrderListFilterState } from '@/composables/useOrderListFilterState'
 import { useOrderSizePopover } from '@/composables/useOrderSizePopover'
 import { useOrderListActions } from '@/composables/useOrderListActions'
+import { useOrderListNavigation } from '@/composables/useOrderListNavigation'
 import OrderViewDialog from '@/components/orders/OrderViewDialog.vue'
 import OrderLogDialog from '@/components/orders/OrderLogDialog.vue'
 import OrderRemarkDialog from '@/components/orders/OrderRemarkDialog.vue'
@@ -139,10 +138,10 @@ import OrderReviewDialog from '@/components/orders/OrderReviewDialog.vue'
 import OrderCardGrid from '@/components/orders/OrderCardGrid.vue'
 import OrderListFilterBar from '@/views/orders/components/OrderListFilterBar.vue'
 
-const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
 const ORDERS_LIST_FILTER_STATE_KEY = 'orders-list-filter-state-v1'
+
 const {
   STATUS_TABS,
   STATUS_LABEL_MAP,
@@ -158,13 +157,6 @@ const {
   findOrderTypeLabelById,
   findCollaborationLabelById,
   getProcessItemDisplayLabel,
-  loadOrderTypeTree,
-  loadCollaborationItems,
-  loadProcessOptions,
-  loadFactoryOptions,
-  loadCustomerOptions,
-  loadSalespersonOptions,
-  loadMerchandiserOptions,
   loadOptions,
 } = useOrderListOptions()
 
@@ -271,6 +263,8 @@ const {
   reloadWithCounts,
 })
 
+const { openEdit, openCost, printOrder, onCreateOrder } = useOrderListNavigation()
+
 const {
   persistFilterState,
   restoreFilterState,
@@ -287,6 +281,8 @@ const {
   skuCodeLabelVisible,
 })
 const stopPersistWatch = startPersistWatch()
+
+// 卡片滚动位置保持
 const cardScrollRef = ref<HTMLElement | null>(null)
 const cardScrollTop = ref(0)
 
@@ -368,48 +364,6 @@ function onCardToggle(orderId: number, checked: boolean) {
   onCardSelectChange()
 }
 
-function openEdit(order: OrderListItem) {
-  const title = `订单编辑 ${order.orderNo || order.id}`
-  router.push({
-    name: 'OrdersEdit',
-    params: { id: order.id },
-    query: { tabTitle: title, tabKey: `orders-edit-${order.id}` },
-  })
-}
-
-function openView(order: OrderListItem) {
-  const title = `订单详情 ${order.orderNo || order.id}`
-  router.push({
-    name: 'OrdersDetail',
-    params: { id: order.id },
-    query: { tabTitle: title, tabKey: `orders-detail-${order.id}` },
-  })
-}
-
-function openCost(order: OrderListItem) {
-  const title = `订单成本 ${order.orderNo || order.id}`
-  router.push({
-    name: 'OrdersCost',
-    params: { id: order.id },
-    query: { tabTitle: title, tabKey: `orders-cost-${order.id}` },
-  })
-}
-
-function printOrder(_order: OrderListItem) {
-  // 统一使用订单详情页进行打印，保证版式一致
-  const title = `订单详情 ${_order.orderNo || _order.id}`
-  router.push({
-    name: 'OrdersDetail',
-    params: { id: _order.id },
-    query: { tabTitle: title, tabKey: `orders-detail-${_order.id}` },
-  })
-}
-
-function onCreateOrder() {
-  const key = `orders-edit-new-${Date.now()}`
-  router.push({ name: 'OrdersEdit', query: { new: '1', tabKey: key, tabTitle: '订单编辑 新建' } })
-}
-
 onMounted(async () => {
   try {
     // 强制刷新当前用户权限与订单状态策略，避免旧缓存导致按钮显示不一致
@@ -482,42 +436,6 @@ watchEffect(() => {
   flex-shrink: 0;
 }
 
-.filter-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-sm);
-  padding: var(--space-sm);
-  margin-bottom: var(--space-md);
-  border-radius: var(--radius-lg);
-  background-color: var(--color-bg-subtle, #f5f6f8);
-  flex-shrink: 0;
-}
-
-.filter-bar :deep(.el-form-item) {
-  margin-bottom: 0;
-}
-
-.range-single.el-date-editor--daterange :deep(.el-range-separator) {
-  display: none;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) {
-  display: none;
-}
-.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) {
-  width: 100%;
-}
-.range-single.el-date-editor--daterange :deep(.el-range__close-icon) {
-  margin-left: 0;
-}
-
-.filter-bar-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-left: auto;
-}
-
 .orders-card-scroll {
   flex: 1;
   min-height: 0;
@@ -556,5 +474,4 @@ watchEffect(() => {
   font-size: var(--font-size-caption, 12px);
   color: var(--color-text-secondary, #606266);
 }
-
 </style>

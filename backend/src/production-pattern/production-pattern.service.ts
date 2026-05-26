@@ -184,8 +184,8 @@ export class ProductionPatternService {
       .groupBy('h.orderId')
       .getRawMany<{ orderId: number; enteredAt: string }>();
     for (const r of rows) {
-      const orderId = Number((r as any).orderId);
-      const enteredAt = (r as any).enteredAt as string | undefined;
+      const orderId = Number(r.orderId);
+      const enteredAt = r.enteredAt;
       if (!Number.isNaN(orderId) && enteredAt) {
         map.set(orderId, this.toDateTimeLocalString(enteredAt) ?? enteredAt);
       }
@@ -241,7 +241,7 @@ export class ProductionPatternService {
     return list.map((m) => ({
       materialTypeId: m.materialTypeId ?? null,
       materialName: (m.materialName ?? '').trim(),
-      fabricWidth: (((m as any).fabricWidth ?? '') as string).trim(),
+      fabricWidth: ((m.fabricWidth ?? '') as string).trim(),
       usagePerPiece: m.usagePerPiece ?? null,
       cuttingQuantity: m.cuttingQuantity ?? null,
       remark: (m.remark ?? '').trim(),

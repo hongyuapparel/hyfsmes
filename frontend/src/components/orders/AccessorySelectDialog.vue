@@ -39,23 +39,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
-
-interface AccessoryDialogItem {
-  id: number
-  name: string
-  unit?: string
-  [key: string]: any
-}
+import type { AccessoryItem } from '@/api/inventory'
 
 const props = defineProps<{
   modelValue: boolean
   loading: boolean
-  items: AccessoryDialogItem[]
+  items: AccessoryItem[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'select', item: AccessoryDialogItem): void
+  (e: 'select', item: AccessoryItem): void
 }>()
 
 const keyword = ref('')
