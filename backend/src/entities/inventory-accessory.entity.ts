@@ -28,6 +28,18 @@ export class InventoryAccessory {
   @Column({ type: 'int', default: 0 })
   quantity: number;
 
+  /** 是否启用分码（按尺码拆分数量），逐条开关 */
+  @Column({ name: 'is_sized', type: 'boolean', default: false })
+  isSized: boolean;
+
+  /** 分码尺码表头，如 ["S","M","L"]，与 sizeQuantities 下标对齐 */
+  @Column({ name: 'size_headers', type: 'json', nullable: true })
+  sizeHeaders: string[] | null;
+
+  /** 分码各码数量，与 sizeHeaders 下标对齐，可为负（待订购信号） */
+  @Column({ name: 'size_quantities', type: 'json', nullable: true })
+  sizeQuantities: number[] | null;
+
   @Column({ length: 32, default: '个' })
   unit: string;
 

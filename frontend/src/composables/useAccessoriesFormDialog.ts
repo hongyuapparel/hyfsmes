@@ -2,6 +2,8 @@ import { reactive, ref, type Ref } from 'vue'
 import { ElMessage, type FormRules } from 'element-plus'
 import { createAccessory, updateAccessory, type AccessoryItem } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { cleanAccessoryMatrix } from '@/utils/accessorySizeMatrix'
+import { sumDetailRowQty } from '@/utils/finishedStockTableUtils'
 
 export interface AccessoriesFormDialogExpose {
   validate: () => Promise<unknown> | undefined
@@ -26,6 +28,9 @@ export function useAccessoriesFormDialog(
     name: '',
     category: '',
     quantity: 0,
+    isSized: false,
+    sizeHeaders: [] as string[],
+    sizeQuantities: [] as number[],
     unit: '个',
     warehouseId: null as number | null,
     location: '',
@@ -59,16 +64,26 @@ export function useAccessoriesFormDialog(
         : (seed.imageUrl ? [seed.imageUrl] : [''])
       form.imageUrls = seedImageUrls.length ? seedImageUrls : ['']
       form.remark = seed.remark ?? ''
+      form.isSized = !!seed.isSized
       if (row) {
         form.quantity = seed.quantity ?? 0
+        form.sizeHeaders = Array.isArray(seed.sizeHeaders) ? [...seed.sizeHeaders] : []
+        form.sizeQuantities = Array.isArray(seed.sizeQuantities) ? [...seed.sizeQuantities] : []
       } else {
         quickAddSource.value = seed
         form.quantity = 0
+        // 增量入库：沿用源的尺码结构，本次各码数量从 0 开始填
+        const sizedHeaders = seed.isSized && Array.isArray(seed.sizeHeaders) ? seed.sizeHeaders : []
+        form.sizeHeaders = [...sizedHeaders]
+        form.sizeQuantities = sizedHeaders.map(() => 0)
       }
     } else {
       form.name = ''
       form.category = ''
       form.quantity = 0
+      form.isSized = false
+      form.sizeHeaders = []
+      form.sizeQuantities = []
       form.unit = '个'
       form.warehouseId = null
       form.location = ''
@@ -113,40 +128,39 @@ export function useAccessoriesFormDialog(
         })
         ElMessage.success('保存成功')
       } else {
-        const inputQty = Number(form.quantity) || 0
-        if (quickAddSource.value) {
-          if (inputQty <= 0) {
-            ElMessage.warning('请输入大于 0 的新增数量')
-            return
-          }
-          await createAccessory({
-            name: form.name,
-            category: form.category,
-            quantity: inputQty,
-            unit: form.unit,
-            warehouseId: form.warehouseId ?? null,
-            location: form.location || undefined,
-            customerName: form.customerName || undefined,
-            salesperson: form.salesperson,
-            ...imagePayload,
-            remark: form.remark,
-          })
-          ElMessage.success('库存增加成功')
-        } else {
-          await createAccessory({
-            name: form.name,
-            category: form.category,
-            quantity: form.quantity,
-            unit: form.unit,
-            warehouseId: form.warehouseId ?? null,
-            location: form.location || undefined,
-            customerName: form.customerName || undefined,
-            salesperson: form.salesperson,
-            ...imagePayload,
-            remark: form.remark,
-          })
-          ElMessage.success('新增成功')
+        const isSized = form.isSized
+        const matrix = isSized ? cleanAccessoryMatrix(form.sizeHeaders, form.sizeQuantities) : null
+        if (isSized && (!matrix || matrix.headers.length === 0)) {
+          ElMessage.warning('请填写分码尺码')
+          return
         }
+        const total = matrix ? sumDetailRowQty(matrix.quantities) : Number(form.quantity) || 0
+        if (total <= 0) {
+          ElMessage.warning(
+            isSized
+              ? '分码数量合计必须大于 0'
+              : quickAddSource.value
+                ? '请输入大于 0 的新增数量'
+                : '数量必须大于 0',
+          )
+          return
+        }
+        const sizePayload = matrix
+          ? { isSized: true, sizeHeaders: matrix.headers, sizeQuantities: matrix.quantities }
+          : { quantity: Number(form.quantity) || 0 }
+        await createAccessory({
+          name: form.name,
+          category: form.category,
+          ...sizePayload,
+          unit: form.unit,
+          warehouseId: form.warehouseId ?? null,
+          location: form.location || undefined,
+          customerName: form.customerName || undefined,
+          salesperson: form.salesperson,
+          ...imagePayload,
+          remark: form.remark,
+        })
+        ElMessage.success(quickAddSource.value ? '库存增加成功' : '新增成功')
       }
       formDialog.visible = false
       await reloadList()

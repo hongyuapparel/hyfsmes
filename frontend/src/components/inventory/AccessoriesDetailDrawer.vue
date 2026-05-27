@@ -32,16 +32,29 @@ const emit = defineEmits<{
   (e: 'update:visible', value: boolean): void
 }>()
 
+function buildSizeDetailText(row: AccessoryItem): string {
+  const headers = Array.isArray(row.sizeHeaders) ? row.sizeHeaders : []
+  const quantities = Array.isArray(row.sizeQuantities) ? row.sizeQuantities : []
+  if (!headers.length) return '-'
+  return headers
+    .map((h, i) => `${h}：${formatDisplayNumber(quantities[i] ?? 0)}`)
+    .join('   ')
+}
+
 const fields = computed<DetailField[]>(() => {
   const row = props.row
   if (!row) return []
-  return [
+  const list: DetailField[] = [
     { label: '名称', value: row.name || '-' },
     { label: '类别', value: row.category || '-' },
     { label: '客户', value: row.customerName || '-' },
     { label: '当前库存', value: `${formatDisplayNumber(row.quantity)} ${row.unit || ''}`.trim() },
-    { label: '备注', value: row.remark || '-' },
   ]
+  if (row.isSized && Array.isArray(row.sizeHeaders) && row.sizeHeaders.length) {
+    list.push({ label: '分码明细', value: buildSizeDetailText(row) })
+  }
+  list.push({ label: '备注', value: row.remark || '-' })
+  return list
 })
 
 const logs = computed<DetailLog[]>(() =>

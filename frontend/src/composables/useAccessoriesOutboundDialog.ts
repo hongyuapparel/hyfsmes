@@ -7,6 +7,8 @@ import {
   type AccessoryOutboundUserOption,
 } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { cleanAccessoryMatrix } from '@/utils/accessorySizeMatrix'
+import { sumDetailRowQty } from '@/utils/finishedStockTableUtils'
 
 export interface AccessoriesOutboundDialogExpose {
   validate: () => Promise<unknown> | undefined
@@ -31,6 +33,9 @@ export function useAccessoriesOutboundDialog(
     pickupUserId: number | null
     quantity: number
     maxQuantity: number
+    isSized: boolean
+    sizeHeaders: string[]
+    sizeQuantities: number[]
     remark: string
   }>({
     accessoryId: null,
@@ -38,6 +43,9 @@ export function useAccessoriesOutboundDialog(
     pickupUserId: null,
     quantity: 1,
     maxQuantity: 0,
+    isSized: false,
+    sizeHeaders: [],
+    sizeQuantities: [],
     remark: '',
   })
   const outboundRules: FormRules = {
@@ -65,6 +73,10 @@ export function useAccessoriesOutboundDialog(
     outboundForm.accessoryName = row.name
     outboundForm.maxQuantity = Number(row.quantity) || 0
     outboundForm.quantity = outboundForm.maxQuantity > 0 ? 1 : 0
+    outboundForm.isSized = !!row.isSized
+    const sizedHeaders = row.isSized && Array.isArray(row.sizeHeaders) ? row.sizeHeaders : []
+    outboundForm.sizeHeaders = [...sizedHeaders]
+    outboundForm.sizeQuantities = sizedHeaders.map(() => 0)
     outboundForm.pickupUserId = null
     outboundForm.remark = ''
     await ensureOutboundUserOptionsLoaded()
@@ -85,12 +97,15 @@ export function useAccessoriesOutboundDialog(
       ElMessage.warning('领取人无效，请重新选择')
       return
     }
-    const qty = Number(outboundForm.quantity) || 0
+    const matrix = outboundForm.isSized
+      ? cleanAccessoryMatrix(outboundForm.sizeHeaders, outboundForm.sizeQuantities)
+      : null
+    const qty = matrix ? sumDetailRowQty(matrix.quantities) : Number(outboundForm.quantity) || 0
     if (qty <= 0) {
-      ElMessage.warning('出库数量不合法')
+      ElMessage.warning(outboundForm.isSized ? '请填写本次各码出库数量' : '出库数量不合法')
       return
     }
-    if (qty > (Number(outboundForm.maxQuantity) || 0)) {
+    if (!outboundForm.isSized && qty > (Number(outboundForm.maxQuantity) || 0)) {
       ElMessage.warning('出库数量不能大于当前库存')
       return
     }
@@ -101,6 +116,7 @@ export function useAccessoriesOutboundDialog(
         accessoryId: outboundForm.accessoryId,
         quantity: qty,
         remark,
+        ...(matrix ? { sizeOutbound: { headers: matrix.headers, quantities: matrix.quantities } } : {}),
       })
       ElMessage.success('出库成功')
       outboundDialog.visible = false

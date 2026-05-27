@@ -35,8 +35,8 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { reviewOrders, reviewRejectOrders } from '@/api/orders'
+import { ElMessage, ElNotification } from 'element-plus'
+import { reviewOrders, reviewRejectOrders, type AccessoryShortageItem } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const props = defineProps<{
@@ -79,6 +79,22 @@ function resetForm() {
   reason.value = ''
 }
 
+function notifyShortages(shortages: AccessoryShortageItem[]) {
+  const lines = shortages
+    .map((s) => {
+      const sizePart = s.size ? `（${s.size}）` : ''
+      return `${s.accessoryName}${sizePart}：扣后 ${s.after}`
+    })
+    .join('\n')
+  ElNotification({
+    title: '审核成功，以下辅料库存不足（已扣为负数，请安排订购）',
+    message: lines,
+    type: 'warning',
+    duration: 0,
+    customClass: 'accessory-shortage-notify',
+  })
+}
+
 async function reviewApprove() {
   if (!reviewIds.value.length) {
     ElMessage.warning('未选择待审核订单')
@@ -86,8 +102,13 @@ async function reviewApprove() {
   }
   submittingApprove.value = true
   try {
-    await reviewOrders(reviewIds.value)
-    ElMessage.success('审核成功')
+    const res = await reviewOrders(reviewIds.value)
+    const shortages = res.data?.shortages ?? []
+    if (shortages.length) {
+      notifyShortages(shortages)
+    } else {
+      ElMessage.success('审核成功')
+    }
     emit('reviewed')
     emit('update:modelValue', false)
   } catch (e: unknown) {
@@ -138,5 +159,13 @@ async function reviewReject() {
   margin: 0;
   font-size: 12px;
   color: var(--el-text-color-secondary);
+}
+</style>
+
+<style>
+.accessory-shortage-notify .el-notification__content {
+  white-space: pre-line;
+  max-height: 50vh;
+  overflow-y: auto;
 }
 </style>

@@ -1,12 +1,22 @@
 import request from './request'
 import type { AxiosRequestConfig } from 'axios'
 
+/** 分码明细：headers 与 quantities 下标对齐，quantities 可为负 */
+export interface AccessorySizeBreakdown {
+  headers: string[]
+  quantities: number[]
+}
+
 /** 辅料 */
 export interface AccessoryItem {
   id: number
   name: string
   category: string
   quantity: number
+  /** 是否启用分码（按尺码拆分数量） */
+  isSized?: boolean
+  sizeHeaders?: string[] | null
+  sizeQuantities?: number[] | null
   unit: string
   warehouseId?: number | null
   location?: string
@@ -44,6 +54,9 @@ export function createAccessory(body: {
   name: string
   category?: string
   quantity?: number
+  isSized?: boolean
+  sizeHeaders?: string[]
+  sizeQuantities?: number[]
   unit?: string
   warehouseId?: number | null
   location?: string
@@ -93,6 +106,7 @@ export function manualAccessoryOutbound(body: {
   accessoryId: number
   quantity: number
   remark: string
+  sizeOutbound?: AccessorySizeBreakdown
 }) {
   return request.post<void>('/inventory/accessories/outbounds', body)
 }
@@ -107,6 +121,7 @@ export interface AccessoryOutboundRecord {
   category?: string
   outboundType: string
   quantity: number
+  sizeOutbound?: AccessorySizeBreakdown | null
   beforeQuantity: number
   afterQuantity: number
   operatorUsername: string

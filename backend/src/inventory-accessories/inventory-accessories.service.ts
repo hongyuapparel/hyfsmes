@@ -5,38 +5,17 @@ import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
 import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
 import { User, UserStatus } from '../entities/user.entity';
-
-type AccessoryOutboundRawRow = {
-  id: number | string;
-  accessoryId: number | string;
-  orderId: number | string | null;
-  orderNo: string | null;
-  outboundType: 'manual' | 'order_auto' | null;
-  quantity: number | string | null;
-  beforeQuantity: number | string | null;
-  afterQuantity: number | string | null;
-  operatorUsername: string | null;
-  remark: string | null;
-  createdAt: Date | string | null;
-  imageUrl: string | null;
-  customerName: string | null;
-  category: string | null;
-};
-
-type InventoryAccessoryOutboundParams = {
-  accessoryId: number;
-  quantity: number;
-  outboundType: 'order_auto' | 'manual';
-  operatorUsername: string;
-  remark?: string;
-  orderId?: number | null;
-  orderNo?: string;
-};
-
-type InventoryAccessoryOutboundResult = {
-  accessory: InventoryAccessory;
-  record: InventoryAccessoryOutbound;
-};
+import { normalizeSizeMatrix } from '../common/size-headers.util';
+import {
+  applySizedOutbound,
+  distributeProportional,
+  mapOutboundRawRow,
+  toAccessorySnapshot,
+  type AccessoryOutboundNegative,
+  type AccessoryOutboundRawRow,
+  type InventoryAccessoryOutboundParams,
+  type InventoryAccessoryOutboundResult,
+} from './inventory-accessory.helpers';
 
 @Injectable()
 export class InventoryAccessoriesService {
@@ -57,23 +36,6 @@ export class InventoryAccessoriesService {
     const e = error as { code?: string; errno?: number; message?: string } | undefined;
     const msg = String(e?.message ?? '').toLowerCase();
     return e?.code === 'ER_NO_SUCH_TABLE' || e?.errno === 1146 || msg.includes("doesn't exist");
-  }
-
-  private toSnapshot(item: InventoryAccessory): Record<string, unknown> {
-    return {
-      id: item.id,
-      name: item.name,
-      category: item.category,
-      quantity: item.quantity,
-      unit: item.unit,
-      warehouseId: item.warehouseId,
-      location: item.location,
-      customerName: item.customerName,
-      salesperson: item.salesperson,
-      imageUrl: item.imageUrl,
-      imageUrls: Array.isArray(item.imageUrls) ? item.imageUrls : [],
-      remark: item.remark,
-    };
   }
 
   private normalizeName(value: unknown): string {
@@ -179,6 +141,9 @@ export class InventoryAccessoriesService {
     name: string;
     category?: string;
     quantity?: number;
+    isSized?: boolean;
+    sizeHeaders?: string[];
+    sizeQuantities?: number[];
     unit?: string;
     warehouseId?: number | null;
     location?: string;
@@ -191,9 +156,14 @@ export class InventoryAccessoriesService {
   }): Promise<InventoryAccessory> {
     const name = this.normalizeName(dto.name);
     if (!name) throw new BadRequestException('辅料名称不能为空');
-    const qty = Number(dto.quantity ?? 0);
+    const isSized = !!dto.isSized;
+    const matrix = isSized ? normalizeSizeMatrix(dto.sizeHeaders, dto.sizeQuantities) : null;
+    if (isSized && (!matrix || !matrix.headers.length)) {
+      throw new BadRequestException('请填写分码尺码明细');
+    }
+    const qty = isSized ? matrix!.total : Number(dto.quantity ?? 0);
     if (!Number.isFinite(qty) || qty <= 0) {
-      throw new BadRequestException('新增数量必须大于 0');
+      throw new BadRequestException(isSized ? '分码新增数量合计必须大于 0' : '新增数量必须大于 0');
     }
     const salesperson = (dto.salesperson ?? '').trim();
     if (!salesperson) throw new BadRequestException('业务员不能为空');
@@ -201,8 +171,21 @@ export class InventoryAccessoriesService {
     const mainImageUrl = imageUrls[0] ?? this.normalizeName(dto.imageUrl);
     const existing = await this.findByName(name);
     if (existing) {
-      const before = this.toSnapshot(existing);
-      existing.quantity = (Number(existing.quantity) || 0) + qty;
+      const before = toAccessorySnapshot(existing);
+      if (existing.isSized) {
+        if (!matrix) {
+          throw new BadRequestException('该辅料为分码辅料，请按尺码录入入库数量');
+        }
+        const merged = normalizeSizeMatrix(
+          [...(existing.sizeHeaders ?? []), ...matrix.headers],
+          [...(existing.sizeQuantities ?? []), ...matrix.quantities],
+        );
+        existing.sizeHeaders = merged.headers;
+        existing.sizeQuantities = merged.quantities;
+        existing.quantity = merged.total;
+      } else {
+        existing.quantity = (Number(existing.quantity) || 0) + qty;
+      }
       if (!existing.category && dto.category) existing.category = dto.category.trim();
       if (!existing.unit && dto.unit) existing.unit = dto.unit.trim();
       if (existing.warehouseId == null && dto.warehouseId != null) existing.warehouseId = dto.warehouseId;
@@ -217,7 +200,7 @@ export class InventoryAccessoriesService {
         action: 'inbound',
         operatorUsername: dto.operatorUsername ?? '',
         beforeSnapshot: before,
-        afterSnapshot: this.toSnapshot(savedExisting),
+        afterSnapshot: toAccessorySnapshot(savedExisting),
         remark: dto.remark ?? '',
       });
       return savedExisting;
@@ -226,6 +209,9 @@ export class InventoryAccessoriesService {
       name,
       category: dto.category?.trim() ?? '',
       quantity: qty,
+      isSized,
+      sizeHeaders: isSized ? matrix!.headers : null,
+      sizeQuantities: isSized ? matrix!.quantities : null,
       unit: dto.unit?.trim() ?? '个',
       warehouseId: dto.warehouseId ?? null,
       location: dto.location?.trim() ?? '',
@@ -241,7 +227,7 @@ export class InventoryAccessoriesService {
       action: 'create',
       operatorUsername: dto.operatorUsername ?? '',
       beforeSnapshot: null,
-      afterSnapshot: this.toSnapshot(saved),
+      afterSnapshot: toAccessorySnapshot(saved),
     });
     return saved;
   }
@@ -265,7 +251,7 @@ export class InventoryAccessoriesService {
   ): Promise<InventoryAccessory> {
     const item = await this.repo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('辅料记录不存在');
-    const before = this.toSnapshot(item);
+    const before = toAccessorySnapshot(item);
     if (dto.name !== undefined) {
       const nextName = this.normalizeName(dto.name);
       if (!nextName) throw new BadRequestException('辅料名称不能为空');
@@ -301,7 +287,7 @@ export class InventoryAccessoriesService {
       action: 'update',
       operatorUsername: dto.operatorUsername ?? '',
       beforeSnapshot: before,
-      afterSnapshot: this.toSnapshot(saved),
+      afterSnapshot: toAccessorySnapshot(saved),
     });
     return saved;
   }
@@ -309,7 +295,7 @@ export class InventoryAccessoriesService {
   async remove(id: number, operatorUsername = ''): Promise<void> {
     const item = await this.repo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('辅料记录不存在');
-    const before = this.toSnapshot(item);
+    const before = toAccessorySnapshot(item);
     await this.repo.remove(item);
     await this.addOperationLog({
       accessoryId: id,
@@ -344,10 +330,6 @@ export class InventoryAccessoriesService {
     }
   }
 
-  /**
-   * 辅料出库（事务 + 行锁），并写出库记录。
-   * @param params.quantity 出库数量（正数）
-   */
   async outbound(params: InventoryAccessoryOutboundParams): Promise<InventoryAccessoryOutboundResult> {
     return this.repo.manager.transaction((manager) => this.outboundInTransaction(manager, params));
   }
@@ -374,12 +356,45 @@ export class InventoryAccessoriesService {
     if (!accessory) throw new NotFoundException('辅料记录不存在');
 
     const before = Number(accessory.quantity) || 0;
-    const beforeSnapshot = this.toSnapshot(accessory);
-    if (before < qty) {
-      throw new BadRequestException(`库存不足：当前 ${before}，需要出库 ${qty}`);
+    const beforeSnapshot = toAccessorySnapshot(accessory);
+
+    // 允许负库存：库存不足不再报错，扣成负数作为「待订购」信号，入库后自然抵消。
+    const negatives: AccessoryOutboundNegative[] = [];
+    let recordSizeOutbound: { headers: string[]; quantities: number[] } | null = null;
+    let recordQty = qty;
+
+    if (accessory.isSized) {
+      let deductHeaders: string[];
+      let deductQuantities: number[];
+      if (params.sizeOutbound && params.sizeOutbound.headers.length) {
+        deductHeaders = params.sizeOutbound.headers;
+        deductQuantities = params.sizeOutbound.quantities.map((q) => Number(q) || 0);
+      } else {
+        // R4 兜底：无按码明细时按现有各码比例（最大余数）拆分 qty，保持「总量=各码和」
+        deductHeaders = [...(accessory.sizeHeaders ?? [])];
+        deductQuantities = distributeProportional(
+          (accessory.sizeQuantities ?? []).map((q) => Number(q) || 0),
+          qty,
+        );
+      }
+
+      const outcome = applySizedOutbound(
+        accessory.sizeHeaders,
+        accessory.sizeQuantities,
+        deductHeaders,
+        deductQuantities,
+      );
+      accessory.sizeHeaders = outcome.headers;
+      accessory.sizeQuantities = outcome.quantities;
+      accessory.quantity = outcome.total;
+      negatives.push(...outcome.negatives);
+      recordSizeOutbound = outcome.deduct;
+      recordQty = outcome.deduct.quantities.reduce((sum, q) => sum + q, 0);
+    } else {
+      accessory.quantity = before - qty;
+      if (accessory.quantity < 0) negatives.push({ size: null, after: accessory.quantity });
     }
 
-    accessory.quantity = before - qty;
     const savedAccessory = await accessoryRepo.save(accessory);
 
     const record = recordRepo.create({
@@ -387,7 +402,8 @@ export class InventoryAccessoriesService {
       orderId: params.orderId ?? null,
       orderNo: params.orderNo ?? '',
       outboundType: params.outboundType,
-      quantity: qty,
+      quantity: recordQty,
+      sizeOutbound: recordSizeOutbound,
       beforeQuantity: before,
       afterQuantity: savedAccessory.quantity,
       operatorUsername: (params.operatorUsername ?? '').trim(),
@@ -401,7 +417,7 @@ export class InventoryAccessoriesService {
           action: 'outbound',
           operatorUsername: (params.operatorUsername ?? '').trim(),
           beforeSnapshot,
-          afterSnapshot: this.toSnapshot(savedAccessory),
+          afterSnapshot: toAccessorySnapshot(savedAccessory),
           remark: (params.remark ?? '').trim(),
         }),
       );
@@ -410,7 +426,7 @@ export class InventoryAccessoriesService {
       this.logger.warn('操作记录表不存在，已跳过本次辅料出库日志写入');
     }
 
-    return { accessory: savedAccessory, record: savedRecord };
+    return { accessory: savedAccessory, record: savedRecord, negatives };
   }
 
   async getOutboundRecords(params: {
@@ -448,6 +464,7 @@ export class InventoryAccessoriesService {
         'r.operator_username AS operatorUsername',
         'r.remark AS remark',
         'r.created_at AS createdAt',
+        'r.size_outbound AS sizeOutbound',
         "COALESCE(a.image_url, '') AS imageUrl",
         "COALESCE(a.customer_name, '') AS customerName",
         "COALESCE(a.category, '') AS category",
@@ -462,22 +479,7 @@ export class InventoryAccessoriesService {
       .skip((page - 1) * pageSize)
       .take(pageSize)
       .getRawMany<AccessoryOutboundRawRow>();
-    const rows = list.map((r) => ({
-      id: Number(r.id),
-      accessoryId: Number(r.accessoryId),
-      orderId: r.orderId != null ? Number(r.orderId) : null,
-      orderNo: r.orderNo ?? '',
-      outboundType: r.outboundType ?? 'manual',
-      quantity: Number(r.quantity) || 0,
-      beforeQuantity: Number(r.beforeQuantity) || 0,
-      afterQuantity: Number(r.afterQuantity) || 0,
-      operatorUsername: r.operatorUsername ?? '',
-      remark: r.remark ?? '',
-      createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
-      imageUrl: r.imageUrl ?? '',
-      customerName: r.customerName ?? '',
-      category: r.category ?? '',
-    }));
+    const rows = list.map(mapOutboundRawRow);
     return { list: rows, total, page, pageSize };
   }
 
