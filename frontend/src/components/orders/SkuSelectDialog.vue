@@ -15,20 +15,26 @@
       height="360px"
       border
     >
-      <el-table-column label="图片" width="90">
+      <el-table-column label="图片" :width="isMobile ? 76 : 90">
         <template #default="{ row }">
-          <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="dialog" />
+          <AppImageThumb
+            v-if="row.imageUrl"
+            :raw-url="row.imageUrl"
+            variant="dialog"
+            :width="isMobile ? 48 : undefined"
+            :height="isMobile ? 48 : undefined"
+          />
           <span v-else>无</span>
         </template>
       </el-table-column>
-      <el-table-column prop="skuCode" label="SKU 编号" min-width="140" />
-      <el-table-column prop="productName" label="产品名称" min-width="160" />
-      <el-table-column prop="customerName" label="客户" min-width="160">
+      <el-table-column prop="skuCode" label="SKU 编号" :min-width="isMobile ? 96 : 140" />
+      <el-table-column prop="productName" label="产品名称" :min-width="isMobile ? 104 : 160" />
+      <el-table-column prop="customerName" label="客户" :min-width="isMobile ? 96 : 160">
         <template #default="{ row }">
           {{ row.customerName || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" align="center">
+      <el-table-column label="操作" :width="isMobile ? 56 : 90" align="center">
         <template #default="{ row }">
           <el-button type="primary" link size="small" @click="emit('select', row)">选择</el-button>
         </template>
@@ -56,6 +62,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 const props = defineProps<{
   modelValue: boolean

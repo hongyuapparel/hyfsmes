@@ -15,28 +15,28 @@
       height="360px"
       border
     >
-      <el-table-column prop="customerId" label="客户编号" min-width="120">
+      <el-table-column prop="customerId" label="客户编号" :min-width="isMobile ? 84 : 120">
         <template #default="{ row }">
           {{ row.customerId || '-' }}
         </template>
       </el-table-column>
-      <el-table-column prop="country" label="国家" min-width="120">
+      <el-table-column prop="country" label="国家" :min-width="isMobile ? 64 : 120">
         <template #default="{ row }">
           {{ row.country || '-' }}
         </template>
       </el-table-column>
-      <el-table-column prop="companyName" label="公司名称" min-width="180" />
-      <el-table-column prop="contactPerson" label="联系人" min-width="120">
+      <el-table-column prop="companyName" label="公司名称" :min-width="isMobile ? 120 : 180" />
+      <el-table-column prop="contactPerson" label="联系人" :min-width="isMobile ? 84 : 120">
         <template #default="{ row }">
           {{ row.contactPerson || '-' }}
         </template>
       </el-table-column>
-      <el-table-column prop="salesperson" label="业务员" min-width="120">
+      <el-table-column prop="salesperson" label="业务员" :min-width="isMobile ? 84 : 120">
         <template #default="{ row }">
           {{ row.salesperson || '-' }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90" align="center">
+      <el-table-column label="操作" :width="isMobile ? 56 : 90" align="center">
         <template #default="{ row }">
           <el-button type="primary" link size="small" @click="emit('select', row)">选择</el-button>
         </template>
@@ -63,6 +63,9 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useIsMobile } from '@/composables/useIsMobile'
+
+const { isMobile } = useIsMobile()
 
 interface CustomerSelectItem {
   id: number
