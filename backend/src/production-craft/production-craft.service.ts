@@ -185,8 +185,8 @@ export class ProductionCraftService {
       );
       if (!Array.isArray(rows)) return map;
       for (const r of rows) {
-        const orderId = Number((r as any).orderId);
-        const raw = (r as any).processItems;
+        const orderId = Number((r as Record<string, unknown>).orderId);
+        const raw = (r as Record<string, unknown>).processItems;
         if (Number.isNaN(orderId)) continue;
         const items = this.normalizeProcessItems(raw);
         map.set(orderId, items);

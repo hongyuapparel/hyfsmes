@@ -46,25 +46,19 @@
 import { computed, ref } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { useIsMobile } from '@/composables/useIsMobile'
+import type { AccessoryItem } from '@/api/inventory'
 
 const { isMobile } = useIsMobile()
-
-interface AccessoryDialogItem {
-  id: number
-  name: string
-  unit?: string
-  [key: string]: any
-}
 
 const props = defineProps<{
   modelValue: boolean
   loading: boolean
-  items: AccessoryDialogItem[]
+  items: AccessoryItem[]
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'select', item: AccessoryDialogItem): void
+  (e: 'select', item: AccessoryItem): void
 }>()
 
 const keyword = ref('')

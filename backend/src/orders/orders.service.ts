@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { OrderQueryService } from './order-query.service';
 import { OrderMutationService } from './order-mutation.service';
+import { OrderCostSnapshotService } from './order-cost-snapshot.service';
 import { OrderStatusService } from './order-status.service';
 import { type OrderListQuery, type OrderEditPayload, type OrderActor } from './order.types';
 
@@ -11,6 +12,7 @@ export class OrdersService {
   constructor(
     private readonly orderQueryService: OrderQueryService,
     private readonly orderMutationService: OrderMutationService,
+    private readonly orderCostSnapshotService: OrderCostSnapshotService,
     private readonly orderStatusService: OrderStatusService,
   ) {}
 
@@ -83,11 +85,11 @@ export class OrdersService {
   }
 
   saveCostSnapshot(orderId: number, payload: { snapshot: Record<string, unknown> }, actor?: OrderActor) {
-    return this.orderMutationService.saveCostSnapshot(orderId, payload, actor);
+    return this.orderCostSnapshotService.saveCostSnapshot(orderId, payload, actor);
   }
 
   confirmCostQuote(orderId: number, payload: { snapshot: Record<string, unknown> }, actor: OrderActor) {
-    return this.orderMutationService.confirmCostQuote(orderId, payload, actor);
+    return this.orderCostSnapshotService.confirmCostQuote(orderId, payload, actor);
   }
 
   assertOrderActionById(orderId: number, userId: number, action: string): Promise<void> {

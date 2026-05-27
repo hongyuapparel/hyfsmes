@@ -262,7 +262,7 @@ export function usePatternDialogs(
     try {
       const res = await getDictItems('material_types')
       const list = res.data ?? []
-      materialTypeOptions.value = (Array.isArray(list) ? list : []).map((item: any) => ({
+      materialTypeOptions.value = (Array.isArray(list) ? list : []).map((item) => ({
         id: item.id,
         label: item.value,
       }))

@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <div class="page-card page-card--fill pattern-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
@@ -210,268 +210,55 @@
       @size-change="onPageSizeChange"
     />
 
-    <ProductionDetailDrawerShell
+    <PatternDetailDrawer
+      ref="detailDrawerRef"
       v-model="detailDrawer.visible"
-      title="纸样详情"
-      :size="760"
-      :resizable="true"
+      :row="detailDrawer.row"
+      :brief="detailDrawer.row ? patternBriefFromRow(detailDrawer.row) : emptyBrief"
+      :loading="detailDrawer.loading"
+      :saving="detailDrawer.saving"
+      :can-edit="canEditPatternMaterials"
+      :materials-form="materialsForm"
+      :material-type-options="materialTypeOptions"
+      :logs="patternDrawerLogs"
       @closed="onDetailDrawerClosed"
-    >
-      <template v-if="detailDrawer.row">
-        <ProductionDetailSection>
-          <ProductionOrderBriefPanel :brief="patternBriefFromRow(detailDrawer.row)" />
-        </ProductionDetailSection>
-        <ProductionDetailSection title="业务扩展信息">
-          <el-descriptions :column="2" border size="small" class="pattern-brief-extra">
-            <el-descriptions-item label="纸样师">
-              {{ (detailDrawer.row.patternMaster ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="车版师">
-              {{ (detailDrawer.row.sampleMaker ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="纸样状态">
-              {{ patternStatusLabel(detailDrawer.row.patternStatus) }}
-            </el-descriptions-item>
-          </el-descriptions>
-        </ProductionDetailSection>
-        <ProductionDetailSection title="时效与节点">
-          <el-descriptions :column="2" border size="small" class="pattern-brief-extra">
-            <el-descriptions-item label="到纸样时间">
-              {{ formatDateTime(detailDrawer.row.arrivedAtPattern) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="完成时间">
-              {{ formatDateTime(detailDrawer.row.completedAt) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="时效判定">
-              <SlaJudgeTag :text="detailDrawer.row.timeRating" />
-            </el-descriptions-item>
-          </el-descriptions>
-        </ProductionDetailSection>
-        <ProductionDetailSection title="纸样物料/裁片清单">
-          <template #actions>
-            <el-button
-              v-if="!materialsEditMode && canEditPatternMaterials"
-              size="small"
-              text
-              type="primary"
-              class="materials-head-btn"
-              :disabled="detailDrawer.loading"
-              @click="enterMaterialsEdit"
-            >
-              <el-icon><Edit /></el-icon>
-              <span>编辑</span>
-            </el-button>
-            <template v-if="materialsEditMode">
-              <el-button
-                size="small"
-                :disabled="detailDrawer.saving"
-                @click="cancelMaterialsEdit"
-              >
-                取消
-              </el-button>
-              <el-button
-                type="primary"
-                size="small"
-                :loading="detailDrawer.saving"
-                :disabled="detailDrawer.loading"
-                @click="handleSubmitMaterials"
-              >
-                保存
-              </el-button>
-            </template>
-          </template>
+      @enter-edit="onEnterEdit"
+      @cancel-edit="onCancelEdit"
+      @save="onSaveMaterials"
+      @add-material-row="addMaterialRow"
+      @remove-material-row="removeMaterialRow"
+    />
 
-          <el-table v-loading="detailDrawer.loading" :data="materialsForm.materials" border size="small" class="materials-table">
-            <el-table-column label="物料类型" min-width="110" align="center">
-              <template #default="{ row }">
-                <el-select
-                  v-model="row.materialTypeId"
-                  placeholder="选择"
-                  filterable
-                  clearable
-                  size="small"
-                  style="width: 100%"
-                  :disabled="!canEditPatternMaterials || !materialsEditMode"
-                >
-                  <el-option v-for="opt in materialTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
-                </el-select>
-              </template>
-            </el-table-column>
-            <el-table-column label="物料名称" min-width="180" align="center">
-              <template #default="{ row }">
-                <el-input v-model="row.materialName" size="small" :disabled="!canEditPatternMaterials || !materialsEditMode" />
-              </template>
-            </el-table-column>
-            <el-table-column label="幅宽(cm)" width="120" align="center">
-              <template #default="{ row }">
-                <el-input
-                  v-model="row.fabricWidth"
-                  size="small"
-                  placeholder="如 183cm"
-                  :disabled="!canEditPatternMaterials || !materialsEditMode"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="单件用量(米)" width="110" align="center">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.usagePerPiece"
-                  :min="0"
-                  :controls="false"
-                  size="small"
-                  :disabled="!canEditPatternMaterials || !materialsEditMode"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="裁片数量" width="110" align="center">
-              <template #default="{ row }">
-                <el-input-number
-                  v-model="row.cuttingQuantity"
-                  :min="0"
-                  :controls="false"
-                  size="small"
-                  :disabled="!canEditPatternMaterials || !materialsEditMode"
-                />
-              </template>
-            </el-table-column>
-            <el-table-column label="备注" min-width="200" align="center">
-              <template #default="{ row }">
-                <el-input v-model="row.remark" size="small" :disabled="!canEditPatternMaterials || !materialsEditMode" />
-              </template>
-            </el-table-column>
-            <el-table-column v-if="canEditPatternMaterials && materialsEditMode" label="操作" width="70" fixed="right" align="center">
-              <template #default="{ $index }">
-                <el-button link type="danger" size="small" @click="removeMaterialRow($index)">删除</el-button>
-              </template>
-            </el-table-column>
-          </el-table>
-
-          <div v-if="materialsEditMode" class="materials-add-row">
-            <el-button
-              link
-              type="primary"
-              size="small"
-              :disabled="detailDrawer.loading"
-              @click="addMaterialRow"
-            >
-              <el-icon><Plus /></el-icon>
-              <span>新增一行</span>
-            </el-button>
-          </div>
-
-          <div class="materials-remark">
-            <div class="materials-remark-label">备注</div>
-            <div class="materials-remark-field">
-              <el-input
-                v-model="materialsForm.remark"
-                type="textarea"
-                size="small"
-                :autosize="{ minRows: 1, maxRows: 8 }"
-                placeholder="可选"
-                :disabled="!canEditPatternMaterials || !materialsEditMode"
-              />
-            </div>
-          </div>
-
-        </ProductionDetailSection>
-        <ProductionDetailSection>
-          <OperationLogsSection :logs="patternDrawerLogs" />
-        </ProductionDetailSection>
-      </template>
-    </ProductionDetailDrawerShell>
-
-    <AppDialog
+    <PatternAssignDialog
       v-model="assignDialog.visible"
-      title="分配纸样师和车版师"
-      width="420"
-      destroy-on-close
+      :form="assignForm"
+      :rules="assignRules"
+      :pattern-master-options="patternMasterOptions"
+      :sample-maker-options="sampleMakerOptions"
+      :submitting="assignDialog.submitting"
       @close="resetAssignForm"
-    >
-      <el-form ref="assignFormRef" :model="assignForm" :rules="assignRules" label-width="100px">
-        <el-form-item label="纸样师" prop="patternMaster">
-          <el-select
-            v-model="assignForm.patternMaster"
-            placeholder="请选择纸样师"
-            clearable
-            filterable
-            style="width: 100%"
-          >
-            <el-option v-for="e in patternMasterOptions" :key="e.id" :label="e.name" :value="e.name" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="车版师" prop="sampleMaker">
-          <el-select
-            v-model="assignForm.sampleMaker"
-            placeholder="请选择车版师"
-            clearable
-            filterable
-            style="width: 100%"
-          >
-            <el-option v-for="e in sampleMakerOptions" :key="e.id" :label="e.name" :value="e.name" />
-          </el-select>
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="assignDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="assignDialog.submitting" @click="submitAssign">
-          确定
-        </el-button>
-      </template>
-    </AppDialog>
+      @submit="submitAssign"
+    />
 
-    <AppDialog
+    <PatternCompleteDialog
+      ref="completeDialogRef"
       v-model="completeDialog.visible"
-      title="确认完成"
-      width="480"
-      destroy-on-close
+      :row="completeDialog.row"
+      :form="completeForm"
+      :rules="completeRules"
+      :submitting="completeDialog.submitting"
       @close="resetCompleteForm"
-    >
-      <div v-if="completeDialog.row" class="complete-brief">
-        <div>订单号：{{ completeDialog.row.orderNo }}</div>
-        <div>SKU：{{ completeDialog.row.skuCode }}</div>
-      </div>
-      <div class="complete-hint">样品图片可选：不上传也可以完成纸样</div>
-      <el-form ref="completeFormRef" :model="completeForm" :rules="completeRules" label-width="100px">
-        <el-form-item label="样品图片" prop="sampleImageUrl">
-          <div class="sample-image-upload" @click="triggerSampleImageUpload">
-            <div v-if="completeForm.sampleImageUrl" class="image-preview-wrap">
-              <el-image
-                :src="completeForm.sampleImageUrl"
-                fit="contain"
-                :preview-teleported="true"
-                :preview-src-list="[completeForm.sampleImageUrl]"
-              />
-              <el-button text type="danger" size="small" class="image-remove" @click.stop="clearSampleImage">
-                移除
-              </el-button>
-            </div>
-            <div v-else class="image-placeholder">
-              <span>点击上传样品图片</span>
-            </div>
-          </div>
-          <input
-            ref="sampleImageFileInputRef"
-            type="file"
-            accept="image/jpeg,image/png,image/gif,image/webp"
-            class="hidden-file-input"
-            @change="onSampleImageFileChange"
-          />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="completeDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="completeDialog.submitting" @click="submitComplete">
-          完成纸样
-        </el-button>
-      </template>
-    </AppDialog>
+      @submit="submitComplete"
+      @trigger-upload="overrideTriggerUpload"
+      @clear-image="clearSampleImage"
+      @file-change="onSampleImageFileChange"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDateTime } from '@/utils/date-format'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -484,19 +271,17 @@ import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
-import { PATTERN_TABS, patternStatusLabel, usePatternList } from '@/composables/usePatternList'
+import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
-import { Edit, Plus } from '@element-plus/icons-vue'
 import type { PatternListItem, PatternMaterialRow } from '@/api/production-pattern'
-import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
-import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import PatternTable from '@/components/production/PatternTable.vue'
-import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
-import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
-import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
-import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
-import { useAuthStore } from '@/stores/auth'
+import PatternDetailDrawer from '@/components/production/PatternDetailDrawer.vue'
+import PatternAssignDialog from '@/components/production/PatternAssignDialog.vue'
+import PatternCompleteDialog from '@/components/production/PatternCompleteDialog.vue'
+import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import { useAuthStore } from '@/stores/auth'
+import type { ProductionOrderBriefModel } from '@/components/production/ProductionOrderBriefPanel.vue'
 
 const authStore = useAuthStore()
 const canAssignPattern = computed(() => authStore.hasPermission('production_pattern_assign'))
@@ -582,16 +367,13 @@ const {
   materialsForm,
   materialTypeOptions,
   assignDialog,
-  assignFormRef,
   assignForm,
   assignRules,
   patternMasterOptions,
   sampleMakerOptions,
   completeDialog,
-  completeFormRef,
   completeForm,
   completeRules,
-  sampleImageFileInputRef,
   patternBriefFromRow,
   addMaterialRow,
   removeMaterialRow,
@@ -603,7 +385,6 @@ const {
   submitAssign,
   openCompleteDialog,
   resetCompleteForm,
-  triggerSampleImageUpload,
   clearSampleImage,
   onSampleImageFileChange,
   submitComplete,
@@ -615,10 +396,20 @@ const {
   { findOrderTypeLabelById, findCollaborationLabelById },
 )
 
-const materialsEditMode = ref(false)
+const emptyBrief: ProductionOrderBriefModel = {
+  orderNo: '',
+  skuCode: '',
+  imageUrl: '',
+  customerName: '',
+  merchandiser: '',
+  customerDueDate: '',
+  orderQuantity: 0,
+}
+
+const detailDrawerRef = ref<{ onSaveSuccess: () => void } | null>(null)
 let materialsSnapshot: { materials: PatternMaterialRow[]; remark: string } | null = null
 
-function enterMaterialsEdit() {
+function onEnterEdit() {
   materialsSnapshot = {
     materials: JSON.parse(JSON.stringify(materialsForm.materials)) as PatternMaterialRow[],
     remark: materialsForm.remark,
@@ -626,24 +417,22 @@ function enterMaterialsEdit() {
   if (!materialsForm.materials.length) {
     addMaterialRow()
   }
-  materialsEditMode.value = true
 }
 
-function cancelMaterialsEdit() {
+function onCancelEdit() {
   if (materialsSnapshot) {
     materialsForm.materials = materialsSnapshot.materials
     materialsForm.remark = materialsSnapshot.remark
   }
   materialsSnapshot = null
-  materialsEditMode.value = false
 }
 
-async function handleSubmitMaterials() {
+async function onSaveMaterials() {
   if (detailDrawer.saving) return
   const ok = await submitMaterials()
   if (ok) {
     materialsSnapshot = null
-    materialsEditMode.value = false
+    detailDrawerRef.value?.onSaveSuccess()
     await loadPatternDrawerLogs(detailDrawer.row)
   }
 }
@@ -651,10 +440,7 @@ async function handleSubmitMaterials() {
 watch(
   () => detailDrawer.visible,
   (visible) => {
-    if (!visible) {
-      materialsEditMode.value = false
-      materialsSnapshot = null
-    }
+    if (!visible) materialsSnapshot = null
   },
 )
 
@@ -671,10 +457,14 @@ async function loadPatternDrawerLogs(row: PatternListItem | null) {
 
 watch(
   () => detailDrawer.row,
-  (row) => {
-    void loadPatternDrawerLogs(row)
-  },
+  (row) => { void loadPatternDrawerLogs(row) },
 )
+
+const completeDialogRef = ref<{ fileInputRef: HTMLInputElement | null } | null>(null)
+
+function overrideTriggerUpload() {
+  completeDialogRef.value?.fileInputRef?.click()
+}
 
 onMounted(() => {
   void loadOptions()

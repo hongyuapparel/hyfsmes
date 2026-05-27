@@ -32,6 +32,7 @@ import { OrderMutationService } from './order-mutation.service';
 import { OrderStatusService } from './order-status.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
 import { OrderReconcileScheduler } from './order-reconcile.scheduler';
+import { OrderCostSnapshotService } from './order-cost-snapshot.service';
 
 @Module({
   imports: [
@@ -67,10 +68,11 @@ import { OrderReconcileScheduler } from './order-reconcile.scheduler';
     OrdersService,
     OrderQueryService,
     OrderMutationService,
+    OrderCostSnapshotService,
     OrderStatusService,
     OrderLifecycleService,
     OrderReconcileScheduler,
   ],
-  exports: [OrdersService, OrderQueryService, OrderMutationService, OrderStatusService, OrderLifecycleService],
+  exports: [OrdersService, OrderQueryService, OrderMutationService, OrderCostSnapshotService, OrderStatusService, OrderLifecycleService],
 })
 export class OrdersModule {}

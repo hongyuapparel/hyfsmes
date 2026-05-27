@@ -1,13 +1,12 @@
 <template>
-  <el-drawer
+  <AppDrawer
     :model-value="visible"
     title="供应商详情"
-    :size="`${width}px`"
-    destroy-on-close
-    class="supplier-detail-drawer"
+    :size="860"
+    :min-size="680"
+    :resizable="true"
     @update:model-value="(value) => emit('update:visible', value)"
   >
-    <div class="detail-drawer-resizer" title="拖拽调整宽度" @mousedown="emit('start-resize', $event)" />
     <div v-loading="loading" class="supplier-detail-wrap">
       <template v-if="data">
         <div class="supplier-detail-grid">
@@ -60,16 +59,16 @@
         </div>
       </template>
     </div>
-  </el-drawer>
+  </AppDrawer>
 </template>
 
 <script setup lang="ts">
+import AppDrawer from '@/components/AppDrawer.vue'
 import { formatDateTime } from '@/utils/date-format'
 import type { SupplierItem, SupplierRecentRecordItem } from '@/api/suppliers'
 
 defineProps<{
   visible: boolean
-  width: number
   loading: boolean
   data: SupplierItem | null
   recentRecords: SupplierRecentRecordItem[]
@@ -79,7 +78,6 @@ defineProps<{
 
 const emit = defineEmits<{
   (event: 'update:visible', value: boolean): void
-  (event: 'start-resize', value: MouseEvent): void
 }>()
 </script>
 
@@ -129,19 +127,5 @@ const emit = defineEmits<{
   font-size: 13px;
   font-weight: 600;
   margin-bottom: 8px;
-}
-
-.detail-drawer-resizer {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 10px;
-  height: 100%;
-  z-index: 10;
-  cursor: ew-resize;
-}
-
-.detail-drawer-resizer:hover {
-  background: rgba(64, 158, 255, 0.12);
 }
 </style>

@@ -63,13 +63,14 @@
 import { computed, ref, watch } from 'vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { useIsMobile } from '@/composables/useIsMobile'
+import type { ProductSkuOption } from '@/api/products'
 
 const { isMobile } = useIsMobile()
 
 const props = defineProps<{
   modelValue: boolean
   loading: boolean
-  items: any[]
+  items: ProductSkuOption[]
   total: number
   page: number
   pageSize: number
@@ -77,7 +78,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
-  (e: 'select', item: any): void
+  (e: 'select', item: ProductSkuOption): void
   (e: 'keyword-change', keyword: string): void
   (e: 'page-change', page: number): void
   (e: 'page-size-change', size: number): void

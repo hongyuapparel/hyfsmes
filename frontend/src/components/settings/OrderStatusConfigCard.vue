@@ -139,9 +139,10 @@
 
 <script setup lang="ts">
 import { watch, toRaw } from 'vue'
-import { TRIGGER_ACTION_OPTIONS } from '@/composables/useOrderSettingsStatus'
+import type { ShallowUnwrapRef } from 'vue'
+import { TRIGGER_ACTION_OPTIONS, useOrderSettingsStatus } from '@/composables/useOrderSettingsStatus'
 
-const props = defineProps<{ active: boolean; state: any }>()
+const props = defineProps<{ active: boolean; state: ShallowUnwrapRef<ReturnType<typeof useOrderSettingsStatus>> }>()
 const state = props.state
 const chainTableRef = toRaw(state).chainTableRef
 

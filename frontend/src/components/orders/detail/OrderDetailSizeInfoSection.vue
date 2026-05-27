@@ -2,33 +2,30 @@
   <section v-if="hasSizeInfo" class="block">
     <div class="block-title">D 尺寸信息</div>
     <div class="block-body">
-      <el-table
-        :data="sizeInfoRowsForView"
-        border
-        size="small"
-        class="compact-table table-full size-table"
-      >
-        <el-table-column
-          v-for="(header, index) in sizeMetaHeadersForView"
-          :key="'meta-' + index"
-          :label="header"
-          :min-width="sizeMetaColWidth"
-        >
-          <template #default="{ row }">
-            <span>{{ formatDisplayNumber(row.metaValues[index]) }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column
-          v-for="(header, index) in sizeHeadersForView"
-          :key="'size-' + index"
-          :label="header"
-          :min-width="sizeValueColWidth"
-        >
-          <template #default="{ row }">
-            <span>{{ formatDisplayNumber(row.sizeValues[index]) }}</span>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 原生表格 + table-layout:auto：列按内容自适应，能放下则单行，
+           放不下则压缩换行铺满，屏幕与打印都不裁切、不横向滚动。 -->
+      <table class="detail-grid-table is-centered">
+        <thead>
+          <tr>
+            <th v-for="(header, index) in sizeMetaHeadersForView" :key="'meta-' + index">
+              {{ header }}
+            </th>
+            <th v-for="(header, index) in sizeHeadersForView" :key="'size-' + index">
+              {{ header }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, rowIndex) in sizeInfoRowsForView" :key="rowIndex">
+            <td v-for="(header, index) in sizeMetaHeadersForView" :key="'meta-' + index">
+              {{ formatDisplayNumber(row.metaValues[index]) }}
+            </td>
+            <td v-for="(header, index) in sizeHeadersForView" :key="'size-' + index">
+              {{ formatDisplayNumber(row.sizeValues[index]) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 </template>
@@ -46,8 +43,6 @@ defineProps<{
   sizeInfoRowsForView: SizeInfoRow[]
   sizeMetaHeadersForView: string[]
   sizeHeadersForView: string[]
-  sizeMetaColWidth: number
-  sizeValueColWidth: number
 }>()
 </script>
 
@@ -66,19 +61,5 @@ defineProps<{
   border: 1px solid #dcdfe6;
   border-radius: 2px;
   padding: 6px 8px;
-}
-
-.table-full {
-  width: 100%;
-}
-
-.compact-table :deep(.el-table__cell) {
-  padding: 1px 1px;
-  font-size: 12px;
-  color: #303133;
-}
-
-.size-table :deep(.el-table__cell) {
-  font-size: 12px;
 }
 </style>

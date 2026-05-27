@@ -165,9 +165,10 @@
 
 <script setup lang="ts">
 import { Delete } from '@element-plus/icons-vue'
+import type { MaterialRow } from '@/composables/useOrderMaterials'
 
 defineProps<{
-  materials: any[]
+  materials: MaterialRow[]
   materialSourceOptions: Array<{ id: number; label: string }>
   materialTypeOptions: Array<{ id: number; label: string }>
   supplierOptions: Array<{ id: number; name: string }>
@@ -176,11 +177,11 @@ defineProps<{
   onMaterialCellKeydown: (event: KeyboardEvent, rowIndex: number, colIndex: number) => void
   addMaterialRow: () => void
   removeMaterialRow: (index: number) => void
-  recalcPurchaseQuantity: (row: any) => void
-  onSupplierChange: (row: any) => void
-  onMaterialTypeChange: (row: any) => void
-  onMaterialSupplierVisibleChange: (visible: boolean, row: any) => void
-  searchMaterialSuppliers: (keyword: string, row: any) => void
+  recalcPurchaseQuantity: (row: MaterialRow) => void
+  onSupplierChange: (row: MaterialRow) => void
+  onMaterialTypeChange: (row: MaterialRow) => void
+  onMaterialSupplierVisibleChange: (visible: boolean, row: MaterialRow) => void
+  searchMaterialSuppliers: (keyword: string, row: MaterialRow) => void
 }>()
 </script>
 

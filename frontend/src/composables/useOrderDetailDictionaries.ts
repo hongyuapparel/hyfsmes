@@ -25,12 +25,12 @@ export function useOrderDetailDictionaries() {
 
       const collabVals = collabRes.data ?? []
       collaborationItems.value = Array.isArray(collabVals)
-        ? collabVals.map((item: any) => ({ id: item.id, value: item.value }))
+        ? collabVals.map((item) => ({ id: item.id, value: item.value }))
         : []
 
       const materialVals = materialTypeRes.data ?? []
       materialTypeItems.value = Array.isArray(materialVals)
-        ? materialVals.map((item: any) => ({ id: item.id, value: item.value }))
+        ? materialVals.map((item) => ({ id: item.id, value: item.value }))
         : []
     } catch (e: unknown) {
       if (!isErrorHandled(e)) {

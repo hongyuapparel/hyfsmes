@@ -43,34 +43,29 @@
           <section v-if="hasColorSize" class="block block-color-qty">
             <div class="block-title">B 颜色 / 数量</div>
             <div class="block-body">
-              <el-table
-                :data="colorSizeRowsForView"
-                border
-                size="small"
-                class="compact-table table-full"
-              >
-                <el-table-column prop="colorName" label="颜色" min-width="80" />
-                <el-table-column
-                  v-for="(header, index) in colorSizeHeadersForView"
-                  :key="header + index"
-                  :label="header"
-                  min-width="60"
-                >
-                  <template #default="{ row }">
-                    <span>{{ formatDisplayNumber(row.quantities[index]) }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column label="合计" min-width="60">
-                  <template #default="{ row }">
-                    <span>{{ formatDisplayNumber(row.total) }}</span>
-                  </template>
-                </el-table-column>
-                <el-table-column v-if="hasColorRemark" label="备注" min-width="100">
-                  <template #default="{ row }">
-                    <span>{{ row.remark }}</span>
-                  </template>
-                </el-table-column>
-              </el-table>
+              <!-- 原生表格自适应列宽：保证 “合计” 等所有列都显示，不裁切。 -->
+              <table class="detail-grid-table is-centered">
+                <thead>
+                  <tr>
+                    <th>颜色</th>
+                    <th v-for="(header, index) in colorSizeHeadersForView" :key="header + index">
+                      {{ header }}
+                    </th>
+                    <th>合计</th>
+                    <th v-if="hasColorRemark">备注</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, rowIndex) in colorSizeRowsForView" :key="rowIndex">
+                    <td>{{ row.colorName }}</td>
+                    <td v-for="(header, index) in colorSizeHeadersForView" :key="header + index">
+                      {{ formatDisplayNumber(row.quantities[index]) }}
+                    </td>
+                    <td>{{ formatDisplayNumber(row.total) }}</td>
+                    <td v-if="hasColorRemark">{{ row.remark }}</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </section>
         </div>
@@ -88,32 +83,28 @@
         :size-info-rows-for-view="sizeInfoRowsForView"
         :size-meta-headers-for-view="sizeMetaHeadersForView"
         :size-headers-for-view="sizeHeadersForView"
-        :size-meta-col-width="sizeMetaColWidth"
-        :size-value-col-width="sizeValueColWidth"
       />
 
       <section v-if="hasProcessItems" class="block">
         <div class="block-title">E 工艺项目</div>
         <div class="block-body">
-          <el-table
-            :data="processItemsForView"
-            border
-            size="small"
-            class="compact-table table-full process-table-view"
-          >
-            <el-table-column
-              v-for="col in processColumns"
-              :key="`process-col-${col.key}`"
-              :prop="col.key"
-              :label="col.label"
-              :min-width="col.minWidth"
-              :show-overflow-tooltip="col.showOverflowTooltip"
-            >
-              <template #default="{ row }">
-                {{ formatDetailProcessCell(row, col.key) }}
-              </template>
-            </el-table-column>
-          </el-table>
+          <!-- 原生表格自适应；备注多行用 is-prewrap 保留换行。 -->
+          <table class="detail-grid-table is-centered is-prewrap">
+            <thead>
+              <tr>
+                <th v-for="col in processColumns" :key="`process-col-${col.key}`">
+                  {{ col.label }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="(row, rowIndex) in processItemsForView" :key="rowIndex">
+                <td v-for="col in processColumns" :key="`process-col-${col.key}`">
+                  {{ formatDetailProcessCell(row, col.key) }}
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </section>
 
@@ -200,8 +191,6 @@ const {
   materialColumns,
   sizeMetaHeadersForView,
   sizeHeadersForView,
-  sizeMetaColWidth,
-  sizeValueColWidth,
   sizeInfoRowsForView,
   hasSizeInfo,
   processItemsForView,

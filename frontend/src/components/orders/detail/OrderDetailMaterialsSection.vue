@@ -2,25 +2,23 @@
   <section v-if="hasMaterials" class="block block-materials">
     <div class="block-title">C 物料信息</div>
     <div class="block-body">
-      <el-table
-        :data="materialsForView"
-        border
-        size="small"
-        class="compact-table table-full materials-table"
-      >
-        <el-table-column
-          v-for="col in materialColumns"
-          :key="`material-col-${col.key}`"
-          :prop="col.key"
-          :label="col.label"
-          :min-width="col.minWidth"
-          :show-overflow-tooltip="col.showOverflowTooltip"
-        >
-          <template #default="{ row }">
-            {{ formatDetailMaterialCell(row, col.key) }}
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 原生表格 + table-layout:auto：列按内容自适应，与 B/D 表一致。 -->
+      <table class="detail-grid-table is-centered">
+        <thead>
+          <tr>
+            <th v-for="col in materialColumns" :key="`material-col-${col.key}`">
+              {{ col.label }}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(row, rowIndex) in materialsForView" :key="rowIndex">
+            <td v-for="col in materialColumns" :key="`material-col-${col.key}`">
+              {{ formatDetailMaterialCell(row, col.key) }}
+            </td>
+          </tr>
+        </tbody>
+      </table>
     </div>
   </section>
 </template>
@@ -56,19 +54,5 @@ defineProps<{
   border: 1px solid #dcdfe6;
   border-radius: 2px;
   padding: 6px 8px;
-}
-
-.table-full {
-  width: 100%;
-}
-
-.compact-table :deep(.el-table__cell) {
-  padding: 1px 1px;
-  font-size: 12px;
-  color: #303133;
-}
-
-.materials-table :deep(.el-table__body .el-table__cell) {
-  word-break: break-word;
 }
 </style>

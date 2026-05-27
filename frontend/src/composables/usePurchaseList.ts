@@ -118,7 +118,7 @@ export function usePurchaseList() {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
-        restoreColumnWidths((purchaseTableHostRef.value as any)?.purchaseTableRef)
+        restoreColumnWidths(purchaseTableHostRef.value?.purchaseTableRef as Parameters<typeof restoreColumnWidths>[0])
       }
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))

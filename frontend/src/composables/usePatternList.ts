@@ -253,7 +253,7 @@ export function usePatternList() {
       ])
       orderTypeTree.value = Array.isArray(orderTypeRes.data) ? orderTypeRes.data : []
       const items = collabRes.data ?? []
-      collaborationOptions.value = (Array.isArray(items) ? items : []).map((item: any) => ({
+      collaborationOptions.value = (Array.isArray(items) ? items : []).map((item) => ({
         id: item.id,
         label: item.value,
       }))
