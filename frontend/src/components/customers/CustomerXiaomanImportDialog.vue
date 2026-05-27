@@ -45,9 +45,9 @@
             class-name="selection-column"
             header-class-name="selection-column"
           />
-          <el-table-column prop="serial_id" label="客户编号" min-width="120" show-overflow-tooltip />
-          <el-table-column prop="name" label="公司名称" min-width="160" show-overflow-tooltip />
-          <el-table-column prop="contactPerson" label="联系人" min-width="120" show-overflow-tooltip>
+          <el-table-column prop="serial_id" label="客户编号" :min-width="isMobile ? 84 : 120" show-overflow-tooltip />
+          <el-table-column prop="name" label="公司名称" :min-width="isMobile ? 110 : 160" show-overflow-tooltip />
+          <el-table-column prop="contactPerson" label="联系人" :min-width="isMobile ? 84 : 120" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.contactPerson || '-' }}
             </template>
@@ -85,7 +85,10 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useIsMobile } from '@/composables/useIsMobile'
 import type { XiaomanCompanyItem, XiaomanImportRes } from '@/api/customers'
+
+const { isMobile } = useIsMobile()
 
 const props = defineProps<{
   visible: boolean
