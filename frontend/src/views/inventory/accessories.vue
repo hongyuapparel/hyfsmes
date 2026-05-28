@@ -147,10 +147,9 @@
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120" align="center" fixed="right">
+          <el-table-column label="操作" width="90" align="center" fixed="right">
             <template #default="{ row }">
-              <el-button link type="info" size="small" @click="openDetail(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
+              <el-button link type="info" size="small" @click="openForm(row, 'view')">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -177,7 +176,7 @@
       ref="accessoriesFormDialogRef"
       v-model:visible="formDialog.visible"
       :submitting="formDialog.submitting"
-      :is-edit="formDialog.isEdit"
+      :mode="formDialog.mode"
       :quick-add-source="quickAddSource"
       :form="form"
       :form-rules="formRules"
@@ -185,8 +184,12 @@
       :customer-options="customerOptions"
       :salesperson-options="salespersonOptions"
       :warehouse-options="warehouseOptions"
+      :logs="logs"
+      :logs-loading="formDialog.logsLoading"
+      :format-log-action="formatLogAction"
       @close="resetForm"
       @confirm="submitForm"
+      @edit="enterEdit"
     />
 
     <AccessoriesOutboundDialog
@@ -198,14 +201,6 @@
       :outbound-user-options="outboundUserOptions"
       @close="resetOutboundDialog"
       @confirm="submitOutbound"
-    />
-
-    <AccessoriesDetailDrawer
-      v-model:visible="detailDrawer.visible"
-      :row="detailDrawer.row"
-      :loading="detailDrawer.loading"
-      :logs="detailDrawer.logs"
-      :format-log-action="formatLogAction"
     />
   </div>
 </template>
@@ -225,11 +220,9 @@ import {
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { useAccessoriesDetailDrawer } from '@/composables/useAccessoriesDetailDrawer'
 import { useAccessoryInventoryOptions } from '@/composables/useAccessoryInventoryOptions'
 import { useAccessoriesFormDialog, type AccessoriesFormDialogExpose } from '@/composables/useAccessoriesFormDialog'
 import { useAccessoriesOutboundDialog, type AccessoriesOutboundDialogExpose } from '@/composables/useAccessoriesOutboundDialog'
-import AccessoriesDetailDrawer from '@/components/inventory/AccessoriesDetailDrawer.vue'
 import AccessoriesFormDrawer from '@/components/inventory/AccessoriesFormDrawer.vue'
 import AccessoriesOutboundDialog from '@/components/inventory/AccessoriesOutboundDialog.vue'
 import AccessoriesOutboundTab from '@/components/inventory/AccessoriesOutboundTab.vue'
@@ -259,13 +252,8 @@ const {
   customerOptions, salespersonOptions, categoryOptions, warehouseOptions, loadCustomerOptions, loadSalespersonOptions,
   loadCategoryOptions, loadWarehouseOptions, formatWarehouseLabel, getMainImageUrl,
 } = useAccessoryInventoryOptions()
-const { detailDrawer, formatLogAction, openDetail } = useAccessoriesDetailDrawer()
-
-const { formDialog, quickAddSource, form, formRules, openForm, resetForm, submitForm } = useAccessoriesFormDialog(
-  selectedRows,
-  load,
-  accessoriesFormDialogRef,
-)
+const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, resetForm, submitForm, formatLogAction } =
+  useAccessoriesFormDialog(selectedRows, load, accessoriesFormDialogRef)
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
 

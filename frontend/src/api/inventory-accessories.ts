@@ -75,6 +75,9 @@ export function updateAccessory(
     name?: string
     category?: string
     quantity?: number
+    isSized?: boolean
+    sizeHeaders?: string[]
+    sizeQuantities?: number[]
     unit?: string
     warehouseId?: number | null
     location?: string

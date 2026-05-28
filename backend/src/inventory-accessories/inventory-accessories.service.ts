@@ -184,6 +184,11 @@ export class InventoryAccessoriesService {
         existing.sizeQuantities = merged.quantities;
         existing.quantity = merged.total;
       } else {
+        if (isSized) {
+          throw new BadRequestException(
+            '已存在同名「非分码」辅料，无法按分码新增；请在该辅料「编辑」里开启分码，或换一个名称',
+          );
+        }
         existing.quantity = (Number(existing.quantity) || 0) + qty;
       }
       if (!existing.category && dto.category) existing.category = dto.category.trim();
@@ -238,6 +243,9 @@ export class InventoryAccessoriesService {
       name?: string;
       category?: string;
       quantity?: number;
+      isSized?: boolean;
+      sizeHeaders?: string[];
+      sizeQuantities?: number[];
       unit?: string;
       warehouseId?: number | null;
       location?: string;
@@ -252,6 +260,22 @@ export class InventoryAccessoriesService {
     const item = await this.repo.findOne({ where: { id } });
     if (!item) throw new NotFoundException('辅料记录不存在');
     const before = toAccessorySnapshot(item);
+    if (dto.isSized !== undefined) {
+      if (dto.isSized) {
+        const matrix = normalizeSizeMatrix(dto.sizeHeaders, dto.sizeQuantities);
+        if (!matrix || !matrix.headers.length) {
+          throw new BadRequestException('请填写分码尺码明细');
+        }
+        item.isSized = true;
+        item.sizeHeaders = matrix.headers;
+        item.sizeQuantities = matrix.quantities;
+        item.quantity = matrix.total;
+      } else {
+        item.isSized = false;
+        item.sizeHeaders = null;
+        item.sizeQuantities = null;
+      }
+    }
     if (dto.name !== undefined) {
       const nextName = this.normalizeName(dto.name);
       if (!nextName) throw new BadRequestException('辅料名称不能为空');
