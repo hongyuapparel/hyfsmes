@@ -166,6 +166,12 @@ export interface OrderFormPayload {
     supplierName?: string
     materialName?: string
     color?: string
+    /** 成分（如 100%棉），面料常用，辅料可空 */
+    composition?: string
+    /** 克重 / 规格（如 180g/m²），面料常用，辅料可空 */
+    weight?: string
+    /** 物料参考图（色卡 / 辅料图），由跟单在订单编辑上传 */
+    referenceImageUrl?: string
     fabricWidth?: string
     usagePerPiece?: number | null
     lossPercent?: number | null

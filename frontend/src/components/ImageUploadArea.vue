@@ -1,7 +1,7 @@
 <template>
   <div
     class="image-upload-area"
-    :class="{ 'is-dragover': isDragover, 'has-image': displayUrl }"
+    :class="{ 'is-dragover': isDragover, 'has-image': displayUrl, 'is-dense': props.dense }"
     @click="fileInputRef?.click()"
     @dragover.prevent="isDragover = true"
     @dragleave.prevent="isDragover = false"
@@ -42,12 +42,12 @@
       </div>
     </template>
     <template v-else>
-      <div class="placeholder" :class="{ 'placeholder-compact-icon': props.compact && props.compactIconOnly }">
-        <template v-if="props.compact && props.compactIconOnly">
+      <div class="placeholder" :class="{ 'placeholder-compact-icon': props.compact && props.compactIconOnly, 'placeholder-dense': props.dense }">
+        <template v-if="props.dense || (props.compact && props.compactIconOnly)">
           <el-icon class="placeholder-plus-icon"><Plus /></el-icon>
         </template>
-        <span v-if="uploading" class="uploading-text">上传中...</span>
-        <span v-else class="placeholder-text">
+        <span v-if="uploading && !props.dense" class="uploading-text">上传中...</span>
+        <span v-else-if="!props.dense" class="placeholder-text">
           {{ props.compact && props.compactIconOnly ? '点击上传' : '点击上传、拖拽图片到此处，或粘贴剪贴板图片' }}
         </span>
       </div>
@@ -69,10 +69,13 @@ const props = withDefaults(
     modelValue?: string
     compact?: boolean
     compactIconOnly?: boolean
+    /** 表格单元等紧凑场景：极小 min-height、隐藏文字、缩略图限高 */
+    dense?: boolean
   }>(),
   {
     compact: true,
     compactIconOnly: false,
+    dense: false,
   },
 )
 
@@ -311,5 +314,30 @@ onBeforeUnmount(() => {
 .compact-delete-btn:hover {
   color: #fff;
   background: rgba(239, 68, 68, 0.9);
+}
+
+/* 紧凑模式（表格单元）：跟随全站可编辑表格行高（--editable-grid-row-h，默认 34px） */
+.image-upload-area.is-dense {
+  min-height: var(--editable-grid-row-h, 34px);
+}
+
+.image-upload-area.is-dense .placeholder,
+.image-upload-area.is-dense .placeholder-dense {
+  padding: 4px;
+  gap: 0;
+}
+
+.image-upload-area.is-dense .placeholder-plus-icon {
+  font-size: 16px;
+}
+
+.image-upload-area.is-dense .preview-wrap {
+  padding: 2px;
+}
+
+.image-upload-area.is-dense .preview-img {
+  max-width: 100%;
+  max-height: calc(var(--editable-grid-row-h, 34px) - 4px);
+  aspect-ratio: auto;
 }
 </style>

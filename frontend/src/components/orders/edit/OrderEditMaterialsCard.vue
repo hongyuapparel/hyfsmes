@@ -7,7 +7,12 @@
       </div>
     </template>
     <el-table :data="materials" border size="small" class="materials-table editable-grid">
-      <el-table-column label="物料来源" min-width="120" header-align="center" align="center">
+      <el-table-column label="物料图" width="80" header-align="center" align="center">
+        <template #default="{ row }">
+          <ImageUploadArea v-model="row.referenceImageUrl" dense />
+        </template>
+      </el-table-column>
+      <el-table-column label="物料来源" min-width="90" header-align="center" align="center">
         <template #default="{ row, $index }">
           <el-select
             v-model="row.materialSourceId"
@@ -21,7 +26,7 @@
           </el-select>
         </template>
       </el-table-column>
-      <el-table-column label="物料类型" min-width="120" header-align="center" align="center">
+      <el-table-column label="物料类型" min-width="90" header-align="center" align="center">
         <template #default="{ row, $index }">
           <el-select
             v-model="row.materialTypeId"
@@ -78,6 +83,28 @@
           />
         </template>
       </el-table-column>
+      <el-table-column label="成分" min-width="120" header-align="center" align="center">
+        <template #default="{ row, $index }">
+          <el-input
+            v-model="row.composition"
+            placeholder="如 100%棉"
+            :input-style="{ textAlign: 'center' }"
+            :ref="(el) => setMaterialCellRef(el, $index, 5)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
+          />
+        </template>
+      </el-table-column>
+      <el-table-column label="克重" min-width="90" header-align="center" align="center">
+        <template #default="{ row, $index }">
+          <el-input
+            v-model="row.weight"
+            placeholder="如 180g/m²"
+            :input-style="{ textAlign: 'center' }"
+            :ref="(el) => setMaterialCellRef(el, $index, 6)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
+          />
+        </template>
+      </el-table-column>
       <el-table-column label="单件用量" width="100" header-align="center" align="center">
         <template #default="{ row, $index }">
           <el-input-number
@@ -87,8 +114,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
-            :ref="(el) => setMaterialCellRef(el, $index, 5)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
+            :ref="(el) => setMaterialCellRef(el, $index, 7)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
           />
         </template>
       </el-table-column>
@@ -100,8 +127,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
-            :ref="(el) => setMaterialCellRef(el, $index, 6)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
+            :ref="(el) => setMaterialCellRef(el, $index, 8)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
           />
         </template>
       </el-table-column>
@@ -113,8 +140,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
-            :ref="(el) => setMaterialCellRef(el, $index, 7)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
+            :ref="(el) => setMaterialCellRef(el, $index, 9)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 9)"
           />
         </template>
       </el-table-column>
@@ -127,8 +154,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             :readonly="true"
-            :ref="(el) => setMaterialCellRef(el, $index, 8)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
+            :ref="(el) => setMaterialCellRef(el, $index, 10)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 10)"
           />
         </template>
       </el-table-column>
@@ -136,14 +163,14 @@
         <template #default="{ row, $index }">
           <el-input
             v-model="row.remark"
-            placeholder="面料成分 / 克重等"
+            placeholder="其他说明"
             :input-style="{ textAlign: 'center' }"
-            :ref="(el) => setMaterialCellRef(el, $index, 9)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 9)"
+            :ref="(el) => setMaterialCellRef(el, $index, 11)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 11)"
           />
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="80" fixed="right" header-align="center" align="center">
+      <el-table-column label="操作" width="56" fixed="right" header-align="center" align="center">
         <template #default="{ $index }">
           <el-tooltip content="删除" placement="top">
             <el-button
@@ -166,6 +193,7 @@
 <script setup lang="ts">
 import { Delete } from '@element-plus/icons-vue'
 import type { MaterialRow } from '@/composables/useOrderMaterials'
+import ImageUploadArea from '@/components/ImageUploadArea.vue'
 
 defineProps<{
   materials: MaterialRow[]

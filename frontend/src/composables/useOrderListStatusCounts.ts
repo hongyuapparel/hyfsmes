@@ -16,11 +16,12 @@ interface OrderListFilterStateLike {
 interface UseOrderListStatusCountsParams {
   filter: OrderListFilterStateLike
   orderDateRange: Ref<[string, string] | null>
+  customerDueRange: Ref<[string, string] | null>
   completedRange: Ref<[string, string] | null>
 }
 
 export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams) {
-  const { filter, orderDateRange, completedRange } = params
+  const { filter, orderDateRange, customerDueRange, completedRange } = params
 
   const statusCounts = ref<Record<string, number>>({})
   const statusTotal = ref<number>(0)
@@ -43,6 +44,10 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
       q.orderDateEnd = orderDateRange.value[1]
+    }
+    if (customerDueRange.value && customerDueRange.value.length === 2) {
+      q.customerDueStart = customerDueRange.value[0]
+      q.customerDueEnd = customerDueRange.value[1]
     }
     if (completedRange.value && completedRange.value.length === 2) {
       q.completedStart = completedRange.value[0]

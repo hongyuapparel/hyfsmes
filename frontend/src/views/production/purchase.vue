@@ -197,6 +197,20 @@
             <el-descriptions-item label="颜色">
               {{ (purchaseBriefDrawer.row.color ?? '').trim() || '—' }}
             </el-descriptions-item>
+            <el-descriptions-item label="成分">
+              {{ (purchaseBriefDrawer.row.composition ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="克重">
+              {{ (purchaseBriefDrawer.row.weight ?? '').trim() || '—' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="物料图">
+              <AppImageThumb
+                v-if="purchaseBriefDrawer.row.referenceImageUrl"
+                :raw-url="purchaseBriefDrawer.row.referenceImageUrl"
+                variant="compact"
+              />
+              <span v-else>—</span>
+            </el-descriptions-item>
             <el-descriptions-item label="供应商">
               {{ (purchaseBriefDrawer.row.supplierName ?? '').trim() || '—' }}
             </el-descriptions-item>

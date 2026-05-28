@@ -28,6 +28,17 @@
           <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
+      <el-table-column label="物料图" :width="compactImageColumnMinWidth" align="center">
+        <template #default="{ row }">
+          <AppImageThumb
+            v-if="row.referenceImageUrl"
+            :raw-url="row.referenceImageUrl"
+            :width="compactImageSize"
+            :height="compactImageSize"
+          />
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="采购物料" min-width="150" show-overflow-tooltip>
         <template #default="{ row }">
           <div class="material-cell">
@@ -41,6 +52,18 @@
       <el-table-column label="供应商" min-width="110" show-overflow-tooltip>
         <template #default="{ row }">
           <span :class="{ 'text-muted': isMissingSupplier(row) }">{{ displaySupplier(row) }}</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="成分" min-width="100" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.composition">{{ row.composition }}</span>
+          <span v-else class="text-muted">-</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="克重" min-width="80" show-overflow-tooltip>
+        <template #default="{ row }">
+          <span v-if="row.weight">{{ row.weight }}</span>
+          <span v-else class="text-muted">-</span>
         </template>
       </el-table-column>
       <el-table-column label="计划用量" width="96" align="center">
