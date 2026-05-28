@@ -21,6 +21,7 @@
     <OrderListFilterBar
       v-model:filters="filters"
       v-model:order-date-range="orderDateRange"
+      v-model:customer-due-range="customerDueRange"
       v-model:completed-range="completedRange"
       v-model:order-no-label-visible="orderNoLabelVisible"
       v-model:sku-code-label-visible="skuCodeLabelVisible"
@@ -167,6 +168,7 @@ const {
   pagination,
   currentStatus,
   orderDateRange,
+  customerDueRange,
   completedRange,
   orderNoLabelVisible,
   skuCodeLabelVisible,
@@ -188,6 +190,7 @@ const {
 } = useOrderListStatusCounts({
   filter,
   orderDateRange,
+  customerDueRange,
   completedRange,
 })
 
@@ -274,6 +277,7 @@ const {
   storageKey: ORDERS_LIST_FILTER_STATE_KEY,
   filter,
   orderDateRange,
+  customerDueRange,
   completedRange,
   currentStatus,
   pagination,

@@ -16,6 +16,12 @@ export interface PurchaseItemRow {
   materialType?: string | null
   materialName: string
   color?: string | null
+  /** 成分（如 100%棉），跟单在订单编辑录入 */
+  composition?: string
+  /** 克重 / 规格（如 180g/m²），跟单在订单编辑录入 */
+  weight?: string
+  /** 物料参考图（色卡 / 辅料图），跟单在订单编辑上传 */
+  referenceImageUrl?: string | null
   planQuantity: number | null
   actualPurchaseQuantity: number | null
   purchaseAmount: string | null

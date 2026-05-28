@@ -14,6 +14,7 @@ interface OrderListFilterStateLike {
 interface OrdersListFilterState {
   filter: OrderListFilterStateLike
   orderDateRange: [string, string] | null
+  customerDueRange: [string, string] | null
   completedRange: [string, string] | null
   currentStatus: string
   page: number
@@ -26,6 +27,7 @@ interface UseOrderListFilterStateParams {
   storageKey: string
   filter: OrderListFilterStateLike
   orderDateRange: Ref<[string, string] | null>
+  customerDueRange: Ref<[string, string] | null>
   completedRange: Ref<[string, string] | null>
   currentStatus: Ref<string>
   pagination: { page: number; pageSize: number }
@@ -38,6 +40,7 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
     storageKey,
     filter,
     orderDateRange,
+    customerDueRange,
     completedRange,
     currentStatus,
     pagination,
@@ -58,6 +61,7 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
         factory: filter.factory,
       },
       orderDateRange: orderDateRange.value ? [...orderDateRange.value] as [string, string] : null,
+      customerDueRange: customerDueRange.value ? [...customerDueRange.value] as [string, string] : null,
       completedRange: completedRange.value ? [...completedRange.value] as [string, string] : null,
       currentStatus: currentStatus.value,
       page: pagination.page,
@@ -91,6 +95,9 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
       filter.factory = typeof f.factory === 'string' ? f.factory : ''
       orderDateRange.value = Array.isArray(parsed.orderDateRange) && parsed.orderDateRange.length === 2
         ? [parsed.orderDateRange[0], parsed.orderDateRange[1]]
+        : null
+      customerDueRange.value = Array.isArray(parsed.customerDueRange) && parsed.customerDueRange.length === 2
+        ? [parsed.customerDueRange[0], parsed.customerDueRange[1]]
         : null
       completedRange.value = Array.isArray(parsed.completedRange) && parsed.completedRange.length === 2
         ? [parsed.completedRange[0], parsed.completedRange[1]]
@@ -134,6 +141,7 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
         () => filter.merchandiser,
         () => filter.factory,
         () => orderDateRange.value,
+        () => customerDueRange.value,
         () => completedRange.value,
         () => currentStatus.value,
         () => pagination.page,

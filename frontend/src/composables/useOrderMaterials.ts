@@ -13,6 +13,10 @@ export interface MaterialRow {
   supplierName?: string
   materialName?: string
   color?: string
+  composition?: string
+  weight?: string
+  /** 物料参考图（色卡 / 辅料图），由跟单在订单编辑上传 */
+  referenceImageUrl?: string
   fabricWidth?: string
   usagePerPiece?: number | null
   lossPercent?: number | null
@@ -57,7 +61,7 @@ export function useOrderMaterials() {
 
   function onMaterialCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
     const rowsCount = materials.value.length
-    const colsCount = 10
+    const colsCount = 12
     let targetRow = rowIndex
     let targetCol = colIndex
 

@@ -176,6 +176,31 @@
     </div>
     <div
       class="filter-bar-item filter-date-box"
+      :class="{ 'is-active': customerDueRange }"
+      :style="getAdaptiveRangeStyle(customerDueRange, '客户交期')"
+    >
+      <span
+        v-if="customerDueRange"
+        class="filter-date-label-text"
+        :style="{ color: ACTIVE_FILTER_COLOR }"
+      >客户交期：</span>
+      <el-date-picker
+        v-model="customerDueRange"
+        type="daterange"
+        :name="['customerDueStart', 'customerDueEnd']"
+        :range-separator="customerDueRange ? '~' : ''"
+        start-placeholder="客户交期"
+        end-placeholder=""
+        value-format="YYYY-MM-DD"
+        :shortcuts="rangeShortcuts"
+        unlink-panels
+        clearable
+        :class="['filter-range', { 'range-single': !customerDueRange }]"
+        @change="onSearch()"
+      />
+    </div>
+    <div
+      class="filter-bar-item filter-date-box"
       :class="{ 'is-active': completedRange }"
       :style="getAdaptiveRangeStyle(completedRange, '完成时间')"
     >
@@ -291,6 +316,7 @@ interface OrderTypeTreeSelectNode {
 
 const filters = defineModel<OrderListFilters>('filters', { required: true })
 const orderDateRange = defineModel<[string, string] | null>('orderDateRange', { required: true })
+const customerDueRange = defineModel<[string, string] | null>('customerDueRange', { required: true })
 const completedRange = defineModel<[string, string] | null>('completedRange', { required: true })
 const orderNoLabelVisible = defineModel<boolean>('orderNoLabelVisible', { required: true })
 const skuCodeLabelVisible = defineModel<boolean>('skuCodeLabelVisible', { required: true })

@@ -14,7 +14,18 @@
         <tbody>
           <tr v-for="(row, rowIndex) in materialsForView" :key="rowIndex">
             <td v-for="col in materialColumns" :key="`material-col-${col.key}`">
-              {{ formatDetailMaterialCell(row, col.key) }}
+              <template v-if="col.key === 'referenceImageUrl'">
+                <AppImageThumb
+                  v-if="row[col.key]"
+                  :raw-url="String(row[col.key])"
+                  :width="32"
+                  :height="32"
+                />
+                <span v-else>—</span>
+              </template>
+              <template v-else>
+                {{ formatDetailMaterialCell(row, col.key) }}
+              </template>
             </td>
           </tr>
         </tbody>
@@ -24,6 +35,8 @@
 </template>
 
 <script setup lang="ts">
+import AppImageThumb from '@/components/AppImageThumb.vue'
+
 interface DynamicColumn {
   key: string
   label: string

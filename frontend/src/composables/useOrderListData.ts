@@ -24,6 +24,7 @@ const pagination = reactive({
 
 const currentStatus = ref<'all' | string>('all')
 const orderDateRange = ref<[string, string] | null>(null)
+const customerDueRange = ref<[string, string] | null>(null)
 const completedRange = ref<[string, string] | null>(null)
 const orderNoLabelVisible = ref(false)
 const skuCodeLabelVisible = ref(false)
@@ -48,6 +49,10 @@ function buildQuery(): OrderListQuery {
   if (orderDateRange.value && orderDateRange.value.length === 2) {
     q.orderDateStart = orderDateRange.value[0]
     q.orderDateEnd = orderDateRange.value[1]
+  }
+  if (customerDueRange.value && customerDueRange.value.length === 2) {
+    q.customerDueStart = customerDueRange.value[0]
+    q.customerDueEnd = customerDueRange.value[1]
   }
   if (completedRange.value && completedRange.value.length === 2) {
     q.completedStart = completedRange.value[0]
@@ -106,6 +111,7 @@ function onReset(totalQuantity?: { value: number }) {
   filter.merchandiser = ''
   filter.factory = ''
   orderDateRange.value = null
+  customerDueRange.value = null
   completedRange.value = null
   currentStatus.value = 'all'
   pagination.page = 1
@@ -150,6 +156,7 @@ export function useOrderListData() {
     pagination,
     currentStatus,
     orderDateRange,
+    customerDueRange,
     completedRange,
     orderNoLabelVisible,
     skuCodeLabelVisible,
