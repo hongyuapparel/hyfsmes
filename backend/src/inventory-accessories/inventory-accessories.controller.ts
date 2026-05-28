@@ -62,6 +62,9 @@ export class InventoryAccessoriesController {
     @Body('name') name: string,
     @Body('category') category?: string,
     @Body('quantity') quantity?: number,
+    @Body('isSized') isSized?: boolean,
+    @Body('sizeHeaders') sizeHeaders?: string[],
+    @Body('sizeQuantities') sizeQuantities?: number[],
     @Body('unit') unit?: string,
     @Body('warehouseId') warehouseId?: number | null,
     @Body('location') location?: string,
@@ -72,7 +75,7 @@ export class InventoryAccessoriesController {
     @Body('salesperson') salesperson?: string,
     @CurrentUser() user?: { username?: string },
   ) {
-    return this.service.create({ name, category, quantity, unit, warehouseId, location, remark, imageUrl, imageUrls, customerName, salesperson, operatorUsername: user?.username ?? '' });
+    return this.service.create({ name, category, quantity, isSized, sizeHeaders, sizeQuantities, unit, warehouseId, location, remark, imageUrl, imageUrls, customerName, salesperson, operatorUsername: user?.username ?? '' });
   }
 
   @Put('items/:id')
@@ -81,6 +84,9 @@ export class InventoryAccessoriesController {
     @Body('name') name?: string,
     @Body('category') category?: string,
     @Body('quantity') quantity?: number,
+    @Body('isSized') isSized?: boolean,
+    @Body('sizeHeaders') sizeHeaders?: string[],
+    @Body('sizeQuantities') sizeQuantities?: number[],
     @Body('unit') unit?: string,
     @Body('warehouseId') warehouseId?: number | null,
     @Body('location') location?: string,
@@ -95,6 +101,9 @@ export class InventoryAccessoriesController {
       name,
       category,
       quantity,
+      isSized,
+      sizeHeaders,
+      sizeQuantities,
       unit,
       warehouseId,
       location,
@@ -147,6 +156,7 @@ export class InventoryAccessoriesController {
     @Body('accessoryId') accessoryId: number,
     @Body('quantity') quantity: number,
     @Body('remark') remark: string,
+    @Body('sizeOutbound') sizeOutbound: { headers: string[]; quantities: number[] } | undefined,
     @CurrentUser() user: { userId: number; username: string },
   ) {
     const uid = user?.userId ?? 0;
@@ -155,6 +165,7 @@ export class InventoryAccessoriesController {
       this.service.outbound({
         accessoryId: Number(accessoryId),
         quantity: Number(quantity),
+        sizeOutbound,
         outboundType: 'manual',
         operatorUsername,
         remark,

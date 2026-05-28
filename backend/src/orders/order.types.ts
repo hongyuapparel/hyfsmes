@@ -75,6 +75,22 @@ export interface OrderActor {
   username: string;
 }
 
+/** 审核扣减辅料后，被扣成负数（缺货）的明细 */
+export interface AccessoryShortageItem {
+  accessoryId: number;
+  accessoryName: string;
+  orderId: number;
+  orderNo: string;
+  /** 分码辅料为具体尺码；不分码为 null */
+  size: string | null;
+  /** 扣减后该项库存（负数） */
+  after: number;
+}
+
+export interface ReviewResult {
+  shortages: AccessoryShortageItem[];
+}
+
 export type OrderDetail = Order & {
   materials?: OrderMaterialRow[];
   colorSizeHeaders?: string[];

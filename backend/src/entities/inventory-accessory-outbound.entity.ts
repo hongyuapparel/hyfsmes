@@ -37,6 +37,10 @@ export class InventoryAccessoryOutbound {
   @Column({ type: 'int', default: 0 })
   quantity: number;
 
+  /** 分码辅料本次各码出库明细（不分码为 null） */
+  @Column({ name: 'size_outbound', type: 'json', nullable: true })
+  sizeOutbound: { headers: string[]; quantities: number[] } | null;
+
   /** 出库前库存 */
   @Column({ name: 'before_quantity', type: 'int', default: 0 })
   beforeQuantity: number;

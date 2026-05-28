@@ -12,7 +12,7 @@ import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
 import { OrderCostSnapshotService } from './order-cost-snapshot.service';
-import { type OrderActor, type OrderEditPayload } from './order.types';
+import { type OrderActor, type OrderEditPayload, type ReviewResult } from './order.types';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 
 @Injectable()
@@ -401,7 +401,7 @@ export class OrderMutationService {
     return this.orderLifecycleService.deleteMany(ids, actor);
   }
 
-  async reviewMany(ids: number[], actor: OrderActor): Promise<void> {
+  async reviewMany(ids: number[], actor: OrderActor): Promise<ReviewResult> {
     return this.orderLifecycleService.reviewMany(ids, actor);
   }
 

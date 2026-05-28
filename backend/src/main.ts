@@ -158,6 +158,41 @@ async function ensureInventoryOperationLogTables(dataSource: DataSource) {
   console.log('[Schema] Ensured inventory operation log tables');
 }
 
+async function ensureInventoryAccessorySizedColumns(dataSource: DataSource) {
+  const accessoryCols: Array<{ name: string; ddl: string }> = [
+    { name: 'is_sized', ddl: 'TINYINT(1) NOT NULL DEFAULT 0 AFTER quantity' },
+    { name: 'size_headers', ddl: 'JSON NULL AFTER is_sized' },
+    { name: 'size_quantities', ddl: 'JSON NULL AFTER size_headers' },
+  ];
+  for (const col of accessoryCols) {
+    const rows: Array<{ cnt: number }> = await dataSource.query(
+      `SELECT COUNT(*) AS cnt
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'inventory_accessory'
+         AND COLUMN_NAME = ?`,
+      [col.name],
+    );
+    if (Number(rows?.[0]?.cnt ?? 0) > 0) continue;
+    await dataSource.query(`ALTER TABLE inventory_accessory ADD COLUMN ${col.name} ${col.ddl}`);
+    console.log(`[Schema] Added inventory_accessory.${col.name}`);
+  }
+
+  const outboundRows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'inventory_accessory_outbound'
+       AND COLUMN_NAME = 'size_outbound'`,
+  );
+  if (Number(outboundRows?.[0]?.cnt ?? 0) <= 0) {
+    await dataSource.query(
+      `ALTER TABLE inventory_accessory_outbound ADD COLUMN size_outbound JSON NULL AFTER quantity`,
+    );
+    console.log('[Schema] Added inventory_accessory_outbound.size_outbound');
+  }
+}
+
 async function ensureOrderSoftDeleteColumns(dataSource: DataSource) {
   const columns: Array<{ name: string; ddl: string }> = [
     { name: 'deleted_at', ddl: 'DATETIME NULL AFTER image_url' },
@@ -228,6 +263,7 @@ async function bootstrap() {
     await ensureInventoryOperationLogTables(dataSource);
     await ensureOrderOperationLogTargetColumns(dataSource);
     await ensureOrderFinishingQtyRowColumns(dataSource);
+    await ensureInventoryAccessorySizedColumns(dataSource);
     await ensureOrderSoftDeleteColumns(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);

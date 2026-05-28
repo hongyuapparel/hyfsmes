@@ -1,6 +1,6 @@
 <template>
   <div class="page-card page-card--fill inventory-accessories-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
+    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs">
       <el-tab-pane label="库存" name="stock">
         <div class="tab-pane-scroll">
         <el-form class="filter-bar" @submit.prevent>
@@ -134,7 +134,9 @@
           <el-table-column prop="salesperson" label="业务员" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="category" label="类别" width="100" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column label="数量" width="90" align="center" header-align="center">
-            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
+            <template #default="{ row }">
+              <AccessoryQtyCell :value="Number(row.quantity) || 0" :detail="stockSizeDetail(row)" />
+            </template>
           </el-table-column>
           <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
           <el-table-column label="仓库" min-width="120" show-overflow-tooltip align="center" header-align="center">
@@ -145,10 +147,9 @@
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120" align="center" fixed="right">
+          <el-table-column label="操作" width="90" align="center" fixed="right">
             <template #default="{ row }">
-              <el-button link type="info" size="small" @click="openDetail(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
+              <el-button link type="info" size="small" @click="openForm(row, 'view')">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -166,121 +167,16 @@
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="出库记录" name="outbounds">
-        <div class="tab-pane-scroll">
-        <el-form class="filter-bar" @submit.prevent>
-          <el-input
-            v-model="outboundFilter.orderNo"
-            placeholder="订单号（自动出库）"
-            clearable
-            size="large"
-            class="filter-bar-item"
-            :style="getTextFilterStyle('订单号（自动出库）', outboundFilter.orderNo, false)"
-            :input-style="getFilterInputStyle(outboundFilter.orderNo)"
-            @keyup.enter="onOutboundSearch(true)"
-          />
-          <el-select
-            v-model="outboundFilter.outboundType"
-            placeholder="出库类型"
-            clearable
-            size="large"
-            class="filter-bar-item"
-            :style="getAdaptiveSelectStyle(outboundFilter.outboundType ? `出库类型：${outboundFilter.outboundType === 'order_auto' ? '订单自动出库' : '手动出库'}` : '', '出库类型')"
-            @change="onOutboundSearch(true)"
-          >
-            <template #label="{ label }">
-              <span v-if="outboundFilter.outboundType">出库类型：{{ label }}</span>
-              <span v-else>{{ label }}</span>
-            </template>
-            <el-option label="订单自动出库" value="order_auto" />
-            <el-option label="手动出库" value="manual" />
-          </el-select>
-          <div
-            class="filter-bar-item filter-date-box"
-            :class="{ 'is-active': outboundFilter.dateRange && outboundFilter.dateRange.length === 2 }"
-            :style="getFilterRangeStyle(outboundFilter.dateRange as [string, string] | [], '出库时间')"
-          >
-            <span v-if="outboundFilter.dateRange && outboundFilter.dateRange.length === 2" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">出库时间：</span>
-            <el-date-picker
-              v-model="outboundFilter.dateRange"
-              type="daterange"
-              :name="['accessoriesOutboundDateStart', 'accessoriesOutboundDateEnd']"
-              :range-separator="outboundFilter.dateRange && outboundFilter.dateRange.length === 2 ? '~' : ''"
-              start-placeholder="出库时间"
-              end-placeholder=""
-              unlink-panels
-              clearable
-              value-format="YYYY-MM-DD"
-              :shortcuts="rangeShortcuts"
-              size="large"
-              :class="['filter-range', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-              @change="onOutboundSearch(true)"
-            />
-          </div>
-          <div class="filter-bar-actions">
-            <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
-            <el-button size="large" @click="onOutboundReset">清空</el-button>
-          </div>
-        </el-form>
-
-        <div ref="accessoriesOutboundShellRef" class="list-page-table-shell">
-        <el-table
-          ref="accessoriesOutboundTableRef"
-          v-loading="outboundLoading2"
-          :data="outboundList"
-          border
-          stripe
-          class="accessories-table"
-          :height="accessoriesOutboundTableHeight"
-          :row-style="compactRowStyle"
-          :cell-style="compactCellStyle"
-          :header-cell-style="compactHeaderCellStyle"
-          @header-dragend="onAccessoriesOutboundHeaderDragEnd"
-        >
-          <el-table-column prop="createdAt" label="时间" width="160" align="center">
-            <template #default="{ row }">{{ row.createdAt }}</template>
-          </el-table-column>
-          <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
-            <template #default="{ row }">
-              <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" :width="compactImageSize" :height="compactImageSize" />
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="customerName" label="客户" min-width="120" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="category" label="类别" width="100" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="出库类型" width="110" align="center" header-align="center">
-            <template #default="{ row }">{{ row.outboundType === 'order_auto' ? '订单自动出库' : '手动出库' }}</template>
-          </el-table-column>
-          <el-table-column label="出库数量" width="100" align="center" header-align="center">
-            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
-          </el-table-column>
-          <el-table-column prop="beforeQuantity" label="出库前库存" width="110" align="center" header-align="center" />
-          <el-table-column prop="afterQuantity" label="出库后库存" width="110" align="center" header-align="center" />
-          <el-table-column prop="operatorUsername" label="操作人" width="120" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip align="center" header-align="center" />
-        </el-table>
-
-        </div>
-
-        <AppPaginationBar
-          v-model:current-page="outboundPagination.page"
-          v-model:page-size="outboundPagination.pageSize"
-          :total="outboundPagination.total"
-          :total-quantity="outboundTotalQuantity"
-          summary-label="出库数量"
-          @current-change="loadOutbounds"
-          @size-change="onOutboundPageSizeChange"
-        />
-        </div>
+      <el-tab-pane label="出库记录" name="outbounds" lazy>
+        <AccessoriesOutboundTab />
       </el-tab-pane>
     </el-tabs>
 
-    <AccessoriesFormDialog
+    <AccessoriesFormDrawer
       ref="accessoriesFormDialogRef"
       v-model:visible="formDialog.visible"
       :submitting="formDialog.submitting"
-      :is-edit="formDialog.isEdit"
+      :mode="formDialog.mode"
       :quick-add-source="quickAddSource"
       :form="form"
       :form-rules="formRules"
@@ -288,8 +184,12 @@
       :customer-options="customerOptions"
       :salesperson-options="salespersonOptions"
       :warehouse-options="warehouseOptions"
+      :logs="logs"
+      :logs-loading="formDialog.logsLoading"
+      :format-log-action="formatLogAction"
       @close="resetForm"
       @confirm="submitForm"
+      @edit="enterEdit"
     />
 
     <AccessoriesOutboundDialog
@@ -302,22 +202,13 @@
       @close="resetOutboundDialog"
       @confirm="submitOutbound"
     />
-
-    <AccessoriesDetailDrawer
-      v-model:visible="detailDrawer.visible"
-      :row="detailDrawer.row"
-      :loading="detailDrawer.loading"
-      :logs="detailDrawer.logs"
-      :format-log-action="formatLogAction"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { getAccessoriesList, getAccessoryOutboundRecords, type AccessoryItem, type AccessoryOutboundRecord } from '@/api/inventory'
+import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
@@ -328,15 +219,15 @@ import {
   getTextFilterStyle,
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
-import { useAccessoriesDetailDrawer } from '@/composables/useAccessoriesDetailDrawer'
+import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { useAccessoryInventoryOptions } from '@/composables/useAccessoryInventoryOptions'
 import { useAccessoriesFormDialog, type AccessoriesFormDialogExpose } from '@/composables/useAccessoriesFormDialog'
 import { useAccessoriesOutboundDialog, type AccessoriesOutboundDialogExpose } from '@/composables/useAccessoriesOutboundDialog'
-import AccessoriesDetailDrawer from '@/components/inventory/AccessoriesDetailDrawer.vue'
-import AccessoriesFormDialog from '@/components/inventory/AccessoriesFormDialog.vue'
+import AccessoriesFormDrawer from '@/components/inventory/AccessoriesFormDrawer.vue'
 import AccessoriesOutboundDialog from '@/components/inventory/AccessoriesOutboundDialog.vue'
+import AccessoriesOutboundTab from '@/components/inventory/AccessoriesOutboundTab.vue'
+import AccessoryQtyCell from '@/components/inventory/AccessoryQtyCell.vue'
 import { formatDateTime as formatDate } from '@/utils/date-format'
-import { formatDisplayNumber } from '@/utils/display-number'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
@@ -346,48 +237,34 @@ const inboundDateRange = ref<[string, string] | null>(null)
 const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
 const accessoriesStockTableRef = ref()
-const accessoriesOutboundTableRef = ref()
 const accessoriesStockShellRef = ref<HTMLElement | null>(null)
-const accessoriesOutboundShellRef = ref<HTMLElement | null>(null)
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<AccessoryItem[]>([])
-const outboundFilter = reactive<{ orderNo: string; outboundType: string; dateRange: [string, string] | [] }>({
-  orderNo: '',
-  outboundType: '',
-  dateRange: [],
-})
-const outboundList = ref<AccessoryOutboundRecord[]>([])
-const outboundLoading2 = ref(false)
-const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const accessoriesFormDialogRef = ref<AccessoriesFormDialogExpose>()
 const accessoriesOutboundDialogRef = ref<AccessoriesOutboundDialogExpose>()
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
 const { tableHeight: accessoriesStockTableHeight } = useFlexShellTableHeight(accessoriesStockShellRef)
-const { tableHeight: accessoriesOutboundTableHeight } = useFlexShellTableHeight(accessoriesOutboundShellRef)
 const { onHeaderDragEnd: onAccessoriesStockHeaderDragEnd, restoreColumnWidths: restoreAccessoriesStockColumnWidths } =
   useTableColumnWidthPersist('inventory-accessories-stock')
-const {
-  onHeaderDragEnd: onAccessoriesOutboundHeaderDragEnd,
-  restoreColumnWidths: restoreAccessoriesOutboundColumnWidths,
-} = useTableColumnWidthPersist('inventory-accessories-outbounds')
 const {
   customerOptions, salespersonOptions, categoryOptions, warehouseOptions, loadCustomerOptions, loadSalespersonOptions,
   loadCategoryOptions, loadWarehouseOptions, formatWarehouseLabel, getMainImageUrl,
 } = useAccessoryInventoryOptions()
-const { detailDrawer, formatLogAction, openDetail } = useAccessoriesDetailDrawer()
-
-const { formDialog, quickAddSource, form, formRules, openForm, resetForm, submitForm } = useAccessoriesFormDialog(
-  selectedRows,
-  load,
-  accessoriesFormDialogRef,
-)
+const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, resetForm, submitForm, formatLogAction } =
+  useAccessoriesFormDialog(selectedRows, load, accessoriesFormDialogRef)
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
 
 const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
-const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+
+function stockSizeDetail(row: AccessoryItem): { headers: string[]; quantities: number[] } | null {
+  if (row.isSized && Array.isArray(row.sizeHeaders) && row.sizeHeaders.length) {
+    return { headers: row.sizeHeaders, quantities: Array.isArray(row.sizeQuantities) ? row.sizeQuantities : [] }
+  }
+  return null
+}
 
 async function load() {
   loading.value = true
@@ -414,13 +291,6 @@ async function load() {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
     loading.value = false
-  }
-}
-
-function onPageTabChange() {
-  if (pageTab.value === 'outbounds') {
-    outboundPagination.page = 1
-    loadOutbounds()
   }
 }
 
@@ -457,44 +327,6 @@ function onPageSizeChange() {
 
 function onSelectionChange(rows: AccessoryItem[]) {
   selectedRows.value = rows ?? []
-}
-
-async function loadOutbounds() {
-  outboundLoading2.value = true
-  try {
-    const res = await getAccessoryOutboundRecords({
-      orderNo: outboundFilter.orderNo || undefined,
-      outboundType: outboundFilter.outboundType || undefined,
-      page: outboundPagination.page,
-      pageSize: outboundPagination.pageSize,
-    })
-    const data = res.data
-    outboundList.value = data?.list ?? []
-    outboundPagination.total = data?.total ?? 0
-    restoreAccessoriesOutboundColumnWidths(accessoriesOutboundTableRef.value)
-  } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  } finally {
-    outboundLoading2.value = false
-  }
-}
-
-function onOutboundSearch(_byUser = false) {
-  outboundPagination.page = 1
-  loadOutbounds()
-}
-
-function onOutboundReset() {
-  outboundFilter.orderNo = ''
-  outboundFilter.outboundType = ''
-  outboundFilter.dateRange = []
-  outboundPagination.page = 1
-  loadOutbounds()
-}
-
-function onOutboundPageSizeChange() {
-  outboundPagination.page = 1
-  loadOutbounds()
 }
 
 onMounted(() => {

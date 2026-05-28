@@ -14,7 +14,7 @@
           />
         </el-select>
       </el-form-item>
-      <el-form-item label="出库数量" prop="quantity">
+      <el-form-item v-if="!form.isSized" label="出库数量" prop="quantity">
         <el-input-number
           v-model="form.quantity"
           :min="1"
@@ -24,6 +24,14 @@
           style="width: 100%"
         />
         <div class="outbound-qty-tip">当前库存：{{ form.maxQuantity }}</div>
+      </el-form-item>
+      <el-form-item v-else label="出库明细" prop="sizeQuantities">
+        <AccessorySizeMatrix
+          v-model:size-headers="form.sizeHeaders"
+          v-model:size-quantities="form.sizeQuantities"
+          headers-readonly
+        />
+        <div class="outbound-qty-tip">按尺码填本次出库数量，合计 {{ outboundTotal }}（当前库存 {{ form.maxQuantity }}）</div>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
         <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="备注（可选）" clearable />
@@ -40,6 +48,8 @@
 import { computed, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { AccessoryOutboundUserOption } from '@/api/inventory'
+import AccessorySizeMatrix from '@/components/inventory/AccessorySizeMatrix.vue'
+import { sumDetailRowQty } from '@/utils/finishedStockTableUtils'
 
 interface AccessoriesOutboundFormModel {
   accessoryId: number | null
@@ -47,6 +57,9 @@ interface AccessoriesOutboundFormModel {
   pickupUserId: number | null
   quantity: number
   maxQuantity: number
+  isSized: boolean
+  sizeHeaders: string[]
+  sizeQuantities: number[]
   remark: string
 }
 
@@ -70,6 +83,8 @@ const dialogVisible = computed({
   get: () => props.visible,
   set: (value: boolean) => emit('update:visible', value),
 })
+
+const outboundTotal = computed(() => sumDetailRowQty(props.form.sizeQuantities))
 
 function onClose() {
   emit('close')

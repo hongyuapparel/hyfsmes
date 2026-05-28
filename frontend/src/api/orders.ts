@@ -352,9 +352,23 @@ export function deleteOrders(ids: number[]) {
   return request.post<void>('/orders/batch-delete', { ids })
 }
 
+/** 审核扣减辅料后被扣成负数（缺货）的明细 */
+export interface AccessoryShortageItem {
+  accessoryId: number
+  accessoryName: string
+  orderId: number
+  orderNo: string
+  size: string | null
+  after: number
+}
+
+export interface ReviewOrdersResult {
+  shortages: AccessoryShortageItem[]
+}
+
 /** 待审单批量审核 */
 export function reviewOrders(ids: number[]) {
-  return request.post<void>('/orders/review', { ids })
+  return request.post<ReviewOrdersResult>('/orders/review', { ids })
 }
 
 /** 待审单批量审核退回为草稿，并写入退回原因备注 */

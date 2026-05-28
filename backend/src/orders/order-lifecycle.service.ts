@@ -8,8 +8,9 @@ import { User } from '../entities/user.entity';
 import { InventoryAccessoriesService } from '../inventory-accessories/inventory-accessories.service';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusService } from './order-status.service';
-import { type OrderActor } from './order.types';
+import { type AccessoryShortageItem, type OrderActor, type ReviewResult } from './order.types';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { normalizeSizeMatrix } from '../common/size-headers.util';
 
 @Injectable()
 export class OrderLifecycleService {
@@ -29,13 +30,13 @@ export class OrderLifecycleService {
     order: Order,
     actor: OrderActor,
     manager: EntityManager,
-  ): Promise<void> {
+  ): Promise<AccessoryShortageItem[]> {
     const orderExtRepo = manager.getRepository(OrderExt);
     const ext = await orderExtRepo.findOne({ where: { orderId: order.id } });
     const cells: PackagingCell[] = Array.isArray(ext?.packagingCells) ? ext.packagingCells : [];
-    if (!cells.length) return;
+    if (!cells.length) return [];
     const orderQty = Number(order.quantity) || 0;
-    if (orderQty <= 0) return;
+    if (orderQty <= 0) return [];
 
     const countById = new Map<number, number>();
     for (const cell of cells) {
@@ -43,20 +44,48 @@ export class OrderLifecycleService {
       if (!Number.isInteger(accessoryId) || accessoryId <= 0) continue;
       countById.set(accessoryId, (countById.get(accessoryId) ?? 0) + 1);
     }
-    if (!countById.size) return;
+    if (!countById.size) return [];
 
+    // 订单各码总量：B 区每个尺码跨颜色行求和后规范化
+    const headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
+    const rows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
+    const summedPerHeader = headers.map((_, i) =>
+      rows.reduce((sum, row) => sum + (Number(row?.quantities?.[i]) || 0), 0),
+    );
+    const orderMatrix = normalizeSizeMatrix(headers, summedPerHeader);
+    const hasSizeDetail = orderMatrix.headers.length > 0 && orderMatrix.total > 0;
+
+    const shortages: AccessoryShortageItem[] = [];
     for (const [accessoryId, times] of countById.entries()) {
       const quantity = orderQty * times;
-      await this.inventoryAccessoriesService.outboundInTransaction(manager, {
+      const sizeOutbound = hasSizeDetail
+        ? {
+            headers: orderMatrix.headers,
+            quantities: orderMatrix.quantities.map((q) => q * times),
+          }
+        : undefined;
+      const result = await this.inventoryAccessoriesService.outboundInTransaction(manager, {
         accessoryId,
         quantity,
+        sizeOutbound,
         outboundType: 'order_auto',
         operatorUsername: actor.username,
         remark: `订单自动出库：${order.orderNo}（${orderQty} * ${times}）`,
         orderId: order.id,
         orderNo: order.orderNo,
       });
+      for (const neg of result.negatives) {
+        shortages.push({
+          accessoryId,
+          accessoryName: result.accessory.name,
+          orderId: order.id,
+          orderNo: order.orderNo,
+          size: neg.size,
+          after: neg.after,
+        });
+      }
     }
+    return shortages;
   }
 
   async deleteMany(ids: number[], actor: OrderActor): Promise<void> {
@@ -88,18 +117,19 @@ export class OrderLifecycleService {
     }
   }
 
-  async reviewMany(ids: number[], actor: OrderActor): Promise<void> {
+  async reviewMany(ids: number[], actor: OrderActor): Promise<ReviewResult> {
     const orderIds = [...new Set((ids ?? []).filter((id) => Number.isInteger(id) && id > 0))];
-    if (!orderIds.length) return;
+    const shortages: AccessoryShortageItem[] = [];
+    if (!orderIds.length) return { shortages };
     for (const id of orderIds) {
-      await this.orderRepo.manager.transaction(async (manager) => {
+      const orderShortages = await this.orderRepo.manager.transaction(async (manager) => {
         const orderRepo = manager.getRepository(Order);
         const o = await orderRepo
           .createQueryBuilder('o')
           .setLock('pessimistic_write')
           .where('o.id = :id', { id })
           .getOne();
-        if (!o || o.status !== 'pending_review') return;
+        if (!o || o.status !== 'pending_review') return [];
         const before = o.status;
         const next = await this.orderWorkflowService.resolveNextStatus({
           order: o,
@@ -107,15 +137,17 @@ export class OrderLifecycleService {
           actorUserId: actor.userId,
         });
         const to = next ?? 'pending_purchase';
-        if (before === to) return;
+        if (before === to) return [];
         o.status = to;
         o.statusTime = new Date();
         const saved = await orderRepo.save(o);
         await this.orderStatusService.addLog(saved, actor, 'review', `审核订单：${before} -> ${to}`, manager);
         await this.orderStatusService.appendStatusHistory(saved.id, to, manager);
-        await this.autoOutboundAccessoriesByPackagingCells(saved, actor, manager);
+        return this.autoOutboundAccessoriesByPackagingCells(saved, actor, manager);
       });
+      shortages.push(...orderShortages);
     }
+    return { shortages };
   }
 
   async reviewRejectMany(ids: number[], reason: string, actor: OrderActor): Promise<void> {
