@@ -73,6 +73,10 @@
   --radius-lg: 8px;
   --radius-xl: 12px;
 
+  /* 可编辑表格（填写表格）统一行高 / 表头高度 */
+  --editable-grid-row-h: 34px;
+  --editable-grid-header-h: 36px;
+
   /* ========== 5. Element Plus 变量映射 ========== */
   --el-color-primary: var(--color-primary);
   --el-color-primary-light-3: #3d5c7f;
@@ -482,8 +486,6 @@ a:hover {
   border-radius: 6px !important;
 }
 .el-button {
-  padding: 0 var(--space-sm);
-  height: 40px;
   font-weight: var(--font-weight-medium);
   font-family: var(--font-family-ui);
   transition: all 0.2s ease-in-out;
@@ -575,6 +577,64 @@ a:hover {
   padding: var(--space-sm);
 }
 
+/* 可编辑表格（.editable-grid）：填写框无内框、铺满单元格（类 Excel），
+   平时无边框、靠表格线分隔，鼠标移上 / 聚焦时才整格高亮；行高统一 */
+/* 去掉 Element Plus .cell 包裹层默认的左右内边距（横向空间浪费的主因），让输入铺满 */
+.editable-grid .cell {
+  padding-left: 0;
+  padding-right: 0;
+}
+/* 统一行高：数据行 + 合计行（表尾）等高、垂直居中 */
+.editable-grid .el-table__body .el-table__cell,
+.editable-grid .el-table__footer .el-table__cell {
+  height: var(--editable-grid-row-h);
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+/* 统一表头高度 + 表头文字垂直居中 */
+.editable-grid .el-table__header .el-table__cell {
+  height: var(--editable-grid-header-h);
+  padding-top: 0;
+  padding-bottom: 0;
+  vertical-align: middle;
+}
+.editable-grid .el-input__wrapper,
+.editable-grid .el-select__wrapper,
+.editable-grid .el-textarea__inner {
+  box-shadow: none;
+  background-color: transparent;
+  border-radius: 0;
+}
+/* 统一行高基准 32px + 极小左右留白 */
+.editable-grid .el-input__wrapper,
+.editable-grid .el-select__wrapper {
+  padding-left: 4px;
+  padding-right: 4px;
+  min-height: 32px;
+}
+/* 内容左右居中（输入框文字、文本域、下拉选中项与占位） */
+.editable-grid .el-input__inner,
+.editable-grid .el-textarea__inner,
+.editable-grid .el-select__selected-item,
+.editable-grid .el-select__placeholder {
+  text-align: center;
+}
+.editable-grid .el-select__wrapper {
+  justify-content: center;
+}
+.editable-grid .el-input__wrapper:hover,
+.editable-grid .el-select__wrapper:hover,
+.editable-grid .el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--color-border) inset;
+}
+.editable-grid .el-input__wrapper.is-focus,
+.editable-grid .el-input.is-focus .el-input__wrapper,
+.editable-grid .el-select__wrapper.is-focused,
+.editable-grid .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--el-color-primary) inset;
+}
+
 /* ========== 10. 卡片样式 ========== */
 .card {
   background-color: var(--color-card);
@@ -642,11 +702,6 @@ a:hover {
   margin-left: auto;
 }
 
-.filter-bar-actions .el-button--large {
-  padding-left: 8px;
-  padding-right: 8px;
-}
-
 /* ── 日期选择器外包装盒（含字段标签 + picker）── */
 .filter-date-box {
   display: flex;
@@ -655,7 +710,7 @@ a:hover {
   box-shadow: 0 0 0 1px var(--el-border-color) inset;
   border-radius: var(--el-border-radius-base);
   padding: 0 8px;
-  height: 40px;
+  height: 32px;
   box-sizing: border-box;
   cursor: text;
   transition: box-shadow 0.2s;

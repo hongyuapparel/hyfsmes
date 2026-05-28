@@ -10,7 +10,6 @@
         v-model="filter.orderNo"
         placeholder="订单号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
         :input-style="getFilterInputStyle(filter.orderNo)"
@@ -30,7 +29,6 @@
         v-model="filter.skuCode"
         placeholder="SKU编号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
         :input-style="getFilterInputStyle(filter.skuCode)"
@@ -47,12 +45,11 @@
         </template>
       </el-input>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
+        <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
         <el-button
           v-if="pageTab === 'pending' && hasSelection"
           type="primary"
-          size="large"
           :loading="inboundLoading"
           @click="openInboundDialog"
         >
@@ -61,7 +58,6 @@
         <el-button
           v-if="pageTab === 'pending' && canOutboundSelection"
           type="warning"
-          size="large"
           :loading="outboundDialog.submitting"
           @click="openOutboundDialog"
         >

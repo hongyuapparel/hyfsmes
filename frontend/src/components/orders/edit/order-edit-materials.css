@@ -1,5 +1,5 @@
 .materials-table :deep(.el-table__cell) {
-  padding: 4px 6px;
+  padding: 0;
 }
 
 .materials-table :deep(.el-input),

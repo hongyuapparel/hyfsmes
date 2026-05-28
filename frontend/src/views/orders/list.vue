@@ -3,7 +3,7 @@
     <!-- 状态切换 + 新建订单 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
-        <el-radio-group v-model="currentStatus" size="large" @change="onStatusChange">
+        <el-radio-group v-model="currentStatus" @change="onStatusChange">
           <el-radio-button
             v-for="tab in STATUS_TABS"
             :key="tab.value"
@@ -14,7 +14,7 @@
         </el-radio-group>
       </div>
       <div class="status-tabs-right">
-        <el-button v-if="canEditOrders" type="primary" size="small" @click="onCreateOrder">新建订单</el-button>
+        <el-button v-if="canEditOrders" type="primary" @click="onCreateOrder">新建订单</el-button>
       </div>
     </div>
 

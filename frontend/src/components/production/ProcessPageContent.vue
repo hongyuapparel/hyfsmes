@@ -2,7 +2,7 @@
   <div class="page-card page-card--fill process-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
-        <el-radio-group v-model="currentTab" size="large" @change="onTabChange">
+        <el-radio-group v-model="currentTab" @change="onTabChange">
           <el-radio-button
             v-for="tab in CRAFT_TABS"
             :key="tab.value"
@@ -19,7 +19,6 @@
         v-model="filter.supplier"
         placeholder="供应商"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.supplier ? `供应商：${filter.supplier}` : '', '供应商')"
         :input-style="getFilterInputStyle(filter.supplier)"
@@ -34,7 +33,6 @@
         v-model="filter.processItem"
         placeholder="工艺项目"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.processItem ? `工艺项目：${filter.processItem}` : '', '工艺项目')"
         :input-style="getFilterInputStyle(filter.processItem)"
@@ -57,7 +55,6 @@
         :render-after-expand="false"
         node-key="value"
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`, '订单类型')"
         @change="onSearch"
@@ -72,7 +69,6 @@
         placeholder="合作方式"
         filterable
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.collaborationTypeId && `合作方式：${findCollaborationLabelById(filter.collaborationTypeId)}`, '合作方式')"
         @change="onSearch"
@@ -105,7 +101,6 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !orderDateRange }]"
           @change="onSearch"
         />
@@ -127,19 +122,17 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
+        <el-button type="primary" @click="onSearch">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
           v-if="hasSelection && canCompleteSelection && canCompleteProcessAction"
           type="primary"
-          size="large"
           :loading="completing"
           @click="onConfirmComplete"
         >

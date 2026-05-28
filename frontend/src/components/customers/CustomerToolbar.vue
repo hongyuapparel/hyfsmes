@@ -4,7 +4,6 @@
       v-model="companyNameModel"
       placeholder="公司名称或联系人"
       clearable
-      size="large"
       class="filter-bar-item"
       :style="getTextFilterStyle('名称/联系人：', companyNameModel, companyNameLabelVisible)"
       :input-style="getFilterInputStyle(companyNameModel)"
@@ -26,7 +25,6 @@
       placeholder="业务员"
       clearable
       filterable
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(salespersonModel ? `业务员：${salespersonModel}` : '', '业务员', 42)"
       @change="$emit('search', false)"
@@ -38,15 +36,14 @@
       <el-option v-for="sales in salespeople" :key="sales" :label="sales" :value="sales" />
     </el-select>
 
-    <el-button type="primary" size="large" @click="$emit('search', true)">搜索</el-button>
-    <el-button size="large" @click="$emit('reset')">清空</el-button>
+    <el-button type="primary" @click="$emit('search', true)">搜索</el-button>
+    <el-button @click="$emit('reset')">清空</el-button>
 
     <div class="filter-bar-actions">
-      <el-button type="primary" size="large" @click="$emit('create')">新建客户</el-button>
+      <el-button type="primary" @click="$emit('create')">新建客户</el-button>
       <el-tooltip v-if="selectedCount" content="删除" placement="top">
         <el-button
           type="danger"
-          size="large"
           circle
           aria-label="Delete selected customers"
           @click="$emit('batch-delete')"
@@ -54,7 +51,7 @@
           <el-icon><Delete /></el-icon>
         </el-button>
       </el-tooltip>
-      <el-button type="primary" plain size="large" @click="$emit('open-xiaoman')">
+      <el-button type="primary" plain @click="$emit('open-xiaoman')">
         从小满导入
       </el-button>
     </div>

@@ -41,6 +41,7 @@
 - 禁止：大段私有 CSS、`!important`、深层选择器、包裹遮盖原组件
 - 字号只用：`--font-size-title` / `--font-size-subtitle` / `--font-size-body` / `--font-size-caption`
 - `el-radio`/`el-radio-button` 必须显式用 `value`/`:value`，禁止用 `label` 充当选中值；改动后执行 `npm run check:el-radio-value`
+- 可编辑/填写型表格（单元格内放 `el-input`/`el-select`/`el-input-number`/textarea 等供录入的表）统一在 `<el-table>` 上加 `class="editable-grid"`，外观由 `design-system.css` 的全局 `.editable-grid` 规则提供：填写框无内框（铺满单元格、靠表格线分隔，hover/focus 才整格高亮）、表头/数据行/合计行等高（变量 `--editable-grid-header-h` / `--editable-grid-row-h`）、内容上下左右居中。新建此类表必须套 `editable-grid`，禁止各表自写单元格内边距/边框/对齐；要调密度改 `design-system.css` 变量一处即可。含图片列的表（如尺码矩阵）在该表局部把行高改回自适应，避免压坏图片
 
 ## 数据与字段
 

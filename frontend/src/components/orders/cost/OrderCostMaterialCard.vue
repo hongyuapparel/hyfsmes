@@ -10,7 +10,7 @@
       :data="rows"
       border
       size="small"
-      class="cost-table"
+      class="cost-table editable-grid"
       :span-method="spanMethod"
       :row-class-name="rowClassName"
     >

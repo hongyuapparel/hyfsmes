@@ -24,7 +24,7 @@
       :data="rows"
       border
       size="small"
-      class="cost-table production-cost-table"
+      class="cost-table production-cost-table editable-grid"
       :span-method="spanMethod"
       @selection-change="(rows) => $emit('selectionChange', rows)"
     >

@@ -8,7 +8,6 @@
             v-model="filter.name"
             placeholder="名称"
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getTextFilterStyle('名称：', filter.name, nameLabelVisible)"
             :input-style="getFilterInputStyle(filter.name)"
@@ -24,7 +23,6 @@
             placeholder="类别"
             filterable
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.category ? `类别：${filter.category}` : '', '类别')"
             @change="onSearch(true)"
@@ -40,7 +38,6 @@
             placeholder="客户"
             filterable
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.customerName ? `客户：${filter.customerName}` : '', '客户', 42)"
             @change="onSearch(true)"
@@ -56,7 +53,6 @@
             placeholder="业务员"
             filterable
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.salesperson ? `业务员：${filter.salesperson}` : '', '业务员', 42)"
             @change="onSearch(true)"
@@ -84,19 +80,17 @@
               :shortcuts="rangeShortcuts"
               unlink-panels
               clearable
-              size="large"
               :class="['filter-range', { 'range-single': !inboundDateRange }]"
               @change="onSearch(true)"
             />
           </div>
           <div class="filter-bar-actions">
-            <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-            <el-button size="large" @click="onReset">清空</el-button>
-            <el-button type="primary" size="large" @click="openForm(null)">新增辅料</el-button>
+            <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+            <el-button @click="onReset">清空</el-button>
+            <el-button type="primary" @click="openForm(null)">新增辅料</el-button>
             <el-button
               v-if="selectedRows.length"
               type="warning"
-              size="large"
               :disabled="selectedRows.length !== 1"
               @click="openOutboundDialog"
             >

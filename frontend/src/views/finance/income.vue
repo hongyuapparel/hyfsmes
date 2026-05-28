@@ -18,7 +18,6 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !hasDateRangeValue(filter.occurDateRange) }]"
           @change="onSearch"
           @clear="onDateRangeClear"
@@ -29,7 +28,6 @@
         placeholder="收入类型"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.incomeTypeId != null ? `收入类型：${options.incomeTypes.find(t => t.id === filter.incomeTypeId)?.name ?? ''}` : '', '收入类型')"
         @change="onSearch"
@@ -45,7 +43,6 @@
         placeholder="收款账户"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.fundAccountId != null ? `收款账户：${options.fundAccounts.find(a => a.id === filter.fundAccountId)?.name ?? ''}` : '', '收款账户')"
         @change="onSearch"
@@ -61,7 +58,6 @@
         placeholder="部门"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.departmentId != null ? `部门：${options.departments.find(d => d.id === filter.departmentId)?.value ?? ''}` : '', '部门')"
         @change="onSearch"
@@ -73,9 +69,9 @@
         <el-option v-for="d in options.departments" :key="d.id" :label="d.value" :value="d.id" />
       </el-select>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch">查询</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button type="primary" size="large" @click="openForm(null)">登记收入</el-button>
+        <el-button type="primary" @click="onSearch">查询</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button type="primary" @click="openForm(null)">登记收入</el-button>
       </div>
     </div>
 

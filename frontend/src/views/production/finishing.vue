@@ -2,7 +2,7 @@
   <div class="page-card page-card--fill finishing-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
-        <el-radio-group v-model="currentTab" size="large" @change="onTabChange">
+        <el-radio-group v-model="currentTab" @change="onTabChange">
           <el-radio-button
             v-for="tab in FINISHING_TABS"
             :key="tab.value"
@@ -19,7 +19,6 @@
         v-model="filter.orderNo"
         placeholder="订单号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
         :input-style="getFilterInputStyle(filter.orderNo)"
@@ -36,7 +35,6 @@
         v-model="filter.skuCode"
         placeholder="SKU编号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
         :input-style="getFilterInputStyle(filter.skuCode)"
@@ -66,19 +64,17 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
+        <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
           v-if="hasSelection && canRegisterReceiveSelection && canRegisterReceiveAction"
           type="primary"
-          size="large"
           @click="openReceiveDialog"
         >
           登记收货
@@ -86,7 +82,6 @@
         <el-button
           v-if="hasSelection && canPackagingCompleteSelection && canPackagingAction"
           type="primary"
-          size="large"
           @click="openPackagingCompleteDialog"
         >
           登记入库
@@ -94,7 +89,6 @@
         <el-button
           v-if="hasSelection && canAmendPackagingSelection && canPackagingAction"
           type="primary"
-          size="large"
           @click="openPackagingAmendDialog"
         >
           修改入库/次品

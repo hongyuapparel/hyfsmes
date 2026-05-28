@@ -8,7 +8,6 @@
             v-model="filter.name"
             placeholder="面料名称"
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getTextFilterStyle('名称：', filter.name, nameLabelVisible)"
             :input-style="getFilterInputStyle(filter.name)"
@@ -29,7 +28,6 @@
             placeholder="客户"
             filterable
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.customerName ? `客户：${filter.customerName}` : '', '客户', 42)"
             @change="onSearch(true)"
@@ -50,7 +48,6 @@
             placeholder="库存类型"
             filterable
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.inventoryTypeId ? `库存类型：${selectedInventoryTypeLabel}` : '', '库存类型', 42)"
             @change="onSearch(true)"
@@ -83,19 +80,17 @@
               :shortcuts="rangeShortcuts"
               unlink-panels
               clearable
-              size="large"
               :class="['filter-range', { 'range-single': !inboundDateRange }]"
               @change="onSearch(true)"
             />
           </div>
           <div class="filter-bar-actions">
-            <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-            <el-button size="large" @click="onReset">清空</el-button>
-            <el-button type="primary" size="large" @click="openForm(null)">新增面料</el-button>
+            <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+            <el-button @click="onReset">清空</el-button>
+            <el-button type="primary" @click="openForm(null)">新增面料</el-button>
             <el-button
               v-if="selectedRows.length"
               type="warning"
-              size="large"
               :disabled="selectedRows.length !== 1"
               @click="openOutboundDialog()"
             >
@@ -173,7 +168,6 @@
             v-model="outboundFilter.name"
             placeholder="面料名称"
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getTextFilterStyle('面料名称', outboundFilter.name, false)"
             :input-style="getFilterInputStyle(outboundFilter.name)"
@@ -184,7 +178,6 @@
             placeholder="客户"
             filterable
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(outboundFilter.customerName ? `客户：${outboundFilter.customerName}` : '', '客户', 42)"
             @change="onOutboundSearch(true)"
@@ -212,14 +205,13 @@
               clearable
               value-format="YYYY-MM-DD"
               :shortcuts="rangeShortcuts"
-              size="large"
               :class="['filter-range', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
               @change="onOutboundSearch(true)"
             />
           </div>
           <div class="filter-bar-actions">
-            <el-button type="primary" size="large" @click="onOutboundSearch(true)">搜索</el-button>
-            <el-button size="large" @click="onOutboundReset">清空</el-button>
+            <el-button type="primary" @click="onOutboundSearch(true)">搜索</el-button>
+            <el-button @click="onOutboundReset">清空</el-button>
           </div>
         </el-form>
 

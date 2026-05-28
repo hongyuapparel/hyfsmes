@@ -39,7 +39,6 @@
             v-model="filter.productName"
             placeholder="产品名称"
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getTextFilterStyle('产品名称：', filter.productName, productNameLabelVisible)"
             :input-style="getFilterInputStyle(filter.productName)"
@@ -54,7 +53,6 @@
             v-model="filter.companyName"
             placeholder="客户"
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getTextFilterStyle('客户：', filter.companyName, companyNameLabelVisible)"
             :input-style="getFilterInputStyle(filter.companyName)"
@@ -69,7 +67,6 @@
             v-model="filter.skuCode"
             placeholder="SKU编号"
             clearable
-            size="large"
             class="filter-bar-item"
             :style="getTextFilterStyle('SKU编号：', filter.skuCode, skuCodeLabelVisible)"
             :input-style="getFilterInputStyle(filter.skuCode)"
@@ -85,7 +82,6 @@
             placeholder="适用人群"
             clearable
             filterable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.applicablePeopleId ? `适用人群：${applicablePeopleOptions.find(o => o.id === filter.applicablePeopleId)?.value ?? ''}` : '', '适用人群')"
             @change="onFilterChange"
@@ -101,7 +97,6 @@
             placeholder="业务员"
             clearable
             filterable
-            size="large"
             class="filter-bar-item"
             :style="getAdaptiveSelectStyle(filter.salesperson ? `业务员：${filter.salesperson}` : '', '业务员')"
             @change="onFilterChange"
@@ -112,15 +107,14 @@
             </template>
             <el-option v-for="s in salespeople" :key="s" :label="s" :value="s" />
           </el-select>
-          <el-button type="primary" size="large" @click="onFilterChange(true)">搜索</el-button>
-          <el-button size="large" @click="resetFilter">清空</el-button>
+          <el-button type="primary" @click="onFilterChange(true)">搜索</el-button>
+          <el-button @click="resetFilter">清空</el-button>
           <div class="filter-bar-actions">
-            <el-button size="large" @click="openColumnConfig">列设置</el-button>
-            <el-button type="primary" size="large" @click="openCreate">新建SKU</el-button>
+            <el-button @click="openColumnConfig">列设置</el-button>
+            <el-button type="primary" @click="openCreate">新建SKU</el-button>
             <el-tooltip v-if="selectedIds.length" content="删除" placement="top">
               <el-button
                 type="danger"
-                size="large"
                 circle
                 aria-label="Delete selected SKUs"
                 @click="batchDelete"

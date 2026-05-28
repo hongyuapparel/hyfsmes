@@ -5,7 +5,6 @@
         v-model="filter.keyword"
         placeholder="按显示名/登录账号搜索"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getTextFilterStyle('关键字：', filter.keyword, keywordLabelVisible)"
         :input-style="getFilterInputStyle(filter.keyword)"
@@ -21,7 +20,6 @@
         placeholder="角色"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.role ? `角色：${roles.find(r => r.code === filter.role)?.name ?? ''}` : '', '角色')"
         @change="onSearch"
@@ -33,10 +31,10 @@
         </template>
         <el-option v-for="r in roles" :key="r.id" :label="r.name" :value="r.code" />
       </el-select>
-      <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
-      <el-button size="large" @click="onReset">清空</el-button>
+      <el-button type="primary" @click="onSearch">搜索</el-button>
+      <el-button @click="onReset">清空</el-button>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="openCreate">新增用户</el-button>
+        <el-button type="primary" @click="openCreate">新增用户</el-button>
       </div>
     </div>
 
@@ -166,11 +164,6 @@ onMounted(() => load(tableRef.value as TableRef))
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-:deep(.el-table .el-table__cell) {
-  padding-top: 10px;
-  padding-bottom: 10px;
 }
 
 :deep(.el-table .cell) {

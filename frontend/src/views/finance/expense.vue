@@ -18,7 +18,6 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !hasDateRangeValue(filter.occurDateRange) }]"
           @change="onSearch"
           @clear="onDateRangeClear"
@@ -29,7 +28,6 @@
         placeholder="支出类型"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.expenseTypeId != null ? `支出类型：${options.expenseTypes.find(t => t.id === filter.expenseTypeId)?.name ?? ''}` : '', '支出类型')"
         @change="onSearch"
@@ -45,7 +43,6 @@
         placeholder="支出账户"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.fundAccountId != null ? `支出账户：${options.fundAccounts.find(a => a.id === filter.fundAccountId)?.name ?? ''}` : '', '支出账户')"
         @change="onSearch"
@@ -60,7 +57,6 @@
         v-model="filter.payeeKeyword"
         placeholder="收款方"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.payeeKeyword ? `收款方：${filter.payeeKeyword}` : '', '收款方')"
         :input-style="getFilterInputStyle(filter.payeeKeyword)"
@@ -75,7 +71,6 @@
         v-model="filter.orderNo"
         placeholder="订单号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.orderNo ? `订单号：${filter.orderNo}` : '', '订单号')"
         :input-style="getFilterInputStyle(filter.orderNo)"
@@ -87,9 +82,9 @@
         </template>
       </el-input>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch">查询</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button type="primary" size="large" @click="openForm(null)">登记支出</el-button>
+        <el-button type="primary" @click="onSearch">查询</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button type="primary" @click="openForm(null)">登记支出</el-button>
       </div>
     </div>
 

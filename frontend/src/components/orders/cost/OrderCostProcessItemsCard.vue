@@ -6,7 +6,7 @@
         <el-button link type="primary" size="small" @click="$emit('add')">新增</el-button>
       </div>
     </template>
-    <el-table :data="rows" border size="small" class="cost-table">
+    <el-table :data="rows" border size="small" class="cost-table editable-grid">
       <el-table-column label="工艺项目" min-width="120">
         <template #default="{ row }">
           <el-tree-select

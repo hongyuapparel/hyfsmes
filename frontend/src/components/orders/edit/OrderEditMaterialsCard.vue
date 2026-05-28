@@ -6,7 +6,7 @@
         <el-button link type="primary" @click="addMaterialRow">新增物料</el-button>
       </div>
     </template>
-    <el-table :data="materials" border size="small" class="materials-table">
+    <el-table :data="materials" border size="small" class="materials-table editable-grid">
       <el-table-column label="物料来源" min-width="120" header-align="center" align="center">
         <template #default="{ row, $index }">
           <el-select

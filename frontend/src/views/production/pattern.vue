@@ -2,7 +2,7 @@
   <div class="page-card page-card--fill pattern-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
-        <el-radio-group v-model="currentTab" size="large" @change="onTabChange">
+        <el-radio-group v-model="currentTab" @change="onTabChange">
           <el-radio-button v-for="tab in PATTERN_TABS" :key="tab.value" :value="tab.value">
             {{ getTabLabel(tab) }}
           </el-radio-button>
@@ -15,7 +15,6 @@
         v-model="filter.orderNo"
         placeholder="订单号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
         :input-style="getFilterInputStyle(filter.orderNo)"
@@ -32,7 +31,6 @@
         v-model="filter.skuCode"
         placeholder="SKU编号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
         :input-style="getFilterInputStyle(filter.skuCode)"
@@ -50,7 +48,6 @@
         placeholder="纸样师"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.patternMaster ? `纸样师：${filter.patternMaster}` : '', '纸样师')"
         @change="onSearch"
@@ -66,7 +63,6 @@
         placeholder="车版师"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.sampleMaker ? `车版师：${filter.sampleMaker}` : '', '车版师')"
         @change="onSearch"
@@ -89,7 +85,6 @@
         :render-after-expand="false"
         node-key="value"
         :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`, '订单类型')"
         @change="onSearch"
@@ -104,7 +99,6 @@
         placeholder="合作方式"
         filterable
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.collaborationTypeId && `合作方式：${findCollaborationLabelById(filter.collaborationTypeId)}`, '合作方式')"
         @change="onSearch"
@@ -132,7 +126,6 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !orderDateRange }]"
           @change="onSearch"
         />
@@ -154,22 +147,20 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
-        <el-button v-if="hasSelection && canAssignPattern" type="primary" size="large" @click="openAssignDialog">
+        <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button :loading="exporting" @click="onExport">导出表格</el-button>
+        <el-button v-if="hasSelection && canAssignPattern" type="primary" @click="openAssignDialog">
           分配纸样师和车版师
         </el-button>
         <el-button
           v-if="hasSelection && canCompleteSelection && canCompletePattern"
           type="primary"
-          size="large"
           @click="openCompleteDialog"
         >
           确认完成

@@ -16,7 +16,7 @@
       row-key="__rowKey"
       border
       size="small"
-      class="size-info-table"
+      class="size-info-table editable-grid"
       header-align="center"
     >
       <el-table-column width="32" align="center" header-align="center">

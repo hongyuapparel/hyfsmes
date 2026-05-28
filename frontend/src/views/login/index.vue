@@ -13,7 +13,6 @@
           <el-input
             v-model="form.username"
             placeholder="用户名"
-            size="large"
             autocomplete="username"
           />
         </el-form-item>
@@ -22,14 +21,13 @@
             v-model="form.password"
             type="password"
             placeholder="密码"
-            size="large"
             show-password
             autocomplete="current-password"
             @keyup.enter="onSubmit"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" size="large" :loading="loading" style="width: 100%" @click="onSubmit">
+          <el-button type="primary" :loading="loading" style="width: 100%" @click="onSubmit">
             登录
           </el-button>
         </el-form-item>

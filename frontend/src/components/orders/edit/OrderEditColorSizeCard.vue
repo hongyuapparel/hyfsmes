@@ -16,6 +16,7 @@
       sum-text="合计"
       :summary-method="bSummaryMethod"
       header-align="center"
+      class="editable-grid"
     >
       <el-table-column label="颜色名称" min-width="120" align="center" header-align="center">
         <template #default="{ row, $index }">

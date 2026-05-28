@@ -6,7 +6,7 @@
         <el-button link type="primary" @click="addProcessRow">新增工艺</el-button>
       </div>
     </template>
-    <el-table :data="processItems" border class="process-items-table">
+    <el-table :data="processItems" border class="process-items-table editable-grid">
       <el-table-column label="工艺项目" min-width="160">
         <template #default="{ row }">
           <el-tree-select
@@ -44,7 +44,7 @@
             :autosize="{ minRows: 1, maxRows: 6 }"
             :input-style="processTextareaInputStyle"
             resize="none"
-            placeholder="如：前幅 / 后幅 / 袖子"
+            placeholder="如 前幅/后幅"
           />
         </template>
       </el-table-column>

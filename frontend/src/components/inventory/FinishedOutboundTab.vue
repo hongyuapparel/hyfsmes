@@ -5,7 +5,6 @@
         v-model="outboundFilter.orderNo"
         placeholder="订单号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(outboundFilter.orderNo ? `订单号：${outboundFilter.orderNo}` : '', '订单号')"
         :input-style="getFilterInputStyle(outboundFilter.orderNo)"
@@ -19,7 +18,6 @@
         v-model="outboundFilter.skuCode"
         placeholder="SKU编号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(outboundFilter.skuCode ? `SKU编号：${outboundFilter.skuCode}` : '', 'SKU编号')"
         :input-style="getFilterInputStyle(outboundFilter.skuCode)"
@@ -34,7 +32,6 @@
         placeholder="客户"
         filterable
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(outboundFilter.customerName ? `客户：${outboundFilter.customerName}` : '', '客户', 42)"
         @change="emit('search', true)"
@@ -62,14 +59,13 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !(dateRangeModel && dateRangeModel.length === 2) }]"
           @change="emit('search', true)"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="emit('search', true)">搜索</el-button>
-        <el-button size="large" @click="emit('reset')">清空</el-button>
+        <el-button type="primary" @click="emit('search', true)">搜索</el-button>
+        <el-button @click="emit('reset')">清空</el-button>
       </div>
     </div>
 

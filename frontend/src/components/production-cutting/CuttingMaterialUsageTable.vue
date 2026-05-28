@@ -10,7 +10,7 @@
       :data="modelValue"
       border
       size="small"
-      class="cutting-mat-usage__table"
+      class="cutting-mat-usage__table editable-grid"
       :max-height="tableMaxHeight"
       table-layout="fixed"
     >
@@ -211,6 +211,10 @@ function standardPerPiece(r: CuttingMaterialUsagePayloadRow): number | null {
 <style scoped>
 .cutting-mat-usage__table {
   width: 100%;
+}
+
+.cutting-mat-usage__table :deep(.el-table__cell) {
+  padding: 0;
 }
 
 .cutting-mat-usage__num {

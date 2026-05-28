@@ -2,7 +2,7 @@
   <div class="page-card page-card--fill sewing-page">
     <div class="status-tabs">
       <div class="status-tabs-left">
-        <el-radio-group v-model="currentTab" size="large" @change="onTabChange">
+        <el-radio-group v-model="currentTab" @change="onTabChange">
           <el-radio-button v-for="tab in SEWING_TABS" :key="tab.value" :value="tab.value">
             {{ getTabLabel(tab) }}
           </el-radio-button>
@@ -15,7 +15,6 @@
         v-model="filter.orderNo"
         placeholder="订单号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible)"
         :input-style="getFilterInputStyle(filter.orderNo)"
@@ -32,7 +31,6 @@
         v-model="filter.skuCode"
         placeholder="SKU编号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
         :input-style="getFilterInputStyle(filter.skuCode)"
@@ -62,27 +60,25 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button size="large" :loading="exporting" @click="onExport">导出表格</el-button>
-        <el-button v-if="hasSelection && canAssignSelection && canAssignSewingAction" type="primary" size="large" @click="openAssignDialog">
+        <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button :loading="exporting" @click="onExport">导出表格</el-button>
+        <el-button v-if="hasSelection && canAssignSelection && canAssignSewingAction" type="primary" @click="openAssignDialog">
           分单
         </el-button>
         <el-button
           v-if="hasSelection && canAssignCompletedSelection && canAssignSewingAction"
           type="primary"
-          size="large"
           @click="openAssignDialog"
         >
           补录分单
         </el-button>
-        <el-button v-if="hasSelection && canRegisterSelection && canCompleteSewingAction" type="primary" size="large" @click="openRegisterDialog">
+        <el-button v-if="hasSelection && canRegisterSelection && canCompleteSewingAction" type="primary" @click="openRegisterDialog">
           登记车缝完成
         </el-button>
       </div>

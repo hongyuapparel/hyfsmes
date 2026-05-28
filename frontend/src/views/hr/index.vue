@@ -5,7 +5,6 @@
         v-model="filter.name"
         placeholder="姓名"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getTextFilterStyle('姓名：', filter.name, nameLabelVisible)"
         :input-style="getFilterInputStyle(filter.name)"
@@ -23,7 +22,6 @@
         placeholder="部门"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         popper-class="hr-department-tree-popper"
         :data="departmentTreeOptions"
@@ -42,7 +40,6 @@
         v-model="filter.status"
         placeholder="状态"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.status ? `状态：${statusLabel(filter.status)}` : '', '状态')"
         @change="onSearch"
@@ -70,7 +67,6 @@
           end-placeholder=""
           unlink-panels
           clearable
-          size="large"
           :shortcuts="hrDateRangeShortcuts"
           :class="['filter-range', { 'range-single': !filter.entryDateRange }]"
           @change="onSearch(true)"
@@ -92,27 +88,25 @@
           end-placeholder=""
           unlink-panels
           clearable
-          size="large"
           :shortcuts="hrDateRangeShortcuts"
           :class="['filter-range', { 'range-single': !filter.leaveDateRange }]"
           @change="onSearch(true)"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
-        <el-button size="large" @click="onExport">导出</el-button>
+        <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
+        <el-button @click="onExport">导出</el-button>
         <el-button
           v-if="selectedIds.length"
           type="danger"
-          size="large"
           circle
           aria-label="Delete selected employees"
           @click="onBatchDelete"
         >
           <el-icon><Delete /></el-icon>
         </el-button>
-        <el-button type="primary" size="large" @click="drawerRef?.openForm(null)">新建人员</el-button>
+        <el-button type="primary" @click="drawerRef?.openForm(null)">新建人员</el-button>
       </div>
     </div>
 

@@ -3,7 +3,7 @@
     <el-table
       :data="rows"
       border
-      class="cutting-qty-matrix__table"
+      class="cutting-qty-matrix__table editable-grid"
       size="small"
       :max-height="matrixMaxHeight"
       table-layout="fixed"
@@ -104,6 +104,10 @@ function onCell(row: CuttingQtyRow, idx: number, v: number | undefined) {
 <style scoped>
 .cutting-qty-matrix__table {
   width: 100%;
+}
+
+.cutting-qty-matrix__table :deep(.el-table__cell) {
+  padding: 0;
 }
 
 .cutting-qty-matrix__input {

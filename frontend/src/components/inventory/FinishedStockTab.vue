@@ -5,7 +5,6 @@
         v-model="filter.skuCode"
         placeholder="SKU编号"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
         :input-style="getFilterInputStyle(filter.skuCode)"
@@ -21,7 +20,6 @@
         placeholder="客户"
         filterable
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.customerName ? `客户：${filter.customerName}` : '', '客户', 42)"
         @change="emit('search', true)"
@@ -37,7 +35,6 @@
         placeholder="库存类型"
         filterable
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.inventoryTypeId != null ? `库存类型：${findInventoryTypeLabelById(filter.inventoryTypeId)}` : '', '库存类型')"
         @change="emit('search', true)"
@@ -65,19 +62,18 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !inboundDateRangeModel }]"
           @change="emit('search', true)"
         />
       </div>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="emit('search', true)">搜索</el-button>
-        <el-button size="large" @click="emit('reset')">清空</el-button>
-        <el-button type="primary" size="large" @click="emit('open-create')">新增库存</el-button>
-        <el-button v-if="hasPendingSelection" type="primary" size="large" @click="emit('open-inbound')">
+        <el-button type="primary" @click="emit('search', true)">搜索</el-button>
+        <el-button @click="emit('reset')">清空</el-button>
+        <el-button type="primary" @click="emit('open-create')">新增库存</el-button>
+        <el-button v-if="hasPendingSelection" type="primary" @click="emit('open-inbound')">
           入库
         </el-button>
-        <el-button v-if="hasStoredSelection" type="warning" size="large" @click="emit('open-outbound')">
+        <el-button v-if="hasStoredSelection" type="warning" @click="emit('open-outbound')">
           出库
         </el-button>
       </div>

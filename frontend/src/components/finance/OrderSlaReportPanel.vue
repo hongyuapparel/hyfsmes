@@ -27,7 +27,6 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !filter.orderDateRange }]"
           @change="onSearch"
         />
@@ -49,7 +48,6 @@
           :shortcuts="rangeShortcuts"
           unlink-panels
           clearable
-          size="large"
           :class="['filter-range', { 'range-single': !filter.completedRange }]"
           @change="onSearch"
         />
@@ -58,7 +56,6 @@
         v-model="filter.statusId"
         placeholder="状态"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.statusId != null ? `状态：${statusOptions.find(s => s.id === filter.statusId)?.label ?? ''}` : '', '状态')"
         @change="onSearch"
@@ -73,7 +70,6 @@
         v-model="filter.collaborationTypeId"
         placeholder="合作方式"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.collaborationTypeId != null ? `合作方式：${collaborationOptions.find(o => o.id === filter.collaborationTypeId)?.value ?? ''}` : '', '合作方式')"
         @change="onSearch"
@@ -88,7 +84,6 @@
         v-model="filter.orderTypeId"
         placeholder="订单类型"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.orderTypeId != null ? `订单类型：${orderTypeOptions.find(o => o.id === filter.orderTypeId)?.value ?? ''}` : '', '订单类型')"
         @change="onSearch"
@@ -101,9 +96,9 @@
       </el-select>
 
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
-        <el-button size="large" :disabled="activeTab === 'sla' ? !list.length : !profitList.length" @click="onExport(false)">导出当前</el-button>
-        <el-button size="large" :disabled="currentSelectionCount === 0" @click="onExport(true)">导出选中</el-button>
+        <el-button type="primary" @click="onSearch">搜索</el-button>
+        <el-button :disabled="activeTab === 'sla' ? !list.length : !profitList.length" @click="onExport(false)">导出当前</el-button>
+        <el-button :disabled="currentSelectionCount === 0" @click="onExport(true)">导出选中</el-button>
       </div>
     </div>
 

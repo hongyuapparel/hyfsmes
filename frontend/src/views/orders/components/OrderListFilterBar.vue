@@ -4,7 +4,6 @@
       v-model="filters.orderNo"
       placeholder="订单号"
       clearable
-      size="large"
       class="filter-bar-item"
       :style="filters.orderNo ? getOrderNoFilterStyle(filters.orderNo, orderNoLabelVisible) : getAdaptiveWidthStyle('订单号', 56)"
       :input-style="getFilterInputStyle(filters.orderNo)"
@@ -24,7 +23,6 @@
       v-model="filters.skuCode"
       placeholder="SKU编号"
       clearable
-      size="large"
       class="filter-bar-item"
       :style="filters.skuCode ? getSkuCodeFilterStyle(filters.skuCode, skuCodeLabelVisible) : getAdaptiveWidthStyle('SKU编号', 56)"
       :input-style="getFilterInputStyle(filters.skuCode)"
@@ -45,7 +43,6 @@
       placeholder="客户"
       filterable
       clearable
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(filters.customer ? `客户：${filters.customer}` : '', '客户', 48)"
       @change="onSearch()"
@@ -73,7 +70,6 @@
       :render-after-expand="false"
       node-key="value"
       :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(filters.orderTypeId && `订单类型：${findOrderTypeLabelById(filters.orderTypeId)}`, '订单类型')"
       @change="onSearch()"
@@ -99,7 +95,6 @@
       default-expand-all
       :render-after-expand="false"
       :props="{ label: 'label', value: 'value', children: 'children' }"
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(filters.processItem && `工艺项目：${getProcessItemDisplayLabel(filters.processItem)}`, '工艺项目')"
       @change="onSearch()"
@@ -119,7 +114,6 @@
       placeholder="业务员"
       filterable
       clearable
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(filters.salesperson ? `业务员：${filters.salesperson}` : '', '业务员', 42)"
       @change="onSearch()"
@@ -140,7 +134,6 @@
       placeholder="跟单员"
       filterable
       clearable
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(filters.merchandiser ? `跟单员：${filters.merchandiser}` : '', '跟单员', 42)"
       @change="onSearch()"
@@ -177,7 +170,6 @@
         :shortcuts="rangeShortcuts"
         unlink-panels
         clearable
-        size="large"
         :class="['filter-range', { 'range-single': !orderDateRange }]"
         @change="onSearch()"
       />
@@ -203,7 +195,6 @@
         :shortcuts="rangeShortcuts"
         unlink-panels
         clearable
-        size="large"
         :class="['filter-range', { 'range-single': !completedRange }]"
         @change="onSearch()"
       />
@@ -213,7 +204,6 @@
       placeholder="加工供应商"
       filterable
       clearable
-      size="large"
       class="filter-bar-item"
       :style="getAdaptiveSelectStyle(filters.factory && `加工供应商：${filters.factory}`, '加工供应商')"
       @change="onSearch()"
@@ -231,12 +221,11 @@
     </el-select>
 
     <div class="filter-bar-actions">
-      <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-      <el-button size="large" @click="onReset">清空</el-button>
+      <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+      <el-button @click="onReset">清空</el-button>
       <el-button
         v-if="canDeleteOrders && hasSelection && canDeleteSelectedByStatus"
         type="danger"
-        size="large"
         @click="onBatchDelete"
       >
         删除
@@ -244,7 +233,6 @@
       <el-button
         v-if="canEditOrders && hasSelection"
         type="warning"
-        size="large"
         @click="onBatchCopyToDraft"
       >
         复制为草稿
@@ -252,7 +240,6 @@
       <el-button
         v-if="canReviewOrders && isPendingReviewTab && hasSelection && canReviewSelectedByStatus"
         type="success"
-        size="large"
         @click="openReviewDialog"
       >
         审单

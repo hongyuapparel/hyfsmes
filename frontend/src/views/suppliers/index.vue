@@ -5,7 +5,6 @@
         v-model="filter.name"
         placeholder="供应商名称"
         clearable
-        size="large"
         class="filter-bar-item"
         :style="getTextFilterStyle('供应商名称：', filter.name, nameLabelVisible)"
         :input-style="getFilterInputStyle(filter.name)"
@@ -21,7 +20,6 @@
         placeholder="供应商类型"
         clearable
         filterable
-        size="large"
         class="filter-bar-item"
         :style="getAdaptiveSelectStyle(filter.supplierTypeId != null ? `供应商类型：${findSupplierTypeLabelById(filter.supplierTypeId)}` : '', '供应商类型')"
         @change="onSearch"
@@ -33,19 +31,18 @@
         <el-option v-for="option in supplierTypeOptions" :key="option.id" :label="option.label" :value="option.id" />
       </el-select>
       <div class="filter-bar-actions">
-        <el-button type="primary" size="large" @click="onSearch(true)">搜索</el-button>
-        <el-button size="large" @click="onReset">清空</el-button>
+        <el-button type="primary" @click="onSearch(true)">搜索</el-button>
+        <el-button @click="onReset">清空</el-button>
         <el-button
           v-if="selectedIds.length"
           type="danger"
-          size="large"
           circle
           aria-label="Delete selected suppliers"
           @click="onBatchDelete"
         >
           <el-icon><Delete /></el-icon>
         </el-button>
-        <el-button type="primary" size="large" @click="openForm(null)">新建供应商</el-button>
+        <el-button type="primary" @click="openForm(null)">新建供应商</el-button>
       </div>
     </div>
 
