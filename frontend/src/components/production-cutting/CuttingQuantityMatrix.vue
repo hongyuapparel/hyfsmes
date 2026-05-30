@@ -16,20 +16,24 @@
         min-width="88"
         align="center"
       >
-        <template #default="{ row }">
+        <template #default="{ row, $index }">
           <span v-if="readonly" class="cutting-qty-matrix__cell-text">{{
             formatDisplayNumber(row.quantities[idx] ?? 0)
           }}</span>
-          <el-input-number
-            v-else
-            :model-value="row.quantities[idx] ?? 0"
-            :min="0"
-            :precision="0"
-            :controls="false"
-            size="small"
-            class="cutting-qty-matrix__input"
-            @update:model-value="(v: number | undefined) => onCell(row, idx, v)"
-          />
+          <span v-else :data-cell-r="$index" :data-cell-c="idx" class="cutting-qty-matrix__cell">
+            <el-input-number
+              :model-value="row.quantities[idx] ?? 0"
+              :min="0"
+              :max="getCellMax ? getCellMax($index, idx) : undefined"
+              :precision="0"
+              :controls="false"
+              size="small"
+              class="cutting-qty-matrix__input"
+              @update:model-value="(v: number | undefined) => onCell(row, idx, v)"
+              @keydown="onMatrixCellKeydown"
+              @focus="selectAllOnFocus"
+            />
+          </span>
         </template>
       </el-table-column>
       <el-table-column label="合计" width="80" align="right">
@@ -45,7 +49,7 @@
       </el-table-column>
     </el-table>
     <div class="cutting-qty-matrix__footer">
-      实际裁剪数量合计：<strong>{{ formatDisplayNumber(grandTotal) }}</strong>
+      {{ footerLabel }}：<strong>{{ formatDisplayNumber(grandTotal) }}</strong>
     </div>
   </div>
 </template>
@@ -53,6 +57,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { onMatrixCellKeydown, selectAllOnFocus } from '@/utils/matrix-cell-nav'
 
 export interface CuttingQtyRow {
   colorName: string
@@ -66,8 +71,12 @@ const props = withDefaults(
     modelValue: CuttingQtyRow[]
     matrixMaxHeight?: number
     readonly?: boolean
+    /** 脚注合计文案，默认"实际裁剪数量合计"；其他环节复用时传入对应文案 */
+    footerLabel?: string
+    /** 每格上限（如车缝/入库不可超过裁床数）：传 (rowIdx, colIdx) => max | undefined */
+    getCellMax?: (rowIdx: number, colIdx: number) => number | undefined
   }>(),
-  { readonly: false },
+  { readonly: false, footerLabel: '实际裁剪数量合计' },
 )
 
 const emit = defineEmits<{

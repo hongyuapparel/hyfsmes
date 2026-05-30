@@ -56,7 +56,7 @@ export function getFinishingItems(params?: FinishingListQuery) {
   return request.get<FinishingListRes>('/production/finishing/items', { params })
 }
 
-/** 登记包装完成弹窗用：订单/裁床/车缝按尺码（只读） */
+/** 登记包装完成弹窗用：订单/裁床/车缝按尺码（只读）+ 按颜色×尺码二维 */
 export interface FinishingRegisterFormDataRes {
   headers: string[]
   orderRow: (number | null)[]
@@ -67,6 +67,14 @@ export interface FinishingRegisterFormDataRes {
   tailInboundRow: (number | null)[] | null
   /** 已登记次品按尺码（与 headers 对齐，无明细时为 null） */
   defectRow: (number | null)[] | null
+  /** 不含合计列的尺码 headers，用于二维矩阵 */
+  sizeHeaders: string[]
+  planColorRows: Array<{ colorName: string; quantities: number[] }>
+  cutColorRows: Array<{ colorName: string; quantities: number[] }>
+  sewingColorRows: Array<{ colorName: string; quantities: number[] }>
+  tailReceivedColorRows: Array<{ colorName: string; quantities: number[] }>
+  tailInboundColorRows: Array<{ colorName: string; quantities: number[] }>
+  defectColorRows: Array<{ colorName: string; quantities: number[] }>
 }
 
 export function getFinishingRegisterFormData(orderId: number) {
@@ -83,11 +91,12 @@ export function exportFinishingItems(params?: Omit<FinishingListQuery, 'page' | 
   })
 }
 
-/** 待尾部：登记收货（仅收货数量） */
+/** 待尾部：登记收货（仅收货数量；按颜色×尺码为真值） */
 export function registerFinishingReceive(payload: {
   orderId: number
   tailReceivedQty: number
   tailReceivedQuantities?: number[]
+  tailReceivedQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
 }) {
   return request.post<void>('/production/finishing/items/register-receive', payload)
 }
@@ -100,9 +109,12 @@ export interface RegisterFinishingPackagingCompletePayload {
   tailInboundQty: number
   defectQuantity: number
   remark?: string
-  /** 与登记弹窗尺码列一致（不含合计列），有 DB 列时后端会持久化 */
+  /** 一维尺码兜底（旧客户端） */
   tailInboundQuantities?: number[]
   defectQuantities?: number[]
+  /** 按颜色×尺码真值（多色订单必填） */
+  tailInboundQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
+  defectQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
 }
 
 export function registerFinishingPackagingComplete(payload: RegisterFinishingPackagingCompletePayload) {

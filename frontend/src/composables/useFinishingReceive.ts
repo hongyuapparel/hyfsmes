@@ -7,10 +7,31 @@ import {
 } from '@/api/production-finishing'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
+interface ColorRow {
+  colorName: string
+  quantities: number[]
+}
+
 interface UseFinishingReceiveParams {
   selectedRows: Ref<FinishingListItem[]>
   reloadList: () => Promise<void>
   reloadTabCounts: () => Promise<void>
+}
+
+function emptyColorRows(planColors: string[], sizeLen: number): ColorRow[] {
+  return planColors.map((name) => ({
+    colorName: name,
+    quantities: Array(sizeLen).fill(0),
+  }))
+}
+
+function sumColorRowsTotal(rows: ColorRow[]): number {
+  let s = 0
+  for (const r of rows) {
+    const q = Array.isArray(r?.quantities) ? r.quantities : []
+    for (const n of q) s += Math.max(0, Math.trunc(Number(n) || 0))
+  }
+  return s
 }
 
 export function useFinishingReceive(params: UseFinishingReceiveParams) {
@@ -22,20 +43,28 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
     formLoading: boolean
     row: FinishingListItem | null
     headers: string[]
+    sizeHeaders: string[]
     orderRow: (number | null)[]
     cutRow: (number | null)[]
     sewingRow: (number | null)[]
-    tailReceivedQuantities: number[]
+    planColorRows: ColorRow[]
+    cutColorRows: ColorRow[]
+    sewingColorRows: ColorRow[]
+    tailReceivedQuantitiesByColor: ColorRow[]
   }>({
     visible: false,
     submitting: false,
     formLoading: false,
     row: null,
     headers: [],
+    sizeHeaders: [],
     orderRow: [],
     cutRow: [],
     sewingRow: [],
-    tailReceivedQuantities: [],
+    planColorRows: [],
+    cutColorRows: [],
+    sewingColorRows: [],
+    tailReceivedQuantitiesByColor: [],
   })
 
   const receiveSizeTableRows = computed(() => {
@@ -45,21 +74,28 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
       { key: 'order', label: '订单数量', values: receiveDialog.orderRow },
       { key: 'cut', label: '裁床数量', values: receiveDialog.cutRow },
       { key: 'sewing', label: '车缝数量', values: receiveDialog.sewingRow },
-      { key: 'tail', label: '尾部收货数', values: receiveDialog.tailReceivedQuantities },
     ]
   })
 
-  const receiveTailReceivedTotal = computed(() =>
-    receiveDialog.tailReceivedQuantities.reduce((a, b) => a + (Number(b) || 0), 0),
-  )
+  const receiveTailReceivedTotal = computed(() => sumColorRowsTotal(receiveDialog.tailReceivedQuantitiesByColor))
+
+  /** 每格上限：等于该颜色对应尺码的车缝数（收货数不能超过车缝数） */
+  function receiveCellMax(rowIdx: number, colIdx: number): number | undefined {
+    const v = receiveDialog.sewingColorRows[rowIdx]?.quantities?.[colIdx]
+    return v != null && Number.isFinite(Number(v)) ? Number(v) : undefined
+  }
 
   function resetReceiveForm() {
     receiveDialog.row = null
     receiveDialog.headers = []
+    receiveDialog.sizeHeaders = []
     receiveDialog.orderRow = []
     receiveDialog.cutRow = []
     receiveDialog.sewingRow = []
-    receiveDialog.tailReceivedQuantities = []
+    receiveDialog.planColorRows = []
+    receiveDialog.cutColorRows = []
+    receiveDialog.sewingColorRows = []
+    receiveDialog.tailReceivedQuantitiesByColor = []
   }
 
   async function openReceiveDialog() {
@@ -67,31 +103,34 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
     if (rows.length === 0) return
     const row = rows[0]
     receiveDialog.row = row
-    receiveDialog.headers = []
-    receiveDialog.orderRow = []
-    receiveDialog.cutRow = []
-    receiveDialog.sewingRow = []
-    receiveDialog.tailReceivedQuantities = []
+    resetReceiveForm()
+    receiveDialog.row = row
     receiveDialog.visible = true
     receiveDialog.formLoading = true
     try {
       const res = await getFinishingRegisterFormData(row.orderId)
       const data = res.data
       const headers = data?.headers ?? []
-      const orderRow = data?.orderRow ?? []
-      const cutRow = data?.cutRow ?? []
-      const sewingRow = data?.sewingRow ?? []
+      const sizeHeaders = Array.isArray(data?.sizeHeaders) ? data.sizeHeaders : []
+      const sizeLen = sizeHeaders.length
+      const planColors = Array.isArray(data?.planColorRows) ? data.planColorRows.map((r) => r.colorName) : []
+      const cutColorRows = Array.isArray(data?.cutColorRows) ? data.cutColorRows : emptyColorRows(planColors, sizeLen)
+      const sewingColorRows = Array.isArray(data?.sewingColorRows) && data.sewingColorRows.length
+        ? data.sewingColorRows
+        : emptyColorRows(planColors, sizeLen)
       receiveDialog.headers = headers
-      receiveDialog.orderRow = orderRow
-      receiveDialog.cutRow = cutRow
-      receiveDialog.sewingRow = sewingRow
-      const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-      receiveDialog.tailReceivedQuantities = sewingRow
-        .slice(0, sizeCount)
-        .map((v) => (v != null ? Number(v) : 0))
-      while (receiveDialog.tailReceivedQuantities.length < sizeCount) {
-        receiveDialog.tailReceivedQuantities.push(0)
-      }
+      receiveDialog.sizeHeaders = sizeHeaders
+      receiveDialog.orderRow = data?.orderRow ?? []
+      receiveDialog.cutRow = data?.cutRow ?? []
+      receiveDialog.sewingRow = data?.sewingRow ?? []
+      receiveDialog.planColorRows = Array.isArray(data?.planColorRows) ? data.planColorRows : []
+      receiveDialog.cutColorRows = cutColorRows
+      receiveDialog.sewingColorRows = sewingColorRows
+      // 默认：把"车缝按颜色×尺码"作为收货默认值（用户大概率收的就是车缝量）
+      receiveDialog.tailReceivedQuantitiesByColor = sewingColorRows.map((r) => ({
+        colorName: r.colorName,
+        quantities: [...r.quantities],
+      }))
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
       receiveDialog.visible = false
@@ -104,7 +143,7 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
     if (!receiveDialog.row) return
     const total = receiveTailReceivedTotal.value
     if (!total || total < 1) {
-      ElMessage.warning('请填写尾部收货数（可按尺码填写）')
+      ElMessage.warning('请填写尾部收货数（按颜色×尺码）')
       return
     }
     receiveDialog.submitting = true
@@ -112,7 +151,7 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
       await registerFinishingReceive({
         orderId: receiveDialog.row.orderId,
         tailReceivedQty: total,
-        tailReceivedQuantities: receiveDialog.tailReceivedQuantities,
+        tailReceivedQuantitiesByColor: receiveDialog.tailReceivedQuantitiesByColor,
       })
       ElMessage.success('登记收货成功，订单已进入「尾部中」')
       receiveDialog.visible = false
@@ -129,6 +168,7 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
     receiveDialog,
     receiveSizeTableRows,
     receiveTailReceivedTotal,
+    receiveCellMax,
     resetReceiveForm,
     openReceiveDialog,
     submitReceive,

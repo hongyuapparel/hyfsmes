@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { Order } from './order.entity';
+import type { ColorSizeQuantityRow } from '../common/color-size-row.util';
 
 /** 订单车缝登记：车缝数量、次品数量、次品说明、完成时间 */
 @Entity('order_sewing')
@@ -53,4 +54,9 @@ export class OrderSewing {
   /** 车缝完成数量按尺码明细（与 B 区尺码列一致，最后一项为合计） */
   @Column({ name: 'sewing_quantity_row', type: 'json', nullable: true })
   sewingQuantityRow: number[] | null;
+
+  /** 车缝完成数量按颜色×尺码（真值，逐渐替代 sewingQuantityRow）。
+   *  select=false 以兼容未执行 ALTER 的旧库；读取处需 addSelect 或原生查询。 */
+  @Column({ name: 'sewing_quantities_by_color', type: 'json', nullable: true, select: false })
+  sewingQuantitiesByColor: ColorSizeQuantityRow[] | null;
 }

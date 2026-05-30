@@ -139,6 +139,7 @@
       :complete-loading="registerFormCompleteLoading"
       :size-table-rows="registerSizeTableRows"
       :sewing-total="registerSewingTotal"
+      :get-cell-max="registerSewingCellMax"
       @update:dialog="registerDialog.visible = $event.visible"
       @close="resetRegisterForm"
       @submit="submitRegister"
@@ -237,6 +238,7 @@ const {
   registerForm,
   registerSizeTableRows,
   registerSewingTotal,
+  registerSewingCellMax,
   registerRules,
   loadFactorySuppliers,
   openAssignDialog,

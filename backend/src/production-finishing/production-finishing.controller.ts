@@ -136,11 +136,13 @@ export class ProductionFinishingController {
     @Body('orderId') orderId: number,
     @Body('tailReceivedQty') tailReceivedQty: number,
     @Body('tailReceivedQuantities') tailReceivedQuantities?: number[],
+    @Body('tailReceivedQuantitiesByColor') tailReceivedQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
   ) {
     return this.finishingMutationService.registerReceive(
       Number(orderId),
       Number(tailReceivedQty),
       Array.isArray(tailReceivedQuantities) ? tailReceivedQuantities : null,
+      Array.isArray(tailReceivedQuantitiesByColor) ? tailReceivedQuantitiesByColor : null,
     );
   }
 
@@ -154,6 +156,8 @@ export class ProductionFinishingController {
     @Body('remark') remark?: string,
     @Body('tailInboundQuantities') tailInboundQuantities?: number[],
     @Body('defectQuantities') defectQuantities?: number[],
+    @Body('tailInboundQuantitiesByColor') tailInboundQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
+    @Body('defectQuantitiesByColor') defectQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     const normalizedMode: 'partial' | 'full' = mode === 'partial' ? 'partial' : 'full';
@@ -167,6 +171,8 @@ export class ProductionFinishingController {
       user?.username,
       Array.isArray(tailInboundQuantities) ? tailInboundQuantities : null,
       Array.isArray(defectQuantities) ? defectQuantities : null,
+      Array.isArray(tailInboundQuantitiesByColor) ? tailInboundQuantitiesByColor : null,
+      Array.isArray(defectQuantitiesByColor) ? defectQuantitiesByColor : null,
     );
   }
 

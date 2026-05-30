@@ -106,47 +106,50 @@
             effect="light"
             :show-after="250"
             :hide-after="0"
-            :disabled="!row.orderId"
             popper-class="pending-qty-popper"
-            @show="ensureColorSizeBreakdown(row.orderId)"
           >
             <template #content>
               <div class="qty-tooltip">
-                <template v-if="colorSizeCache[row.orderId]?.loading">
-                  <div class="qty-tooltip-loading">加载中...</div>
-                </template>
-                <template v-else-if="colorSizeCache[row.orderId]?.error">
-                  <div class="qty-tooltip-error">明细加载失败</div>
-                </template>
-                <template v-else>
-                  <div v-if="(colorSizeCache[row.orderId]?.headers?.length ?? 0) === 0" class="qty-tooltip-empty">
-                    暂无明细
+                <template v-if="row.colorSizeSnapshot && row.colorSizeSnapshot.headers.length && row.colorSizeSnapshot.rows.length">
+                  <div class="qty-tooltip-title">
+                    {{ row.sourceType === 'defect' ? '本批次品明细' : '本批入库明细' }}
                   </div>
-                  <div v-else class="qty-tooltip-grid">
+                  <div class="qty-tooltip-grid">
                     <div class="qty-tooltip-row qty-tooltip-head">
                       <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
                       <div
-                        v-for="(h, idx) in colorSizeCache[row.orderId].headers"
+                        v-for="(h, idx) in row.colorSizeSnapshot.headers"
                         :key="idx"
                         class="qty-tooltip-cell"
                       >
                         {{ h }}
                       </div>
+                      <div class="qty-tooltip-cell">合计</div>
                     </div>
                     <div
-                      v-for="(r, rIdx) in colorSizeCache[row.orderId].rows"
+                      v-for="(r, rIdx) in row.colorSizeSnapshot.rows"
                       :key="rIdx"
                       class="qty-tooltip-row"
                     >
                       <div class="qty-tooltip-cell qty-tooltip-color">{{ r.colorName || '-' }}</div>
                       <div
-                        v-for="(v, vIdx) in r.values"
+                        v-for="(v, vIdx) in r.quantities"
                         :key="vIdx"
                         class="qty-tooltip-cell qty-tooltip-num"
                       >
                         {{ formatDisplayNumber(v) }}
                       </div>
+                      <div class="qty-tooltip-cell qty-tooltip-num">
+                        <strong>{{ formatDisplayNumber(sumSnapshotRow(r.quantities)) }}</strong>
+                      </div>
                     </div>
+                  </div>
+                </template>
+                <template v-else>
+                  <div class="qty-tooltip-empty">
+                    {{ row.sourceType === 'defect' ? `本批次品 ${formatDisplayNumber(row.quantity)} 件` : `本批入库 ${formatDisplayNumber(row.quantity)} 件` }}
+                    <br />
+                    <span class="qty-tooltip-empty-sub">（颜色×尺码明细未留存）</span>
                   </div>
                 </template>
               </div>
@@ -275,6 +278,10 @@ const colorSizeCache = reactive<Record<
   }
 >>({})
 
+// 待仓 tooltip 严格只用 inbound_pending.color_size_snapshot（这一批登记时填的真值）。
+// snapshot 缺失（老数据 byColor 未存）就显示"本批未留存颜色×尺码明细"，不再回退到
+// 订单累计/订单计划，避免显示跟用户本批实际填写不符的数据。
+
 const {
   inboundDialog,
   inboundForm,
@@ -308,6 +315,11 @@ const {
   ensureColorSizeBreakdown,
   colorSizeCache,
 })
+
+function sumSnapshotRow(values: number[] | undefined): number {
+  if (!Array.isArray(values)) return 0
+  return values.reduce((s, n) => s + (Number(n) || 0), 0)
+}
 
 async function ensureColorSizeBreakdown(orderId: number) {
   if (!orderId) return
@@ -432,6 +444,18 @@ onMounted(async () => {
   line-height: 1.4;
 }
 
+.qty-tooltip-empty-sub {
+  color: var(--el-text-color-secondary);
+  font-size: 11px;
+}
+
+.qty-tooltip-title {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--el-color-primary);
+}
+
 .qty-tooltip-grid {
   display: flex;
   flex-direction: column;
@@ -495,6 +519,37 @@ onMounted(async () => {
 .pending-qty-popper .qty-tooltip-head .qty-tooltip-cell {
   background: #eef1f6;
   font-weight: 600;
+}
+
+/* 按颜色分组的尺码追踪表（跟尾部 hover 同款） */
+.pending-qty-popper .qty-tooltip-color-block + .qty-tooltip-color-block {
+  margin-top: 8px;
+}
+.pending-qty-popper .qty-tooltip-color-name {
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--el-text-color-primary);
+  font-size: var(--font-size-body);
+}
+.pending-qty-popper .qty-tooltip-color-table {
+  border-collapse: collapse;
+  font-size: var(--font-size-caption);
+}
+.pending-qty-popper .qty-tooltip-color-table th,
+.pending-qty-popper .qty-tooltip-color-table td {
+  border: 1px solid var(--el-border-color-lighter);
+  padding: 3px 8px;
+  text-align: center;
+  white-space: nowrap;
+  background: #fff;
+}
+.pending-qty-popper .qty-tooltip-color-table thead th {
+  background: #eef1f6;
+  font-weight: 500;
+}
+.pending-qty-popper .qty-tooltip-color-table .qty-tooltip-label {
+  text-align: left;
+  color: var(--el-text-color-secondary);
 }
 
 </style>

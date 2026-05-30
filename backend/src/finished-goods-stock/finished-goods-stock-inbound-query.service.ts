@@ -60,6 +60,38 @@ export class FinishedGoodsStockInboundQueryService {
     }
   }
 
+  /**
+   * 读 order_finishing.tail_inbound_quantities_by_color（真值）。
+   * select=false，需要原生 SQL；返回 normalize 后的颜色×尺码二维。
+   */
+  private async fetchTailInboundQuantitiesByColor(
+    orderId: number | null,
+  ): Promise<Array<{ colorName: string; quantities: number[] }> | null> {
+    if (orderId == null) return null;
+    try {
+      const rows = await this.orderFinishingRepo.query(
+        'SELECT tail_inbound_quantities_by_color AS rowJson FROM `order_finishing` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { rowJson?: unknown }).rowJson : null;
+      if (raw == null) return null;
+      let parsed: unknown = raw;
+      if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw); } catch { return null; }
+      }
+      if (!Array.isArray(parsed) || parsed.length === 0) return null;
+      const out: Array<{ colorName: string; quantities: number[] }> = [];
+      for (const r of parsed as Array<{ colorName?: string; quantities?: unknown }>) {
+        const name = String(r?.colorName ?? '').trim();
+        const q = Array.isArray(r?.quantities) ? (r.quantities as unknown[]) : [];
+        out.push({ colorName: name, quantities: q.map((n) => Math.max(0, Math.trunc(Number(n) || 0))) });
+      }
+      return out.length > 0 ? out : null;
+    } catch {
+      return null;
+    }
+  }
+
   private snapshotRowTotal(row: { quantities: unknown[] }): number {
     return row.quantities.reduce<number>(
       (sum, quantity) => sum + Math.max(0, Math.trunc(Number(quantity) || 0)),
@@ -268,7 +300,20 @@ export class FinishedGoodsStockInboundQueryService {
     }
     const planRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
 
-    // 1) 优先：尾部实际入库尺码（仅单色订单可直接使用）
+    // 0) 最优先：尾部入库登记的真值 颜色×尺码（多色订单也支持）
+    const tailByColor = await this.fetchTailInboundQuantitiesByColor(orderId);
+    if (Array.isArray(tailByColor) && tailByColor.length > 0) {
+      return {
+        headers,
+        rows: scaleColorSizeRowsToQuantity(
+          headers,
+          tailByColor.map((r) => ({ colorName: r.colorName, quantities: r.quantities })),
+          quantity,
+        ),
+      };
+    }
+
+    // 1) 兜底：单色订单可由聚合 tail_inbound_qty_row 直接使用
     if (planRows.length === 1) {
       const tailRow = await this.fetchTailInboundQtyRow(orderId, headers.length);
       if (tailRow) {

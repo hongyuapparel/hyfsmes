@@ -141,6 +141,7 @@ export class ProductionSewingController {
     @Body('defectQuantity') defectQuantity: number,
     @Body('defectReason') defectReason: string,
     @Body('sewingQuantities') sewingQuantities?: number[],
+    @Body('sewingQuantitiesByColor') sewingQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.sewingService.completeSewing(
@@ -149,6 +150,7 @@ export class ProductionSewingController {
       Number(defectQuantity ?? 0),
       defectReason ?? '',
       Array.isArray(sewingQuantities) ? sewingQuantities : undefined,
+      Array.isArray(sewingQuantitiesByColor) ? sewingQuantitiesByColor : undefined,
       user ? { userId: user.userId, username: user.username } : undefined,
     );
   }

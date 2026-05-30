@@ -10,6 +10,13 @@ import { OrderStatusConfigService } from '../order-status-config/order-status-co
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import {
+  type ColorSizeQuantityRow,
+  assertColorRowsShape,
+  normalizeColorRows,
+  sumColorRows,
+  sumColorRowsBySize,
+} from '../common/color-size-row.util';
 
 export interface SewingListItem {
   orderId: number;
@@ -126,11 +133,17 @@ export class ProductionSewingService {
     return true;
   }
 
-  /** 登记车缝完成弹窗用：订单数量/裁床数量按尺码（只读）、车缝数量由前端按尺码填写 */
+  /** 登记车缝完成弹窗用：订单数量/裁床数量按颜色×尺码（只读）+ 聚合行；车缝按颜色×尺码填写 */
   async getCompleteFormData(orderId: number): Promise<{
     headers: string[];
     orderRow: (number | null)[];
     cutRow: (number | null)[];
+    /** 不含合计列的纯尺码 headers，用于二维矩阵 */
+    sizeHeaders: string[];
+    /** 订单计划按颜色×尺码（参考与上限基础） */
+    orderColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 裁床实际按颜色×尺码（车缝/入库的每格上限） */
+    cutColorRows: Array<{ colorName: string; quantities: number[] }>;
   }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -140,11 +153,9 @@ export class ProductionSewingService {
       this.orderExtRepo.findOne({ where: { orderId } }),
       this.cuttingRepo.findOne({ where: { orderId } }),
     ]);
-    const headers =
-      Array.isArray(ext?.colorSizeHeaders) && ext.colorSizeHeaders.length > 0
-        ? [...ext.colorSizeHeaders, '合计']
-        : ['合计'];
-    const sizeLen = headers.length - 1;
+    const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders.slice() : [];
+    const headers = sizeHeaders.length > 0 ? [...sizeHeaders, '合计'] : ['合计'];
+    const sizeLen = sizeHeaders.length;
     const buildPerSize = (rows: { quantities?: number[] }[] | null | undefined): (number | null)[] | null => {
       if (!rows || rows.length === 0 || sizeLen <= 0) return null;
       const sums = Array(sizeLen).fill(0) as number[];
@@ -161,17 +172,51 @@ export class ProductionSewingService {
       const total = sums.reduce((a, b) => a + b, 0);
       return [...sums, total];
     };
-    const orderRow = buildPerSize((ext as { colorSizeRows?: { quantities?: number[] }[] })?.colorSizeRows ?? null);
-    const cutRow = buildPerSize(cutting?.actualCutRows ?? null);
-    const cutTotal = this.sumActualCut(cutting?.actualCutRows ?? null);
+    const planRows = (ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[] }> })?.colorSizeRows ?? [];
+    const planRowsArr = Array.isArray(planRows) ? planRows : [];
+    const actualCutRows = Array.isArray(cutting?.actualCutRows) ? cutting!.actualCutRows : [];
+
+    const orderRow = buildPerSize(planRowsArr);
+    const cutRow = buildPerSize(actualCutRows);
+    const cutTotal = this.sumActualCut(actualCutRows);
+
+    // 按订单计划颜色顺序对齐 cut（裁床可能少颜色或顺序不同，缺失补 0）
+    const norm = (s: unknown) => String(s ?? '').trim();
+    const cutByColorName = new Map<string, number[]>();
+    for (const r of actualCutRows) {
+      const name = norm(r?.colorName);
+      const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
+      const filled = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
+      if (cutByColorName.has(name)) {
+        const prev = cutByColorName.get(name)!;
+        for (let i = 0; i < sizeLen; i++) prev[i] += filled[i];
+      } else {
+        cutByColorName.set(name, filled);
+      }
+    }
+    const orderColorRows = planRowsArr.map((r) => {
+      const name = norm(r?.colorName);
+      const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
+      const quantities = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
+      return { colorName: name, quantities };
+    });
+    const cutColorRows = planRowsArr.map((r) => {
+      const name = norm(r?.colorName);
+      const quantities = cutByColorName.get(name) ?? Array(sizeLen).fill(0);
+      return { colorName: name, quantities };
+    });
+
     return {
       headers,
+      sizeHeaders,
       orderRow:
         orderRow ??
         (headers.length === 1 ? [order.quantity ?? 0] : [...Array(headers.length).fill(null)]),
       cutRow:
         cutRow ??
         (headers.length === 1 ? [cutTotal != null ? cutTotal : null] : [...Array(headers.length).fill(null)]),
+      orderColorRows,
+      cutColorRows,
     };
   }
 
@@ -377,13 +422,14 @@ export class ProductionSewingService {
     }
   }
 
-  /** 车缝登记完成：写入车缝数量（可按尺码）、次品数量、次品说明，订单状态改为待尾部 */
+  /** 车缝登记完成：写入车缝数量（按颜色×尺码真值）、次品数量、次品说明，订单状态改为待尾部 */
   async completeSewing(
     orderId: number,
     sewingQuantity: number,
     defectQuantity: number,
     defectReason: string,
     sewingQuantities?: number[] | null,
+    sewingQuantitiesByColor?: ColorSizeQuantityRow[] | null,
     actor?: { userId?: number; username?: string },
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
@@ -397,12 +443,36 @@ export class ProductionSewingService {
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const now = new Date();
     const arrivedAt = order.statusTime ?? now;
-    const totalQty =
-      Array.isArray(sewingQuantities) && sewingQuantities.length > 0
+    const headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
+    const sizeLen = headers.length;
+    const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) => String(r?.colorName ?? '').trim());
+
+    // 真值优先级：byColor（前端二维矩阵）→ 一维兜底（仅单色订单或老客户端）
+    let byColor: ColorSizeQuantityRow[] | null = null;
+    if (Array.isArray(sewingQuantitiesByColor) && sewingQuantitiesByColor.length > 0) {
+      byColor = normalizeColorRows(sewingQuantitiesByColor, sizeLen);
+      if (planColors.length > 0 && sizeLen > 0) {
+        assertColorRowsShape(byColor, planColors, sizeLen);
+      }
+    } else if (Array.isArray(sewingQuantities) && sewingQuantities.length > 0) {
+      if (planColors.length === 1 && sizeLen > 0) {
+        // 单色订单：把一维兜底为单色二维
+        byColor = normalizeColorRows([{ colorName: planColors[0], quantities: sewingQuantities }], sizeLen);
+      } else if (planColors.length > 1) {
+        throw new BadRequestException('多色订单必须按颜色×尺码填写车缝数量');
+      }
+    }
+
+    const totalQty = byColor
+      ? sumColorRows(byColor)
+      : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
         ? sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
         : sewingQuantity;
-    const sewingQuantityRow =
-      Array.isArray(sewingQuantities) && sewingQuantities.length > 0 ? sewingQuantities : null;
+    const sewingQuantityRow = byColor
+      ? sumColorRowsBySize(byColor, sizeLen)
+      : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
+        ? sewingQuantities
+        : null;
 
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
@@ -422,6 +492,7 @@ export class ProductionSewingService {
         completedAt: now,
         sewingQuantity: totalQty,
         sewingQuantityRow,
+        sewingQuantitiesByColor: byColor,
         defectQuantity: defectQuantity ?? 0,
         defectReason: (defectReason ?? '').trim(),
       });
@@ -431,10 +502,18 @@ export class ProductionSewingService {
       sewing.completedAt = now;
       sewing.sewingQuantity = totalQty;
       sewing.sewingQuantityRow = sewingQuantityRow;
+      sewing.sewingQuantitiesByColor = byColor;
       sewing.defectQuantity = defectQuantity ?? 0;
       sewing.defectReason = (defectReason ?? '').trim();
     }
     await this.sewingRepo.save(sewing);
+
+    // sewing_quantities_by_color 是 select:false JSON 列，typeorm save 不会写入 DB，
+    // 必须用 raw UPDATE 显式落库（否则用户填的按颜色×尺码细数会丢失）。
+    await this.sewingRepo.manager.query(
+      'UPDATE order_sewing SET sewing_quantities_by_color = ? WHERE order_id = ?',
+      [byColor ? JSON.stringify(byColor) : null, orderId],
+    );
 
     if (next && next !== order.status) {
       order.status = next;

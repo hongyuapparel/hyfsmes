@@ -7,15 +7,32 @@ import {
 } from '@/api/production-finishing'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
+interface ColorRow {
+  colorName: string
+  quantities: number[]
+}
+
 export interface PackagingCompleteItem {
   row: FinishingListItem
+  /** 含合计列（旧 UI 残留） */
   headers: string[]
+  /** 不含合计列的尺码 headers，用于二维矩阵 */
+  sizeHeaders: string[]
+  /** 各只读参考行（旧表格用） */
   orderRow: (number | null)[]
   cutRow: (number | null)[]
   sewingRow: (number | null)[]
   tailReceivedRow: (number | null)[]
-  inboundQuantities: number[]
-  defectQuantities: number[]
+  /** 按颜色×尺码的尾部收货数（真值；用于限制每格最大值） */
+  tailReceivedColorRows: ColorRow[]
+  /** 此前累计入库（已登记，按颜色×尺码） */
+  alreadyInboundColorRows: ColorRow[]
+  /** 此前累计次品（已登记，按颜色×尺码） */
+  alreadyDefectColorRows: ColorRow[]
+  /** 本次入库按颜色×尺码（用户输入） */
+  inboundQuantitiesByColor: ColorRow[]
+  /** 本次次品按颜色×尺码（用户输入） */
+  defectQuantitiesByColor: ColorRow[]
   remark: string
 }
 
@@ -23,6 +40,31 @@ interface UseFinishingPackagingParams {
   selectedRows: Ref<FinishingListItem[]>
   reloadList: () => Promise<void>
   reloadTabCounts: () => Promise<void>
+}
+
+function emptyColorRows(planColors: string[], sizeLen: number): ColorRow[] {
+  return planColors.map((name) => ({
+    colorName: name,
+    quantities: Array(sizeLen).fill(0),
+  }))
+}
+
+function sumColorRowsTotal(rows: ColorRow[]): number {
+  let s = 0
+  for (const r of rows) {
+    const q = Array.isArray(r?.quantities) ? r.quantities : []
+    for (const n of q) s += Math.max(0, Math.trunc(Number(n) || 0))
+  }
+  return s
+}
+
+function sumColorRowsBySize(rows: ColorRow[], sizeLen: number): number[] {
+  const out = Array(sizeLen).fill(0) as number[]
+  for (const r of rows) {
+    const q = Array.isArray(r?.quantities) ? r.quantities : []
+    for (let i = 0; i < sizeLen; i++) out[i] += Math.max(0, Math.trunc(Number(q[i]) || 0))
+  }
+  return out
 }
 
 export function useFinishingPackaging(params: UseFinishingPackagingParams) {
@@ -42,132 +84,159 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
   }
 
   function defectTotal(item: PackagingCompleteItem): number {
-    return (item.defectQuantities ?? []).reduce((a, b) => a + (Number(b) || 0), 0)
+    return sumColorRowsTotal(item.defectQuantitiesByColor)
   }
 
   function inboundTotal(item: PackagingCompleteItem): number {
-    return (item.inboundQuantities ?? []).reduce((a, b) => a + (Number(b) || 0), 0)
+    return sumColorRowsTotal(item.inboundQuantitiesByColor)
   }
 
-  /** 该订单此前已登记的入库数 */
   function alreadyInboundQty(item: PackagingCompleteItem): number {
     return Number(item.row.tailInboundQty ?? 0)
   }
 
-  /** 该订单此前已登记的次品数 */
   function alreadyDefectQty(item: PackagingCompleteItem): number {
     return Number(item.row.defectQuantity ?? 0)
   }
 
-  /** 尾部收货数减去已登记入库/次品后，剩余可登记数 */
   function remainingQty(item: PackagingCompleteItem): number {
     return Number(item.row.tailReceivedQty ?? 0) - alreadyInboundQty(item) - alreadyDefectQty(item)
   }
 
+  /** 旧表格：保留尾部收货数 只读行（用于上方对照） */
   function packagingSizeTableRows(item: PackagingCompleteItem) {
     const received = item.row.tailReceivedQty ?? 0
-    const i = item.inboundQuantities
-    const sumI = i.reduce((a, b) => a + b, 0)
-    const sumD = defectTotal(item)
     const valuesReceived =
       Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
         ? item.tailReceivedRow
         : item.headers.length === 1
           ? [received]
           : [...Array(item.headers.length - 1).fill(null), received]
-    const valuesInbound = item.headers.length === 1 ? [...i] : [...i, sumI]
-    return [
-      { key: 'tail_received', label: '尾部收货数', values: valuesReceived },
-      { key: 'inbound', label: '入库数', values: valuesInbound },
-      { key: 'defect', label: '次品数', values: item.headers.length === 1 ? [...item.defectQuantities] : [...item.defectQuantities, sumD] },
-    ]
+    return [{ key: 'tail_received', label: '尾部收货数', values: valuesReceived }]
   }
 
   function packagingSetZero(item: PackagingCompleteItem) {
-    item.inboundQuantities.fill(0)
-    item.defectQuantities.fill(0)
+    const sizeLen = item.sizeHeaders.length
+    item.inboundQuantitiesByColor = emptyColorRows(item.inboundQuantitiesByColor.map((r) => r.colorName), sizeLen)
+    item.defectQuantitiesByColor = emptyColorRows(item.defectQuantitiesByColor.map((r) => r.colorName), sizeLen)
   }
 
+  /** 一键把"剩余可登记的颜色×尺码"填给入库（用户最常用动作） */
   function packagingSetInboundToReceived(item: PackagingCompleteItem) {
-    const total = item.row.tailReceivedQty ?? 0
-    const len = item.inboundQuantities.length
-    if (len === 0) return
-    const sizeValues = Array.isArray(item.tailReceivedRow) && item.tailReceivedRow.length === item.headers.length
-      ? item.tailReceivedRow.slice(0, len).map((v) => (v != null ? Number(v) : 0))
-      : null
-    if (sizeValues) {
-      for (let i = 0; i < len; i++) item.inboundQuantities[i] = Math.max(0, Number(sizeValues[i]) || 0)
-    } else {
-      item.inboundQuantities[0] = total
-      for (let i = 1; i < len; i++) item.inboundQuantities[i] = 0
-    }
-    item.defectQuantities.fill(0)
+    const sizeLen = item.sizeHeaders.length
+    if (sizeLen <= 0) return
+    item.inboundQuantitiesByColor = item.tailReceivedColorRows.map((r, ri) => {
+      const already = item.alreadyInboundColorRows[ri]?.quantities ?? Array(sizeLen).fill(0)
+      const def = item.alreadyDefectColorRows[ri]?.quantities ?? Array(sizeLen).fill(0)
+      const quantities = Array.from({ length: sizeLen }, (_, ci) => {
+        const remain = (Number(r.quantities[ci]) || 0) - (Number(already[ci]) || 0) - (Number(def[ci]) || 0)
+        return Math.max(0, remain)
+      })
+      return { colorName: r.colorName, quantities }
+    })
+    item.defectQuantitiesByColor = emptyColorRows(
+      item.tailReceivedColorRows.map((r) => r.colorName),
+      sizeLen,
+    )
   }
 
-  function maxPackagingQtyForSize(item: PackagingCompleteItem, hIdx: number): number {
-    const tr = item.tailReceivedRow
-    if (Array.isArray(tr) && tr.length > hIdx && tr[hIdx] != null && Number.isFinite(Number(tr[hIdx]))) {
-      return Number(tr[hIdx]) || 0
-    }
-    return item.row.tailReceivedQty ?? 0
+  /** 入库每格上限：颜色 ri 尺码 ci 剩余 = 尾部收货[ri][ci] − 已入库[ri][ci] − 已次品[ri][ci] − 本次次品[ri][ci] */
+  function inboundCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
+    const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
+    const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
+    const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+    return Math.max(0, r - a - d - td)
   }
 
-  function maxDefectQtyForSize(item: PackagingCompleteItem, hIdx: number): number {
-    return maxPackagingQtyForSize(item, hIdx)
+  /** 次品每格上限：同理但本次入库占用 */
+  function defectCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
+    const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
+    const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
+    const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+    return Math.max(0, r - a - d - ti)
   }
 
-  function assertPackagingPerSize(item: PackagingCompleteItem): string | null {
-    const h = item.headers
-    if (h.length <= 1) return null
-    const tr = item.tailReceivedRow
-    if (!Array.isArray(tr) || tr.length !== h.length) return null
-    const sizeCount = h.length - 1
-    for (let i = 0; i < sizeCount; i++) {
-      if (tr[i] == null || !Number.isFinite(Number(tr[i]))) return null
+  function assertPackagingPerCell(item: PackagingCompleteItem, mode: 'register' | 'amend'): string | null {
+    const sizeLen = item.sizeHeaders.length
+    if (sizeLen === 0) return null
+    const rows = item.tailReceivedColorRows
+    if (mode === 'amend') {
+      // 覆盖式：每格 入库 + 次品 = 尾部收货
+      for (let ri = 0; ri < rows.length; ri++) {
+        for (let ci = 0; ci < sizeLen; ci++) {
+          const r = Number(rows[ri]?.quantities?.[ci] ?? 0)
+          const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+          const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+          if (ti + td !== r) {
+            return `订单 ${item.row.orderNo}：${rows[ri].colorName}/${item.sizeHeaders[ci]} 入库+次品须等于该格尾部收货(${r})`
+          }
+        }
+      }
+      return null
     }
-    for (let i = 0; i < sizeCount; i++) {
-      const a = Number(item.inboundQuantities[i]) || 0
-      const b = Number(item.defectQuantities[i]) || 0
-      const r = Number(tr[i]) || 0
-      if (a + b !== r) {
-        return `订单 ${item.row.orderNo}：尺码 ${h[i]} 入库数+次品数须等于该码尾部收货数(${r})`
+    // 分批：每格 已入库 + 已次品 + 本次入库 + 本次次品 ≤ 尾部收货
+    for (let ri = 0; ri < rows.length; ri++) {
+      for (let ci = 0; ci < sizeLen; ci++) {
+        const r = Number(rows[ri]?.quantities?.[ci] ?? 0)
+        const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
+        const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
+        const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+        const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+        if (a + d + ti + td > r) {
+          return `订单 ${item.row.orderNo}：${rows[ri].colorName}/${item.sizeHeaders[ci]} 合计(${a + d + ti + td})超过尾部收货(${r})`
+        }
       }
     }
     return null
   }
 
-  function hydratePackagingQtyFromSaved(
-    item: PackagingCompleteItem,
-    inbRow: (number | null)[] | null | undefined,
-    defRow: (number | null)[] | null | undefined,
-    inbTotal: number,
-    defTotal: number,
-  ) {
-    const headers = item.headers
-    const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-    const takePerSize = (r: (number | null)[] | null | undefined): number[] | null => {
-      if (!r || r.length === 0) return null
-      if (r.length >= headers.length) return r.slice(0, sizeCount).map((v) => Number(v) || 0)
-      if (r.length === sizeCount) return r.map((v) => Number(v) || 0)
-      return null
+  async function buildItem(row: FinishingListItem, mode: 'register' | 'amend'): Promise<PackagingCompleteItem | null> {
+    const res = await getFinishingRegisterFormData(row.orderId)
+    const data = res.data
+    const headers = data?.headers ?? ['合计']
+    const sizeHeaders = Array.isArray(data?.sizeHeaders) ? data.sizeHeaders : []
+    const sizeLen = sizeHeaders.length
+    const planColors = Array.isArray(data?.planColorRows) ? data.planColorRows.map((r) => r.colorName) : []
+    const tailReceivedColorRows = Array.isArray(data?.tailReceivedColorRows) && data.tailReceivedColorRows.length
+      ? data.tailReceivedColorRows
+      : planColors.map((name) => ({ colorName: name, quantities: Array(sizeLen).fill(0) }))
+    const alreadyInboundColorRows = Array.isArray(data?.tailInboundColorRows) && data.tailInboundColorRows.length
+      ? data.tailInboundColorRows
+      : emptyColorRows(planColors, sizeLen)
+    const alreadyDefectColorRows = Array.isArray(data?.defectColorRows) && data.defectColorRows.length
+      ? data.defectColorRows
+      : emptyColorRows(planColors, sizeLen)
+
+    const item: PackagingCompleteItem = {
+      row,
+      headers,
+      sizeHeaders,
+      orderRow: data?.orderRow ?? [],
+      cutRow: data?.cutRow ?? [],
+      sewingRow: data?.sewingRow ?? [],
+      tailReceivedRow: data?.tailReceivedRow ?? [],
+      tailReceivedColorRows,
+      alreadyInboundColorRows,
+      alreadyDefectColorRows,
+      inboundQuantitiesByColor: emptyColorRows(planColors, sizeLen),
+      defectQuantitiesByColor: emptyColorRows(planColors, sizeLen),
+      remark: mode === 'amend' ? row.remark?.trim() ?? '' : '',
     }
-    const perIn = takePerSize(inbRow)
-    const perDef = takePerSize(defRow)
-    if (perIn && perDef && perIn.length === sizeCount && perDef.length === sizeCount) {
-      const sumI = perIn.reduce((a, b) => a + b, 0)
-      const sumD = perDef.reduce((a, b) => a + b, 0)
-      if (sumI === inbTotal && sumD === defTotal) {
-        for (let i = 0; i < sizeCount; i++) {
-          item.inboundQuantities[i] = perIn[i]
-          item.defectQuantities[i] = perDef[i]
-        }
-        return
-      }
+
+    if (mode === 'amend') {
+      // 修正模式：把已累计入库/次品填入当前编辑值（覆盖式编辑）
+      item.inboundQuantitiesByColor = alreadyInboundColorRows.map((r) => ({
+        colorName: r.colorName,
+        quantities: [...r.quantities],
+      }))
+      item.defectQuantitiesByColor = alreadyDefectColorRows.map((r) => ({
+        colorName: r.colorName,
+        quantities: [...r.quantities],
+      }))
     }
-    item.inboundQuantities[0] = inbTotal
-    for (let i = 1; i < sizeCount; i++) item.inboundQuantities[i] = 0
-    item.defectQuantities[0] = defTotal
-    for (let i = 1; i < sizeCount; i++) item.defectQuantities[i] = 0
+    return item
   }
 
   async function openPackagingCompleteDialog() {
@@ -179,28 +248,8 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     packagingCompleteDialog.items = []
     try {
       for (const row of rows) {
-        const res = await getFinishingRegisterFormData(row.orderId)
-        const data = res.data
-        const headers = data?.headers ?? ['合计']
-        const orderRow = data?.orderRow ?? []
-        const cutRow = data?.cutRow ?? []
-        const sewingRow = data?.sewingRow ?? []
-        const tailReceivedRow = data?.tailReceivedRow ?? []
-        const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-        const item: PackagingCompleteItem = {
-          row,
-          headers,
-          orderRow,
-          cutRow,
-          sewingRow,
-          tailReceivedRow,
-          inboundQuantities: Array(sizeCount).fill(0),
-          defectQuantities: Array(sizeCount).fill(0),
-          remark: '',
-        }
-        // 分批入库：首次打开从 0 开始，由用户显式填入本批数量
-        packagingSetZero(item)
-        packagingCompleteDialog.items.push(item)
+        const item = await buildItem(row, 'register')
+        if (item) packagingCompleteDialog.items.push(item)
       }
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
@@ -219,29 +268,8 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     packagingCompleteDialog.items = []
     try {
       for (const row of rows) {
-        const res = await getFinishingRegisterFormData(row.orderId)
-        const data = res.data
-        const headers = data?.headers ?? ['合计']
-        const orderRow = data?.orderRow ?? []
-        const cutRow = data?.cutRow ?? []
-        const sewingRow = data?.sewingRow ?? []
-        const tailReceivedRow = data?.tailReceivedRow ?? []
-        const sizeCount = headers.length > 1 ? headers.length - 1 : 1
-        const item: PackagingCompleteItem = {
-          row,
-          headers,
-          orderRow,
-          cutRow,
-          sewingRow,
-          tailReceivedRow,
-          inboundQuantities: Array(sizeCount).fill(0),
-          defectQuantities: Array(sizeCount).fill(0),
-          remark: row.remark?.trim() ?? '',
-        }
-        const inb = row.tailInboundQty ?? 0
-        const def = row.defectQuantity ?? 0
-        hydratePackagingQtyFromSaved(item, data?.tailInboundRow, data?.defectRow, inb, def)
-        packagingCompleteDialog.items.push(item)
+        const item = await buildItem(row, 'amend')
+        if (item) packagingCompleteDialog.items.push(item)
       }
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
@@ -257,24 +285,22 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     for (const item of packagingCompleteDialog.items) {
       const sumInbound = inboundTotal(item)
       const defect = defectTotal(item)
+      const cellMsg = assertPackagingPerCell(item, isAmend ? 'amend' : 'register')
+      if (cellMsg) {
+        ElMessage.warning(cellMsg)
+        return
+      }
       if (isAmend) {
-        // 修正模式：维持原校验——按尺码须等于该码尾部收货数（覆盖式）
-        const perMsg = assertPackagingPerSize(item)
-        if (perMsg) {
-          ElMessage.warning(perMsg)
-          return
-        }
-        // 修正模式：维持原校验——入库数+次品数须等于尾部收货数（覆盖式）
         const received = item.row.tailReceivedQty ?? 0
         if (sumInbound + defect !== received) {
-          ElMessage.warning(`订单 ${item.row.orderNo}：入库数合计(${sumInbound})+次品数(${defect}) 须等于尾部收货数(${received})`)
+          ElMessage.warning(`订单 ${item.row.orderNo}：入库合计(${sumInbound})+次品(${defect}) 须等于尾部收货数(${received})`)
           return
         }
       } else {
         const remaining = remainingQty(item)
         const sumThis = sumInbound + defect
         if (sumThis <= 0) {
-          ElMessage.warning(`订单 ${item.row.orderNo}：本次入库数 + 次品数必须大于 0`)
+          ElMessage.warning(`订单 ${item.row.orderNo}：本次入库 + 次品必须大于 0`)
           return
         }
         if (sumThis > remaining) {
@@ -282,7 +308,7 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
           return
         }
         if (mode === 'full' && sumThis !== remaining) {
-          ElMessage.warning(`订单 ${item.row.orderNo}：「全部入库」需要填满剩余 ${remaining} 件，当前差 ${remaining - sumThis} 件`)
+          ElMessage.warning(`订单 ${item.row.orderNo}：「全部入库」需填满剩余 ${remaining}，当前差 ${remaining - sumThis}`)
           return
         }
       }
@@ -290,6 +316,9 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     packagingCompleteDialog.submitting = true
     try {
       for (const item of packagingCompleteDialog.items) {
+        const sizeLen = item.sizeHeaders.length
+        const inbound1D = sumColorRowsBySize(item.inboundQuantitiesByColor, sizeLen)
+        const defect1D = sumColorRowsBySize(item.defectQuantitiesByColor, sizeLen)
         const sumInbound = inboundTotal(item)
         const defect = defectTotal(item)
         await registerFinishingPackagingComplete({
@@ -298,8 +327,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
           tailInboundQty: sumInbound,
           defectQuantity: defect,
           remark: item.remark?.trim() || undefined,
-          tailInboundQuantities: [...item.inboundQuantities],
-          defectQuantities: [...item.defectQuantities],
+          tailInboundQuantities: inbound1D,
+          defectQuantities: defect1D,
+          tailInboundQuantitiesByColor: item.inboundQuantitiesByColor,
+          defectQuantitiesByColor: item.defectQuantitiesByColor,
         })
       }
       ElMessage.success(
@@ -331,8 +362,8 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     remainingQty,
     packagingSetZero,
     packagingSetInboundToReceived,
-    maxPackagingQtyForSize,
-    maxDefectQtyForSize,
+    inboundCellMax,
+    defectCellMax,
     openPackagingCompleteDialog,
     openPackagingAmendDialog,
     submitPackagingComplete,

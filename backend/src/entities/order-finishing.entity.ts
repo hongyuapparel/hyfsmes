@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, OneToOne, JoinColumn } from 'typeorm';
 import { Order } from './order.entity';
+import type { ColorSizeQuantityRow } from '../common/color-size-row.util';
 
 /** 订单尾部：包装完成数、出货数、次品数、发货/入库状态 */
 @Entity('order_finishing')
@@ -36,6 +37,10 @@ export class OrderFinishing {
   @Column({ name: 'tail_received_qty_row', type: 'json', nullable: true, select: false })
   tailReceivedQtyRow: number[] | null;
 
+  /** 尾部收货数按颜色×尺码（真值） */
+  @Column({ name: 'tail_received_quantities_by_color', type: 'json', nullable: true, select: false })
+  tailReceivedQuantitiesByColor: ColorSizeQuantityRow[] | null;
+
   /** 尾部出货数（发货数量，可多次累加） */
   @Column({ name: 'tail_shipped_qty', type: 'int', default: 0 })
   tailShippedQty: number;
@@ -48,6 +53,10 @@ export class OrderFinishing {
   @Column({ name: 'tail_inbound_qty_row', type: 'json', nullable: true, select: false })
   tailInboundQtyRow: number[] | null;
 
+  /** 尾部入库数按颜色×尺码（真值） */
+  @Column({ name: 'tail_inbound_quantities_by_color', type: 'json', nullable: true, select: false })
+  tailInboundQuantitiesByColor: ColorSizeQuantityRow[] | null;
+
   /** 次品数 */
   @Column({ name: 'defect_quantity', type: 'int', default: 0 })
   defectQuantity: number;
@@ -55,6 +64,10 @@ export class OrderFinishing {
   /** 次品数按尺码明细（与 B 区尺码列一致，最后一项为合计） */
   @Column({ name: 'defect_quantity_row', type: 'json', nullable: true, select: false })
   defectQuantityRow: number[] | null;
+
+  /** 次品数按颜色×尺码（真值） */
+  @Column({ name: 'defect_quantities_by_color', type: 'json', nullable: true, select: false })
+  defectQuantitiesByColor: ColorSizeQuantityRow[] | null;
 
   /** 登记包装完成时的备注（发货/入库/次品分配说明等） */
   @Column({ name: 'remark', type: 'varchar', length: 500, nullable: true })

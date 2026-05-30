@@ -92,9 +92,11 @@ import { FinanceDashboardModule } from './finance-dashboard/finance-dashboard.mo
       password: process.env.MYSQL_PASSWORD || '',
       database: process.env.MYSQL_DATABASE || 'erp',
       entities: [User, Role, UserRole, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCostSnapshot, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, ProcessQuoteTemplate, ProcessQuoteTemplateItem, InboundPending, FinishedGoodsStock, FinishedGoodsOutbound, FinishedGoodsStockColorImage, FinishedGoodsStockAdjustLog, InventoryAccessory, InventoryAccessoryOutbound, InventoryAccessoryOperationLog, FabricStock, FabricOutbound, FabricStockOperationLog, Employee, Supplier, OrderStatus, OrderStatusTransition, OrderWorkflowChain, OrderStatusSla, OrderStatusHistory, IncomeRecord, ExpenseRecord, FinanceFundAccount, FinanceIncomeType, FinanceExpenseType, RoleOrderPolicy, RoleDisplayOrder],
-      // 默认关闭，避免已有库在启动时重复建表/建索引导致启动失败。
-      // 如需同步结构：设置 TYPEORM_SYNCHRONIZE=true（仅建议本地开发库使用）。
-      synchronize: (process.env.TYPEORM_SYNCHRONIZE ?? '').toLowerCase() === 'true',
+      // 强制关闭：TYPEORM sync 会在启动时对已有表"修正"列定义（含 JSON select=false 字段），
+      // 实际操作是 DROP + RE-ADD，**导致数据被清空**。已发生过一次：JSON 列还在但数据全 NULL。
+      // schema 变更一律走 backend/src/database/ensure-*.ts 启动补列模式（main.ts 已注册）。
+      // 不要再受 TYPEORM_SYNCHRONIZE env 影响，避免任何一台机器误开导致线上事故。
+      synchronize: false,
       charset: 'utf8mb4',
     }),
     HealthModule,

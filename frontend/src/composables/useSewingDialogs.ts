@@ -49,16 +49,22 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
   const registerFormRef = ref<FormInstance>()
   const registerForm = reactive<{
     headers: string[]
+    sizeHeaders: string[]
     orderRow: (number | null)[]
     cutRow: (number | null)[]
-    sewingQuantities: number[]
+    orderColorRows: Array<{ colorName: string; quantities: number[] }>
+    cutColorRows: Array<{ colorName: string; quantities: number[] }>
+    sewingQuantitiesByColor: Array<{ colorName: string; quantities: number[] }>
     defectQuantity: number
     defectReason: string
   }>({
     headers: [],
+    sizeHeaders: [],
     orderRow: [],
     cutRow: [],
-    sewingQuantities: [],
+    orderColorRows: [],
+    cutColorRows: [],
+    sewingQuantitiesByColor: [],
     defectQuantity: 0,
     defectReason: '',
   })
@@ -68,12 +74,19 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     return [
       { key: 'order', label: '订单数量', values: registerForm.orderRow },
       { key: 'cut', label: '裁床数量', values: registerForm.cutRow },
-      { key: 'sewing', label: '车缝数量', values: registerForm.sewingQuantities },
     ]
   })
   const registerSewingTotal = computed(() =>
-    registerForm.sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0),
+    registerForm.sewingQuantitiesByColor.reduce(
+      (sum, r) => sum + (Array.isArray(r.quantities) ? r.quantities.reduce((s, n) => s + (Number(n) || 0), 0) : 0),
+      0,
+    ),
   )
+  /** 每个颜色×尺码的车缝上限 = 对应裁床数量 */
+  function registerSewingCellMax(rowIdx: number, colIdx: number): number | undefined {
+    const cut = registerForm.cutColorRows?.[rowIdx]?.quantities?.[colIdx]
+    return cut != null && Number.isFinite(Number(cut)) ? Number(cut) : undefined
+  }
   const registerRules: FormRules = {
     defectQuantity: [],
     defectReason: [],
@@ -131,9 +144,12 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     const row = pending[0]
     registerDialog.row = row
     registerForm.headers = []
+    registerForm.sizeHeaders = []
     registerForm.orderRow = []
     registerForm.cutRow = []
-    registerForm.sewingQuantities = []
+    registerForm.orderColorRows = []
+    registerForm.cutColorRows = []
+    registerForm.sewingQuantitiesByColor = []
     registerForm.defectQuantity = 0
     registerForm.defectReason = ''
     registerDialog.visible = true
@@ -142,22 +158,30 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
       const res = await getCompleteFormData(row.orderId)
       const data = res.data
       const headers = data?.headers ?? []
+      const sizeHeaders = data?.sizeHeaders ?? []
       const orderRow = data?.orderRow ?? []
       const cutRow = data?.cutRow ?? []
+      const orderColorRows = Array.isArray(data?.orderColorRows) ? data.orderColorRows : []
+      const cutColorRows = Array.isArray(data?.cutColorRows) ? data.cutColorRows : []
       registerForm.headers = headers
+      registerForm.sizeHeaders = sizeHeaders
       registerForm.orderRow = orderRow
       registerForm.cutRow = cutRow
-      const len = headers.length
-      const sizeCount = len > 1 ? len - 1 : 1
-      const cutSizeValues = cutRow.slice(0, sizeCount)
-      const hasAnyCutValue = cutSizeValues.some((v) => v != null && !Number.isNaN(Number(v)))
-      const defaultSource = hasAnyCutValue ? cutRow : orderRow
-      registerForm.sewingQuantities = defaultSource
-        .slice(0, sizeCount)
-        .map((v) => (v != null ? Number(v) : 0))
-      while (registerForm.sewingQuantities.length < sizeCount) {
-        registerForm.sewingQuantities.push(0)
-      }
+      registerForm.orderColorRows = orderColorRows
+      registerForm.cutColorRows = cutColorRows
+      // 默认：把"裁床按颜色×尺码"作为车缝默认值（用户大概率沿用），可逐格修改
+      const sizeLen = sizeHeaders.length
+      registerForm.sewingQuantitiesByColor = orderColorRows.map((plan, ri) => {
+        const cutQ = cutColorRows[ri]?.quantities ?? []
+        const orderQ = plan.quantities ?? []
+        const quantities = Array.from({ length: sizeLen }, (_, ci) => {
+          const c = Number(cutQ[ci])
+          if (Number.isFinite(c) && c > 0) return c
+          const o = Number(orderQ[ci])
+          return Number.isFinite(o) && o > 0 ? o : 0
+        })
+        return { colorName: plan.colorName, quantities }
+      })
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
       registerDialog.visible = false
@@ -169,9 +193,12 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
   function resetRegisterForm() {
     registerDialog.row = null
     registerForm.headers = []
+    registerForm.sizeHeaders = []
     registerForm.orderRow = []
     registerForm.cutRow = []
-    registerForm.sewingQuantities = []
+    registerForm.orderColorRows = []
+    registerForm.cutColorRows = []
+    registerForm.sewingQuantitiesByColor = []
     registerForm.defectQuantity = 0
     registerForm.defectReason = ''
     registerFormRef.value?.clearValidate()
@@ -192,7 +219,7 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
         sewingQuantity: total,
         defectQuantity: registerForm.defectQuantity,
         defectReason: registerForm.defectReason.trim(),
-        sewingQuantities: registerForm.headers.length ? registerForm.sewingQuantities : undefined,
+        sewingQuantitiesByColor: registerForm.sewingQuantitiesByColor,
       })
       ElMessage.success('车缝登记完成，订单已进入待尾部')
       registerDialog.visible = false
@@ -216,6 +243,7 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     registerForm,
     registerSizeTableRows,
     registerSewingTotal,
+    registerSewingCellMax,
     registerRules,
     loadFactorySuppliers,
     openAssignDialog,

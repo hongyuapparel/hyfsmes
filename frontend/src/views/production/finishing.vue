@@ -143,6 +143,7 @@
       :dialog="receiveDialog"
       :size-table-rows="receiveSizeTableRows"
       :tail-total="receiveTailReceivedTotal"
+      :get-cell-max="receiveCellMax"
       @close="resetReceiveForm"
       @submit="submitReceive"
     />
@@ -152,10 +153,13 @@
       :dialog="packagingCompleteDialog"
       :packaging-size-table-rows="packagingSizeTableRows"
       :defect-total="defectTotal"
+      :inbound-total="inboundTotal"
       :already-inbound-qty="alreadyInboundQty"
       :remaining-qty="remainingQty"
-      :max-packaging-qty-for-size="maxPackagingQtyForSize"
-      :max-defect-qty-for-size="maxDefectQtyForSize"
+      :inbound-cell-max="inboundCellMax"
+      :defect-cell-max="defectCellMax"
+      :packaging-set-inbound-to-received="packagingSetInboundToReceived"
+      :packaging-set-zero="packagingSetZero"
       @close="resetPackagingCompleteDialog"
       @submit="submitPackagingComplete"
     />
@@ -311,6 +315,7 @@ const {
   receiveDialog,
   receiveSizeTableRows,
   receiveTailReceivedTotal,
+  receiveCellMax,
   resetReceiveForm,
   openReceiveDialog,
   submitReceive,
@@ -325,8 +330,11 @@ const {
   resetPackagingCompleteDialog,
   packagingSizeTableRows,
   defectTotal,
-  maxPackagingQtyForSize,
-  maxDefectQtyForSize,
+  inboundTotal,
+  inboundCellMax,
+  defectCellMax,
+  packagingSetInboundToReceived,
+  packagingSetZero,
   alreadyInboundQty,
   remainingQty,
   openPackagingCompleteDialog,

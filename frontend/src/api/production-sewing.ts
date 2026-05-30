@@ -70,11 +70,14 @@ export function assignSewing(payload: {
   return request.post<void>('/production/sewing/items/assign', payload)
 }
 
-/** 登记车缝完成弹窗用：订单数量/裁床数量按尺码（只读） */
+/** 登记车缝完成弹窗用：订单/裁床按颜色×尺码（只读） + 聚合行（兼容） */
 export interface CompleteFormDataRes {
   headers: string[]
   orderRow: (number | null)[]
   cutRow: (number | null)[]
+  sizeHeaders: string[]
+  orderColorRows: Array<{ colorName: string; quantities: number[] }>
+  cutColorRows: Array<{ colorName: string; quantities: number[] }>
 }
 
 export function getCompleteFormData(orderId: number) {
@@ -86,8 +89,10 @@ export function completeSewing(payload: {
   sewingQuantity: number
   defectQuantity: number
   defectReason: string
-  /** 按尺码车缝数量，与 headers 顺序一致；传则优先于 sewingQuantity */
+  /** 按尺码车缝数量（仅单色或老客户端兜底） */
   sewingQuantities?: number[]
+  /** 按颜色×尺码车缝数量真值（多色订单必填） */
+  sewingQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
 }) {
   return request.post<void>('/production/sewing/items/complete', payload)
 }

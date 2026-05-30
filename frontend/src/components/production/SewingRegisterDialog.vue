@@ -7,73 +7,98 @@
     @close="emit('close')"
   >
     <template v-if="dialog.row">
-      <div class="register-brief">
-        <div>订单号：{{ dialog.row.orderNo }}</div>
-        <div>SKU：{{ dialog.row.skuCode }}</div>
+      <div class="register-brief register-brief-inline">
+        <span><span class="brief-label">订单号</span>{{ dialog.row.orderNo }}</span>
+        <span class="brief-sep">·</span>
+        <span><span class="brief-label">SKU</span>{{ dialog.row.skuCode }}</span>
       </div>
       <div v-if="completeLoading" class="register-loading">加载尺寸细数...</div>
-      <template v-else-if="form.headers?.length">
-        <div class="register-qty-title">尺寸细数</div>
-        <el-table :data="sizeTableRows" border size="small" class="register-qty-table" style="width: 100%">
-          <el-table-column prop="label" label="" width="90" align="right" />
-          <el-table-column
-            v-for="(h, idx) in form.headers"
-            :key="idx"
-            :label="h"
-            min-width="100"
-            align="center"
+      <template v-else-if="form.sizeHeaders?.length">
+        <p class="register-qty-tip">按颜色分别登记车缝数量；每格不可超过对应颜色的裁床数。</p>
+        <div
+          v-for="(plan, ri) in form.orderColorRows"
+          :key="plan.colorName + ri"
+          class="color-register-block"
+        >
+          <div class="color-register-title">{{ plan.colorName }}</div>
+          <el-table
+            :data="rowsForColor(ri)"
+            border
+            size="small"
+            class="editable-grid color-register-table"
+            style="width: 100%"
+            :row-class-name="rowClassName"
           >
-            <template #default="{ row }">
-              <template v-if="row.key === 'order' || row.key === 'cut'">
-                {{ row.values[idx] != null ? formatDisplayNumber(row.values[idx]) : '-' }}
+            <el-table-column label="" width="80" align="right">
+              <template #default="{ row }">
+                <span :class="{ 'cell-input-label': row.kind === 'input' }">{{ row.label }}</span>
               </template>
-              <template
-                v-else-if="row.key === 'sewing' && idx === form.headers.length - 1 && form.headers.length > 1"
-              >
-                {{ formatDisplayNumber(sewingTotal) }}
+            </el-table-column>
+            <el-table-column
+              v-for="(h, ci) in form.sizeHeaders"
+              :key="ci"
+              :label="h"
+              min-width="72"
+              align="center"
+            >
+              <template #default="{ row }">
+                <template v-if="row.kind === 'readonly'">
+                  {{ formatDisplayNumber(row.values[ci] ?? 0) }}
+                </template>
+                <span v-else :data-cell-r="0" :data-cell-c="ci" class="cell-input">
+                  <el-input-number
+                    v-model="form.sewingQuantitiesByColor[ri].quantities[ci]"
+                    :min="0"
+                    :max="getCellMax(ri, ci)"
+                    :precision="0"
+                    :controls="false"
+                    size="small"
+                    style="width: 100%"
+                    @keydown="onMatrixCellKeydown"
+                    @focus="selectAllOnFocus"
+                  />
+                </span>
               </template>
-              <template v-else>
-                <el-input-number
-                  v-model="form.sewingQuantities[idx]"
-                  :min="0"
-                  :max="form.cutRow[idx] != null ? Number(form.cutRow[idx]) : undefined"
-                  :precision="0"
-                  controls-position="right"
-                  size="small"
-                  style="width: 100%"
-                />
+            </el-table-column>
+            <el-table-column label="合计" width="68" align="right">
+              <template #default="{ row }">
+                <strong v-if="row.kind === 'input'">{{ formatDisplayNumber(sumColorRowInput(ri)) }}</strong>
+                <span v-else>{{ formatDisplayNumber(sumReadonly(row.values)) }}</span>
               </template>
-            </template>
-          </el-table-column>
-        </el-table>
-        <p class="register-qty-sum">车缝数量合计：{{ formatDisplayNumber(sewingTotal) }}</p>
+            </el-table-column>
+          </el-table>
+        </div>
+        <p class="register-qty-grand">车缝数量总合计：<strong>{{ formatDisplayNumber(sewingTotal) }}</strong></p>
       </template>
       <el-form
         ref="internalFormRef"
         :model="form"
         :rules="rules"
-        label-width="100px"
-        class="register-form"
+        label-width="70px"
+        class="register-form register-form-inline"
+        size="small"
       >
-        <el-form-item label="次品数量" prop="defectQuantity">
-          <el-input-number
-            v-model="form.defectQuantity"
-            :min="0"
-            :precision="0"
-            controls-position="right"
-            style="width: 160px"
-          />
-        </el-form-item>
-        <el-form-item label="次品说明" prop="defectReason">
-          <el-input
-            v-model="form.defectReason"
-            type="textarea"
-            :rows="3"
-            placeholder="填写次品原因或说明"
-            maxlength="500"
-            show-word-limit
-          />
-        </el-form-item>
+        <div class="defect-row">
+          <el-form-item label="次品数" prop="defectQuantity" class="defect-qty-item">
+            <el-input-number
+              v-model="form.defectQuantity"
+              :min="0"
+              :precision="0"
+              :controls="false"
+              size="small"
+              style="width: 90px"
+            />
+          </el-form-item>
+          <el-form-item label="次品说明" prop="defectReason" class="defect-reason-item">
+            <el-input
+              v-model="form.defectReason"
+              placeholder="填写次品原因或说明"
+              maxlength="200"
+              size="small"
+              clearable
+            />
+          </el-form-item>
+        </div>
       </el-form>
     </template>
     <template #footer>
@@ -88,12 +113,21 @@ import { computed, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { SewingListItem } from '@/api/production-sewing'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { onMatrixCellKeydown, selectAllOnFocus } from '@/utils/matrix-cell-nav'
+
+interface ColorRow {
+  colorName: string
+  quantities: number[]
+}
 
 interface RegisterForm {
   headers: string[]
+  sizeHeaders: string[]
   orderRow: (number | null)[]
   cutRow: (number | null)[]
-  sewingQuantities: number[]
+  orderColorRows: ColorRow[]
+  cutColorRows: ColorRow[]
+  sewingQuantitiesByColor: ColorRow[]
   defectQuantity: number
   defectReason: string
 }
@@ -117,7 +151,34 @@ const props = defineProps<{
   completeLoading: boolean
   sizeTableRows: SizeTableRow[]
   sewingTotal: number
+  getCellMax: (rowIdx: number, colIdx: number) => number | undefined
 }>()
+
+type ColorBlockRow =
+  | { kind: 'readonly'; label: string; values: number[] }
+  | { kind: 'input'; label: string }
+
+function rowsForColor(ri: number): ColorBlockRow[] {
+  const orderQ = props.form.orderColorRows[ri]?.quantities ?? []
+  const cutQ = props.form.cutColorRows[ri]?.quantities ?? []
+  return [
+    { kind: 'readonly', label: '订单数量', values: orderQ },
+    { kind: 'readonly', label: '裁床数量', values: cutQ },
+    { kind: 'input', label: '车缝数量' },
+  ]
+}
+
+function sumReadonly(values: number[]): number {
+  return (values ?? []).reduce((s, n) => s + (Number(n) || 0), 0)
+}
+
+function sumColorRowInput(ri: number): number {
+  return (props.form.sewingQuantitiesByColor[ri]?.quantities ?? []).reduce((s, n) => s + (Number(n) || 0), 0)
+}
+
+function rowClassName({ row }: { row: ColorBlockRow }): string {
+  return row.kind === 'input' ? 'register-input-row' : ''
+}
 
 const emit = defineEmits<{
   (e: 'update:dialog', val: DialogState): void
@@ -148,6 +209,42 @@ defineExpose({ formRef: internalFormRef })
   margin-top: 4px;
 }
 
+.register-brief-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  margin-bottom: 8px;
+}
+
+.register-brief-inline .brief-label {
+  color: var(--el-text-color-secondary);
+  margin-right: 4px;
+}
+
+.register-brief-inline .brief-sep {
+  color: var(--el-text-color-placeholder);
+}
+
+.register-form-inline {
+  margin-top: 8px;
+}
+
+.defect-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.defect-qty-item {
+  margin-bottom: 0;
+}
+
+.defect-reason-item {
+  flex: 1;
+  margin-bottom: 0;
+}
+
 .register-loading {
   padding: var(--space-md);
   color: var(--el-text-color-secondary);
@@ -172,5 +269,47 @@ defineExpose({ formRef: internalFormRef })
 
 .register-form {
   margin-top: var(--space-sm);
+}
+
+.register-qty-tip {
+  margin: 0 0 12px;
+  color: var(--el-text-color-secondary);
+  font-size: 12px;
+}
+
+.color-register-block {
+  margin-bottom: 14px;
+}
+
+.color-register-title {
+  font-weight: 600;
+  font-size: 13px;
+  margin-bottom: 6px;
+  color: var(--el-text-color-primary);
+}
+
+.color-register-block:last-child {
+  margin-bottom: 0;
+}
+
+.cell-input-label {
+  font-weight: 600;
+  color: var(--el-color-primary);
+}
+
+:deep(.register-input-row > td.el-table__cell) {
+  background-color: var(--el-color-primary-light-9);
+}
+
+.register-qty-grand {
+  margin: 12px 0 0;
+  text-align: right;
+  font-size: 13px;
+  color: var(--el-text-color-regular);
+}
+
+.register-qty-grand strong {
+  color: var(--el-text-color-primary);
+  font-size: 14px;
 }
 </style>

@@ -16,6 +16,11 @@ export interface PendingListItem {
   operatorUsername?: string
   remark?: string
   createdAt: string
+  /** 本批入库/次品的颜色×尺码真值快照（来自尾部入库登记） */
+  colorSizeSnapshot?: {
+    headers: string[]
+    rows: Array<{ colorName: string; quantities: number[] }>
+  } | null
 }
 
 export function getPendingList(params?: {

@@ -341,12 +341,9 @@ export class OrderQueryService {
       if (oa > 0) out.push(Math.round((Number(a) * oc) / oa));
       else out.push(null);
     }
-    const aT = agg[sizeLen];
-    const cT = Number(orderC[sizeLen]) || 0;
-    const allT = Number(orderAll[sizeLen]) || 0;
-    if (aT == null) out.push(null);
-    else if (allT > 0) out.push(Math.round((Number(aT) * cT) / allT));
-    else out.push(cT > 0 ? Number(aT) : null);
+    const hasAnyPerSize = out.some((v) => v != null);
+    if (!hasAnyPerSize) out.push(null);
+    else out.push(out.reduce((sum: number, v) => sum + (Number(v) || 0), 0));
     return out;
   }
 
@@ -384,59 +381,29 @@ export class OrderQueryService {
 
     let sewingRow: (number | null)[] | null = null;
     const sewingQtyRow = sewing?.sewingQuantityRow ?? null;
-    if (Array.isArray(sewingQtyRow) && sewingQtyRow.length === headers.length) {
-      sewingRow = sewingQtyRow.map((n) => (typeof n === 'number' && Number.isFinite(n) ? n : null));
+    const sewingTotal = sewing?.sewingQuantity ?? null;
+    if (headers.length === 1) {
+      if (sewingTotal != null) sewingRow = [sewingTotal];
     } else if (Array.isArray(sewingQtyRow) && sewingQtyRow.length > 0) {
-      const total = sewingQtyRow.reduce((a, b) => a + (Number(b) || 0), 0);
-      sewingRow = headers.length === 1 ? [total] : [...sewingQtyRow.slice(0, sizeLen), total];
-      while (sewingRow.length < headers.length) sewingRow.push(null);
-    } else {
-      const sewingTotal = sewing?.sewingQuantity ?? null;
-      sewingRow = sewingTotal != null ? [...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []), sewingTotal] : null;
+      const perSize: (number | null)[] = Array.from({ length: sizeLen }, (_, i) => {
+        const v = sewingQtyRow[i];
+        return typeof v === 'number' && Number.isFinite(v) ? v : null;
+      });
+      const total = perSize.reduce((sum: number, v) => sum + (Number(v) || 0), 0);
+      sewingRow = [...perSize, total];
+    } else if (sewingTotal != null) {
+      sewingRow = [...Array(sizeLen).fill(null), sewingTotal];
     }
 
-    const inboundTotal = finishing?.tailInboundQty ?? null;
-    let inboundRow: (number | null)[] | null = null;
-    if (inboundTotal != null) {
-      let receivedQtyRow: number[] | null = null;
-      try {
-        const rows = await this.orderFinishingRepo.query(
-          'SELECT tail_received_qty_row AS tailReceivedQtyRow FROM `order_finishing` WHERE order_id = ? LIMIT 1',
-          [orderId],
-        );
-        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as Record<string, unknown>).tailReceivedQtyRow : null;
-        if (raw != null) {
-          const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          if (Array.isArray(parsed)) receivedQtyRow = parsed.map((n: unknown) => Number(n) || 0);
-        }
-      } catch {
-        // ignore
-      }
-      if (receivedQtyRow && sizeLen > 0) {
-        const base = receivedQtyRow.slice(0, sizeLen).map((n) => Math.max(0, Number(n) || 0));
-        while (base.length < sizeLen) base.push(0);
-        const receivedTotal = Number(finishing?.tailReceivedQty) || base.reduce((a, b) => a + b, 0);
-        if (receivedTotal > 0) {
-          const exact = base.map((n) => (n * Number(inboundTotal)) / receivedTotal);
-          const floorVals = exact.map((v) => Math.floor(v));
-          let remain = Number(inboundTotal) - floorVals.reduce((a, b) => a + b, 0);
-          const idxByFrac = exact.map((v, i) => ({ i, frac: v - Math.floor(v) })).sort((a, b) => b.frac - a.frac);
-          for (const item of idxByFrac) {
-            if (remain <= 0) break;
-            floorVals[item.i] += 1;
-            remain -= 1;
-          }
-          inboundRow = [...floorVals, Number(inboundTotal)];
-        }
-      }
-      if (!inboundRow) inboundRow = [...(headers.length > 1 ? Array(headers.length - 1).fill(null) : []), Number(inboundTotal)];
-    }
+    // 严格"以系统填写为准"：不再用 fin.tailInboundQty / fin.defectQuantity 标量
+    // 按 tail_received_qty_row 比例兜底估算尾部入库数 / 次品数的尺码分布。
+    // 真值（tail_inbound_quantities_by_color / defect_quantities_by_color）存在
+    // 时由下方真值优先路径补行；不存在则该行不出现在结果中。
 
     const rows: Array<{ label: string; values: (number | null)[] }> = [];
     if (orderPerSize) rows.push({ label: '订单数量', values: orderPerSize });
     if (cutPerSize) rows.push({ label: '裁床数量', values: cutPerSize });
     if (sewingRow) rows.push({ label: '车缝数量', values: sewingRow });
-    if (inboundRow) rows.push({ label: '尾部入库数', values: inboundRow });
 
     const colorSizeRowsList = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
     let orderAllNumeric: number[] = [];
@@ -449,7 +416,91 @@ export class OrderQueryService {
         for (let i = 0; i < r.length; i++) orderAllNumeric[i] += r[i];
       }
     }
-    const cutAggNullable: (number | null)[] | null = cutPerSize ? cutPerSize.map((x) => Number(x)) : null;
+    // === 真值优先：读 *_by_color 三个字段（select=false，需原生 SQL） ===
+    const fetchByColorTruth = async (
+      repo: { query: (sql: string, params: unknown[]) => Promise<unknown> },
+      table: string,
+      column: string,
+    ): Promise<Map<string, number[]> | null> => {
+      try {
+        const rs = await repo.query(`SELECT \`${column}\` AS value FROM \`${table}\` WHERE order_id = ? LIMIT 1`, [orderId]);
+        const raw = Array.isArray(rs) && rs.length > 0 ? (rs[0] as { value?: unknown }).value : null;
+        if (raw == null) return null;
+        let parsed: unknown = raw;
+        if (typeof raw === 'string') {
+          try { parsed = JSON.parse(raw); } catch { return null; }
+        }
+        if (!Array.isArray(parsed) || parsed.length === 0) return null;
+        const m = new Map<string, number[]>();
+        for (const r of parsed as Array<{ colorName?: string; quantities?: unknown }>) {
+          const name = this.normColorNameForBreakdown(r?.colorName);
+          const q = Array.isArray(r?.quantities) ? (r.quantities as unknown[]) : [];
+          const filled = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
+          if (m.has(name)) {
+            const prev = m.get(name)!;
+            for (let i = 0; i < sizeLen; i++) prev[i] += filled[i];
+          } else {
+            m.set(name, filled);
+          }
+        }
+        return m;
+      } catch {
+        return null;
+      }
+    };
+    const [sewingByColorMap, receivedByColorMap, inboundByColorMap, defectByColorMap] = await Promise.all([
+      fetchByColorTruth(this.orderSewingRepo, 'order_sewing', 'sewing_quantities_by_color'),
+      fetchByColorTruth(this.orderFinishingRepo, 'order_finishing', 'tail_received_quantities_by_color'),
+      fetchByColorTruth(this.orderFinishingRepo, 'order_finishing', 'tail_inbound_quantities_by_color'),
+      fetchByColorTruth(this.orderFinishingRepo, 'order_finishing', 'defect_quantities_by_color'),
+    ]);
+
+    // 真值优先时，把聚合行也按真值之和重算（避免读到老的 sewingQuantityRow 一维与新二维不一致）
+    if (sewingByColorMap && sizeLen > 0) {
+      const sums = Array(sizeLen).fill(0) as number[];
+      for (const q of sewingByColorMap.values()) {
+        for (let i = 0; i < sizeLen; i++) sums[i] += q[i] || 0;
+      }
+      const total = sums.reduce((a, b) => a + b, 0);
+      const sewingRowAgg: (number | null)[] = [...sums, total];
+      const idx = rows.findIndex((r) => r.label === '车缝数量');
+      if (idx >= 0) rows[idx].values = sewingRowAgg;
+      else rows.push({ label: '车缝数量', values: sewingRowAgg });
+    }
+    if (receivedByColorMap && sizeLen > 0) {
+      const sums = Array(sizeLen).fill(0) as number[];
+      for (const q of receivedByColorMap.values()) {
+        for (let i = 0; i < sizeLen; i++) sums[i] += q[i] || 0;
+      }
+      const total = sums.reduce((a, b) => a + b, 0);
+      const receivedRowAgg: (number | null)[] = [...sums, total];
+      const idx = rows.findIndex((r) => r.label === '尾部收货数');
+      if (idx >= 0) rows[idx].values = receivedRowAgg;
+      else rows.push({ label: '尾部收货数', values: receivedRowAgg });
+    }
+    if (inboundByColorMap && sizeLen > 0) {
+      const sums = Array(sizeLen).fill(0) as number[];
+      for (const q of inboundByColorMap.values()) {
+        for (let i = 0; i < sizeLen; i++) sums[i] += q[i] || 0;
+      }
+      const total = sums.reduce((a, b) => a + b, 0);
+      const inboundRowAgg: (number | null)[] = [...sums, total];
+      const idx = rows.findIndex((r) => r.label === '尾部入库数');
+      if (idx >= 0) rows[idx].values = inboundRowAgg;
+      else rows.push({ label: '尾部入库数', values: inboundRowAgg });
+    }
+    if (defectByColorMap && sizeLen > 0) {
+      const sums = Array(sizeLen).fill(0) as number[];
+      for (const q of defectByColorMap.values()) {
+        for (let i = 0; i < sizeLen; i++) sums[i] += q[i] || 0;
+      }
+      const total = sums.reduce((a, b) => a + b, 0);
+      const defectRowAgg: (number | null)[] = [...sums, total];
+      const idx = rows.findIndex((r) => r.label === '次品数');
+      if (idx >= 0) rows[idx].values = defectRowAgg;
+      else rows.push({ label: '次品数', values: defectRowAgg });
+    }
+
     const byColor: Array<{ colorName: string; rows: Array<{ label: string; values: (number | null)[] }> }> = [];
     if (!colorSizeRowsList.length) {
       byColor.push({ colorName: '-', rows: rows.map((r) => ({ label: r.label, values: [...r.values] })) });
@@ -457,16 +508,49 @@ export class OrderQueryService {
       for (const cr of colorSizeRowsList) {
         const displayName = this.normColorNameForBreakdown(cr?.colorName) || '-';
         const orderC = this.orderRowFromColorSizeRow(cr, sizeLen);
+        // 裁床：actualCutRows 本身按颜色分行的真值；缺该色就不输出本色裁床行（不再按订单计划比例分摊）
         const cutExact = this.cutRowForColor(this.normColorNameForBreakdown(cr?.colorName), cutting?.actualCutRows ?? null, sizeLen);
-        let cutVals: (number | null)[] | null = cutExact ? cutExact.map((x) => x) : null;
-        if (!cutVals && cutAggNullable) cutVals = this.allocateAggByOrderColumns(cutAggNullable, orderC, orderAllNumeric);
-        const sewVals = sewingRow ? this.allocateAggByOrderColumns(sewingRow, orderC, orderAllNumeric) : null;
-        const inbVals = inboundRow ? this.allocateAggByOrderColumns(inboundRow, orderC, orderAllNumeric) : null;
+        const cutVals: (number | null)[] | null = cutExact ? cutExact.map((x) => x) : null;
+
+        // 车缝：严格真值（sewing_quantities_by_color），没真值不输出本色车缝行
+        let sewVals: (number | null)[] | null = null;
+        const sewTruth = sewingByColorMap?.get(displayName);
+        if (sewTruth && sizeLen > 0) {
+          const total = sewTruth.reduce((a, b) => a + (Number(b) || 0), 0);
+          sewVals = [...sewTruth.map((n) => Number(n)), total];
+        }
+
+        // 尾部收货：严格真值，没真值不输出本色尾部收货行
+        let recVals: (number | null)[] | null = null;
+        const recTruth = receivedByColorMap?.get(displayName);
+        if (recTruth && sizeLen > 0) {
+          const total = recTruth.reduce((a, b) => a + (Number(b) || 0), 0);
+          recVals = [...recTruth.map((n) => Number(n)), total];
+        }
+
+        // 尾部入库：严格真值，没真值不输出本色尾部入库行
+        let inbVals: (number | null)[] | null = null;
+        const inbTruth = inboundByColorMap?.get(displayName);
+        if (inbTruth && sizeLen > 0) {
+          const total = inbTruth.reduce((a, b) => a + (Number(b) || 0), 0);
+          inbVals = [...inbTruth.map((n) => Number(n)), total];
+        }
+
+        // 次品：严格真值，没真值不输出本色次品行
+        let defVals: (number | null)[] | null = null;
+        const defTruth = defectByColorMap?.get(displayName);
+        if (defTruth && sizeLen > 0) {
+          const total = defTruth.reduce((a, b) => a + (Number(b) || 0), 0);
+          defVals = [...defTruth.map((n) => Number(n)), total];
+        }
+
         const blockRows: Array<{ label: string; values: (number | null)[] }> = [];
         blockRows.push({ label: '订单数量', values: orderC.map((x) => x) });
         if (cutVals) blockRows.push({ label: '裁床数量', values: cutVals });
         if (sewVals) blockRows.push({ label: '车缝数量', values: sewVals });
+        if (recVals) blockRows.push({ label: '尾部收货数', values: recVals });
         if (inbVals) blockRows.push({ label: '尾部入库数', values: inbVals });
+        if (defVals) blockRows.push({ label: '次品数', values: defVals });
         byColor.push({ colorName: displayName, rows: blockRows });
       }
     }

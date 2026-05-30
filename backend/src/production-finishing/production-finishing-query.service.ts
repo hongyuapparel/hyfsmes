@@ -313,6 +313,20 @@ export class ProductionFinishingQueryService {
     tailReceivedRow: (number | null)[];
     tailInboundRow: (number | null)[] | null;
     defectRow: (number | null)[] | null;
+    /** 不含合计列的尺码 headers，用于二维矩阵 */
+    sizeHeaders: string[];
+    /** 订单计划按颜色×尺码 */
+    planColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 裁床实际按颜色×尺码 */
+    cutColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 车缝完成按颜色×尺码（真值，无则空数组） */
+    sewingColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 尾部收货按颜色×尺码（真值，无则空数组） */
+    tailReceivedColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 尾部入库按颜色×尺码累计（真值，无则空数组） */
+    tailInboundColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 次品按颜色×尺码累计（真值，无则空数组） */
+    defectColorRows: Array<{ colorName: string; quantities: number[] }>;
   }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
@@ -373,6 +387,83 @@ export class ProductionFinishingQueryService {
     const tailInboundRow = this.normalizeFinishingQtyRowToHeaders(inboundStored, headers);
     const defectRow = this.normalizeFinishingQtyRowToHeaders(defectStored, headers);
 
+    // === 按颜色×尺码（真值或对齐订单计划的展开） ===
+    const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders.slice() : [];
+    const norm = (s: unknown) => String(s ?? '').trim();
+    const planRowsArr = Array.isArray((ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[] }> })?.colorSizeRows)
+      ? ((ext as { colorSizeRows: Array<{ colorName?: string; quantities?: number[] }> }).colorSizeRows)
+      : [];
+    const planColorRows = planRowsArr.map((r) => {
+      const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
+      const quantities = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
+      return { colorName: norm(r?.colorName), quantities };
+    });
+    const buildColorRowsAlignedToPlan = (
+      source: Array<{ colorName?: string; quantities?: number[] }> | null | undefined,
+    ): Array<{ colorName: string; quantities: number[] }> => {
+      if (!Array.isArray(source) || source.length === 0 || sizeLen === 0) return [];
+      const map = new Map<string, number[]>();
+      for (const r of source) {
+        const name = norm(r?.colorName);
+        const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
+        const filled = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
+        if (map.has(name)) {
+          const prev = map.get(name)!;
+          for (let i = 0; i < sizeLen; i++) prev[i] += filled[i];
+        } else {
+          map.set(name, filled);
+        }
+      }
+      return planColorRows.map((p) => ({
+        colorName: p.colorName,
+        quantities: map.get(p.colorName) ?? Array(sizeLen).fill(0),
+      }));
+    };
+    const cutColorRows = buildColorRowsAlignedToPlan(cutting?.actualCutRows ?? null);
+
+    const fetchByColor = async (column: string): Promise<Array<{ colorName: string; quantities: number[] }>> => {
+      try {
+        const rows = await this.finishingRepo.query(
+          `SELECT \`${column}\` AS value FROM \`order_finishing\` WHERE order_id = ? LIMIT 1`,
+          [orderId],
+        );
+        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { value?: unknown }).value : null;
+        if (raw == null) return [];
+        let parsed: unknown = raw;
+        if (typeof raw === 'string') {
+          try { parsed = JSON.parse(raw); } catch { return []; }
+        }
+        if (!Array.isArray(parsed)) return [];
+        return buildColorRowsAlignedToPlan(parsed as Array<{ colorName?: string; quantities?: number[] }>);
+      } catch {
+        return [];
+      }
+    };
+    const fetchSewingByColor = async (): Promise<Array<{ colorName: string; quantities: number[] }>> => {
+      try {
+        const rows = await this.sewingRepo.query(
+          'SELECT `sewing_quantities_by_color` AS value FROM `order_sewing` WHERE order_id = ? LIMIT 1',
+          [orderId],
+        );
+        const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { value?: unknown }).value : null;
+        if (raw == null) return [];
+        let parsed: unknown = raw;
+        if (typeof raw === 'string') {
+          try { parsed = JSON.parse(raw); } catch { return []; }
+        }
+        if (!Array.isArray(parsed)) return [];
+        return buildColorRowsAlignedToPlan(parsed as Array<{ colorName?: string; quantities?: number[] }>);
+      } catch {
+        return [];
+      }
+    };
+    const [sewingColorRows, tailReceivedColorRows, tailInboundColorRows, defectColorRows] = await Promise.all([
+      fetchSewingByColor(),
+      fetchByColor('tail_received_quantities_by_color'),
+      fetchByColor('tail_inbound_quantities_by_color'),
+      fetchByColor('defect_quantities_by_color'),
+    ]);
+
     return {
       headers,
       orderRow: orderRow ?? (headers.length === 1 ? [order.quantity ?? 0] : [...Array(headers.length).fill(null)]),
@@ -383,6 +474,13 @@ export class ProductionFinishingQueryService {
       tailReceivedRow,
       tailInboundRow,
       defectRow,
+      sizeHeaders,
+      planColorRows,
+      cutColorRows,
+      sewingColorRows,
+      tailReceivedColorRows,
+      tailInboundColorRows,
+      defectColorRows,
     };
   }
 

@@ -24,6 +24,8 @@ export interface PendingListItem {
   operatorUsername: string;
   remark: string;
   createdAt: string;
+  /** 本批入库/次品的颜色×尺码真值快照（来自尾部入库登记） */
+  colorSizeSnapshot: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null;
 }
 
 type PendingOutboundItemInput = {
@@ -164,6 +166,7 @@ export class InventoryPendingService {
         operatorUsername: r.operatorUsername ?? '',
         remark: r.remark ?? '',
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
+        colorSizeSnapshot: null,
       }));
       return { list, total, page, pageSize };
     }
@@ -183,6 +186,7 @@ export class InventoryPendingService {
         'p.quantity AS quantity',
         'p.source_type AS sourceType',
         'p.created_at AS createdAt',
+        'p.color_size_snapshot AS colorSizeSnapshot',
       ]);
 
     if (orderNo?.trim()) {
@@ -218,7 +222,29 @@ export class InventoryPendingService {
         quantity: number;
         sourceType: string;
         createdAt: Date;
+        colorSizeSnapshot: unknown;
       }>();
+
+    const parseSnapshot = (raw: unknown): PendingListItem['colorSizeSnapshot'] => {
+      if (raw == null) return null;
+      let parsed: unknown = raw;
+      if (typeof raw === 'string') {
+        try { parsed = JSON.parse(raw); } catch { return null; }
+      }
+      if (!parsed || typeof parsed !== 'object') return null;
+      const rec = parsed as { headers?: unknown; rows?: unknown };
+      const headers = Array.isArray(rec.headers) ? rec.headers.map((h) => String(h ?? '')) : [];
+      const rowsArr = Array.isArray(rec.rows) ? rec.rows : [];
+      const rowsOut: Array<{ colorName: string; quantities: number[] }> = [];
+      for (const item of rowsArr) {
+        if (!item || typeof item !== 'object') continue;
+        const r = item as { colorName?: unknown; quantities?: unknown };
+        const colorName = String(r.colorName ?? '').trim();
+        const q = Array.isArray(r.quantities) ? r.quantities : [];
+        rowsOut.push({ colorName, quantities: q.map((n) => Math.max(0, Math.trunc(Number(n) || 0))) });
+      }
+      return headers.length > 0 && rowsOut.length > 0 ? { headers, rows: rowsOut } : null;
+    };
 
     const list: PendingListItem[] = rows.map((r) => ({
       id: r.id,
@@ -234,6 +260,7 @@ export class InventoryPendingService {
       operatorUsername: '',
       remark: '',
       createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
+      colorSizeSnapshot: parseSnapshot(r.colorSizeSnapshot),
     }));
 
     return { list, total, page, pageSize };
@@ -252,9 +279,11 @@ export class InventoryPendingService {
     if (!ids?.length) {
       throw new NotFoundException('请选择待仓处理记录');
     }
-    const pendings = await this.pendingRepo.find({
-      where: { id: In(ids), status: 'pending' },
-    });
+    const pendings = await this.pendingRepo
+      .createQueryBuilder('p')
+      .where('p.id IN (:...ids) AND p.status = :status', { ids, status: 'pending' })
+      .addSelect('p.color_size_snapshot')
+      .getMany();
     if (pendings.length === 0) {
       throw new NotFoundException('未找到有效的待仓处理记录');
     }
@@ -275,6 +304,9 @@ export class InventoryPendingService {
     }
     for (const p of pendings) {
       const order = orderMap.get(p.orderId);
+      // 优先使用 inbound_pending 上的颜色×尺码 snapshot（尾部入库登记的真值）；
+      // 缺失时（老数据）回退到 createManual 内部的 buildOrderColorSizeSnapshot 兜底反推。
+      const snapshot = (p as { colorSizeSnapshot?: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null }).colorSizeSnapshot ?? null;
       await this.finishedGoodsStockService.createManual(
         {
           orderNo: order?.orderNo ?? '',
@@ -286,6 +318,7 @@ export class InventoryPendingService {
           department: department?.trim() ?? '',
           location: location?.trim() ?? '',
           imageUrl: img,
+          colorSize: snapshot ?? undefined,
         },
         operatorUsername,
       );

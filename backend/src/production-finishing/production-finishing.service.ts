@@ -26,20 +26,17 @@ export class ProductionFinishingService {
     return this.queryService.getFinishingExportRows(query);
   }
 
-  getRegisterFormData(orderId: number): Promise<{
-    headers: string[];
-    orderRow: (number | null)[];
-    cutRow: (number | null)[];
-    sewingRow: (number | null)[];
-    tailReceivedRow: (number | null)[];
-    tailInboundRow: (number | null)[] | null;
-    defectRow: (number | null)[] | null;
-  }> {
+  getRegisterFormData(orderId: number): ReturnType<ProductionFinishingQueryService['getRegisterFormData']> {
     return this.queryService.getRegisterFormData(orderId);
   }
 
-  registerReceive(orderId: number, tailReceivedQty: number, tailReceivedQuantities?: number[] | null): Promise<void> {
-    return this.mutationService.registerReceive(orderId, tailReceivedQty, tailReceivedQuantities);
+  registerReceive(
+    orderId: number,
+    tailReceivedQty: number,
+    tailReceivedQuantities?: number[] | null,
+    tailReceivedQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }> | null,
+  ): Promise<void> {
+    return this.mutationService.registerReceive(orderId, tailReceivedQty, tailReceivedQuantities, tailReceivedQuantitiesByColor);
   }
 
   registerPackagingComplete(
@@ -52,6 +49,8 @@ export class ProductionFinishingService {
     actorUsername?: string,
     tailInboundQuantities?: number[] | null,
     defectQuantities?: number[] | null,
+    tailInboundQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }> | null,
+    defectQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }> | null,
   ): Promise<void> {
     return this.mutationService.registerPackagingComplete(
       orderId,
@@ -63,6 +62,8 @@ export class ProductionFinishingService {
       actorUsername,
       tailInboundQuantities,
       defectQuantities,
+      tailInboundQuantitiesByColor,
+      defectQuantitiesByColor,
     );
   }
 
