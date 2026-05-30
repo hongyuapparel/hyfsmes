@@ -79,7 +79,7 @@
             <AppTabs v-if="showHeaderTabs" />
           </div>
           <div class="header-actions">
-            <el-tag v-if="healthStatus" type="success" size="small" class="health-status-tag">{{ healthStatus }}</el-tag>
+            <UpdateBell />
             <span class="user-name">{{ authStore.user?.displayName || authStore.user?.username }}</span>
             <el-button text type="primary" @click="handleLogout">退出</el-button>
           </div>
@@ -101,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import {
   Expand,
@@ -121,8 +121,8 @@ import {
 import { useAppStore } from '@/stores/app'
 import { useAuthStore } from '@/stores/auth'
 import AppTabs from './AppTabs.vue'
+import UpdateBell from '@/components/layout/UpdateBell.vue'
 import { menuConfig } from '@/router/menu'
-import { getHealth } from '@/api/health'
 import type { MenuItem } from '@/router/menu'
 import brandLogoUrl from '@/assets/brand-logo.svg'
 import { OUTER_ROUTE_CACHE_MAX, getOuterRouteCacheKey } from '@/composables/useRouteCacheControl'
@@ -132,7 +132,6 @@ const route = useRoute()
 const router = useRouter()
 const appStore = useAppStore()
 const authStore = useAuthStore()
-const healthStatus = ref('')
 const { isMobile } = useIsMobile()
 const mobileSidebarOpen = ref(false)
 const layoutMainRef = ref<HTMLElement | null>(null)
@@ -263,15 +262,6 @@ function handleLogout() {
   authStore.logout()
   router.push('/login')
 }
-
-onMounted(async () => {
-  try {
-    const res = await getHealth()
-    healthStatus.value = res.data?.status === 'ok' ? '后端正常' : ''
-  } catch {
-    healthStatus.value = '后端未连接'
-  }
-})
 
 watch(
   () => getRouteScrollSnapshot(route),
@@ -408,11 +398,6 @@ onBeforeUnmount(() => {
   gap: var(--space-sm);
 }
 
-.health-status-tag {
-  color: #2f7d1f;
-  border-color: #a8d696;
-}
-
 .user-name {
   font-size: var(--font-size-body);
   color: var(--color-text);
@@ -545,7 +530,7 @@ onBeforeUnmount(() => {
     z-index: 1999;
   }
 
-  /* 头部塞得下：缩间距、隐藏后端状态标签、用户名截断不换行 */
+  /* 头部塞得下：缩间距、用户名截断不换行 */
   .layout-header {
     padding: 0 8px;
     gap: 4px;
@@ -559,10 +544,6 @@ onBeforeUnmount(() => {
   .header-actions {
     gap: 6px;
     flex-shrink: 0;
-  }
-
-  .health-status-tag {
-    display: none;
   }
 
   .user-name {

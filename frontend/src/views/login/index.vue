@@ -44,6 +44,7 @@ import type { FormInstance, FormRules } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import { getHealth } from '@/api/health'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { markPendingAutoOpen } from '@/composables/useSystemUpdates'
 
 const router = useRouter()
 const authStore = useAuthStore()
@@ -105,6 +106,7 @@ async function onSubmit() {
   loading.value = true
   try {
     await authStore.login(form.username, form.password)
+    markPendingAutoOpen()
     ElMessage.success('登录成功')
     router.replace('/')
   } catch (e: unknown) {
