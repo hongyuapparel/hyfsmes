@@ -246,22 +246,147 @@ export class InventoryPendingService {
       return headers.length > 0 && rowsOut.length > 0 ? { headers, rows: rowsOut } : null;
     };
 
-    const list: PendingListItem[] = rows.map((r) => ({
-      id: r.id,
-      tabType: 'pending',
-      orderId: r.orderId,
-      orderNo: r.orderNo ?? '',
-      customerName: r.customerName ?? '',
-      skuCode: r.skuCode ?? '',
-      imageUrl: r.imageUrl ?? '',
-      quantity: r.quantity ?? 0,
-      sourceType: r.sourceType ?? 'normal',
-      pickupUserName: '',
-      operatorUsername: '',
-      remark: '',
-      createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
-      colorSizeSnapshot: parseSnapshot(r.colorSizeSnapshot),
-    }));
+    // 兜底：commit 521389ba 之前完成入库的订单，inbound_pending.color_size_snapshot
+    // 全为 NULL；同一订单的 order_finishing.*_by_color / *_qty_row 通常已有数据。
+    // 该订单只有一条同 sourceType 的 pending 时，把累计真值直接当作"本批"显示，
+    // 让 hover 至少看到尺码/颜色明细，不再卡在"未留存"。
+    const fallbackTargets = rows
+      .map((r) => ({ id: Number(r.id), orderId: Number(r.orderId), sourceType: String(r.sourceType ?? 'normal'), hasSnapshot: r.colorSizeSnapshot != null }))
+      .filter((r) => !r.hasSnapshot && r.orderId > 0);
+    const orderIdsForFallback = Array.from(new Set(fallbackTargets.map((r) => r.orderId)));
+    const fallbackByOrder = new Map<number, {
+      headers: string[];
+      normalByColor: Array<{ colorName: string; quantities: number[] }> | null;
+      defectByColor: Array<{ colorName: string; quantities: number[] }> | null;
+      normalRow: number[] | null;
+      defectRow: number[] | null;
+    }>();
+    const pendingCountByOrderType = new Map<string, number>();
+    if (orderIdsForFallback.length > 0) {
+      const countRows = (await this.pendingRepo.manager.query(
+        `SELECT order_id AS orderId, source_type AS sourceType, COUNT(*) AS cnt
+         FROM inbound_pending WHERE order_id IN (${orderIdsForFallback.map(() => '?').join(',')}) AND status = 'pending'
+         GROUP BY order_id, source_type`,
+        orderIdsForFallback,
+      )) as Array<{ orderId: number | string; sourceType: string; cnt: number | string }>;
+      for (const c of countRows) {
+        pendingCountByOrderType.set(`${Number(c.orderId)}|${c.sourceType}`, Number(c.cnt));
+      }
+      const finRows = (await this.pendingRepo.manager.query(
+        `SELECT f.order_id AS orderId,
+                f.tail_inbound_quantities_by_color AS inboundByColor,
+                f.defect_quantities_by_color AS defectByColor,
+                f.tail_inbound_qty_row AS inboundRow,
+                f.defect_quantity_row AS defectRow,
+                e.color_size_headers AS headers
+         FROM order_finishing f
+         LEFT JOIN order_ext e ON e.order_id = f.order_id
+         WHERE f.order_id IN (${orderIdsForFallback.map(() => '?').join(',')})`,
+        orderIdsForFallback,
+      )) as Array<{
+        orderId: number | string;
+        inboundByColor: unknown;
+        defectByColor: unknown;
+        inboundRow: unknown;
+        defectRow: unknown;
+        headers: unknown;
+      }>;
+      const parseJsonArr = (raw: unknown): unknown[] | null => {
+        if (raw == null) return null;
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') {
+          try { const j = JSON.parse(raw); return Array.isArray(j) ? j : null; } catch { return null; }
+        }
+        return null;
+      };
+      const parseByColorList = (raw: unknown): Array<{ colorName: string; quantities: number[] }> | null => {
+        const arr = parseJsonArr(raw);
+        if (!arr || arr.length === 0) return null;
+        const out: Array<{ colorName: string; quantities: number[] }> = [];
+        for (const item of arr) {
+          if (!item || typeof item !== 'object') continue;
+          const it = item as { colorName?: unknown; quantities?: unknown };
+          const name = String(it.colorName ?? '').trim();
+          const qs = Array.isArray(it.quantities) ? it.quantities : [];
+          out.push({ colorName: name, quantities: qs.map((n) => Math.max(0, Math.trunc(Number(n) || 0))) });
+        }
+        return out.length > 0 ? out : null;
+      };
+      const parseNumberRow = (raw: unknown): number[] | null => {
+        const arr = parseJsonArr(raw);
+        if (!arr || arr.length === 0) return null;
+        return arr.map((n) => Math.max(0, Math.trunc(Number(n) || 0)));
+      };
+      const parseHeaders = (raw: unknown): string[] => {
+        const arr = parseJsonArr(raw);
+        if (!arr) return [];
+        return arr.map((h) => String(h ?? ''));
+      };
+      for (const f of finRows) {
+        fallbackByOrder.set(Number(f.orderId), {
+          headers: parseHeaders(f.headers),
+          normalByColor: parseByColorList(f.inboundByColor),
+          defectByColor: parseByColorList(f.defectByColor),
+          normalRow: parseNumberRow(f.inboundRow),
+          defectRow: parseNumberRow(f.defectRow),
+        });
+      }
+    }
+
+    const buildFallbackSnapshot = (
+      orderId: number,
+      sourceType: string,
+      quantity: number,
+    ): PendingListItem['colorSizeSnapshot'] => {
+      const f = fallbackByOrder.get(orderId);
+      if (!f) return null;
+      // 仅当该订单 + 该 sourceType 的 pending 只有一条时，累计真值即"本批"真值；
+      // 多条时无法可靠拆分到批次，回退不输出（保留"未留存"提示，不做估算）。
+      if ((pendingCountByOrderType.get(`${orderId}|${sourceType}`) ?? 0) !== 1) return null;
+      const headers = f.headers;
+      if (headers.length === 0) return null;
+      const sizeLen = headers.length;
+      const byColor = sourceType === 'defect' ? f.defectByColor : f.normalByColor;
+      if (byColor && byColor.length > 0) {
+        const rows = byColor.map((r) => {
+          const q = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(r.quantities[i]) || 0)));
+          return { colorName: r.colorName || '-', quantities: q };
+        });
+        const grand = rows.reduce((s, r) => s + r.quantities.reduce((a, b) => a + b, 0), 0);
+        if (grand === quantity) return { headers, rows };
+      }
+      const oneRow = sourceType === 'defect' ? f.defectRow : f.normalRow;
+      if (oneRow && oneRow.length > 0) {
+        // 后端写入的 _qty_row 末尾可能含合计列（headers.length + 1），剪到 sizeLen
+        const perSize = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(oneRow[i]) || 0)));
+        const total = perSize.reduce((a, b) => a + b, 0);
+        if (total === quantity) {
+          return { headers, rows: [{ colorName: '-', quantities: perSize }] };
+        }
+      }
+      return null;
+    };
+
+    const list: PendingListItem[] = rows.map((r) => {
+      const parsed = parseSnapshot(r.colorSizeSnapshot);
+      const snapshot = parsed ?? buildFallbackSnapshot(Number(r.orderId), String(r.sourceType ?? 'normal'), Number(r.quantity) || 0);
+      return {
+        id: r.id,
+        tabType: 'pending',
+        orderId: r.orderId,
+        orderNo: r.orderNo ?? '',
+        customerName: r.customerName ?? '',
+        skuCode: r.skuCode ?? '',
+        imageUrl: r.imageUrl ?? '',
+        quantity: r.quantity ?? 0,
+        sourceType: r.sourceType ?? 'normal',
+        pickupUserName: '',
+        operatorUsername: '',
+        remark: '',
+        createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
+        colorSizeSnapshot: snapshot,
+      };
+    });
 
     return { list, total, page, pageSize };
   }

@@ -1,9 +1,11 @@
 <template>
   <el-popover
-    placement="top-start"
+    placement="top"
     trigger="hover"
     :width="width"
     :show-arrow="true"
+    popper-class="qty-trace-popper"
+    :popper-options="popperOptions"
     @show="emit('show')"
   >
     <template #reference>
@@ -78,6 +80,13 @@ defineProps<{
 const emit = defineEmits<{
   (e: 'show'): void
 }>()
+
+const popperOptions = {
+  modifiers: [
+    { name: 'flip', options: { fallbackPlacements: ['bottom', 'right', 'left'], padding: 8 } },
+    { name: 'preventOverflow', options: { padding: 8 } },
+  ],
+}
 </script>
 
 <style scoped>
@@ -131,5 +140,13 @@ const emit = defineEmits<{
 .qty-popover-empty {
   font-size: 12px;
   color: var(--color-text-muted, #909399);
+}
+</style>
+
+<style>
+/* el-popover 弹层 teleport 到 body，需用全局样式作用到 popper */
+.qty-trace-popper {
+  max-height: calc(100vh - 32px);
+  overflow-y: auto;
 }
 </style>
