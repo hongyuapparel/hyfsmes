@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-05-31-packaging-show-upstream-chain',
+    date: '2026-05-31',
+    module: '生产',
+    title: '登记入库展示上游各环节实填数',
+    description: '尾部"登记入库"对话框，每个颜色 block 顶部按生产链顺序展示订单数量/裁床/车缝（如该环节填了数据）。仓管员能直接对比上下游数字，及时发现异常。没数据的环节自动隐藏，老订单不会变高。',
+    link: '/production/finishing',
+  },
+  {
     id: '2026-05-31-fix-detail-not-yet-vs-no-detail',
     date: '2026-05-31',
     module: '生产',

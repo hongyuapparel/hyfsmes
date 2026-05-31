@@ -23,6 +23,12 @@ export interface PackagingCompleteItem {
   cutRow: (number | null)[]
   sewingRow: (number | null)[]
   tailReceivedRow: (number | null)[]
+  /** 订单计划按颜色×尺码（真值；只读对照行） */
+  planColorRows: ColorRow[]
+  /** 裁床实际按颜色×尺码（真值；只读对照行，缺真值时为空） */
+  cutColorRows: ColorRow[]
+  /** 车缝完成按颜色×尺码（真值；只读对照行，缺真值时为空） */
+  sewingColorRows: ColorRow[]
   /** 按颜色×尺码的尾部收货数（真值；用于限制每格最大值） */
   tailReceivedColorRows: ColorRow[]
   /** 此前累计入库（已登记，按颜色×尺码） */
@@ -228,6 +234,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     const alreadyDefectColorRows = Array.isArray(data?.defectColorRows) && data.defectColorRows.length
       ? data.defectColorRows
       : emptyColorRows(planColors, sizeLen)
+    // 生产链对照只读行：订单/裁床/车缝。缺真值时给空数组，模板按 hasNonZero 决定渲染
+    const planColorRowsFull = Array.isArray(data?.planColorRows) ? data.planColorRows : []
+    const cutColorRows = Array.isArray(data?.cutColorRows) ? data.cutColorRows : []
+    const sewingColorRows = Array.isArray(data?.sewingColorRows) ? data.sewingColorRows : []
 
     const item: PackagingCompleteItem = {
       row,
@@ -237,6 +247,9 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
       cutRow: data?.cutRow ?? [],
       sewingRow: data?.sewingRow ?? [],
       tailReceivedRow: data?.tailReceivedRow ?? [],
+      planColorRows: planColorRowsFull,
+      cutColorRows,
+      sewingColorRows,
       tailReceivedColorRows,
       alreadyInboundColorRows,
       alreadyDefectColorRows,

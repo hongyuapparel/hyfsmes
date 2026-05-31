@@ -201,17 +201,27 @@ type BlockRow =
   | { kind: 'readonly'; label: string; values: number[] }
   | { kind: 'input'; field: 'inbound' | 'defect'; label: string }
 
+function hasNonZero(values: number[] | undefined | null): boolean {
+  if (!Array.isArray(values)) return false
+  return values.some((n) => Number(n) > 0)
+}
+
 function rowsForColor(item: PackagingCompleteItem, ri: number): BlockRow[] {
+  const plan = item.planColorRows[ri]?.quantities ?? []
+  const cut = item.cutColorRows[ri]?.quantities ?? []
+  const sew = item.sewingColorRows[ri]?.quantities ?? []
   const received = item.tailReceivedColorRows[ri]?.quantities ?? []
   const alreadyIn = item.alreadyInboundColorRows[ri]?.quantities ?? []
   const alreadyDef = item.alreadyDefectColorRows[ri]?.quantities ?? []
-  const rows: BlockRow[] = [{ kind: 'readonly', label: '尾部收货', values: received }]
-  if ((alreadyIn ?? []).some((n) => Number(n) > 0)) {
-    rows.push({ kind: 'readonly', label: '已累计入库', values: alreadyIn })
-  }
-  if ((alreadyDef ?? []).some((n) => Number(n) > 0)) {
-    rows.push({ kind: 'readonly', label: '已累计次品', values: alreadyDef })
-  }
+  const rows: BlockRow[] = []
+  // 上游生产链对照（按"该色有数据才显示"，避免老订单缺真值时全 0 占行）
+  if (hasNonZero(plan)) rows.push({ kind: 'readonly', label: '订单数量', values: plan })
+  if (hasNonZero(cut)) rows.push({ kind: 'readonly', label: '裁床数量', values: cut })
+  if (hasNonZero(sew)) rows.push({ kind: 'readonly', label: '车缝数量', values: sew })
+  // 尾部收货：即便全 0 也展示（老订单 byColor 缺真值时也要让仓管看到收货 = 0/未登记）
+  rows.push({ kind: 'readonly', label: '尾部收货', values: received })
+  if (hasNonZero(alreadyIn)) rows.push({ kind: 'readonly', label: '已累计入库', values: alreadyIn })
+  if (hasNonZero(alreadyDef)) rows.push({ kind: 'readonly', label: '已累计次品', values: alreadyDef })
   rows.push({ kind: 'input', field: 'inbound', label: '本次入库' })
   rows.push({ kind: 'input', field: 'defect', label: '本次次品' })
   return rows
