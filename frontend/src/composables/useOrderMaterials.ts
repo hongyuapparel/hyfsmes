@@ -61,7 +61,7 @@ export function useOrderMaterials() {
 
   function onMaterialCellKeydown(e: KeyboardEvent, rowIndex: number, colIndex: number) {
     const rowsCount = materials.value.length
-    const colsCount = 12
+    const colsCount = 13
     let targetRow = rowIndex
     let targetCol = colIndex
 

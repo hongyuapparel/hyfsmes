@@ -29,8 +29,10 @@ export class SuppliersController {
   /**
    * 供应商类型下拉选项（一级节点，来自系统设置-供应商设置）
    * GET /suppliers/options
+   * 订单编辑/采购/财务等页都会调用，放开到 /orders/list 即可
    */
   @Get('options')
+  @RequirePermission(['/suppliers', '/orders/list'])
   getTypeOptions() {
     return this.systemOptionsService.findRootsByType(SUPPLIER_TYPE_OPTION_TYPE);
   }
@@ -40,6 +42,7 @@ export class SuppliersController {
    * GET /suppliers/options/business-scope?type=面料
    */
   @Get('options/business-scope')
+  @RequirePermission(['/suppliers', '/orders/list'])
   getBusinessScopeOptions(@Query('type') type: string) {
     return this.systemOptionsService.findChildrenValuesByParentValue(
       SUPPLIER_TYPE_OPTION_TYPE,
@@ -52,6 +55,7 @@ export class SuppliersController {
    * GET /suppliers/options/business-scope/tree?type=工艺供应商
    */
   @Get('options/business-scope/tree')
+  @RequirePermission(['/suppliers', '/orders/list'])
   async getBusinessScopeTree(@Query('type') type: string) {
     const tree = await this.systemOptionsService.findTreeByType(SUPPLIER_TYPE_OPTION_TYPE);
     const root = tree.find((n) => n.parentId == null && n.value === (type || '').trim());
@@ -59,10 +63,12 @@ export class SuppliersController {
   }
 
   /**
-   * 下拉搜索供应商（订单编辑等调用，需具备 /suppliers 权限）
+   * 下拉搜索供应商（订单编辑等调用）
    * GET /suppliers?keyword=&page=&pageSize=
+   * 订单列表权限即可访问，避免业务员账号下拉为空
    */
   @Get()
+  @RequirePermission(['/suppliers', '/orders/list'])
   search(
     @Query('keyword') keyword?: string,
     @Query('page') page?: string,
@@ -77,8 +83,10 @@ export class SuppliersController {
 
   /**
    * 供应商管理页：列表。支持按类型名称 type（如「加工供应商」）或 supplierTypeId 筛选。
+   * 订单编辑工艺/物料供应商下拉同样依赖此接口，放开到 /orders/list
    */
   @Get('items')
+  @RequirePermission(['/suppliers', '/orders/list'])
   async getList(
     @Query('name') name?: string,
     @Query('supplierTypeId') supplierTypeIdStr?: string,

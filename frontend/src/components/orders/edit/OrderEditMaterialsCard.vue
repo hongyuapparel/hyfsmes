@@ -83,14 +83,25 @@
           />
         </template>
       </el-table-column>
+      <el-table-column label="幅宽(cm)" min-width="90" header-align="center" align="center">
+        <template #default="{ row, $index }">
+          <el-input
+            v-model="row.fabricWidth"
+            placeholder="如 183"
+            :input-style="{ textAlign: 'center' }"
+            :ref="(el) => setMaterialCellRef(el, $index, 5)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
+          />
+        </template>
+      </el-table-column>
       <el-table-column label="成分" min-width="120" header-align="center" align="center">
         <template #default="{ row, $index }">
           <el-input
             v-model="row.composition"
             placeholder="如 100%棉"
             :input-style="{ textAlign: 'center' }"
-            :ref="(el) => setMaterialCellRef(el, $index, 5)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 5)"
+            :ref="(el) => setMaterialCellRef(el, $index, 6)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
           />
         </template>
       </el-table-column>
@@ -100,8 +111,8 @@
             v-model="row.weight"
             placeholder="如 180g/m²"
             :input-style="{ textAlign: 'center' }"
-            :ref="(el) => setMaterialCellRef(el, $index, 6)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 6)"
+            :ref="(el) => setMaterialCellRef(el, $index, 7)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
           />
         </template>
       </el-table-column>
@@ -114,8 +125,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
-            :ref="(el) => setMaterialCellRef(el, $index, 7)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 7)"
+            :ref="(el) => setMaterialCellRef(el, $index, 8)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
           />
         </template>
       </el-table-column>
@@ -127,8 +138,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
-            :ref="(el) => setMaterialCellRef(el, $index, 8)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 8)"
+            :ref="(el) => setMaterialCellRef(el, $index, 9)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 9)"
           />
         </template>
       </el-table-column>
@@ -140,8 +151,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
-            :ref="(el) => setMaterialCellRef(el, $index, 9)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 9)"
+            :ref="(el) => setMaterialCellRef(el, $index, 10)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 10)"
           />
         </template>
       </el-table-column>
@@ -154,8 +165,8 @@
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             :readonly="true"
-            :ref="(el) => setMaterialCellRef(el, $index, 10)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 10)"
+            :ref="(el) => setMaterialCellRef(el, $index, 11)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 11)"
           />
         </template>
       </el-table-column>
@@ -165,8 +176,8 @@
             v-model="row.remark"
             placeholder="其他说明"
             :input-style="{ textAlign: 'center' }"
-            :ref="(el) => setMaterialCellRef(el, $index, 11)"
-            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 11)"
+            :ref="(el) => setMaterialCellRef(el, $index, 12)"
+            @keydown.capture.stop="onMaterialCellKeydown($event, $index, 12)"
           />
         </template>
       </el-table-column>
