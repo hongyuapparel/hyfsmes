@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-05-31-fix-detail-not-yet-vs-no-detail',
+    date: '2026-05-31',
+    module: '生产',
+    title: '尾部详情区分"尚未登记"和"无明细"',
+    description: '订单还没走到某个阶段（比如还没入库），该阶段不再误显示"未留存颜色×尺码明细"，改为浅灰色"尚未登记"，跟"已登记但缺颜色细分"明确区分。',
+    link: '/production/finishing',
+  },
+  {
     id: '2026-05-31-fix-packaging-legacy-input',
     date: '2026-05-31',
     module: '生产',

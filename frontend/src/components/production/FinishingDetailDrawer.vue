@@ -67,6 +67,12 @@
                       <strong>{{ formatDisplayNumber(sumArr(stage.values)) }}</strong>
                     </td>
                   </template>
+                  <template v-else-if="stage.total === null || Number(stage.total) === 0">
+                    <td
+                      :colspan="(colorBreakdown?.sizeHeaders.length ?? 0) + 1"
+                      class="color-bd-not-yet"
+                    >尚未登记</td>
+                  </template>
                   <template v-else>
                     <td
                       :colspan="(colorBreakdown?.sizeHeaders.length ?? 0) + 1"
@@ -159,7 +165,12 @@ const finishingStatusText = computed(() => {
   return FINISHING_STATUS_LABELS[s] ?? s
 })
 
-interface StageRow { label: string; values: number[] | null }
+interface StageRow {
+  label: string
+  values: number[] | null
+  /** 该阶段跨色合计（取自 finishing 标量真值）；用来区分"未登记 (0/null)" vs "已登记但缺 byColor 明细" */
+  total: number | null
+}
 function colorRowOrNull(colorIdx: number, rows: Array<{ colorName: string; quantities: number[] }> | undefined | null): number[] | null {
   if (!Array.isArray(rows) || rows.length === 0) return null
   return rows[colorIdx]?.quantities ?? null
@@ -167,14 +178,15 @@ function colorRowOrNull(colorIdx: number, rows: Array<{ colorName: string; quant
 
 function stagesForColor(colorIdx: number): StageRow[] {
   const data = colorBreakdown.value
+  const row = props.row
   if (!data) return []
   return [
-    { label: '订单数量', values: colorRowOrNull(colorIdx, data.planColorRows) },
-    { label: '裁床数量', values: colorRowOrNull(colorIdx, data.cutColorRows) },
-    { label: '车缝数量', values: colorRowOrNull(colorIdx, data.sewingColorRows) },
-    { label: '尾部收货数', values: colorRowOrNull(colorIdx, data.tailReceivedColorRows) },
-    { label: '尾部入库数', values: colorRowOrNull(colorIdx, data.tailInboundColorRows) },
-    { label: '次品数', values: colorRowOrNull(colorIdx, data.defectColorRows) },
+    { label: '订单数量', values: colorRowOrNull(colorIdx, data.planColorRows), total: row?.quantity ?? null },
+    { label: '裁床数量', values: colorRowOrNull(colorIdx, data.cutColorRows), total: row?.cutTotal ?? null },
+    { label: '车缝数量', values: colorRowOrNull(colorIdx, data.sewingColorRows), total: row?.sewingQuantity ?? null },
+    { label: '尾部收货数', values: colorRowOrNull(colorIdx, data.tailReceivedColorRows), total: row?.tailReceivedQty ?? null },
+    { label: '尾部入库数', values: colorRowOrNull(colorIdx, data.tailInboundColorRows), total: row?.tailInboundQty ?? null },
+    { label: '次品数', values: colorRowOrNull(colorIdx, data.defectColorRows), total: row?.defectQuantity ?? null },
   ]
 }
 
@@ -263,6 +275,10 @@ watch(
 }
 .color-bd-total {
   background-color: var(--el-fill-color-lighter);
+}
+.color-bd-not-yet {
+  color: var(--el-text-color-placeholder);
+  text-align: center;
 }
 .color-bd-no-detail {
   color: var(--el-text-color-secondary);
