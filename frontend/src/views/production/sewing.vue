@@ -140,6 +140,7 @@
       :size-table-rows="registerSizeTableRows"
       :sewing-total="registerSewingTotal"
       :get-cell-max="registerSewingCellMax"
+      :cut-skipped="registerCutSkipped"
       @update:dialog="registerDialog.visible = $event.visible"
       @close="resetRegisterForm"
       @submit="submitRegister"
@@ -239,6 +240,7 @@ const {
   registerSizeTableRows,
   registerSewingTotal,
   registerSewingCellMax,
+  registerCutSkipped,
   registerRules,
   loadFactorySuppliers,
   openAssignDialog,

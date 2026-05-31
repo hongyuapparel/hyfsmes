@@ -14,7 +14,10 @@
       </div>
       <div v-if="completeLoading" class="register-loading">加载尺寸细数...</div>
       <template v-else-if="form.sizeHeaders?.length">
-        <p class="register-qty-tip">按颜色分别登记车缝数量；每格不可超过对应颜色的裁床数。</p>
+        <p class="register-qty-tip">
+          <template v-if="cutSkipped">此订单未登记裁床数据，车缝数量按订单计划填写（每格上限 = 订单计划该色该码）。</template>
+          <template v-else>按颜色分别登记车缝数量；每格不可超过对应颜色的裁床数。</template>
+        </p>
         <div
           v-for="(plan, ri) in form.orderColorRows"
           :key="plan.colorName + ri"
@@ -152,6 +155,7 @@ const props = defineProps<{
   sizeTableRows: SizeTableRow[]
   sewingTotal: number
   getCellMax: (rowIdx: number, colIdx: number) => number | undefined
+  cutSkipped?: boolean
 }>()
 
 type ColorBlockRow =

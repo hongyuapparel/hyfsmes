@@ -75,9 +75,10 @@ export interface CompleteFormDataRes {
   headers: string[]
   orderRow: (number | null)[]
   cutRow: (number | null)[]
-  sizeHeaders: string[]
-  orderColorRows: Array<{ colorName: string; quantities: number[] }>
-  cutColorRows: Array<{ colorName: string; quantities: number[] }>
+  // 老后端（commit 521389ba 前）不返回下列三字段，前端在 useSewingDialogs 兜底拉取 color-size-breakdown
+  sizeHeaders?: string[]
+  orderColorRows?: Array<{ colorName: string; quantities: number[] }>
+  cutColorRows?: Array<{ colorName: string; quantities: number[] }>
 }
 
 export function getCompleteFormData(orderId: number) {
