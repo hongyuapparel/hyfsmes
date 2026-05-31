@@ -31,6 +31,27 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-05-30-1-color-size-full-trail',
+    date: '2026-05-30',
+    module: '生产',
+    title: '生产各环节颜色×尺码明细全程留存',
+    description: '裁床/车缝/尾部收货/尾部入库/次品环节填写的颜色×尺码明细会完整保存。尾部、待仓 hover、详情页都以你填的原始数据为准，不再按订单计划估算。',
+  },
+  {
+    id: '2026-05-30-2-materials-fabric-width',
+    date: '2026-05-30',
+    module: '订单',
+    title: '订单物料新增"幅宽"列',
+    description: '物料表增加了幅宽(cm)一列。能在订单编辑页填写面料幅宽，采购和生产环节能看到。',
+  },
+  {
+    id: '2026-05-30-3-suppliers-dropdown-salesperson',
+    date: '2026-05-30',
+    module: '供应商',
+    title: '供应商下拉对业务员开放',
+    description: '业务员账号在订单编辑/采购/财务页可以看到供应商下拉列表了，不再需要供应商管理权限。',
+  },
+  {
     id: '2026-05-29-system-updates-bell',
     date: '2026-05-29',
     module: '系统',
