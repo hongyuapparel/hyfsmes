@@ -31,6 +31,21 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-05-31-order-report-filter-and-fit',
+    date: '2026-05-31',
+    module: '财务',
+    title: '订单报表加订单号/SKU 筛选 + 表格列自适应',
+    description: '时效报表和利润报表的筛选区开头加了"订单号""SKU编号"两个搜索框，与其他页面写法一致。表格列改为按容器宽度自适应（客户列加宽避免换行），内容过长用省略号+悬停查看，列与列之间也可手动拖宽。',
+    link: '/finance/order-sla-report',
+  },
+  {
+    id: '2026-05-31-deleted-orders-no-leak',
+    date: '2026-05-31',
+    module: '系统',
+    title: '已删除订单不再同步到其他页面',
+    description: '修复了删除订单（移入回收站）后仍出现在 时效/利润报表、采购/纸样/裁床/工艺/车缝/尾部 等生产页面、以及供应商最近合作时间统计 的问题。已删订单只在订单回收站可见，恢复后才回到各页面。',
+  },
+  {
     id: '2026-05-31-sewing-allow-no-cut',
     date: '2026-05-31',
     module: '生产',

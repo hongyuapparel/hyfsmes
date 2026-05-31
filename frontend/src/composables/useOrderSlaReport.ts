@@ -20,6 +20,8 @@ interface ReportFilter {
   orderTypeId?: number
   orderDateRange?: [string, string] | null
   completedRange?: [string, string] | null
+  orderNo?: string
+  skuCode?: string
 }
 
 const DATE_RANGE_WIDTH_EMPTY = '170px'
@@ -56,6 +58,9 @@ export function useOrderSlaReport() {
   const router = useRouter()
   const activeTab = ref<ReportTab>('sla')
   const filter = ref<ReportFilter>({})
+  const orderNoLabelVisible = ref(true)
+  const skuCodeLabelVisible = ref(true)
+  let searchTimer: ReturnType<typeof setTimeout> | null = null
 
   function getFilterRangeStyle(v?: [string, string] | null) {
     const hasValue = !!(v && v.length === 2)
@@ -195,6 +200,14 @@ export function useOrderSlaReport() {
     void loadCurrentTab()
   }
 
+  function debouncedSearch() {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = setTimeout(() => {
+      searchTimer = null
+      onSearch()
+    }, 400)
+  }
+
   function parseTab(v: unknown): ReportTab {
     return v === 'profit' ? 'profit' : 'sla'
   }
@@ -253,6 +266,8 @@ export function useOrderSlaReport() {
         order_date_to: orderDateTo,
         completed_from: completedFrom,
         completed_to: completedTo,
+        order_no: filter.value.orderNo?.trim() || undefined,
+        sku_code: filter.value.skuCode?.trim() || undefined,
         page: pagination.value.page,
         page_size: pagination.value.pageSize,
       })
@@ -280,6 +295,8 @@ export function useOrderSlaReport() {
         order_date_to: orderDateTo,
         completed_from: completedFrom,
         completed_to: completedTo,
+        order_no: filter.value.orderNo?.trim() || undefined,
+        sku_code: filter.value.skuCode?.trim() || undefined,
         page: pagination.value.page,
         page_size: pagination.value.pageSize,
       })
@@ -342,6 +359,9 @@ export function useOrderSlaReport() {
     calcFactoryTotalProfit,
     onExport,
     onSearch,
+    debouncedSearch,
+    orderNoLabelVisible,
+    skuCodeLabelVisible,
     onTabChange,
     onPageChange,
     onPageSizeChange,

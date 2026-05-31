@@ -250,6 +250,8 @@ export function getOrderSlaReport(params?: {
   order_date_to?: string
   completed_from?: string
   completed_to?: string
+  order_no?: string
+  sku_code?: string
   page?: number
   page_size?: number
 }) {
@@ -288,6 +290,8 @@ export function getOrderProfitReport(params?: {
   order_date_to?: string
   completed_from?: string
   completed_to?: string
+  order_no?: string
+  sku_code?: string
   page?: number
   page_size?: number
 }) {

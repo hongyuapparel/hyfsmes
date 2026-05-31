@@ -39,6 +39,8 @@ export class OrderStatusReportService {
     completedTo?: string;
     collaborationTypeId?: number;
     orderTypeId?: number;
+    orderNo?: string;
+    skuCode?: string;
     page?: number;
     pageSize?: number;
   }): Promise<{
@@ -88,7 +90,7 @@ export class OrderStatusReportService {
     }>;
     summary: { total: number; overdue: number };
   }> {
-    const orderQb = this.orderRepo.createQueryBuilder('o');
+    const orderQb = this.orderRepo.createQueryBuilder('o').where('o.deleted_at IS NULL');
     if (params.orderDateFrom) {
       orderQb.andWhere('o.order_date >= :orderDateFrom', { orderDateFrom: params.orderDateFrom });
     }
@@ -112,6 +114,14 @@ export class OrderStatusReportService {
     }
     if (params.orderTypeId != null) {
       orderQb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: params.orderTypeId });
+    }
+    const orderNoKw = params.orderNo?.trim();
+    if (orderNoKw) {
+      orderQb.andWhere('o.order_no LIKE :orderNoKw', { orderNoKw: `%${orderNoKw}%` });
+    }
+    const skuCodeKw = params.skuCode?.trim();
+    if (skuCodeKw) {
+      orderQb.andWhere('o.sku_code LIKE :skuCodeKw', { skuCodeKw: `%${skuCodeKw}%` });
     }
     const filteredOrders = await orderQb.getMany();
     const orderIds = filteredOrders.map((o) => o.id);
@@ -345,6 +355,8 @@ export class OrderStatusReportService {
     completedTo?: string;
     collaborationTypeId?: number;
     orderTypeId?: number;
+    orderNo?: string;
+    skuCode?: string;
     page?: number;
     pageSize?: number;
   }): Promise<{
@@ -370,7 +382,7 @@ export class OrderStatusReportService {
     }>;
     summary: { total: number };
   }> {
-    const qb = this.orderRepo.createQueryBuilder('o');
+    const qb = this.orderRepo.createQueryBuilder('o').where('o.deleted_at IS NULL');
     if (params.statusId != null) {
       const status = await this.statusRepo.findOne({ where: { id: params.statusId } });
       if (status?.code) qb.andWhere('o.status = :statusCode', { statusCode: status.code });
@@ -387,6 +399,10 @@ export class OrderStatusReportService {
       qb.andWhere('o.collaboration_type_id = :collaborationTypeId', { collaborationTypeId: params.collaborationTypeId });
     }
     if (params.orderTypeId != null) qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: params.orderTypeId });
+    const orderNoKw = params.orderNo?.trim();
+    if (orderNoKw) qb.andWhere('o.order_no LIKE :orderNoKw', { orderNoKw: `%${orderNoKw}%` });
+    const skuCodeKw = params.skuCode?.trim();
+    if (skuCodeKw) qb.andWhere('o.sku_code LIKE :skuCodeKw', { skuCodeKw: `%${skuCodeKw}%` });
     const orders = await qb.orderBy('o.order_date', 'DESC').addOrderBy('o.id', 'DESC').getMany();
     const orderIds = orders.map((o) => o.id);
     const snapshots =

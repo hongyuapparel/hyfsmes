@@ -312,7 +312,7 @@ export class SuppliersService {
     if (!allOrderIds.length) return;
 
     const orders = await this.orderRepo.find({
-      where: { id: In(allOrderIds) },
+      where: { id: In(allOrderIds), deletedAt: IsNull() },
       select: ['id', 'orderDate', 'createdAt'],
     });
     const orderTimeById = new Map<number, Date>();

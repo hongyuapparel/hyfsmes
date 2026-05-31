@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, Repository } from 'typeorm';
+import { Brackets, In, IsNull, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
@@ -134,7 +134,7 @@ export class ProductionPatternService {
     const patterns = await this.patternRepo.find({ where: { status: 'completed' } });
     if (!patterns.length) return;
     const orderIds = patterns.map((p) => p.orderId);
-    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_pattern' } });
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_pattern', deletedAt: IsNull() } });
     if (!orders.length) return;
     const patternMap = new Map(patterns.map((p) => [p.orderId, p]));
     for (const order of orders) {
@@ -343,7 +343,8 @@ export class ProductionPatternService {
     // 否则订单后续流程推进后会在本页消失。
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .where(
+      .where('o.deleted_at IS NULL')
+      .andWhere(
         new Brackets((subQb) => {
           subQb
             .where('o.status = :pendingPattern')

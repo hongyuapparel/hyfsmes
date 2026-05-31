@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderStatus } from '../entities/order-status.entity';
@@ -64,7 +64,8 @@ export class ProductionPurchaseQueryService {
 
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .where('o.status IN (:...statuses)', { statuses: PURCHASE_ORDER_STATUSES });
+      .where('o.deleted_at IS NULL')
+      .andWhere('o.status IN (:...statuses)', { statuses: PURCHASE_ORDER_STATUSES });
 
     if (orderNo?.trim()) {
       qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
@@ -263,7 +264,7 @@ export class ProductionPurchaseQueryService {
   private async reconcilePurchaseCompletedOrders(actorUserId?: number): Promise<void> {
     if (typeof actorUserId !== 'number') return;
     await this.ensureMaterialSourceOptionCache();
-    const orders = await this.orderRepo.find({ where: { status: 'pending_purchase' } });
+    const orders = await this.orderRepo.find({ where: { status: 'pending_purchase', deletedAt: IsNull() } });
     if (!orders.length) return;
     const orderIds = orders.map((order) => order.id);
     const extList = await this.orderExtRepo.find({ where: { orderId: In(orderIds) } });

@@ -158,6 +158,8 @@ export class OrderStatusConfigController {
     @Query('completed_to') completedTo?: string,
     @Query('collaboration_type_id') collaborationTypeId?: string,
     @Query('order_type_id') orderTypeId?: string,
+    @Query('order_no') orderNo?: string,
+    @Query('sku_code') skuCode?: string,
     @Query('page') page?: string,
     @Query('page_size') pageSize?: string,
   ) {
@@ -171,6 +173,8 @@ export class OrderStatusConfigController {
       completedTo,
       collaborationTypeId: collaborationTypeId != null ? Number(collaborationTypeId) : undefined,
       orderTypeId: orderTypeId != null ? Number(orderTypeId) : undefined,
+      orderNo,
+      skuCode,
       page: page != null ? Number(page) : undefined,
       pageSize: pageSize != null ? Number(pageSize) : undefined,
     });
@@ -185,6 +189,8 @@ export class OrderStatusConfigController {
     @Query('completed_to') completedTo?: string,
     @Query('collaboration_type_id') collaborationTypeId?: string,
     @Query('order_type_id') orderTypeId?: string,
+    @Query('order_no') orderNo?: string,
+    @Query('sku_code') skuCode?: string,
     @Query('page') page?: string,
     @Query('page_size') pageSize?: string,
   ) {
@@ -196,6 +202,8 @@ export class OrderStatusConfigController {
       completedTo,
       collaborationTypeId: collaborationTypeId != null ? Number(collaborationTypeId) : undefined,
       orderTypeId: orderTypeId != null ? Number(orderTypeId) : undefined,
+      orderNo,
+      skuCode,
       page: page != null ? Number(page) : undefined,
       pageSize: pageSize != null ? Number(pageSize) : undefined,
     });

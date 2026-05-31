@@ -238,8 +238,9 @@ export class ProductionCraftService {
     const qb = this.orderRepo
       .createQueryBuilder('o')
       .innerJoin(OrderExt, 'ext', 'ext.order_id = o.id')
+      .where('o.deleted_at IS NULL')
       // MySQL JSON：只展示 E 区至少 1 行工艺项目的订单
-      .where('IFNULL(JSON_LENGTH(ext.process_items), 0) > 0')
+      .andWhere('IFNULL(JSON_LENGTH(ext.process_items), 0) > 0')
       .andWhere('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review'] });
 
     if (typeof orderTypeId === 'number') {

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderStatus } from '../entities/order-status.entity';
@@ -41,7 +41,7 @@ export class ProductionCuttingListService {
     const cuttings = await this.cuttingRepo.find({ where: { status: 'completed' } });
     if (!cuttings.length) return;
     const orderIds = cuttings.map((c) => c.orderId);
-    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_cutting' } });
+    const orders = await this.orderRepo.find({ where: { id: In(orderIds), status: 'pending_cutting', deletedAt: IsNull() } });
     if (!orders.length) return;
     const cuttingMap = new Map(cuttings.map((c) => [c.orderId, c]));
     for (const order of orders) {
@@ -202,7 +202,8 @@ export class ProductionCuttingListService {
     const completedIds = completedOrderIds.length > 0 ? completedOrderIds : [0];
     const qb = this.orderRepo
       .createQueryBuilder('o')
-      .where('(o.status = :pendingCutting OR o.id IN (:...completedIds))', {
+      .where('o.deleted_at IS NULL')
+      .andWhere('(o.status = :pendingCutting OR o.id IN (:...completedIds))', {
         pendingCutting: 'pending_cutting',
         completedIds,
       });

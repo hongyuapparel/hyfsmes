@@ -228,10 +228,13 @@ export class ProductionSewingService {
       select: ['orderId'],
     });
     const completedOrderIds = completedSewing.map((s) => s.orderId);
-    const qb = this.orderRepo.createQueryBuilder('o').where(
-      '(o.status = :pendingSewing OR o.id IN (:...completedIds))',
-      { pendingSewing: 'pending_sewing', completedIds: completedOrderIds.length ? completedOrderIds : [0] },
-    );
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.deleted_at IS NULL')
+      .andWhere(
+        '(o.status = :pendingSewing OR o.id IN (:...completedIds))',
+        { pendingSewing: 'pending_sewing', completedIds: completedOrderIds.length ? completedOrderIds : [0] },
+      );
 
     if (orderNo?.trim()) {
       qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });

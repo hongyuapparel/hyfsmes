@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderExt } from '../entities/order-ext.entity';
@@ -189,16 +189,19 @@ export class ProductionFinishingQueryService {
       inboundOrderIds.length > 0
         ? (
             await this.orderRepo.find({
-              where: { status: 'completed', id: In(inboundOrderIds) },
+              where: { status: 'completed', id: In(inboundOrderIds), deletedAt: IsNull() },
               select: ['id'],
             })
           ).map((o) => o.id)
         : [];
 
-    const qb = this.orderRepo.createQueryBuilder('o').where('(o.status = :pendingFinishing OR o.id IN (:...inboundIds))', {
-      pendingFinishing: 'pending_finishing',
-      inboundIds: completedWithInbound.length ? completedWithInbound : [0],
-    });
+    const qb = this.orderRepo
+      .createQueryBuilder('o')
+      .where('o.deleted_at IS NULL')
+      .andWhere('(o.status = :pendingFinishing OR o.id IN (:...inboundIds))', {
+        pendingFinishing: 'pending_finishing',
+        inboundIds: completedWithInbound.length ? completedWithInbound : [0],
+      });
     if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
     if (skuCode?.trim()) qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
     qb.orderBy('o.order_date', 'DESC').addOrderBy('o.id', 'DESC');

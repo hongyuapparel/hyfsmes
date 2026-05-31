@@ -10,6 +10,44 @@
     </p>
 
     <div class="filter-bar">
+      <el-input
+        v-model="filter.orderNo"
+        placeholder="订单号"
+        clearable
+        class="filter-bar-item"
+        :style="filter.orderNo ? getOrderNoFilterStyle(filter.orderNo, orderNoLabelVisible) : getAdaptiveWidthStyle('订单号', 56)"
+        :input-style="getFilterInputStyle(filter.orderNo)"
+        @input="debouncedSearch"
+        @keyup.enter="onSearch"
+      >
+        <template #prefix>
+          <span
+            v-if="filter.orderNo && orderNoLabelVisible"
+            :style="{ color: ACTIVE_FILTER_COLOR }"
+          >
+            订单号：
+          </span>
+        </template>
+      </el-input>
+      <el-input
+        v-model="filter.skuCode"
+        placeholder="SKU编号"
+        clearable
+        class="filter-bar-item"
+        :style="filter.skuCode ? getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible) : getAdaptiveWidthStyle('SKU编号', 56)"
+        :input-style="getFilterInputStyle(filter.skuCode)"
+        @input="debouncedSearch"
+        @keyup.enter="onSearch"
+      >
+        <template #prefix>
+          <span
+            v-if="filter.skuCode && skuCodeLabelVisible"
+            :style="{ color: ACTIVE_FILTER_COLOR }"
+          >
+            SKU编号：
+          </span>
+        </template>
+      </el-input>
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': filter.orderDateRange }"
@@ -116,7 +154,6 @@
             v-loading="loading"
             :data="list"
             :height="slaTableHeight ?? defaultTableHeight"
-            :fit="false"
             border
             stripe
             size="small"
@@ -128,96 +165,96 @@
             @selection-change="onSelectionChange"
           >
         <el-table-column type="selection" width="46" />
-        <el-table-column prop="orderNo" label="订单号" width="110" show-overflow-tooltip />
-        <el-table-column prop="skuCode" label="sku" width="90" show-overflow-tooltip />
-        <el-table-column prop="collaborationTypeLabel" label="合作方式" width="90" show-overflow-tooltip />
-        <el-table-column prop="orderTypeLabel" label="订单类型" width="90" show-overflow-tooltip />
-        <el-table-column label="数量" width="70" show-overflow-tooltip>
+        <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="skuCode" label="sku" min-width="90" show-overflow-tooltip />
+        <el-table-column prop="collaborationTypeLabel" label="合作方式" min-width="90" show-overflow-tooltip />
+        <el-table-column prop="orderTypeLabel" label="订单类型" min-width="90" show-overflow-tooltip />
+        <el-table-column label="数量" min-width="70" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.quantity) }}</template>
         </el-table-column>
-        <el-table-column prop="merchandiser" label="跟单员" width="80" show-overflow-tooltip />
-        <el-table-column prop="salesperson" label="业务员" width="80" show-overflow-tooltip />
-        <el-table-column prop="customerName" label="客户" width="110" show-overflow-tooltip />
-        <el-table-column label="下单时间" width="150" show-overflow-tooltip>
+        <el-table-column prop="merchandiser" label="跟单员" min-width="80" show-overflow-tooltip />
+        <el-table-column prop="salesperson" label="业务员" min-width="80" show-overflow-tooltip />
+        <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
+        <el-table-column label="下单时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.orderDate) }}</template>
         </el-table-column>
-        <el-table-column label="客户交期" width="150" show-overflow-tooltip>
+        <el-table-column label="客户交期" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.customerDueDate) }}</template>
         </el-table-column>
-        <el-table-column label="审单时间" width="150" show-overflow-tooltip>
+        <el-table-column label="审单时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.reviewAt) }}</template>
         </el-table-column>
-        <el-table-column label="审单耗时（小时）" width="120" show-overflow-tooltip>
+        <el-table-column label="审单耗时（小时）" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.reviewDurationHours) }}</template>
         </el-table-column>
-        <el-table-column label="审单判定" width="90" show-overflow-tooltip>
+        <el-table-column label="审单判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.reviewJudge" /></template>
         </el-table-column>
-        <el-table-column label="到采购时间" width="150" show-overflow-tooltip>
+        <el-table-column label="到采购时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.purchaseArrivedAt) }}</template>
         </el-table-column>
-        <el-table-column label="采购完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="采购完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.purchaseCompletedAt) }}</template>
         </el-table-column>
-        <el-table-column label="采购判定" width="90" show-overflow-tooltip>
+        <el-table-column label="采购判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.purchaseJudge" /></template>
         </el-table-column>
-        <el-table-column label="到纸样时间" width="150" show-overflow-tooltip>
+        <el-table-column label="到纸样时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.patternArrivedAt) }}</template>
         </el-table-column>
-        <el-table-column label="纸样完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="纸样完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.patternCompletedAt) }}</template>
         </el-table-column>
-        <el-table-column label="纸样判定" width="90" show-overflow-tooltip>
+        <el-table-column label="纸样判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.patternJudge" /></template>
         </el-table-column>
-        <el-table-column label="到裁床时间" width="150" show-overflow-tooltip>
+        <el-table-column label="到裁床时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.cuttingArrivedAt) }}</template>
         </el-table-column>
-        <el-table-column label="裁床完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="裁床完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.cuttingCompletedAt) }}</template>
         </el-table-column>
-        <el-table-column label="裁床判定" width="90" show-overflow-tooltip>
+        <el-table-column label="裁床判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.cuttingJudge" /></template>
         </el-table-column>
-        <el-table-column label="到工艺时间" width="150" show-overflow-tooltip>
+        <el-table-column label="到工艺时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.craftArrivedAt) }}</template>
         </el-table-column>
-        <el-table-column label="工艺完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="工艺完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.craftCompletedAt) }}</template>
         </el-table-column>
-        <el-table-column label="工艺判定" width="90" show-overflow-tooltip>
+        <el-table-column label="工艺判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.craftJudge" /></template>
         </el-table-column>
-        <el-table-column label="到车缝时间" width="150" show-overflow-tooltip>
+        <el-table-column label="到车缝时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.sewingArrivedAt) }}</template>
         </el-table-column>
-        <el-table-column label="车缝完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="车缝完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.sewingCompletedAt) }}</template>
         </el-table-column>
-        <el-table-column label="车缝判定" width="90" show-overflow-tooltip>
+        <el-table-column label="车缝判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.sewingJudge" /></template>
         </el-table-column>
-        <el-table-column label="到尾部时间" width="150" show-overflow-tooltip>
+        <el-table-column label="到尾部时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.finishingArrivedAt) }}</template>
         </el-table-column>
-        <el-table-column label="尾部完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="尾部完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.finishingCompletedAt) }}</template>
         </el-table-column>
-        <el-table-column label="尾部判定" width="90" show-overflow-tooltip>
+        <el-table-column label="尾部判定" min-width="90" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="row.finishingJudge" /></template>
         </el-table-column>
-        <el-table-column label="完成时间" width="150" show-overflow-tooltip>
+        <el-table-column label="完成时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.completedAt) }}</template>
         </el-table-column>
-        <el-table-column prop="statusLabel" label="状态" width="80" show-overflow-tooltip />
-        <el-table-column label="进入状态时间" width="150" show-overflow-tooltip>
+        <el-table-column prop="statusLabel" label="状态" min-width="80" show-overflow-tooltip />
+        <el-table-column label="进入状态时间" min-width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ formatMaybeDateTime(row.enteredAt) }}</template>
         </el-table-column>
-        <el-table-column label="耗时（小时）" width="110" show-overflow-tooltip>
+        <el-table-column label="耗时（小时）" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.durationHours) }}</template>
         </el-table-column>
-        <el-table-column label="时效判定" width="90" align="center" show-overflow-tooltip>
+        <el-table-column label="时效判定" min-width="90" align="center" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="currentSegmentSlaLabel(row)" /></template>
         </el-table-column>
           </el-table>
@@ -241,7 +278,6 @@
             v-loading="loading"
             :data="profitList"
             :height="profitTableHeight ?? defaultTableHeight"
-            :fit="false"
             border
             stripe
             size="small"
@@ -253,35 +289,35 @@
             @selection-change="onProfitSelectionChange"
           >
         <el-table-column type="selection" width="46" />
-        <el-table-column prop="orderNo" label="订单号" width="110" />
-        <el-table-column prop="skuCode" label="SKU" width="100" />
-        <el-table-column prop="collaborationTypeLabel" label="合作方式" width="100" />
-        <el-table-column prop="orderTypeLabel" label="订单类型" width="100" />
-        <el-table-column label="出货数量" width="90">
+        <el-table-column prop="orderNo" label="订单号" min-width="110" show-overflow-tooltip />
+        <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="collaborationTypeLabel" label="合作方式" min-width="100" show-overflow-tooltip />
+        <el-table-column prop="orderTypeLabel" label="订单类型" min-width="100" show-overflow-tooltip />
+        <el-table-column label="出货数量" min-width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.shipmentQty) }}</template>
         </el-table-column>
-        <el-table-column prop="merchandiser" label="跟单" width="90" />
-        <el-table-column prop="salesperson" label="业务员" width="90" />
-        <el-table-column prop="customerName" label="客户" width="120" />
-        <el-table-column label="销售价" width="90">
+        <el-table-column prop="merchandiser" label="跟单" min-width="90" show-overflow-tooltip />
+        <el-table-column prop="salesperson" label="业务员" min-width="90" show-overflow-tooltip />
+        <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
+        <el-table-column label="销售价" min-width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.salePrice) }}</template>
         </el-table-column>
-        <el-table-column label="出厂价" width="90">
+        <el-table-column label="出厂价" min-width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.factoryPrice) }}</template>
         </el-table-column>
-        <el-table-column label="材料成本" width="150">
+        <el-table-column label="材料成本" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.materialCost) }}</template>
         </el-table-column>
-        <el-table-column label="工艺项目" width="150">
+        <el-table-column label="工艺项目" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.processCost) }}</template>
         </el-table-column>
-        <el-table-column label="生产工序" width="150">
+        <el-table-column label="生产工序" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.productionCost) }}</template>
         </el-table-column>
-        <el-table-column label="单件利润" width="130">
+        <el-table-column label="单件利润" min-width="110" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(row.unitProfit) }}</template>
         </el-table-column>
-        <el-table-column label="工厂总利润" width="130">
+        <el-table-column label="工厂总利润" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ formatBizNumberForTable(calcFactoryTotalProfit(row)) }}</template>
         </el-table-column>
           </el-table>
@@ -310,11 +346,25 @@ import { rangeShortcuts } from '@/utils/date-shortcuts'
 import {
   ACTIVE_FILTER_COLOR,
   getAdaptiveSelectStyle,
+  getAdaptiveWidthStyle,
+  getFilterInputStyle,
   getFilterRangeStyle as getStandardFilterRangeStyle,
+  getOrderNoFilterStyle as getStandardOrderNoFilterStyle,
+  getSkuCodeFilterStyle as getStandardSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 
 function getSlaFilterRangeStyle(v: [string, string] | null | undefined, placeholder: string) {
   return getStandardFilterRangeStyle(v as [string, string] | [] | null | undefined, placeholder)
+}
+
+function getOrderNoFilterStyle(v: string | undefined, labelVisible: { value: boolean } | boolean) {
+  const visible = typeof labelVisible === 'boolean' ? labelVisible : labelVisible.value
+  return getStandardOrderNoFilterStyle(v, visible)
+}
+
+function getSkuCodeFilterStyle(v: string | undefined, labelVisible: { value: boolean } | boolean) {
+  const visible = typeof labelVisible === 'boolean' ? labelVisible : labelVisible.value
+  return getStandardSkuCodeFilterStyle(v, visible)
 }
 
 const {
@@ -341,6 +391,9 @@ const {
   calcFactoryTotalProfit,
   onExport,
   onSearch,
+  debouncedSearch,
+  orderNoLabelVisible,
+  skuCodeLabelVisible,
   onTabChange,
   onPageChange,
   onPageSizeChange,
