@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-05-31-fix-packaging-legacy-input',
+    date: '2026-05-31',
+    module: '生产',
+    title: '修复"登记入库"老订单填写失效',
+    description: '尾部"登记入库"对话框，以前没按颜色×尺码登记过收货的老订单现在也能正常填本次入库/次品了。输入数字切到下一格不再被清零。',
+    link: '/production/finishing',
+  },
+  {
     id: '2026-05-31-order-report-filter-and-fit',
     date: '2026-05-31',
     module: '财务',

@@ -140,8 +140,25 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     )
   }
 
-  /** 入库每格上限：颜色 ri 尺码 ci 剩余 = 尾部收货[ri][ci] − 已入库[ri][ci] − 已次品[ri][ci] − 本次次品[ri][ci] */
+  /** 老订单没有按颜色×尺码登记的尾部收货真值时，跳过 per-cell 上限/校验，只在 submit 时
+   *  校验跨色×尺码总和 ≤ remaining。否则填写框 :max=0 会让 el-input-number 把输入值自动
+   *  reset 到 0（看起来像"切下一格前面填的就消失了"）。 */
+  function hasReceivedTruth(item: PackagingCompleteItem): boolean {
+    const rows = item.tailReceivedColorRows
+    if (!Array.isArray(rows) || rows.length === 0) return false
+    for (const r of rows) {
+      const q = Array.isArray(r?.quantities) ? r.quantities : []
+      for (const n of q) {
+        if ((Number(n) || 0) > 0) return true
+      }
+    }
+    return false
+  }
+
+  /** 入库每格上限：颜色 ri 尺码 ci 剩余 = 尾部收货[ri][ci] − 已入库[ri][ci] − 已次品[ri][ci] − 本次次品[ri][ci]
+   *  老订单缺 byColor 真值时返回 undefined（不设 cell 上限），避免输入值被 el-input-number 自动 reset 到 0。 */
   function inboundCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    if (!hasReceivedTruth(item)) return undefined
     const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
     const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
     const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
@@ -151,6 +168,7 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
 
   /** 次品每格上限：同理但本次入库占用 */
   function defectCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    if (!hasReceivedTruth(item)) return undefined
     const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
     const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
     const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
@@ -161,6 +179,8 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
   function assertPackagingPerCell(item: PackagingCompleteItem, mode: 'register' | 'amend'): string | null {
     const sizeLen = item.sizeHeaders.length
     if (sizeLen === 0) return null
+    // 老订单无 byColor 真值时跳过 per-cell 校验；submit 时仍校验跨色×尺码总和 ≤ remaining
+    if (!hasReceivedTruth(item)) return null
     const rows = item.tailReceivedColorRows
     if (mode === 'amend') {
       // 覆盖式：每格 入库 + 次品 = 尾部收货
