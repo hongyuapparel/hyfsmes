@@ -31,6 +31,13 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-05-31-sewing-allow-no-cut',
+    date: '2026-05-31',
+    module: '生产',
+    title: '未过裁床订单也能登记车缝',
+    description: '不需要过裁床的订单（裁床数全是0），打开"登记车缝完成"弹窗后，车缝数量直接按订单数量预填，可手动改，能正常保存。会提示"此订单未登记裁床数据"。',
+  },
+  {
     id: '2026-05-30-1-color-size-full-trail',
     date: '2026-05-30',
     module: '生产',
