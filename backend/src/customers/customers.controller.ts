@@ -27,6 +27,13 @@ export class CustomersController {
   constructor(private customersService: CustomersService) {}
 
   @Get()
+  @RequirePermission([
+    '/customers',
+    '/inventory/accessories',
+    '/inventory/fabric',
+    '/inventory/finished',
+    '/inventory/pending',
+  ])
   findAll(
     @Query('companyName') companyName?: string,
     @Query('salesperson') salesperson?: string,
@@ -51,6 +58,13 @@ export class CustomersController {
   }
 
   @Get('options/salespeople')
+  @RequirePermission([
+    '/customers',
+    '/inventory/accessories',
+    '/inventory/fabric',
+    '/inventory/finished',
+    '/inventory/pending',
+  ])
   getSalespeople() {
     return this.customersService.getSalespeople();
   }
