@@ -71,6 +71,14 @@ export const systemUpdates: SystemUpdate[] = [
     link: '/finance/order-sla-report',
   },
   {
+    id: '2026-05-31-sla-report-source-aligned-with-production',
+    date: '2026-05-31',
+    module: '财务',
+    title: '时效报表的生产环节时间与生产页对齐',
+    description: '修复了时效报表里 纸样/裁床/工艺/车缝/尾部 五个环节时间大量显示 "-" 的问题。报表现在和「生产管理」对应的几个页面读同一张表，生产页有数据，报表就有数据。老订单（含 3 月之前的）现在也能正确显示生产环节时效与超期判定。',
+    link: '/finance/order-sla-report',
+  },
+  {
     id: '2026-05-31-deleted-orders-no-leak',
     date: '2026-05-31',
     module: '系统',

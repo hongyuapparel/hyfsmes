@@ -1,11 +1,19 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusSla } from '../entities/order-status-sla.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
+import { OrderStatusTransition } from '../entities/order-status-transition.entity';
 import { Order } from '../entities/order.entity';
 import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
+import { OrderCutting } from '../entities/order-cutting.entity';
+import { OrderSewing } from '../entities/order-sewing.entity';
+import { OrderFinishing } from '../entities/order-finishing.entity';
+import { OrderCraft } from '../entities/order-craft.entity';
+import { OrderPattern } from '../entities/order-pattern.entity';
+import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
+import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
 export type ProductionSlaJudgeContext = {
@@ -22,10 +30,26 @@ export class OrderStatusReportService {
     private readonly slaRepo: Repository<OrderStatusSla>,
     @InjectRepository(OrderStatusHistory)
     private readonly historyRepo: Repository<OrderStatusHistory>,
+    @InjectRepository(OrderStatusTransition)
+    private readonly transitionRepo: Repository<OrderStatusTransition>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderCostSnapshot)
     private readonly orderCostSnapshotRepo: Repository<OrderCostSnapshot>,
+    @InjectRepository(OrderCutting)
+    private readonly orderCuttingRepo: Repository<OrderCutting>,
+    @InjectRepository(OrderSewing)
+    private readonly orderSewingRepo: Repository<OrderSewing>,
+    @InjectRepository(OrderFinishing)
+    private readonly orderFinishingRepo: Repository<OrderFinishing>,
+    @InjectRepository(OrderCraft)
+    private readonly orderCraftRepo: Repository<OrderCraft>,
+    @InjectRepository(OrderPattern)
+    private readonly orderPatternRepo: Repository<OrderPattern>,
+    @InjectRepository(OrderExt)
+    private readonly orderExtRepo: Repository<OrderExt>,
+    @InjectRepository(OrderOperationLog)
+    private readonly orderOperationLogRepo: Repository<OrderOperationLog>,
     private readonly systemOptionsService: SystemOptionsService,
   ) {}
 
@@ -125,27 +149,123 @@ export class OrderStatusReportService {
     }
     const filteredOrders = await orderQb.getMany();
     const orderIds = filteredOrders.map((o) => o.id);
-    const rows =
+
+    // ===== 数据加载：与各生产页面保持同源 =====
+    // - 审单：order_operation_logs（action='submit'/'review'） + orders.createdAt 兜底
+    // - 采购：order_status_history (pending_purchase) + orders.statusTime 兜底（同 production-purchase-query.service.ts:94-117）
+    //   + order_ext.materials[].purchaseCompletedAt 取 max（同生产采购页第 170 行）
+    // - 纸样/裁床/工艺/车缝/尾部：直接读 order_pattern / order_cutting / order_craft / order_sewing / order_finishing 实体表
+    //   （与 production-pattern/cutting-list/craft/sewing/finishing-query.service.ts 同源）
+    const slaRows = await this.slaRepo.find({ where: { enabled: true } });
+    const slaMap = new Map<number, number>();
+    for (const r of slaRows) slaMap.set(r.orderStatusId, parseFloat(r.limitHours));
+    const allStatuses = await this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
+    const statusByCode = new Map(allStatuses.map((s) => [s.code, s]));
+
+    const collaborationIds = Array.from(
+      new Set(filteredOrders.map((o) => o.collaborationTypeId).filter((v) => v != null) as number[]),
+    );
+    const orderTypeIds = Array.from(
+      new Set(filteredOrders.map((o) => o.orderTypeId).filter((v) => v != null) as number[]),
+    );
+
+    type EntityMap<T> = Map<number, T>;
+    const emptyMap = <T>(): EntityMap<T> => new Map<number, T>();
+
+    const [
+      collaborationLabels,
+      orderTypeLabels,
+      cuttings,
+      sewings,
+      finishings,
+      crafts,
+      patterns,
+      exts,
+      opLogs,
+      historyRowsForReviewAndPurchase,
+      craftTransitions,
+    ] = await Promise.all([
+      this.systemOptionsService.getOptionLabelsByIds('collaboration', collaborationIds),
+      this.systemOptionsService.getOptionLabelsByIds('order_types', orderTypeIds),
+      orderIds.length > 0 ? this.orderCuttingRepo.find({ where: { orderId: In(orderIds) } }) : Promise.resolve([] as OrderCutting[]),
+      orderIds.length > 0 ? this.orderSewingRepo.find({ where: { orderId: In(orderIds) } }) : Promise.resolve([] as OrderSewing[]),
+      orderIds.length > 0 ? this.orderFinishingRepo.find({ where: { orderId: In(orderIds) } }) : Promise.resolve([] as OrderFinishing[]),
+      orderIds.length > 0 ? this.orderCraftRepo.find({ where: { orderId: In(orderIds) } }) : Promise.resolve([] as OrderCraft[]),
+      orderIds.length > 0 ? this.orderPatternRepo.find({ where: { orderId: In(orderIds) } }) : Promise.resolve([] as OrderPattern[]),
+      orderIds.length > 0 ? this.orderExtRepo.find({ where: { orderId: In(orderIds) } }) : Promise.resolve([] as OrderExt[]),
       orderIds.length > 0
-        ? await this.historyRepo
+        ? this.orderOperationLogRepo.find({
+            where: { orderId: In(orderIds), action: In(['submit', 'review', 'create']) },
+            order: { createdAt: 'ASC' },
+          })
+        : Promise.resolve([] as OrderOperationLog[]),
+      orderIds.length > 0
+        ? this.historyRepo
             .createQueryBuilder('h')
-            .innerJoinAndSelect('h.order', 'o')
             .innerJoinAndSelect('h.status', 's')
             .where('h.order_id IN (:...orderIds)', { orderIds })
             .orderBy('h.order_id', 'ASC')
             .addOrderBy('h.entered_at', 'ASC')
             .getMany()
-        : [];
-    const slaMap = new Map<number, number>();
-    const slaRows = await this.slaRepo.find({ where: { enabled: true } });
-    for (const r of slaRows) slaMap.set(r.orderStatusId, parseFloat(r.limitHours));
+        : Promise.resolve([] as OrderStatusHistory[]),
+      this.transitionRepo.find({ where: { triggerCode: 'craft_completed', enabled: true } }),
+    ]);
 
-    const byOrder = new Map<number, OrderStatusHistory[]>();
-    for (const r of rows) {
-      const id = r.orderId;
-      if (!byOrder.has(id)) byOrder.set(id, []);
-      byOrder.get(id)!.push(r);
+    const cuttingByOrder: EntityMap<OrderCutting> = emptyMap();
+    for (const r of cuttings) cuttingByOrder.set(r.orderId, r);
+    const sewingByOrder: EntityMap<OrderSewing> = emptyMap();
+    for (const r of sewings) sewingByOrder.set(r.orderId, r);
+    const finishingByOrder: EntityMap<OrderFinishing> = emptyMap();
+    for (const r of finishings) finishingByOrder.set(r.orderId, r);
+    const craftByOrder: EntityMap<OrderCraft> = emptyMap();
+    for (const r of crafts) craftByOrder.set(r.orderId, r);
+    const patternByOrder: EntityMap<OrderPattern> = emptyMap();
+    for (const r of patterns) patternByOrder.set(r.orderId, r);
+    const extByOrder: EntityMap<OrderExt> = emptyMap();
+    for (const r of exts) extByOrder.set(r.orderId, r);
+
+    const submitFirstByOrder = new Map<number, Date>();
+    const reviewLastByOrder = new Map<number, Date>();
+    for (const log of opLogs) {
+      if (log.action === 'submit' && !submitFirstByOrder.has(log.orderId)) {
+        submitFirstByOrder.set(log.orderId, log.createdAt);
+      } else if (log.action === 'review') {
+        reviewLastByOrder.set(log.orderId, log.createdAt); // 顺序按 createdAt ASC，覆盖式保留最后一条
+      }
     }
+
+    // 工艺阶段状态码集合：标准 pending_craft + 工作流链路里所有 trigger='craft_completed' 的 fromStatus
+    const craftPhaseCodes = new Set<string>(['pending_craft']);
+    for (const t of craftTransitions) {
+      if (t.fromStatus) craftPhaseCodes.add(t.fromStatus);
+    }
+
+    // 状态历史按订单分组：用于审单/采购阶段的进入时间查询
+    const historyByOrder = new Map<number, OrderStatusHistory[]>();
+    for (const r of historyRowsForReviewAndPurchase) {
+      if (!historyByOrder.has(r.orderId)) historyByOrder.set(r.orderId, []);
+      historyByOrder.get(r.orderId)!.push(r);
+    }
+    const findFirstHistoryEnteredAt = (orderId: number, phaseCode: string): Date | null => {
+      const list = historyByOrder.get(orderId);
+      if (!list) return null;
+      for (const h of list) {
+        const code = String((h as { status?: { code?: string } })?.status?.code ?? '').trim();
+        if (code === phaseCode) return h.enteredAt;
+      }
+      return null;
+    };
+    const findEnteredAtAfterPhase = (orderId: number, phaseCode: string): Date | null => {
+      const list = historyByOrder.get(orderId);
+      if (!list) return null;
+      let foundPhase = false;
+      for (const h of list) {
+        const code = String((h as { status?: { code?: string } })?.status?.code ?? '').trim();
+        if (foundPhase) return h.enteredAt;
+        if (code === phaseCode) foundPhase = true;
+      }
+      return null;
+    };
 
     const list: Array<{
       orderId: number;
@@ -192,146 +312,156 @@ export class OrderStatusReportService {
       isOverdue: boolean;
     }> = [];
     const now = new Date();
-
-    const collaborationIds = Array.from(
-      new Set(filteredOrders.map((o) => o.collaborationTypeId).filter((v) => v != null) as number[]),
-    );
-    const orderTypeIds = Array.from(
-      new Set(filteredOrders.map((o) => o.orderTypeId).filter((v) => v != null) as number[]),
-    );
-    const [collaborationLabels, orderTypeLabels] = await Promise.all([
-      this.systemOptionsService.getOptionLabelsByIds('collaboration', collaborationIds),
-      this.systemOptionsService.getOptionLabelsByIds('order_types', orderTypeIds),
-    ]);
-    const allStatuses = await this.statusRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
-    const statusByCode = new Map(allStatuses.map((s) => [s.code, s]));
-    for (const order of filteredOrders) {
-      if (byOrder.has(order.id)) continue;
-      const code = String(order.status ?? '').trim();
-      const status = code ? statusByCode.get(code) : undefined;
-      const enteredAt = order.statusTime ?? order.orderDate ?? order.createdAt;
-      const synthetic = {
-        orderId: order.id,
-        statusId: status?.id ?? 0,
-        enteredAt,
-        order,
-        status: status ?? null,
-      } as unknown as OrderStatusHistory;
-      byOrder.set(order.id, [synthetic]);
-    }
-
-    const getPhaseWindow = (
-      histSorted: OrderStatusHistory[],
-      phaseCode: string,
-      orderCompletedAt: Date | null,
-    ): { start: Date | null; end: Date | null } => {
-      const timeline = histSorted
-        .map((h) => ({
-          code: String((h as { status?: { code?: string } })?.status?.code ?? '').trim(),
-          enteredAt: h.enteredAt,
-        }))
-        .filter((x) => x.code.length > 0);
-      const idx = timeline.findIndex((t) => t.code === phaseCode);
-      if (idx < 0) return { start: null, end: null };
-      const start = timeline[idx].enteredAt;
-      if (idx + 1 < timeline.length) return { start, end: timeline[idx + 1].enteredAt };
-      if (phaseCode === 'pending_finishing' && orderCompletedAt) return { start, end: orderCompletedAt };
-      return { start, end: null };
+    const toIso = (d: Date | null | undefined): string | null => (d ? d.toISOString() : null);
+    const limitByPhaseCode = (phaseCode: string): number | null => {
+      const phaseStatus = statusByCode.get(phaseCode);
+      return phaseStatus ? slaMap.get(phaseStatus.id) ?? null : null;
+    };
+    const judge = (limit: number | null, startAt: Date | null, endAt: Date | null, isCurrent: boolean): string => {
+      if (!startAt) return '-';
+      if (endAt) {
+        if (limit == null) return '未配置时限';
+        const hours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
+        return hours > limit ? '超期' : '未超期';
+      }
+      return isCurrent ? '进行中' : '-';
     };
 
-    for (const [, hist] of byOrder) {
-      hist.sort((a, b) => a.enteredAt.getTime() - b.enteredAt.getTime());
-      const latest = hist[hist.length - 1];
-      if (!latest) continue;
-      const order = (latest as { order?: Order }).order;
-      const orderStatusCode = (order?.status ?? '').trim();
-      const matchedByOrderStatus =
-        orderStatusCode.length > 0
-          ? [...hist]
-              .reverse()
-              .find((h) => String((h as { status?: { code?: string } })?.status?.code ?? '').trim() === orderStatusCode)
-          : undefined;
-      const currentSeg = matchedByOrderStatus ?? latest;
-      const leftAt = now;
-      const durationHours = (leftAt.getTime() - currentSeg.enteredAt.getTime()) / (1000 * 60 * 60);
+    for (const order of filteredOrders) {
+      const orderStatusCode = (order.status ?? '').trim();
+      const enteredAt = order.statusTime ?? order.orderDate ?? order.createdAt;
       const statusFromOrder = orderStatusCode ? statusByCode.get(orderStatusCode) : undefined;
-      const resolvedStatusId = statusFromOrder?.id ?? currentSeg.statusId;
-      const resolvedStatusLabel = statusFromOrder?.label ?? String((currentSeg as { status?: { label?: string } })?.status?.label ?? '');
+      const resolvedStatusId = statusFromOrder?.id ?? 0;
+      const resolvedStatusLabel = statusFromOrder?.label ?? '';
       const limitHours = slaMap.get(resolvedStatusId) ?? null;
+      const durationHours = (now.getTime() - enteredAt.getTime()) / (1000 * 60 * 60);
       const isOverdue = limitHours != null && durationHours > limitHours;
-      const collaborationTypeId = order?.collaborationTypeId ?? null;
-      const orderTypeId = order?.orderTypeId ?? null;
-      const completedAt = order?.status === 'completed' && order.statusTime ? order.statusTime.toISOString() : null;
-      const orderCompletedAtDate = order?.status === 'completed' && order.statusTime ? order.statusTime : null;
-      const toIso = (d: Date | null): string | null => (d ? d.toISOString() : null);
-      const getJudge = (phaseCode: string, startAt: Date | null, endAt: Date | null): string => {
-        if (!startAt) return '-';
-        const phaseStatus = statusByCode.get(phaseCode);
-        const limit = phaseStatus ? slaMap.get(phaseStatus.id) ?? null : null;
-        if (endAt) {
-          if (limit == null) return '未配置时限';
-          const hours = (endAt.getTime() - startAt.getTime()) / (1000 * 60 * 60);
-          return hours > limit ? '超期' : '未超期';
-        }
-        return orderStatusCode === phaseCode ? '进行中' : '-';
-      };
-      const reviewW = getPhaseWindow(hist, 'pending_review', orderCompletedAtDate);
-      const reviewAtDate = reviewW.start;
-      const reviewCompletedAtDate = reviewW.end;
-      const reviewDurationHours =
-        reviewAtDate && reviewCompletedAtDate
-          ? Math.round(((reviewCompletedAtDate.getTime() - reviewAtDate.getTime()) / (1000 * 60 * 60)) * 100) / 100
-          : null;
-      const purchaseW = getPhaseWindow(hist, 'pending_purchase', orderCompletedAtDate);
-      const patternW = getPhaseWindow(hist, 'pending_pattern', orderCompletedAtDate);
-      const cuttingW = getPhaseWindow(hist, 'pending_cutting', orderCompletedAtDate);
-      const craftW = getPhaseWindow(hist, 'pending_craft', orderCompletedAtDate);
-      const sewingW = getPhaseWindow(hist, 'pending_sewing', orderCompletedAtDate);
-      const finishingW = getPhaseWindow(hist, 'pending_finishing', orderCompletedAtDate);
+      const collaborationTypeId = order.collaborationTypeId ?? null;
+      const orderTypeId = order.orderTypeId ?? null;
+      const completedAtIso = order.status === 'completed' && order.statusTime ? order.statusTime.toISOString() : null;
 
+      // —— 审单 ——
+      const reviewStart =
+        findFirstHistoryEnteredAt(order.id, 'pending_review') ??
+        submitFirstByOrder.get(order.id) ??
+        order.createdAt ?? null;
+      const reviewEnd =
+        findEnteredAtAfterPhase(order.id, 'pending_review') ??
+        reviewLastByOrder.get(order.id) ??
+        null;
+      const reviewDurationHours =
+        reviewStart && reviewEnd
+          ? Math.round(((reviewEnd.getTime() - reviewStart.getTime()) / (1000 * 60 * 60)) * 100) / 100
+          : null;
+
+      // —— 采购 —— （同生产采购页的取数逻辑）
+      const purchaseHistoryEnteredAt = findFirstHistoryEnteredAt(order.id, 'pending_purchase');
+      const purchaseStart =
+        purchaseHistoryEnteredAt ??
+        (orderStatusCode === 'pending_purchase' && order.statusTime ? order.statusTime : null);
+      const ext = extByOrder.get(order.id);
+      const materials: OrderMaterialRow[] = Array.isArray(ext?.materials) ? ext!.materials! : [];
+      let purchaseEnd: Date | null = null;
+      for (const m of materials) {
+        const raw = m?.purchaseCompletedAt;
+        if (raw) {
+          const d = new Date(raw);
+          if (!Number.isNaN(d.getTime()) && (!purchaseEnd || d > purchaseEnd)) purchaseEnd = d;
+        }
+      }
+      if (!purchaseEnd) purchaseEnd = findEnteredAtAfterPhase(order.id, 'pending_purchase');
+
+      // —— 各生产环节：直接读对应实体表，逻辑与生产页一致 ——
+      // 纸样实体表没有 arrivedAt 字段，到达时间从 order_status_history 找 pending_pattern 的最早进入时间，
+      // 兜底用 order.statusTime（当前正处于 pending_pattern 时）；与 production-pattern.service.ts:413-416 同源。
+      const pattern = patternByOrder.get(order.id);
+      const patternHistoryEnteredAt = findFirstHistoryEnteredAt(order.id, 'pending_pattern');
+      const patternStart =
+        patternHistoryEnteredAt ??
+        (orderStatusCode === 'pending_pattern' && order.statusTime ? order.statusTime : null);
+      const patternEnd = pattern?.completedAt ?? null;
+      const patternIsCurrent =
+        orderStatusCode === 'pending_pattern' ||
+        (!!pattern && (pattern.status === 'pending_assign' || pattern.status === 'in_progress'));
+
+      const cutting = cuttingByOrder.get(order.id);
+      const cuttingStart =
+        cutting?.arrivedAt ?? (orderStatusCode === 'pending_cutting' && order.statusTime ? order.statusTime : null);
+      const cuttingEnd = cutting?.completedAt ?? null;
+      const cuttingIsCurrent =
+        orderStatusCode === 'pending_cutting' ||
+        (!!cutting && cutting.status === 'pending' && !!cutting.arrivedAt && !cutting.completedAt);
+
+      const craft = craftByOrder.get(order.id);
+      const craftStart =
+        craft?.arrivedAtCraft ??
+        (craftPhaseCodes.has(orderStatusCode) && order.statusTime ? order.statusTime : null);
+      const craftEnd = craft?.completedAt ?? null;
+      const craftIsCurrent =
+        craftPhaseCodes.has(orderStatusCode) ||
+        (!!craft && craft.status === 'pending' && !!craft.arrivedAtCraft && !craft.completedAt);
+
+      const sewing = sewingByOrder.get(order.id);
+      const sewingStart =
+        sewing?.arrivedAt ?? (orderStatusCode === 'pending_sewing' && order.statusTime ? order.statusTime : null);
+      const sewingEnd = sewing?.completedAt ?? null;
+      const sewingIsCurrent =
+        orderStatusCode === 'pending_sewing' ||
+        (!!sewing && sewing.status === 'pending' && !!sewing.arrivedAt && !sewing.completedAt);
+
+      const finishing = finishingByOrder.get(order.id);
+      const finishingStart =
+        finishing?.arrivedAt ??
+        (orderStatusCode === 'pending_finishing' && order.statusTime ? order.statusTime : null);
+      const finishingEnd = finishing?.completedAt ?? null;
+      const finishingIsCurrent =
+        orderStatusCode === 'pending_finishing' ||
+        (!!finishing && !!finishing.arrivedAt && !finishing.completedAt && finishing.status !== 'inbound');
+
+      // 跳过 status 不匹配 / 进入时间不在筛选范围内的订单
       if (params.statusId != null && resolvedStatusId !== params.statusId) continue;
-      if (params.startDate && currentSeg.enteredAt < new Date(params.startDate)) continue;
-      if (params.endDate && currentSeg.enteredAt > new Date(`${params.endDate} 23:59:59`)) continue;
+      if (params.startDate && enteredAt < new Date(params.startDate)) continue;
+      if (params.endDate && enteredAt > new Date(`${params.endDate} 23:59:59`)) continue;
 
       list.push({
-        orderId: currentSeg.orderId,
-        orderNo: order?.orderNo ?? '',
-        skuCode: order?.skuCode ?? '',
+        orderId: order.id,
+        orderNo: order.orderNo ?? '',
+        skuCode: order.skuCode ?? '',
         collaborationTypeId,
         collaborationTypeLabel: collaborationTypeId != null ? collaborationLabels[collaborationTypeId] ?? '' : '',
         orderTypeId,
         orderTypeLabel: orderTypeId != null ? orderTypeLabels[orderTypeId] ?? '' : '',
-        quantity: order?.quantity ?? 0,
-        merchandiser: order?.merchandiser ?? '',
-        salesperson: order?.salesperson ?? '',
-        customerName: order?.customerName ?? '',
-        orderDate: order?.orderDate ? order.orderDate.toISOString() : null,
-        customerDueDate: order?.customerDueDate ? order.customerDueDate.toISOString() : null,
-        reviewAt: toIso(reviewAtDate),
+        quantity: order.quantity ?? 0,
+        merchandiser: order.merchandiser ?? '',
+        salesperson: order.salesperson ?? '',
+        customerName: order.customerName ?? '',
+        orderDate: order.orderDate ? order.orderDate.toISOString() : null,
+        customerDueDate: order.customerDueDate ? order.customerDueDate.toISOString() : null,
+        reviewAt: toIso(reviewStart),
         reviewDurationHours,
-        reviewJudge: getJudge('pending_review', reviewAtDate, reviewCompletedAtDate),
-        purchaseArrivedAt: toIso(purchaseW.start),
-        purchaseCompletedAt: toIso(purchaseW.end),
-        purchaseJudge: getJudge('pending_purchase', purchaseW.start, purchaseW.end),
-        patternArrivedAt: toIso(patternW.start),
-        patternCompletedAt: toIso(patternW.end),
-        patternJudge: getJudge('pending_pattern', patternW.start, patternW.end),
-        cuttingArrivedAt: toIso(cuttingW.start),
-        cuttingCompletedAt: toIso(cuttingW.end),
-        cuttingJudge: getJudge('pending_cutting', cuttingW.start, cuttingW.end),
-        craftArrivedAt: toIso(craftW.start),
-        craftCompletedAt: toIso(craftW.end),
-        craftJudge: getJudge('pending_craft', craftW.start, craftW.end),
-        sewingArrivedAt: toIso(sewingW.start),
-        sewingCompletedAt: toIso(sewingW.end),
-        sewingJudge: getJudge('pending_sewing', sewingW.start, sewingW.end),
-        finishingArrivedAt: toIso(finishingW.start),
-        finishingCompletedAt: toIso(finishingW.end),
-        finishingJudge: getJudge('pending_finishing', finishingW.start, finishingW.end),
-        completedAt,
+        reviewJudge: judge(limitByPhaseCode('pending_review'), reviewStart, reviewEnd, orderStatusCode === 'pending_review'),
+        purchaseArrivedAt: toIso(purchaseStart),
+        purchaseCompletedAt: toIso(purchaseEnd),
+        purchaseJudge: judge(limitByPhaseCode('pending_purchase'), purchaseStart, purchaseEnd, orderStatusCode === 'pending_purchase'),
+        patternArrivedAt: toIso(patternStart),
+        patternCompletedAt: toIso(patternEnd),
+        patternJudge: judge(limitByPhaseCode('pending_pattern'), patternStart, patternEnd, patternIsCurrent),
+        cuttingArrivedAt: toIso(cuttingStart),
+        cuttingCompletedAt: toIso(cuttingEnd),
+        cuttingJudge: judge(limitByPhaseCode('pending_cutting'), cuttingStart, cuttingEnd, cuttingIsCurrent),
+        craftArrivedAt: toIso(craftStart),
+        craftCompletedAt: toIso(craftEnd),
+        craftJudge: judge(limitByPhaseCode('pending_craft'), craftStart, craftEnd, craftIsCurrent),
+        sewingArrivedAt: toIso(sewingStart),
+        sewingCompletedAt: toIso(sewingEnd),
+        sewingJudge: judge(limitByPhaseCode('pending_sewing'), sewingStart, sewingEnd, sewingIsCurrent),
+        finishingArrivedAt: toIso(finishingStart),
+        finishingCompletedAt: toIso(finishingEnd),
+        finishingJudge: judge(limitByPhaseCode('pending_finishing'), finishingStart, finishingEnd, finishingIsCurrent),
+        completedAt: completedAtIso,
         statusId: resolvedStatusId,
         statusLabel: resolvedStatusLabel,
-        enteredAt: currentSeg.enteredAt.toISOString(),
+        enteredAt: enteredAt.toISOString(),
         leftAt: null,
         durationHours: Math.round(durationHours * 100) / 100,
         limitHours,
