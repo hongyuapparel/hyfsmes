@@ -37,6 +37,26 @@
         </template>
       </el-tree-select>
       <el-select
+        v-model="filter.jobTitleId"
+        placeholder="岗位"
+        filterable
+        clearable
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.jobTitleId ? `岗位：${getJobTitleLabel(filter.jobTitleId)}` : '', '岗位')"
+        @change="onSearch(true)"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.jobTitleId">岗位：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option
+          v-for="job in allJobs"
+          :key="job.id"
+          :label="job.label"
+          :value="job.id"
+        />
+      </el-select>
+      <el-select
         v-model="filter.status"
         placeholder="状态"
         clearable
@@ -54,7 +74,7 @@
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': filter.entryDateRange }"
-        :style="getFilterRangeStyle(filter.entryDateRange as [string, string] | [], '入职日期')"
+        :style="getFilterRangeStyle(filter.entryDateRange, '入职日期')"
       >
         <span v-if="filter.entryDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">入职日期：</span>
         <el-date-picker
@@ -75,7 +95,7 @@
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': filter.leaveDateRange }"
-        :style="getFilterRangeStyle(filter.leaveDateRange as [string, string] | [], '离职日期')"
+        :style="getFilterRangeStyle(filter.leaveDateRange, '离职日期')"
       >
         <span v-if="filter.leaveDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">离职日期：</span>
         <el-date-picker
@@ -242,6 +262,7 @@ const {
   loadJobs,
   loadUsers,
   getDepartmentLabel,
+  getJobTitleLabel,
   getRowIndex,
   onSearch,
   debouncedSearch,

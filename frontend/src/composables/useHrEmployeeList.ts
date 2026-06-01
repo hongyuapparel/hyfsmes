@@ -22,13 +22,23 @@ export interface DeptOption { id: number; label: string }
 export interface DeptTreeOption extends DeptOption { children?: DeptTreeOption[] }
 export interface JobOption { id: number; label: string; parentId: number | null }
 
+interface HrFilter {
+  name: string
+  departmentId: number | null
+  jobTitleId: number | null
+  status: string
+  entryDateRange: [string, string] | null
+  leaveDateRange: [string, string] | null
+}
+
 export function useHrEmployeeList() {
-  const filter = reactive({
+  const filter = reactive<HrFilter>({
     name: '',
-    departmentId: null as number | null,
+    departmentId: null,
+    jobTitleId: null,
     status: '',
-    entryDateRange: [] as string[],
-    leaveDateRange: [] as string[],
+    entryDateRange: null,
+    leaveDateRange: null,
   })
   const nameLabelVisible = ref(false)
   const hrDateRangeShortcuts = [
@@ -93,6 +103,11 @@ export function useHrEmployeeList() {
     return flatDepartments.value.find((d) => d.id === id)?.label ?? ''
   }
 
+  function getJobTitleLabel(id: number | null): string {
+    if (id == null) return ''
+    return allJobs.value.find((j) => j.id === id)?.label ?? ''
+  }
+
   function getRowIndex(id: number): number {
     const idx = list.value.findIndex((x) => x.id === id)
     return idx >= 0 ? (pagination.page - 1) * pagination.pageSize + idx + 1 : 1
@@ -104,6 +119,7 @@ export function useHrEmployeeList() {
       const res = await getEmployeeList({
         name: filter.name || undefined,
         departmentId: filter.departmentId || undefined,
+        jobTitleId: filter.jobTitleId || undefined,
         status: filter.status || undefined,
         entryDateStart: filter.entryDateRange?.[0] || undefined,
         entryDateEnd: filter.entryDateRange?.[1] || undefined,
@@ -140,7 +156,7 @@ export function useHrEmployeeList() {
 
   function onReset() {
     nameLabelVisible.value = false
-    Object.assign(filter, { name: '', departmentId: null, status: '', entryDateRange: [], leaveDateRange: [] })
+    Object.assign(filter, { name: '', departmentId: null, jobTitleId: null, status: '', entryDateRange: null, leaveDateRange: null })
     sortState.sortBy = ''
     sortState.sortOrder = ''
     pagination.page = 1
@@ -186,6 +202,7 @@ export function useHrEmployeeList() {
       const res = await getEmployeeList({
         name: filter.name || undefined,
         departmentId: filter.departmentId || undefined,
+        jobTitleId: filter.jobTitleId || undefined,
         status: filter.status || undefined,
         entryDateStart: filter.entryDateRange?.[0] || undefined,
         entryDateEnd: filter.entryDateRange?.[1] || undefined,
@@ -215,7 +232,7 @@ export function useHrEmployeeList() {
   return {
     filter, nameLabelVisible, hrDateRangeShortcuts, list, selectedIds, loading,
     pagination, sortState, departmentTreeOptions, flatDepartments, allJobs, userOptions,
-    load, loadDepartments, loadJobs, loadUsers, getDepartmentLabel, getRowIndex,
+    load, loadDepartments, loadJobs, loadUsers, getDepartmentLabel, getJobTitleLabel, getRowIndex,
     onSearch, debouncedSearch, onReset, onSortChange, onPageSizeChange,
     onSelectionChange, onBatchDelete, onExport,
   }
