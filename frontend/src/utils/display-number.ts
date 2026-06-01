@@ -40,3 +40,28 @@ export function formatDisplayNumber(
   }
   return rounded.toFixed(2)
 }
+
+export type FormatCurrencyOptions = FormatDisplayNumberOptions & {
+  /** 货币符号，默认 '￥'（全角，与财务/库存模块现有用法一致） */
+  symbol?: string
+}
+
+/**
+ * 金额展示：基于 formatDisplayNumber，前面拼货币符号。
+ * - null / undefined / 空字符串 → emptyDisplay（默认 '-'，不带符号）
+ * - 非数字字符串 → 原样返回（不带符号）
+ * - 合法数字 → `￥{格式化}`，负数照样为 `￥-27.57`
+ */
+export function formatCurrency(value: unknown, options?: FormatCurrencyOptions): string {
+  const empty = options?.emptyDisplay ?? '-'
+  if (value === null || value === undefined) return empty
+  if (typeof value === 'string' && value.trim() === '') return empty
+
+  const formatted = formatDisplayNumber(value, { emptyDisplay: empty })
+  if (formatted === empty) return empty
+  if (typeof value === 'string' && !/^-?\d+(?:\.\d+)?$/.test(value.trim())) {
+    return formatted
+  }
+  const symbol = options?.symbol ?? '￥'
+  return `${symbol}${formatted}`
+}

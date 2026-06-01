@@ -299,26 +299,26 @@
         <el-table-column prop="merchandiser" label="跟单" min-width="90" show-overflow-tooltip />
         <el-table-column prop="salesperson" label="业务员" min-width="90" show-overflow-tooltip />
         <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
-        <el-table-column label="销售价" min-width="90" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.salePrice) }}</template>
+        <el-table-column label="销售价" min-width="100" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(row.salePrice) }}</template>
         </el-table-column>
-        <el-table-column label="出厂价" min-width="90" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.factoryPrice) }}</template>
+        <el-table-column label="出厂价" min-width="100" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(row.factoryPrice) }}</template>
         </el-table-column>
-        <el-table-column label="材料成本" min-width="110" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.materialCost) }}</template>
+        <el-table-column label="材料成本" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(row.materialCost) }}</template>
         </el-table-column>
-        <el-table-column label="工艺项目" min-width="110" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.processCost) }}</template>
+        <el-table-column label="工艺项目" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(row.processCost) }}</template>
         </el-table-column>
-        <el-table-column label="生产工序" min-width="110" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.productionCost) }}</template>
+        <el-table-column label="生产工序" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(row.productionCost) }}</template>
         </el-table-column>
-        <el-table-column label="单件利润" min-width="110" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.unitProfit) }}</template>
+        <el-table-column label="单件利润" min-width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(row.unitProfit) }}</template>
         </el-table-column>
-        <el-table-column label="工厂总利润" min-width="120" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(calcFactoryTotalProfit(row)) }}</template>
+        <el-table-column label="工厂总利润" min-width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatMoney(calcFactoryTotalProfit(row)) }}</template>
         </el-table-column>
           </el-table>
         </div>
@@ -343,6 +343,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
+import { formatCurrency } from '@/utils/display-number'
 import {
   ACTIVE_FILTER_COLOR,
   getAdaptiveSelectStyle,
@@ -352,6 +353,10 @@ import {
   getOrderNoFilterStyle as getStandardOrderNoFilterStyle,
   getSkuCodeFilterStyle as getStandardSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
+
+function formatMoney(value: unknown): string {
+  return formatCurrency(value)
+}
 
 function getSlaFilterRangeStyle(v: [string, string] | null | undefined, placeholder: string) {
   return getStandardFilterRangeStyle(v as [string, string] | [] | null | undefined, placeholder)

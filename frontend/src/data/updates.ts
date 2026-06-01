@@ -55,6 +55,14 @@ export const systemUpdates: SystemUpdate[] = [
     link: '/production/finishing',
   },
   {
+    id: '2026-05-31-profit-report-currency-symbol',
+    date: '2026-05-31',
+    module: '财务',
+    title: '利润报表金额列前面加￥符号',
+    description: '利润报表里 销售价/出厂价/材料成本/工艺项目/生产工序/单件利润/工厂总利润 7 列数字前面统一加￥，一眼能区分金额和数量。负数原样展示（如 ￥-27.57）。',
+    link: '/finance/order-sla-report?tab=profit',
+  },
+  {
     id: '2026-05-31-order-report-filter-and-fit',
     date: '2026-05-31',
     module: '财务',
