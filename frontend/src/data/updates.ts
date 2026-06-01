@@ -31,6 +31,22 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-06-02-fix-warehouse-keeper-403-on-accessories',
+    date: '2026-06-02',
+    module: '库存',
+    title: '修复仓管打开辅料库存的无权限提示',
+    description: '仓管账号刷新"辅料库存"时，页面顶部会闪两条"无权限访问"红条，"新增辅料"抽屉里的客户和业务员下拉显示"无数据"。已放开仓管对客户和业务员名单的只读权限（不影响客户管理菜单），现在两个下拉都能正常选了。同样的问题在面料/成品/待仓页面也一起修了。',
+    link: '/inventory/accessories',
+  },
+  {
+    id: '2026-06-02-accessories-detail-button-primary',
+    date: '2026-06-02',
+    module: '库存',
+    title: '辅料库存"详情"按钮颜色对齐成品库存',
+    description: '辅料库存操作列的"详情"原来是灰色，和成品库存的蓝色不一致。统一为蓝色，列表里更显眼。',
+    link: '/inventory/accessories',
+  },
+  {
     id: '2026-05-31-packaging-show-upstream-chain',
     date: '2026-05-31',
     module: '生产',
