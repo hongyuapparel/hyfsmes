@@ -54,6 +54,9 @@ export function useHrEmployeeForm(options: FormOptions) {
     remark: '',
     photoUrl: '',
     sortIndex: 1,
+    birthYear: null as number | null,
+    birthMonth: null as number | null,
+    birthDay: null as number | null,
   })
 
   const formRules: FormRules = {
@@ -131,6 +134,9 @@ export function useHrEmployeeForm(options: FormOptions) {
     form.remark = row.remark ?? ''
     form.photoUrl = row.photoUrl ?? ''
     form.sortIndex = getRowIndex(row.id)
+    form.birthYear = row.birthYear ?? null
+    form.birthMonth = row.birthMonth ?? null
+    form.birthDay = row.birthDay ?? null
   }
 
   function resetInitForm() {
@@ -142,6 +148,7 @@ export function useHrEmployeeForm(options: FormOptions) {
       leaveDate: '', leaveReason: '', status: 'active',
       userId: null, remark: '', photoUrl: '',
       sortIndex: paginationTotal.value + 1,
+      birthYear: null, birthMonth: null, birthDay: null,
     })
   }
 

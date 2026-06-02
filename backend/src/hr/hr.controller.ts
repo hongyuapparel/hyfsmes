@@ -33,6 +33,7 @@ export class HrController {
     @Query('entryDateEnd') entryDateEnd?: string,
     @Query('leaveDateStart') leaveDateStart?: string,
     @Query('leaveDateEnd') leaveDateEnd?: string,
+    @Query('birthMonth') birthMonth?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
     @Query('page') page?: string,
@@ -47,6 +48,7 @@ export class HrController {
       entryDateEnd: entryDateEnd?.trim() || undefined,
       leaveDateStart: leaveDateStart?.trim() || undefined,
       leaveDateEnd: leaveDateEnd?.trim() || undefined,
+      birthMonth: birthMonth ? parseInt(birthMonth, 10) : undefined,
       sortBy: sortBy?.trim() || undefined,
       sortOrder: sortOrder === 'desc' ? 'desc' : sortOrder === 'asc' ? 'asc' : undefined,
       page: page ? parseInt(page, 10) : 1,
@@ -182,6 +184,22 @@ export class HrController {
   @Delete('items/:id')
   remove(@Param('id') id: string) {
     return this.hrService.remove(Number(id));
+  }
+
+  @Get('items/:id/history')
+  getEmployeeHistory(@Param('id', ParseIntPipe) id: number) {
+    return this.hrService.getEmployeeHistory(id);
+  }
+
+  @Get('items/:id/yearly-records')
+  getEmployeeYearlyRecords(@Param('id', ParseIntPipe) id: number) {
+    return this.hrService.getEmployeeYearlyRecords(id);
+  }
+
+  /** 一次性导入历史花名册（清空 employees + history + yearly_record 后重导） */
+  @Post('import-rosters')
+  importRosters() {
+    return this.hrService.importRosters();
   }
 
   @Patch('batch/order')

@@ -23,6 +23,9 @@ export interface EmployeeItem {
   leaveDate: string | null
   leaveReason: string
   status: string
+  birthYear?: number | null
+  birthMonth?: number | null
+  birthDay?: number | null
   userId: number | null
   user?: { id: number; username: string; displayName: string } | null
   remark: string
@@ -53,6 +56,7 @@ export function getEmployeeList(params?: {
   entryDateEnd?: string
   leaveDateStart?: string
   leaveDateEnd?: string
+  birthMonth?: number
   sortBy?: 'sortOrder' | 'name' | 'entryDate' | 'status'
   sortOrder?: 'asc' | 'desc'
   page?: number
@@ -164,4 +168,47 @@ export function checkEmployeeNameExists(name: string, excludeId?: number | null)
   return request.get<{ exists: boolean }>('/hr/exists-name', {
     params: { name, excludeId: excludeId ?? undefined },
   })
+}
+
+export interface EmployeeHistoryItem {
+  id: number
+  employeeId: number
+  entryDate: string | null
+  leaveDate: string | null
+  leaveReason: string
+  remark: string
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface EmployeeYearlyRecordItem {
+  id: number
+  employeeId: number
+  year: number
+  type: 'spring_festival_return' | 'vacation_start' | 'work_start' | 'remark' | string
+  value: string
+  createdAt: string
+  updatedAt: string
+}
+
+export function getEmployeeHistory(id: number) {
+  return request.get<EmployeeHistoryItem[]>(`/hr/items/${id}/history`)
+}
+
+export function getEmployeeYearlyRecords(id: number) {
+  return request.get<EmployeeYearlyRecordItem[]>(`/hr/items/${id}/yearly-records`)
+}
+
+export interface ImportRostersResult {
+  importedEmployees: number
+  importedHistory: number
+  importedYearlyRecords: number
+  unmatchedDepartments: string[]
+  unmatchedJobTitles: string[]
+  durationMs: number
+}
+
+export function importEmployeeRosters() {
+  return request.post<ImportRostersResult>('/hr/import-rosters')
 }

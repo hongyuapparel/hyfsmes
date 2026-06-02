@@ -32,6 +32,7 @@
       <el-descriptions-item label="家庭地址">{{ form.homeAddress || '-' }}</el-descriptions-item>
       <el-descriptions-item label="紧急联系人">{{ form.emergencyContact || '-' }}</el-descriptions-item>
       <el-descriptions-item label="紧急电话">{{ form.emergencyPhone || '-' }}</el-descriptions-item>
+      <el-descriptions-item label="生日">{{ birthDisplay() }}</el-descriptions-item>
       <el-descriptions-item label="状态">{{ statusLabel(form.status) }}</el-descriptions-item>
       <el-descriptions-item label="离职日期">
         {{ form.status === 'left' ? formatDate(form.leaveDate) : '-' }}
@@ -51,6 +52,35 @@
         <span v-else>-</span>
       </el-descriptions-item>
     </el-descriptions>
+
+    <section v-if="drawerPreview" v-loading="loadingExtras" class="preview-section">
+      <div class="preview-section-title">入职履历</div>
+      <div v-if="historyList.length" class="history-list">
+        <div v-for="h in historyList" :key="h.id" class="history-item">
+          <span class="history-range">
+            {{ formatDate(h.entryDate) || '?' }} ~ {{ h.leaveDate ? formatDate(h.leaveDate) : '在职' }}
+          </span>
+          <span v-if="h.leaveReason" class="history-reason">{{ h.leaveReason }}</span>
+          <span v-if="h.remark" class="history-remark">{{ h.remark }}</span>
+        </div>
+      </div>
+      <div v-else class="preview-section-empty">仅一次入职记录</div>
+    </section>
+
+    <section v-if="drawerPreview && yearlyByYear.length" class="preview-section">
+      <div class="preview-section-title">年度记录（春节/放假/上班/备注）</div>
+      <div class="yearly-list">
+        <div v-for="g in yearlyByYear" :key="g.year" class="yearly-group">
+          <div class="yearly-year">{{ g.year }}</div>
+          <div class="yearly-items">
+            <div v-for="r in g.records" :key="r.id" class="yearly-item">
+              <span class="yearly-type">{{ yearlyTypeLabel[r.type] || r.type }}：</span>
+              <span class="yearly-value">{{ r.value }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
 
     <el-form
       v-else
@@ -202,13 +232,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import AppDrawer from '@/components/AppDrawer.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import { formatDate } from '@/utils/date-format'
 import { useHrEmployeeForm } from '@/composables/useHrEmployeeForm'
 import { genderLabel, statusLabel, type DeptTreeOption, type JobOption } from '@/composables/useHrEmployeeList'
-import type { EmployeeItem, HrUserOption } from '@/api/hr'
+import {
+  getEmployeeHistory,
+  getEmployeeYearlyRecords,
+  type EmployeeHistoryItem,
+  type EmployeeItem,
+  type EmployeeYearlyRecordItem,
+  type HrUserOption,
+} from '@/api/hr'
+import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 const props = defineProps<{
   paginationTotal: number
@@ -230,6 +269,7 @@ const paginationTotalRef = computed(() => props.paginationTotal)
 const {
   formDialog,
   drawerPreview,
+  editId,
   formRef,
   form,
   formRules,
@@ -247,6 +287,63 @@ const {
   getRowIndex: (id) => props.getRowIndex(id),
   onSaved: () => emit('saved'),
 })
+
+const historyList = ref<EmployeeHistoryItem[]>([])
+const yearlyRecords = ref<EmployeeYearlyRecordItem[]>([])
+const loadingExtras = ref(false)
+
+const yearlyByYear = computed(() => {
+  const map = new Map<number, EmployeeYearlyRecordItem[]>()
+  for (const r of yearlyRecords.value) {
+    if (!map.has(r.year)) map.set(r.year, [])
+    map.get(r.year)!.push(r)
+  }
+  return Array.from(map.entries())
+    .sort((a, b) => b[0] - a[0])
+    .map(([year, records]) => ({ year, records }))
+})
+
+const yearlyTypeLabel: Record<string, string> = {
+  spring_festival_return: '春节回家',
+  vacation_start: '放假时间',
+  work_start: '上班时间',
+  remark: '备注',
+}
+
+function birthDisplay(): string {
+  const m = form.birthMonth
+  const d = form.birthDay
+  if (!m) return '-'
+  return d ? `${m}月${d}日` : `${m}月`
+}
+
+async function loadExtras(id: number) {
+  loadingExtras.value = true
+  historyList.value = []
+  yearlyRecords.value = []
+  try {
+    const [h, y] = await Promise.all([getEmployeeHistory(id), getEmployeeYearlyRecords(id)])
+    historyList.value = h.data ?? []
+    yearlyRecords.value = y.data ?? []
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  } finally {
+    loadingExtras.value = false
+  }
+}
+
+watch(
+  () => [drawerPreview.value, editId.value] as const,
+  ([preview, id]) => {
+    if (preview && typeof id === 'number') {
+      loadExtras(id)
+    } else if (!preview) {
+      historyList.value = []
+      yearlyRecords.value = []
+    }
+  },
+  { immediate: true },
+)
 
 async function submitForm() {
   await _submitForm()
@@ -291,5 +388,93 @@ defineExpose({ openForm, openPreview })
 .employee-photo-upload {
   width: 100%;
   min-height: 140px;
+}
+
+.preview-section {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--color-bg-soft, #fafafa);
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.preview-section-title {
+  font-weight: 600;
+  font-size: var(--font-size-subtitle);
+  margin-bottom: 8px;
+  color: var(--el-text-color-primary);
+}
+
+.preview-section-empty {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.history-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 8px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.history-range {
+  font-weight: 500;
+  color: var(--el-text-color-primary);
+}
+
+.history-reason,
+.history-remark {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-muted);
+}
+
+.yearly-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.yearly-group {
+  display: flex;
+  gap: 12px;
+  padding: 6px 8px;
+  background: #fff;
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #e5e7eb);
+}
+
+.yearly-year {
+  font-weight: 600;
+  color: var(--el-color-primary);
+  min-width: 48px;
+}
+
+.yearly-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.yearly-item {
+  font-size: var(--font-size-body);
+}
+
+.yearly-type {
+  color: var(--color-text-muted);
+}
+
+.yearly-value {
+  color: var(--el-text-color-primary);
 }
 </style>

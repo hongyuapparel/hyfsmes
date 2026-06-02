@@ -71,6 +71,21 @@
         <el-option label="在职" value="active" />
         <el-option label="离职" value="left" />
       </el-select>
+      <el-select
+        v-model="filter.birthMonth"
+        placeholder="生日月份"
+        clearable
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.birthMonth ? `生日：${filter.birthMonth}月` : '', '生日月份')"
+        @change="onSearch(true)"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.birthMonth">生日：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option label="本月生日" :value="currentMonth" />
+        <el-option v-for="m in 12" :key="m" :label="`${m}月`" :value="m" />
+      </el-select>
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': filter.entryDateRange }"
@@ -127,6 +142,7 @@
           <el-icon><Delete /></el-icon>
         </el-button>
         <el-button type="primary" @click="drawerRef?.openForm(null)">新建人员</el-button>
+        <el-button type="warning" @click="onImportRosters">导入花名册</el-button>
       </div>
     </div>
 
@@ -220,8 +236,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onActivated } from 'vue'
+import { ref, computed, onMounted, onActivated } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { formatDate } from '@/utils/date-format'
 import {
   ACTIVE_FILTER_COLOR,
@@ -238,7 +255,10 @@ import {
   genderLabel,
 } from '@/composables/useHrEmployeeList'
 import HrEmployeeDrawer from '@/components/hr/HrEmployeeDrawer.vue'
-import type { EmployeeItem } from '@/api/hr'
+import { importEmployeeRosters, type EmployeeItem } from '@/api/hr'
+import { getErrorMessage, isErrorHandled } from '@/api/request'
+
+const currentMonth = computed(() => new Date().getMonth() + 1)
 
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
 
@@ -280,6 +300,36 @@ function onRowClick(row: EmployeeItem, column: { type?: string }, event: Event) 
   if (!target) return
   if (target.closest('.el-button, .el-checkbox')) return
   drawerRef.value?.openPreview(row)
+}
+
+async function onImportRosters() {
+  try {
+    await ElMessageBox.confirm(
+      '将清空当前所有员工档案，并按服务端 scripts/import-rosters.data.json 重新导入。是否继续？',
+      '导入花名册',
+      { confirmButtonText: '确定导入', cancelButtonText: '取消', type: 'warning' },
+    )
+  } catch {
+    return
+  }
+  try {
+    const res = await importEmployeeRosters()
+    const r = res.data
+    if (r) {
+      const tips: string[] = []
+      tips.push(`员工 ${r.importedEmployees} 条 / 履历 ${r.importedHistory} 段 / 年度记录 ${r.importedYearlyRecords} 条`)
+      if (r.unmatchedDepartments.length) {
+        tips.push(`未匹配部门 ${r.unmatchedDepartments.length} 个：${r.unmatchedDepartments.slice(0, 5).join('、')}${r.unmatchedDepartments.length > 5 ? '...' : ''}`)
+      }
+      if (r.unmatchedJobTitles.length) {
+        tips.push(`未匹配岗位 ${r.unmatchedJobTitles.length} 个：${r.unmatchedJobTitles.slice(0, 5).join('、')}${r.unmatchedJobTitles.length > 5 ? '...' : ''}`)
+      }
+      ElMessage.success({ message: tips.join('；'), duration: 8000 })
+    }
+    load()
+  } catch (e: unknown) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+  }
 }
 
 onMounted(() => {

@@ -95,6 +95,18 @@ export class Employee {
   @Column({ name: 'status', length: 32, default: 'active' })
   status: string;
 
+  /** 生日年（从身份证号自动解析） */
+  @Column({ name: 'birth_year', type: 'smallint', nullable: true })
+  birthYear: number | null;
+
+  /** 生日月（1-12，从身份证号解析，用于生日筛选） */
+  @Column({ name: 'birth_month', type: 'tinyint', nullable: true })
+  birthMonth: number | null;
+
+  /** 生日日（1-31） */
+  @Column({ name: 'birth_day', type: 'tinyint', nullable: true })
+  birthDay: number | null;
+
   /** 关联系统用户（可选，用于“该员工对应哪个登录账号”） */
   @Column({ name: 'user_id', type: 'int', nullable: true })
   userId: number | null;

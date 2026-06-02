@@ -1,15 +1,61 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Employee } from '../entities/employee.entity';
+import { EmployeeHistory } from '../entities/employee-history.entity';
+import { EmployeeYearlyRecord } from '../entities/employee-yearly-record.entity';
+import { SystemOption } from '../entities/system-option.entity';
 import { UsersService } from '../users/users.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
 
+interface ImportEmployeePayload {
+  employeeNo?: string;
+  name: string;
+  gender?: string;
+  department?: string;
+  jobTitle?: string;
+  entryDate?: string | null;
+  leaveDate?: string | null;
+  leaveReason?: string;
+  status?: string;
+  education?: string;
+  dormitory?: string;
+  contactPhone?: string;
+  idCardNo?: string;
+  nativePlace?: string;
+  homeAddress?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  birthYear?: number | null;
+  birthMonth?: number | null;
+  birthDay?: number | null;
+  remark?: string;
+  sortOrder?: number;
+  history?: Array<{
+    entryDate?: string | null;
+    leaveDate?: string | null;
+    leaveReason?: string;
+    remark?: string;
+  }>;
+  yearlyRecords?: Array<{ year: number; type: string; value: string }>;
+}
+
 @Injectable()
 export class HrService {
+  private readonly logger = new Logger(HrService.name);
+
   constructor(
     @InjectRepository(Employee)
     private readonly repo: Repository<Employee>,
+    @InjectRepository(EmployeeHistory)
+    private readonly historyRepo: Repository<EmployeeHistory>,
+    @InjectRepository(EmployeeYearlyRecord)
+    private readonly yearlyRecordRepo: Repository<EmployeeYearlyRecord>,
+    @InjectRepository(SystemOption)
+    private readonly systemOptionRepo: Repository<SystemOption>,
+    private readonly dataSource: DataSource,
     private readonly usersService: UsersService,
     private readonly systemOptionsService: SystemOptionsService,
   ) {}
@@ -23,6 +69,7 @@ export class HrService {
     entryDateEnd?: string;
     leaveDateStart?: string;
     leaveDateEnd?: string;
+    birthMonth?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     page?: number;
@@ -37,6 +84,7 @@ export class HrService {
       entryDateEnd,
       leaveDateStart,
       leaveDateEnd,
+      birthMonth,
       sortBy,
       sortOrder,
       page = 1,
@@ -66,6 +114,9 @@ export class HrService {
     }
     if (leaveDateEnd) {
       qb.andWhere('e.leave_date <= :leaveDateEnd', { leaveDateEnd });
+    }
+    if (typeof birthMonth === 'number' && birthMonth >= 1 && birthMonth <= 12) {
+      qb.andWhere('e.birth_month = :birthMonth', { birthMonth });
     }
     const sortColumnMap: Record<string, string> = {
       sortOrder: 'e.sortOrder',
@@ -325,5 +376,186 @@ export class HrService {
       username: u.username,
       displayName: u.displayName ?? '',
     }));
+  }
+
+  /** 员工入职履历（按时间倒序） */
+  async getEmployeeHistory(employeeId: number): Promise<EmployeeHistory[]> {
+    return this.historyRepo.find({
+      where: { employeeId },
+      order: { entryDate: 'DESC', id: 'DESC' },
+    });
+  }
+
+  /** 员工年度记录（按年倒序） */
+  async getEmployeeYearlyRecords(employeeId: number): Promise<EmployeeYearlyRecord[]> {
+    return this.yearlyRecordRepo.find({
+      where: { employeeId },
+      order: { year: 'DESC', id: 'ASC' },
+    });
+  }
+
+  /**
+   * 一次性导入花名册：清空 employees / employee_history / employee_yearly_record，
+   * 按 backend/scripts/import-rosters.data.json 重新写入。
+   */
+  async importRosters(): Promise<{
+    importedEmployees: number;
+    importedHistory: number;
+    importedYearlyRecords: number;
+    unmatchedDepartments: string[];
+    unmatchedJobTitles: string[];
+    durationMs: number;
+  }> {
+    const started = Date.now();
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'scripts', 'import-rosters.data.json'),
+      path.resolve(__dirname, '../../scripts/import-rosters.data.json'),
+      path.resolve(__dirname, '../../../scripts/import-rosters.data.json'),
+    ];
+    const dataPath = candidatePaths.find((p) => fs.existsSync(p));
+    if (!dataPath) {
+      throw new BadRequestException(`导入数据文件不存在，已尝试：${candidatePaths.join(' | ')}`);
+    }
+    const raw = fs.readFileSync(dataPath, 'utf-8');
+    let payload: { employees: ImportEmployeePayload[] };
+    try {
+      payload = JSON.parse(raw) as { employees: ImportEmployeePayload[] };
+    } catch (e: unknown) {
+      throw new BadRequestException(`导入数据文件 JSON 解析失败：${(e as Error).message}`);
+    }
+    const employees = Array.isArray(payload?.employees) ? payload.employees : [];
+    if (!employees.length) {
+      throw new BadRequestException('导入数据为空');
+    }
+
+    const allDeptOptions = await this.systemOptionRepo.find({
+      where: { optionType: 'org_departments' },
+      select: ['id', 'value', 'parentId'],
+    });
+    const allJobOptions = await this.systemOptionRepo.find({
+      where: { optionType: 'org_jobs' },
+      select: ['id', 'value', 'parentId'],
+    });
+    const deptIdByName = new Map<string, number>();
+    for (const o of allDeptOptions) {
+      const key = (o.value ?? '').trim().toLowerCase();
+      if (key && !deptIdByName.has(key)) deptIdByName.set(key, o.id);
+    }
+    const jobIdByName = new Map<string, number>();
+    for (const o of allJobOptions) {
+      const key = (o.value ?? '').trim().toLowerCase();
+      if (key && !jobIdByName.has(key)) jobIdByName.set(key, o.id);
+    }
+
+    const unmatchedDept = new Set<string>();
+    const unmatchedJob = new Set<string>();
+    let importedEmployees = 0;
+    let importedHistory = 0;
+    let importedYearlyRecords = 0;
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('DELETE FROM employee_history');
+      await manager.query('DELETE FROM employee_yearly_record');
+      await manager.query('DELETE FROM employees');
+
+      for (let i = 0; i < employees.length; i += 1) {
+        const e = employees[i];
+        const name = (e.name ?? '').trim();
+        if (!name) continue;
+        const deptName = (e.department ?? '').trim();
+        const jobName = (e.jobTitle ?? '').trim();
+        let departmentId: number | null = null;
+        if (deptName) {
+          departmentId = deptIdByName.get(deptName.toLowerCase()) ?? null;
+          if (!departmentId) unmatchedDept.add(deptName);
+        }
+        let jobTitleId: number | null = null;
+        if (jobName) {
+          jobTitleId = jobIdByName.get(jobName.toLowerCase()) ?? null;
+          if (!jobTitleId) unmatchedJob.add(jobName);
+        }
+
+        const status = e.status === 'left' ? 'left' : 'active';
+        const gender =
+          e.gender === 'male' || e.gender === 'female' ? e.gender : 'unknown';
+        const entryDate = e.entryDate ? new Date(e.entryDate) : null;
+        const leaveDate = e.leaveDate ? new Date(e.leaveDate) : null;
+
+        const employee = manager.create(Employee, {
+          employeeNo: (e.employeeNo ?? '').trim(),
+          name,
+          gender,
+          department: deptName,
+          jobTitle: jobName,
+          departmentId,
+          jobTitleId,
+          entryDate,
+          contactPhone: (e.contactPhone ?? '').trim(),
+          education: (e.education ?? '').trim(),
+          dormitory: (e.dormitory ?? '').trim(),
+          idCardNo: (e.idCardNo ?? '').trim(),
+          nativePlace: (e.nativePlace ?? '').trim(),
+          homeAddress: (e.homeAddress ?? '').trim(),
+          emergencyContact: (e.emergencyContact ?? '').trim(),
+          emergencyPhone: (e.emergencyPhone ?? '').trim(),
+          leaveDate,
+          leaveReason: (e.leaveReason ?? '').trim(),
+          status,
+          birthYear: typeof e.birthYear === 'number' ? e.birthYear : null,
+          birthMonth: typeof e.birthMonth === 'number' ? e.birthMonth : null,
+          birthDay: typeof e.birthDay === 'number' ? e.birthDay : null,
+          userId: null,
+          remark: (e.remark ?? '').trim(),
+          photoUrl: '',
+          sortOrder: typeof e.sortOrder === 'number' ? e.sortOrder : i + 1,
+        });
+        const savedEmployee = await manager.save(Employee, employee);
+        importedEmployees += 1;
+
+        if (Array.isArray(e.history) && e.history.length) {
+          const historyEntities = e.history.map((h, idx) =>
+            manager.create(EmployeeHistory, {
+              employeeId: savedEmployee.id,
+              entryDate: h.entryDate ? new Date(h.entryDate) : null,
+              leaveDate: h.leaveDate ? new Date(h.leaveDate) : null,
+              leaveReason: (h.leaveReason ?? '').trim(),
+              remark: (h.remark ?? '').trim(),
+              sortOrder: idx + 1,
+            }),
+          );
+          await manager.save(EmployeeHistory, historyEntities);
+          importedHistory += historyEntities.length;
+        }
+        if (Array.isArray(e.yearlyRecords) && e.yearlyRecords.length) {
+          const yearlyEntities = e.yearlyRecords
+            .filter((r) => r && typeof r.year === 'number' && r.type)
+            .map((r) =>
+              manager.create(EmployeeYearlyRecord, {
+                employeeId: savedEmployee.id,
+                year: r.year,
+                type: r.type,
+                value: (r.value ?? '').trim(),
+              }),
+            );
+          if (yearlyEntities.length) {
+            await manager.save(EmployeeYearlyRecord, yearlyEntities);
+            importedYearlyRecords += yearlyEntities.length;
+          }
+        }
+      }
+    });
+
+    const durationMs = Date.now() - started;
+    this.logger.log(
+      `importRosters done: employees=${importedEmployees} history=${importedHistory} yearly=${importedYearlyRecords} in ${durationMs}ms`,
+    );
+    return {
+      importedEmployees,
+      importedHistory,
+      importedYearlyRecords,
+      unmatchedDepartments: Array.from(unmatchedDept).sort(),
+      unmatchedJobTitles: Array.from(unmatchedJob).sort(),
+      durationMs,
+    };
   }
 }

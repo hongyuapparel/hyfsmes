@@ -29,6 +29,7 @@ interface HrFilter {
   status: string
   entryDateRange: [string, string] | null
   leaveDateRange: [string, string] | null
+  birthMonth: number | null
 }
 
 export function useHrEmployeeList() {
@@ -39,6 +40,7 @@ export function useHrEmployeeList() {
     status: '',
     entryDateRange: null,
     leaveDateRange: null,
+    birthMonth: null,
   })
   const nameLabelVisible = ref(false)
   const hrDateRangeShortcuts = [
@@ -125,6 +127,7 @@ export function useHrEmployeeList() {
         entryDateEnd: filter.entryDateRange?.[1] || undefined,
         leaveDateStart: filter.leaveDateRange?.[0] || undefined,
         leaveDateEnd: filter.leaveDateRange?.[1] || undefined,
+        birthMonth: filter.birthMonth ?? undefined,
         sortBy: sortState.sortBy || undefined,
         sortOrder: sortState.sortOrder || undefined,
         page: pagination.page,
@@ -156,7 +159,7 @@ export function useHrEmployeeList() {
 
   function onReset() {
     nameLabelVisible.value = false
-    Object.assign(filter, { name: '', departmentId: null, jobTitleId: null, status: '', entryDateRange: null, leaveDateRange: null })
+    Object.assign(filter, { name: '', departmentId: null, jobTitleId: null, status: '', entryDateRange: null, leaveDateRange: null, birthMonth: null })
     sortState.sortBy = ''
     sortState.sortOrder = ''
     pagination.page = 1
@@ -208,6 +211,7 @@ export function useHrEmployeeList() {
         entryDateEnd: filter.entryDateRange?.[1] || undefined,
         leaveDateStart: filter.leaveDateRange?.[0] || undefined,
         leaveDateEnd: filter.leaveDateRange?.[1] || undefined,
+        birthMonth: filter.birthMonth ?? undefined,
         page: 1,
         pageSize: 5000,
       })
