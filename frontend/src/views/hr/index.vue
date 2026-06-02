@@ -75,10 +75,8 @@
         v-model="filter.birthMonths"
         placeholder="生日月份"
         multiple
-        collapse-tags
-        collapse-tags-tooltip
         clearable
-        class="filter-bar-item"
+        class="filter-bar-item filter-birth-months"
         :style="birthMonthsStyle"
         @change="onSearch(true)"
       >
@@ -296,8 +294,9 @@ const {
 const birthMonthsStyle = computed(() => {
   const count = filter.birthMonths?.length ?? 0
   if (!count) return getAdaptiveSelectStyle('', '生日月份')
-  const width = Math.min(260, 100 + count * 32)
-  return { width: `${width}px`, minWidth: 'unset', flex: `0 0 ${width}px` }
+  // 前缀"生日："约 50px + 每个 tag (含 ×) 约 50px + 内边距
+  const width = Math.min(360, 90 + count * 50)
+  return { width: `${width}px`, minWidth: 'unset', flex: `0 0 ${width}px`, '--el-text-color-regular': 'var(--el-color-primary)' }
 })
 
 function onRowClick(row: EmployeeItem, column: { type?: string }, event: Event) {
