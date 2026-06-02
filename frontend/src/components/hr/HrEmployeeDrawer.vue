@@ -83,7 +83,7 @@
     </section>
 
     <el-form
-      v-else
+      v-if="!drawerPreview"
       ref="formRef"
       :model="form"
       :rules="formRules"
