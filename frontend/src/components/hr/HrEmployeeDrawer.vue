@@ -68,7 +68,7 @@
     </section>
 
     <section v-if="drawerPreview && yearlyByYear.length" class="preview-section">
-      <div class="preview-section-title">年度记录（春节/放假/上班/备注）</div>
+      <div class="preview-section-title">年度记录（春节/放假/上班）</div>
       <div class="yearly-list">
         <div v-for="g in yearlyByYear" :key="g.year" class="yearly-group">
           <div class="yearly-year">{{ g.year }}</div>
@@ -307,7 +307,6 @@ const yearlyTypeLabel: Record<string, string> = {
   spring_festival_return: '春节回家',
   vacation_start: '放假时间',
   work_start: '上班时间',
-  remark: '备注',
 }
 
 function birthDisplay(): string {

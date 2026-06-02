@@ -143,21 +143,14 @@ def read_roster_sheet(xlsx: str, sheet: str):
         "springFestivalReturn": f("春节回家时间"),
     }
     emergency_phone_idx = -1
-    cphone = cols["contactPhone"]
-    for i, h in enumerate(header):
-        if i <= cphone:
-            continue
-        if h == "联系方式" or "联系" in h:
-            emergency_phone_idx = i
-            break
-    cols["emergencyPhone"] = emergency_phone_idx
-    remark_idx = -1
-    if emergency_phone_idx >= 0:
-        for i in range(emergency_phone_idx + 1, len(header)):
-            if header[i] and not any(x in header[i] for x in ("生日", "春节", "放假", "上班")):
-                remark_idx = i
+    ec_idx = cols.get("emergencyContact", -1)
+    if ec_idx >= 0:
+        for i in range(ec_idx + 1, len(header)):
+            if header[i] in ("联系方式", "联系电话"):
+                emergency_phone_idx = i
                 break
-    cols["remark"] = remark_idx
+    cols["emergencyPhone"] = emergency_phone_idx
+    cols["remark"] = -1
 
     rows = []
     for _, r in body.iterrows():
@@ -171,6 +164,12 @@ def read_roster_sheet(xlsx: str, sheet: str):
             else:
                 rec[k] = ""
         rec["entryDate"] = to_iso_date(rec.get("entryDate"))
+        for k in ("vacationStart", "workStart", "springFestivalReturn"):
+            v = rec.get(k)
+            if v:
+                iso = to_iso_date(v)
+                if iso:
+                    rec[k] = iso
         rows.append(rec)
     return rows
 
@@ -382,15 +381,12 @@ def build_employee(key: str, ent: dict):
         vac = norm(a.get("vacationStart"))
         wk = norm(a.get("workStart"))
         spring = norm(a.get("springFestivalReturn"))
-        cell_remark = norm(a.get("remark"))
         if vac:
             yearly_records.append({"year": year, "type": "vacation_start", "value": vac})
         if wk:
             yearly_records.append({"year": year, "type": "work_start", "value": wk})
         if spring:
             yearly_records.append({"year": year, "type": "spring_festival_return", "value": spring})
-        if cell_remark:
-            yearly_records.append({"year": year, "type": "remark", "value": cell_remark})
 
     emp = {
         "key": key,

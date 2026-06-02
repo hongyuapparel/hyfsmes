@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-02T12:37:07.425080",
+  "generatedAt": "2026-06-02T13:22:10.268208",
   "stats": {
     "rosterSheetCounts": {
       "2020年": 87,
@@ -38,7 +38,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省大英县河边镇太华村5社5号",
       "emergencyContact": "周一",
-      "emergencyPhone": "周一",
+      "emergencyPhone": "17063800006",
       "birthYear": 1968,
       "birthMonth": 4,
       "birthDay": 28,
@@ -53,13 +53,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "17063800006"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 1
     },
@@ -81,7 +75,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省虞城县城郊乡周庄村前何楼",
       "emergencyContact": "何娇",
-      "emergencyPhone": "何娇",
+      "emergencyPhone": "13480497483",
       "birthYear": 2004,
       "birthMonth": 11,
       "birthDay": 2,
@@ -96,13 +90,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13480497483"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 2
     },
@@ -124,7 +112,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省虞城县城郊乡周庄村前何楼",
       "emergencyContact": "何亚辉",
-      "emergencyPhone": "何亚辉",
+      "emergencyPhone": "13416863395",
       "birthYear": 1985,
       "birthMonth": 10,
       "birthDay": 5,
@@ -148,28 +136,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13416863395"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13416863395"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13416863395"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13416863395"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 3
     },
@@ -191,7 +158,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇赤岗南祥新一区",
       "emergencyContact": "何新轩",
-      "emergencyPhone": "何新轩",
+      "emergencyPhone": "13711983733",
       "birthYear": 1999,
       "birthMonth": 2,
       "birthDay": 10,
@@ -209,28 +176,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13711983733"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13711983733"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13711983733"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13711983733"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 4
     },
@@ -252,7 +198,7 @@
       "nativePlace": "广东",
       "homeAddress": "广东省汕头市潮阳区金灶镇花园横岭",
       "emergencyContact": "林育香",
-      "emergencyPhone": "林育香",
+      "emergencyPhone": "13556443851",
       "birthYear": 2002,
       "birthMonth": 2,
       "birthDay": 25,
@@ -269,23 +215,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13556443851"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13556443851"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13556443851"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 5
     },
@@ -307,7 +237,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省石首市横沟市镇重阳岗村3组16号",
       "emergencyContact": "朱辉",
-      "emergencyPhone": "朱辉",
+      "emergencyPhone": "15017171687",
       "birthYear": 1991,
       "birthMonth": 11,
       "birthDay": 18,
@@ -330,49 +260,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "15017171687"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15017171687"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15017171687"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15017171687"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45671"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15017171687"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15017171687"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15017171687"
+          "value": "2025-01-14"
         }
       ],
       "remark": "",
@@ -396,7 +291,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇大军湖村二组",
       "emergencyContact": "何娇",
-      "emergencyPhone": "何娇",
+      "emergencyPhone": "13480497483",
       "birthYear": 1962,
       "birthMonth": 9,
       "birthDay": 21,
@@ -411,13 +306,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13480497483"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 7
     },
@@ -439,7 +328,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省石首市横沟市镇重阳岗村3组16号",
       "emergencyContact": "冉玉兵",
-      "emergencyPhone": "冉玉兵",
+      "emergencyPhone": "13728410923",
       "birthYear": 1998,
       "birthMonth": 2,
       "birthDay": 10,
@@ -462,44 +351,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13728410923"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13728410923"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13728410923"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13728410923"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13728410923"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13728410923"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13728410923"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -523,7 +377,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省吉安市遂川县草林镇溪下村溪下27号",
       "emergencyContact": "肖春梅",
-      "emergencyPhone": "肖春梅",
+      "emergencyPhone": "18979694277",
       "birthYear": 2002,
       "birthMonth": 9,
       "birthDay": 12,
@@ -539,18 +393,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "18979694277"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18979694277"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 9
     },
@@ -572,7 +415,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省黄梅县新开镇蔡家渡村3组",
       "emergencyContact": "曹球勇",
-      "emergencyPhone": "曹球勇",
+      "emergencyPhone": "13712607125",
       "birthYear": 1989,
       "birthMonth": 2,
       "birthDay": 12,
@@ -587,13 +430,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13712607125"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 10
     },
@@ -615,7 +452,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省瑞金市瑞林镇下坎村",
       "emergencyContact": "陈亮",
-      "emergencyPhone": "陈亮",
+      "emergencyPhone": "13479973275",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -642,13 +479,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13479973275"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 11
     },
@@ -670,7 +501,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省廉江市安铺镇老卜村8号",
       "emergencyContact": "卜武",
-      "emergencyPhone": "卜武",
+      "emergencyPhone": "15875971915",
       "birthYear": 1994,
       "birthMonth": 5,
       "birthDay": 1,
@@ -686,18 +517,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15875971915"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15875971915"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 12
     },
@@ -719,7 +539,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西贺州市八步区桂岭镇爱民村32组",
       "emergencyContact": "栗小树",
-      "emergencyPhone": "栗小树",
+      "emergencyPhone": "13713468013",
       "birthYear": 1991,
       "birthMonth": 10,
       "birthDay": 6,
@@ -734,13 +554,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13713468013"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 13
     },
@@ -762,7 +576,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省丰城市袁渡镇涂坊村虾港组135号",
       "emergencyContact": "李欣",
-      "emergencyPhone": "李欣",
+      "emergencyPhone": "18270910739",
       "birthYear": 1982,
       "birthMonth": 3,
       "birthDay": 7,
@@ -778,18 +592,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "18270910739"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18270910739"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 14
     },
@@ -811,7 +614,7 @@
       "nativePlace": "广东省",
       "homeAddress": "东莞市虎门镇新湾社区新兴楼201",
       "emergencyContact": "吴永欣",
-      "emergencyPhone": "吴永欣",
+      "emergencyPhone": "13538577793",
       "birthYear": 1983,
       "birthMonth": 5,
       "birthDay": 1,
@@ -833,28 +636,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13538577793"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13620044199"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13538577793"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13620044199"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 15
     },
@@ -876,7 +658,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省城步苗族自治县儒林镇",
       "emergencyContact": "朱锦阳",
-      "emergencyPhone": "朱锦阳",
+      "emergencyPhone": "13712100479",
       "birthYear": 1991,
       "birthMonth": 12,
       "birthDay": 2,
@@ -899,44 +681,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13712100479"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13712100479"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13712100479"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13712100479"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13712100479"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13712100479"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13712100479"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -960,7 +707,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省大英县河边镇太华村5组7号",
       "emergencyContact": "焦玉奇",
-      "emergencyPhone": "焦玉奇",
+      "emergencyPhone": "17749955035",
       "birthYear": 1987,
       "birthMonth": 3,
       "birthDay": 7,
@@ -976,18 +723,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "17749955035"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "17749955035"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 17
     },
@@ -1009,7 +745,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省渠县天星镇文昌村1组63号",
       "emergencyContact": "杨秀梅",
-      "emergencyPhone": "杨秀梅",
+      "emergencyPhone": "19553947734",
       "birthYear": 1974,
       "birthMonth": 8,
       "birthDay": 24,
@@ -1025,18 +761,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "19553947734"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "19553947734"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 18
     },
@@ -1058,7 +783,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省祁阳县上司源乡南冲源村4组",
       "emergencyContact": "奉春龙",
-      "emergencyPhone": "奉春龙",
+      "emergencyPhone": "15118314457",
       "birthYear": 1994,
       "birthMonth": 4,
       "birthDay": 21,
@@ -1081,11 +806,6 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "15118314457"
-        },
-        {
           "year": 2021,
           "type": "vacation_start",
           "value": "上完1月17日"
@@ -1093,37 +813,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15118314457"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15118314457"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15118314457"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15118314457"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15118314457"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15118314457"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -1147,7 +837,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省潜江市张金镇东湖村3组",
       "emergencyContact": "胡勇",
-      "emergencyPhone": "胡勇",
+      "emergencyPhone": "13821927284",
       "birthYear": 1995,
       "birthMonth": 9,
       "birthDay": 6,
@@ -1174,34 +864,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2022,
-          "type": "remark",
-          "value": "13821927284"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13821927284"
-        },
-        {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45665"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13821927284"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13821927284"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13821927284"
+          "value": "2025-01-08"
         }
       ],
       "remark": "",
@@ -1225,7 +890,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省南昌市进贤县二塘乡夏家村委会前宁村",
       "emergencyContact": "舒爱清",
-      "emergencyPhone": "舒爱清",
+      "emergencyPhone": "15083546163",
       "birthYear": 1981,
       "birthMonth": 9,
       "birthDay": 3,
@@ -1241,18 +906,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15083546163"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15083546163"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 21
     },
@@ -1274,7 +928,7 @@
       "nativePlace": "陕西省",
       "homeAddress": "陕西省城固县崔家山镇崔家山村2组",
       "emergencyContact": "崔婉婷",
-      "emergencyPhone": "崔婉婷",
+      "emergencyPhone": "15217111458",
       "birthYear": 1971,
       "birthMonth": 5,
       "birthDay": 15,
@@ -1303,37 +957,12 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15217111458"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15217111458"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45670"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15217111458"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15217111458"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15217111458"
+          "value": "2025-01-13"
         }
       ],
       "remark": "",
@@ -1357,7 +986,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省电白县观珠镇邮电友局宿舍",
       "emergencyContact": "罗如锋",
-      "emergencyPhone": "罗如锋",
+      "emergencyPhone": "13926808480",
       "birthYear": 1972,
       "birthMonth": 7,
       "birthDay": 18,
@@ -1380,44 +1009,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13926808480"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13926808480"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13926808480"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13926808480"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13926808480"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13926808480"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13926808480"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -1441,7 +1035,7 @@
       "nativePlace": "贵州省",
       "homeAddress": "贵州省紫云苗族布依族自治县五峰街",
       "emergencyContact": "陈娇",
-      "emergencyPhone": "陈娇",
+      "emergencyPhone": "15992862690",
       "birthYear": 2001,
       "birthMonth": 6,
       "birthDay": 20,
@@ -1458,23 +1052,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15992862690"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15992862690"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15992862690"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 24
     },
@@ -1496,7 +1074,7 @@
       "nativePlace": "陕西省",
       "homeAddress": "陕西省富平县留古镇联合村永丰社",
       "emergencyContact": "倚娟珠",
-      "emergencyPhone": "倚娟珠",
+      "emergencyPhone": "13412373163",
       "birthYear": 1981,
       "birthMonth": 3,
       "birthDay": 27,
@@ -1519,44 +1097,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13512373163"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13512373163"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13412373163"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13412373163"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13412373163"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13412373163"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13412373163"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -1580,7 +1123,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省华容县胜锋乡毛家巷村5组",
       "emergencyContact": "陈小红",
-      "emergencyPhone": "陈小红",
+      "emergencyPhone": "13418269781",
       "birthYear": 1984,
       "birthMonth": 6,
       "birthDay": 30,
@@ -1601,34 +1144,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2022,
-          "type": "remark",
-          "value": "13418269781"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13418269781"
-        },
-        {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13418269781"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13418269781"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13418269781"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -1652,7 +1170,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省武冈市龙溪乡岐邝五组",
       "emergencyContact": "杨菊春",
-      "emergencyPhone": "杨菊春",
+      "emergencyPhone": "18230641981",
       "birthYear": 1972,
       "birthMonth": 1,
       "birthDay": 29,
@@ -1669,23 +1187,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "18230641981"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "18230641981"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18230641981"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 27
     },
@@ -1732,12 +1234,12 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44608"
+          "value": "2022-02-16"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -1761,7 +1263,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇金龙南路金峦花园",
       "emergencyContact": "胡海明",
-      "emergencyPhone": "胡海明",
+      "emergencyPhone": "85102049",
       "birthYear": 1968,
       "birthMonth": 7,
       "birthDay": 3,
@@ -1784,49 +1286,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "85102049"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "85102049"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "85102049"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "85102049"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45670"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "85102049"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "85102049"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "85102049"
+          "value": "2025-01-13"
         }
       ],
       "remark": "",
@@ -1850,7 +1317,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省蓬溪县高坪镇倒流溪村3社60号",
       "emergencyContact": "曾玉",
-      "emergencyPhone": "曾玉",
+      "emergencyPhone": "13686676575",
       "birthYear": 1975,
       "birthMonth": 5,
       "birthDay": 19,
@@ -1865,13 +1332,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13686676575"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 30
     },
@@ -1893,7 +1354,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省宁远县湾井镇冷江村4组",
       "emergencyContact": "齐书斌",
-      "emergencyPhone": "齐书斌",
+      "emergencyPhone": "13509858683",
       "birthYear": 1981,
       "birthMonth": 11,
       "birthDay": 6,
@@ -1909,18 +1370,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13509858683"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13509858683"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 31
     },
@@ -1942,7 +1392,7 @@
       "nativePlace": "贵州省",
       "homeAddress": "贵州省安顺市西秀区杨武乡毛栗村",
       "emergencyContact": "李平",
-      "emergencyPhone": "李平",
+      "emergencyPhone": "13985721379",
       "birthYear": 1971,
       "birthMonth": 7,
       "birthDay": 14,
@@ -1966,37 +1416,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13985721379"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13985721379"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13985721379"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13985721379"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13985721379"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13985721379"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -2020,7 +1440,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省上蔡县朱里镇霍庄村李庄二组",
       "emergencyContact": "李红亮",
-      "emergencyPhone": "李红亮",
+      "emergencyPhone": "13712308980",
       "birthYear": 2001,
       "birthMonth": 2,
       "birthDay": 1,
@@ -2036,18 +1456,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13712308980"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13712308980"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 33
     },
@@ -2069,7 +1478,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省天门市张港镇河山村8组",
       "emergencyContact": "蒋四荣",
-      "emergencyPhone": "蒋四荣",
+      "emergencyPhone": "13728445667",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -2084,13 +1493,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13728445667"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 34
     },
@@ -2112,7 +1515,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省渠县天星镇文昌村1组63号",
       "emergencyContact": "唐秋基",
-      "emergencyPhone": "唐秋基",
+      "emergencyPhone": "13650371997",
       "birthYear": 1975,
       "birthMonth": 3,
       "birthDay": 18,
@@ -2128,18 +1531,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13650371997"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13650371997"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 35
     },
@@ -2161,7 +1553,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省武冈市龙溪乡岐邝五组",
       "emergencyContact": "戴爱元",
-      "emergencyPhone": "戴爱元",
+      "emergencyPhone": "13187281488",
       "birthYear": 1972,
       "birthMonth": 9,
       "birthDay": 23,
@@ -2182,34 +1574,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2022,
-          "type": "remark",
-          "value": "13187281488"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13187281488"
-        },
-        {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45671"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13187281488"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13187281488"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13187281488"
+          "value": "2025-01-14"
         }
       ],
       "remark": "",
@@ -2233,7 +1600,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省汕头市金平区托莲街道华风三巷15号",
       "emergencyContact": "林伟波",
-      "emergencyPhone": "林伟波",
+      "emergencyPhone": "15915552365",
       "birthYear": 2003,
       "birthMonth": 6,
       "birthDay": 18,
@@ -2249,18 +1616,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15915552365"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15915552365"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 37
     },
@@ -2282,7 +1638,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省汕头市潮阳区胪镇青山鸡什岭村",
       "emergencyContact": "林平",
-      "emergencyPhone": "林平",
+      "emergencyPhone": "13652643822",
       "birthYear": 2000,
       "birthMonth": 7,
       "birthDay": 24,
@@ -2305,11 +1661,6 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13652643822"
-        },
-        {
           "year": 2021,
           "type": "vacation_start",
           "value": "上完1月18日"
@@ -2317,37 +1668,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13652643822"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13652643822"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13652643822"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13652643822"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13652643822"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13652643822"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -2371,7 +1692,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省南部县马王乡东林寺村2组",
       "emergencyContact": "向世菊",
-      "emergencyPhone": "向世菊",
+      "emergencyPhone": "19119075071",
       "birthYear": 1972,
       "birthMonth": 6,
       "birthDay": 28,
@@ -2399,44 +1720,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "19119075071"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "19119075071"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "19119075071"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "19119075071"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "19119075071"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "19119075071"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -2460,7 +1751,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇中正街38号",
       "emergencyContact": "罗少兰",
-      "emergencyPhone": "罗少兰",
+      "emergencyPhone": "13642859809",
       "birthYear": 1999,
       "birthMonth": 8,
       "birthDay": 14,
@@ -2483,44 +1774,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13642859809"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13642859809"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13642859809"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13642859809"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13642859809"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13642859809"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13642859809"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -2544,7 +1800,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省上饶市余干县江垢乡山里彭坊村",
       "emergencyContact": "刘柳萍",
-      "emergencyPhone": "刘柳萍",
+      "emergencyPhone": "19168327600",
       "birthYear": 1971,
       "birthMonth": 2,
       "birthDay": 3,
@@ -2560,18 +1816,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "19168327600"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "19168327600"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 41
     },
@@ -2593,7 +1838,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利市容城镇红军路商品房",
       "emergencyContact": "游海港",
-      "emergencyPhone": "游海港",
+      "emergencyPhone": "15899945348",
       "birthYear": 2004,
       "birthMonth": 2,
       "birthDay": 20,
@@ -2609,18 +1854,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15899945348"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15899945348"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 42
     },
@@ -2642,7 +1876,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西宾阳县露圩镇周黎村委会周村一队",
       "emergencyContact": "黄国忠",
-      "emergencyPhone": "黄国忠",
+      "emergencyPhone": "13559716985",
       "birthYear": 1972,
       "birthMonth": 6,
       "birthDay": 10,
@@ -2658,18 +1892,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13559716985"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13559716985"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 43
     },
@@ -2691,7 +1914,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省萍乡市莲花县良坊镇布口村布口1号",
       "emergencyContact": "贺帅",
-      "emergencyPhone": "贺帅",
+      "emergencyPhone": "13157917119",
       "birthYear": 1994,
       "birthMonth": 7,
       "birthDay": 28,
@@ -2714,44 +1937,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13157917119"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13157917119"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13157917119"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13157917119"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13157917119"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13157917119"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13157917119"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -2775,7 +1963,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省于都县车溪乡河边村旱塘背组19号",
       "emergencyContact": "王银花",
-      "emergencyPhone": "王银花",
+      "emergencyPhone": "15979795871",
       "birthYear": 1974,
       "birthMonth": 7,
       "birthDay": 8,
@@ -2797,18 +1985,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15979795871"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15979795871"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 45
     },
@@ -2830,7 +2007,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省渠县屏西乡元通村6组50号",
       "emergencyContact": "杨光琴",
-      "emergencyPhone": "杨光琴",
+      "emergencyPhone": "13980238949",
       "birthYear": 1970,
       "birthMonth": 12,
       "birthDay": 30,
@@ -2853,11 +2030,6 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13980238949"
-        },
-        {
           "year": 2021,
           "type": "vacation_start",
           "value": "上完1月18日"
@@ -2865,42 +2037,12 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13980238949"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13980238949"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13980238949"
+          "value": "2022-02-10"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13980238949"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13980238949"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13980238949"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -2924,7 +2066,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西藤县濛江镇安和村马星一组25号",
       "emergencyContact": "肖秋生",
-      "emergencyPhone": "肖秋生",
+      "emergencyPhone": "13737814589",
       "birthYear": 2003,
       "birthMonth": 11,
       "birthDay": 26,
@@ -2940,18 +2082,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13737814589"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13737814589"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 47
     },
@@ -2973,7 +2104,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇西庄湖村四组",
       "emergencyContact": "胡勇",
-      "emergencyPhone": "胡勇",
+      "emergencyPhone": "13826927284",
       "birthYear": 1987,
       "birthMonth": 8,
       "birthDay": 19,
@@ -2996,49 +2127,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13826927284"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44608"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13826927284"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13826927284"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13826927284"
+          "value": "2022-02-16"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13826927284"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13826927284"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13826927284"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -3062,7 +2158,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省南昌市进贤县二塘乡夏家村委会前宁村",
       "emergencyContact": "宋可飞",
-      "emergencyPhone": "宋可飞",
+      "emergencyPhone": "18938539586",
       "birthYear": 1983,
       "birthMonth": 10,
       "birthDay": 3,
@@ -3078,18 +2174,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "18938539586"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18938539586"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 49
     },
@@ -3111,7 +2196,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇镇口则徐街31号101房",
       "emergencyContact": "苏照祥",
-      "emergencyPhone": "苏照祥",
+      "emergencyPhone": "13713284398",
       "birthYear": 2003,
       "birthMonth": 10,
       "birthDay": 11,
@@ -3127,18 +2212,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13713284398"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13713284398"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 50
     },
@@ -3160,7 +2234,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省博罗县湖镇镇新风村委会坪山二小组",
       "emergencyContact": "谢才深",
-      "emergencyPhone": "谢才深",
+      "emergencyPhone": "13829956760",
       "birthYear": 2006,
       "birthMonth": 9,
       "birthDay": 26,
@@ -3175,13 +2249,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13829956760"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 51
     },
@@ -3203,7 +2271,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省长沙市岳麓区莲花镇",
       "emergencyContact": "张议",
-      "emergencyPhone": "张议",
+      "emergencyPhone": "18874933908",
       "birthYear": 2003,
       "birthMonth": 4,
       "birthDay": 19,
@@ -3220,23 +2288,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "18874933908"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "18874933908"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18874933908"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 52
     },
@@ -3258,7 +2310,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省祁东县大忠桥镇金旗村3组",
       "emergencyContact": "老公",
-      "emergencyPhone": "老公",
+      "emergencyPhone": "15914696018",
       "birthYear": 1976,
       "birthMonth": 10,
       "birthDay": 16,
@@ -3281,44 +2333,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "15914696018"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15914696018"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15914696018"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15914696018"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15914696018"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15914696018"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15914696018"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -3342,7 +2359,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省龙川县车田镇园塘村委会园村",
       "emergencyContact": "邓水阡",
-      "emergencyPhone": "邓水阡",
+      "emergencyPhone": "13076132636",
       "birthYear": 2002,
       "birthMonth": 1,
       "birthDay": 7,
@@ -3359,23 +2376,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13076132636"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13076132636"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13076132636"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 54
     },
@@ -3397,7 +2398,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省公安县堵河镇金龙桥村一组",
       "emergencyContact": "何利玲",
-      "emergencyPhone": "何利玲",
+      "emergencyPhone": "15820985866",
       "birthYear": 1997,
       "birthMonth": 12,
       "birthDay": 4,
@@ -3424,34 +2425,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "15820985866"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15820985866"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15820985866"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15820985866"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15820985866"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -3475,7 +2451,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省荆州市江陵县普济镇",
       "emergencyContact": "付华",
-      "emergencyPhone": "付华",
+      "emergencyPhone": "18676988223",
       "birthYear": 2006,
       "birthMonth": 12,
       "birthDay": 30,
@@ -3490,13 +2466,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18676988223"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 56
     },
@@ -3518,7 +2488,7 @@
       "nativePlace": "陕西省",
       "homeAddress": "陕西省洋县胥水镇五间村4组",
       "emergencyContact": "陈丽梅",
-      "emergencyPhone": "陈丽梅",
+      "emergencyPhone": "13642983195",
       "birthYear": 1977,
       "birthMonth": 9,
       "birthDay": 12,
@@ -3547,37 +2517,12 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13642983195"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13642983195"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13642983195"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13642983195"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13642983195"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -3601,7 +2546,7 @@
       "nativePlace": "黑龙江",
       "homeAddress": "黑龙江省海伦市东风镇勤劳村6组481号",
       "emergencyContact": "韩成国",
-      "emergencyPhone": "韩成国",
+      "emergencyPhone": "15045566823",
       "birthYear": 2004,
       "birthMonth": 11,
       "birthDay": 20,
@@ -3617,18 +2562,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15045566823"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15045566823"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 58
     },
@@ -3650,7 +2584,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省湘平县虹桥镇桃源村",
       "emergencyContact": "魏尚清",
-      "emergencyPhone": "魏尚清",
+      "emergencyPhone": "15842854908",
       "birthYear": 1972,
       "birthMonth": 6,
       "birthDay": 2,
@@ -3677,13 +2611,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15842854908"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 59
     },
@@ -3705,7 +2633,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市石龙镇福康里三号",
       "emergencyContact": "黄耀光",
-      "emergencyPhone": "黄耀光",
+      "emergencyPhone": "13662788436",
       "birthYear": 2002,
       "birthMonth": 3,
       "birthDay": 4,
@@ -3722,23 +2650,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13662788436"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13662788436"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13662788436"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 60
     },
@@ -3760,7 +2672,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西横县峦城镇刘奇村委刘奇村6队318号",
       "emergencyContact": "熊燕红",
-      "emergencyPhone": "熊燕红",
+      "emergencyPhone": "",
       "birthYear": 1982,
       "birthMonth": 6,
       "birthDay": 7,
@@ -3785,7 +2697,7 @@
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45670"
+          "value": "2025-01-13"
         }
       ],
       "remark": "",
@@ -3809,7 +2721,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省宁远县湾井镇下寨岗村6组",
       "emergencyContact": "李生",
-      "emergencyPhone": "李生",
+      "emergencyPhone": "15274648970",
       "birthYear": 1980,
       "birthMonth": 11,
       "birthDay": 18,
@@ -3831,18 +2743,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15274648970"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15274648970"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 62
     },
@@ -3864,7 +2765,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省陆丰市南塘镇乌石村委会乌石村",
       "emergencyContact": "黄世维",
-      "emergencyPhone": "黄世维",
+      "emergencyPhone": "13680790266",
       "birthYear": 2003,
       "birthMonth": 2,
       "birthDay": 17,
@@ -3880,18 +2781,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13680790266"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13680790266"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 63
     },
@@ -3913,7 +2803,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西钦州市钦北区那蒙镇",
       "emergencyContact": "凌春华",
-      "emergencyPhone": "凌春华",
+      "emergencyPhone": "18378735875",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -3928,13 +2818,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "18378735875"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 64
     },
@@ -3956,7 +2840,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省荆州市江陵县普济镇居民二组",
       "emergencyContact": "李小燕",
-      "emergencyPhone": "李小燕",
+      "emergencyPhone": "13711989585",
       "birthYear": 1973,
       "birthMonth": 10,
       "birthDay": 10,
@@ -3986,22 +2870,12 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
+          "value": "2022-02-10"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45672"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13711989585"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13711989585"
+          "value": "2025-01-15"
         }
       ],
       "remark": "",
@@ -4025,7 +2899,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇林口村3组156号",
       "emergencyContact": "齐锦烨",
-      "emergencyPhone": "齐锦烨",
+      "emergencyPhone": "15938793801",
       "birthYear": 2006,
       "birthMonth": 12,
       "birthDay": 21,
@@ -4041,18 +2915,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15938793801"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "15938793801"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 66
     },
@@ -4074,7 +2937,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇东李村三组",
       "emergencyContact": "千霞",
-      "emergencyPhone": "千霞",
+      "emergencyPhone": "13138829281",
       "birthYear": 1962,
       "birthMonth": 5,
       "birthDay": 1,
@@ -4093,43 +2956,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13138829281"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13580998451"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13138829281"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13580998451"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13138829281"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13138829281"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13138829281"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 67
     },
@@ -4151,7 +2978,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇林口村4号",
       "emergencyContact": "齐书明",
-      "emergencyPhone": "齐书明",
+      "emergencyPhone": "13763231900",
       "birthYear": 1993,
       "birthMonth": 1,
       "birthDay": 11,
@@ -4176,32 +3003,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13763231900"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13763231900"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13763231900"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13763231900"
-        },
-        {
-          "year": 2026,
-          "type": "remark",
-          "value": "13763231900"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -4225,7 +3027,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇西庄湖村四组",
       "emergencyContact": "胡勇",
-      "emergencyPhone": "胡勇",
+      "emergencyPhone": "13826927284",
       "birthYear": 1966,
       "birthMonth": 9,
       "birthDay": 20,
@@ -4241,18 +3043,7 @@
           "remark": "9"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13826927284"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13826927284"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 69
     },
@@ -4274,7 +3065,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省吉安市吉安县永阳镇上沿河路10号",
       "emergencyContact": "邓红梅",
-      "emergencyPhone": "邓红梅",
+      "emergencyPhone": "17828028500",
       "birthYear": 1978,
       "birthMonth": 6,
       "birthDay": 6,
@@ -4289,13 +3080,7 @@
           "remark": "6"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "17828028500"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 70
     },
@@ -4317,7 +3102,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省衡阳县溪江乡富强村兰桂堂组",
       "emergencyContact": "刘光容",
-      "emergencyPhone": "刘光容",
+      "emergencyPhone": "13662810683",
       "birthYear": 1974,
       "birthMonth": 9,
       "birthDay": 6,
@@ -4345,27 +3130,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13662810683"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13662810683"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13662810683"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13662810683"
+          "value": "2022-02-10"
         }
       ],
       "remark": "",
@@ -4389,7 +3154,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西岑溪市南渡镇六丰村六囊11组158号",
       "emergencyContact": "江俊炎",
-      "emergencyPhone": "江俊炎",
+      "emergencyPhone": "13712719225",
       "birthYear": 1996,
       "birthMonth": 6,
       "birthDay": 18,
@@ -4404,13 +3169,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13712719225"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 72
     },
@@ -4432,7 +3191,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省汝南县罗店镇刑桥村大焦堂55号",
       "emergencyContact": "焦小勇",
-      "emergencyPhone": "焦小勇",
+      "emergencyPhone": "13612687968",
       "birthYear": 2004,
       "birthMonth": 2,
       "birthDay": 16,
@@ -4447,13 +3206,7 @@
           "remark": "2"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13612687968"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 73
     },
@@ -4475,7 +3228,7 @@
       "nativePlace": "重庆市",
       "homeAddress": "重庆市忠县乌杨镇黄谷村四组98号",
       "emergencyContact": "彭潮华",
-      "emergencyPhone": "彭潮华",
+      "emergencyPhone": "17782200058",
       "birthYear": 1970,
       "birthMonth": 1,
       "birthDay": 1,
@@ -4509,27 +3262,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15820891838"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "17782200058"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "17782200058"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "17782200058"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -4553,7 +3286,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省桂阳县桥市乡架珊村10组",
       "emergencyContact": "肖建清",
-      "emergencyPhone": "肖建清",
+      "emergencyPhone": "15089991291",
       "birthYear": 2004,
       "birthMonth": 12,
       "birthDay": 1,
@@ -4568,13 +3301,7 @@
           "remark": "12"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "15089991291"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 75
     },
@@ -4596,7 +3323,7 @@
       "nativePlace": "广东省",
       "homeAddress": "东莞市虎门镇虎门体育路199号万科云广场35栋",
       "emergencyContact": "胡杨胜",
-      "emergencyPhone": "胡杨胜",
+      "emergencyPhone": "13592764587",
       "birthYear": 2006,
       "birthMonth": 9,
       "birthDay": 1,
@@ -4611,13 +3338,7 @@
           "remark": "9"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13592764587"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 76
     },
@@ -4639,7 +3360,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西马山县林圩镇黄香村城江屯38号",
       "emergencyContact": "谭邦团",
-      "emergencyPhone": "谭邦团",
+      "emergencyPhone": "18929294263",
       "birthYear": 1966,
       "birthMonth": 10,
       "birthDay": 5,
@@ -4654,13 +3375,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "18929294263"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 77
     },
@@ -4682,7 +3397,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省荆州市监利县程集镇三弓村7组",
       "emergencyContact": "覃静",
-      "emergencyPhone": "覃静",
+      "emergencyPhone": "13794903185",
       "birthYear": 1979,
       "birthMonth": 2,
       "birthDay": 19,
@@ -4697,13 +3412,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13794903185"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 78
     },
@@ -4725,7 +3434,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省惠州市大亚湾区澳头街道新澳大道18号",
       "emergencyContact": "邹运辉",
-      "emergencyPhone": "邹运辉",
+      "emergencyPhone": "13048725838",
       "birthYear": 2003,
       "birthMonth": 8,
       "birthDay": 28,
@@ -4740,13 +3449,7 @@
           "remark": "8"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "13048725838"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 79
     },
@@ -4768,7 +3471,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省滑县城关镇桥西街84号",
       "emergencyContact": "周素红",
-      "emergencyPhone": "周素红",
+      "emergencyPhone": "16639253684",
       "birthYear": 1975,
       "birthMonth": 7,
       "birthDay": 2,
@@ -4784,18 +3487,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "16639253684"
-        },
-        {
-          "year": 2025,
-          "type": "remark",
-          "value": "16639253684"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 80
     },
@@ -4817,7 +3509,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省道县祥霖铺镇青松村3组",
       "emergencyContact": "刘瑶九",
-      "emergencyPhone": "刘瑶九",
+      "emergencyPhone": "13725701575",
       "birthYear": 1997,
       "birthMonth": 1,
       "birthDay": 17,
@@ -4833,18 +3525,7 @@
           "remark": "1"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13725701575"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13725701575"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 81
     },
@@ -4866,7 +3547,7 @@
       "nativePlace": "广东省",
       "homeAddress": "东莞市虎门镇新湾社区新兴楼201",
       "emergencyContact": "吴永欣",
-      "emergencyPhone": "吴永欣",
+      "emergencyPhone": "13538577793",
       "birthYear": 1991,
       "birthMonth": 9,
       "birthDay": 23,
@@ -4887,34 +3568,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13538577793"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13538577793"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13538577793"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13538577793"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13538577793"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -4938,7 +3594,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省高州市谢鸡镇新联勒坑村14号",
       "emergencyContact": "巫树进",
-      "emergencyPhone": "巫树进",
+      "emergencyPhone": "13535934812",
       "birthYear": 1995,
       "birthMonth": 9,
       "birthDay": 11,
@@ -4955,23 +3611,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13535934812"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13535934812"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13535934812"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 83
     },
@@ -4993,7 +3633,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县秦市乡曾家湾村二组",
       "emergencyContact": "曾平",
-      "emergencyPhone": "曾平",
+      "emergencyPhone": "13392332898",
       "birthYear": 1988,
       "birthMonth": 4,
       "birthDay": 29,
@@ -5019,34 +3659,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13392332898"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44606"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13392332898"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13392332898"
+          "value": "2022-02-14"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45671"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13392332898"
+          "value": "2025-01-14"
         }
       ],
       "remark": "",
@@ -5070,7 +3690,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省罗定市素龙街道凤西村委",
       "emergencyContact": "彭立龙",
-      "emergencyPhone": "彭立龙",
+      "emergencyPhone": "13030275748",
       "birthYear": 1999,
       "birthMonth": 3,
       "birthDay": 3,
@@ -5086,18 +3706,7 @@
           "remark": "3"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13030275748"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13030275748"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 85
     },
@@ -5119,7 +3728,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省武冈市龙溪乡岐邝五组",
       "emergencyContact": "杨菊春",
-      "emergencyPhone": "杨菊春",
+      "emergencyPhone": "18230641981",
       "birthYear": 1972,
       "birthMonth": 1,
       "birthDay": 29,
@@ -5137,19 +3746,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2023,
-          "type": "remark",
-          "value": "18230641981"
-        },
-        {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45671"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "18230641981"
+          "value": "2025-01-14"
         }
       ],
       "remark": "",
@@ -5173,7 +3772,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省黄冈市阳新县排市镇山田村观泉村",
       "emergencyContact": "明梦枝",
-      "emergencyPhone": "明梦枝",
+      "emergencyPhone": "17723851413",
       "birthYear": 1993,
       "birthMonth": 8,
       "birthDay": 12,
@@ -5192,12 +3791,7 @@
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45670"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "17723851413"
+          "value": "2025-01-13"
         }
       ],
       "remark": "",
@@ -5221,7 +3815,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县熊河镇吴桥二组",
       "emergencyContact": "评平平",
-      "emergencyPhone": "评平平",
+      "emergencyPhone": "18507217205",
       "birthYear": 1987,
       "birthMonth": 10,
       "birthDay": 11,
@@ -5248,39 +3842,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "18507217205"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44606"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "18507217205"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "18507217205"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "18507217205"
+          "value": "2022-02-14"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45671"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "18507217205"
+          "value": "2025-01-14"
         }
       ],
       "remark": "",
@@ -5304,7 +3873,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县程集镇曾周村5-230-1号",
       "emergencyContact": "黄良波",
-      "emergencyPhone": "黄良波",
+      "emergencyPhone": "13544639599",
       "birthYear": 1969,
       "birthMonth": 12,
       "birthDay": 4,
@@ -5330,34 +3899,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13544639599"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13544639599"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13544639599"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
           "value": "1月13日上午"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13544639599"
         }
       ],
       "remark": "",
@@ -5381,7 +3930,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省连平县内莞镇蓝州禽族村朱屋",
       "emergencyContact": "吴腊江",
-      "emergencyPhone": "吴腊江",
+      "emergencyPhone": "13266005645",
       "birthYear": 1986,
       "birthMonth": 4,
       "birthDay": 25,
@@ -5403,27 +3952,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13266005645"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13266005645"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13266005645"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13266005645"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -5447,7 +3976,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省石门县夹山镇汉丰村汉阳8组08007号",
       "emergencyContact": "李国生",
-      "emergencyPhone": "李国生",
+      "emergencyPhone": "13875051920",
       "birthYear": 1991,
       "birthMonth": 2,
       "birthDay": 12,
@@ -5466,12 +3995,7 @@
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45671"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13875051920"
+          "value": "2025-01-14"
         }
       ],
       "remark": "",
@@ -5495,7 +4019,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇银龙路7号2单元601房",
       "emergencyContact": "罗红秀",
-      "emergencyPhone": "罗红秀",
+      "emergencyPhone": "13528565380",
       "birthYear": 2003,
       "birthMonth": 3,
       "birthDay": 11,
@@ -5510,13 +4034,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13528565380"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 92
     },
@@ -5538,7 +4056,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西钦洲市钦北区平吉镇贤架村委",
       "emergencyContact": "班克志",
-      "emergencyPhone": "班克志",
+      "emergencyPhone": "",
       "birthYear": 1975,
       "birthMonth": 6,
       "birthDay": 7,
@@ -5560,12 +4078,12 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45670"
+          "value": "2025-01-13"
         }
       ],
       "remark": "",
@@ -5589,7 +4107,7 @@
       "nativePlace": "河北省",
       "homeAddress": "河北省承德市滦平小营镇小营村",
       "emergencyContact": "黄少飞",
-      "emergencyPhone": "黄少飞",
+      "emergencyPhone": "17746112697",
       "birthYear": 2002,
       "birthMonth": 5,
       "birthDay": 10,
@@ -5604,13 +4122,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "17746112697"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 94
     },
@@ -5632,7 +4144,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县程集镇曾周村5-230-1号",
       "emergencyContact": "曾祥松",
-      "emergencyPhone": "曾祥松",
+      "emergencyPhone": "13538579158",
       "birthYear": 1977,
       "birthMonth": 5,
       "birthDay": 14,
@@ -5658,34 +4170,14 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13538579158"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13538579158"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13538579158"
+          "value": "2022-02-12"
         },
         {
           "year": 2024,
           "type": "spring_festival_return",
           "value": "1月13日上午"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "13538579158"
         }
       ],
       "remark": "",
@@ -5709,7 +4201,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北江陵县普济镇林口村4组134号",
       "emergencyContact": "齐书斌",
-      "emergencyPhone": "齐书斌",
+      "emergencyPhone": "15938933801",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -5728,12 +4220,7 @@
         {
           "year": 2024,
           "type": "spring_festival_return",
-          "value": "45670"
-        },
-        {
-          "year": 2024,
-          "type": "remark",
-          "value": "15938933801"
+          "value": "2025-01-13"
         }
       ],
       "remark": "",
@@ -5757,7 +4244,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省永兴县金龟镇牛头村牛岭组07号",
       "emergencyContact": "何广彬",
-      "emergencyPhone": "何广彬",
+      "emergencyPhone": "13609683563",
       "birthYear": 2001,
       "birthMonth": 8,
       "birthDay": 18,
@@ -5772,13 +4259,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13609683563"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 97
     },
@@ -5800,7 +4281,7 @@
       "nativePlace": "安徽省",
       "homeAddress": "安徽省安庆市宿松县凉亭镇柳溪村",
       "emergencyContact": "柳彩霞",
-      "emergencyPhone": "柳彩霞",
+      "emergencyPhone": "15209811193",
       "birthYear": 2002,
       "birthMonth": 7,
       "birthDay": 15,
@@ -5815,13 +4296,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15209811193"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 98
     },
@@ -5843,7 +4318,7 @@
       "nativePlace": "陕西省",
       "homeAddress": "陕西省洋县磨子桥镇磨子桥村一组",
       "emergencyContact": "张艳霞",
-      "emergencyPhone": "张艳霞",
+      "emergencyPhone": "18992465872",
       "birthYear": 1975,
       "birthMonth": 10,
       "birthDay": 20,
@@ -5863,29 +4338,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "18992465872"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "18992465872"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "18992465872"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "18992465872"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -5909,7 +4364,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省英德市横石塘镇龙建村委会",
       "emergencyContact": "谢六妹",
-      "emergencyPhone": "谢六妹",
+      "emergencyPhone": "13725849963",
       "birthYear": 2002,
       "birthMonth": 10,
       "birthDay": 22,
@@ -5924,13 +4379,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13725849963"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 100
     },
@@ -5952,7 +4401,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市道窑镇北永振兴路四巷",
       "emergencyContact": "叶炳沃",
-      "emergencyPhone": "叶炳沃",
+      "emergencyPhone": "18028267899",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -5967,13 +4416,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "18028267899"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 101
     },
@@ -5995,7 +4438,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省虎门镇永康街28号2栋203室",
       "emergencyContact": "邹荷莲",
-      "emergencyPhone": "邹荷莲",
+      "emergencyPhone": "13434567576",
       "birthYear": 1978,
       "birthMonth": 4,
       "birthDay": 16,
@@ -6010,13 +4453,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13434567576"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 102
     },
@@ -6038,7 +4475,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省汇县小渡口镇甘家湾村22组22004号",
       "emergencyContact": "张秀",
-      "emergencyPhone": "张秀",
+      "emergencyPhone": "13423093074",
       "birthYear": 2003,
       "birthMonth": 3,
       "birthDay": 2,
@@ -6053,13 +4490,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13423093074"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 103
     },
@@ -6081,7 +4512,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省荆春县横车镇白鹤村9组",
       "emergencyContact": "张敏",
-      "emergencyPhone": "张敏",
+      "emergencyPhone": "13717393948",
       "birthYear": 1964,
       "birthMonth": 8,
       "birthDay": 22,
@@ -6096,13 +4527,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13717393948"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 104
     },
@@ -6124,7 +4549,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省烯水县团陂镇 曹畈村2组",
       "emergencyContact": "徐思",
-      "emergencyPhone": "徐思",
+      "emergencyPhone": "13476597646",
       "birthYear": 1991,
       "birthMonth": 2,
       "birthDay": 28,
@@ -6139,13 +4564,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13476597646"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 105
     },
@@ -6167,7 +4586,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省普宁市里湖镇富美书斋园新村",
       "emergencyContact": "李妙如",
-      "emergencyPhone": "李妙如",
+      "emergencyPhone": "15766889499",
       "birthYear": 2001,
       "birthMonth": 3,
       "birthDay": 19,
@@ -6182,13 +4601,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15766889499"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 106
     },
@@ -6210,7 +4623,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西北流市清湾镇龙南村铁火炉垌组",
       "emergencyContact": "林玲",
-      "emergencyPhone": "林玲",
+      "emergencyPhone": "13544663424",
       "birthYear": 1981,
       "birthMonth": 3,
       "birthDay": 2,
@@ -6225,13 +4638,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13544663424"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 107
     },
@@ -6253,7 +4660,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省广安市邻水县",
       "emergencyContact": "彭洪",
-      "emergencyPhone": "彭洪",
+      "emergencyPhone": "13713006723",
       "birthYear": 1974,
       "birthMonth": 6,
       "birthDay": 23,
@@ -6269,18 +4676,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13713006723"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13713006723"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 108
     },
@@ -6302,7 +4698,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省湛江市麻章区太平镇通明村",
       "emergencyContact": "河秀真",
-      "emergencyPhone": "河秀真",
+      "emergencyPhone": "17817341364",
       "birthYear": 1994,
       "birthMonth": 1,
       "birthDay": 15,
@@ -6317,13 +4713,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "17817341364"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 109
     },
@@ -6345,7 +4735,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省达县黄都乡椅湾村5组",
       "emergencyContact": "刘利",
-      "emergencyPhone": "刘利",
+      "emergencyPhone": "15228016802",
       "birthYear": 1993,
       "birthMonth": 4,
       "birthDay": 10,
@@ -6365,29 +4755,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "15228016802"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15228016802"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15228016802"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15228016802"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -6411,7 +4781,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省灃县灃西街道办事处黄泥社区",
       "emergencyContact": "王飞",
-      "emergencyPhone": "王飞",
+      "emergencyPhone": "13757721675",
       "birthYear": 1980,
       "birthMonth": 12,
       "birthDay": 24,
@@ -6426,13 +4796,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13757721675"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 111
     },
@@ -6454,7 +4818,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省茂名市信宜市镇隆镇田子村",
       "emergencyContact": "甘军寿",
-      "emergencyPhone": "甘军寿",
+      "emergencyPhone": "13532715853",
       "birthYear": 2001,
       "birthMonth": 7,
       "birthDay": 18,
@@ -6469,13 +4833,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13532715853"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 112
     },
@@ -6497,7 +4855,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇西庄湖村四组",
       "emergencyContact": "姚倩倩",
-      "emergencyPhone": "姚倩倩",
+      "emergencyPhone": "13972193986",
       "birthYear": 1990,
       "birthMonth": 6,
       "birthDay": 4,
@@ -6517,29 +4875,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13972193986"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13972193986"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13972193986"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13972193986"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -6563,7 +4901,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西博白县颈口镇三有村枚子同队015号",
       "emergencyContact": "冯敏",
-      "emergencyPhone": "冯敏",
+      "emergencyPhone": "19175493566",
       "birthYear": 2004,
       "birthMonth": 4,
       "birthDay": 11,
@@ -6578,13 +4916,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "19175493566"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 114
     },
@@ -6606,7 +4938,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇连升路91号2号楼",
       "emergencyContact": "范红潮",
-      "emergencyPhone": "范红潮",
+      "emergencyPhone": "13713028230",
       "birthYear": 1979,
       "birthMonth": 8,
       "birthDay": 10,
@@ -6621,13 +4953,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13713028230"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 115
     },
@@ -6649,7 +4975,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省唐河县少拜寺乡枣庄村王岗35号",
       "emergencyContact": "王辉",
-      "emergencyPhone": "王辉",
+      "emergencyPhone": "15712246221",
       "birthYear": 1966,
       "birthMonth": 6,
       "birthDay": 29,
@@ -6671,22 +4997,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15712246221"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15712246221"
-        },
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "15712246221"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -6710,7 +5021,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省大竹县安吉乡安村村6组",
       "emergencyContact": "陈志强",
-      "emergencyPhone": "陈志强",
+      "emergencyPhone": "13602335452",
       "birthYear": 2003,
       "birthMonth": 10,
       "birthDay": 2,
@@ -6725,13 +5036,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2023,
-          "type": "remark",
-          "value": "13602335452"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 117
     },
@@ -6753,7 +5058,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县汪桥镇 花园村五组",
       "emergencyContact": "李永怀",
-      "emergencyPhone": "李永怀",
+      "emergencyPhone": "13642954005",
       "birthYear": 1974,
       "birthMonth": 9,
       "birthDay": 4,
@@ -6768,13 +5073,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13642954005"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 118
     },
@@ -6796,7 +5095,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西玉林市玉州区新桥镇阳尚村阳山2号",
       "emergencyContact": "曾维德",
-      "emergencyPhone": "曾维德",
+      "emergencyPhone": "17777555352",
       "birthYear": 1981,
       "birthMonth": 12,
       "birthDay": 20,
@@ -6815,24 +5114,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "17777555352"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "17777555352"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "17777555352"
+          "value": "2022-02-10"
         }
       ],
       "remark": "",
@@ -6856,7 +5140,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西大新县全名镇上马村双外屯12号",
       "emergencyContact": "农定江",
-      "emergencyPhone": "农定江",
+      "emergencyPhone": "13677815527",
       "birthYear": 1976,
       "birthMonth": 2,
       "birthDay": 14,
@@ -6875,24 +5159,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13677815527"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13677815527"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13677815527"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -6916,7 +5185,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省雷州市北和镇那尾村29号",
       "emergencyContact": "吴爱华",
-      "emergencyPhone": "吴爱华",
+      "emergencyPhone": "15118480075",
       "birthYear": 1997,
       "birthMonth": 6,
       "birthDay": 20,
@@ -6931,13 +5200,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15118480075"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 121
     },
@@ -6959,7 +5222,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省祁东县白地市镇铁塘桥村20组",
       "emergencyContact": "刘先生",
-      "emergencyPhone": "刘先生",
+      "emergencyPhone": "13412719249",
       "birthYear": 1990,
       "birthMonth": 8,
       "birthDay": 4,
@@ -6974,13 +5237,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13412719249"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 122
     },
@@ -7002,7 +5259,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省津市市李家铺乡双坪村02047号",
       "emergencyContact": "李惠彬",
-      "emergencyPhone": "李惠彬",
+      "emergencyPhone": "13923626150",
       "birthYear": 1976,
       "birthMonth": 3,
       "birthDay": 6,
@@ -7023,13 +5280,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13923626150"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 123
     },
@@ -7071,7 +5322,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7095,7 +5346,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省广汉市西高镇白里村2组",
       "emergencyContact": "吴正火",
-      "emergencyPhone": "吴正火",
+      "emergencyPhone": "18781040539",
       "birthYear": 1980,
       "birthMonth": 4,
       "birthDay": 25,
@@ -7110,13 +5361,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "18781040539"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 125
     },
@@ -7138,7 +5383,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省公安县麻豪口镇新华村1组",
       "emergencyContact": "覃文平",
-      "emergencyPhone": "覃文平",
+      "emergencyPhone": "15992935203",
       "birthYear": 1975,
       "birthMonth": 2,
       "birthDay": 24,
@@ -7153,13 +5398,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15992935203"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 126
     },
@@ -7181,7 +5420,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省电白县望夫镇民乐双石村二队33号",
       "emergencyContact": "石锡溪",
-      "emergencyPhone": "石锡溪",
+      "emergencyPhone": "13528555721",
       "birthYear": 1991,
       "birthMonth": 3,
       "birthDay": 8,
@@ -7200,24 +5439,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13528555721"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44611"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13528555721"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13528555721"
+          "value": "2022-02-19"
         }
       ],
       "remark": "",
@@ -7241,7 +5465,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县程集镇永丰村6组",
       "emergencyContact": "莫珊珊",
-      "emergencyPhone": "莫珊珊",
+      "emergencyPhone": "13712610313",
       "birthYear": 1968,
       "birthMonth": 9,
       "birthDay": 2,
@@ -7256,13 +5480,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "13712610313"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 128
     },
@@ -7284,7 +5502,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省公安县麻豪口镇新华村1组",
       "emergencyContact": "杨香玉",
-      "emergencyPhone": "杨香玉",
+      "emergencyPhone": "15876913296",
       "birthYear": 1970,
       "birthMonth": 5,
       "birthDay": 14,
@@ -7299,13 +5517,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15876913296"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 129
     },
@@ -7348,7 +5560,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7372,7 +5584,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省丰城市筱塘乡双岗村宣家组36号",
       "emergencyContact": "陈生",
-      "emergencyPhone": "陈生",
+      "emergencyPhone": "15870668466",
       "birthYear": 1977,
       "birthMonth": 7,
       "birthDay": 28,
@@ -7398,17 +5610,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15870668466"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15870668466"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7432,7 +5634,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省兴国县社富乡黄岗村和平组58号",
       "emergencyContact": "陈生",
-      "emergencyPhone": "陈生",
+      "emergencyPhone": "15184120099",
       "birthYear": 1972,
       "birthMonth": 8,
       "birthDay": 13,
@@ -7452,17 +5654,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15184120099"
-        },
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15184120099"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7486,7 +5678,7 @@
       "nativePlace": "甘肃省",
       "homeAddress": "甘肃省庆阳市西峰区遇泉乡齐家楼村",
       "emergencyContact": "齐国庆",
-      "emergencyPhone": "齐国庆",
+      "emergencyPhone": "15593448862",
       "birthYear": 1990,
       "birthMonth": 7,
       "birthDay": 20,
@@ -7501,13 +5693,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2022,
-          "type": "remark",
-          "value": "15593448862"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 133
     },
@@ -7529,7 +5715,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省公安县斑竹当镇同和村一组",
       "emergencyContact": "朱传兵",
-      "emergencyPhone": "朱传兵",
+      "emergencyPhone": "15814257050",
       "birthYear": 1967,
       "birthMonth": 6,
       "birthDay": 23,
@@ -7547,19 +5733,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "15814257050"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15814257050"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7583,7 +5759,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省永州市东安县鹿马桥镇肖家岭",
       "emergencyContact": "刘善荀",
-      "emergencyPhone": "刘善荀",
+      "emergencyPhone": "13657460812",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -7601,19 +5777,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13657460812"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44603"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13657460812"
+          "value": "2022-02-11"
         }
       ],
       "remark": "",
@@ -7637,7 +5803,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省永兴县高亭乡大沅村15组",
       "emergencyContact": "黄吕凤",
-      "emergencyPhone": "黄吕凤",
+      "emergencyPhone": "18024673316",
       "birthYear": 1965,
       "birthMonth": 4,
       "birthDay": 12,
@@ -7655,19 +5821,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "18024673316"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "18024673316"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7691,7 +5847,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西灵山县檀圩镇村心村委会塘珍队",
       "emergencyContact": "劳荣鹏",
-      "emergencyPhone": "劳荣鹏",
+      "emergencyPhone": "15278730347",
       "birthYear": 1995,
       "birthMonth": 11,
       "birthDay": 26,
@@ -7706,13 +5862,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15278730347"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 137
     },
@@ -7734,7 +5884,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县",
       "emergencyContact": "秦春斯",
-      "emergencyPhone": "秦春斯",
+      "emergencyPhone": "13580998451",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -7752,19 +5902,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13580998451"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13580998451"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7788,7 +5928,7 @@
       "nativePlace": "重庆市",
       "homeAddress": "重庆市忠县乌杨镇黄谷村4组83号",
       "emergencyContact": "李桂平",
-      "emergencyPhone": "李桂平",
+      "emergencyPhone": "13594744050",
       "birthYear": 1984,
       "birthMonth": 5,
       "birthDay": 16,
@@ -7806,19 +5946,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13594744050"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13594744050"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7842,7 +5972,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省安陆市接官乡唐畈村7组",
       "emergencyContact": "朱秀玲",
-      "emergencyPhone": "朱秀玲",
+      "emergencyPhone": "13647123949",
       "birthYear": 1999,
       "birthMonth": 5,
       "birthDay": 10,
@@ -7860,11 +5990,6 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13647123949"
-        },
-        {
           "year": 2021,
           "type": "vacation_start",
           "value": "上完1月17日"
@@ -7872,12 +5997,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13647123949"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -7901,7 +6021,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省祁东县白地市镇铁塘桥村20组",
       "emergencyContact": "刘先生",
-      "emergencyPhone": "刘先生",
+      "emergencyPhone": "13412719249",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -7919,11 +6039,6 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "13412719249"
-        },
-        {
           "year": 2021,
           "type": "vacation_start",
           "value": "1月3日起请假"
@@ -7931,12 +6046,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13412719249"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -7997,7 +6107,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省五华县水寨镇华兴南路352号",
       "emergencyContact": "宋柳",
-      "emergencyPhone": "宋柳",
+      "emergencyPhone": "13412148797",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -8016,12 +6126,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13412148797"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8045,7 +6150,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省新华县上梅镇园艺村第11组",
       "emergencyContact": "钟才",
-      "emergencyPhone": "钟才",
+      "emergencyPhone": "13026660050",
       "birthYear": 1989,
       "birthMonth": 1,
       "birthDay": 14,
@@ -8064,12 +6169,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13026660050"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8112,7 +6212,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8136,7 +6236,7 @@
       "nativePlace": "重庆市",
       "homeAddress": "重庆市忠县乌杨镇黄谷村四组98号",
       "emergencyContact": "彭潮华",
-      "emergencyPhone": "彭潮华",
+      "emergencyPhone": "17782200058",
       "birthYear": 1986,
       "birthMonth": 6,
       "birthDay": 4,
@@ -8155,12 +6255,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "17782200058"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8184,7 +6279,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省江永县上江于镇白巡村1组153号",
       "emergencyContact": "欧斌",
-      "emergencyPhone": "欧斌",
+      "emergencyPhone": "18228050951",
       "birthYear": 1983,
       "birthMonth": 8,
       "birthDay": 23,
@@ -8203,12 +6298,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "18228050951"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8232,7 +6322,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西横县校椅镇耕冷村委上局村1号",
       "emergencyContact": "潘德贵",
-      "emergencyPhone": "潘德贵",
+      "emergencyPhone": "19152623236",
       "birthYear": 1979,
       "birthMonth": 5,
       "birthDay": 23,
@@ -8258,11 +6348,6 @@
           "year": 2021,
           "type": "vacation_start",
           "value": "上完1月17日"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "19152623236"
         }
       ],
       "remark": "",
@@ -8286,7 +6371,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省淆水县关口镇丰山村二组43号",
       "emergencyContact": "范玉娥",
-      "emergencyPhone": "范玉娥",
+      "emergencyPhone": "15507189359",
       "birthYear": 1975,
       "birthMonth": 8,
       "birthDay": 22,
@@ -8310,12 +6395,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15507189359"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8339,7 +6419,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省南县南洲镇大洲村第9村民小组",
       "emergencyContact": "刘启林",
-      "emergencyPhone": "刘启林",
+      "emergencyPhone": "13609053258",
       "birthYear": 1976,
       "birthMonth": 10,
       "birthDay": 13,
@@ -8358,12 +6438,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13609053258"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8387,7 +6462,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省仪陇县永光乡龙王村一组",
       "emergencyContact": "简爱民",
-      "emergencyPhone": "简爱民",
+      "emergencyPhone": "13215185198",
       "birthYear": 2000,
       "birthMonth": 10,
       "birthDay": 23,
@@ -8406,12 +6481,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13215185198"
+          "value": "2022-02-10"
         }
       ],
       "remark": "",
@@ -8435,7 +6505,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省资阳市安岳县元呗镇花排村",
       "emergencyContact": "魏敏",
-      "emergencyPhone": "魏敏",
+      "emergencyPhone": "13559788442",
       "birthYear": 1980,
       "birthMonth": 10,
       "birthDay": 17,
@@ -8454,12 +6524,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13559788442"
+          "value": "2022-02-10"
         }
       ],
       "remark": "",
@@ -8483,7 +6548,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省兴国县龙岗镇大坎村富林组",
       "emergencyContact": "柯茂",
-      "emergencyPhone": "柯茂",
+      "emergencyPhone": "13433003770",
       "birthYear": 1972,
       "birthMonth": 10,
       "birthDay": 4,
@@ -8507,12 +6572,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13433003770"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8536,7 +6596,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县程集镇永联村10-242号",
       "emergencyContact": "袁超波",
-      "emergencyPhone": "袁超波",
+      "emergencyPhone": "15826598381",
       "birthYear": 1992,
       "birthMonth": 3,
       "birthDay": 10,
@@ -8555,12 +6615,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "15826598381"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8584,7 +6639,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省于都县银坑香塘村老新屋组47号",
       "emergencyContact": "谢红英",
-      "emergencyPhone": "谢红英",
+      "emergencyPhone": "13662296058",
       "birthYear": 1972,
       "birthMonth": 8,
       "birthDay": 13,
@@ -8603,12 +6658,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13662296058"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8651,7 +6701,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
+          "value": "2022-02-10"
         }
       ],
       "remark": "",
@@ -8675,7 +6725,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省广州市南沙区东涌镇细沥路",
       "emergencyContact": "郭浩明",
-      "emergencyPhone": "郭浩明",
+      "emergencyPhone": "13535559131",
       "birthYear": 2000,
       "birthMonth": 6,
       "birthDay": 30,
@@ -8694,12 +6744,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13535559131"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8723,7 +6768,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省揭阳市揭东区田镇牌边村榕华围",
       "emergencyContact": "蔡浩龙",
-      "emergencyPhone": "蔡浩龙",
+      "emergencyPhone": "13712395593",
       "birthYear": 1993,
       "birthMonth": 5,
       "birthDay": 13,
@@ -8742,12 +6787,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13712395593"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8771,7 +6811,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省于都县银坑香塘村老新屋组47号",
       "emergencyContact": "谢红英",
-      "emergencyPhone": "谢红英",
+      "emergencyPhone": "13662296058",
       "birthYear": 1969,
       "birthMonth": 8,
       "birthDay": 18,
@@ -8790,12 +6830,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13662296058"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8819,7 +6854,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省黄冈市黄州区陈策楼镇浒子口村",
       "emergencyContact": "周清",
-      "emergencyPhone": "周清",
+      "emergencyPhone": "18826828313",
       "birthYear": 1985,
       "birthMonth": 8,
       "birthDay": 15,
@@ -8837,19 +6872,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "18826828313"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44606"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "18826828313"
+          "value": "2022-02-14"
         }
       ],
       "remark": "",
@@ -8873,7 +6898,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省永兴县高亭乡大沅村15组",
       "emergencyContact": "刘洪招",
-      "emergencyPhone": "刘洪招",
+      "emergencyPhone": "18024673316",
       "birthYear": 1967,
       "birthMonth": 1,
       "birthDay": 20,
@@ -8898,7 +6923,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -8922,7 +6947,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西桂平市社步镇乌竹村横揩屯41号",
       "emergencyContact": "黄炳林",
-      "emergencyPhone": "黄炳林",
+      "emergencyPhone": "18269569815",
       "birthYear": 1996,
       "birthMonth": 2,
       "birthDay": 9,
@@ -8940,19 +6965,9 @@
       ],
       "yearlyRecords": [
         {
-          "year": 2020,
-          "type": "remark",
-          "value": "18269569815"
-        },
-        {
           "year": 2021,
           "type": "work_start",
-          "value": "44600"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "18269569815"
+          "value": "2022-02-08"
         }
       ],
       "remark": "",
@@ -8976,7 +6991,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西贵港市覃塘区樟木乡黄道村谷龙屯148号",
       "emergencyContact": "黄祖造",
-      "emergencyPhone": "黄祖造",
+      "emergencyPhone": "13751349497",
       "birthYear": 1967,
       "birthMonth": 10,
       "birthDay": 14,
@@ -8995,12 +7010,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44604"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13751349497"
+          "value": "2022-02-12"
         }
       ],
       "remark": "",
@@ -9024,7 +7034,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西苍梧县广平镇西罗村西一组27号",
       "emergencyContact": "黎凤琼",
-      "emergencyPhone": "黎凤琼",
+      "emergencyPhone": "13711965165",
       "birthYear": 1965,
       "birthMonth": 11,
       "birthDay": 5,
@@ -9043,12 +7053,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44608"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13711965165"
+          "value": "2022-02-16"
         }
       ],
       "remark": "",
@@ -9072,7 +7077,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇",
       "emergencyContact": "千霞",
-      "emergencyPhone": "千霞",
+      "emergencyPhone": "13138829281",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -9091,12 +7096,7 @@
         {
           "year": 2021,
           "type": "work_start",
-          "value": "44602"
-        },
-        {
-          "year": 2021,
-          "type": "remark",
-          "value": "13138829281"
+          "value": "2022-02-10"
         }
       ],
       "remark": "",
@@ -9120,7 +7120,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省祁东县凤石堰镇山西村6组9号",
       "emergencyContact": "魏银艳",
-      "emergencyPhone": "魏银艳",
+      "emergencyPhone": "13538523769",
       "birthYear": 1979,
       "birthMonth": 2,
       "birthDay": 7,
@@ -9141,13 +7141,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13538523769"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 166
     },
@@ -9169,7 +7163,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西钦州市钦北区青塘镇华岭村三队37号",
       "emergencyContact": "利开世",
-      "emergencyPhone": "利开世",
+      "emergencyPhone": "19966706926",
       "birthYear": 1984,
       "birthMonth": 12,
       "birthDay": 13,
@@ -9184,13 +7178,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "19966706926"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 167
     },
@@ -9212,7 +7200,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇东李村三组",
       "emergencyContact": "付华",
-      "emergencyPhone": "付华",
+      "emergencyPhone": "18676988223",
       "birthYear": 1986,
       "birthMonth": 12,
       "birthDay": 16,
@@ -9233,13 +7221,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "18676988223"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 168
     },
@@ -9298,7 +7280,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省连平县田源镇永吉村红星5号",
       "emergencyContact": "黎连娣",
-      "emergencyPhone": "黎连娣",
+      "emergencyPhone": "15811623275",
       "birthYear": 1997,
       "birthMonth": 10,
       "birthDay": 8,
@@ -9313,13 +7295,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15811623275"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 170
     },
@@ -9341,7 +7317,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省东莞市虎门镇新联凤华豪园3栋110",
       "emergencyContact": "叶伟祥",
-      "emergencyPhone": "叶伟祥",
+      "emergencyPhone": "13712082628",
       "birthYear": 1997,
       "birthMonth": 8,
       "birthDay": 1,
@@ -9356,13 +7332,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13712082628"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 171
     },
@@ -9384,7 +7354,7 @@
       "nativePlace": "广东省",
       "homeAddress": "东莞市虎门镇新湾永安街三巷4号永安楼",
       "emergencyContact": "何丽瑶",
-      "emergencyPhone": "何丽瑶",
+      "emergencyPhone": "13549279528",
       "birthYear": 1991,
       "birthMonth": 7,
       "birthDay": 23,
@@ -9399,13 +7369,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13549279528"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 172
     },
@@ -9427,7 +7391,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西岺溪市水汶镇竹兰村上湾组21号",
       "emergencyContact": "吴永梅",
-      "emergencyPhone": "吴永梅",
+      "emergencyPhone": "15107662956",
       "birthYear": 1973,
       "birthMonth": 6,
       "birthDay": 11,
@@ -9442,13 +7406,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15107662956"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 173
     },
@@ -9470,7 +7428,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省赣州市于都县",
       "emergencyContact": "陈丽萍",
-      "emergencyPhone": "陈丽萍",
+      "emergencyPhone": "18002860979",
       "birthYear": 1967,
       "birthMonth": 9,
       "birthDay": 19,
@@ -9485,13 +7443,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "18002860979"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 174
     },
@@ -9513,7 +7465,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西陆川县温泉镇陆兴路二区五巷1号",
       "emergencyContact": "广哥涔",
-      "emergencyPhone": "广哥涔",
+      "emergencyPhone": "13347552666",
       "birthYear": 1975,
       "birthMonth": 2,
       "birthDay": 26,
@@ -9528,13 +7480,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13347552666"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 175
     },
@@ -9556,7 +7502,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省瑞昌市桂林办事处洪源村豪主张",
       "emergencyContact": "李春花",
-      "emergencyPhone": "李春花",
+      "emergencyPhone": "15992792462",
       "birthYear": 1968,
       "birthMonth": 1,
       "birthDay": 13,
@@ -9571,13 +7517,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15992792462"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 176
     },
@@ -9599,7 +7539,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省荆州市荆州区弥市镇弥市村4组",
       "emergencyContact": "谢龙朝",
-      "emergencyPhone": "谢龙朝",
+      "emergencyPhone": "13686006753",
       "birthYear": 1986,
       "birthMonth": 6,
       "birthDay": 26,
@@ -9614,13 +7554,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13686006753"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 177
     },
@@ -9642,7 +7576,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省于都县银坑镇梅屋村汗塘组8号",
       "emergencyContact": "葛福春",
-      "emergencyPhone": "葛福春",
+      "emergencyPhone": "13479452029",
       "birthYear": 1994,
       "birthMonth": 12,
       "birthDay": 2,
@@ -9657,13 +7591,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13479452029"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 178
     },
@@ -9685,7 +7613,7 @@
       "nativePlace": "重庆市",
       "homeAddress": "重庆市云阳县南溪镇吉仙村8组25号",
       "emergencyContact": "李芝平",
-      "emergencyPhone": "李芝平",
+      "emergencyPhone": "17358323620",
       "birthYear": 1983,
       "birthMonth": 10,
       "birthDay": 7,
@@ -9700,13 +7628,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "17358323620"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 179
     },
@@ -9728,7 +7650,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省黄梅县新开镇团坡村10组",
       "emergencyContact": "梅洲青",
-      "emergencyPhone": "梅洲青",
+      "emergencyPhone": "15360663629",
       "birthYear": 1984,
       "birthMonth": 4,
       "birthDay": 4,
@@ -9743,13 +7665,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15360663629"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 180
     },
@@ -9771,7 +7687,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省漓样板县哩阳街道黄桥社区4组",
       "emergencyContact": "熊云祥",
-      "emergencyPhone": "熊云祥",
+      "emergencyPhone": "13268736491",
       "birthYear": 1977,
       "birthMonth": 2,
       "birthDay": 22,
@@ -9786,13 +7702,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13268736491"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 181
     },
@@ -9814,7 +7724,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省宁远县鲤溪镇游马石村3组",
       "emergencyContact": "杨士祥",
-      "emergencyPhone": "杨士祥",
+      "emergencyPhone": "13326880986",
       "birthYear": 1992,
       "birthMonth": 1,
       "birthDay": 1,
@@ -9829,13 +7739,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13326880986"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 182
     },
@@ -9857,7 +7761,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西苍梧县广平镇山村平山四组",
       "emergencyContact": "李平",
-      "emergencyPhone": "李平",
+      "emergencyPhone": "13412552226",
       "birthYear": 1978,
       "birthMonth": 5,
       "birthDay": 25,
@@ -9872,13 +7776,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13412552226"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 183
     },
@@ -9900,7 +7798,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省漓样板县哩阳街道黄桥社区4组",
       "emergencyContact": "李春香",
-      "emergencyPhone": "李春香",
+      "emergencyPhone": "19936886892",
       "birthYear": 1972,
       "birthMonth": 5,
       "birthDay": 21,
@@ -9915,13 +7813,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "19936886892"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 184
     },
@@ -9943,7 +7835,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县汪桥镇金熊村7组7－13号",
       "emergencyContact": "熊秋红",
-      "emergencyPhone": "熊秋红",
+      "emergencyPhone": "15327768541",
       "birthYear": 1987,
       "birthMonth": 8,
       "birthDay": 10,
@@ -9958,13 +7850,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15327768541"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 185
     },
@@ -10023,7 +7909,7 @@
       "nativePlace": "河南省",
       "homeAddress": "河南省夹县堂街镇孟庄村4号",
       "emergencyContact": "王校科",
-      "emergencyPhone": "王校科",
+      "emergencyPhone": "15516022512",
       "birthYear": 1976,
       "birthMonth": 5,
       "birthDay": 25,
@@ -10038,13 +7924,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15516022512"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 187
     },
@@ -10066,7 +7946,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西钦洲市钦北区平吉镇贤架村委",
       "emergencyContact": "班克志",
-      "emergencyPhone": "班克志",
+      "emergencyPhone": "",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -10103,7 +7983,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省竹山县擂鼓镇西河村2组55号",
       "emergencyContact": "刘小英",
-      "emergencyPhone": "刘小英",
+      "emergencyPhone": "13412193457",
       "birthYear": 1970,
       "birthMonth": 12,
       "birthDay": 1,
@@ -10118,13 +7998,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13412193457"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 189
     },
@@ -10146,7 +8020,7 @@
       "nativePlace": "四川省",
       "homeAddress": "四川省广安市广安区肖溪镇五庙村1组10号",
       "emergencyContact": "王淑芳",
-      "emergencyPhone": "王淑芳",
+      "emergencyPhone": "18784177967",
       "birthYear": 1972,
       "birthMonth": 12,
       "birthDay": 9,
@@ -10161,13 +8035,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "18784177967"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 190
     },
@@ -10189,7 +8057,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省云浮市新兴县河头镇步朗村",
       "emergencyContact": "练振彬",
-      "emergencyPhone": "练振彬",
+      "emergencyPhone": "13823545528",
       "birthYear": 1998,
       "birthMonth": 2,
       "birthDay": 27,
@@ -10204,13 +8072,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13823545528"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 191
     },
@@ -10232,7 +8094,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省永新县石桥镇江背大队消家49号",
       "emergencyContact": "肖云娜",
-      "emergencyPhone": "肖云娜",
+      "emergencyPhone": "15170890723",
       "birthYear": null,
       "birthMonth": null,
       "birthDay": null,
@@ -10247,13 +8109,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15170890723"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 192
     },
@@ -10275,7 +8131,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省隆回县七江乡七寨铺村3组9号",
       "emergencyContact": "胡胜元",
-      "emergencyPhone": "胡胜元",
+      "emergencyPhone": "17378127851",
       "birthYear": 1964,
       "birthMonth": 9,
       "birthDay": 24,
@@ -10290,13 +8146,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "17378127851"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 193
     },
@@ -10355,7 +8205,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省天门市汪场镇方桥村六组18号",
       "emergencyContact": "李福海",
-      "emergencyPhone": "李福海",
+      "emergencyPhone": "15112893428",
       "birthYear": 1967,
       "birthMonth": 4,
       "birthDay": 5,
@@ -10370,13 +8220,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15112893428"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 195
     },
@@ -10398,7 +8242,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省茶陵县严塘镇塘并村井下",
       "emergencyContact": "陈明成",
-      "emergencyPhone": "陈明成",
+      "emergencyPhone": "13713252259",
       "birthYear": 1979,
       "birthMonth": 1,
       "birthDay": 14,
@@ -10413,13 +8257,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13713252259"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 196
     },
@@ -10441,7 +8279,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省东安县顶头圩镇宝峰村1组",
       "emergencyContact": "蒋雨晴",
-      "emergencyPhone": "蒋雨晴",
+      "emergencyPhone": "15107603331",
       "birthYear": 2000,
       "birthMonth": 2,
       "birthDay": 25,
@@ -10456,13 +8294,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15107603331"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 197
     },
@@ -10484,7 +8316,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县熊河镇吴桥二组",
       "emergencyContact": "曾梅梅",
-      "emergencyPhone": "曾梅梅",
+      "emergencyPhone": "13886605243",
       "birthYear": 1988,
       "birthMonth": 9,
       "birthDay": 28,
@@ -10499,13 +8331,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13886605243"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 198
     },
@@ -10527,7 +8353,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省枝江市安福寺镇峰山岗村三组",
       "emergencyContact": "谢购玲",
-      "emergencyPhone": "谢购玲",
+      "emergencyPhone": "15099776975",
       "birthYear": 1969,
       "birthMonth": 12,
       "birthDay": 24,
@@ -10542,13 +8368,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15099776975"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 199
     },
@@ -10570,7 +8390,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省清远市清城区东城长丰村委会",
       "emergencyContact": "谭家亮",
-      "emergencyPhone": "谭家亮",
+      "emergencyPhone": "18933647408",
       "birthYear": 1985,
       "birthMonth": 6,
       "birthDay": 15,
@@ -10585,13 +8405,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "18933647408"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 200
     },
@@ -10613,7 +8427,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省监利县红城乡鲍家门村6-29号",
       "emergencyContact": "李刚",
-      "emergencyPhone": "李刚",
+      "emergencyPhone": "13532951386",
       "birthYear": 1987,
       "birthMonth": 2,
       "birthDay": 16,
@@ -10628,13 +8442,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13532951386"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 201
     },
@@ -10656,7 +8464,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省赣州市于都 县宽田乡宽田村38号",
       "emergencyContact": "郭桂兰",
-      "emergencyPhone": "郭桂兰",
+      "emergencyPhone": "13790416832",
       "birthYear": 1998,
       "birthMonth": 11,
       "birthDay": 19,
@@ -10671,13 +8479,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13790416832"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 202
     },
@@ -10699,7 +8501,7 @@
       "nativePlace": "湖北省",
       "homeAddress": "湖北省江陵县普济镇居民二组",
       "emergencyContact": "彭倩",
-      "emergencyPhone": "彭倩",
+      "emergencyPhone": "15362469903",
       "birthYear": 1983,
       "birthMonth": 12,
       "birthDay": 12,
@@ -10714,13 +8516,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15362469903"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 203
     },
@@ -10742,7 +8538,7 @@
       "nativePlace": "江苏省",
       "homeAddress": "江苏省泰兴市宜堡镇宜保村十组53号",
       "emergencyContact": "汪长春",
-      "emergencyPhone": "汪长春",
+      "emergencyPhone": "13631719656",
       "birthYear": 1983,
       "birthMonth": 4,
       "birthDay": 28,
@@ -10757,13 +8553,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13631719656"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 204
     },
@@ -10785,7 +8575,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省佛山市顺德区均安镇环山西路56号",
       "emergencyContact": "陈应炎",
-      "emergencyPhone": "陈应炎",
+      "emergencyPhone": "19928250154",
       "birthYear": 1997,
       "birthMonth": 11,
       "birthDay": 17,
@@ -10800,13 +8590,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "19928250154"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 205
     },
@@ -10828,7 +8612,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省定南县天九镇兴隆村洋芬组231号",
       "emergencyContact": "范子成",
-      "emergencyPhone": "范子成",
+      "emergencyPhone": "15362870199",
       "birthYear": 1974,
       "birthMonth": 3,
       "birthDay": 8,
@@ -10843,13 +8627,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "15362870199"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 206
     },
@@ -10871,7 +8649,7 @@
       "nativePlace": "江西省",
       "homeAddress": "江西省瑞金市广陂乡山潭村滩头小组36号",
       "emergencyContact": "胡叶瑜",
-      "emergencyPhone": "胡叶瑜",
+      "emergencyPhone": "18779818591",
       "birthYear": 1982,
       "birthMonth": 10,
       "birthDay": 2,
@@ -10886,13 +8664,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "18779818591"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 207
     },
@@ -10914,7 +8686,7 @@
       "nativePlace": "广西",
       "homeAddress": "广西柳州市柳江区土博镇孝中村么秀屯",
       "emergencyContact": "兰冬宾",
-      "emergencyPhone": "兰冬宾",
+      "emergencyPhone": "13711963190",
       "birthYear": 1987,
       "birthMonth": 5,
       "birthDay": 17,
@@ -10929,13 +8701,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13711963190"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 208
     },
@@ -10957,7 +8723,7 @@
       "nativePlace": "广东省",
       "homeAddress": "广东省云浮市云安区高村镇高村村委",
       "emergencyContact": "韦卓荣",
-      "emergencyPhone": "韦卓荣",
+      "emergencyPhone": "13672643993",
       "birthYear": 1999,
       "birthMonth": 1,
       "birthDay": 20,
@@ -10972,13 +8738,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13672643993"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 209
     },
@@ -11000,7 +8760,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省祁东县凤石堰镇山西村6组9号",
       "emergencyContact": "刘万里",
-      "emergencyPhone": "刘万里",
+      "emergencyPhone": "13609677355",
       "birthYear": 1980,
       "birthMonth": 7,
       "birthDay": 18,
@@ -11015,13 +8775,7 @@
           "remark": ""
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "13609677355"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 210
     },
@@ -11043,7 +8797,7 @@
       "nativePlace": "湖南省",
       "homeAddress": "湖南省竹溪县新洲乡新发茶场3组",
       "emergencyContact": "陈琼",
-      "emergencyPhone": "陈琼",
+      "emergencyPhone": "18942188952",
       "birthYear": 1991,
       "birthMonth": 11,
       "birthDay": 19,
@@ -11058,13 +8812,7 @@
           "remark": "工资已结清"
         }
       ],
-      "yearlyRecords": [
-        {
-          "year": 2020,
-          "type": "remark",
-          "value": "18942188952"
-        }
-      ],
+      "yearlyRecords": [],
       "remark": "",
       "sortOrder": 211
     },
