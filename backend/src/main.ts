@@ -18,6 +18,7 @@ import { ensureProductionColorRowsColumns } from './database/ensure-production-c
 import { ensureEmployeeRostersTables } from './database/ensure-employee-rosters-tables';
 import { ensureSupplierTypesMaxDepth } from './database/ensure-supplier-types-max-depth';
 import { ensureSupplierTypesDedupe } from './database/ensure-supplier-types-dedupe';
+import { reconcileEmployeeDeptJobIds } from './database/reconcile-employee-dept-job-ids';
 // HrService 仅在重新启用启动自动导入钩子时需要（见下方注释）
 // import { HrService } from './hr/hr.service';
 
@@ -282,6 +283,7 @@ async function bootstrap() {
     await seedOrderSewingFactoryDueDate(dataSource);
     await seedOrderSewingQuantityRow(dataSource);
     await seedInboundPendingBatchColumns(dataSource);
+    await reconcileEmployeeDeptJobIds(dataSource);
   } catch (err) {
     console.error('[Seed] Failed:', err);
   }
