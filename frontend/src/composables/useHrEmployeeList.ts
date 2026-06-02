@@ -60,7 +60,7 @@ export function useHrEmployeeList() {
   const loading = ref(false)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
   const sortState = reactive<{
-    sortBy: '' | 'sortOrder' | 'name' | 'entryDate' | 'status'
+    sortBy: '' | 'sortOrder' | 'name' | 'entryDate' | 'leaveDate' | 'status'
     sortOrder: '' | 'asc' | 'desc'
   }>({ sortBy: '', sortOrder: '' })
 
@@ -167,8 +167,8 @@ export function useHrEmployeeList() {
   }
 
   function onSortChange(payload: { prop: string; order: 'ascending' | 'descending' | null }) {
-    const map: Record<string, 'sortOrder' | 'name' | 'entryDate' | 'status'> = {
-      sortOrder: 'sortOrder', name: 'name', entryDate: 'entryDate', status: 'status',
+    const map: Record<string, 'sortOrder' | 'name' | 'entryDate' | 'leaveDate' | 'status'> = {
+      sortOrder: 'sortOrder', name: 'name', entryDate: 'entryDate', leaveDate: 'leaveDate', status: 'status',
     }
     const nextSortBy = map[payload.prop] ?? ''
     if (!nextSortBy || !payload.order) {

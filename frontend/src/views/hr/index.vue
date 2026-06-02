@@ -82,6 +82,9 @@
         :style="birthMonthsStyle"
         @change="onSearch(true)"
       >
+        <template #prefix>
+          <span v-if="filter.birthMonths.length" :style="{ color: ACTIVE_FILTER_COLOR }">生日：</span>
+        </template>
         <el-option label="本月生日" :value="currentMonth" />
         <el-option v-for="m in 12" :key="m" :label="`${m}月`" :value="m" />
       </el-select>
@@ -183,7 +186,7 @@
         <el-table-column prop="homeAddress" label="家庭地址" min-width="180" show-overflow-tooltip />
         <el-table-column prop="emergencyContact" label="紧急联系人" width="110" show-overflow-tooltip />
         <el-table-column prop="emergencyPhone" label="紧急联系电话" width="130" show-overflow-tooltip />
-        <el-table-column prop="leaveDate" label="离职日期" width="110" align="center">
+        <el-table-column prop="leaveDate" label="离职日期" width="110" align="center" sortable="custom">
           <template #default="{ row }">{{ formatDate(row.leaveDate) }}</template>
         </el-table-column>
         <el-table-column prop="leaveReason" label="离职原因" width="140" show-overflow-tooltip />

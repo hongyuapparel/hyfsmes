@@ -125,6 +125,7 @@ export class HrService {
       sortOrder: 'e.sortOrder',
       name: 'e.name',
       entryDate: 'e.entryDate',
+      leaveDate: 'e.leaveDate',
       status: 'e.status',
     };
     const sortColumn = sortBy ? sortColumnMap[sortBy] : '';

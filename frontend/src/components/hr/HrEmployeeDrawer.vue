@@ -1,22 +1,10 @@
 <template>
   <AppDrawer
     v-model="formDialog.visible"
+    :title="drawerTitle"
     :size="760"
     @closed="resetForm"
   >
-    <template #header>
-      <div class="drawer-header">
-        <span>{{ formDialog.isEdit ? '人员详情' : '新建人员' }}</span>
-        <el-button
-          v-if="formDialog.isEdit && drawerPreview"
-          type="primary"
-          link
-          @click="drawerPreview = false"
-        >
-          编辑
-        </el-button>
-      </div>
-    </template>
 
     <el-descriptions v-if="drawerPreview" :column="2" border class="preview-descriptions">
       <el-descriptions-item label="姓名">{{ form.name || '-' }}</el-descriptions-item>
@@ -220,6 +208,13 @@
         {{ drawerPreview ? '关闭' : '取消' }}
       </el-button>
       <el-button
+        v-if="drawerPreview"
+        type="primary"
+        @click="drawerPreview = false"
+      >
+        编辑
+      </el-button>
+      <el-button
         v-if="!drawerPreview"
         type="primary"
         :loading="formDialog.submitting"
@@ -292,6 +287,11 @@ const historyList = ref<EmployeeHistoryItem[]>([])
 const yearlyRecords = ref<EmployeeYearlyRecordItem[]>([])
 const loadingExtras = ref(false)
 
+const drawerTitle = computed(() => {
+  if (!formDialog.isEdit) return '新建人员'
+  return drawerPreview.value ? '人员详情' : '编辑人员'
+})
+
 const yearlyByYear = computed(() => {
   const map = new Map<number, EmployeeYearlyRecordItem[]>()
   for (const r of yearlyRecords.value) {
@@ -352,14 +352,6 @@ defineExpose({ openForm, openPreview })
 </script>
 
 <style scoped>
-.drawer-header {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  font-weight: 600;
-}
-
 .preview-descriptions {
   margin-bottom: 8px;
 }
