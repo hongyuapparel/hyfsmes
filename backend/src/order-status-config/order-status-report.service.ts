@@ -108,8 +108,7 @@ export class OrderStatusReportService {
       statusLabel: string;
       enteredAt: string;
       leftAt: string | null;
-      durationHours: number;
-      limitHours: number | null;
+      durationDays: number | null;
       isOverdue: boolean;
     }>;
     summary: { total: number; overdue: number };
@@ -307,8 +306,7 @@ export class OrderStatusReportService {
       statusLabel: string;
       enteredAt: string;
       leftAt: string | null;
-      durationHours: number;
-      limitHours: number | null;
+      durationDays: number | null;
       isOverdue: boolean;
     }> = [];
     const now = new Date();
@@ -333,12 +331,25 @@ export class OrderStatusReportService {
       const statusFromOrder = orderStatusCode ? statusByCode.get(orderStatusCode) : undefined;
       const resolvedStatusId = statusFromOrder?.id ?? 0;
       const resolvedStatusLabel = statusFromOrder?.label ?? '';
-      const limitHours = slaMap.get(resolvedStatusId) ?? null;
-      const durationHours = (now.getTime() - enteredAt.getTime()) / (1000 * 60 * 60);
-      const isOverdue = limitHours != null && durationHours > limitHours;
       const collaborationTypeId = order.collaborationTypeId ?? null;
       const orderTypeId = order.orderTypeId ?? null;
-      const completedAtIso = order.status === 'completed' && order.statusTime ? order.statusTime.toISOString() : null;
+      const isCompleted = order.status === 'completed' && !!order.statusTime;
+      const completedAt = isCompleted ? order.statusTime : null;
+      const completedAtIso = completedAt ? completedAt.toISOString() : null;
+      const orderStart = order.orderDate ?? order.createdAt;
+      const durationDays =
+        isCompleted && orderStart && completedAt
+          ? Math.round(((completedAt.getTime() - orderStart.getTime()) / (1000 * 60 * 60 * 24)) * 10) / 10
+          : null;
+      const dueDate = order.customerDueDate;
+      let isOverdue = false;
+      if (dueDate) {
+        if (isCompleted && completedAt) {
+          isOverdue = completedAt.getTime() > dueDate.getTime();
+        } else if (!isCompleted) {
+          isOverdue = now.getTime() > dueDate.getTime();
+        }
+      }
 
       // —— 审单 ——
       const reviewStart =
@@ -463,8 +474,7 @@ export class OrderStatusReportService {
         statusLabel: resolvedStatusLabel,
         enteredAt: enteredAt.toISOString(),
         leftAt: null,
-        durationHours: Math.round(durationHours * 100) / 100,
-        limitHours,
+        durationDays,
         isOverdue,
       });
     }

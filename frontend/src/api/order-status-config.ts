@@ -235,8 +235,7 @@ export interface OrderSlaReportRow {
   statusLabel: string
   enteredAt: string
   leftAt: string | null
-  durationHours: number
-  limitHours: number | null
+  durationDays: number | null
   isOverdue: boolean
 }
 

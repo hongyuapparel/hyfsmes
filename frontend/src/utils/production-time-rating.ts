@@ -6,6 +6,7 @@ export function productionTimeRatingTagType(
   rating: string,
 ): 'success' | 'info' | 'warning' | 'danger' | undefined {
   if (rating === '超期') return 'danger'
+  if (rating === '已超期') return 'danger'
   if (rating === '未超期') return 'success'
   if (rating === '进行中') return 'warning'
   if (rating === '未配置时限') return 'info'

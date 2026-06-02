@@ -47,6 +47,14 @@ export const systemUpdates: SystemUpdate[] = [
     link: '/inventory/accessories',
   },
   {
+    id: '2026-06-02-sla-report-overall-duration',
+    date: '2026-06-02',
+    module: '财务',
+    title: '时效报表改按客户交期判定超期',
+    description: '财务→订单报表→时效报表：最右"订单总耗时（天）"列改为下单到完成的天数（只对已完成订单显示，未完成显示 -）。"时效判定"改成对比客户交期：已完成订单看完成时间是否晚于交期，未完成订单看今天是否已过交期，结果分"超期/未超期/已超期/进行中"四类。冗余的"进入状态时间"列已删除。',
+    link: '/finance/order-sla-report',
+  },
+  {
     id: '2026-05-31-packaging-show-upstream-chain',
     date: '2026-05-31',
     module: '生产',

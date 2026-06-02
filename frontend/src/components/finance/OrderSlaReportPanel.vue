@@ -248,11 +248,8 @@
           <template #default="{ row }">{{ formatMaybeDateTime(row.completedAt) }}</template>
         </el-table-column>
         <el-table-column prop="statusLabel" label="状态" min-width="80" show-overflow-tooltip />
-        <el-table-column label="进入状态时间" min-width="150" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMaybeDateTime(row.enteredAt) }}</template>
-        </el-table-column>
-        <el-table-column label="耗时（小时）" min-width="110" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatBizNumberForTable(row.durationHours) }}</template>
+        <el-table-column label="订单总耗时（天）" min-width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ formatBizNumberForTable(row.durationDays) }}</template>
         </el-table-column>
         <el-table-column label="时效判定" min-width="90" align="center" show-overflow-tooltip>
           <template #default="{ row }"><SlaJudgeTag :text="currentSegmentSlaLabel(row)" /></template>

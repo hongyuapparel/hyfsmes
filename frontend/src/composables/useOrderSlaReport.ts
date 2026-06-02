@@ -73,8 +73,10 @@ export function useOrderSlaReport() {
   }
 
   function currentSegmentSlaLabel(row: OrderSlaReportRow): string {
-    if (row.limitHours == null) return '未配置时限'
-    return row.isOverdue ? '超期' : '未超期'
+    if (!row.customerDueDate) return '-'
+    const completed = !!row.completedAt
+    if (completed) return row.isOverdue ? '超期' : '未超期'
+    return row.isOverdue ? '已超期' : '进行中'
   }
 
   function onSelectionChange(rows: OrderSlaReportRow[]) {
@@ -105,7 +107,7 @@ export function useOrderSlaReport() {
   }
 
   function buildCsv(rows: OrderSlaReportRow[]): string {
-    const headers = ['订单号', 'SKU', '合作方式', '订单类型', '数量', '跟单员', '业务员', '客户', '下单时间', '客户交期', '审单时间', '审单耗时（小时）', '审单判定', '到采购时间', '采购完成时间', '采购判定', '到纸样时间', '纸样完成时间', '纸样判定', '到裁床时间', '裁床完成时间', '裁床判定', '到工艺时间', '工艺完成时间', '工艺判定', '到车缝时间', '车缝完成时间', '车缝判定', '到尾部时间', '尾部完成时间', '尾部判定', '完成时间', '状态', '进入状态时间', '耗时（小时）', '时效判定']
+    const headers = ['订单号', 'SKU', '合作方式', '订单类型', '数量', '跟单员', '业务员', '客户', '下单时间', '客户交期', '审单时间', '审单耗时（小时）', '审单判定', '到采购时间', '采购完成时间', '采购判定', '到纸样时间', '纸样完成时间', '纸样判定', '到裁床时间', '裁床完成时间', '裁床判定', '到工艺时间', '工艺完成时间', '工艺判定', '到车缝时间', '车缝完成时间', '车缝判定', '到尾部时间', '尾部完成时间', '尾部判定', '完成时间', '状态', '订单总耗时（天）', '时效判定']
     const lines = [headers.map(toCsvCell).join(',')]
     for (const r of rows) {
       lines.push([
@@ -142,8 +144,7 @@ export function useOrderSlaReport() {
         r.finishingJudge || '-',
         formatMaybeDateTime(r.completedAt),
         r.statusLabel,
-        formatMaybeDateTime(r.enteredAt),
-        r.durationHours,
+        r.durationDays == null ? '-' : r.durationDays,
         currentSegmentSlaLabel(r),
       ].map(toCsvCell).join(','))
     }
