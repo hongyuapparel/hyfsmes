@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getCustomerCompanyOptions, getSalespeople, type CustomerItem } from '@/api/customers'
+import { getAllCustomerCompanyOptions, getSalespeople } from '@/api/customers'
 import { getDictItems, getDictTree } from '@/api/dicts'
 import type { AccessoryItem } from '@/api/inventory'
 import type { SystemOptionItem, SystemOptionTreeNode } from '@/api/system-options'
@@ -15,8 +15,7 @@ export function useAccessoryInventoryOptions() {
 
   async function loadCustomerOptions() {
     try {
-      const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
-      const customers = (res.data?.list ?? []) as CustomerItem[]
+      const customers = await getAllCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
       customerOptions.value = customers.map((item) => ({
         label: item.companyName,
         value: item.companyName,

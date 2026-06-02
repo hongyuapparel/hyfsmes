@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { getCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
+import { getAllCustomerCompanyOptions } from '@/api/customers'
 import { getDictItems, getDictTree } from '@/api/dicts'
 import type { SystemOptionItem, SystemOptionTreeNode } from '@/api/system-options'
 import { getFinishedPickupUserOptions, type FinishedPickupUserOption } from '@/api/inventory'
@@ -15,13 +15,12 @@ export function useFinishedOptions() {
 
   async function loadCustomerOptions() {
     try {
-      const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
-      const list = (res.data?.list ?? []) as CustomerItem[]
+      const list = await getAllCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
       customerOptions.value = list.map((c) => ({
         label: c.companyName,
         value: c.companyName,
       }))
-    } catch (e: unknown) {
+    } catch {
       console.warn('客户选项加载失败')
     }
   }

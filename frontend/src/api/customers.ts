@@ -59,6 +59,31 @@ export function getCustomerCompanyOptions(params?: {
   })
 }
 
+/**
+ * 取全量客户用于前端 filterable 下拉：分页拉到 total。
+ * 不要在做远程搜索时用此函数（远程搜索请直接调用 getCustomerCompanyOptions({ companyName })）。
+ */
+export async function getAllCustomerCompanyOptions(params?: {
+  sortBy?: string
+  sortOrder?: 'asc' | 'desc'
+}): Promise<CustomerItem[]> {
+  const pageSize = 500
+  const sortBy = params?.sortBy ?? 'companyName'
+  const sortOrder = params?.sortOrder ?? 'asc'
+  const aggregated: CustomerItem[] = []
+  let page = 1
+  // 硬上限 50 页 = 2.5 万客户，避免后端 total 异常时死循环
+  while (page <= 50) {
+    const res = await getCustomerCompanyOptions({ page, pageSize, sortBy, sortOrder })
+    const list = (res.data?.list ?? []) as CustomerItem[]
+    const total = Number(res.data?.total ?? 0)
+    aggregated.push(...list)
+    if (list.length === 0 || aggregated.length >= total) break
+    page++
+  }
+  return aggregated
+}
+
 export function getCustomer(id: number) {
   return request.get<CustomerItem>(`/customers/${id}`)
 }

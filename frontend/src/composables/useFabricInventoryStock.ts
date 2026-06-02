@@ -1,6 +1,6 @@
 import { nextTick, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { getCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
+import { getAllCustomerCompanyOptions } from '@/api/customers'
 import {
   createFabric,
   getFabricList,
@@ -139,13 +139,12 @@ export function useFabricInventoryStock() {
 
   async function loadCustomerOptions() {
     try {
-      const res = await getCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
-      const list = (res.data?.list ?? []) as CustomerItem[]
+      const list = await getAllCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
       customerOptions.value = list.map((c) => ({
         label: c.companyName,
         value: c.companyName,
       }))
-    } catch (e: unknown) {
+    } catch {
       console.warn('客户选项加载失败')
     }
   }
