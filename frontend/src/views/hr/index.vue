@@ -30,7 +30,7 @@
         :props="{ label: 'label', value: 'id', children: 'children' }"
         :style="getAdaptiveSelectStyle(filter.departmentId ? `部门：${getDepartmentLabel(filter.departmentId)}` : '', '部门')"
         @change="onSearch(true)"
-        @visible-change="(v: boolean) => v && adjustTreePopperWidth('hr-department-tree-popper')"
+        @visible-change="onDeptDropdownVisibleChange"
       >
         <template #prefix>
           <span v-if="filter.departmentId" :style="{ color: ACTIVE_FILTER_COLOR }">部门：</span>
@@ -254,6 +254,7 @@ import {
 } from '@/composables/useHrEmployeeList'
 import HrEmployeeDrawer from '@/components/hr/HrEmployeeDrawer.vue'
 import type { EmployeeItem } from '@/api/hr'
+import { invalidateSharedGetCache } from '@/api/shared-request-cache'
 
 const currentMonth = computed(() => new Date().getMonth() + 1)
 
@@ -291,6 +292,18 @@ const {
   onExport,
 } = useHrEmployeeList()
 
+/**
+ * 部门下拉 popper 宽度兜底：visible-change 触发太早时 el-tree 节点还没渲染，
+ * 第一次调用 adjustTreePopperWidth 找不到 .el-tree-node__content 会直接 return。
+ * 加 100ms / 300ms 两次兜底重试，保证字典渲染完后宽度能被正确算出。
+ */
+function onDeptDropdownVisibleChange(v: boolean) {
+  if (!v) return
+  adjustTreePopperWidth('hr-department-tree-popper')
+  setTimeout(() => adjustTreePopperWidth('hr-department-tree-popper'), 100)
+  setTimeout(() => adjustTreePopperWidth('hr-department-tree-popper'), 300)
+}
+
 const birthMonthsStyle = computed(() => {
   const count = filter.birthMonths?.length ?? 0
   if (!count) return getAdaptiveSelectStyle('', '生日月份')
@@ -315,6 +328,10 @@ onMounted(() => {
 })
 
 onActivated(() => {
+  // 强制丢弃部门/岗位字典的 30s 共享缓存，
+  // 避免用户在「组织与人事」改完字典回到本页时下拉显示旧数据
+  invalidateSharedGetCache('/dicts/tree')
+  invalidateSharedGetCache('/dicts/list')
   loadDepartments()
   loadJobs()
 })
