@@ -17,56 +17,60 @@ import * as path from 'path';
  * 存在则跳过。要重新跑：删 marker 文件 + 重启 PM2；或改 MARKER_FILENAME 版本号。
  */
 
-const MARKER_FILENAME = '.reconcile-employee-dept-job-v2.applied';
+const MARKER_FILENAME = '.reconcile-employee-dept-job-v5.applied';
 
-const DEPT_MAPPING: Record<string, string> = {
-  电商中心: 'B2B外贸',
-  尾部: '尾部',
-  整件组: '车缝',
-  整件B组: '车缝',
-  流水组: '车缝',
-  流水1组: '车缝',
-  A组: '车缝',
-  B组: '车缝',
-  C组: '车缝',
-  裁床部: '裁床',
-  版房: '版房',
-  板房: '版房',
-  生产部: '生产部门',
-  生产中心: '生产部门',
-  跟单部: '跟单',
-  人事部: '人事行政',
-  人力行政部: '人事行政',
-  财务部: '财务',
-  希音部: 'C端希音',
-  IE部: '跟单',
-  物流部: '仓库',
-  外贸业务: 'B2B外贸',
-  品控部: '跟单',
-  品质部: '跟单',
-  采购部: '采购',
-  // 跳过（保持 department_id = NULL，用户后续手动处理）:
-  // 抖音部 / 抖音2部 / 总经办
+/**
+ * 映射目标：value + parent（可选）。同名字典项在不同父级下会有不同 ID
+ * （本地脏字典遗留过同名顶级项），指定 parent 可精确锁定到 seed 加的项。
+ */
+interface MappingTarget {
+  value: string;
+  parent: string | null;
+}
+
+const DEPT_MAPPING: Record<string, MappingTarget> = {
+  电商中心: { value: 'B2B外贸', parent: null },
+  尾部: { value: '尾部', parent: '生产部门' },
+  整件组: { value: '车缝', parent: '生产部门' },
+  整件B组: { value: '车缝', parent: '生产部门' },
+  流水组: { value: '车缝', parent: '生产部门' },
+  流水1组: { value: '车缝', parent: '生产部门' },
+  A组: { value: '车缝', parent: '生产部门' },
+  B组: { value: '车缝', parent: '生产部门' },
+  C组: { value: '车缝', parent: '生产部门' },
+  裁床部: { value: '裁床', parent: '生产部门' },
+  版房: { value: '版房', parent: '生产部门' },
+  板房: { value: '版房', parent: '生产部门' },
+  生产部: { value: '生产部门', parent: null },
+  生产中心: { value: '生产部门', parent: null },
+  跟单部: { value: '跟单', parent: '生产部门' },
+  人事部: { value: '人事行政', parent: '辅助部门' },
+  人力行政部: { value: '人事行政', parent: '辅助部门' },
+  财务部: { value: '财务', parent: '辅助部门' },
+  希音部: { value: 'C端希音', parent: 'C端电商' },
+  IE部: { value: '跟单', parent: '生产部门' },
+  物流部: { value: '仓库', parent: '辅助部门' },
+  外贸业务: { value: 'B2B外贸', parent: null },
+  品控部: { value: '跟单', parent: '生产部门' },
+  品质部: { value: '跟单', parent: '生产部门' },
+  采购部: { value: '采购', parent: '生产部门' },
+  // 跳过（保持 department_id = NULL）：抖音部 / 抖音2部 / 总经办
 };
 
 const FORCE_QC_DEPTS = new Set(['IE部', '品控部', '品质部']);
 
-/**
- * Excel 老岗位名 → 系统字典里的实际岗位名。
- * 用于错字纠正、同义词归一。匹配规则：
- *   1. employees.job_title 先查 JOB_MAPPING；命中则用映射后的名字查字典
- *   2. 否则用 employees.job_title 字面直接查字典
- *   3. 都查不到留 NULL，console.warn 列出，等用户在「组织与人事」补字典再重跑
- */
-const JOB_MAPPING: Record<string, string> = {
-  车板: '车版师',
-  车位: '平车',
-  流水车位: '平车',
-  纸样: '纸样师',
-  服装QC: 'QC',
-  外发QC: 'QC',
-  大烫学徒: '大烫',
+const JOB_MAPPING: Record<string, MappingTarget> = {
+  车板: { value: '车版师', parent: '版房' },
+  车位: { value: '平车', parent: '车缝' },
+  流水车位: { value: '平车', parent: '车缝' },
+  纸样: { value: '纸样师', parent: '版房' },
+  服装QC: { value: 'QC', parent: '跟单' },
+  外发QC: { value: 'QC', parent: '跟单' },
+  大烫学徒: { value: '大烫', parent: '尾部' },
 };
+
+/** QC 岗位也是跟单部门下的 */
+const QC_JOB_TARGET: MappingTarget = { value: 'QC', parent: '跟单' };
 
 interface EmployeeRow {
   id: number;
@@ -93,24 +97,47 @@ export async function reconcileEmployeeDeptJobIds(dataSource: DataSource): Promi
     return;
   }
 
+  type OptRow = { id: number; value: string; parentId: number | null };
   const deptRows = (await dataSource.query(
-    `SELECT id, value FROM system_options WHERE option_type = 'org_departments'`,
-  )) as Array<{ id: number; value: string }>;
+    `SELECT id, value, parent_id AS parentId FROM system_options WHERE option_type = 'org_departments'`,
+  )) as OptRow[];
   const jobRows = (await dataSource.query(
-    `SELECT id, value FROM system_options WHERE option_type = 'org_jobs'`,
-  )) as Array<{ id: number; value: string }>;
-  const deptIdByName = new Map<string, number>();
-  for (const r of deptRows) {
-    const k = (r.value ?? '').trim();
-    if (k && !deptIdByName.has(k)) deptIdByName.set(k, r.id);
-  }
-  const jobIdByName = new Map<string, number>();
-  for (const r of jobRows) {
-    const k = (r.value ?? '').trim();
-    if (k && !jobIdByName.has(k)) jobIdByName.set(k, r.id);
+    `SELECT id, value, parent_id AS parentId FROM system_options WHERE option_type = 'org_jobs'`,
+  )) as OptRow[];
+
+  /**
+   * 查 dict ID。支持指定 parent value 精确锁定（解决本地脏字典有同名顶级项时
+   * 选错的问题）。fallback 顺序：
+   *   1. 精确匹配指定 parent
+   *   2. 没指定 parent：优先选 parent_id 不为 null 的（即 seed/正常字典）
+   *   3. 都不行取第一个
+   */
+  function findIdByTarget(
+    rows: OptRow[],
+    deptRows: OptRow[],
+    target: MappingTarget,
+  ): number | null {
+    if (target.parent != null) {
+      const parent = deptRows.find((r) => r.value === target.parent && r.parentId == null);
+      if (parent) {
+        const child = rows.find((r) => r.value === target.value && r.parentId === parent.id);
+        if (child) return child.id;
+      }
+      return null;
+    }
+    const withParent = rows.find((r) => r.value === target.value && r.parentId != null);
+    if (withParent) return withParent.id;
+    return rows.find((r) => r.value === target.value)?.id ?? null;
   }
 
-  const qcId = jobIdByName.get('QC') ?? null;
+  /** 按字面查（DEPT_MAPPING/JOB_MAPPING 没列出的项用） */
+  function findIdByLiteralName(rows: OptRow[], name: string): number | null {
+    const withParent = rows.find((r) => r.value === name && r.parentId != null);
+    if (withParent) return withParent.id;
+    return rows.find((r) => r.value === name)?.id ?? null;
+  }
+
+  const qcId = findIdByTarget(jobRows, deptRows, QC_JOB_TARGET);
   if (FORCE_QC_DEPTS.size > 0 && !qcId) {
     console.warn(`[ReconcileDeptJob] 系统岗位字典里没有 "QC"，IE/品控/品质部的岗位无法映射。`);
   }
@@ -131,19 +158,30 @@ export async function reconcileEmployeeDeptJobIds(dataSource: DataSource): Promi
     const updates: string[] = [];
     const params: unknown[] = [];
 
-    // 部门：只补 department_id 为 NULL 的
-    if (emp.departmentId == null && emp.department) {
+    // 部门映射：
+    //   - DEPT_MAPPING 列出的 Excel 老名字 → 按 (value, parent) 精确锁定 seed 加的 ID
+    //   - 没列的 → 仅当 departmentId 为 NULL 时按字面查（优先有父级的字典项）
+    if (emp.department) {
       const target = DEPT_MAPPING[emp.department];
-      if (target === undefined) {
-        unmatchedDept.add(emp.department);
-      } else if (target !== '') {
-        const id = deptIdByName.get(target);
+      if (target !== undefined) {
+        const id = findIdByTarget(deptRows, deptRows, target);
+        if (id) {
+          if (id !== emp.departmentId) {
+            updates.push('department_id = ?');
+            params.push(id);
+            deptUpdated += 1;
+          }
+        } else {
+          unmatchedDept.add(`${emp.department} -> ${target.value}（${target.parent ?? '顶级'}）下未找到`);
+        }
+      } else if (emp.departmentId == null) {
+        const id = findIdByLiteralName(deptRows, emp.department);
         if (id) {
           updates.push('department_id = ?');
           params.push(id);
           deptUpdated += 1;
         } else {
-          unmatchedDept.add(`${emp.department} -> ${target}（字典里没有该项）`);
+          unmatchedDept.add(emp.department);
         }
       }
     }
@@ -162,21 +200,36 @@ export async function reconcileEmployeeDeptJobIds(dataSource: DataSource): Promi
           jobTitleStrUpdated += 1;
         }
       }
-    } else if (emp.jobTitleId == null && emp.jobTitle) {
-      const mappedJobName = JOB_MAPPING[emp.jobTitle] ?? emp.jobTitle;
-      const id = jobIdByName.get(mappedJobName);
-      if (id) {
-        updates.push('job_title_id = ?');
-        params.push(id);
-        jobIdUpdated += 1;
-        // 若是映射出来的（错字/同义词），也把字符串字段更新为标准名
-        if (mappedJobName !== emp.jobTitle) {
-          updates.push('job_title = ?');
-          params.push(mappedJobName);
-          jobTitleStrUpdated += 1;
+    } else if (emp.jobTitle) {
+      // 岗位映射：
+      //   - JOB_MAPPING 列出的（错字/同义词）→ (value, parent) 精确锁定
+      //   - 没列的 → 仅当 jobTitleId 为 NULL 时按字面查字典补
+      const target = JOB_MAPPING[emp.jobTitle];
+      if (target !== undefined) {
+        const id = findIdByTarget(jobRows, deptRows, target);
+        if (id) {
+          if (id !== emp.jobTitleId) {
+            updates.push('job_title_id = ?');
+            params.push(id);
+            jobIdUpdated += 1;
+          }
+          if (target.value !== emp.jobTitle) {
+            updates.push('job_title = ?');
+            params.push(target.value);
+            jobTitleStrUpdated += 1;
+          }
+        } else {
+          unmatchedJob.add(`${emp.jobTitle} -> ${target.value}（${target.parent ?? '顶级'}）下未找到`);
         }
-      } else {
-        unmatchedJob.add(emp.jobTitle);
+      } else if (emp.jobTitleId == null) {
+        const id = findIdByLiteralName(jobRows, emp.jobTitle);
+        if (id) {
+          updates.push('job_title_id = ?');
+          params.push(id);
+          jobIdUpdated += 1;
+        } else {
+          unmatchedJob.add(emp.jobTitle);
+        }
       }
     }
 
