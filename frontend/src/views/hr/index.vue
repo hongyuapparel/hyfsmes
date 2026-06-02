@@ -72,17 +72,16 @@
         <el-option label="离职" value="left" />
       </el-select>
       <el-select
-        v-model="filter.birthMonth"
+        v-model="filter.birthMonths"
         placeholder="生日月份"
+        multiple
+        collapse-tags
+        collapse-tags-tooltip
         clearable
         class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.birthMonth ? `生日：${filter.birthMonth}月` : '', '生日月份')"
+        :style="birthMonthsStyle"
         @change="onSearch(true)"
       >
-        <template #label="{ label }">
-          <span v-if="filter.birthMonth">生日：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
         <el-option label="本月生日" :value="currentMonth" />
         <el-option v-for="m in 12" :key="m" :label="`${m}月`" :value="m" />
       </el-select>
@@ -290,6 +289,13 @@ const {
   onBatchDelete,
   onExport,
 } = useHrEmployeeList()
+
+const birthMonthsStyle = computed(() => {
+  const count = filter.birthMonths?.length ?? 0
+  if (!count) return getAdaptiveSelectStyle('', '生日月份')
+  const width = Math.min(260, 100 + count * 32)
+  return { width: `${width}px`, minWidth: 'unset', flex: `0 0 ${width}px` }
+})
 
 function onRowClick(row: EmployeeItem, column: { type?: string }, event: Event) {
   if (column?.type === 'selection') return

@@ -56,7 +56,7 @@ export function getEmployeeList(params?: {
   entryDateEnd?: string
   leaveDateStart?: string
   leaveDateEnd?: string
-  birthMonth?: number
+  birthMonths?: string
   sortBy?: 'sortOrder' | 'name' | 'entryDate' | 'status'
   sortOrder?: 'asc' | 'desc'
   page?: number

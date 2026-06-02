@@ -33,7 +33,7 @@ export class HrController {
     @Query('entryDateEnd') entryDateEnd?: string,
     @Query('leaveDateStart') leaveDateStart?: string,
     @Query('leaveDateEnd') leaveDateEnd?: string,
-    @Query('birthMonth') birthMonth?: string,
+    @Query('birthMonths') birthMonths?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: string,
     @Query('page') page?: string,
@@ -48,7 +48,12 @@ export class HrController {
       entryDateEnd: entryDateEnd?.trim() || undefined,
       leaveDateStart: leaveDateStart?.trim() || undefined,
       leaveDateEnd: leaveDateEnd?.trim() || undefined,
-      birthMonth: birthMonth ? parseInt(birthMonth, 10) : undefined,
+      birthMonths: birthMonths
+        ? birthMonths
+            .split(',')
+            .map((s) => parseInt(s.trim(), 10))
+            .filter((n) => Number.isInteger(n) && n >= 1 && n <= 12)
+        : undefined,
       sortBy: sortBy?.trim() || undefined,
       sortOrder: sortOrder === 'desc' ? 'desc' : sortOrder === 'asc' ? 'asc' : undefined,
       page: page ? parseInt(page, 10) : 1,

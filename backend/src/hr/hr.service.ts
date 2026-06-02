@@ -69,7 +69,7 @@ export class HrService {
     entryDateEnd?: string;
     leaveDateStart?: string;
     leaveDateEnd?: string;
-    birthMonth?: number;
+    birthMonths?: number[];
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
     page?: number;
@@ -84,7 +84,7 @@ export class HrService {
       entryDateEnd,
       leaveDateStart,
       leaveDateEnd,
-      birthMonth,
+      birthMonths,
       sortBy,
       sortOrder,
       page = 1,
@@ -115,8 +115,11 @@ export class HrService {
     if (leaveDateEnd) {
       qb.andWhere('e.leave_date <= :leaveDateEnd', { leaveDateEnd });
     }
-    if (typeof birthMonth === 'number' && birthMonth >= 1 && birthMonth <= 12) {
-      qb.andWhere('e.birth_month = :birthMonth', { birthMonth });
+    if (Array.isArray(birthMonths) && birthMonths.length > 0) {
+      const validMonths = birthMonths.filter((m) => Number.isInteger(m) && m >= 1 && m <= 12);
+      if (validMonths.length) {
+        qb.andWhere('e.birth_month IN (:...birthMonthList)', { birthMonthList: validMonths });
+      }
     }
     const sortColumnMap: Record<string, string> = {
       sortOrder: 'e.sortOrder',
