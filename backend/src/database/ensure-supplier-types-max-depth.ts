@@ -3,22 +3,27 @@ import { DataSource } from 'typeorm';
 /**
  * 清理 system_options 表里 option_type='supplier_types' 的层级越界数据。
  *
- * 业务约定：supplier_types 只允许 3 层（root 供应商类型 / 业务范围父分组 / 业务范围子分组）。
- * 即任何节点的 parent 要么是 NULL（root），要么 parent.parent 必须是 NULL。
+ * 业务约定：supplier_types 只允许 3 层（level 0 root 供应商类型 / level 1 业务范围父分组 / level 2 业务范围子分组）。
+ * 越界 = level ≥ 3。判定方式：child 必须存在曾祖父，即 parent.parent 自身还有 parent（NOT NULL）。
  *
- * 历史 / 异常写入可能产生第 4 层及更深的节点（例：直喷 parent=普洗 parent=洗水 parent=工艺供应商），
- * 这种节点在「供应商设置」表格里因为前缀都用 `└` 看着像同级，但在订单编辑的 tree-select 下拉里会按真实层级嵌一层，
+ * ⚠️ 这里需要 3 层 JOIN：
+ *   child → parent → grand → grand.parent_id
+ * 只查到 parent.parent_id IS NOT NULL 等同于"child 有祖父"=level ≥ 2，会把合法的业务范围子分组全删。
+ *
+ * 历史 / 异常写入可能产生 level 3 节点（例：直喷 parent=普洗 parent=洗水 parent=工艺供应商，曾祖父=工艺供应商），
+ * 在「供应商设置」表格里因为前缀都用 `└` 看着像同级，但在订单编辑的 tree-select 下拉里会按真实层级嵌一层，
  * 造成两边显示不一致。这里在启动时一次性把这种越界节点连同它们的整棵子树删除。
  */
 export async function ensureSupplierTypesMaxDepth(dataSource: DataSource): Promise<void> {
-  // 找出所有 type='supplier_types' 且 parent 自身有 parent 的节点（深度 >= 3，按 root=0 起算 >= level 3）
-  const violating: Array<{ id: number; value: string; parent_id: number; grandparent_id: number }> =
+  // 必须 3 层 JOIN：child 自己有 parent、有祖父、有曾祖父 → 才说明 child 处在 level >= 3
+  const violating: Array<{ id: number; value: string; parent_id: number }> =
     await dataSource.query(`
-      SELECT child.id, child.value, child.parent_id, parent.parent_id AS grandparent_id
+      SELECT child.id, child.value, child.parent_id
       FROM system_options child
       INNER JOIN system_options parent ON parent.id = child.parent_id
+      INNER JOIN system_options grand ON grand.id = parent.parent_id
       WHERE child.option_type = 'supplier_types'
-        AND parent.parent_id IS NOT NULL
+        AND grand.parent_id IS NOT NULL
     `);
 
   if (!violating.length) return;
