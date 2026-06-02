@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-06-02-align-process-dropdown-with-supplier-settings',
+    date: '2026-06-02',
+    module: '供应商',
+    title: '工艺项目下拉跟供应商设置对齐',
+    description: '原来订单编辑"工艺项目"下拉里看到的层级，跟"系统设置 → 供应商设置"里配置的对不上（个别子项错挂到更深一层）。系统启动会自动清掉历史错位数据，往后两边完全一致；以后再有人不小心建到第 4 层，会被直接拦下。',
+    link: '/settings/suppliers',
+  },
+  {
     id: '2026-06-02-fix-warehouse-keeper-403-on-accessories',
     date: '2026-06-02',
     module: '库存',
