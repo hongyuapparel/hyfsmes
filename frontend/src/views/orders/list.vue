@@ -240,6 +240,7 @@ const {
   orderTypeTree,
   findOrderTypeLabelById,
   findCollaborationLabelById,
+  getProcessItemDisplayLabel,
 })
 
 const reloadListOnly = () => loadList(totalQuantity)

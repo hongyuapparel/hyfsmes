@@ -10,6 +10,7 @@ interface UseOrderListPresentationParams {
   orderTypeTree: Ref<SystemOptionTreeNode[]>
   findOrderTypeLabelById: (id: number) => string
   findCollaborationLabelById: (id: number) => string
+  getProcessItemDisplayLabel: (v: string | undefined) => string
 }
 
 export function useOrderListPresentation(params: UseOrderListPresentationParams) {
@@ -20,6 +21,7 @@ export function useOrderListPresentation(params: UseOrderListPresentationParams)
     orderTypeTree,
     findOrderTypeLabelById,
     findCollaborationLabelById,
+    getProcessItemDisplayLabel,
   } = params
 
   function getStatusLabel(status: string): string {
@@ -94,7 +96,12 @@ export function useOrderListPresentation(params: UseOrderListPresentationParams)
   function getOrderMetaTags(item: OrderListItem): string[] {
     const tags: string[] = []
     const orderType = orderTypeDisplay(item)
-    const processItem = item.processItem?.trim()
+    // 工艺串按 、 拆开，每段若是"父 / 子"形式则只取子项，避免卡片标签过长
+    const processItem = (item.processItem ?? '')
+      .split('、')
+      .map((s) => getProcessItemDisplayLabel(s))
+      .filter(Boolean)
+      .join('、')
     const collaboration = collaborationDisplay(item)
     if (orderType) tags.push(orderType)
     if (processItem) tags.push(processItem)
