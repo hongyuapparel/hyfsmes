@@ -18,7 +18,8 @@ import { ensureProductionColorRowsColumns } from './database/ensure-production-c
 import { ensureEmployeeRostersTables } from './database/ensure-employee-rosters-tables';
 import { ensureSupplierTypesMaxDepth } from './database/ensure-supplier-types-max-depth';
 import { ensureSupplierTypesDedupe } from './database/ensure-supplier-types-dedupe';
-import { HrService } from './hr/hr.service';
+// HrService 仅在重新启用启动自动导入钩子时需要（见下方注释）
+// import { HrService } from './hr/hr.service';
 
 async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
   const rows: Array<{ cnt: number }> = await dataSource.query(
@@ -285,12 +286,15 @@ async function bootstrap() {
     console.error('[Seed] Failed:', err);
   }
 
-  try {
-    const hrService = app.get(HrService);
-    await hrService.importRostersIfNeeded();
-  } catch (err) {
-    console.error('[ImportRosters] startup auto import failed:', err);
-  }
+  // 启动自动导入花名册：已禁用。
+  // 历史花名册（689 人）已经一次性导入完成，之后日常增删改走系统 UI。
+  // 如需重新批量导入，可手动调用 POST /hr/import-rosters，或在此处放开钩子。
+  // try {
+  //   const hrService = app.get(HrService);
+  //   await hrService.importRostersIfNeeded();
+  // } catch (err) {
+  //   console.error('[ImportRosters] startup auto import failed:', err);
+  // }
 
   console.log(`Backend running at http://localhost:${port}`);
 }
