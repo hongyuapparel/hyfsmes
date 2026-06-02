@@ -32,6 +32,8 @@
 - 沿用框架官方 API、现有模块结构、项目既有模式
 - 前端用 Composition API；后端保持 NestJS 模块边界
 - 新逻辑优先复用现有工具、接口封装、公共组件
+- 新建文件前必须读 ≥2 个同目录/同类型现有文件，照搬 import 路径、导出方式、命名、结构。禁止凭印象写路径（`@/xxx` 还是 `./xxx`、`request` 在 `api/` 还是 `utils/` 必须查证）
+- 新建 API 接口/类型前，必须先打开所有调用方（template + script + 后端 controller）按它们实际访问的字段/嵌套定义类型；禁止先编类型再让调用方报错
 
 ## UI 与组件
 
@@ -54,7 +56,17 @@
 
 **TypeScript**：禁止 `: any`、`as any`、`any[]`、`Record<string, any>`、`Promise<any>`，用具体类型或 `unknown` + 类型守卫。`props` 用 `defineProps<{...}>()`，`emit` 用 `defineEmits<{...}>()`，Pinia state 显式声明类型。
 
-**构建验证**：涉及类型或逻辑的改动，完成前必须本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）并通过才算完成；`npm run dev` 不做类型检查、不能替代，消除 `any`/改类型后尤其要跑。
+**Vue 3 + vue-tsc 已知坑**（踩过的不再踩）：
+- composable 返回 reactive 对象做 prop 类型，必须用 `ShallowUnwrapRef<ReturnType<typeof useXxx>>`，直接用 `ReturnType<typeof useXxx>` 会暴露 Ref 包裹导致模板访问报错
+- `<script setup>` 中判别联合类型 narrowing 不稳定：`if (!row.flag)`、`if (row.flag) return` 之后访问独有字段仍可能报 union 错。统一用 `(row as ConcreteType).field` 显式断言或抽 type predicate `function isX(v): v is X`
+- 移除一个 `any` 不只是改一处类型注解；改完必须沿调用链跑完整 build，确认所有消费方都通得过
+
+**构建验证**：
+- 涉及类型或逻辑的改动，**commit 前**（不是 commit 后、不是 push 后）必须本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）通过
+- `npm run dev` 不做类型检查、不能替代；单文件 `vue-tsc --noEmit some.vue` 也不能替代完整 build
+- 多文件重构/拆分、批量类型改动、sub-agent 完成的工作，merge 回主干前本人必须在项目根目录跑一次完整 build，不能只看 agent 报告
+- push 前 `git status` 二次确认改动范围，所有新建文件已 staged，没有把无关 untracked 文件带上
+- 禁止 `git add 目录/` 或 `git add .`；必须用具体文件路径分批 add
 
 **分层职责**：
 - `views`：只做编排（路由参数 + 调用 composable + 组合子组件），不写业务计算
@@ -88,6 +100,7 @@
 - 修复后说明验证了什么、结果是什么；无法自动验证时告知用户操作步骤
 - 未确认修复不说"修复完成"，只说"已修改，请按步骤验证"
 - 同一问题修复超过 2 次未解决：停止猜测，列出已排除方向和需要的新证据
+- sub-agent 返回"完成"不等于真完成；本人必须跑 build + 看 git diff 验证再向用户回报
 - 只输出核心代码，不写注释、不写文档、不做总结；完成后只说改了什么文件、潜在影响点
 
 ## 启动与排查

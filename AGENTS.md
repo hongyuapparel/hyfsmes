@@ -34,6 +34,8 @@
 - 优先沿用框架、组件库官方 API、DTO、校验器、现有模块结构和项目既有模式。
 - 前端优先使用 Composition API；后端接口保持现有 NestJS 模块边界。
 - 新逻辑优先复用现有工具、字段定义、接口封装和公共组件。
+- 新建文件前必须读 ≥2 个同目录/同类型现有文件，照搬 import 路径、导出方式、命名、结构。禁止凭印象写路径（如 `request` 工具位于 `api/` 还是 `utils/` 必须查证，`@/xxx` 还是 `./xxx` 必须查证）。
+- 新建 API 接口/类型前，必须先打开所有调用方（template + script + 后端 controller）按它们实际访问的字段/嵌套结构定义类型；禁止先编类型再让调用方报错。
 
 ## 5. 复用优先强制流程
 
@@ -66,7 +68,15 @@
 ## 8. 代码健康
 
 - 不新增 `any` 技术债；所有新代码、本次触碰代码禁止 `: any`、`as any`、`any[]`、`Record<string, any>`、`Promise<any>` 等写法，必须使用具体类型或 `unknown` + 类型守卫。
-- 涉及类型或逻辑的代码改动，完成前必须在本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）并通过才算完成；`npm run dev`/dev 服务器不做类型检查、不能替代，消除 `any`、改类型后尤其要跑。
+- Vue 3 + vue-tsc 已知坑（踩过的不再踩）：
+  - composable 返回 reactive 对象做 prop 类型，必须用 `ShallowUnwrapRef<ReturnType<typeof useXxx>>`，直接用 `ReturnType<typeof useXxx>` 会暴露 Ref 包裹导致模板访问报错。
+  - `<script setup>` 中判别联合类型 narrowing 不稳定：`if (!row.flag)`、`if (row.flag) return` 之后访问独有字段仍可能报 union 错。统一用 `(row as ConcreteType).field` 显式断言或抽 type predicate `function isX(v): v is X`。
+  - 移除一个 `any` 不只是改一处类型注解；必须沿调用链跑完整 build 确认所有消费方都通得过。
+- 构建验证：
+  - 涉及类型或逻辑的改动，**commit 前**（不是 commit 后、不是 push 后）必须本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）通过；`npm run dev` 不做类型检查、不能替代；单文件 `vue-tsc --noEmit` 也不能替代完整 build。
+  - 多文件重构/拆分、批量类型改动、sub-agent 完成的工作，merge 回主干前本人必须在项目根目录跑一次完整 build，不能只看 agent 报告。
+  - push 前 `git status` 二次确认改动范围，所有新建文件已 staged，没有把无关 untracked 文件带上。
+  - 禁止 `git add 目录/` 或 `git add .`；必须用具体文件路径分批 add。
 - 交付结果不得新增技术债：不留下临时兜底、重复逻辑、补丁式覆盖、超长文件/函数、未验证的 TODO 或“以后再处理”的半成品。
 - 如正确方案超出本次范围，先说明影响和拆分方案，获得确认后再做；不得用错误但省事的方案交付。
 - 页面 `views` 只做编排；组件只处理 UI 交互并通过 props/emit 通信；业务逻辑进 `composables`；API 层只做 HTTP 封装。
@@ -93,6 +103,7 @@
 - 修复后必须说明验证了什么、结果是什么；不能验证时明确告诉用户还需如何验证。
 - 不能确认修复时，不说“已修复完成”，只说“已按分析修改，请按步骤验证”。
 - 同一问题修复超过 2 次仍未解决时，停止猜测，列出已排除方向和仍需的新证据。
+- sub-agent 返回"完成"不等于真完成；本人必须跑 build + 看 git diff 验证再向用户回报。
 - 完成较大修改后简要说明：改了什么、关键文件、是否同步文档、验证结果、风险点。
 - 本地启动或重启前后端时，默认使用 `scripts/start.ps1` 或 `scripts/restart.ps1` 隐藏窗口启动；不要主动打开可见命令窗口。需要排查时看 `.codex-backend-3000.log`、`.codex-frontend-5173.log` 或运行 `scripts/check.ps1`。
 
