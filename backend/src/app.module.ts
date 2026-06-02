@@ -38,6 +38,8 @@ import { FabricStock } from './entities/fabric-stock.entity';
 import { FabricOutbound } from './entities/fabric-outbound.entity';
 import { FabricStockOperationLog } from './entities/fabric-stock-operation-log.entity';
 import { Employee } from './entities/employee.entity';
+import { EmployeeHistory } from './entities/employee-history.entity';
+import { EmployeeYearlyRecord } from './entities/employee-yearly-record.entity';
 import { Supplier } from './entities/supplier.entity';
 import { OrderStatus } from './entities/order-status.entity';
 import { OrderStatusTransition } from './entities/order-status-transition.entity';
@@ -91,7 +93,7 @@ import { FinanceDashboardModule } from './finance-dashboard/finance-dashboard.mo
       username: process.env.MYSQL_USER || 'root',
       password: process.env.MYSQL_PASSWORD || '',
       database: process.env.MYSQL_DATABASE || 'erp',
-      entities: [User, Role, UserRole, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCostSnapshot, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, ProcessQuoteTemplate, ProcessQuoteTemplateItem, InboundPending, FinishedGoodsStock, FinishedGoodsOutbound, FinishedGoodsStockColorImage, FinishedGoodsStockAdjustLog, InventoryAccessory, InventoryAccessoryOutbound, InventoryAccessoryOperationLog, FabricStock, FabricOutbound, FabricStockOperationLog, Employee, Supplier, OrderStatus, OrderStatusTransition, OrderWorkflowChain, OrderStatusSla, OrderStatusHistory, IncomeRecord, ExpenseRecord, FinanceFundAccount, FinanceIncomeType, FinanceExpenseType, RoleOrderPolicy, RoleDisplayOrder],
+      entities: [User, Role, UserRole, Permission, RolePermission, Customer, Product, FieldDefinition, SystemOption, Order, OrderExt, OrderOperationLog, OrderCostSnapshot, OrderCraft, OrderCutting, OrderFinishing, OrderPattern, OrderRemark, OrderSewing, ProductionProcess, ProcessQuoteTemplate, ProcessQuoteTemplateItem, InboundPending, FinishedGoodsStock, FinishedGoodsOutbound, FinishedGoodsStockColorImage, FinishedGoodsStockAdjustLog, InventoryAccessory, InventoryAccessoryOutbound, InventoryAccessoryOperationLog, FabricStock, FabricOutbound, FabricStockOperationLog, Employee, EmployeeHistory, EmployeeYearlyRecord, Supplier, OrderStatus, OrderStatusTransition, OrderWorkflowChain, OrderStatusSla, OrderStatusHistory, IncomeRecord, ExpenseRecord, FinanceFundAccount, FinanceIncomeType, FinanceExpenseType, RoleOrderPolicy, RoleDisplayOrder],
       // 强制关闭：TYPEORM sync 会在启动时对已有表"修正"列定义（含 JSON select=false 字段），
       // 实际操作是 DROP + RE-ADD，**导致数据被清空**。已发生过一次：JSON 列还在但数据全 NULL。
       // schema 变更一律走 backend/src/database/ensure-*.ts 启动补列模式（main.ts 已注册）。

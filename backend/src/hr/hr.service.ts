@@ -558,4 +558,72 @@ export class HrService {
       durationMs,
     };
   }
+
+  /**
+   * 启动时自动调用：
+   *   - 找不到数据文件 → 跳过（不报错）
+   *   - JSON.generatedAt 与本地 marker 一致 → 跳过（已导入过）
+   *   - 否则执行导入 + 写 marker
+   * 任何异常都吞掉、只记日志，避免启动失败。
+   */
+  async importRostersIfNeeded(): Promise<void> {
+    const candidatePaths = [
+      path.resolve(process.cwd(), 'scripts', 'import-rosters.data.json'),
+      path.resolve(__dirname, '../../scripts/import-rosters.data.json'),
+      path.resolve(__dirname, '../../../scripts/import-rosters.data.json'),
+    ];
+    const dataPath = candidatePaths.find((p) => fs.existsSync(p));
+    if (!dataPath) {
+      this.logger.log('[ImportRosters] no data file, skip auto import.');
+      return;
+    }
+
+    let generatedAt = '';
+    try {
+      const parsed = JSON.parse(fs.readFileSync(dataPath, 'utf-8')) as {
+        generatedAt?: string;
+      };
+      generatedAt = (parsed.generatedAt ?? '').trim();
+    } catch (e) {
+      this.logger.error(`[ImportRosters] read generatedAt failed: ${(e as Error).message}`);
+      return;
+    }
+    if (!generatedAt) {
+      this.logger.warn('[ImportRosters] generatedAt missing in data file, skip.');
+      return;
+    }
+
+    const markerPath = path.join(path.dirname(dataPath), '.import-rosters.applied');
+    if (fs.existsSync(markerPath)) {
+      try {
+        const last = fs.readFileSync(markerPath, 'utf-8').trim();
+        if (last === generatedAt) {
+          this.logger.log(`[ImportRosters] already applied at ${last}, skip.`);
+          return;
+        }
+      } catch {
+        // ignore, will re-import
+      }
+    }
+
+    try {
+      const result = await this.importRosters();
+      fs.writeFileSync(markerPath, generatedAt, 'utf-8');
+      this.logger.log(
+        `[ImportRosters] auto import done: employees=${result.importedEmployees} history=${result.importedHistory} yearly=${result.importedYearlyRecords}`,
+      );
+      if (result.unmatchedDepartments.length) {
+        this.logger.warn(
+          `[ImportRosters] unmatched departments (${result.unmatchedDepartments.length}): ${result.unmatchedDepartments.slice(0, 10).join(', ')}`,
+        );
+      }
+      if (result.unmatchedJobTitles.length) {
+        this.logger.warn(
+          `[ImportRosters] unmatched job titles (${result.unmatchedJobTitles.length}): ${result.unmatchedJobTitles.slice(0, 10).join(', ')}`,
+        );
+      }
+    } catch (e) {
+      this.logger.error(`[ImportRosters] auto import failed: ${(e as Error).message}`);
+    }
+  }
 }

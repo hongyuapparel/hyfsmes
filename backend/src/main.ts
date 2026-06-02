@@ -16,6 +16,7 @@ import { seedInboundPendingBatchColumns } from './database/seed-inbound-pending-
 import { ensureOrderOperationLogTargetColumns } from './database/ensure-order-operation-log-target-columns';
 import { ensureProductionColorRowsColumns } from './database/ensure-production-color-rows-columns';
 import { ensureEmployeeRostersTables } from './database/ensure-employee-rosters-tables';
+import { HrService } from './hr/hr.service';
 
 async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
   const rows: Array<{ cnt: number }> = await dataSource.query(
@@ -278,6 +279,13 @@ async function bootstrap() {
     await seedInboundPendingBatchColumns(dataSource);
   } catch (err) {
     console.error('[Seed] Failed:', err);
+  }
+
+  try {
+    const hrService = app.get(HrService);
+    await hrService.importRostersIfNeeded();
+  } catch (err) {
+    console.error('[ImportRosters] startup auto import failed:', err);
   }
 
   console.log(`Backend running at http://localhost:${port}`);
