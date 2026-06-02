@@ -5,9 +5,10 @@
     :size="760"
     @closed="resetForm"
   >
-    <div v-if="drawerPreview && formDialog.isEdit" class="view-toolbar">
-      <el-button type="primary" @click="drawerPreview = false">编辑</el-button>
-    </div>
+    <div class="hr-drawer-scroll">
+      <div v-if="drawerPreview && formDialog.isEdit" class="view-toolbar">
+        <el-button type="primary" @click="drawerPreview = false">编辑</el-button>
+      </div>
 
     <el-descriptions v-if="drawerPreview" :column="2" border class="preview-descriptions">
       <el-descriptions-item label="姓名">{{ form.name || '-' }}</el-descriptions-item>
@@ -205,6 +206,7 @@
         <ImageUploadArea v-model="form.photoUrl" :compact="false" class="employee-photo-upload" />
       </el-form-item>
     </el-form>
+    </div>
 
     <template #footer>
       <el-button @click="formDialog.visible = false">
@@ -348,6 +350,13 @@ defineExpose({ openForm, openPreview })
 </script>
 
 <style scoped>
+.hr-drawer-scroll {
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 12px 8px 0;
+}
+
 .view-toolbar {
   display: flex;
   justify-content: flex-end;
