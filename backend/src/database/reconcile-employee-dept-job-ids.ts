@@ -17,7 +17,7 @@ import * as path from 'path';
  * 存在则跳过。要重新跑：删 marker 文件 + 重启 PM2；或改 MARKER_FILENAME 版本号。
  */
 
-const MARKER_FILENAME = '.reconcile-employee-dept-job-v1.applied';
+const MARKER_FILENAME = '.reconcile-employee-dept-job-v2.applied';
 
 const DEPT_MAPPING: Record<string, string> = {
   电商中心: 'B2B外贸',
@@ -50,6 +50,23 @@ const DEPT_MAPPING: Record<string, string> = {
 };
 
 const FORCE_QC_DEPTS = new Set(['IE部', '品控部', '品质部']);
+
+/**
+ * Excel 老岗位名 → 系统字典里的实际岗位名。
+ * 用于错字纠正、同义词归一。匹配规则：
+ *   1. employees.job_title 先查 JOB_MAPPING；命中则用映射后的名字查字典
+ *   2. 否则用 employees.job_title 字面直接查字典
+ *   3. 都查不到留 NULL，console.warn 列出，等用户在「组织与人事」补字典再重跑
+ */
+const JOB_MAPPING: Record<string, string> = {
+  车板: '车版师',
+  车位: '平车',
+  流水车位: '平车',
+  纸样: '纸样师',
+  服装QC: 'QC',
+  外发QC: 'QC',
+  大烫学徒: '大烫',
+};
 
 interface EmployeeRow {
   id: number;
@@ -146,11 +163,18 @@ export async function reconcileEmployeeDeptJobIds(dataSource: DataSource): Promi
         }
       }
     } else if (emp.jobTitleId == null && emp.jobTitle) {
-      const id = jobIdByName.get(emp.jobTitle);
+      const mappedJobName = JOB_MAPPING[emp.jobTitle] ?? emp.jobTitle;
+      const id = jobIdByName.get(mappedJobName);
       if (id) {
         updates.push('job_title_id = ?');
         params.push(id);
         jobIdUpdated += 1;
+        // 若是映射出来的（错字/同义词），也把字符串字段更新为标准名
+        if (mappedJobName !== emp.jobTitle) {
+          updates.push('job_title = ?');
+          params.push(mappedJobName);
+          jobTitleStrUpdated += 1;
+        }
       } else {
         unmatchedJob.add(emp.jobTitle);
       }
