@@ -16,6 +16,7 @@ import { seedInboundPendingBatchColumns } from './database/seed-inbound-pending-
 import { ensureOrderOperationLogTargetColumns } from './database/ensure-order-operation-log-target-columns';
 import { ensureProductionColorRowsColumns } from './database/ensure-production-color-rows-columns';
 import { ensureEmployeeRostersTables } from './database/ensure-employee-rosters-tables';
+import { ensureSupplierTypesMaxDepth } from './database/ensure-supplier-types-max-depth';
 import { HrService } from './hr/hr.service';
 
 async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
@@ -270,6 +271,7 @@ async function bootstrap() {
     await ensureEmployeeRostersTables(dataSource);
     await ensureInventoryAccessorySizedColumns(dataSource);
     await ensureOrderSoftDeleteColumns(dataSource);
+    await ensureSupplierTypesMaxDepth(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);

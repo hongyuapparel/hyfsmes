@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository, IsNull } from 'typeorm';
 import { SystemOption } from '../entities/system-option.entity';
@@ -299,12 +299,49 @@ export class SystemOptionsService {
     return build(null);
   }
 
+  /**
+   * supplier_types 仅允许 3 层（level 0 root 供应商类型 / level 1 业务范围父分组 / level 2 业务范围子分组）。
+   * 新增节点的层级 = parent.level + 1，所以只要 parent 已经是 level 2 就要拦住（否则会产生 level 3）。
+   * level 2 的判定：parent 有 parent，且 parent.parent 也有 parent（即 parent 的祖父存在）—— 等价于 parent 自己有"祖父"。
+   * 这种越界数据在「供应商设置」表格里因为 `└` 前缀都一样、视觉上像同级，但在订单编辑下拉里会嵌一层显示，
+   * 造成两边不一致。
+   */
+  private async assertSupplierTypeParentDepth(
+    optionType: string,
+    parentId: number | null | undefined,
+  ): Promise<void> {
+    if (optionType !== 'supplier_types') return;
+    if (parentId == null) return;
+    const parent = await this.repo.findOne({
+      where: { id: parentId },
+      select: ['id', 'optionType', 'parentId'],
+    });
+    if (!parent) {
+      throw new BadRequestException('父分组不存在');
+    }
+    if (parent.optionType !== 'supplier_types') {
+      throw new BadRequestException('父分组类型不匹配');
+    }
+    if (parent.parentId == null) return; // parent 是 level 0 → 新节点是 level 1，允许
+    const grand = await this.repo.findOne({
+      where: { id: parent.parentId },
+      select: ['parentId'],
+    });
+    if (grand?.parentId != null) {
+      // parent 已经是 level 2（祖父还有祖父，意味着 parent 自己处在 level >= 2），新增就会变 level >= 3
+      throw new BadRequestException(
+        '供应商设置仅支持「供应商类型 / 业务范围父分组 / 业务范围子分组」三层，不允许再继续添加更深层级',
+      );
+    }
+  }
+
   async create(
     optionType: string,
     value: string,
     sortOrder = 0,
     parentId: number | null = null,
   ): Promise<SystemOption> {
+    await this.assertSupplierTypeParentDepth(optionType, parentId);
     const opt = this.repo.create({ optionType, value, sortOrder, parentId });
     return this.repo.save(opt);
   }
@@ -316,6 +353,10 @@ export class SystemOptionsService {
     const opt = await this.repo.findOne({ where: { id } });
     if (!opt) throw new NotFoundException('选项不存在');
     const oldValue = opt.value;
+
+    if (dto.parentId !== undefined && dto.parentId !== opt.parentId) {
+      await this.assertSupplierTypeParentDepth(opt.optionType, dto.parentId);
+    }
 
     if (dto.value !== undefined) opt.value = dto.value;
     if (dto.sortOrder !== undefined) opt.sortOrder = dto.sortOrder;
