@@ -16,7 +16,7 @@ import * as path from 'path';
  * 部门 19 个、岗位 17 个，来源：用户线上「系统设置 → 组织与人事」截图。
  */
 
-const MARKER_FILENAME = '.seed-org-dictionary-v1.applied';
+const MARKER_FILENAME = '.seed-org-dictionary-v2.applied';
 
 interface DeptNode {
   value: string;
@@ -36,13 +36,25 @@ const DEPARTMENTS: DeptNode[] = [
   },
 ];
 
-/** 部门 value -> 该部门下的岗位 value 列表（仅截图中可见的部门有岗位） */
+/**
+ * 部门 value -> 该部门下的岗位 value 列表。
+ * v2: 在用户线上截图的 17 个基础上，加入用户后续在「组织与人事」补建的岗位
+ * （reconcile JOB_MAPPING/DEPT_JOB_MAPPING 的所有 target 都覆盖到，确保线上
+ * 首次部署后 reconcile 能把 689 个员工全部挂到字典 ID 上）。
+ */
 const JOBS_BY_DEPT: Record<string, string[]> = {
+  B2B外贸: ['外贸业务', '美工', '外贸运营', '外贸跟单', '外贸经理'],
+  C端电商: ['C端运营', 'C端运营助理'],
+  人事行政: ['人事', '清洁/厨师'],
+  财务: ['财务'],
+  仓库: ['仓管'],
+  采购: ['生产采购'],
   版房: ['纸样师', '车版师'],
   跟单: ['QC', '跟单'],
   裁床: ['电剪', '裁床主管', '外发裁床'],
   车缝: ['车缝组长', '平车', '打边', '中烫'],
   尾部: ['尾部主管', '大烫', '包装', '剪线', '尾查', '收发'],
+  生产部门: ['生产经理'],
 };
 
 function findMarkerPath(): { path: string; exists: boolean } {

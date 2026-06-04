@@ -54,6 +54,9 @@ backend/uploads/
 # Git worktrees
 .worktrees/
 
+# 启动钩子幂等执行的 marker 文件（本地状态，每环境独立，禁止入库）
+backend/scripts/*.applied
+
 # 本地开发用截图工具（playwright-core 驱动本机 Chrome，不入库）
 tools/
 .superpowers/
