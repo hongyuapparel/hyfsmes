@@ -17,6 +17,7 @@ import { ensureOrderOperationLogTargetColumns } from './database/ensure-order-op
 import { ensureProductionColorRowsColumns } from './database/ensure-production-color-rows-columns';
 import { ensureEmployeeRostersTables } from './database/ensure-employee-rosters-tables';
 import { ensureSupplierTypesMaxDepth } from './database/ensure-supplier-types-max-depth';
+import { ensureSupplierTypesDedupe } from './database/ensure-supplier-types-dedupe';
 import { HrService } from './hr/hr.service';
 
 async function ensureSupplierMultiScopeColumn(dataSource: DataSource) {
@@ -272,6 +273,7 @@ async function bootstrap() {
     await ensureInventoryAccessorySizedColumns(dataSource);
     await ensureOrderSoftDeleteColumns(dataSource);
     await ensureSupplierTypesMaxDepth(dataSource);
+    await ensureSupplierTypesDedupe(dataSource);
     await seedPermissions(dataSource);
     await seedAdmin(dataSource);
     await seedFieldDefinitions(dataSource);
