@@ -19,6 +19,12 @@
 
 用户指定的文档优先于本文件。
 
+## 上线环境
+
+- 线上：`https://erp.hyfsmes.com`
+- 部署：宝塔面板终端（跑 `scripts/deploy-frontend.sh` / `deploy-backend.sh` / `deploy-full.sh`，路径与 PM2 名以 `docs/DEPLOY_GUIDE.md` 为准）
+- 数据库：阿里云 RDS（MySQL）。用户不在命令行操作数据库，改库结构/数据时必须给**可直接粘贴执行的 SQL**（写成 `backend/scripts/*.sql` 文件或聊天里贴出来），不要让用户跑脚本/命令
+
 ## 执行边界
 
 - 只改用户明确要求的范围；必须改动未点名内容时先说明原因并获确认
