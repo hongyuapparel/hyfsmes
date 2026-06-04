@@ -75,6 +75,26 @@ async function ensureUserLastActiveColumn(dataSource: DataSource) {
   console.log('[Schema] Added users.last_active_at');
 }
 
+async function ensureUserLoginLockoutColumns(dataSource: DataSource) {
+  const cols: Array<{ name: string; ddl: string }> = [
+    { name: 'failed_login_count', ddl: 'INT NOT NULL DEFAULT 0 AFTER last_active_at' },
+    { name: 'locked_until', ddl: 'DATETIME NULL AFTER failed_login_count' },
+  ];
+  for (const col of cols) {
+    const rows: Array<{ cnt: number }> = await dataSource.query(
+      `SELECT COUNT(*) AS cnt
+       FROM information_schema.COLUMNS
+       WHERE TABLE_SCHEMA = DATABASE()
+         AND TABLE_NAME = 'users'
+         AND COLUMN_NAME = ?`,
+      [col.name],
+    );
+    if (Number(rows?.[0]?.cnt ?? 0) > 0) continue;
+    await dataSource.query(`ALTER TABLE users ADD COLUMN ${col.name} ${col.ddl}`);
+    console.log(`[Schema] Added users.${col.name}`);
+  }
+}
+
 async function dropSupplierCooperationDateColumn(dataSource: DataSource) {
   const rows: Array<{ cnt: number }> = await dataSource.query(
     `SELECT COUNT(*) AS cnt
@@ -267,6 +287,7 @@ async function bootstrap() {
     await ensureSupplierMultiScopeColumn(dataSource);
     await ensureSupplierLastActiveColumn(dataSource);
     await ensureUserLastActiveColumn(dataSource);
+    await ensureUserLoginLockoutColumns(dataSource);
     await dropSupplierCooperationDateColumn(dataSource);
     await ensureSupplierRemarkColumn(dataSource);
     await ensureInventoryOperationLogTables(dataSource);

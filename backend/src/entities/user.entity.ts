@@ -54,4 +54,10 @@ export class User {
 
   @Column({ name: 'last_active_at', type: 'datetime', nullable: true })
   lastActiveAt: Date | null;
+
+  @Column({ name: 'failed_login_count', type: 'int', default: 0 })
+  failedLoginCount: number;
+
+  @Column({ name: 'locked_until', type: 'datetime', nullable: true })
+  lockedUntil: Date | null;
 }

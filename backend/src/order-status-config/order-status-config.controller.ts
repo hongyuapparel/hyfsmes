@@ -1,7 +1,9 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards } from '@nestjs/common';
 import { OrderStatusDefinitionService } from './order-status-definition.service';
 import { OrderStatusTransitionService } from './order-status-transition.service';
 import { OrderStatusReportService } from './order-status-report.service';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import {
   CreateOrderStatusDto,
@@ -14,6 +16,7 @@ import {
 } from './dto';
 
 @Controller('order-status-config')
+@UseGuards(JwtAuthGuard, PermissionGuard)
 export class OrderStatusConfigController {
   constructor(
     private readonly definitionService: OrderStatusDefinitionService,

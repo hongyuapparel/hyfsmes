@@ -225,3 +225,94 @@ sh scripts/deploy-full.sh
 - 不能只凭感觉判断“是不是只改了页面”
 - 上线前最好先跑一次 `.\scripts\deploy-plan.ps1`
 - 如果脚本提示 `db = YES`，先不要直接部署，先让我检查数据库部分
+
+## 11. 上线安全检查清单（重要！）
+
+这一节是踩过坑后补的。**部署到新服务器、换域名、第一次上线时，每一条都要核对**。
+
+### 11.1 nginx 站点配置（必须做，否则源代码会被外人下载）
+
+宝塔面板 → 网站 → erp.hyfsmes.com → 配置文件 → 在 `server { ... }` 块里加入下面这段：
+
+```nginx
+# 禁止访问源代码、配置、git 目录等敏感路径
+location ~ /\.git { deny all; return 404; }
+location ~ /\.env { deny all; return 404; }
+location ~ /\.cursor { deny all; return 404; }
+location ~ /\.claude { deny all; return 404; }
+location ~ ^/backend(/|$) { deny all; return 404; }
+location ~ ^/scripts(/|$) { deny all; return 404; }
+location ~ ^/docs(/|$) { deny all; return 404; }
+location ~ ^/node_modules(/|$) { deny all; return 404; }
+location ~ \.(env|sql|sh|ps1|log|md|tsv|bak|dump)$ { deny all; return 404; }
+```
+
+保存后，在宝塔终端执行 `nginx -t && nginx -s reload`。
+
+**验证（必做一次）**：在浏览器或手机流量打开下面这些 URL，**都必须显示 404**：
+
+- `https://erp.hyfsmes.com/.git/config`
+- `https://erp.hyfsmes.com/backend/.env`
+- `https://erp.hyfsmes.com/scripts/deploy-frontend.sh`
+- `https://erp.hyfsmes.com/docs/DEPLOY_GUIDE.md`
+
+如果任何一个能下载，说明 nginx 没生效，立即把上面配置加回去。
+
+### 11.2 强制 HTTPS（防止首次访问时密码明文传输）
+
+宝塔面板 → 网站 → SSL → **开启"强制 HTTPS"开关**（HTTP 自动跳 HTTPS）。
+
+### 11.3 默认管理员密码（admin/admin123 必须改）
+
+第一次上线后，立即登录系统：用户管理 → admin → 重置密码。**不要再用 admin123**。
+密码可以简单到你能记住即可（比如公司缩写 + 年份 + 一个标识），但不能是这些公开列表里的：
+`admin / admin123 / 123456 / password / 12345678 / hyfsmes / boss`。
+
+### 11.4 环境变量（生产环境必须设的）
+
+`backend/.env`（线上文件）里必须有这几项,**绝对不能用 `.env.example` 的默认值**：
+
+```
+NODE_ENV=production
+JWT_SECRET=<这里粘贴一段随机的至少 32 位字符串，比如 openssl rand -base64 48>
+MYSQL_PASSWORD=<阿里云 RDS 的真实密码>
+ADMIN_PASSWORD=<不能是 admin123>
+```
+
+`JWT_SECRET` 用宝塔终端跑 `openssl rand -base64 48` 生成，复制粘贴即可。**这串字符串泄露 = 任何人能伪造任何用户登录**。
+
+### 11.5 阿里云 RDS 数据库白名单
+
+阿里云控制台 → RDS 实例 → 数据安全性 → 白名单设置：
+
+- ✅ 只放服务器自己的内网 IP 或公网 IP
+- ❌ 绝对不要写 `0.0.0.0/0`（任何 IP 都能连）
+
+### 11.6 后端端口（3000）只能内网访问
+
+宝塔面板 → 安全 → 防火墙：3000 端口**只放本机**（127.0.0.1），不对外开放。
+公网只需要 80（HTTP）和 443（HTTPS），其他端口都关。
+阿里云安全组同样规则。
+
+### 11.7 PM2 启动参数
+
+宝塔终端检查：`pm2 env erp-backend | grep NODE_ENV`，必须输出 `NODE_ENV: production`。
+如果不是，停止服务后用 `NODE_ENV=production pm2 start dist/main.js --name erp-backend` 重启。
+
+### 11.8 部署完一次性自检
+
+部署完成后跑一次：
+
+```bash
+# 1. 确认敏感文件不可访问
+curl -I https://erp.hyfsmes.com/.git/config         # 期望 404
+curl -I https://erp.hyfsmes.com/backend/.env        # 期望 404
+
+# 2. 确认 HTTP 跳转到 HTTPS
+curl -I http://erp.hyfsmes.com                       # 期望 301/302 Location: https://...
+
+# 3. 确认登录限速生效（连续错 5 次同一账号，第 6 次应该被锁 15 分钟）
+# 在登录页用错的密码试 5 次，第 6 次正确密码也应该被锁住
+```
+
+任何一条不符合预期，**先不要把系统给员工使用**，先把上面对应小节再走一遍。

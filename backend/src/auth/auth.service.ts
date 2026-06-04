@@ -7,6 +7,9 @@ import { User, UserStatus } from '../entities/user.entity';
 import { Permission } from '../entities/permission.entity';
 import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
 
+const MAX_FAILED_LOGIN = 5;
+const LOCK_MINUTES = 15;
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -36,10 +39,42 @@ export class AuthService {
   }
 
   async login(username: string, password: string): Promise<{ access_token: string }> {
-    const user = await this.validateUser(username, password);
-    if (!user) throw new UnauthorizedException('用户名或密码错误');
+    const user = await this.userRepo.findOne({
+      where: { username },
+      relations: [
+        'role',
+        'role.rolePermissions',
+        'role.rolePermissions.permission',
+        'userRoles',
+        'userRoles.role',
+        'userRoles.role.rolePermissions',
+        'userRoles.role.rolePermissions.permission',
+      ],
+    });
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new UnauthorizedException('用户名或密码错误');
+    }
     const now = new Date();
-    await this.userRepo.update(user.id, { lastLoginAt: now, lastActiveAt: now });
+    if (user.lockedUntil && user.lockedUntil.getTime() > now.getTime()) {
+      const minutes = Math.ceil((user.lockedUntil.getTime() - now.getTime()) / 60000);
+      throw new UnauthorizedException(`账号已锁定，请 ${minutes} 分钟后再试`);
+    }
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) {
+      const nextCount = (user.failedLoginCount ?? 0) + 1;
+      const patch: Partial<User> = { failedLoginCount: nextCount };
+      if (nextCount >= MAX_FAILED_LOGIN) {
+        patch.lockedUntil = new Date(now.getTime() + LOCK_MINUTES * 60 * 1000);
+      }
+      await this.userRepo.update(user.id, patch);
+      throw new UnauthorizedException('用户名或密码错误');
+    }
+    await this.userRepo.update(user.id, {
+      lastLoginAt: now,
+      lastActiveAt: now,
+      failedLoginCount: 0,
+      lockedUntil: null,
+    });
     const roleIds = Array.from(new Set([user.roleId, ...(user.userRoles ?? []).map((x) => x.roleId)].filter(Boolean)));
     const payload = { sub: user.id, username: user.username, roleId: user.roleId, roleIds };
     return { access_token: this.jwtService.sign(payload) };
