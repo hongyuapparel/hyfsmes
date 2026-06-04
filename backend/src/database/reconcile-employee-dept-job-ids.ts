@@ -17,7 +17,7 @@ import * as path from 'path';
  * 存在则跳过。要重新跑：删 marker 文件 + 重启 PM2；或改 MARKER_FILENAME 版本号。
  */
 
-const MARKER_FILENAME = '.reconcile-employee-dept-job-v14.applied';
+const MARKER_FILENAME = '.reconcile-employee-dept-job-v15.applied';
 
 /**
  * 映射目标：value + parent（可选）。同名字典项在不同父级下会有不同 ID
@@ -208,15 +208,15 @@ export async function reconcileEmployeeDeptJobIds(dataSource: DataSource): Promi
     target: MappingTarget,
   ): number | null {
     if (target.parent != null) {
-      // parent 节点不一定是顶级（如"跟单"是"生产部门"的子，岗位 QC 又挂在"跟单"下）
-      // 同名 parent 时优先选有父级的（即 seed 加在正确路径上的）
+      // 试遍每个同名 parent 下的同名 child（兼容线上字典存在重复同名部门的情况，
+      // 例如顶级"车缝"和"生产部门/车缝"同时存在，岗位可能挂在任意一份下）
       const parents = deptRows.filter((r) => r.value === target.parent);
-      const parent = parents.find((p) => p.parentId != null) ?? parents[0];
-      if (parent) {
+      for (const parent of parents) {
         const child = rows.find((r) => r.value === target.value && r.parentId === parent.id);
         if (child) return child.id;
       }
-      return null;
+      // 兜底：path 完全不存在时，按字面查同名 child（任意 parent 下），优先有父级的
+      return findIdByLiteralName(rows, target.value);
     }
     const withParent = rows.find((r) => r.value === target.value && r.parentId != null);
     if (withParent) return withParent.id;
