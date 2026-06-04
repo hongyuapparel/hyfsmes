@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-06-04-dedupe-supplier-processing-options',
+    date: '2026-06-04',
+    module: '供应商',
+    title: '加工供应商业务范围自动去重',
+    description: '"系统设置 → 供应商设置 → 加工供应商"下面历史多次导入时把 A/B/C/D/E 加工方式写了 3-4 份，订单和供应商抽屉里同一项重复出现。系统启动会自动合并这些重复项（保留最早一条），并把曾经选过重复项的供应商引用迁到保留的那条，已配好的供应商不会因为去重而丢业务范围。',
+    link: '/settings/suppliers',
+  },
+  {
     id: '2026-06-02-align-process-dropdown-with-supplier-settings',
     date: '2026-06-02',
     module: '供应商',
