@@ -23,7 +23,7 @@ import * as path from 'path';
  * 可重跑（前提是字典又脏了）。
  */
 
-const MARKER_FILENAME = '.cleanup-dirty-org-dictionary-v1.applied';
+const MARKER_FILENAME = '.cleanup-dirty-org-dictionary-v2.applied';
 
 const KEEP_TOP_DEPTS = new Set(['C端电商', 'B2B外贸', '辅助部门', '生产部门']);
 
