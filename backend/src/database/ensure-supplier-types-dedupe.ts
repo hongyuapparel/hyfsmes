@@ -21,6 +21,9 @@ import { DataSource } from 'typeorm';
  * 即将被深度 ensure 删掉的节点的 keep_id 当成正常项保留。
  */
 export async function ensureSupplierTypesDedupe(dataSource: DataSource): Promise<void> {
+  // 注意：阿里云 RDS MySQL 8 默认开 ONLY_FULL_GROUP_BY 严格模式，
+  // SELECT 里出现的非聚合列必须严格等于 GROUP BY 里的列（包括函数包装）。
+  // 直接 GROUP BY parent_id，NULL 本身就会被聚成同一组，不需要 COALESCE 兜底。
   const groups: Array<{ parent_id: number | null; value: string; ids: string; keep_id: number }> =
     await dataSource.query(`
       SELECT
@@ -30,7 +33,7 @@ export async function ensureSupplierTypesDedupe(dataSource: DataSource): Promise
         MIN(id) AS keep_id
       FROM system_options
       WHERE option_type = 'supplier_types'
-      GROUP BY COALESCE(parent_id, -1), value
+      GROUP BY parent_id, value
       HAVING COUNT(*) > 1
     `);
 
