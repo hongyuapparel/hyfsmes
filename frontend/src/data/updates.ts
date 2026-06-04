@@ -31,15 +31,6 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
-    id: '2026-06-04-hr-roster-and-org-mapping',
-    date: '2026-06-04',
-    module: '人事',
-    title: '历史花名册 689 人入档并完成部门岗位映射',
-    description:
-      '把 2020-2026 年花名册里 689 名员工（含再次入职）导入人事管理。部门/岗位字典按线上结构整理，老 Excel 名字（电商中心→B2B外贸、整件组→车缝、B 组→车缝等）自动归位，每个员工的部门和岗位都精准对应字典 ID。员工详情抽屉新增「入职履历」时间轴和「年度记录」，列表加生日月份多选筛选、离职日期可排序，部门下拉文字不再被截断。',
-    link: '/hr',
-  },
-  {
     id: '2026-06-04-dedupe-supplier-processing-options',
     date: '2026-06-04',
     module: '供应商',
