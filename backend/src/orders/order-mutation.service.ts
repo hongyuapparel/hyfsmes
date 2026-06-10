@@ -278,6 +278,7 @@ export class OrderMutationService {
     if (payload.sizeInfoMetaHeaders && Array.isArray(payload.sizeInfoMetaHeaders)) extPayload.sizeInfoMetaHeaders = payload.sizeInfoMetaHeaders;
     if (payload.sizeInfoRows && Array.isArray(payload.sizeInfoRows)) extPayload.sizeInfoRows = payload.sizeInfoRows;
     if (payload.processItems && Array.isArray(payload.processItems)) extPayload.processItems = payload.processItems;
+    if (typeof payload.revisionNotes === 'string') extPayload.revisionNotes = payload.revisionNotes;
     if (typeof payload.productionRequirement === 'string') extPayload.productionRequirement = payload.productionRequirement;
     if (payload.packagingHeaders && Array.isArray(payload.packagingHeaders)) extPayload.packagingHeaders = payload.packagingHeaders;
     if (payload.packagingCells && Array.isArray(payload.packagingCells)) extPayload.packagingCells = payload.packagingCells;
@@ -322,6 +323,7 @@ export class OrderMutationService {
       payload.sizeInfoMetaHeaders !== undefined ||
       payload.sizeInfoRows !== undefined ||
       payload.processItems !== undefined ||
+      payload.revisionNotes !== undefined ||
       payload.productionRequirement !== undefined ||
       payload.packagingHeaders !== undefined ||
       payload.packagingCells !== undefined ||
@@ -338,6 +340,7 @@ export class OrderMutationService {
           sizeInfoMetaHeaders: payload.sizeInfoMetaHeaders ?? null,
           sizeInfoRows: payload.sizeInfoRows ?? null,
           processItems: payload.processItems ?? null,
+          revisionNotes: payload.revisionNotes ?? null,
           productionRequirement: payload.productionRequirement ?? null,
           packagingHeaders: payload.packagingHeaders ?? null,
           packagingCells: payload.packagingCells ?? null,
@@ -355,6 +358,7 @@ export class OrderMutationService {
         if (payload.sizeInfoMetaHeaders !== undefined) ext.sizeInfoMetaHeaders = payload.sizeInfoMetaHeaders;
         if (payload.sizeInfoRows !== undefined) ext.sizeInfoRows = payload.sizeInfoRows;
         if (payload.processItems !== undefined) ext.processItems = payload.processItems;
+        if (payload.revisionNotes !== undefined) ext.revisionNotes = payload.revisionNotes ?? null;
         if (payload.productionRequirement !== undefined) ext.productionRequirement = payload.productionRequirement ?? null;
         if (payload.packagingHeaders !== undefined) ext.packagingHeaders = payload.packagingHeaders;
         if (payload.packagingCells !== undefined) ext.packagingCells = payload.packagingCells;
@@ -456,6 +460,7 @@ export class OrderMutationService {
           sizeInfoMetaHeaders: srcExt.sizeInfoMetaHeaders ?? null,
           sizeInfoRows: srcExt.sizeInfoRows ?? null,
           processItems: srcExt.processItems ?? null,
+          revisionNotes: srcExt.revisionNotes ?? null,
           productionRequirement: srcExt.productionRequirement ?? null,
           packagingHeaders: srcExt.packagingHeaders ?? null,
           packagingCells: srcExt.packagingCells ?? null,

@@ -6,16 +6,18 @@
         <el-button link type="primary" @click="addPackagingHeader">新增列</el-button>
       </div>
     </template>
-    <div class="packaging-grid">
-      <div v-for="(header, idx) in packagingHeaders" :key="header + idx" class="packaging-cell">
+    <div ref="packagingGridRef" class="packaging-grid">
+      <div
+        v-for="(_header, idx) in packagingHeaders"
+        :key="packagingCellKeys[idx] ?? `packaging-fallback-${idx}`"
+        class="packaging-cell"
+      >
         <div class="packaging-header">
+          <span class="packaging-drag-handle" title="拖拽排序">≡</span>
           <el-input v-model="packagingHeaders[idx]" size="small" />
         </div>
         <div class="packaging-body">
-          <div class="packaging-image" @click="choosePackagingImage(idx)">
-            <img v-if="packagingCells[idx]?.imageUrl" :src="packagingCells[idx].imageUrl" alt="" />
-            <span v-else>点击上传图片</span>
-          </div>
+          <ImageUploadArea v-model="packagingCells[idx].imageUrl" />
           <el-input v-model="packagingCells[idx].accessoryName" placeholder="选择/填写辅料" size="small">
             <template #suffix>
               <el-button link type="primary" size="small" @click.stop="openAccessoryDialog(idx)">选择</el-button>
@@ -47,29 +49,24 @@
         @update:model-value="emit('update:packagingMethod', String($event ?? ''))"
       />
     </div>
-    <input
-      ref="packagingFileInputRef"
-      type="file"
-      accept="image/jpeg,image/png,image/gif,image/webp"
-      class="hidden-file-input"
-      @change="onPackagingFileChange"
-    />
   </el-card>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
+import Sortable from 'sortablejs'
 import type { PackagingCell } from '@/composables/useOrderPackaging'
+import ImageUploadArea from '@/components/ImageUploadArea.vue'
 
 const props = defineProps<{
   packagingHeaders: string[]
   packagingCells: PackagingCell[]
+  packagingCellKeys: string[]
   packagingMethod: string
   addPackagingHeader: () => void
   removePackagingHeader: (index: number) => void
-  preparePackagingUpload: (index: number) => void
-  onPackagingFileChange: (event: Event) => void
+  movePackagingHeader: (from: number, to: number) => void
   openAccessoryDialog: (index: number) => void
 }>()
 
@@ -77,12 +74,34 @@ const emit = defineEmits<{
   (e: 'update:packagingMethod', value: string): void
 }>()
 
-const packagingFileInputRef = ref<HTMLInputElement | null>(null)
+const packagingGridRef = ref<HTMLElement | null>(null)
+let packagingSortable: Sortable | null = null
 
-function choosePackagingImage(index: number) {
-  props.preparePackagingUpload(index)
-  packagingFileInputRef.value?.click()
-}
+onMounted(() => {
+  const grid = packagingGridRef.value
+  if (!grid) return
+  packagingSortable = Sortable.create(grid, {
+    animation: 120,
+    handle: '.packaging-drag-handle',
+    draggable: '.packaging-cell',
+    onEnd: (evt) => {
+      const oldIndex = evt.oldDraggableIndex ?? evt.oldIndex
+      const newIndex = evt.newDraggableIndex ?? evt.newIndex
+      // 先把被 Sortable 移动的节点放回原位，再改数据，由 Vue 按 key 重排，避免 DOM 与 v-for 双重移动
+      if (evt.item.parentNode === grid) {
+        grid.removeChild(evt.item)
+        grid.insertBefore(evt.item, grid.children[oldIndex ?? 0] ?? null)
+      }
+      if (oldIndex == null || newIndex == null || oldIndex === newIndex) return
+      props.movePackagingHeader(oldIndex, newIndex)
+    },
+  })
+})
+
+onBeforeUnmount(() => {
+  packagingSortable?.destroy()
+  packagingSortable = null
+})
 </script>
 
 <style scoped src="./order-edit-card.css"></style>

@@ -63,6 +63,7 @@ export interface OrderEditPayload {
   sizeInfoMetaHeaders?: string[];
   sizeInfoRows?: SizeInfoRow[];
   processItems?: ProcessRow[];
+  revisionNotes?: string;
   productionRequirement?: string;
   packagingHeaders?: string[];
   packagingCells?: PackagingCell[];
@@ -98,6 +99,7 @@ export type OrderDetail = Order & {
   sizeInfoMetaHeaders?: string[];
   sizeInfoRows?: SizeInfoRow[];
   processItems?: ProcessRow[];
+  revisionNotes?: string;
   productionRequirement?: string;
   packagingHeaders?: string[];
   packagingCells?: PackagingCell[];

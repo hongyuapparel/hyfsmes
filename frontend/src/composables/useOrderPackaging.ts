@@ -1,8 +1,6 @@
 import { ref } from 'vue'
-import { ElMessage } from 'element-plus'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
-import { uploadImage } from '@/api/uploads'
 
 export interface PackagingCell {
   imageUrl?: string
@@ -16,13 +14,20 @@ const defaultPackagingHeaders = ['主唛', '洗水唛', '吊牌', '包装袋', '
 export function useOrderPackaging() {
   const packagingHeaders = ref<string[]>([...defaultPackagingHeaders])
   const packagingCells = ref<PackagingCell[]>([])
+  const packagingCellKeys = ref<string[]>([])
   const packagingMethod = ref('')
-  const activePackagingIndex = ref<number | null>(null)
 
   const accessoryDialogVisible = ref(false)
   const accessoryDialogLoading = ref(false)
   const accessoryItems = ref<AccessoryItem[]>([])
   const accessoryTargetIndex = ref<number | null>(null)
+
+  let packagingCellKeySeed = 0
+
+  function nextPackagingCellKey() {
+    packagingCellKeySeed += 1
+    return `packaging-cell-${packagingCellKeySeed}`
+  }
 
   function normalizePackagingCells() {
     const len = packagingHeaders.value.length
@@ -31,6 +36,12 @@ export function useOrderPackaging() {
       for (let i = 0; i < toAdd; i++) packagingCells.value.push({})
     } else if (packagingCells.value.length > len) {
       packagingCells.value.splice(len)
+    }
+    if (packagingCellKeys.value.length < len) {
+      const toAdd = len - packagingCellKeys.value.length
+      for (let i = 0; i < toAdd; i++) packagingCellKeys.value.push(nextPackagingCellKey())
+    } else if (packagingCellKeys.value.length > len) {
+      packagingCellKeys.value.splice(len)
     }
   }
 
@@ -51,25 +62,18 @@ export function useOrderPackaging() {
   function removePackagingHeader(index: number) {
     packagingHeaders.value.splice(index, 1)
     packagingCells.value.splice(index, 1)
+    packagingCellKeys.value.splice(index, 1)
   }
 
-  function preparePackagingUpload(index: number) {
-    activePackagingIndex.value = index
-  }
-
-  async function onPackagingFileChange(e: Event) {
-    const input = e.target as HTMLInputElement
-    const file = input.files?.[0]
-    input.value = ''
-    if (!file || activePackagingIndex.value == null) return
-    try {
-      const url = await uploadImage(file)
-      packagingCells.value[activePackagingIndex.value].imageUrl = url
-    } catch (err: unknown) {
-      if (!isErrorHandled(err)) ElMessage.error(getErrorMessage(err))
-    } finally {
-      activePackagingIndex.value = null
-    }
+  function movePackagingHeader(from: number, to: number) {
+    const len = packagingHeaders.value.length
+    if (from === to || from < 0 || to < 0 || from >= len || to >= len) return
+    const [movedHeader] = packagingHeaders.value.splice(from, 1)
+    packagingHeaders.value.splice(to, 0, movedHeader ?? '')
+    const [movedCell] = packagingCells.value.splice(from, 1)
+    packagingCells.value.splice(to, 0, movedCell ?? {})
+    const [movedKey] = packagingCellKeys.value.splice(from, 1)
+    packagingCellKeys.value.splice(to, 0, movedKey ?? nextPackagingCellKey())
   }
 
   async function loadAccessoryItems() {
@@ -108,8 +112,8 @@ export function useOrderPackaging() {
     defaultPackagingHeaders,
     packagingHeaders,
     packagingCells,
+    packagingCellKeys,
     packagingMethod,
-    activePackagingIndex,
     accessoryDialogVisible,
     accessoryDialogLoading,
     accessoryItems,
@@ -118,8 +122,7 @@ export function useOrderPackaging() {
     getNextPackagingHeader,
     addPackagingHeader,
     removePackagingHeader,
-    preparePackagingUpload,
-    onPackagingFileChange,
+    movePackagingHeader,
     loadAccessoryItems,
     openAccessoryDialog,
     onSelectAccessory,

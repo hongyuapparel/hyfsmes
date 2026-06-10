@@ -23,12 +23,9 @@
 
       <el-row :gutter="16" class="a-area-row">
         <el-col :xs="24" :md="4" class="a-area-image-col">
-          <div
-            class="order-image-block"
-            @click="triggerOrderImageUpload"
-          >
+          <div class="order-image-block">
             <div class="image-preview-wrap" v-if="form.imageUrl">
-              <el-image :src="form.imageUrl" fit="contain" :preview-src-list="[form.imageUrl]" />
+              <el-image :src="form.imageUrl" fit="contain" :preview-src-list="[form.imageUrl]" preview-teleported />
               <el-button text type="primary" size="small" class="image-reupload" @click.stop="triggerOrderImageUpload">
                 重新上传
               </el-button>
@@ -36,7 +33,7 @@
                 移除
               </el-button>
             </div>
-            <div v-else class="image-placeholder">
+            <div v-else class="image-placeholder" @click="triggerOrderImageUpload">
               <span>选择SKU后显示</span>
               <span class="image-upload-hint">点击上传图片</span>
             </div>
@@ -294,6 +291,23 @@
       :search-process-suppliers="searchProcessSuppliers"
     />
 
+    <!-- 修改意见（生产要求前） -->
+    <el-card class="block-card">
+      <template #header>
+        <div class="block-header">
+          <span class="block-title">修改意见</span>
+        </div>
+      </template>
+      <el-input
+        v-model="revisionNotes"
+        type="textarea"
+        :autosize="{ minRows: 1, maxRows: 12 }"
+        :input-style="{ padding: '5px 11px' }"
+        resize="none"
+        placeholder="填写打样、确认样、大货等环节的修改意见"
+      />
+    </el-card>
+
     <!-- F 区：生产要求 -->
     <el-card class="block-card">
       <template #header>
@@ -314,11 +328,11 @@
     <OrderEditPackagingCard
       :packaging-headers="packagingHeaders"
       :packaging-cells="packagingCells"
+      :packaging-cell-keys="packagingCellKeys"
       v-model:packaging-method="packagingMethod"
       :add-packaging-header="addPackagingHeader"
       :remove-packaging-header="removePackagingHeader"
-      :prepare-packaging-upload="preparePackagingUpload"
-      :on-packaging-file-change="onPackagingFileChange"
+      :move-packaging-header="movePackagingHeader"
       :open-accessory-dialog="openAccessoryDialog"
     />
 
@@ -382,7 +396,7 @@ import OrderEditAttachmentsCard from '@/components/orders/edit/OrderEditAttachme
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useOrderEditPage } from '@/composables/useOrderEditPage'
 
-const { pageLoading, goBack, orderNo, orderStatus, saving, submitting, onSaveDraft, onSaveAndSubmit, form, rules, openSkuDialog, orderImageFileInputRef, triggerOrderImageUpload, onOrderImageFileChange, selectedSkuMeta, collaborationOptions, orderTypeTreeSelectData, orderTypeTreeSelectProps, customerDisplayText, customerLoading, clearSelectedCustomer, openCustomerDialog, userLoading, merchandiserOptions, salespersonOptions, onMerchandiserChange, bTableRef, colorRows, sizeHeaders, editingCell, colorNameInputRef, remarkInputRef, bSummaryMethod, addSizeColumn, addColorRow, startEditBCell, onBCellBlur, insertSizeColumnBefore, removeSizeColumn, setColorCellRef, setActiveColorCell, onColorCellKeydown, onColorCellPaste, calcRowTotal, removeColorRow, setEditingCellNull, materials, materialSourceOptions, materialTypeOptions, supplierOptions, supplierLoading, setMaterialCellRef, onMaterialCellKeydown, addMaterialRow, removeMaterialRow, recalcPurchaseQuantity, onSupplierChange, onMaterialTypeChange, onMaterialSupplierVisibleChange, searchMaterialSuppliers, setSizeInfoTableRef, sizeInfoRows, sizeMetaHeaders, setSizeGridCellRef, onSizeGridKeydown, onSizeGridPaste, addSizeMetaColumn, removeSizeMetaColumn, addSizeInfoRow, removeSizeInfoRow, copySizeInfoToClipboard, processItems, processOptions, addProcessRow, removeProcessRow, searchProcessSuppliers, productionRequirement, packagingHeaders, packagingCells, packagingMethod, addPackagingHeader, removePackagingHeader, preparePackagingUpload, onPackagingFileChange, openAccessoryDialog, accessoryDialogVisible, accessoryDialogLoading, accessoryItems, onSelectAccessory, skuDialogVisible, skuDialogLoading, skuProducts, skuTotal, skuPage, skuPageSize, onSelectSku, onSkuPageChange, onSkuPageSizeChange, onSkuKeywordChange, customerDialogVisible, customerDialogLoading, customerDialogList, customerTotal, customerPage, customerPageSize, onSelectCustomer, onCustomerPageChange, onCustomerPageSizeChange, onCustomerKeywordChange, attachments, draggingAttachmentIndex, dragOverAttachmentIndex, onAttachmentFileChange, removeAttachment, onAttachmentDragStart, onAttachmentDragOver, onAttachmentDrop, onAttachmentDragEnd } = useOrderEditPage()
+const { pageLoading, goBack, orderNo, orderStatus, saving, submitting, onSaveDraft, onSaveAndSubmit, form, rules, openSkuDialog, orderImageFileInputRef, triggerOrderImageUpload, onOrderImageFileChange, selectedSkuMeta, collaborationOptions, orderTypeTreeSelectData, orderTypeTreeSelectProps, customerDisplayText, customerLoading, clearSelectedCustomer, openCustomerDialog, userLoading, merchandiserOptions, salespersonOptions, onMerchandiserChange, bTableRef, colorRows, sizeHeaders, editingCell, colorNameInputRef, remarkInputRef, bSummaryMethod, addSizeColumn, addColorRow, startEditBCell, onBCellBlur, insertSizeColumnBefore, removeSizeColumn, setColorCellRef, setActiveColorCell, onColorCellKeydown, onColorCellPaste, calcRowTotal, removeColorRow, setEditingCellNull, materials, materialSourceOptions, materialTypeOptions, supplierOptions, supplierLoading, setMaterialCellRef, onMaterialCellKeydown, addMaterialRow, removeMaterialRow, recalcPurchaseQuantity, onSupplierChange, onMaterialTypeChange, onMaterialSupplierVisibleChange, searchMaterialSuppliers, setSizeInfoTableRef, sizeInfoRows, sizeMetaHeaders, setSizeGridCellRef, onSizeGridKeydown, onSizeGridPaste, addSizeMetaColumn, removeSizeMetaColumn, addSizeInfoRow, removeSizeInfoRow, copySizeInfoToClipboard, processItems, processOptions, addProcessRow, removeProcessRow, searchProcessSuppliers, revisionNotes, productionRequirement, packagingHeaders, packagingCells, packagingCellKeys, packagingMethod, addPackagingHeader, removePackagingHeader, movePackagingHeader, openAccessoryDialog, accessoryDialogVisible, accessoryDialogLoading, accessoryItems, onSelectAccessory, skuDialogVisible, skuDialogLoading, skuProducts, skuTotal, skuPage, skuPageSize, onSelectSku, onSkuPageChange, onSkuPageSizeChange, onSkuKeywordChange, customerDialogVisible, customerDialogLoading, customerDialogList, customerTotal, customerPage, customerPageSize, onSelectCustomer, onCustomerPageChange, onCustomerPageSizeChange, onCustomerKeywordChange, attachments, draggingAttachmentIndex, dragOverAttachmentIndex, onAttachmentFileChange, removeAttachment, onAttachmentDragStart, onAttachmentDragOver, onAttachmentDrop, onAttachmentDragEnd } = useOrderEditPage()
 </script>
 
 <style scoped src="./edit.css"></style>

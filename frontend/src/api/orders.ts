@@ -193,6 +193,8 @@ export interface OrderFormPayload {
     part?: string
     remark?: string
   }>
+  /** 修改意见（生产要求前） */
+  revisionNotes?: string
   /** F 区：生产要求 */
   productionRequirement?: string
   /** G 区：包装要求 */

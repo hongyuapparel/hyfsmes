@@ -55,6 +55,7 @@ export function useOrderEditPage() {
     sizeInfoMetaHeaders: [],
     sizeInfoRows: [],
     processItems: [],
+    revisionNotes: '',
     productionRequirement: '',
     packagingHeaders: [],
     packagingCells: [],
@@ -105,6 +106,7 @@ export function useOrderEditPage() {
     if (u?.mobile && !form.merchandiserPhone) form.merchandiserPhone = u.mobile
   }
 
+  const revisionNotes = ref('')
   const productionRequirement = ref('')
 
   const { collectPayload } = useOrderEditPayload({
@@ -117,6 +119,7 @@ export function useOrderEditPage() {
     sizeMetaHeaders: sizeInfoApi.sizeMetaHeaders,
     sizeInfoRows: sizeInfoApi.sizeInfoRows,
     processItems: processItemsApi.processItems,
+    revisionNotes,
     productionRequirement,
     packagingHeaders: packagingApi.packagingHeaders,
     packagingCells: packagingApi.packagingCells,
@@ -145,6 +148,7 @@ export function useOrderEditPage() {
     nextSizeInfoRowKey: sizeInfoApi.nextSizeInfoRowKey,
     normalizeSizeInfoRows: sizeInfoApi.normalizeSizeInfoRows,
     processItems: processItemsApi.processItems,
+    revisionNotes,
     productionRequirement,
     defaultPackagingHeaders: packagingApi.defaultPackagingHeaders,
     packagingHeaders: packagingApi.packagingHeaders,
@@ -196,6 +200,7 @@ export function useOrderEditPage() {
       sizeInfoApi.sizeMetaHeaders.value,
       sizeInfoApi.sizeInfoRows.value,
       processItemsApi.processItems.value,
+      revisionNotes.value,
       productionRequirement.value,
       packagingApi.packagingHeaders.value,
       packagingApi.packagingCells.value,
@@ -243,6 +248,7 @@ export function useOrderEditPage() {
     setEditingCellNull,
     ...sizeInfoApi,
     onMerchandiserChange,
+    revisionNotes,
     productionRequirement,
     saving,
     submitting,

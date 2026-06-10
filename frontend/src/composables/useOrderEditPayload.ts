@@ -30,6 +30,7 @@ interface UseOrderEditPayloadParams {
   sizeMetaHeaders: Ref<string[]>
   sizeInfoRows: Ref<SizeInfoRow[]>
   processItems: Ref<ProcessItemInputRow[]>
+  revisionNotes: Ref<string>
   productionRequirement: Ref<string>
   packagingHeaders: Ref<string[]>
   packagingCells: Ref<PackagingCellInputRow[]>
@@ -48,6 +49,7 @@ export function useOrderEditPayload(params: UseOrderEditPayloadParams) {
     sizeMetaHeaders,
     sizeInfoRows,
     processItems,
+    revisionNotes,
     productionRequirement,
     packagingHeaders,
     packagingCells,
@@ -107,6 +109,7 @@ export function useOrderEditPayload(params: UseOrderEditPayloadParams) {
         sizeValues: [...r.sizeValues],
       })),
       processItems: processItems.value.map((p) => ({ ...p })),
+      revisionNotes: revisionNotes.value,
       productionRequirement: productionRequirement.value,
       packagingHeaders: [...packagingHeaders.value],
       packagingCells: packagingCells.value.map((c, idx) => ({

@@ -166,6 +166,7 @@ export class OrderQueryService {
     const sizeInfoMetaHeaders = ext?.sizeInfoMetaHeaders ?? [];
     const sizeInfoRows = ext?.sizeInfoRows ?? [];
     const processItems = ext?.processItems ?? [];
+    const revisionNotes = ext?.revisionNotes ?? '';
     const productionRequirement = ext?.productionRequirement ?? '';
     const packagingHeaders = ext?.packagingHeaders ?? [];
     const packagingCells = ext?.packagingCells ?? [];
@@ -198,6 +199,7 @@ export class OrderQueryService {
       sizeInfoMetaHeaders,
       sizeInfoRows,
       processItems,
+      revisionNotes,
       productionRequirement,
       packagingHeaders,
       packagingCells,

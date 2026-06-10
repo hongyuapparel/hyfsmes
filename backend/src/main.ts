@@ -255,6 +255,22 @@ async function ensureOrderSoftDeleteColumns(dataSource: DataSource) {
   }
 }
 
+async function ensureOrderExtRevisionNotesColumn(dataSource: DataSource) {
+  const rows: Array<{ cnt: number }> = await dataSource.query(
+    `SELECT COUNT(*) AS cnt
+     FROM information_schema.COLUMNS
+     WHERE TABLE_SCHEMA = DATABASE()
+       AND TABLE_NAME = 'order_ext'
+       AND COLUMN_NAME = 'revision_notes'`,
+  );
+  if (Number(rows?.[0]?.cnt ?? 0) > 0) return;
+  await dataSource.query(
+    `ALTER TABLE order_ext
+     ADD COLUMN revision_notes TEXT NULL AFTER process_items`,
+  );
+  console.log('[Schema] Added order_ext.revision_notes');
+}
+
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
@@ -297,6 +313,7 @@ async function bootstrap() {
     await ensureEmployeeRostersTables(dataSource);
     await ensureInventoryAccessorySizedColumns(dataSource);
     await ensureOrderSoftDeleteColumns(dataSource);
+    await ensureOrderExtRevisionNotesColumn(dataSource);
     await ensureSupplierTypesMaxDepth(dataSource);
     await ensureSupplierTypesDedupe(dataSource);
     await seedPermissions(dataSource);

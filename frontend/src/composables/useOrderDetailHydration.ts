@@ -39,6 +39,7 @@ interface UseOrderDetailHydrationParams {
   nextSizeInfoRowKey: () => string
   normalizeSizeInfoRows: () => void
   processItems: Ref<ProcessItemInputRow[]>
+  revisionNotes: Ref<string>
   productionRequirement: Ref<string>
   defaultPackagingHeaders: string[]
   packagingHeaders: Ref<string[]>
@@ -126,6 +127,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
       part: p.part ?? '',
       remark: p.remark ?? '',
     }))
+    params.revisionNotes.value = d.revisionNotes ?? ''
     params.productionRequirement.value = d.productionRequirement ?? ''
     params.packagingHeaders.value = d.packagingHeaders && Array.isArray(d.packagingHeaders)
       ? [...d.packagingHeaders]

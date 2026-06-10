@@ -41,6 +41,10 @@ export class OrderExt {
   @Column({ name: 'process_items', type: 'json', nullable: true })
   processItems: ProcessRow[] | null;
 
+  /** 修改意见（编辑页置于生产要求前的长文本） */
+  @Column({ name: 'revision_notes', type: 'text', nullable: true })
+  revisionNotes: string | null;
+
   /** F 区：生产要求（长文本，仍放在扩展表中以保持 orders 表精简） */
   @Column({ name: 'production_requirement', type: 'text', nullable: true })
   productionRequirement: string | null;

@@ -2,7 +2,7 @@
   <div
     class="image-upload-area"
     :class="{ 'is-dragover': isDragover, 'has-image': displayUrl, 'is-dense': props.dense }"
-    @click="fileInputRef?.click()"
+    @click="onAreaClick"
     @dragover.prevent="isDragover = true"
     @dragleave.prevent="isDragover = false"
     @drop.prevent="onDrop"
@@ -22,8 +22,18 @@
         <template v-if="props.compact">
           <div class="preview-actions preview-actions-compact">
             <el-button
-              class="compact-delete-btn"
+              class="compact-icon-btn is-replace"
               size="small"
+              title="替换图片"
+              :disabled="uploading"
+              @click.stop="fileInputRef?.click()"
+            >
+              <el-icon><RefreshRight /></el-icon>
+            </el-button>
+            <el-button
+              class="compact-icon-btn is-delete"
+              size="small"
+              title="删除图片"
               :disabled="uploading"
               @click.stop="clear"
             >
@@ -52,16 +62,26 @@
         </span>
       </div>
     </template>
+    <teleport to="body">
+      <ElImageViewer
+        v-if="viewerVisible"
+        :url-list="[viewerUrl]"
+        :z-index="10100"
+        teleported
+        @close="viewerVisible = false"
+      />
+    </teleport>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElImageViewer, ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
-import { Plus } from '@element-plus/icons-vue'
+import { Plus, RefreshRight } from '@element-plus/icons-vue'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getUploadImageOriginalForPreview, LIST_IMAGE_PLACEHOLDER } from '@/utils/image'
 import { useUploadListImage } from '@/composables/useUploadListImage'
 
 const props = withDefaults(
@@ -98,6 +118,24 @@ const displayUrl = computed(() => {
   // 与 AppImageThumb 一致：处理 /uploads/ 等站内路径，应用 small_ 缩略规则与失败回退
   return resolveUploadSrc(raw)
 })
+
+const viewerVisible = ref(false)
+
+const viewerUrl = computed(() => {
+  if (localPreviewUrl.value) return localPreviewUrl.value
+  const raw = (props.modelValue ?? '').trim()
+  if (!raw) return displayUrl.value
+  return getUploadImageOriginalForPreview(raw) || displayUrl.value
+})
+
+function onAreaClick() {
+  // 加载失败只剩占位图时不可放大，点击回到上传
+  if (displayUrl.value && displayUrl.value !== LIST_IMAGE_PLACEHOLDER) {
+    viewerVisible.value = true
+    return
+  }
+  fileInputRef.value?.click()
+}
 
 function onImageError() {
   // 失败时推进列表回退阶段（small_ → 原图 → 占位），避免死循环
@@ -205,7 +243,7 @@ onBeforeUnmount(() => {
 }
 
 .image-upload-area.has-image {
-  cursor: pointer;
+  cursor: zoom-in;
 }
 
 .image-upload-area.has-image:hover {
@@ -289,6 +327,8 @@ onBeforeUnmount(() => {
   right: 6px;
   top: 6px;
   z-index: 2;
+  display: flex;
+  gap: 4px;
   opacity: 0;
   transform: translateY(2px);
   transition: opacity 0.2s ease, transform 0.2s ease;
@@ -299,7 +339,11 @@ onBeforeUnmount(() => {
   transform: translateY(0);
 }
 
-.compact-delete-btn {
+.preview-actions-compact .el-button + .el-button {
+  margin-left: 0;
+}
+
+.compact-icon-btn {
   border: none !important;
   box-shadow: none !important;
   padding: 0;
@@ -311,7 +355,12 @@ onBeforeUnmount(() => {
   background: rgba(31, 41, 55, 0.52);
 }
 
-.compact-delete-btn:hover {
+.compact-icon-btn.is-replace:hover {
+  color: #fff;
+  background: var(--el-color-primary);
+}
+
+.compact-icon-btn.is-delete:hover {
   color: #fff;
   background: rgba(239, 68, 68, 0.9);
 }
@@ -333,6 +382,19 @@ onBeforeUnmount(() => {
 
 .image-upload-area.is-dense .preview-wrap {
   padding: 2px;
+}
+
+.image-upload-area.is-dense .preview-actions-compact {
+  right: 2px;
+  top: 2px;
+  gap: 2px;
+}
+
+.image-upload-area.is-dense .compact-icon-btn {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  font-size: 11px;
 }
 
 .image-upload-area.is-dense .preview-img {

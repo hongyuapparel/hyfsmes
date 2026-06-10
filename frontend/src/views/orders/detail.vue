@@ -108,6 +108,13 @@
         </div>
       </section>
 
+      <section v-if="detail.revisionNotes" class="block">
+        <div class="block-title">修改意见</div>
+        <div class="block-text production-text">
+          {{ detail.revisionNotes }}
+        </div>
+      </section>
+
       <section v-if="detail.productionRequirement" class="block">
         <div class="block-title">F 生产要求</div>
         <div class="block-text production-text">
