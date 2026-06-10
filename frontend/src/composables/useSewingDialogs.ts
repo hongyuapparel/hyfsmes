@@ -53,7 +53,7 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     sizeHeaders: string[]
     orderRow: (number | null)[]
     cutRow: (number | null)[]
-    orderColorRows: Array<{ colorName: string; quantities: number[] }>
+    orderColorRows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>
     cutColorRows: Array<{ colorName: string; quantities: number[] }>
     sewingQuantitiesByColor: Array<{ colorName: string; quantities: number[] }>
     defectQuantity: number

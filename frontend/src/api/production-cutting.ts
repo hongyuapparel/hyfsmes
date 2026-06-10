@@ -65,6 +65,8 @@ export interface ColorSizeRow {
   colorName: string
   quantities: number[]
   remark?: string
+  /** 订单计划行的颜色参考图（登记矩阵显示用，不随登记保存） */
+  imageUrl?: string
 }
 
 export interface CuttingRegisterOrderBrief {

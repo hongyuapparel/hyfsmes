@@ -8,6 +8,7 @@ export interface ColorRow {
   colorName: string
   quantities: number[]
   remark: string
+  imageUrl: string
 }
 
 export interface UseOrderColorSizeMatrixOptions {
@@ -172,6 +173,7 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
       colorName: '',
       quantities: Array(len).fill(0),
       remark: '',
+      imageUrl: '',
     })
   }
 
@@ -181,6 +183,7 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
       colorName: '',
       quantities: Array(len).fill(0),
       remark: '',
+      imageUrl: '',
     })
   }
 
@@ -258,7 +261,8 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
   function bSummaryMethod() {
     const totals = sizeTotals.value
     const total = grandTotal.value
-    const row: (string | number)[] = ['合计', ...totals, total, '', '']
+    // 列序：图片 | 颜色名称 | 尺码... | 合计 | 备注 | 操作
+    const row: (string | number)[] = ['合计', '', ...totals, total, '', '']
     return row
   }
 

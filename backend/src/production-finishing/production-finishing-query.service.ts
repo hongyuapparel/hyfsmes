@@ -319,7 +319,7 @@ export class ProductionFinishingQueryService {
     /** 不含合计列的尺码 headers，用于二维矩阵 */
     sizeHeaders: string[];
     /** 订单计划按颜色×尺码 */
-    planColorRows: Array<{ colorName: string; quantities: number[] }>;
+    planColorRows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>;
     /** 裁床实际按颜色×尺码 */
     cutColorRows: Array<{ colorName: string; quantities: number[] }>;
     /** 车缝完成按颜色×尺码（真值，无则空数组） */
@@ -393,13 +393,13 @@ export class ProductionFinishingQueryService {
     // === 按颜色×尺码（真值或对齐订单计划的展开） ===
     const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders.slice() : [];
     const norm = (s: unknown) => String(s ?? '').trim();
-    const planRowsArr = Array.isArray((ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[] }> })?.colorSizeRows)
-      ? ((ext as { colorSizeRows: Array<{ colorName?: string; quantities?: number[] }> }).colorSizeRows)
+    const planRowsArr = Array.isArray((ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[]; imageUrl?: string }> })?.colorSizeRows)
+      ? ((ext as { colorSizeRows: Array<{ colorName?: string; quantities?: number[]; imageUrl?: string }> }).colorSizeRows)
       : [];
     const planColorRows = planRowsArr.map((r) => {
       const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
       const quantities = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
-      return { colorName: norm(r?.colorName), quantities };
+      return { colorName: norm(r?.colorName), quantities, imageUrl: String(r?.imageUrl ?? '').trim() };
     });
     const buildColorRowsAlignedToPlan = (
       source: Array<{ colorName?: string; quantities?: number[] }> | null | undefined,

@@ -165,10 +165,11 @@ export function useOrderDetailView({
         colorName: row.colorName?.trim?.() ?? '',
         quantities,
         remark: row.remark?.trim?.() ?? '',
+        imageUrl: row.imageUrl?.trim?.() ?? '',
         total,
       }
     })
-    return rows.filter((row) => row.colorName || row.total || row.remark)
+    return rows.filter((row) => row.colorName || row.total || row.remark || row.imageUrl)
   })
 
   const hasColorSize = computed(() => {
@@ -177,6 +178,10 @@ export function useOrderDetailView({
 
   const hasColorRemark = computed(() => {
     return colorSizeRowsForView.value.some((row) => !!row.remark)
+  })
+
+  const hasColorImage = computed(() => {
+    return colorSizeRowsForView.value.some((row) => !!row.imageUrl)
   })
 
   const materialsForView = computed(() => {
@@ -332,6 +337,7 @@ export function useOrderDetailView({
     colorSizeRowsForView,
     hasColorSize,
     hasColorRemark,
+    hasColorImage,
     materialsForView,
     hasMaterials,
     materialColumns,

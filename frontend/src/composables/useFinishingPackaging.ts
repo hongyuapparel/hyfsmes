@@ -10,6 +10,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 interface ColorRow {
   colorName: string
   quantities: number[]
+  imageUrl?: string
 }
 
 export interface PackagingCompleteItem {

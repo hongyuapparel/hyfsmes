@@ -99,7 +99,7 @@ import CuttingMaterialUsageTable from '@/components/production-cutting/CuttingMa
 interface RegisterForm {
   orderBrief: CuttingRegisterOrderBrief
   colorSizeHeaders: string[]
-  actualCutRows: { colorName: string; quantities: number[]; remark?: string }[]
+  actualCutRows: { colorName: string; quantities: number[]; remark?: string; imageUrl?: string }[]
   materialUsageRows: CuttingMaterialUsagePayloadRow[]
   cuttingDepartment: string
   cutterName: string

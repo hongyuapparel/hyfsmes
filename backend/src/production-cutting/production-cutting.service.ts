@@ -54,7 +54,7 @@ export class ProductionCuttingService {
 
   getOrderColorSize(orderId: number): Promise<{
     colorSizeHeaders: string[];
-    colorSizeRows: { colorName: string; quantities: number[]; remark?: string }[];
+    colorSizeRows: { colorName: string; quantities: number[]; remark?: string; imageUrl?: string }[];
   }> {
     return this.queryService.getOrderColorSize(orderId);
   }

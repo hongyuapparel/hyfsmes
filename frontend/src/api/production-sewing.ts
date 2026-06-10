@@ -77,7 +77,7 @@ export interface CompleteFormDataRes {
   cutRow: (number | null)[]
   // 老后端（commit 521389ba 前）不返回下列三字段，前端在 useSewingDialogs 兜底拉取 color-size-breakdown
   sizeHeaders?: string[]
-  orderColorRows?: Array<{ colorName: string; quantities: number[] }>
+  orderColorRows?: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>
   cutColorRows?: Array<{ colorName: string; quantities: number[] }>
 }
 

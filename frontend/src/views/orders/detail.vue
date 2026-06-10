@@ -47,6 +47,7 @@
               <table class="detail-grid-table is-centered">
                 <thead>
                   <tr>
+                    <th v-if="hasColorImage">图片</th>
                     <th>颜色</th>
                     <th v-for="(header, index) in colorSizeHeadersForView" :key="header + index">
                       {{ header }}
@@ -57,6 +58,9 @@
                 </thead>
                 <tbody>
                   <tr v-for="(row, rowIndex) in colorSizeRowsForView" :key="rowIndex">
+                    <td v-if="hasColorImage" class="color-image-cell">
+                      <AppImageThumb :raw-url="row.imageUrl" variant="table" :width="24" :height="24" />
+                    </td>
                     <td>{{ row.colorName }}</td>
                     <td v-for="(header, index) in colorSizeHeadersForView" :key="header + index">
                       {{ formatDisplayNumber(row.quantities[index]) }}
@@ -159,6 +163,7 @@ import { computed, nextTick, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import OrderDetailBasicInfoSection from '@/components/orders/detail/OrderDetailBasicInfoSection.vue'
 import OrderDetailMaterialsSection from '@/components/orders/detail/OrderDetailMaterialsSection.vue'
 import OrderDetailSizeInfoSection from '@/components/orders/detail/OrderDetailSizeInfoSection.vue'
@@ -186,6 +191,7 @@ const {
   colorSizeRowsForView,
   hasColorSize,
   hasColorRemark,
+  hasColorImage,
   materialsForView,
   hasMaterials,
   materialColumns,
