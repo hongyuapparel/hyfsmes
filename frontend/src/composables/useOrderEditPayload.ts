@@ -100,6 +100,7 @@ export function useOrderEditPayload(params: UseOrderEditPayloadParams) {
         colorName: row.colorName,
         quantities: [...row.quantities],
         remark: row.remark,
+        imageUrl: row.imageUrl,
       })),
       colorSizeHeaders: [...sizeHeaders.value],
       materials: materials.value.map(({ materialType: _t, materialSource: _s, ...m }) => ({ ...m })),

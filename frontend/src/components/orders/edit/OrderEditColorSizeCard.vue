@@ -18,6 +18,11 @@
       header-align="center"
       class="editable-grid"
     >
+      <el-table-column label="图片" width="80" align="center" header-align="center">
+        <template #default="{ row }">
+          <ImageUploadArea v-model="row.imageUrl" dense />
+        </template>
+      </el-table-column>
       <el-table-column label="颜色名称" min-width="120" align="center" header-align="center">
         <template #default="{ row, $index }">
           <div
@@ -170,12 +175,14 @@
 
 <script setup lang="ts">
 import { Delete, CircleClose, Plus } from '@element-plus/icons-vue'
+import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 
 interface ColorRow {
   colorName: string
   quantities: number[]
   remark: string
+  imageUrl: string
 }
 
 const props = defineProps<{

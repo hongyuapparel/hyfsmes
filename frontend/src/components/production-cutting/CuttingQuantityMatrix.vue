@@ -8,7 +8,20 @@
       :max-height="matrixMaxHeight"
       table-layout="fixed"
     >
-      <el-table-column prop="colorName" label="颜色" width="100" fixed />
+      <el-table-column label="颜色" width="100" fixed>
+        <template #default="{ row }">
+          <span class="cutting-qty-matrix__color">
+            <AppImageThumb
+              v-if="row.imageUrl"
+              :raw-url="row.imageUrl"
+              variant="table"
+              :width="28"
+              :height="28"
+            />
+            <span>{{ row.colorName }}</span>
+          </span>
+        </template>
+      </el-table-column>
       <el-table-column
         v-for="(header, idx) in headers"
         :key="idx"
@@ -56,6 +69,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { onMatrixCellKeydown, selectAllOnFocus } from '@/utils/matrix-cell-nav'
 
@@ -63,6 +77,8 @@ export interface CuttingQtyRow {
   colorName: string
   quantities: number[]
   remark?: string
+  /** 订单计划行的颜色参考图（仅显示，不随登记提交） */
+  imageUrl?: string
 }
 
 const props = withDefaults(
@@ -139,4 +155,12 @@ function onCell(row: CuttingQtyRow, idx: number, v: number | undefined) {
 .cutting-qty-matrix__cell-text {
   font-variant-numeric: tabular-nums;
 }
+
+.cutting-qty-matrix__color {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 4px;
+}
+
 </style>

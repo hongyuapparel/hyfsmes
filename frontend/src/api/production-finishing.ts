@@ -69,7 +69,7 @@ export interface FinishingRegisterFormDataRes {
   defectRow: (number | null)[] | null
   /** 不含合计列的尺码 headers，用于二维矩阵 */
   sizeHeaders: string[]
-  planColorRows: Array<{ colorName: string; quantities: number[] }>
+  planColorRows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>
   cutColorRows: Array<{ colorName: string; quantities: number[] }>
   sewingColorRows: Array<{ colorName: string; quantities: number[] }>
   tailReceivedColorRows: Array<{ colorName: string; quantities: number[] }>

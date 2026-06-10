@@ -42,7 +42,7 @@ export function useCuttingRegister(params: UseCuttingRegisterParams) {
   const registerForm = reactive<{
     orderBrief: CuttingRegisterOrderBrief
     colorSizeHeaders: string[]
-    actualCutRows: { colorName: string; quantities: number[]; remark?: string }[]
+    actualCutRows: { colorName: string; quantities: number[]; remark?: string; imageUrl?: string }[]
     materialUsageRows: CuttingMaterialUsagePayloadRow[]
     cuttingDepartment: string
     cutterName: string
@@ -126,6 +126,7 @@ export function useCuttingRegister(params: UseCuttingRegisterParams) {
         colorName: r.colorName ?? '',
         quantities: Array.isArray(r.quantities) ? [...r.quantities] : [],
         remark: r.remark ?? '',
+        imageUrl: r.imageUrl ?? '',
       }))
       if (registerForm.actualCutRows.length === 0) {
         registerForm.actualCutRows = [{ colorName: '', quantities: [], remark: '' }]

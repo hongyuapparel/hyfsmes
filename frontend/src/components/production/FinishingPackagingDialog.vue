@@ -51,7 +51,14 @@
             :key="plan.colorName + ri"
             class="color-register-block"
           >
-            <div class="color-register-title">{{ plan.colorName }}</div>
+            <div class="color-register-title">
+              <AppImageThumb
+                v-if="item.planColorRows[ri]?.imageUrl"
+                :raw-url="item.planColorRows[ri].imageUrl"
+                variant="compact"
+              />
+              <span>{{ plan.colorName }}</span>
+            </div>
             <el-table
               :data="rowsForColor(item, ri)"
               border
@@ -155,6 +162,7 @@
 
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { onMatrixCellKeydown, selectAllOnFocus } from '@/utils/matrix-cell-nav'
 import type { PackagingCompleteItem } from '@/composables/useFinishingPackaging'
@@ -312,6 +320,9 @@ function rowClassName({ row }: { row: BlockRow }): string {
 }
 
 .color-register-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-weight: 600;
   font-size: 13px;
   margin-bottom: 6px;

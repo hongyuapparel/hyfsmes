@@ -156,6 +156,11 @@
   text-align: center;
 }
 
+/* B 区颜色图片列：固定窄列，不挤压数量列 */
+.detail-grid-table .color-image-cell {
+  width: 64px;
+}
+
 /* 含多行文本的表格（E 工艺项目备注）：保留换行、顶部对齐 */
 .detail-grid-table.is-prewrap td {
   white-space: pre-wrap;

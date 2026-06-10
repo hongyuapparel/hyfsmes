@@ -151,6 +151,8 @@ export interface OrderFormPayload {
     colorName: string
     quantities: number[]
     remark?: string
+    /** 颜色参考图（站内上传路径） */
+    imageUrl?: string
   }>
   colorSizeHeaders?: string[]
   /** C 区：物料信息 */

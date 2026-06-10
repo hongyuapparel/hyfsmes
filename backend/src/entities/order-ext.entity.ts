@@ -70,6 +70,8 @@ export interface ColorSizeRow {
   colorName?: string;
   quantities?: number[];
   remark?: string;
+  /** 颜色参考图（站内上传路径），区分同款不同颜色 */
+  imageUrl?: string;
 }
 
 export interface SizeInfoRow {

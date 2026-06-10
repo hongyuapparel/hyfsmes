@@ -223,7 +223,7 @@ export class ProductionCuttingQueryService {
     return { headers, rows: out };
   }
 
-  async getOrderColorSize(orderId: number): Promise<{ colorSizeHeaders: string[]; colorSizeRows: { colorName: string; quantities: number[]; remark?: string }[] }> {
+  async getOrderColorSize(orderId: number): Promise<{ colorSizeHeaders: string[]; colorSizeRows: { colorName: string; quantities: number[]; remark?: string; imageUrl?: string }[] }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
     if (order.status !== 'pending_cutting') throw new NotFoundException('仅待裁床订单可登记');
@@ -232,6 +232,7 @@ export class ProductionCuttingQueryService {
       colorName: r.colorName ?? '',
       quantities: Array.isArray(r.quantities) ? [...r.quantities] : [],
       remark: r.remark,
+      imageUrl: String(r.imageUrl ?? '').trim(),
     }));
     return { colorSizeHeaders: ext?.colorSizeHeaders ?? [], colorSizeRows };
   }
@@ -246,6 +247,7 @@ export class ProductionCuttingQueryService {
       colorName: r.colorName ?? '',
       quantities: Array.isArray(r.quantities) ? [...r.quantities] : [],
       remark: r.remark,
+      imageUrl: String(r.imageUrl ?? '').trim(),
     }));
     return {
       orderBrief: {

@@ -141,7 +141,7 @@ export class ProductionSewingService {
     /** 不含合计列的纯尺码 headers，用于二维矩阵 */
     sizeHeaders: string[];
     /** 订单计划按颜色×尺码（参考与上限基础） */
-    orderColorRows: Array<{ colorName: string; quantities: number[] }>;
+    orderColorRows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>;
     /** 裁床实际按颜色×尺码（车缝/入库的每格上限） */
     cutColorRows: Array<{ colorName: string; quantities: number[] }>;
   }> {
@@ -172,7 +172,7 @@ export class ProductionSewingService {
       const total = sums.reduce((a, b) => a + b, 0);
       return [...sums, total];
     };
-    const planRows = (ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[] }> })?.colorSizeRows ?? [];
+    const planRows = (ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[]; imageUrl?: string }> })?.colorSizeRows ?? [];
     const planRowsArr = Array.isArray(planRows) ? planRows : [];
     const actualCutRows = Array.isArray(cutting?.actualCutRows) ? cutting!.actualCutRows : [];
 
@@ -198,7 +198,7 @@ export class ProductionSewingService {
       const name = norm(r?.colorName);
       const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
       const quantities = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
-      return { colorName: name, quantities };
+      return { colorName: name, quantities, imageUrl: String(r?.imageUrl ?? '').trim() };
     });
     const cutColorRows = planRowsArr.map((r) => {
       const name = norm(r?.colorName);

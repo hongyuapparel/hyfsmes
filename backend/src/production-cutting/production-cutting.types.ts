@@ -62,7 +62,7 @@ export interface CuttingRegisterFormResponse {
     orderDate: string | null;
   };
   colorSizeHeaders: string[];
-  colorSizeRows: { colorName: string; quantities: number[]; remark?: string }[];
+  colorSizeRows: { colorName: string; quantities: number[]; remark?: string; imageUrl?: string }[];
   materialUsageRows: CuttingRegisterFormMaterialRow[];
 }
 

@@ -83,6 +83,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
       colorName: row.colorName ?? '',
       quantities: Array.isArray(row.quantities) ? [...row.quantities] : Array(params.sizeHeaders.value.length).fill(0),
       remark: row.remark ?? '',
+      imageUrl: row.imageUrl ?? '',
     }))
     params.normalizeColorRows()
     params.ensureAtLeastOneColorRow()
