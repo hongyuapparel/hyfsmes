@@ -9,6 +9,16 @@ const SIBLING_THUMB_PATH_RE = /^\/(?:api\/)?(?:uploads\/|migration-old\/)/i
 
 export type ListImagePhase = 'thumb' | 'full' | 'placeholder'
 
+/** 站内图片跨板块拖拽（如附件 → 物料图/包装图/主图）携带已上传 URL 的 dataTransfer 类型 */
+export const IMAGE_URL_DRAG_TYPE = 'application/x-erp-image-url'
+
+/** 上传/拖入允许的图片 MIME（与各处文件选择框 accept 一致） */
+export const UPLOAD_IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+
+export function isUploadImageFile(file: File): boolean {
+  return UPLOAD_IMAGE_MIME_TYPES.includes(file.type)
+}
+
 /** 列表/缩略位失败时的占位图（避免继续触发无效请求） */
 export const LIST_IMAGE_PLACEHOLDER =
   'data:image/svg+xml,' +

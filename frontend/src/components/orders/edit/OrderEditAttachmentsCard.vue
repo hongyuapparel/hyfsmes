@@ -6,7 +6,13 @@
         <el-button link type="primary" @click="chooseAttachments">选择多图</el-button>
       </div>
     </template>
-    <div class="attachments">
+    <div
+      class="attachments"
+      :class="{ 'is-file-dragover': attachmentsFileDragover }"
+      @dragover="onAttachmentsAreaDragOver"
+      @dragleave="onAttachmentsAreaDragLeave"
+      @drop="onAttachmentsAreaDrop"
+    >
       <div
         v-for="(url, idx) in attachments"
         :key="url + idx"
@@ -42,7 +48,7 @@
           </el-button>
         </el-tooltip>
       </div>
-      <div v-if="!attachments.length" class="attachments-empty">暂无附件，可点击右上角选择上传</div>
+      <div v-if="!attachments.length" class="attachments-empty">暂无附件，可点击右上角选择上传，或把图片拖拽到此处</div>
     </div>
     <input
       ref="attachmentFileInputRef"
@@ -64,7 +70,11 @@ defineProps<{
   attachments: string[]
   draggingAttachmentIndex: number | null
   dragOverAttachmentIndex: number | null
+  attachmentsFileDragover: boolean
   onAttachmentFileChange: (event: Event) => void
+  onAttachmentsAreaDragOver: (event: DragEvent) => void
+  onAttachmentsAreaDragLeave: () => void
+  onAttachmentsAreaDrop: (event: DragEvent) => void
   removeAttachment: (index: number) => void
   onAttachmentDragStart: (index: number, event: DragEvent) => void
   onAttachmentDragOver: (index: number, event: DragEvent) => void

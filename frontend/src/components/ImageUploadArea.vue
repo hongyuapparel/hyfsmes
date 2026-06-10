@@ -81,7 +81,12 @@ import { Delete } from '@element-plus/icons-vue'
 import { Plus, RefreshRight } from '@element-plus/icons-vue'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { getUploadImageOriginalForPreview, LIST_IMAGE_PLACEHOLDER } from '@/utils/image'
+import {
+  getUploadImageOriginalForPreview,
+  IMAGE_URL_DRAG_TYPE,
+  isUploadImageFile,
+  LIST_IMAGE_PLACEHOLDER,
+} from '@/utils/image'
 import { useUploadListImage } from '@/composables/useUploadListImage'
 
 const props = withDefaults(
@@ -142,8 +147,6 @@ function onImageError() {
   if (!localPreviewUrl.value && props.modelValue) onUploadListError(props.modelValue)
 }
 
-const IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
-
 function revokeLocalPreview() {
   if (localPreviewUrl.value.startsWith('blob:')) URL.revokeObjectURL(localPreviewUrl.value)
   localPreviewUrl.value = ''
@@ -154,20 +157,16 @@ function setLocalPreview(file: File) {
   localPreviewUrl.value = URL.createObjectURL(file)
 }
 
-function isImageFile(file: File): boolean {
-  return IMAGE_TYPES.includes(file.type)
-}
-
 function getFileFromDrop(e: DragEvent): File | null {
   const file = e.dataTransfer?.files?.[0]
-  return file && isImageFile(file) ? file : null
+  return file && isUploadImageFile(file) ? file : null
 }
 
 function getFileFromPaste(e: ClipboardEvent): File | null {
   const item = e.clipboardData?.items?.[0]
   if (!item || item.kind !== 'file') return null
   const file = item.getAsFile()
-  return file && isImageFile(file) ? file : null
+  return file && isUploadImageFile(file) ? file : null
 }
 
 async function uploadFile(file: File) {
@@ -188,13 +187,22 @@ function onFileChange(ev: Event) {
   const input = ev.target as HTMLInputElement
   const file = input.files?.[0]
   input.value = ''
-  if (file && isImageFile(file)) uploadFile(file)
+  if (file && isUploadImageFile(file)) uploadFile(file)
 }
 
 function onDrop(e: DragEvent) {
   isDragover.value = false
   const file = getFileFromDrop(e)
-  if (file) uploadFile(file)
+  if (file) {
+    uploadFile(file)
+    return
+  }
+  // 站内已上传图片跨板块拖入（如附件区拖来）：直接复用 URL，无需重新上传
+  const droppedUrl = (e.dataTransfer?.getData(IMAGE_URL_DRAG_TYPE) ?? '').trim()
+  if (droppedUrl) {
+    revokeLocalPreview()
+    emit('update:modelValue', droppedUrl)
+  }
 }
 
 function onPaste(e: ClipboardEvent) {

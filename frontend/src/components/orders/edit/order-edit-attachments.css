@@ -2,6 +2,15 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-sm);
+  min-height: 48px;
+  border-radius: var(--radius);
+  border: 1px dashed transparent;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.attachments.is-file-dragover {
+  border-color: var(--color-primary, #409eff);
+  background-color: rgba(64, 158, 255, 0.06);
 }
 
 .attachment-item {
