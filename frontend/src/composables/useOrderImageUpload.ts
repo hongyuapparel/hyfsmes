@@ -4,6 +4,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import type { OrderFormPayload } from '@/api/orders'
 import { uploadImage } from '@/api/uploads'
 import { IMAGE_URL_DRAG_TYPE, isUploadImageFile } from '@/utils/image'
+import { consumeImageUrlDrop } from '@/composables/useImageUrlDragSingleton'
 
 export function useOrderImageUpload(form: OrderFormPayload) {
   const orderImageFileInputRef = ref<HTMLInputElement | null>(null)
@@ -30,14 +31,16 @@ export function useOrderImageUpload(form: OrderFormPayload) {
   }
 
   function onOrderImageDrop(e: DragEvent) {
-    const file = e.dataTransfer?.files?.[0]
-    if (file && isUploadImageFile(file)) {
-      void uploadOrderImageFile(file)
+    // 附件区等站内图片拖入：直接复用已上传 URL。
+    // 必须先于 files 判断：浏览器拖动页面内 <img> 时 files 里会自带一份图片文件，否则会被重复上传
+    const droppedUrl = (e.dataTransfer?.getData(IMAGE_URL_DRAG_TYPE) ?? '').trim()
+    if (droppedUrl) {
+      form.imageUrl = droppedUrl
+      consumeImageUrlDrop(droppedUrl)
       return
     }
-    // 附件区等站内图片拖入：直接复用已上传 URL
-    const droppedUrl = (e.dataTransfer?.getData(IMAGE_URL_DRAG_TYPE) ?? '').trim()
-    if (droppedUrl) form.imageUrl = droppedUrl
+    const file = e.dataTransfer?.files?.[0]
+    if (file && isUploadImageFile(file)) void uploadOrderImageFile(file)
   }
 
   return {

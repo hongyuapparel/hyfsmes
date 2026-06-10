@@ -88,6 +88,7 @@ import {
   LIST_IMAGE_PLACEHOLDER,
 } from '@/utils/image'
 import { useUploadListImage } from '@/composables/useUploadListImage'
+import { consumeImageUrlDrop } from '@/composables/useImageUrlDragSingleton'
 
 const props = withDefaults(
   defineProps<{
@@ -192,17 +193,17 @@ function onFileChange(ev: Event) {
 
 function onDrop(e: DragEvent) {
   isDragover.value = false
-  const file = getFileFromDrop(e)
-  if (file) {
-    uploadFile(file)
-    return
-  }
-  // 站内已上传图片跨板块拖入（如附件区拖来）：直接复用 URL，无需重新上传
+  // 站内已上传图片跨板块拖入（如附件区拖来）：直接复用 URL，无需重新上传。
+  // 必须先于 files 判断：浏览器拖动页面内 <img> 时 files 里会自带一份图片文件，否则会被重复上传
   const droppedUrl = (e.dataTransfer?.getData(IMAGE_URL_DRAG_TYPE) ?? '').trim()
   if (droppedUrl) {
     revokeLocalPreview()
     emit('update:modelValue', droppedUrl)
+    consumeImageUrlDrop(droppedUrl)
+    return
   }
+  const file = getFileFromDrop(e)
+  if (file) uploadFile(file)
 }
 
 function onPaste(e: ClipboardEvent) {

@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadImage } from '@/api/uploads'
 import { IMAGE_URL_DRAG_TYPE, isUploadImageFile } from '@/utils/image'
+import { beginImageUrlDrag, endImageUrlDrag } from '@/composables/useImageUrlDragSingleton'
 
 export function useOrderAttachments() {
   const attachments = ref<string[]>([])
@@ -30,7 +31,12 @@ export function useOrderAttachments() {
   }
 
   function isExternalFileDrag(e: DragEvent): boolean {
-    return draggingAttachmentIndex.value == null && !!e.dataTransfer?.types?.includes('Files')
+    if (draggingAttachmentIndex.value != null) return false
+    const types = e.dataTransfer?.types
+    if (!types?.includes('Files')) return false
+    // 浏览器对页面内 <img> 的原生拖拽也会带 Files，但同时带 text/uri-list；
+    // 只接受真正从系统文件夹拖入的文件，避免页面内拖图被误传成新附件
+    return !types.includes('text/uri-list') && !types.includes(IMAGE_URL_DRAG_TYPE)
   }
 
   function onAttachmentsAreaDragOver(e: DragEvent) {
@@ -70,11 +76,14 @@ export function useOrderAttachments() {
     draggingAttachmentIndex.value = index
     dragOverAttachmentIndex.value = index
     if (e.dataTransfer) {
-      // 区内拖动 = 排序（move）；拖到物料图/包装图/主图 = 复制 URL（copy），附件保留
-      e.dataTransfer.effectAllowed = 'copyMove'
+      // 区内拖动 = 排序；拖到物料图/包装图/主图 = 移动（接收方消费后 dragend 移除原图）
+      e.dataTransfer.effectAllowed = 'move'
       e.dataTransfer.setData('text/plain', String(index))
       const url = attachments.value[index]
-      if (url) e.dataTransfer.setData(IMAGE_URL_DRAG_TYPE, url)
+      if (url) {
+        e.dataTransfer.setData(IMAGE_URL_DRAG_TYPE, url)
+        beginImageUrlDrag(url)
+      }
     }
   }
 
@@ -90,6 +99,8 @@ export function useOrderAttachments() {
   function onAttachmentDrop(index: number, e: DragEvent) {
     if (isExternalFileDrag(e)) return
     e.preventDefault()
+    // 区内排序的 drop 不再冒泡到容器，避免被容器当成文件拖入重复上传
+    e.stopPropagation()
     const from = draggingAttachmentIndex.value
     const fromByTransfer = Number(e.dataTransfer?.getData('text/plain') ?? '')
     const fromIndex = from ?? (Number.isNaN(fromByTransfer) ? null : fromByTransfer)
@@ -102,6 +113,10 @@ export function useOrderAttachments() {
   }
 
   function onAttachmentDragEnd() {
+    const fromIndex = draggingAttachmentIndex.value
+    if (endImageUrlDrag() && fromIndex != null) {
+      attachments.value.splice(fromIndex, 1)
+    }
     draggingAttachmentIndex.value = null
     dragOverAttachmentIndex.value = null
   }
