@@ -6,6 +6,7 @@ import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
+import { FinishedGoodsStockInboundQueryService } from '../finished-goods-stock/finished-goods-stock-inbound-query.service';
 
 export interface PickableQuery {
   customerName?: string;
@@ -74,6 +75,7 @@ export class PackingListsPickableService {
     @InjectRepository(FinishedGoodsStockColorImage) private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
     @InjectRepository(Order) private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderExt) private readonly orderExtRepo: Repository<OrderExt>,
+    private readonly inboundQueryService: FinishedGoodsStockInboundQueryService,
   ) {}
 
   async getPendingPickable(query: PickableQuery): Promise<{ list: PickableLine[]; total: number }> {
@@ -177,28 +179,16 @@ export class PackingListsPickableService {
 
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
-    const total = await qb.getCount();
-    const rows: Array<{
-      id: string;
-      skuCode: string;
-      quantity: string;
-      customerName: string;
-      imageUrl: string | null;
-      colorSizeSnapshot: unknown;
-      orderNo: string | null;
-    }> = await qb
-      .select('s.id', 'id')
-      .addSelect('s.sku_code', 'skuCode')
-      .addSelect('s.quantity', 'quantity')
-      .addSelect('s.customer_name', 'customerName')
-      .addSelect('s.image_url', 'imageUrl')
-      .addSelect('s.color_size_snapshot', 'colorSizeSnapshot')
-      .addSelect('o.order_no', 'orderNo')
-      .offset((page - 1) * pageSize)
-      .limit(pageSize)
-      .getRawMany();
+    const [stocks, total] = await qb
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
 
-    const stockIds = rows.map((r) => Number(r.id)).filter((id) => Number.isInteger(id) && id > 0);
+    const orderIds = Array.from(new Set(stocks.map((s) => s.orderId).filter((id): id is number => id != null && id > 0)));
+    const orders = orderIds.length ? await this.orderRepo.find({ where: { id: In(orderIds) } }) : [];
+    const orderNoById = new Map(orders.map((o) => [o.id, o.orderNo ?? '']));
+
+    const stockIds = stocks.map((s) => s.id);
     const colorImageByStock = new Map<number, Map<string, string>>();
     if (stockIds.length) {
       const images = await this.colorImageRepo.find({ where: { finishedStockId: In(stockIds) } });
@@ -213,22 +203,22 @@ export class PackingListsPickableService {
     }
 
     const list: PickableLine[] = [];
-    for (const raw of rows) {
-      const sourceId = Number(raw.id);
-      const fallbackImage = (raw.imageUrl ?? '').trim();
+    for (const stock of stocks) {
+      const fallbackImage = (stock.imageUrl ?? '').trim();
       const base = {
         sourceType: 'finished' as const,
-        sourceId,
-        orderNo: raw.orderNo ?? '',
-        styleNo: raw.skuCode ?? '',
-        customerName: raw.customerName ?? '',
+        sourceId: stock.id,
+        orderNo: stock.orderId != null ? orderNoById.get(stock.orderId) ?? '' : '',
+        styleNo: stock.skuCode ?? '',
+        customerName: stock.customerName ?? '',
       };
-      const snapshot = parseSnapshot(raw.colorSizeSnapshot);
+      // 与成品出库校验同源：用 buildCurrentStockSnapshot（含历史脏数据自愈回溯），避免选货展示与发货校验不一致
+      const snapshot = await this.inboundQueryService.buildCurrentStockSnapshot(stock);
       if (!snapshot || !snapshot.rows.length) {
-        list.push({ ...base, colorName: '', imageUrl: fallbackImage, sizeQuantities: {}, totalQty: Number(raw.quantity) || 0, hasSnapshot: false });
+        list.push({ ...base, colorName: '', imageUrl: fallbackImage, sizeQuantities: {}, totalQty: Number(stock.quantity) || 0, hasSnapshot: false });
         continue;
       }
-      const imageMap = colorImageByStock.get(sourceId);
+      const imageMap = colorImageByStock.get(stock.id);
       for (const row of snapshot.rows) {
         const { sizeQuantities, totalQty } = snapshotRowToLine(snapshot.headers, row);
         if (totalQty <= 0) continue;

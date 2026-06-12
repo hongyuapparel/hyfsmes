@@ -14,9 +14,12 @@ import { UserRole } from '../entities/user-role.entity';
 import { Role } from '../entities/role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
+import { InventoryPendingModule } from '../inventory-pending/inventory-pending.module';
+import { FinishedGoodsStockModule } from '../finished-goods-stock/finished-goods-stock.module';
 import { PackingListsController } from './packing-lists.controller';
 import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
+import { PackingListsShipService } from './packing-lists-ship.service';
 
 @Module({
   imports: [
@@ -36,8 +39,10 @@ import { PackingListsPickableService } from './packing-lists-pickable.service';
       RolePermission,
     ]),
     AuthModule,
+    InventoryPendingModule,
+    FinishedGoodsStockModule,
   ],
   controllers: [PackingListsController],
-  providers: [PackingListsService, PackingListsPickableService],
+  providers: [PackingListsService, PackingListsPickableService, PackingListsShipService],
 })
 export class PackingListsModule {}

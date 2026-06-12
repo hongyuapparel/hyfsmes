@@ -32,5 +32,6 @@ import { InventoryPendingService } from './inventory-pending.service';
   ],
   controllers: [InventoryPendingController],
   providers: [InventoryPendingService],
+  exports: [InventoryPendingService],
 })
 export class InventoryPendingModule {}

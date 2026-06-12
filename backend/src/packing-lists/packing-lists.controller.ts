@@ -5,6 +5,7 @@ import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
+import { PackingListsShipService } from './packing-lists-ship.service';
 import { SavePackingListDto } from './dto';
 
 @Controller('packing-lists')
@@ -14,7 +15,13 @@ export class PackingListsController {
   constructor(
     private readonly service: PackingListsService,
     private readonly pickableService: PackingListsPickableService,
+    private readonly shipService: PackingListsShipService,
   ) {}
+
+  @Post(':id/ship')
+  ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+    return this.shipService.ship(id, user?.username ?? '');
+  }
 
   @Get('pickable/pending')
   getPendingPickable(
