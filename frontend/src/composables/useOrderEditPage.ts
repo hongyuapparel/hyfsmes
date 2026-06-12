@@ -140,6 +140,7 @@ export function useOrderEditPage() {
     normalizeColorRows: colorSizeApi.normalizeColorRows,
     ensureAtLeastOneColorRow: colorSizeApi.ensureAtLeastOneColorRow,
     materials: materialsApi.materials,
+    nextMaterialRowKey: materialsApi.nextMaterialRowKey,
     roundMaterialQty2: materialsApi.roundMaterialQty2,
     recalcPurchaseQuantity: materialsApi.recalcPurchaseQuantity,
     defaultSizeMetaHeaders: sizeInfoApi.defaultSizeMetaHeaders,
@@ -179,6 +180,7 @@ export function useOrderEditPage() {
     syncMaterialTypeIdsFromLabel: materialsApi.syncMaterialTypeIdsFromLabel,
     syncMaterialSourceIdsFromLabel: materialsApi.syncMaterialSourceIdsFromLabel,
     initSizeInfoSortable: sizeInfoApi.initSizeInfoSortable,
+    initMaterialsSortable: materialsApi.initMaterialsSortable,
   })
 
   const { saving, submitting, onSaveDraft, onSaveAndSubmit } = useOrderEditSubmit({
@@ -226,6 +228,9 @@ export function useOrderEditPage() {
 
   watch(() => sizeInfoApi.sizeInfoRows.value.length, () => { sizeInfoApi.initSizeInfoSortable() })
   onBeforeUnmount(() => { sizeInfoApi.destroySizeInfoSortable() })
+
+  watch(() => materialsApi.materials.value.length, () => { materialsApi.initMaterialsSortable() })
+  onBeforeUnmount(() => { materialsApi.destroyMaterialsSortable() })
 
   return {
     ...orderEditOptionsApi,

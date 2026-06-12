@@ -17,3 +17,13 @@
 .materials-table :deep(.el-select .el-select__wrapper) {
   justify-content: center;
 }
+
+.material-row-drag-handle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  color: var(--el-text-color-secondary);
+  cursor: move;
+  user-select: none;
+}

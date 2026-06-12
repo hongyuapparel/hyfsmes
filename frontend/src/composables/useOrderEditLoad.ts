@@ -32,6 +32,7 @@ interface UseOrderEditLoadParams {
   syncMaterialTypeIdsFromLabel: () => void
   syncMaterialSourceIdsFromLabel: () => void
   initSizeInfoSortable: () => void
+  initMaterialsSortable: () => void
   storageKey?: string
 }
 
@@ -64,6 +65,7 @@ export function useOrderEditLoad({
   syncMaterialTypeIdsFromLabel,
   syncMaterialSourceIdsFromLabel,
   initSizeInfoSortable,
+  initMaterialsSortable,
   storageKey = 'orders_last_edit_id',
 }: UseOrderEditLoadParams) {
   const pageLoading = ref(false)
@@ -160,6 +162,7 @@ export function useOrderEditLoad({
     } finally {
       pageLoading.value = false
       initSizeInfoSortable()
+      initMaterialsSortable()
       nextTick(() => {
         hasUnsavedChanges.value = false
         skipDirtyCheck.value = false

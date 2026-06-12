@@ -6,7 +6,19 @@
         <el-button link type="primary" @click="addMaterialRow">新增物料</el-button>
       </div>
     </template>
-    <el-table :data="materials" border size="small" class="materials-table editable-grid">
+    <el-table
+      :ref="setMaterialsTableRef"
+      :data="materials"
+      row-key="__rowKey"
+      border
+      size="small"
+      class="materials-table editable-grid"
+    >
+      <el-table-column width="32" align="center" header-align="center">
+        <template #default>
+          <span class="material-row-drag-handle" title="拖拽排序">≡</span>
+        </template>
+      </el-table-column>
       <el-table-column label="物料图" width="80" header-align="center" align="center">
         <template #default="{ row }">
           <ImageUploadArea v-model="row.referenceImageUrl" dense />
@@ -208,6 +220,7 @@ import ImageUploadArea from '@/components/ImageUploadArea.vue'
 
 defineProps<{
   materials: MaterialRow[]
+  setMaterialsTableRef: (el: unknown) => void
   materialSourceOptions: Array<{ id: number; label: string }>
   materialTypeOptions: Array<{ id: number; label: string }>
   supplierOptions: Array<{ id: number; name: string }>

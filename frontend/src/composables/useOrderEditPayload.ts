@@ -103,7 +103,7 @@ export function useOrderEditPayload(params: UseOrderEditPayloadParams) {
         imageUrl: row.imageUrl,
       })),
       colorSizeHeaders: [...sizeHeaders.value],
-      materials: materials.value.map(({ materialType: _t, materialSource: _s, ...m }) => ({ ...m })),
+      materials: materials.value.map(({ materialType: _t, materialSource: _s, __rowKey: _k, ...m }) => ({ ...m })),
       sizeInfoMetaHeaders: [...sizeMetaHeaders.value],
       sizeInfoRows: sizeInfoRows.value.map((r) => ({
         metaValues: [...r.metaValues],
