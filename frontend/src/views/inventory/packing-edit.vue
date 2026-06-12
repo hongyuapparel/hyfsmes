@@ -12,6 +12,7 @@
       </div>
       <div class="edit-actions">
         <el-button v-if="edit.detail.value" @click="openLabels">箱贴</el-button>
+        <el-button v-if="edit.detail.value" @click="onExport">导出 Excel</el-button>
         <template v-if="!edit.isReadonly.value">
           <el-button @click="grid.addBox()">加箱</el-button>
           <el-button :loading="edit.saving.value" @click="edit.save()">保存草稿</el-button>
@@ -116,6 +117,7 @@ import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
 import PackingGoodsPickerDialog from '@/components/packing/PackingGoodsPickerDialog.vue'
 import PackingLabelPrint from '@/components/packing/PackingLabelPrint.vue'
+import { exportPackingListExcel } from '@/utils/packing-export'
 
 const route = useRoute()
 const router = useRouter()
@@ -128,6 +130,11 @@ const labelsVisible = ref(false)
 function openLabels() {
   if (!edit.detail.value) return
   labelsVisible.value = true
+}
+
+function onExport() {
+  if (!edit.detail.value) return
+  exportPackingListExcel(edit.detail.value)
 }
 
 function goBack() {
@@ -217,6 +224,7 @@ onMounted(async () => {
   edit.loadOptions()
   await edit.load()
   if (route.query.action === 'labels') openLabels()
+  if (route.query.action === 'export') onExport()
 })
 </script>
 

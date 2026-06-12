@@ -128,7 +128,8 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { deletePackingList, getPackingLists, type PackingListRow } from '@/api/packing-lists'
+import { deletePackingList, getPackingListDetail, getPackingLists, type PackingListRow } from '@/api/packing-lists'
+import { exportPackingListExcel } from '@/utils/packing-export'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
@@ -206,8 +207,13 @@ function openLabels(row: PackingListRow) {
   router.push(`/inventory/packing/edit/${row.id}?action=labels`)
 }
 
-function exportExcel(row: PackingListRow) {
-  router.push(`/inventory/packing/edit/${row.id}?action=export`)
+async function exportExcel(row: PackingListRow) {
+  try {
+    const res = await getPackingListDetail(row.id)
+    exportPackingListExcel(res.data)
+  } catch (e) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
+  }
 }
 
 async function onDelete(row: PackingListRow) {
