@@ -76,6 +76,7 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2026-06-12`：库存管理新增「装箱单」模块：从待仓处理/成品库存选货（含手工行）做 Excel 式分箱录入（editable-grid + 箱级单元格 rowspan 合并），确认发货复用 `InventoryPendingService.doOutbound` 与 `FinishedGoodsStockOutboundService.outbound` 联动扣减（发货前预校验超发），支持可改字箱贴 A4 打印与中英双语 Excel 导出；后端新增 `packing-lists` 模块与 3 张表（启动自动建表，SQL 见 `backend/scripts/create-packing-list-tables.sql`），权限 `/inventory/packing`。
 - `2026-05-16`：生产管理抽屉视觉刷新后修复 3 项：DrawerShell 支持垂直滚动（避免操作记录段被截）；纸样抽屉业务扩展/时效与节点改双列且删除重复订单号/SKU；纸样物料引入「查看/编辑」模式切换（编辑/取消/保存按钮在 section 标题区）。
 - `2026-05-16`：生产管理 6 个抽屉视觉刷新：默认 760 宽 + 可拖（680~1200），基本信息双列 + 右侧图，三段卡片化，与库存抽屉视觉对齐；ProductionDetailDrawerShell 底层换为 AppDrawer，移除 cutting 抽屉动态 size computed。
 - `2026-04-30`：库存管理明确“新增即手工入库”的操作口径；辅料/面料按名称作为唯一 SKU，同名新增改为给现有库存加数，成品库存支持选中现有记录后通过新增弹窗快速加数，并统一辅料/面料详情抽屉基础布局。
