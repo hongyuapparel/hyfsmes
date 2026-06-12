@@ -4,13 +4,47 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PackingListsService } from './packing-lists.service';
+import { PackingListsPickableService } from './packing-lists-pickable.service';
 import { SavePackingListDto } from './dto';
 
 @Controller('packing-lists')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/inventory/packing')
 export class PackingListsController {
-  constructor(private readonly service: PackingListsService) {}
+  constructor(
+    private readonly service: PackingListsService,
+    private readonly pickableService: PackingListsPickableService,
+  ) {}
+
+  @Get('pickable/pending')
+  getPendingPickable(
+    @Query('customerName') customerName?: string,
+    @Query('keyword') keyword?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.pickableService.getPendingPickable({
+      customerName,
+      keyword,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
+
+  @Get('pickable/finished')
+  getFinishedPickable(
+    @Query('customerName') customerName?: string,
+    @Query('keyword') keyword?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.pickableService.getFinishedPickable({
+      customerName,
+      keyword,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
 
   @Get()
   getList(

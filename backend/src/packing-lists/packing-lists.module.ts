@@ -16,6 +16,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { PackingListsController } from './packing-lists.controller';
 import { PackingListsService } from './packing-lists.service';
+import { PackingListsPickableService } from './packing-lists-pickable.service';
 
 @Module({
   imports: [
@@ -37,6 +38,6 @@ import { PackingListsService } from './packing-lists.service';
     AuthModule,
   ],
   controllers: [PackingListsController],
-  providers: [PackingListsService],
+  providers: [PackingListsService, PackingListsPickableService],
 })
 export class PackingListsModule {}
