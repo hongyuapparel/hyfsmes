@@ -11,6 +11,7 @@
         <el-tag v-else-if="edit.listId.value" type="info" size="small">草稿</el-tag>
       </div>
       <div class="edit-actions">
+        <el-button v-if="edit.detail.value" @click="openLabels">箱贴</el-button>
         <template v-if="!edit.isReadonly.value">
           <el-button @click="grid.addBox()">加箱</el-button>
           <el-button :loading="edit.saving.value" @click="edit.save()">保存草稿</el-button>
@@ -93,12 +94,19 @@
       @update:visible="picker.visible = $event"
       @picked="onPicked"
     />
+
+    <PackingLabelPrint
+      v-if="edit.detail.value"
+      :visible="labelsVisible"
+      :detail="edit.detail.value"
+      @update:visible="labelsVisible = $event"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -107,12 +115,20 @@ import { usePackingGridRows } from '@/composables/usePackingGridRows'
 import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
 import PackingGoodsPickerDialog from '@/components/packing/PackingGoodsPickerDialog.vue'
+import PackingLabelPrint from '@/components/packing/PackingLabelPrint.vue'
 
+const route = useRoute()
 const router = useRouter()
 const grid = usePackingGridRows()
 const edit = usePackingListEdit(grid)
 const picker = reactive({ visible: false, boxIndex: 0 })
 const shipping = ref(false)
+const labelsVisible = ref(false)
+
+function openLabels() {
+  if (!edit.detail.value) return
+  labelsVisible.value = true
+}
 
 function goBack() {
   router.push('/inventory/packing')
@@ -200,6 +216,7 @@ async function onShip() {
 onMounted(async () => {
   edit.loadOptions()
   await edit.load()
+  if (route.query.action === 'labels') openLabels()
 })
 </script>
 
