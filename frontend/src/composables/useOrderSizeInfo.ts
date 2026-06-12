@@ -1,10 +1,9 @@
 import type { Ref } from 'vue'
 import { nextTick, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import Sortable from 'sortablejs'
+import { nextRowKey, useTableRowDragSort } from '@/composables/useTableRowDragSort'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
-type TableComponentInstance = HTMLElement | { $el?: HTMLElement } | null
 
 export interface SizeInfoRow {
   __rowKey: string
@@ -22,14 +21,12 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
   const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
   const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
   const sizeInfoRows = ref<SizeInfoRow[]>([])
-  const sizeInfoTableRef = ref<TableComponentInstance>(null)
   const sizeGridRefs = ref<InputComponentInstance[][]>([])
-  let sizeInfoSortable: Sortable | null = null
-  let sizeInfoRowKeySeed = 0
+  const rowDragApi = useTableRowDragSort(sizeInfoRows, '.size-row-drag-handle')
+  const sizeInfoTableRef = rowDragApi.tableRef
 
   function nextSizeInfoRowKey() {
-    sizeInfoRowKeySeed += 1
-    return `size-row-${Date.now()}-${sizeInfoRowKeySeed}`
+    return nextRowKey('size-row')
   }
 
   function setSizeGridCellRef(el: unknown, rowIndex: number, colIndex: number) {
@@ -165,76 +162,6 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     sizeInfoRows.value.splice(index, 1)
   }
 
-  function setSizeInfoTableRef(el: unknown) {
-    if (el instanceof HTMLElement || el === null) {
-      sizeInfoTableRef.value = el
-      return
-    }
-    if (el && typeof el === 'object' && '$el' in el) {
-      const maybeTable = el as { $el?: HTMLElement }
-      sizeInfoTableRef.value = maybeTable.$el ? maybeTable : null
-      return
-    }
-    sizeInfoTableRef.value = null
-  }
-
-  function initSizeInfoSortable() {
-    nextTick(() => {
-      const tableRef = sizeInfoTableRef.value
-      const root = tableRef instanceof HTMLElement ? tableRef : tableRef?.$el
-      const tbody = root?.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
-      if (!tbody) return
-
-      destroySizeInfoSortable()
-
-      sizeInfoSortable = Sortable.create(tbody, {
-        animation: 120,
-        handle: '.size-row-drag-handle',
-        draggable: '> tr',
-        onEnd: (evt) => {
-          const orderedKeys = Array.from(tbody.querySelectorAll('tr.el-table__row'))
-            .map((tr) => tr.getAttribute('data-row-key'))
-            .filter((k): k is string => !!k)
-          if (orderedKeys.length === sizeInfoRows.value.length) {
-            const rowMap = new Map(sizeInfoRows.value.map((r) => [r.__rowKey, r]))
-            const nextRows = orderedKeys.map((k) => rowMap.get(k)).filter((r): r is SizeInfoRow => !!r)
-            if (nextRows.length === sizeInfoRows.value.length) {
-              sizeInfoRows.value = nextRows
-              return
-            }
-          }
-          const anyEvt = evt as unknown as {
-            oldIndex?: number
-            newIndex?: number
-            oldDraggableIndex?: number
-            newDraggableIndex?: number
-          }
-          const oldIndex = anyEvt.oldDraggableIndex ?? anyEvt.oldIndex
-          const newIndex = anyEvt.newDraggableIndex ?? anyEvt.newIndex
-          if (oldIndex == null || newIndex == null || oldIndex === newIndex) return
-          if (
-            oldIndex < 0 ||
-            newIndex < 0 ||
-            oldIndex >= sizeInfoRows.value.length ||
-            newIndex >= sizeInfoRows.value.length
-          ) {
-            return
-          }
-          const moved = sizeInfoRows.value.splice(oldIndex, 1)[0]
-          if (!moved) return
-          sizeInfoRows.value.splice(newIndex, 0, moved)
-        },
-      })
-    })
-  }
-
-  function destroySizeInfoSortable() {
-    if (sizeInfoSortable) {
-      sizeInfoSortable.destroy()
-      sizeInfoSortable = null
-    }
-  }
-
   function addSizeMetaColumn() {
     sizeMetaHeaders.value.push(`字段${sizeMetaHeaders.value.length + 1}`)
     normalizeSizeInfoRows()
@@ -288,7 +215,7 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     sizeMetaHeaders,
     sizeInfoRows,
     sizeInfoTableRef,
-    setSizeInfoTableRef,
+    setSizeInfoTableRef: rowDragApi.setTableRef,
     sizeGridRefs,
     setSizeGridCellRef,
     focusSizeGridCell,
@@ -297,8 +224,8 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     normalizeSizeInfoRows,
     addSizeInfoRow,
     removeSizeInfoRow,
-    initSizeInfoSortable,
-    destroySizeInfoSortable,
+    initSizeInfoSortable: rowDragApi.initSortable,
+    destroySizeInfoSortable: rowDragApi.destroySortable,
     addSizeMetaColumn,
     removeSizeMetaColumn,
     copySizeInfoToClipboard,

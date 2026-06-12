@@ -1,6 +1,6 @@
 import { nextTick, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import Sortable from 'sortablejs'
+import { nextRowKey, useTableRowDragSort } from '@/composables/useTableRowDragSort'
 
 export type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 
@@ -12,11 +12,8 @@ export interface SizeInfoRow {
 
 export const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
 
-let sizeInfoRowKeySeed = 0
-
 function nextSizeInfoRowKey() {
-  sizeInfoRowKeySeed += 1
-  return `size-row-${Date.now()}-${sizeInfoRowKeySeed}`
+  return nextRowKey('size-row')
 }
 
 export function useOrderSizeInfoTable(
@@ -25,9 +22,9 @@ export function useOrderSizeInfoTable(
 ) {
   const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
   const sizeInfoRows = ref<SizeInfoRow[]>([])
-  const sizeInfoTableRef = ref<{ $el?: HTMLElement } | null>(null)
   const sizeGridRefs = ref<InputComponentInstance[][]>([])
-  let sizeInfoSortable: Sortable | null = null
+  const rowDragApi = useTableRowDragSort(sizeInfoRows, '.size-row-drag-handle')
+  const sizeInfoTableRef = rowDragApi.tableRef
 
   function normalizeSizeInfoRows() {
     const metaLen = sizeMetaHeaders.value.length
@@ -147,49 +144,6 @@ export function useOrderSizeInfoTable(
     sizeInfoRows.value.splice(index, 1)
   }
 
-  function initSizeInfoSortable() {
-    nextTick(() => {
-      const root = sizeInfoTableRef.value?.$el as HTMLElement | undefined
-      const tbody = root?.querySelector('.el-table__body-wrapper tbody') as HTMLElement | null
-      if (!tbody) return
-
-      if (sizeInfoSortable) {
-        sizeInfoSortable.destroy()
-        sizeInfoSortable = null
-      }
-
-      sizeInfoSortable = Sortable.create(tbody, {
-        animation: 120,
-        handle: '.size-row-drag-handle',
-        draggable: '> tr',
-        onEnd: (evt) => {
-          const orderedKeys = Array.from(tbody.querySelectorAll('tr.el-table__row'))
-            .map((tr) => tr.getAttribute('data-row-key'))
-            .filter((k): k is string => !!k)
-          if (orderedKeys.length === sizeInfoRows.value.length) {
-            const rowMap = new Map(sizeInfoRows.value.map((r) => [r.__rowKey, r]))
-            const nextRows = orderedKeys.map((k) => rowMap.get(k)).filter((r): r is SizeInfoRow => !!r)
-            if (nextRows.length === sizeInfoRows.value.length) {
-              sizeInfoRows.value = nextRows
-              return
-            }
-          }
-          const anyEvt = evt as unknown as {
-            oldIndex?: number; newIndex?: number
-            oldDraggableIndex?: number; newDraggableIndex?: number
-          }
-          const oldIndex = anyEvt.oldDraggableIndex ?? anyEvt.oldIndex
-          const newIndex = anyEvt.newDraggableIndex ?? anyEvt.newIndex
-          if (oldIndex == null || newIndex == null || oldIndex === newIndex) return
-          if (oldIndex < 0 || newIndex < 0 || oldIndex >= sizeInfoRows.value.length || newIndex >= sizeInfoRows.value.length) return
-          const moved = sizeInfoRows.value.splice(oldIndex, 1)[0]
-          if (!moved) return
-          sizeInfoRows.value.splice(newIndex, 0, moved)
-        },
-      })
-    })
-  }
-
   function addSizeMetaColumn() {
     sizeMetaHeaders.value.push(`字段${sizeMetaHeaders.value.length + 1}`)
     normalizeSizeInfoRows()
@@ -202,13 +156,6 @@ export function useOrderSizeInfoTable(
       if (Array.isArray(row.metaValues)) row.metaValues.splice(mIndex, 1)
     })
     normalizeSizeInfoRows()
-  }
-
-  function destroySizeInfoSortable() {
-    if (sizeInfoSortable) {
-      sizeInfoSortable.destroy()
-      sizeInfoSortable = null
-    }
   }
 
   async function copySizeInfoToClipboard() {
@@ -260,8 +207,8 @@ export function useOrderSizeInfoTable(
     onSizeGridPaste,
     addSizeInfoRow,
     removeSizeInfoRow,
-    initSizeInfoSortable,
-    destroySizeInfoSortable,
+    initSizeInfoSortable: rowDragApi.initSortable,
+    destroySizeInfoSortable: rowDragApi.destroySortable,
     addSizeMetaColumn,
     removeSizeMetaColumn,
     copySizeInfoToClipboard,
