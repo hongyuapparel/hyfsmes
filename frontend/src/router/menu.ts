@@ -41,6 +41,7 @@ export const menuConfig: MenuItem[] = [
       { path: '/inventory/finished', title: '成品库存' },
       { path: '/inventory/accessories', title: '辅料库存' },
       { path: '/inventory/fabric', title: '面料库存' },
+      { path: '/inventory/packing', title: '装箱单' },
     ],
   },
   {

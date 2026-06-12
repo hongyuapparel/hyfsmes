@@ -148,6 +148,19 @@ const routes: RouteRecordRaw[] = [
             meta: { title: '辅料库存', permissionPath: '/inventory/accessories' },
           },
           {
+            path: 'packing',
+            name: 'InventoryPacking',
+            component: () => import('@/views/inventory/packing.vue'),
+            meta: { title: '装箱单', permissionPath: '/inventory/packing' },
+          },
+          {
+            path: 'packing/edit/:id?',
+            name: 'InventoryPackingEdit',
+            component: () => import('@/views/inventory/packing-edit.vue'),
+            // 复用装箱单列表的菜单权限，照 orders edit 先例
+            meta: { title: '装箱单编辑', permissionPath: '/inventory/packing' },
+          },
+          {
             path: 'fabric',
             name: 'InventoryFabric',
             component: () => import('@/views/inventory/fabric.vue'),
