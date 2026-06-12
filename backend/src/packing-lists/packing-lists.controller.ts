@@ -1,0 +1,53 @@
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { PermissionGuard } from '../auth/permission.guard';
+import { RequirePermission } from '../auth/require-permission.decorator';
+import { CurrentUser } from '../auth/current-user.decorator';
+import { PackingListsService } from './packing-lists.service';
+import { SavePackingListDto } from './dto';
+
+@Controller('packing-lists')
+@UseGuards(JwtAuthGuard, PermissionGuard)
+@RequirePermission('/inventory/packing')
+export class PackingListsController {
+  constructor(private readonly service: PackingListsService) {}
+
+  @Get()
+  getList(
+    @Query('status') status?: string,
+    @Query('customerName') customerName?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.service.getList({
+      status,
+      customerName,
+      dateFrom,
+      dateTo,
+      page: page ? parseInt(page, 10) : 1,
+      pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+    });
+  }
+
+  @Get(':id')
+  getDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getDetail(id);
+  }
+
+  @Post()
+  create(@Body() payload: SavePackingListDto, @CurrentUser() user: { userId: number; username: string }) {
+    return this.service.create(payload, user?.username ?? '');
+  }
+
+  @Put(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() payload: SavePackingListDto) {
+    return this.service.update(id, payload);
+  }
+
+  @Delete(':id')
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.service.remove(id);
+  }
+}

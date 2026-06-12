@@ -64,6 +64,7 @@ import { InventoryPendingModule } from './inventory-pending/inventory-pending.mo
 import { FinishedGoodsStockModule } from './finished-goods-stock/finished-goods-stock.module';
 import { InventoryAccessoriesModule } from './inventory-accessories/inventory-accessories.module';
 import { FabricStockModule } from './fabric-stock/fabric-stock.module';
+import { PackingListsModule } from './packing-lists/packing-lists.module';
 import { HrModule } from './hr/hr.module';
 import { SuppliersModule } from './suppliers/suppliers.module';
 import { OrderStatusConfigModule } from './order-status-config/order-status-config.module';
@@ -124,6 +125,7 @@ import { FinanceDashboardModule } from './finance-dashboard/finance-dashboard.mo
     FinishedGoodsStockModule,
     InventoryAccessoriesModule,
     FabricStockModule,
+    PackingListsModule,
     HrModule,
     SuppliersModule,
     OrderStatusConfigModule,
