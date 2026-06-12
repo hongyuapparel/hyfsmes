@@ -31,6 +31,7 @@ interface UseOrderDetailHydrationParams {
   normalizeColorRows: () => void
   ensureAtLeastOneColorRow: () => void
   materials: Ref<MaterialRow[]>
+  nextMaterialRowKey: () => string
   roundMaterialQty2: (n: number) => number
   recalcPurchaseQuantity: (row: MaterialRow) => void
   defaultSizeMetaHeaders: string[]
@@ -89,6 +90,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
     params.ensureAtLeastOneColorRow()
 
     params.materials.value = (d.materials ?? []).map((m: MaterialPayload) => ({
+      __rowKey: params.nextMaterialRowKey(),
       materialSourceId: m.materialSourceId ?? null,
       materialSource: m.materialSource ?? '',
       materialTypeId: m.materialTypeId ?? null,

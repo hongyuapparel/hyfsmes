@@ -2,10 +2,12 @@ import { nextTick, ref } from 'vue'
 import { getDictItems } from '@/api/dicts'
 import type { SystemOptionItem } from '@/api/system-options'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
+import { nextMaterialRowKey, useOrderMaterialsRowDrag } from '@/composables/useOrderMaterialsRowDrag'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 
 export interface MaterialRow {
+  __rowKey?: string
   materialSourceId?: number | null
   materialSource?: string
   materialTypeId?: number | null
@@ -28,6 +30,7 @@ export interface MaterialRow {
 
 export function useOrderMaterials() {
   const materials = ref<MaterialRow[]>([])
+  const materialsRowDragApi = useOrderMaterialsRowDrag(materials)
   const materialSourceOptions = ref<{ id: number; label: string }[]>([])
   const materialTypeOptions = ref<{ id: number; label: string }[]>([])
   const materialCellRefs = ref<InputComponentInstance[][]>([])
@@ -95,7 +98,7 @@ export function useOrderMaterials() {
   }
 
   function addMaterialRow() {
-    materials.value.push({})
+    materials.value.push({ __rowKey: nextMaterialRowKey() })
   }
 
   function removeMaterialRow(index: number) {
@@ -253,6 +256,7 @@ export function useOrderMaterials() {
   }
 
   return {
+    ...materialsRowDragApi,
     materials,
     materialSourceOptions,
     materialTypeOptions,
