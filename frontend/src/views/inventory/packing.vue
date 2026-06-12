@@ -114,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onActivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -232,6 +232,16 @@ async function onDelete(row: PackingListRow) {
 }
 
 onMounted(load)
+
+// 编辑页保存/发货后返回本页（keep-alive 缓存恢复）需重新拉列表，否则看不到最新结果
+let initialActivationDone = false
+onActivated(() => {
+  if (!initialActivationDone) {
+    initialActivationDone = true
+    return
+  }
+  load()
+})
 </script>
 
 <style scoped>

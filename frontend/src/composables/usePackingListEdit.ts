@@ -107,10 +107,17 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     if (!id) {
       listId.value = null
       detail.value = null
+      form.customerId = null
+      form.customerName = ''
+      form.serviceManager = ''
+      form.poNo = ''
+      form.packDate = today()
+      form.remark = ''
+      form.showCompany = true
+      pickedLines.value = []
       grid.sizeHeaders.value = []
       grid.boxes.value = []
       grid.addBox()
-      form.packDate = today()
       return
     }
     loading.value = true
@@ -154,8 +161,10 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     }
   }
 
-  /** 保存草稿。silent 时不弹成功提示（发货前置保存用）。返回是否成功 */
-  async function save(silent = false): Promise<boolean> {
+  /** 保存草稿。silent 时不弹成功提示（发货前置保存用）。
+   * navigate=false 时新建后不做路由替换（路由替换会触发 keep-alive 重挂载、换新组件实例，
+   * 发货流程需在当前实例上继续，由调用方在流程结束后自行导航）。返回是否成功 */
+  async function save(silent = false, navigate = true): Promise<boolean> {
     if (!form.customerName.trim()) {
       ElMessage.warning('请先填写客户')
       return false
@@ -171,7 +180,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
         const res = await createPackingList(buildPayload())
         listId.value = res.data.id
         if (!silent) ElMessage.success(`已保存（单号 ${res.data.code}）`)
-        await router.replace(`/inventory/packing/edit/${res.data.id}`)
+        if (navigate) await router.replace(`/inventory/packing/edit/${res.data.id}`)
         const detailRes = await getPackingListDetail(res.data.id)
         applyDetail(detailRes.data)
       }

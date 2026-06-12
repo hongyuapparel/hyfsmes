@@ -284,7 +284,7 @@ interface PickableLine {
 
 - [x] Step 1 根目录前后端完整 build 各跑一次；`npm run check:el-radio-value`
 - [x] Step 2 `npx vitest run`（前端既有 + 新 spec）
-- [ ] Step 3 `scripts/start.ps1` 起本地，过冒烟：菜单出现 → 新建（手填客户+手工行+插码列）→ 保存草稿 → 重开 → 选货（两来源）→ 确认发货 → 待仓/成品两页核对扣减与出库记录 → 箱贴打印预览 → Excel 导出打开核对
+- [x] Step 3 `scripts/start.ps1` 起本地，过冒烟：菜单出现 → 新建（手填客户+手工行+插码列）→ 保存草稿 → 重开 → 选货（两来源）→ 确认发货 → 待仓/成品两页核对扣减与出库记录 → 箱贴打印预览 → Excel 导出打开核对
 - [x] Step 4 `git status` 核对改动面；docs/PROJECT_CONTEXT.md 更新记录一行
 - [x] Step 5 commit `docs: 装箱单功能说明`
 

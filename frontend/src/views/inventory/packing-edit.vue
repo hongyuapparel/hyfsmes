@@ -106,7 +106,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
+import { onActivated, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft } from '@element-plus/icons-vue'
@@ -207,17 +207,22 @@ async function onShip() {
     return
   }
   shipping.value = true
+  let shipped = false
   try {
-    const saved = await edit.save(true)
+    // 新建单先保存但不导航：导航会重挂载组件，后续发货结果只会更新到旧实例上
+    const saved = await edit.save(true, false)
     if (!saved || !edit.listId.value) return
     await shipPackingList(edit.listId.value)
+    shipped = true
     ElMessage.success('已发货')
-    await edit.load()
   } catch (e) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '发货失败'))
   } finally {
     shipping.value = false
   }
+  if (!edit.listId.value) return
+  if (!route.params.id) await router.replace(`/inventory/packing/edit/${edit.listId.value}`)
+  else if (shipped) await edit.load()
 }
 
 onMounted(async () => {
@@ -225,6 +230,12 @@ onMounted(async () => {
   await edit.load()
   if (route.query.action === 'labels') openLabels()
   if (route.query.action === 'export') onExport()
+})
+
+// 新建页（无 id 路由）被 keep-alive 复活时，旧实例可能还带着上一单的状态（发货后路由已换成 /edit/:id），
+// 此时必须重置为全新空单；带 id 的编辑页不在此重置，避免覆盖用户未保存的修改
+onActivated(() => {
+  if (!route.params.id && edit.listId.value) edit.load()
 })
 </script>
 
