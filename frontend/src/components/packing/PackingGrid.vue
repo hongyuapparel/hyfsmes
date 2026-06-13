@@ -87,17 +87,7 @@
         />
       </template>
     </el-table-column>
-    <el-table-column width="92" align="center" header-align="center">
-      <template #header>
-        <div class="size-header-cell">
-          <span>合计</span>
-          <el-tooltip v-if="!disabled" content="新增尺码列" placement="top">
-            <el-button link type="primary" size="small" @click.stop="emit('add-size')">
-              <el-icon><Plus /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </div>
-      </template>
+    <el-table-column width="92" label="合计" align="center" header-align="center">
       <template #default="{ row }">
         <span v-if="hasSizeQty(row.item)">{{ formatDisplayNumber(packingItemTotal(row.item)) }}</span>
         <el-input-number
@@ -173,7 +163,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'add-size': []
   'rename-size': [index: number, oldName: string]
   'remove-size-at': [index: number]
   'copy-box': [boxIndex: number]
@@ -276,12 +265,36 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   gap: 2px;
 }
 
+/* 列头码名做成"像表头文字"的可编辑框：常态无边框，聚焦才高亮 */
 .size-header-input {
-  width: 48px;
+  width: 46px;
 }
 
+.size-header-input :deep(.el-input__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  padding: 0 4px;
+}
+
+.size-header-input :deep(.el-input__inner) {
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.size-header-input :deep(.el-input__wrapper.is-focus) {
+  background: var(--color-card);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+
+/* 删除「×」常态隐藏，悬停列头才出现，减少视觉杂乱 */
 .size-header-remove {
-  opacity: 0.6;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.size-header-cell:hover .size-header-remove {
+  opacity: 0.55;
 }
 
 .qty-input {

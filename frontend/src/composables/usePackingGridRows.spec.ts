@@ -94,12 +94,19 @@ describe('usePackingGridRows', () => {
     expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({ M: 6 })
   })
 
-  it('addSizeColumn 追加空列并返回下标', () => {
+  it('addSizeColumn 默认补下一个未用标准码并返回下标', () => {
     const grid = usePackingGridRows()
     grid.sizeHeaders.value = ['S']
     const idx = grid.addSizeColumn()
     expect(idx).toBe(1)
-    expect(grid.sizeHeaders.value).toEqual(['S', ''])
+    expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
+  })
+
+  it('addSizeColumn 标准码用尽后留空列', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XS', 'XXS', '均码']
+    const idx = grid.addSizeColumn()
+    expect(grid.sizeHeaders.value[idx]).toBe('')
   })
 
   it('commitSizeHeader 改名迁移行内数据', () => {
@@ -123,9 +130,8 @@ describe('usePackingGridRows', () => {
 
   it('commitSizeHeader 空名删除无数据的新列', () => {
     const grid = usePackingGridRows()
-    grid.sizeHeaders.value = ['S']
-    const idx = grid.addSizeColumn()
-    expect(grid.commitSizeHeader(idx, '')).toBe('removed')
+    grid.sizeHeaders.value = ['S', '']
+    expect(grid.commitSizeHeader(1, '')).toBe('removed')
     expect(grid.sizeHeaders.value).toEqual(['S'])
   })
 

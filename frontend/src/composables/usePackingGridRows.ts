@@ -48,6 +48,9 @@ interface SourceAllocation {
   styleNo: string
 }
 
+/** 新增尺码列默认按此顺序补码，用尽后留空待手填 */
+const STANDARD_SIZES = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XS', 'XXS', '均码']
+
 let draftUid = 0
 function nextKey(): string {
   draftUid += 1
@@ -126,9 +129,11 @@ export function usePackingGridRows() {
     }
   }
 
-  /** 末尾追加一个空尺码列，返回其下标（前端聚焦列头直接录入） */
+  /** 末尾追加一个尺码列：默认取下一个未用的标准码（S/M/L…），标准码用尽则留空待手填。返回其下标 */
   function addSizeColumn(): number {
-    sizeHeaders.value.push('')
+    const used = new Set(sizeHeaders.value.map((h) => h.trim()))
+    const next = STANDARD_SIZES.find((s) => !used.has(s)) ?? ''
+    sizeHeaders.value.push(next)
     return sizeHeaders.value.length - 1
   }
 

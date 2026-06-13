@@ -75,13 +75,20 @@
       </div>
     </el-form>
 
+    <div v-if="!edit.isReadonly.value" class="grid-toolbar">
+      <el-button link type="primary" @click="onAddSize">
+        <el-icon><Plus /></el-icon>
+        新增尺码列
+      </el-button>
+      <span class="grid-toolbar-tip">默认按 S/M/L/XL 顺序补码，点列名可改</span>
+    </div>
+
     <PackingGrid
       ref="packingGridRef"
       :flat-rows="grid.flatRows.value"
       :size-headers="grid.sizeHeaders.value"
       :totals="grid.totals.value"
       :disabled="edit.isReadonly.value"
-      @add-size="onAddSize"
       @rename-size="onRenameSize"
       @remove-size-at="onRemoveSizeAt"
       @copy-box="grid.copyBox"
@@ -119,7 +126,7 @@
 import { onActivated, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Plus } from '@element-plus/icons-vue'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { shipPackingList, type PickableLine } from '@/api/packing-lists'
 import { usePackingGridRows } from '@/composables/usePackingGridRows'
@@ -161,7 +168,8 @@ function goBack() {
 
 function onAddSize() {
   const index = grid.addSizeColumn()
-  packingGridRef.value?.focusSizeHeader(index)
+  // 标准码已自动填好不抢焦点；仅当标准码用尽留了空列时才聚焦让用户手填
+  if (!grid.sizeHeaders.value[index]) packingGridRef.value?.focusSizeHeader(index)
 }
 
 function onRenameSize(index: number, oldName: string) {
@@ -284,6 +292,18 @@ onActivated(() => {
 .edit-code {
   font-size: var(--font-size-subtitle);
   font-weight: 600;
+}
+
+.grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-bottom: calc(-1 * var(--space-sm));
+}
+
+.grid-toolbar-tip {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
 }
 
 .head-form-grid {
