@@ -1,3 +1,4 @@
+/* 统一配色：ink 主文字 / muted 标签 / faint 副文(中文注释) / line 内线 / frame 外框·分隔 / shade 底纹 */
 .doc-toolbar {
   display: flex;
   align-items: center;
@@ -14,13 +15,15 @@
   margin: 0 auto;
   background: #ffffff;
   color: #1f2329;
-  padding: 22px 26px;
+  padding: 24px 28px;
   width: 100%;
   max-width: 760px;
   box-sizing: border-box;
   font-family: Arial, 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
 }
 
+/* 抬头：英文为主，中文小字淡灰；下方深色分隔线（与表格外框同色，形成统一框架） */
 .doc-head {
   display: flex;
   align-items: flex-end;
@@ -32,7 +35,7 @@
 .doc-brand {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .doc-brand-en {
@@ -45,14 +48,14 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 2px;
-  color: #5a6066;
+  color: #9ca3af;
 }
 
 .doc-title {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 .doc-title-en {
@@ -64,60 +67,60 @@
 .doc-title-cn {
   font-size: 13px;
   font-weight: 600;
-  letter-spacing: 3px;
-  color: #5a6066;
+  letter-spacing: 4px;
+  color: #9ca3af;
 }
 
+/* 信息区：无边框，靠列对齐 + 留白；标签 muted、中文注释 faint、值 ink 粗体 */
 .doc-meta {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 4px 32px;
-  margin: 14px 0 16px;
+  gap: 7px 40px;
+  margin: 16px 0;
 }
 
 .doc-meta-item {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 13px;
-  padding: 2px 0;
-  border-bottom: 1px dotted #d7dbe0;
 }
 
 .doc-meta-label {
-  color: #5a6066;
-  white-space: nowrap;
+  color: #6b7280;
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .doc-meta-label .cn {
-  margin-left: 4px;
+  margin-left: 3px;
   font-size: 11px;
   font-weight: 400;
-  color: #9298a0;
+  color: #9ca3af;
 }
 
 .doc-meta-value {
-  font-weight: 600;
+  color: #1f2329;
+  font-weight: 700;
   flex: 1;
 }
 
+/* 表格：外框与抬头同深色，内线统一浅灰；表头/合计统一浅底 */
 .doc-table {
   width: 100%;
+  border: 1.5px solid #1f2329;
   border-collapse: collapse;
-  font-size: 13px;
 }
 
 .doc-table th,
 .doc-table td {
-  border: 1px solid #b8bdc4;
-  padding: 6px 8px;
+  border: 1px solid #d4d8de;
+  padding: 7px 8px;
   text-align: center;
   vertical-align: middle;
 }
 
 .doc-table thead th {
-  background: #f3f5f7;
+  background: #f4f6f8;
   font-weight: 700;
   line-height: 1.25;
 }
@@ -126,7 +129,7 @@
   display: block;
   font-size: 11px;
   font-weight: 400;
-  color: #9298a0;
+  color: #9ca3af;
 }
 
 .doc-table .col-style,
@@ -139,16 +142,15 @@
 }
 
 .doc-table .muted {
-  color: #b8bdc4;
+  color: #c0c5cd;
 }
 
 .doc-table .col-box {
   font-weight: 700;
-  background: #fafbfc;
 }
 
 .doc-total td {
-  background: #f3f5f7;
+  background: #f4f6f8;
   font-weight: 700;
 }
 
@@ -166,7 +168,7 @@
 }
 
 .doc-remark {
-  color: #1f2329;
+  color: #6b7280;
   flex: 1;
 }
 
