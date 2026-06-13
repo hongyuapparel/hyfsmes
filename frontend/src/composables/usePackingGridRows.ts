@@ -129,12 +129,16 @@ export function usePackingGridRows() {
     }
   }
 
-  /** 末尾追加一个尺码列：默认取下一个未用的标准码（S/M/L…），标准码用尽则留空待手填。返回其下标 */
-  function addSizeColumn(): number {
+  /**
+   * 新增一个尺码列：默认取下一个未用的标准码（S/M/L…），标准码用尽则留空待手填。
+   * index 指定插入位置（在该下标前插入），不传则追加到末尾。返回新列的下标。
+   */
+  function addSizeColumn(index?: number): number {
     const used = new Set(sizeHeaders.value.map((h) => h.trim()))
     const next = STANDARD_SIZES.find((s) => !used.has(s)) ?? ''
-    sizeHeaders.value.push(next)
-    return sizeHeaders.value.length - 1
+    const at = index != null && index >= 0 && index <= sizeHeaders.value.length ? index : sizeHeaders.value.length
+    sizeHeaders.value.splice(at, 0, next)
+    return at
   }
 
   function columnHasData(name: string): boolean {

@@ -54,25 +54,31 @@
     >
       <template #header>
         <div class="size-header-cell">
-          <el-input
-            v-if="!disabled"
-            :ref="(el) => setSizeHeaderRef(el, sIndex)"
-            v-model="sizeHeaders[sIndex]"
-            size="small"
-            placeholder="码"
-            class="size-header-input"
-            :input-style="{ textAlign: 'center' }"
-            @focus="onSizeHeaderFocus(sIndex)"
-            @change="onSizeHeaderChange(sIndex)"
-            @keydown.enter.stop="blurEvent"
-            @click.stop
-          />
+          <template v-if="!disabled">
+            <el-tooltip content="在此列前插入尺码列" placement="top">
+              <el-button link type="primary" class="size-header-insert" :aria-label="`在第${sIndex + 1}列前插入`" @click.stop="emit('add-size-at', sIndex)">
+                <el-icon><Plus /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-input
+              :ref="(el) => setSizeHeaderRef(el, sIndex)"
+              v-model="sizeHeaders[sIndex]"
+              size="small"
+              placeholder="码"
+              class="size-header-input"
+              :input-style="{ textAlign: 'center' }"
+              @focus="onSizeHeaderFocus(sIndex)"
+              @change="onSizeHeaderChange(sIndex)"
+              @keydown.enter.stop="blurEvent"
+              @click.stop
+            />
+            <el-tooltip content="删除此码列" placement="top">
+              <el-button link type="danger" class="size-header-remove" :aria-label="`删除第${sIndex + 1}列`" @click.stop="emit('remove-size-at', sIndex)">
+                <el-icon><CircleClose /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </template>
           <span v-else>{{ size }}</span>
-          <el-tooltip v-if="!disabled" content="删除此码列" placement="top">
-            <el-button link type="danger" size="small" class="size-header-remove" @click.stop="emit('remove-size-at', sIndex)">
-              <el-icon><CircleClose /></el-icon>
-            </el-button>
-          </el-tooltip>
         </div>
       </template>
       <template #default="{ row }">
@@ -87,7 +93,17 @@
         />
       </template>
     </el-table-column>
-    <el-table-column width="92" label="合计" align="center" header-align="center">
+    <el-table-column width="92" align="center" header-align="center">
+      <template #header>
+        <div class="total-header-cell">
+          <el-tooltip v-if="!disabled" :content="sizeHeaders.length ? '在末尾新增尺码列' : '新增尺码列'" placement="top">
+            <el-button link type="primary" class="size-header-insert total-insert" aria-label="新增尺码列" @click.stop="emit('add-size-at', sizeHeaders.length)">
+              <el-icon><Plus /></el-icon>
+            </el-button>
+          </el-tooltip>
+          <span>合计</span>
+        </div>
+      </template>
       <template #default="{ row }">
         <span v-if="hasSizeQty(row.item)">{{ formatDisplayNumber(packingItemTotal(row.item)) }}</span>
         <el-input-number
@@ -163,6 +179,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
+  'add-size-at': [index: number]
   'rename-size': [index: number, oldName: string]
   'remove-size-at': [index: number]
   'copy-box': [boxIndex: number]
@@ -259,21 +276,28 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   margin-left: 4px;
 }
 
-.size-header-cell {
-  display: inline-flex;
+/* 列头：码名居中可编辑，左右缝隙在 hover 时浮出「+插入 / ×删除」（复用 order 编辑列头交互） */
+.size-header-cell,
+.total-header-cell {
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
 }
 
-/* 列头码名做成"像表头文字"的可编辑框：常态无边框，聚焦才高亮 */
+/* 码名做成"像表头文字"的可编辑框：常态无边框，聚焦才高亮 */
 .size-header-input {
-  width: 46px;
+  flex: 1;
+  min-width: 0;
 }
 
 .size-header-input :deep(.el-input__wrapper) {
   background: transparent;
   box-shadow: none;
-  padding: 0 4px;
+  padding: 0 2px;
 }
 
 .size-header-input :deep(.el-input__inner) {
@@ -287,14 +311,41 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   box-shadow: 0 0 0 1px var(--color-primary) inset;
 }
 
-/* 删除「×」常态隐藏，悬停列头才出现，减少视觉杂乱 */
+.size-header-insert,
 .size-header-remove {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  min-width: 12px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
   opacity: 0;
   transition: opacity 0.15s;
 }
 
-.size-header-cell:hover .size-header-remove {
-  opacity: 0.55;
+.size-header-insert {
+  left: 0;
+}
+
+.size-header-remove {
+  right: 0;
+}
+
+.total-insert {
+  left: -6px;
+}
+
+.size-header-insert :deep(.el-icon),
+.size-header-remove :deep(.el-icon) {
+  font-size: 11px;
+}
+
+.size-header-cell:hover .size-header-insert,
+.size-header-cell:hover .size-header-remove,
+.total-header-cell:hover .size-header-insert {
+  opacity: 0.7;
 }
 
 .qty-input {

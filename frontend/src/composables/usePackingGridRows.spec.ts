@@ -102,6 +102,14 @@ describe('usePackingGridRows', () => {
     expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
   })
 
+  it('addSizeColumn 指定下标在该位置前插入', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'L']
+    const idx = grid.addSizeColumn(1)
+    expect(idx).toBe(1)
+    expect(grid.sizeHeaders.value).toEqual(['S', 'M', 'L'])
+  })
+
   it('addSizeColumn 标准码用尽后留空列', () => {
     const grid = usePackingGridRows()
     grid.sizeHeaders.value = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XS', 'XXS', '均码']

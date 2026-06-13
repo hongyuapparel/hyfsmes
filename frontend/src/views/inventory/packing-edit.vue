@@ -61,27 +61,21 @@
             v-model="edit.form.packDate"
             type="date"
             value-format="YYYY-MM-DD"
+            style="width: 100%"
             :placeholder="edit.isReadonly.value ? '' : '装箱日期'"
             :disabled="edit.isReadonly.value"
           />
         </el-form-item>
-        <el-form-item label="公司抬头">
-          <el-switch v-model="edit.form.showCompany" :disabled="edit.isReadonly.value" />
-          <span v-if="!edit.isReadonly.value" class="head-form-tip">箱贴/客户单是否显示公司名</span>
-        </el-form-item>
         <el-form-item label="备注" class="head-form-remark">
           <el-input v-model="edit.form.remark" :placeholder="edit.isReadonly.value ? '' : '整单备注'" :disabled="edit.isReadonly.value" />
         </el-form-item>
+        <el-form-item label="公司抬头">
+          <el-tooltip content="开启后箱贴/客户单顶部显示公司名" placement="top">
+            <el-switch v-model="edit.form.showCompany" :disabled="edit.isReadonly.value" />
+          </el-tooltip>
+        </el-form-item>
       </div>
     </el-form>
-
-    <div v-if="!edit.isReadonly.value" class="grid-toolbar">
-      <el-button link type="primary" @click="onAddSize">
-        <el-icon><Plus /></el-icon>
-        新增尺码列
-      </el-button>
-      <span class="grid-toolbar-tip">默认按 S/M/L/XL 顺序补码，点列名可改</span>
-    </div>
 
     <PackingGrid
       ref="packingGridRef"
@@ -89,6 +83,7 @@
       :size-headers="grid.sizeHeaders.value"
       :totals="grid.totals.value"
       :disabled="edit.isReadonly.value"
+      @add-size-at="onAddSizeAt"
       @rename-size="onRenameSize"
       @remove-size-at="onRemoveSizeAt"
       @copy-box="grid.copyBox"
@@ -126,7 +121,7 @@
 import { onActivated, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft, Plus } from '@element-plus/icons-vue'
+import { ArrowLeft } from '@element-plus/icons-vue'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { shipPackingList, type PickableLine } from '@/api/packing-lists'
 import { usePackingGridRows } from '@/composables/usePackingGridRows'
@@ -166,10 +161,10 @@ function goBack() {
   router.push('/inventory/packing')
 }
 
-function onAddSize() {
-  const index = grid.addSizeColumn()
+function onAddSizeAt(index: number) {
+  const at = grid.addSizeColumn(index)
   // 标准码已自动填好不抢焦点；仅当标准码用尽留了空列时才聚焦让用户手填
-  if (!grid.sizeHeaders.value[index]) packingGridRef.value?.focusSizeHeader(index)
+  if (!grid.sizeHeaders.value[at]) packingGridRef.value?.focusSizeHeader(at)
 }
 
 function onRenameSize(index: number, oldName: string) {
@@ -294,22 +289,10 @@ onActivated(() => {
   font-weight: 600;
 }
 
-.grid-toolbar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: calc(-1 * var(--space-sm));
-}
-
-.grid-toolbar-tip {
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
-}
-
 .head-form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 0 var(--space-md);
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  gap: 0 var(--space-lg);
 }
 
 .head-form-grid :deep(.el-form-item) {
@@ -317,12 +300,6 @@ onActivated(() => {
 }
 
 .head-form-remark {
-  grid-column: span 2;
-}
-
-.head-form-tip {
-  margin-left: var(--space-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  grid-column: span 3;
 }
 </style>
