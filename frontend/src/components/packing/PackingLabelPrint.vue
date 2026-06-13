@@ -38,8 +38,7 @@
               <td :colspan="totalCols(box)" class="lt-title-cell">
                 <div class="label-boxno">{{ box.boxSeq }}</div>
                 <div class="lt-title-text">
-                  <span v-if="detail.showCompany" class="lt-brand" contenteditable="true">HONGYU APPAREL</span>
-                  <span class="lt-title" contenteditable="true">PACKING LIST</span>
+                  <span class="lt-brand" contenteditable="true">HONGYU APPAREL</span>
                 </div>
                 <div class="lt-cartonno">
                   <span class="lt-cartonno-label">CARTON NO.</span>
@@ -259,17 +258,10 @@ function onPrint() {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
 }
 
 .lt-brand {
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.lt-title {
-  font-size: 30px;
+  font-size: 32px;
   font-weight: 800;
   letter-spacing: 3px;
 }
@@ -296,9 +288,9 @@ function onPrint() {
   font-weight: 800;
 }
 
-/* 信息行：左标签（灰底）+ 值 */
+/* 信息行：标签（灰底）+ 值，全部居中 */
 .lt-label {
-  text-align: left;
+  text-align: center;
   font-weight: 700;
   background: #f2f2f2;
   white-space: nowrap;
@@ -327,7 +319,7 @@ function onPrint() {
 .label-table .lt-style,
 .label-table .lt-name,
 .label-table .lt-color {
-  text-align: left;
+  text-align: center;
   font-weight: 700;
 }
 
@@ -353,7 +345,7 @@ function onPrint() {
 }
 
 .lt-sum td:first-child {
-  text-align: right;
+  text-align: center;
 }
 
 .label-table .lt-madein {
@@ -422,11 +414,7 @@ function onPrint() {
   }
 
   .packing-label-print-area .lt-brand {
-    font-size: 22px;
-  }
-
-  .packing-label-print-area .lt-title {
-    font-size: 46px;
+    font-size: 48px;
   }
 
   .packing-label-print-area .lt-cartonno-label {
