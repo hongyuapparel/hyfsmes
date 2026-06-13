@@ -11,6 +11,7 @@
         <el-tag v-else-if="edit.listId.value" type="info" size="small">草稿</el-tag>
       </div>
       <div class="edit-actions">
+        <el-button v-if="edit.detail.value" :type="edit.isReadonly.value ? 'primary' : ''" @click="openDoc">客户单</el-button>
         <el-button v-if="edit.detail.value" @click="openLabels">箱贴</el-button>
         <el-button v-if="edit.detail.value" @click="onExport">导出 Excel</el-button>
         <template v-if="!edit.isReadonly.value">
@@ -32,7 +33,7 @@
             filterable
             allow-create
             default-first-option
-            placeholder="选择或输入客户"
+            :placeholder="edit.isReadonly.value ? '' : '选择或输入客户'"
             :disabled="edit.isReadonly.value"
             @change="edit.onCustomerChange"
           >
@@ -46,30 +47,30 @@
             allow-create
             default-first-option
             clearable
-            placeholder="选择或输入业务员"
+            :placeholder="edit.isReadonly.value ? '' : '选择或输入业务员'"
             :disabled="edit.isReadonly.value"
           >
             <el-option v-for="u in edit.userOptions.value" :key="u.id" :label="u.displayName || u.username" :value="u.displayName || u.username" />
           </el-select>
         </el-form-item>
         <el-form-item label="PO#">
-          <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" :disabled="edit.isReadonly.value" />
+          <el-input v-model="edit.form.poNo" :placeholder="edit.isReadonly.value ? '' : '选填，箱贴抬头优先用 PO'" :disabled="edit.isReadonly.value" />
         </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
             v-model="edit.form.packDate"
             type="date"
             value-format="YYYY-MM-DD"
-            placeholder="装箱日期"
+            :placeholder="edit.isReadonly.value ? '' : '装箱日期'"
             :disabled="edit.isReadonly.value"
           />
         </el-form-item>
         <el-form-item label="公司抬头">
           <el-switch v-model="edit.form.showCompany" :disabled="edit.isReadonly.value" />
-          <span class="head-form-tip">箱贴是否显示公司名</span>
+          <span v-if="!edit.isReadonly.value" class="head-form-tip">箱贴/客户单是否显示公司名</span>
         </el-form-item>
         <el-form-item label="备注" class="head-form-remark">
-          <el-input v-model="edit.form.remark" placeholder="整单备注" :disabled="edit.isReadonly.value" />
+          <el-input v-model="edit.form.remark" :placeholder="edit.isReadonly.value ? '' : '整单备注'" :disabled="edit.isReadonly.value" />
         </el-form-item>
       </div>
     </el-form>
@@ -102,6 +103,13 @@
       :detail="edit.detail.value"
       @update:visible="labelsVisible = $event"
     />
+
+    <PackingDocument
+      v-if="edit.detail.value"
+      :visible="docVisible"
+      :detail="edit.detail.value"
+      @update:visible="docVisible = $event"
+    />
   </div>
 </template>
 
@@ -117,6 +125,7 @@ import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
 import PackingGoodsPickerDialog from '@/components/packing/PackingGoodsPickerDialog.vue'
 import PackingLabelPrint from '@/components/packing/PackingLabelPrint.vue'
+import PackingDocument from '@/components/packing/PackingDocument.vue'
 import { exportPackingListExcel } from '@/utils/packing-export'
 
 const route = useRoute()
@@ -126,10 +135,16 @@ const edit = usePackingListEdit(grid)
 const picker = reactive({ visible: false, boxIndex: 0 })
 const shipping = ref(false)
 const labelsVisible = ref(false)
+const docVisible = ref(false)
 
 function openLabels() {
   if (!edit.detail.value) return
   labelsVisible.value = true
+}
+
+function openDoc() {
+  if (!edit.detail.value) return
+  docVisible.value = true
 }
 
 function onExport() {
@@ -229,6 +244,7 @@ onMounted(async () => {
   edit.loadOptions()
   await edit.load()
   if (route.query.action === 'labels') openLabels()
+  if (route.query.action === 'doc') openDoc()
   if (route.query.action === 'export') onExport()
 })
 

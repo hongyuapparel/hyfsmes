@@ -1,0 +1,197 @@
+.doc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.doc-toolbar-tip {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.packing-doc {
+  margin: 0 auto;
+  background: #ffffff;
+  color: #1f2329;
+  padding: 22px 26px;
+  width: 100%;
+  max-width: 760px;
+  box-sizing: border-box;
+  font-family: Arial, 'Microsoft YaHei', sans-serif;
+}
+
+.doc-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1f2329;
+}
+
+.doc-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.doc-brand-cn {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.doc-brand-en {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: #5a6066;
+}
+
+.doc-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.doc-title-cn {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 4px;
+}
+
+.doc-title-en {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #5a6066;
+}
+
+.doc-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px 32px;
+  margin: 14px 0 16px;
+}
+
+.doc-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 13px;
+  padding: 2px 0;
+  border-bottom: 1px dotted #d7dbe0;
+}
+
+.doc-meta-label {
+  color: #5a6066;
+  white-space: nowrap;
+}
+
+.doc-meta-value {
+  font-weight: 600;
+  flex: 1;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid #b8bdc4;
+  padding: 6px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.doc-table thead th {
+  background: #f3f5f7;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.doc-table thead th .en {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: #5a6066;
+}
+
+.doc-table .col-style,
+.doc-table .col-color {
+  text-align: left;
+}
+
+.doc-table .num {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-table .muted {
+  color: #b8bdc4;
+}
+
+.doc-table .col-box {
+  font-weight: 700;
+  background: #fafbfc;
+}
+
+.doc-total td {
+  background: #f3f5f7;
+  font-weight: 700;
+}
+
+.doc-total td:first-child {
+  text-align: right;
+}
+
+.doc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.doc-remark {
+  color: #1f2329;
+  flex: 1;
+}
+
+.doc-madein {
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+/* 打印：只显示客户单区域，A4 纵向，照 orders/detail.css 基准 */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  .packing-doc-print-area,
+  .packing-doc-print-area * {
+    visibility: visible;
+  }
+
+  .packing-doc-print-area {
+    position: absolute;
+    inset: 0;
+  }
+
+  .packing-doc-print-area .packing-doc {
+    max-width: none;
+    width: 100%;
+    padding: 0;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 12mm 14mm;
+  }
+}

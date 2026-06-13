@@ -92,9 +92,10 @@
         <el-table-column prop="packDate" label="装箱日期" width="110" align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" width="248" align="center" header-align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="goEdit(row)">{{ row.status === 'draft' ? '编辑' : '查看' }}</el-button>
+            <el-button link type="primary" size="small" @click="openDoc(row)">客户单</el-button>
             <el-button link type="info" size="small" @click="openLabels(row)">箱贴</el-button>
             <el-button link type="info" size="small" @click="exportExcel(row)">导出</el-button>
             <el-button v-if="row.status === 'draft'" link type="danger" size="small" @click="onDelete(row)">删除</el-button>
@@ -205,6 +206,10 @@ function goEdit(row: PackingListRow | null) {
 
 function openLabels(row: PackingListRow) {
   router.push(`/inventory/packing/edit/${row.id}?action=labels`)
+}
+
+function openDoc(row: PackingListRow) {
+  router.push(`/inventory/packing/edit/${row.id}?action=doc`)
 }
 
 async function exportExcel(row: PackingListRow) {

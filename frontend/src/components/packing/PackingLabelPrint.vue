@@ -137,11 +137,12 @@ function onPrint() {
   width: 100%;
   max-width: 720px;
   margin: 0 auto var(--space-md);
-  padding: 24px 28px;
+  padding: 32px 36px;
   border: 1px dashed var(--color-border);
   background: #ffffff;
   color: #000000;
   font-family: Arial, Helvetica, sans-serif;
+  text-align: center;
 }
 
 .label-select {
@@ -152,75 +153,81 @@ function onPrint() {
 
 .label-topbar {
   display: flex;
-  justify-content: space-between;
-  font-size: 14px;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 15px;
   font-weight: 600;
   border-bottom: 2px solid #000;
-  padding-bottom: 6px;
-  margin-bottom: 12px;
+  padding-bottom: 10px;
+  margin-bottom: 16px;
 }
 
 .label-heading {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 20px;
 }
 
 .label-client {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
+  letter-spacing: 1px;
 }
 
 .label-carton-no {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
 }
 
 .label-style-block {
   display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 12px;
+  gap: 18px;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
 }
 
 .label-style-image {
-  width: 96px;
-  height: 96px;
+  width: 104px;
+  height: 104px;
   object-fit: contain;
 }
 
 .label-style-info {
-  flex: 1;
+  text-align: center;
 }
 
 .label-style-line {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   margin-bottom: 4px;
 }
 
 .label-size-table {
   border-collapse: collapse;
-  margin-top: 4px;
+  margin: 6px auto 0;
 }
 
 .label-size-table td {
   border: 1px solid #000;
-  padding: 2px 14px;
-  font-size: 14px;
+  padding: 3px 18px;
+  font-size: 15px;
   text-align: center;
 }
 
 .label-footer {
-  margin-top: 14px;
+  margin-top: 18px;
   border-top: 2px solid #000;
-  padding-top: 8px;
-  font-size: 15px;
+  padding-top: 12px;
+  font-size: 16px;
   font-weight: 600;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  align-items: center;
+  gap: 4px;
 }
 
 [contenteditable='true']:hover {
@@ -230,8 +237,13 @@ function onPrint() {
 </style>
 
 <style>
-/* 打印：只显示箱贴区域，每箱一页（A4 宽 210mm，照 orders/detail.css 基准） */
+/* 打印：只显示箱贴区域，每箱一页，内容在 A4 可打印区内居中（@page 控制页边距） */
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 16mm 14mm;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -244,7 +256,6 @@ function onPrint() {
   .packing-label-print-area {
     position: absolute;
     inset: 0;
-    width: 210mm;
   }
 
   .packing-label-print-area .packing-label {
@@ -252,8 +263,30 @@ function onPrint() {
     width: 100%;
     margin: 0;
     border: none;
-    padding: 18mm 16mm;
+    padding: 0;
     page-break-after: always;
+  }
+
+  /* A4 上放大字号，唛头更醒目 */
+  .packing-label-print-area .label-client {
+    font-size: 40px;
+  }
+
+  .packing-label-print-area .label-carton-no {
+    font-size: 28px;
+  }
+
+  .packing-label-print-area .label-style-line {
+    font-size: 20px;
+  }
+
+  .packing-label-print-area .label-size-table td {
+    font-size: 18px;
+    padding: 4px 22px;
+  }
+
+  .packing-label-print-area .label-footer {
+    font-size: 18px;
   }
 
   .packing-label-print-area .label-skip-print,
