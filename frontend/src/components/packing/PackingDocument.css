@@ -35,16 +35,16 @@
   line-height: 1.15;
 }
 
-.doc-brand-cn {
-  font-size: 20px;
+.doc-brand-en {
+  font-size: 19px;
   font-weight: 700;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
 }
 
-.doc-brand-en {
+.doc-brand-cn {
   font-size: 12px;
   font-weight: 600;
-  letter-spacing: 1px;
+  letter-spacing: 2px;
   color: #5a6066;
 }
 
@@ -55,16 +55,16 @@
   line-height: 1.15;
 }
 
-.doc-title-cn {
-  font-size: 22px;
+.doc-title-en {
+  font-size: 24px;
   font-weight: 700;
-  letter-spacing: 4px;
+  letter-spacing: 2px;
 }
 
-.doc-title-en {
-  font-size: 12px;
+.doc-title-cn {
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 2px;
+  letter-spacing: 3px;
   color: #5a6066;
 }
 
@@ -87,6 +87,14 @@
 .doc-meta-label {
   color: #5a6066;
   white-space: nowrap;
+  font-weight: 600;
+}
+
+.doc-meta-label .cn {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #9298a0;
 }
 
 .doc-meta-value {
@@ -114,11 +122,11 @@
   line-height: 1.25;
 }
 
-.doc-table thead th .en {
+.doc-table thead th .cn {
   display: block;
   font-size: 11px;
-  font-weight: 500;
-  color: #5a6066;
+  font-weight: 400;
+  color: #9298a0;
 }
 
 .doc-table .col-style,
