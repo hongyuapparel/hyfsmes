@@ -240,8 +240,8 @@ function onPrint() {
 /* 打印：只显示箱贴区域，每箱一页，内容在 A4 可打印区内居中（@page 控制页边距） */
 @media print {
   @page {
-    size: A4 portrait;
-    margin: 16mm 14mm;
+    size: A4 landscape;
+    margin: 12mm 16mm;
   }
 
   body * {
@@ -258,13 +258,22 @@ function onPrint() {
     inset: 0;
   }
 
+  /* 每箱一张，A4 横版整页内上下居中 */
   .packing-label-print-area .packing-label {
     max-width: none;
     width: 100%;
+    min-height: 175mm;
     margin: 0;
     border: none;
     padding: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
     page-break-after: always;
+  }
+
+  .packing-label-print-area .packing-label:last-child {
+    page-break-after: auto;
   }
 
   /* A4 上放大字号，唛头更醒目 */
