@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -185,6 +185,35 @@ function weightDisplay(weight: number | null): string {
   if (weight == null || weight <= 0) return ''
   return `${Math.round(weight * 100) / 100}`
 }
+
+// 打印前给 body 打标记类 + 注入纵版 @page（仅当本弹窗打开时），打印后清理。
+// 用 beforeprint/afterprint 监听，使点「打印 A4」按钮和直接按 Ctrl+P 都生效，且与箱贴(横版)互不干扰。
+let pageStyle: HTMLStyleElement | null = null
+
+function onBeforePrint() {
+  if (!props.visible) return
+  document.body.classList.add('printing-packing-doc')
+  pageStyle = document.createElement('style')
+  pageStyle.textContent = '@page { size: A4 portrait; margin: 12mm 12mm 14mm; }'
+  document.head.appendChild(pageStyle)
+}
+
+function onAfterPrint() {
+  document.body.classList.remove('printing-packing-doc')
+  pageStyle?.remove()
+  pageStyle = null
+}
+
+onMounted(() => {
+  window.addEventListener('beforeprint', onBeforePrint)
+  window.addEventListener('afterprint', onAfterPrint)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeprint', onBeforePrint)
+  window.removeEventListener('afterprint', onAfterPrint)
+  onAfterPrint()
+})
 
 function onPrint() {
   window.print()

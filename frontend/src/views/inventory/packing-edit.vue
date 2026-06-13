@@ -144,11 +144,13 @@ const docVisible = ref(false)
 
 function openLabels() {
   if (!edit.detail.value) return
+  docVisible.value = false
   labelsVisible.value = true
 }
 
 function openDoc() {
   if (!edit.detail.value) return
+  labelsVisible.value = false
   docVisible.value = true
 }
 

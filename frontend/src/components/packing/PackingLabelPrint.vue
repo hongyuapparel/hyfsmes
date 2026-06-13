@@ -98,7 +98,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import type { PackingBoxDetail, PackingItemDetail, PackingListDetail } from '@/api/packing-lists'
 
@@ -181,6 +181,35 @@ function leadCols(box: PackingBoxDetail): number {
 function totalCols(box: PackingBoxDetail): number {
   return leadCols(box) + boxSizes(box).length + 1
 }
+
+// 打印前给 body 打标记类 + 注入横版 @page（仅当本弹窗打开时），打印后清理。
+// 用 beforeprint/afterprint 监听，使点「打印箱贴」按钮和直接按 Ctrl+P 都生效，且与客户单(纵版)互不干扰。
+let pageStyle: HTMLStyleElement | null = null
+
+function onBeforePrint() {
+  if (!props.visible) return
+  document.body.classList.add('printing-packing-label')
+  pageStyle = document.createElement('style')
+  pageStyle.textContent = '@page { size: A4 landscape; margin: 12mm 16mm; }'
+  document.head.appendChild(pageStyle)
+}
+
+function onAfterPrint() {
+  document.body.classList.remove('printing-packing-label')
+  pageStyle?.remove()
+  pageStyle = null
+}
+
+onMounted(() => {
+  window.addEventListener('beforeprint', onBeforePrint)
+  window.addEventListener('afterprint', onAfterPrint)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeprint', onBeforePrint)
+  window.removeEventListener('afterprint', onAfterPrint)
+  onAfterPrint()
+})
 
 function onPrint() {
   window.print()
@@ -361,29 +390,39 @@ function onPrint() {
 </style>
 
 <style>
-/* 打印：只显示箱贴区域，每箱一页，内容在 A4 可打印区内居中（@page 控制页边距） */
+/* 打印：规则全部限定到 body.printing-packing-label（onPrint 时挂上），避免与客户单的全局打印规则冲突；@page 由 onPrint 动态注入 */
 @media print {
-  @page {
-    size: A4 landscape;
-    margin: 12mm 16mm;
-  }
-
-  body * {
+  body.printing-packing-label * {
     visibility: hidden;
   }
 
-  .packing-label-print-area,
-  .packing-label-print-area * {
+  body.printing-packing-label .packing-label-print-area,
+  body.printing-packing-label .packing-label-print-area * {
     visibility: visible;
   }
 
-  .packing-label-print-area {
+  /* 还原弹窗各层定位/裁剪，让打印区相对页面铺满（不被对话框盒子裁切） */
+  body.printing-packing-label .el-overlay-dialog,
+  body.printing-packing-label .el-dialog,
+  body.printing-packing-label .el-dialog__body {
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    transform: none !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  body.printing-packing-label .packing-label-print-area {
     position: absolute;
     inset: 0;
   }
 
   /* 每箱一张，A4 横版整页内上下居中 */
-  .packing-label-print-area .packing-label {
+  body.printing-packing-label .packing-label-print-area .packing-label {
     max-width: none;
     width: 100%;
     min-height: 175mm;
@@ -396,16 +435,16 @@ function onPrint() {
     page-break-after: always;
   }
 
-  .packing-label-print-area .packing-label:last-child {
+  body.printing-packing-label .packing-label-print-area .packing-label:last-child {
     page-break-after: auto;
   }
 
   /* A4 横版放大字号，唛头更醒目、铺满版面 */
-  .packing-label-print-area .lt-title-cell {
+  body.printing-packing-label .packing-label-print-area .lt-title-cell {
     padding: 18px 200px;
   }
 
-  .packing-label-print-area .label-boxno {
+  body.printing-packing-label .packing-label-print-area .label-boxno {
     width: 124px;
     height: 124px;
     border-width: 7px;
@@ -413,44 +452,44 @@ function onPrint() {
     left: 28px;
   }
 
-  .packing-label-print-area .lt-brand {
+  body.printing-packing-label .packing-label-print-area .lt-brand {
     font-size: 48px;
   }
 
-  .packing-label-print-area .lt-cartonno-label {
+  body.printing-packing-label .packing-label-print-area .lt-cartonno-label {
     font-size: 16px;
   }
 
-  .packing-label-print-area .lt-cartonno-val {
+  body.printing-packing-label .packing-label-print-area .lt-cartonno-val {
     font-size: 44px;
   }
 
-  .packing-label-print-area .label-table th,
-  .packing-label-print-area .label-table td {
+  body.printing-packing-label .packing-label-print-area .label-table th,
+  body.printing-packing-label .packing-label-print-area .label-table td {
     font-size: 25px;
     padding: 12px 14px;
   }
 
-  .packing-label-print-area .label-table .lt-customer-val {
+  body.printing-packing-label .packing-label-print-area .label-table .lt-customer-val {
     font-size: 38px;
   }
 
-  .packing-label-print-area .lt-info .lt-info-val,
-  .packing-label-print-area .label-table .lt-madein {
+  body.printing-packing-label .packing-label-print-area .lt-info .lt-info-val,
+  body.printing-packing-label .packing-label-print-area .label-table .lt-madein {
     font-size: 28px;
   }
 
-  .packing-label-print-area .label-table .lt-img img {
+  body.printing-packing-label .packing-label-print-area .label-table .lt-img img {
     width: 120px;
     height: 120px;
   }
 
-  .packing-label-print-area .label-table .lt-img {
+  body.printing-packing-label .packing-label-print-area .label-table .lt-img {
     width: 150px;
   }
 
-  .packing-label-print-area .label-skip-print,
-  .packing-label-print-area .label-select.no-print {
+  body.printing-packing-label .packing-label-print-area .label-skip-print,
+  body.printing-packing-label .packing-label-print-area .label-select.no-print {
     display: none;
   }
 }
