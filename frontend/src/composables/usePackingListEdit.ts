@@ -115,7 +115,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
       form.remark = ''
       form.showCompany = true
       pickedLines.value = []
-      grid.sizeHeaders.value = []
+      grid.sizeHeaders.value = ['S']
       grid.boxes.value = []
       grid.addBox()
       return

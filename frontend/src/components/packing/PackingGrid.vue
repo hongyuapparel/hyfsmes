@@ -55,9 +55,9 @@
       <template #header>
         <div class="size-header-cell">
           <template v-if="!disabled">
-            <el-tooltip content="在此列前插入尺码列" placement="top">
-              <el-button link type="primary" class="size-header-insert" :aria-label="`在第${sIndex + 1}列前插入`" @click.stop="emit('add-size-at', sIndex)">
-                <el-icon><Plus /></el-icon>
+            <el-tooltip v-if="sizeHeaders.length > 1" content="删除此码列" placement="top">
+              <el-button link type="danger" class="size-header-remove" :aria-label="`删除第${sIndex + 1}列`" @click.stop="emit('remove-size-at', sIndex)">
+                <el-icon><CircleClose /></el-icon>
               </el-button>
             </el-tooltip>
             <el-input
@@ -72,9 +72,9 @@
               @keydown.enter.stop="blurEvent"
               @click.stop
             />
-            <el-tooltip content="删除此码列" placement="top">
-              <el-button link type="danger" class="size-header-remove" :aria-label="`删除第${sIndex + 1}列`" @click.stop="emit('remove-size-at', sIndex)">
-                <el-icon><CircleClose /></el-icon>
+            <el-tooltip content="在此列后新增尺码列" placement="top">
+              <el-button link type="primary" class="size-header-insert" :aria-label="`在第${sIndex + 1}列后新增`" @click.stop="emit('add-size-at', sIndex + 1)">
+                <el-icon><Plus /></el-icon>
               </el-button>
             </el-tooltip>
           </template>
@@ -93,17 +93,7 @@
         />
       </template>
     </el-table-column>
-    <el-table-column width="92" align="center" header-align="center">
-      <template #header>
-        <div class="total-header-cell">
-          <el-tooltip v-if="!disabled" :content="sizeHeaders.length ? '在末尾新增尺码列' : '新增尺码列'" placement="top">
-            <el-button link type="primary" class="size-header-insert total-insert" aria-label="新增尺码列" @click.stop="emit('add-size-at', sizeHeaders.length)">
-              <el-icon><Plus /></el-icon>
-            </el-button>
-          </el-tooltip>
-          <span>合计</span>
-        </div>
-      </template>
+    <el-table-column width="92" label="合计" align="center" header-align="center">
       <template #default="{ row }">
         <span v-if="hasSizeQty(row.item)">{{ formatDisplayNumber(packingItemTotal(row.item)) }}</span>
         <el-input-number
@@ -276,9 +266,8 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   margin-left: 4px;
 }
 
-/* 列头：码名居中可编辑，左右缝隙在 hover 时浮出「+插入 / ×删除」（复用 order 编辑列头交互） */
-.size-header-cell,
-.total-header-cell {
+/* 列头：码名居中可编辑，左右缝隙在 hover 时浮出「×删除 / +在后插入」（复用 order 编辑列头交互） */
+.size-header-cell {
   position: relative;
   display: flex;
   align-items: center;
@@ -325,16 +314,12 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   transition: opacity 0.15s;
 }
 
-.size-header-insert {
+.size-header-remove {
   left: 0;
 }
 
-.size-header-remove {
+.size-header-insert {
   right: 0;
-}
-
-.total-insert {
-  left: -6px;
 }
 
 .size-header-insert :deep(.el-icon),
@@ -343,8 +328,7 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
 }
 
 .size-header-cell:hover .size-header-insert,
-.size-header-cell:hover .size-header-remove,
-.total-header-cell:hover .size-header-insert {
+.size-header-cell:hover .size-header-remove {
   opacity: 0.7;
 }
 
