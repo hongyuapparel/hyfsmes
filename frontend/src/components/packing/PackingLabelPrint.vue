@@ -41,14 +41,18 @@
                   <span v-if="detail.showCompany" class="lt-brand" contenteditable="true">HONGYU APPAREL</span>
                   <span class="lt-title" contenteditable="true">PACKING LIST</span>
                 </div>
+                <div class="lt-cartonno">
+                  <span class="lt-cartonno-label">CARTON NO.</span>
+                  <span class="lt-cartonno-val" contenteditable="true">{{ box.boxSeq }} / {{ detail.boxes.length }}</span>
+                </div>
               </td>
             </tr>
-            <tr class="lt-info">
-              <td class="lt-label" colspan="2" contenteditable="true">CUSTOMER:</td>
-              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.poNo || detail.customerName }}</td>
+            <tr class="lt-customer">
+              <td class="lt-label" colspan="2">CUSTOMER</td>
+              <td :colspan="totalCols(box) - 2" class="lt-customer-val" contenteditable="true">{{ detail.poNo || detail.customerName }}</td>
             </tr>
             <tr v-if="detail.serviceManager" class="lt-info">
-              <td class="lt-label" colspan="2" contenteditable="true">SHIP MARK:</td>
+              <td class="lt-label" colspan="2">SHIP MARK</td>
               <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.serviceManager }}</td>
             </tr>
 
@@ -77,15 +81,11 @@
             </tr>
 
             <tr class="lt-info">
-              <td class="lt-label" colspan="2" contenteditable="true">CARTON NO#:</td>
-              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.boxSeq }} OF {{ detail.boxes.length }}</td>
-            </tr>
-            <tr class="lt-info">
-              <td class="lt-label" colspan="2" contenteditable="true">WEIGHT(KG):</td>
+              <td class="lt-label" colspan="2">WEIGHT (KG)</td>
               <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.weightKg != null ? box.weightKg : '' }}</td>
             </tr>
             <tr class="lt-info">
-              <td class="lt-label" colspan="2" contenteditable="true">DIMENSION(CM):</td>
+              <td class="lt-label" colspan="2">DIMENSION (CM)</td>
               <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.cartonSize || '' }}</td>
             </tr>
             <tr>
@@ -231,19 +231,20 @@ function onPrint() {
   word-break: break-word;
 }
 
-/* 标题行：左上角大圈号 + 居中 PACKING LIST */
+/* 标题行：左上角大圈号 + 居中品牌/PACKING LIST + 右上角 CARTON NO. */
 .lt-title-cell {
   position: relative;
-  padding: 14px 10px;
+  padding: 16px 160px;
+  background: #fafafa;
 }
 
 .label-boxno {
   position: absolute;
-  left: 16px;
+  left: 18px;
   top: 50%;
   transform: translateY(-50%);
-  width: 84px;
-  height: 84px;
+  width: 86px;
+  height: 86px;
   border: 5px solid #000;
   border-radius: 50%;
   display: flex;
@@ -273,8 +274,30 @@ function onPrint() {
   letter-spacing: 3px;
 }
 
-/* 客户/箱号/重量/箱规信息行：左标签 + 值 */
-.lt-info .lt-label {
+.lt-cartonno {
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  transform: translateY(-50%);
+  text-align: center;
+  line-height: 1.1;
+}
+
+.lt-cartonno-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.lt-cartonno-val {
+  display: block;
+  font-size: 30px;
+  font-weight: 800;
+}
+
+/* 信息行：左标签（灰底）+ 值 */
+.lt-label {
   text-align: left;
   font-weight: 700;
   background: #f2f2f2;
@@ -285,6 +308,14 @@ function onPrint() {
   text-align: center;
   font-weight: 700;
   font-size: 20px;
+}
+
+/* 客户行：客户名放大加粗，作视觉焦点 */
+.label-table .lt-customer-val {
+  text-align: center;
+  font-weight: 800;
+  font-size: 26px;
+  letter-spacing: 1px;
 }
 
 /* 尺码矩阵 */
@@ -325,7 +356,7 @@ function onPrint() {
   text-align: right;
 }
 
-.lt-madein {
+.label-table .lt-madein {
   font-weight: 800;
   letter-spacing: 2px;
   font-size: 20px;
@@ -378,12 +409,16 @@ function onPrint() {
   }
 
   /* A4 横版放大字号，唛头更醒目、铺满版面 */
+  .packing-label-print-area .lt-title-cell {
+    padding: 18px 200px;
+  }
+
   .packing-label-print-area .label-boxno {
-    width: 120px;
-    height: 120px;
+    width: 124px;
+    height: 124px;
     border-width: 7px;
     font-size: 74px;
-    left: 24px;
+    left: 28px;
   }
 
   .packing-label-print-area .lt-brand {
@@ -391,6 +426,14 @@ function onPrint() {
   }
 
   .packing-label-print-area .lt-title {
+    font-size: 46px;
+  }
+
+  .packing-label-print-area .lt-cartonno-label {
+    font-size: 16px;
+  }
+
+  .packing-label-print-area .lt-cartonno-val {
     font-size: 44px;
   }
 
@@ -400,8 +443,12 @@ function onPrint() {
     padding: 12px 14px;
   }
 
+  .packing-label-print-area .label-table .lt-customer-val {
+    font-size: 38px;
+  }
+
   .packing-label-print-area .lt-info .lt-info-val,
-  .packing-label-print-area .lt-madein {
+  .packing-label-print-area .label-table .lt-madein {
     font-size: 28px;
   }
 
