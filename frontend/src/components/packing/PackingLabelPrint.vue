@@ -32,54 +32,67 @@
           打印此箱
         </el-checkbox>
 
-        <div class="label-header-row">
-          <div class="label-boxno">{{ box.boxSeq }}</div>
-          <div class="label-header-main">
-            <div v-if="detail.showCompany" class="label-topbar">
-              <span class="label-brand" contenteditable="true">HONGYU APPAREL</span>
-              <span v-if="detail.serviceManager" class="label-topbar-sub" contenteditable="true">Service manager: {{ detail.serviceManager }}</span>
-            </div>
-            <div class="label-heading">
-              <span class="label-client" contenteditable="true">{{ detail.poNo || detail.customerName }}</span>
-              <span class="label-carton-no" contenteditable="true">CARTON NO# {{ box.boxSeq }} OF {{ detail.boxes.length }}</span>
-            </div>
-          </div>
-        </div>
-
         <table class="label-table">
-          <thead>
-            <tr>
-              <th v-if="boxHasImage(box)" class="lt-img">图片<span class="lt-en">Photo</span></th>
-              <th class="lt-style">款号<span class="lt-en">Style No.</span></th>
-              <th class="lt-color">颜色<span class="lt-en">Color</span></th>
-              <th v-for="size in boxSizes(box)" :key="`h-${size}`">{{ size }}</th>
-              <th class="lt-total">合计<span class="lt-en">Total</span></th>
-            </tr>
-          </thead>
           <tbody>
+            <tr class="lt-title-row">
+              <td :colspan="totalCols(box)" class="lt-title-cell">
+                <div class="label-boxno">{{ box.boxSeq }}</div>
+                <div class="lt-title-text">
+                  <span v-if="detail.showCompany" class="lt-brand" contenteditable="true">HONGYU APPAREL</span>
+                  <span class="lt-title" contenteditable="true">PACKING LIST</span>
+                </div>
+              </td>
+            </tr>
+            <tr class="lt-info">
+              <td class="lt-label" colspan="2" contenteditable="true">CUSTOMER:</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.poNo || detail.customerName }}</td>
+            </tr>
+            <tr v-if="detail.serviceManager" class="lt-info">
+              <td class="lt-label" colspan="2" contenteditable="true">SHIP MARK:</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.serviceManager }}</td>
+            </tr>
+
+            <tr class="lt-matrix-head">
+              <th v-if="boxHasImage(box)" class="lt-img">PHOTO</th>
+              <th class="lt-style">STYLE NO</th>
+              <th v-if="boxHasName(box)" class="lt-name">DESCRIPTION</th>
+              <th class="lt-color">COLOUR</th>
+              <th v-for="size in boxSizes(box)" :key="`h-${size}`">{{ size }}</th>
+              <th class="lt-total">TOTAL</th>
+            </tr>
             <tr v-for="item in box.items" :key="item.id">
               <td v-if="boxHasImage(box)" class="lt-img">
                 <img v-if="item.imageUrl" :src="item.imageUrl" alt="" />
               </td>
               <td class="lt-style" contenteditable="true">{{ item.styleNo || '-' }}</td>
+              <td v-if="boxHasName(box)" class="lt-name" contenteditable="true">{{ item.styleName || '-' }}</td>
               <td class="lt-color" contenteditable="true">{{ item.colorName || '-' }}</td>
               <td v-for="size in boxSizes(box)" :key="`${item.id}-${size}`" contenteditable="true">{{ itemSizeQty(item, size) }}</td>
               <td class="lt-total" contenteditable="true">{{ itemTotal(item) }}</td>
             </tr>
             <tr class="lt-sum">
-              <td :colspan="leadColspan(box)">合计 TOTAL</td>
+              <td :colspan="leadCols(box)">TOTAL</td>
               <td v-for="size in boxSizes(box)" :key="`s-${size}`">{{ boxSizeTotal(box, size) }}</td>
               <td class="lt-total">{{ boxTotal(box) }}</td>
             </tr>
+
+            <tr class="lt-info">
+              <td class="lt-label" colspan="2" contenteditable="true">CARTON NO#:</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.boxSeq }} OF {{ detail.boxes.length }}</td>
+            </tr>
+            <tr class="lt-info">
+              <td class="lt-label" colspan="2" contenteditable="true">WEIGHT(KG):</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.weightKg != null ? box.weightKg : '' }}</td>
+            </tr>
+            <tr class="lt-info">
+              <td class="lt-label" colspan="2" contenteditable="true">DIMENSION(CM):</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.cartonSize || '' }}</td>
+            </tr>
+            <tr>
+              <td :colspan="totalCols(box)" class="lt-madein" contenteditable="true">MADE IN CHINA</td>
+            </tr>
           </tbody>
         </table>
-
-        <div class="label-footer">
-          <span contenteditable="true">WEIGHT 重量: {{ box.weightKg != null ? box.weightKg : '' }} KG</span>
-          <span contenteditable="true">CARTON SIZE 箱规: {{ box.cartonSize || '' }} CM</span>
-          <span v-if="box.remark" contenteditable="true">SHIPPING: {{ box.remark }}</span>
-          <span class="label-madein" contenteditable="true">MADE IN CHINA</span>
-        </div>
       </div>
     </div>
   </AppDialog>
@@ -147,6 +160,10 @@ function boxHasImage(box: PackingBoxDetail): boolean {
   return box.items.some((it) => !!it.imageUrl)
 }
 
+function boxHasName(box: PackingBoxDetail): boolean {
+  return box.items.some((it) => !!it.styleName)
+}
+
 function itemSizeQty(item: PackingItemDetail, size: string): string {
   const q = Number(item.sizeQuantities[size]) || 0
   return q > 0 ? String(q) : ''
@@ -156,9 +173,14 @@ function boxSizeTotal(box: PackingBoxDetail, size: string): number {
   return box.items.reduce((sum, it) => sum + (Number(it.sizeQuantities[size]) || 0), 0)
 }
 
-/** 合计行前导列跨度：[图片] + 款号 + 颜色 */
-function leadColspan(box: PackingBoxDetail): number {
-  return (boxHasImage(box) ? 1 : 0) + 2
+/** 尺码列前的列数：[图片] + 款号 + [描述] + 颜色 */
+function leadCols(box: PackingBoxDetail): number {
+  return (boxHasImage(box) ? 1 : 0) + 1 + (boxHasName(box) ? 1 : 0) + 1
+}
+
+/** 整表总列数 = 前导列 + 各码 + 合计 */
+function totalCols(box: PackingBoxDetail): number {
+  return leadCols(box) + boxSizes(box).length + 1
 }
 
 function onPrint() {
@@ -193,72 +215,7 @@ function onPrint() {
   right: 12px;
 }
 
-/* 顶部：左上角大号圈圈箱号 + 右侧公司/客户/CARTON NO */
-.label-header-row {
-  display: flex;
-  align-items: center;
-  gap: 22px;
-  border-bottom: 3px solid #000;
-  padding-bottom: 14px;
-  margin-bottom: 18px;
-}
-
-.label-boxno {
-  flex: 0 0 auto;
-  width: 92px;
-  height: 92px;
-  border: 5px solid #000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 54px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.label-header-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.label-topbar {
-  text-align: center;
-  margin-bottom: 8px;
-}
-
-.label-brand {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.label-topbar-sub {
-  margin-left: 12px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.label-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.label-client {
-  font-size: 32px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-.label-carton-no {
-  font-size: 24px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-/* 内容统一表格：图片 / 款号 / 颜色 / 各码 / 合计 */
+/* 整张箱贴 = 一张边框表格（全英文，给国外客户） */
 .label-table {
   width: 100%;
   border-collapse: collapse;
@@ -266,26 +223,78 @@ function onPrint() {
 
 .label-table th,
 .label-table td {
-  border: 1px solid #000;
+  border: 1.5px solid #000;
   padding: 8px 10px;
   font-size: 18px;
   text-align: center;
   vertical-align: middle;
+  word-break: break-word;
 }
 
-.label-table thead th {
+/* 标题行：左上角大圈号 + 居中 PACKING LIST */
+.lt-title-cell {
+  position: relative;
+  padding: 14px 10px;
+}
+
+.label-boxno {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 84px;
+  height: 84px;
+  border: 5px solid #000;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 50px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.lt-title-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.lt-brand {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.lt-title {
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 3px;
+}
+
+/* 客户/箱号/重量/箱规信息行：左标签 + 值 */
+.lt-info .lt-label {
+  text-align: left;
   font-weight: 700;
   background: #f2f2f2;
-  line-height: 1.2;
+  white-space: nowrap;
 }
 
-.label-table .lt-en {
-  display: block;
-  font-size: 12px;
-  font-weight: 500;
+.lt-info .lt-info-val {
+  text-align: center;
+  font-weight: 700;
+  font-size: 20px;
+}
+
+/* 尺码矩阵 */
+.lt-matrix-head th {
+  font-weight: 700;
+  background: #f2f2f2;
 }
 
 .label-table .lt-style,
+.label-table .lt-name,
 .label-table .lt-color {
   text-align: left;
   font-weight: 700;
@@ -296,36 +305,30 @@ function onPrint() {
 }
 
 .label-table .lt-img {
-  width: 96px;
+  width: 110px;
 }
 
 .label-table .lt-img img {
-  width: 80px;
-  height: 80px;
+  width: 88px;
+  height: 88px;
   object-fit: contain;
   display: block;
   margin: 0 auto;
 }
 
-.label-table .lt-sum td {
+.lt-sum td {
   font-weight: 700;
   background: #f8f8f8;
 }
 
-.label-table .lt-sum td:first-child {
+.lt-sum td:first-child {
   text-align: right;
 }
 
-.label-footer {
-  margin-top: 24px;
-  border-top: 3px solid #000;
-  padding-top: 14px;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px 36px;
-  font-size: 18px;
-  font-weight: 700;
+.lt-madein {
+  font-weight: 800;
+  letter-spacing: 2px;
+  font-size: 20px;
 }
 
 [contenteditable='true']:hover {
@@ -376,32 +379,30 @@ function onPrint() {
 
   /* A4 横版放大字号，唛头更醒目、铺满版面 */
   .packing-label-print-area .label-boxno {
-    width: 130px;
-    height: 130px;
+    width: 120px;
+    height: 120px;
     border-width: 7px;
-    font-size: 80px;
+    font-size: 74px;
+    left: 24px;
   }
 
-  .packing-label-print-area .label-brand {
-    font-size: 30px;
+  .packing-label-print-area .lt-brand {
+    font-size: 22px;
   }
 
-  .packing-label-print-area .label-client {
-    font-size: 46px;
-  }
-
-  .packing-label-print-area .label-carton-no {
-    font-size: 32px;
+  .packing-label-print-area .lt-title {
+    font-size: 44px;
   }
 
   .packing-label-print-area .label-table th,
   .packing-label-print-area .label-table td {
-    font-size: 24px;
+    font-size: 25px;
     padding: 12px 14px;
   }
 
-  .packing-label-print-area .label-table .lt-en {
-    font-size: 15px;
+  .packing-label-print-area .lt-info .lt-info-val,
+  .packing-label-print-area .lt-madein {
+    font-size: 28px;
   }
 
   .packing-label-print-area .label-table .lt-img img {
@@ -410,11 +411,7 @@ function onPrint() {
   }
 
   .packing-label-print-area .label-table .lt-img {
-    width: 140px;
-  }
-
-  .packing-label-print-area .label-footer {
-    font-size: 23px;
+    width: 150px;
   }
 
   .packing-label-print-area .label-skip-print,
