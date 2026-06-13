@@ -4,6 +4,7 @@
     title="箱贴预览（A4 横版，每箱一张；文字可点击修改，仅影响本次打印）"
     width="1060px"
     top="4vh"
+    modal-class="packing-print-overlay"
     @update:model-value="emit('update:visible', $event)"
   >
     <div class="label-toolbar">
@@ -17,7 +18,7 @@
       <el-button type="primary" :disabled="!selectedSeqs.size" @click="onPrint">打印箱贴</el-button>
     </div>
 
-    <div class="packing-label-print-area">
+    <div ref="printAreaRef" class="packing-label-print-area">
       <div
         v-for="box in detail.boxes"
         :key="box.boxSeq"
@@ -182,20 +183,29 @@ function totalCols(box: PackingBoxDetail): number {
   return leadCols(box) + boxSizes(box).length + 1
 }
 
-// 打印前给 body 打标记类 + 注入横版 @page（仅当本弹窗打开时），打印后清理。
+// 弹窗渲染在 #app 内部，直接打印会被对话框层裁切/无法正常分页。
+// 打印前把内容克隆到 body 顶层的打印根，注入横版 @page，仅当本弹窗打开时生效；打印后清理。
 // 用 beforeprint/afterprint 监听，使点「打印箱贴」按钮和直接按 Ctrl+P 都生效，且与客户单(纵版)互不干扰。
+const printAreaRef = ref<HTMLElement | null>(null)
+let printRoot: HTMLElement | null = null
 let pageStyle: HTMLStyleElement | null = null
 
 function onBeforePrint() {
-  if (!props.visible) return
-  document.body.classList.add('printing-packing-label')
+  if (!props.visible || !printAreaRef.value) return
+  printRoot = document.createElement('div')
+  printRoot.id = 'packing-print-root'
+  printRoot.appendChild(printAreaRef.value.cloneNode(true))
+  document.body.appendChild(printRoot)
   pageStyle = document.createElement('style')
   pageStyle.textContent = '@page { size: A4 landscape; margin: 12mm 16mm; }'
   document.head.appendChild(pageStyle)
+  document.body.classList.add('printing-packing-label')
 }
 
 function onAfterPrint() {
   document.body.classList.remove('printing-packing-label')
+  printRoot?.remove()
+  printRoot = null
   pageStyle?.remove()
   pageStyle = null
 }
@@ -262,7 +272,8 @@ function onPrint() {
 /* 标题行：左上角大圈号 + 居中品牌/PACKING LIST + 右上角 CARTON NO. */
 .lt-title-cell {
   position: relative;
-  padding: 16px 160px;
+  height: 104px;
+  padding: 10px 160px;
   background: #fafafa;
 }
 
@@ -390,61 +401,46 @@ function onPrint() {
 </style>
 
 <style>
-/* 打印：规则全部限定到 body.printing-packing-label（onPrint 时挂上），避免与客户单的全局打印规则冲突；@page 由 onPrint 动态注入 */
+/* 打印：内容已被克隆到 body 顶层 #packing-print-root，隐藏其余 body 子节点，按正常文档流分页 */
 @media print {
-  body.printing-packing-label * {
-    visibility: hidden;
+  body.printing-packing-label > *:not(#packing-print-root) {
+    display: none !important;
   }
 
-  body.printing-packing-label .packing-label-print-area,
-  body.printing-packing-label .packing-label-print-area * {
-    visibility: visible;
+  #packing-print-root {
+    display: block !important;
   }
 
-  /* 还原弹窗各层定位/裁剪，让打印区相对页面铺满（不被对话框盒子裁切） */
-  body.printing-packing-label .el-overlay-dialog,
-  body.printing-packing-label .el-dialog,
-  body.printing-packing-label .el-dialog__body {
-    position: static !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-    transform: none !important;
-    box-shadow: none !important;
-    background: #fff !important;
+  #packing-print-root .label-skip-print,
+  #packing-print-root .no-print {
+    display: none !important;
   }
 
-  body.printing-packing-label .packing-label-print-area {
-    position: absolute;
-    inset: 0;
-  }
-
-  /* 每箱一张，A4 横版整页内上下居中 */
-  body.printing-packing-label .packing-label-print-area .packing-label {
-    max-width: none;
+  /* 每箱独占一页、整页上下居中 */
+  #packing-print-root .packing-label {
     width: 100%;
-    min-height: 175mm;
+    min-height: 180mm;
     margin: 0;
     border: none;
-    padding: 0;
     display: flex;
     flex-direction: column;
     justify-content: center;
     page-break-after: always;
+    break-after: page;
   }
 
-  body.printing-packing-label .packing-label-print-area .packing-label:last-child {
+  #packing-print-root .packing-label:last-child {
     page-break-after: auto;
+    break-after: auto;
   }
 
-  /* A4 横版放大字号，唛头更醒目、铺满版面 */
-  body.printing-packing-label .packing-label-print-area .lt-title-cell {
-    padding: 18px 200px;
+  /* 标题行加高容下大圈号；放大字号铺满版面 */
+  #packing-print-root .lt-title-cell {
+    height: 150px;
+    padding: 10px 200px;
   }
 
-  body.printing-packing-label .packing-label-print-area .label-boxno {
+  #packing-print-root .label-boxno {
     width: 124px;
     height: 124px;
     border-width: 7px;
@@ -452,45 +448,40 @@ function onPrint() {
     left: 28px;
   }
 
-  body.printing-packing-label .packing-label-print-area .lt-brand {
+  #packing-print-root .lt-brand {
     font-size: 48px;
   }
 
-  body.printing-packing-label .packing-label-print-area .lt-cartonno-label {
+  #packing-print-root .lt-cartonno-label {
     font-size: 16px;
   }
 
-  body.printing-packing-label .packing-label-print-area .lt-cartonno-val {
+  #packing-print-root .lt-cartonno-val {
     font-size: 44px;
   }
 
-  body.printing-packing-label .packing-label-print-area .label-table th,
-  body.printing-packing-label .packing-label-print-area .label-table td {
+  #packing-print-root .label-table th,
+  #packing-print-root .label-table td {
     font-size: 25px;
     padding: 12px 14px;
   }
 
-  body.printing-packing-label .packing-label-print-area .label-table .lt-customer-val {
+  #packing-print-root .label-table .lt-customer-val {
     font-size: 38px;
   }
 
-  body.printing-packing-label .packing-label-print-area .lt-info .lt-info-val,
-  body.printing-packing-label .packing-label-print-area .label-table .lt-madein {
+  #packing-print-root .lt-info .lt-info-val,
+  #packing-print-root .label-table .lt-madein {
     font-size: 28px;
   }
 
-  body.printing-packing-label .packing-label-print-area .label-table .lt-img img {
+  #packing-print-root .label-table .lt-img img {
     width: 120px;
     height: 120px;
   }
 
-  body.printing-packing-label .packing-label-print-area .label-table .lt-img {
+  #packing-print-root .label-table .lt-img {
     width: 150px;
-  }
-
-  body.printing-packing-label .packing-label-print-area .label-skip-print,
-  body.printing-packing-label .packing-label-print-area .label-select.no-print {
-    display: none;
   }
 }
 </style>

@@ -178,38 +178,17 @@
   white-space: nowrap;
 }
 
-/* 打印：规则全部限定到 body.printing-packing-doc（onPrint 时挂上），避免与箱贴的全局打印规则冲突；@page 由 onPrint 动态注入 */
+/* 打印：内容已被克隆到 body 顶层 #packing-print-root，隐藏其余 body 子节点（@page 由 onPrint 动态注入） */
 @media print {
-  body.printing-packing-doc * {
-    visibility: hidden;
+  body.printing-packing-doc > *:not(#packing-print-root) {
+    display: none !important;
   }
 
-  body.printing-packing-doc .packing-doc-print-area,
-  body.printing-packing-doc .packing-doc-print-area * {
-    visibility: visible;
+  #packing-print-root {
+    display: block !important;
   }
 
-  /* 还原弹窗各层定位/裁剪，让打印区相对页面铺满（不被对话框盒子裁切） */
-  body.printing-packing-doc .el-overlay-dialog,
-  body.printing-packing-doc .el-dialog,
-  body.printing-packing-doc .el-dialog__body {
-    position: static !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    max-height: none !important;
-    height: auto !important;
-    overflow: visible !important;
-    transform: none !important;
-    box-shadow: none !important;
-    background: #fff !important;
-  }
-
-  body.printing-packing-doc .packing-doc-print-area {
-    position: absolute;
-    inset: 0;
-  }
-
-  body.printing-packing-doc .packing-doc-print-area .packing-doc {
+  #packing-print-root .packing-doc {
     max-width: none;
     width: 100%;
     padding: 0;

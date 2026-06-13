@@ -4,6 +4,7 @@
     title="客户单预览（可直接截图，或打印 A4）"
     width="900px"
     top="3vh"
+    modal-class="packing-print-overlay"
     @update:model-value="emit('update:visible', $event)"
   >
     <div class="doc-toolbar no-print">
@@ -11,7 +12,7 @@
       <el-button type="primary" @click="onPrint">打印 A4</el-button>
     </div>
 
-    <div class="packing-doc-print-area">
+    <div ref="printAreaRef" class="packing-doc-print-area">
       <div class="packing-doc a4-sheet">
         <header class="doc-head">
           <div v-if="detail.showCompany" class="doc-brand">
@@ -98,7 +99,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -186,20 +187,28 @@ function weightDisplay(weight: number | null): string {
   return `${Math.round(weight * 100) / 100}`
 }
 
-// 打印前给 body 打标记类 + 注入纵版 @page（仅当本弹窗打开时），打印后清理。
-// 用 beforeprint/afterprint 监听，使点「打印 A4」按钮和直接按 Ctrl+P 都生效，且与箱贴(横版)互不干扰。
+// 弹窗渲染在 #app 内部，直接打印会被对话框层裁切。打印前把内容克隆到 body 顶层打印根，
+// 注入纵版 @page，仅当本弹窗打开时生效；打印后清理。beforeprint/afterprint 让按钮和 Ctrl+P 都生效，且与箱贴(横版)互不干扰。
+const printAreaRef = ref<HTMLElement | null>(null)
+let printRoot: HTMLElement | null = null
 let pageStyle: HTMLStyleElement | null = null
 
 function onBeforePrint() {
-  if (!props.visible) return
-  document.body.classList.add('printing-packing-doc')
+  if (!props.visible || !printAreaRef.value) return
+  printRoot = document.createElement('div')
+  printRoot.id = 'packing-print-root'
+  printRoot.appendChild(printAreaRef.value.cloneNode(true))
+  document.body.appendChild(printRoot)
   pageStyle = document.createElement('style')
   pageStyle.textContent = '@page { size: A4 portrait; margin: 12mm 12mm 14mm; }'
   document.head.appendChild(pageStyle)
+  document.body.classList.add('printing-packing-doc')
 }
 
 function onAfterPrint() {
   document.body.classList.remove('printing-packing-doc')
+  printRoot?.remove()
+  printRoot = null
   pageStyle?.remove()
   pageStyle = null
 }
