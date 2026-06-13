@@ -126,6 +126,67 @@ export function usePackingGridRows() {
     }
   }
 
+  /** 末尾追加一个空尺码列，返回其下标（前端聚焦列头直接录入） */
+  function addSizeColumn(): number {
+    sizeHeaders.value.push('')
+    return sizeHeaders.value.length - 1
+  }
+
+  function columnHasData(name: string): boolean {
+    if (!name) return false
+    return boxes.value.some((box) => box.items.some((item) => (Number(item.sizeQuantities[name]) || 0) > 0))
+  }
+
+  function removeSizeColumnAt(index: number): void {
+    const headers = sizeHeaders.value
+    if (index < 0 || index >= headers.length) return
+    const name = headers[index]
+    headers.splice(index, 1)
+    if (name) {
+      for (const box of boxes.value) {
+        for (const item of box.items) {
+          if (name in item.sizeQuantities) delete item.sizeQuantities[name]
+        }
+      }
+    }
+  }
+
+  /**
+   * 提交列头改名（列头 v-model 已把 headers[index] 改为新值后调用）。
+   * oldName 为进入编辑前的列名。返回提交结果，供前端提示。
+   */
+  function commitSizeHeader(index: number, oldName: string): 'ok' | 'duplicate' | 'removed' {
+    const headers = sizeHeaders.value
+    if (index < 0 || index >= headers.length) return 'ok'
+    const newName = (headers[index] ?? '').trim()
+    if (!newName) {
+      // 空名：旧列有数据则撤销回旧名，否则删除该空列
+      if (oldName && columnHasData(oldName)) {
+        headers[index] = oldName
+        return 'ok'
+      }
+      removeSizeColumnAt(index)
+      return 'removed'
+    }
+    if (headers.some((h, i) => i !== index && h.trim() === newName)) {
+      headers[index] = oldName
+      return 'duplicate'
+    }
+    headers[index] = newName
+    if (oldName && oldName !== newName) {
+      for (const box of boxes.value) {
+        for (const item of box.items) {
+          if (oldName in item.sizeQuantities) {
+            const v = item.sizeQuantities[oldName]
+            delete item.sizeQuantities[oldName]
+            item.sizeQuantities[newName] = v
+          }
+        }
+      }
+    }
+    return 'ok'
+  }
+
   const flatRows = computed<PackingFlatRow[]>(() => {
     const rows: PackingFlatRow[] = []
     boxes.value.forEach((box, boxIndex) => {
@@ -230,6 +291,9 @@ export function usePackingGridRows() {
     removeItem,
     insertSizeHeader,
     removeSizeHeader,
+    addSizeColumn,
+    removeSizeColumnAt,
+    commitSizeHeader,
     validateAgainstPicked,
   }
 }

@@ -46,17 +46,30 @@
       </template>
     </el-table-column>
     <el-table-column
-      v-for="size in sizeHeaders"
-      :key="`size-${size}`"
-      min-width="74"
+      v-for="(size, sIndex) in sizeHeaders"
+      :key="`size-col-${sIndex}`"
+      min-width="84"
       align="center"
       header-align="center"
     >
       <template #header>
         <div class="size-header-cell">
-          <span>{{ size }}</span>
+          <el-input
+            v-if="!disabled"
+            :ref="(el) => setSizeHeaderRef(el, sIndex)"
+            v-model="sizeHeaders[sIndex]"
+            size="small"
+            placeholder="码"
+            class="size-header-input"
+            :input-style="{ textAlign: 'center' }"
+            @focus="onSizeHeaderFocus(sIndex)"
+            @change="onSizeHeaderChange(sIndex)"
+            @keydown.enter.stop="blurEvent"
+            @click.stop
+          />
+          <span v-else>{{ size }}</span>
           <el-tooltip v-if="!disabled" content="删除此码列" placement="top">
-            <el-button link type="danger" size="small" class="size-header-remove" @click.stop="emit('remove-size', size)">
+            <el-button link type="danger" size="small" class="size-header-remove" @click.stop="emit('remove-size-at', sIndex)">
               <el-icon><CircleClose /></el-icon>
             </el-button>
           </el-tooltip>
@@ -79,7 +92,7 @@
         <div class="size-header-cell">
           <span>合计</span>
           <el-tooltip v-if="!disabled" content="新增尺码列" placement="top">
-            <el-button link type="primary" size="small" @click.stop="emit('insert-size')">
+            <el-button link type="primary" size="small" @click.stop="emit('add-size')">
               <el-icon><Plus /></el-icon>
             </el-button>
           </el-tooltip>
@@ -144,8 +157,9 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick } from 'vue'
 import { CircleClose, CopyDocument, Delete, Plus, ShoppingCart } from '@element-plus/icons-vue'
-import type { TableColumnCtx } from 'element-plus'
+import type { InputInstance, TableColumnCtx } from 'element-plus'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -159,14 +173,42 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  'insert-size': []
-  'remove-size': [size: string]
+  'add-size': []
+  'rename-size': [index: number, oldName: string]
+  'remove-size-at': [index: number]
   'copy-box': [boxIndex: number]
   'remove-box': [boxIndex: number]
   'add-item': [boxIndex: number]
   'pick-goods': [boxIndex: number]
   'remove-item': [boxIndex: number, itemIndex: number]
 }>()
+
+const sizeHeaderRefs = new Map<number, InputInstance>()
+let editingOldName = ''
+
+function setSizeHeaderRef(el: unknown, index: number): void {
+  if (el) sizeHeaderRefs.set(index, el as InputInstance)
+  else sizeHeaderRefs.delete(index)
+}
+
+function onSizeHeaderFocus(index: number): void {
+  editingOldName = props.sizeHeaders[index] ?? ''
+}
+
+function onSizeHeaderChange(index: number): void {
+  emit('rename-size', index, editingOldName)
+}
+
+function blurEvent(e: Event): void {
+  ;(e.target as HTMLElement | null)?.blur()
+}
+
+async function focusSizeHeader(index: number): Promise<void> {
+  await nextTick()
+  sizeHeaderRefs.get(index)?.focus()
+}
+
+defineExpose({ focusSizeHeader })
 
 function hasSizeQty(item: PackingItemDraft): boolean {
   return Object.values(item.sizeQuantities).some((n) => (Number(n) || 0) > 0)
@@ -232,6 +274,10 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   display: inline-flex;
   align-items: center;
   gap: 2px;
+}
+
+.size-header-input {
+  width: 48px;
 }
 
 .size-header-remove {

@@ -140,7 +140,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
       packDate: form.packDate || null,
       remark: form.remark.trim(),
       showCompany: form.showCompany,
-      sizeHeaders: [...grid.sizeHeaders.value],
+      sizeHeaders: grid.sizeHeaders.value.map((h) => h.trim()).filter(Boolean),
       boxes: grid.boxes.value.map((box) => ({
         weightKg: box.weightKg,
         cartonSize: box.cartonSize,

@@ -76,12 +76,14 @@
     </el-form>
 
     <PackingGrid
+      ref="packingGridRef"
       :flat-rows="grid.flatRows.value"
       :size-headers="grid.sizeHeaders.value"
       :totals="grid.totals.value"
       :disabled="edit.isReadonly.value"
-      @insert-size="onInsertSize"
-      @remove-size="onRemoveSize"
+      @add-size="onAddSize"
+      @rename-size="onRenameSize"
+      @remove-size-at="onRemoveSizeAt"
       @copy-box="grid.copyBox"
       @remove-box="onRemoveBox"
       @add-item="grid.addItemToBox"
@@ -133,6 +135,7 @@ const router = useRouter()
 const grid = usePackingGridRows()
 const edit = usePackingListEdit(grid)
 const picker = reactive({ visible: false, boxIndex: 0 })
+const packingGridRef = ref<InstanceType<typeof PackingGrid> | null>(null)
 const shipping = ref(false)
 const labelsVisible = ref(false)
 const docVisible = ref(false)
@@ -156,19 +159,18 @@ function goBack() {
   router.push('/inventory/packing')
 }
 
-async function onInsertSize() {
-  let value = ''
-  try {
-    const res = await ElMessageBox.prompt('请输入尺码名（如 XL）', '新增尺码列', { inputPattern: /\S+/, inputErrorMessage: '尺码名不能为空' })
-    value = res.value
-  } catch {
-    return
-  }
-  if (!grid.insertSizeHeader(value)) ElMessage.warning('该尺码列已存在')
+function onAddSize() {
+  const index = grid.addSizeColumn()
+  packingGridRef.value?.focusSizeHeader(index)
 }
 
-async function onRemoveSize(size: string) {
-  const hasQty = grid.boxes.value.some((box) => box.items.some((item) => (item.sizeQuantities[size] ?? 0) > 0))
+function onRenameSize(index: number, oldName: string) {
+  if (grid.commitSizeHeader(index, oldName) === 'duplicate') ElMessage.warning('该尺码列已存在')
+}
+
+async function onRemoveSizeAt(index: number) {
+  const size = grid.sizeHeaders.value[index]
+  const hasQty = !!size && grid.boxes.value.some((box) => box.items.some((item) => (item.sizeQuantities[size] ?? 0) > 0))
   if (hasQty) {
     try {
       await ElMessageBox.confirm(`「${size}」列已有填写数量，删除将一并清除，是否继续？`, '删除尺码列', { type: 'warning' })
@@ -176,7 +178,7 @@ async function onRemoveSize(size: string) {
       return
     }
   }
-  grid.removeSizeHeader(size)
+  grid.removeSizeColumnAt(index)
 }
 
 async function onRemoveBox(boxIndex: number) {
