@@ -1,8 +1,8 @@
 <template>
   <AppDialog
     :model-value="visible"
-    title="箱贴预览（文字可点击修改，仅影响本次打印）"
-    width="860px"
+    title="箱贴预览（A4 横版，每箱一张；文字可点击修改，仅影响本次打印）"
+    width="1060px"
     top="4vh"
     @update:model-value="emit('update:visible', $event)"
   >
@@ -33,8 +33,8 @@
         </el-checkbox>
 
         <div v-if="detail.showCompany" class="label-topbar">
-          <span contenteditable="true">HONGYU APPAREL</span>
-          <span v-if="detail.serviceManager" contenteditable="true">Service manager: {{ detail.serviceManager }}</span>
+          <span class="label-brand" contenteditable="true">HONGYU APPAREL</span>
+          <span v-if="detail.serviceManager" class="label-topbar-sub" contenteditable="true">Service manager: {{ detail.serviceManager }}</span>
         </div>
 
         <div class="label-heading">
@@ -42,28 +42,37 @@
           <span class="label-carton-no" contenteditable="true">CARTON NO# {{ box.boxSeq }} OF {{ detail.boxes.length }}</span>
         </div>
 
-        <div v-for="item in box.items" :key="item.id" class="label-style-block">
-          <img v-if="item.imageUrl" :src="item.imageUrl" class="label-style-image" alt="" />
-          <div class="label-style-info">
-            <div class="label-style-line" contenteditable="true">STYLE NO# {{ item.styleNo || '-' }}</div>
-            <div v-if="item.colorName" class="label-style-line" contenteditable="true">COLOR: {{ item.colorName }}</div>
-            <table class="label-size-table">
-              <tbody>
-                <tr v-for="entry in sizeEntries(item)" :key="entry.size">
-                  <td contenteditable="true">{{ entry.size }}</td>
-                  <td contenteditable="true">{{ entry.qty }} PCS</td>
-                </tr>
-              </tbody>
-            </table>
+        <div class="label-body">
+          <div v-for="item in box.items" :key="item.id" class="label-style-block">
+            <img v-if="item.imageUrl" :src="item.imageUrl" class="label-style-image" alt="" />
+            <div class="label-style-info">
+              <div class="label-style-line" contenteditable="true">
+                STYLE NO# {{ item.styleNo || '-' }}<template v-if="item.colorName">　·　COLOR: {{ item.colorName }}</template>
+              </div>
+              <table class="label-size-table">
+                <thead>
+                  <tr>
+                    <th v-for="entry in sizeEntries(item)" :key="entry.size" contenteditable="true">{{ entry.size }}</th>
+                    <th class="label-size-total">TOTAL</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td v-for="entry in sizeEntries(item)" :key="entry.size" contenteditable="true">{{ entry.qty }}</td>
+                    <td class="label-size-total" contenteditable="true">{{ itemTotal(item) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
 
         <div class="label-footer">
-          <div contenteditable="true">TOTAL PCS: {{ boxTotal(box) }}</div>
-          <div v-if="box.weightKg != null" contenteditable="true">WEIGHT: {{ box.weightKg }} KG</div>
-          <div v-if="box.cartonSize" contenteditable="true">CARTON SIZE: {{ box.cartonSize }} CM</div>
-          <div v-if="box.remark" contenteditable="true">SHIPPING: {{ box.remark }}</div>
-          <div contenteditable="true">MADE IN CHINA</div>
+          <span contenteditable="true">TOTAL PCS: {{ boxTotal(box) }}</span>
+          <span v-if="box.weightKg != null" contenteditable="true">WEIGHT: {{ box.weightKg }} KG</span>
+          <span v-if="box.cartonSize" contenteditable="true">CARTON SIZE: {{ box.cartonSize }} CM</span>
+          <span v-if="box.remark" contenteditable="true">SHIPPING: {{ box.remark }}</span>
+          <span contenteditable="true">MADE IN CHINA</span>
         </div>
       </div>
     </div>
@@ -115,8 +124,12 @@ function sizeEntries(item: PackingItemDetail): Array<{ size: string; qty: number
   return entries
 }
 
+function itemTotal(item: PackingItemDetail): number {
+  return sizeEntries(item).reduce((sum, entry) => sum + entry.qty, 0)
+}
+
 function boxTotal(box: PackingBoxDetail): number {
-  return box.items.reduce((sum, item) => sum + (item.totalQty || 0), 0)
+  return box.items.reduce((sum, item) => sum + itemTotal(item), 0)
 }
 
 function onPrint() {
@@ -132,17 +145,17 @@ function onPrint() {
   margin-bottom: var(--space-sm);
 }
 
+/* 横版唛头：抬头band → 客户/箱号左右大字 → 横向尺码表 → 横向底部信息 */
 .packing-label {
   position: relative;
   width: 100%;
-  max-width: 720px;
+  max-width: 1000px;
   margin: 0 auto var(--space-md);
-  padding: 32px 36px;
+  padding: 28px 44px;
   border: 1px dashed var(--color-border);
   background: #ffffff;
   color: #000000;
   font-family: Arial, Helvetica, sans-serif;
-  text-align: center;
 }
 
 .label-select {
@@ -152,47 +165,63 @@ function onPrint() {
 }
 
 .label-topbar {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  font-size: 15px;
-  font-weight: 600;
-  border-bottom: 2px solid #000;
+  text-align: center;
+  border-bottom: 3px solid #000;
   padding-bottom: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+}
+
+.label-brand {
+  display: block;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.label-topbar-sub {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
 }
 
 .label-heading {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 20px;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
 }
 
 .label-client {
-  font-size: 30px;
+  font-size: 34px;
   font-weight: 700;
   letter-spacing: 1px;
 }
 
 .label-carton-no {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.label-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
 }
 
 .label-style-block {
   display: flex;
-  gap: 18px;
+  gap: 28px;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 16px;
 }
 
 .label-style-image {
-  width: 104px;
-  height: 104px;
+  width: 120px;
+  height: 120px;
   object-fit: contain;
 }
 
@@ -201,33 +230,44 @@ function onPrint() {
 }
 
 .label-style-line {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 4px;
+  font-size: 19px;
+  font-weight: 700;
+  margin-bottom: 10px;
 }
 
 .label-size-table {
   border-collapse: collapse;
-  margin: 6px auto 0;
+  margin: 0 auto;
 }
 
+.label-size-table th,
 .label-size-table td {
   border: 1px solid #000;
-  padding: 3px 18px;
-  font-size: 15px;
+  padding: 5px 22px;
+  font-size: 17px;
   text-align: center;
+  min-width: 46px;
+}
+
+.label-size-table th {
+  font-weight: 700;
+  background: #f2f2f2;
+}
+
+.label-size-total {
+  font-weight: 700;
 }
 
 .label-footer {
-  margin-top: 18px;
-  border-top: 2px solid #000;
-  padding-top: 12px;
-  font-size: 16px;
-  font-weight: 600;
+  margin-top: 24px;
+  border-top: 3px solid #000;
+  padding-top: 14px;
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 36px;
+  font-size: 18px;
+  font-weight: 700;
 }
 
 [contenteditable='true']:hover {
@@ -276,26 +316,36 @@ function onPrint() {
     page-break-after: auto;
   }
 
-  /* A4 上放大字号，唛头更醒目 */
+  /* A4 横版放大字号，唛头更醒目、铺满版面 */
+  .packing-label-print-area .label-brand {
+    font-size: 30px;
+  }
+
   .packing-label-print-area .label-client {
-    font-size: 40px;
+    font-size: 48px;
   }
 
   .packing-label-print-area .label-carton-no {
-    font-size: 28px;
+    font-size: 34px;
   }
 
   .packing-label-print-area .label-style-line {
-    font-size: 20px;
+    font-size: 26px;
   }
 
+  .packing-label-print-area .label-size-table th,
   .packing-label-print-area .label-size-table td {
-    font-size: 18px;
-    padding: 4px 22px;
+    font-size: 24px;
+    padding: 8px 30px;
+  }
+
+  .packing-label-print-area .label-style-image {
+    width: 150px;
+    height: 150px;
   }
 
   .packing-label-print-area .label-footer {
-    font-size: 18px;
+    font-size: 23px;
   }
 
   .packing-label-print-area .label-skip-print,
