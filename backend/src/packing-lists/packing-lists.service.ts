@@ -9,6 +9,8 @@ import { SavePackingListDto } from './dto';
 export interface PackingListQuery {
   status?: string;
   customerName?: string;
+  /** 按明细款号/SKU 模糊匹配（命中任一明细即返回该单） */
+  keyword?: string;
   dateFrom?: string;
   dateTo?: string;
   page: number;
@@ -96,6 +98,12 @@ export class PackingListsService {
     if (query.status?.trim()) qb.andWhere('pl.status = :status', { status: query.status.trim() });
     if (query.customerName?.trim()) {
       qb.andWhere('pl.customer_name LIKE :customerName', { customerName: `%${query.customerName.trim()}%` });
+    }
+    if (query.keyword?.trim()) {
+      qb.andWhere(
+        'EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.style_no LIKE :keyword)',
+        { keyword: `%${query.keyword.trim()}%` },
+      );
     }
     if (query.dateFrom?.trim()) qb.andWhere('pl.pack_date >= :dateFrom', { dateFrom: query.dateFrom.trim() });
     if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });
