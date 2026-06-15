@@ -324,6 +324,20 @@ async function ensurePackingListTables(dataSource: DataSource) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  // packing_lists.code 唯一索引（并发/异常下重复单号的最终防线）。幂等：已存在则跳过；
+  // 若老表存在重复单号导致加索引失败，仅告警不中断启动（服务端已用 MAX+1 生成避免撞号）。
+  const codeIndexRows: Array<{ cnt: number }> = await dataSource.query(`
+    SELECT COUNT(*) AS cnt FROM information_schema.statistics
+    WHERE table_schema = DATABASE() AND table_name = 'packing_lists' AND index_name = 'uniq_packing_lists_code'
+  `);
+  if (Number(codeIndexRows?.[0]?.cnt) === 0) {
+    try {
+      await dataSource.query('ALTER TABLE packing_lists ADD UNIQUE INDEX uniq_packing_lists_code (code)');
+    } catch (e) {
+      console.warn('[Schema] 跳过 packing_lists.code 唯一索引（可能存在重复单号）：', (e as Error).message);
+    }
+  }
+
   console.log('[Schema] Ensured packing list tables');
 }
 

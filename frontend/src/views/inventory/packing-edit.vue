@@ -7,21 +7,20 @@
           返回列表
         </el-button>
         <span class="edit-code">{{ edit.code.value ? `装箱单 ${edit.code.value}` : '新建装箱单' }}</span>
-        <el-tag v-if="edit.isReadonly.value" type="success" size="small">已发货</el-tag>
+        <el-tag v-if="edit.isShipped.value" type="success" size="small">已发货</el-tag>
         <el-tag v-else-if="edit.listId.value" type="info" size="small">草稿</el-tag>
+        <span v-if="edit.isShipped.value" class="edit-shipped-tip">可修改装箱方式，保存不影响库存</span>
       </div>
       <div class="edit-actions">
-        <el-button v-if="edit.detail.value" :type="edit.isReadonly.value ? 'primary' : ''" @click="openDoc">客户单</el-button>
+        <el-button v-if="edit.detail.value" :type="edit.isShipped.value ? 'primary' : ''" @click="openDoc">客户单</el-button>
         <el-button v-if="edit.detail.value" @click="openLabels">箱贴</el-button>
         <el-button v-if="edit.detail.value" @click="onExport">导出 Excel</el-button>
-        <template v-if="!edit.isReadonly.value">
-          <el-button @click="grid.addBox()">加箱</el-button>
+        <el-button @click="grid.addBox()">加箱</el-button>
+        <template v-if="!edit.isShipped.value">
           <el-button :loading="edit.saving.value" @click="edit.save()">保存草稿</el-button>
           <el-button type="primary" :loading="shipping" @click="onShip">确认发货</el-button>
         </template>
-        <template v-else>
-          <el-button @click="goBack">返回</el-button>
-        </template>
+        <el-button v-else type="primary" :loading="edit.saving.value" @click="edit.save()">保存修改</el-button>
       </div>
     </div>
 
@@ -33,8 +32,7 @@
             filterable
             allow-create
             default-first-option
-            :placeholder="edit.isReadonly.value ? '' : '选择或输入客户'"
-            :disabled="edit.isReadonly.value"
+            placeholder="选择或输入客户"
             @change="edit.onCustomerChange"
           >
             <el-option v-for="c in edit.customerOptions.value" :key="c.id" :label="c.companyName" :value="c.companyName" />
@@ -47,14 +45,13 @@
             allow-create
             default-first-option
             clearable
-            :placeholder="edit.isReadonly.value ? '' : '选择或输入业务员'"
-            :disabled="edit.isReadonly.value"
+            placeholder="选择或输入业务员"
           >
             <el-option v-for="u in edit.userOptions.value" :key="u.id" :label="u.displayName || u.username" :value="u.displayName || u.username" />
           </el-select>
         </el-form-item>
         <el-form-item label="PO#">
-          <el-input v-model="edit.form.poNo" :placeholder="edit.isReadonly.value ? '' : '选填，箱贴抬头优先用 PO'" :disabled="edit.isReadonly.value" />
+          <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
         </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
@@ -62,16 +59,15 @@
             type="date"
             value-format="YYYY-MM-DD"
             style="width: 100%"
-            :placeholder="edit.isReadonly.value ? '' : '装箱日期'"
-            :disabled="edit.isReadonly.value"
+            placeholder="装箱日期"
           />
         </el-form-item>
         <el-form-item label="备注" class="head-form-remark">
-          <el-input v-model="edit.form.remark" :placeholder="edit.isReadonly.value ? '' : '整单备注'" :disabled="edit.isReadonly.value" />
+          <el-input v-model="edit.form.remark" placeholder="整单备注" />
         </el-form-item>
         <el-form-item label="公司抬头">
           <el-tooltip content="开启后箱贴/客户单顶部显示公司名" placement="top">
-            <el-switch v-model="edit.form.showCompany" :disabled="edit.isReadonly.value" />
+            <el-switch v-model="edit.form.showCompany" />
           </el-tooltip>
         </el-form-item>
       </div>
@@ -82,7 +78,6 @@
       :flat-rows="grid.flatRows.value"
       :size-headers="grid.sizeHeaders.value"
       :totals="grid.totals.value"
-      :disabled="edit.isReadonly.value"
       @add-size-at="onAddSizeAt"
       @rename-size="onRenameSize"
       @remove-size-at="onRemoveSizeAt"
@@ -224,7 +219,7 @@ async function onShip() {
   }
   const { boxCount, totalQty } = grid.totals.value
   try {
-    await ElMessageBox.confirm(`共 ${boxCount} 箱 / ${totalQty} 件，确认发货？发货后将扣减待仓/成品库存且不可修改。`, '确认发货', { type: 'warning' })
+    await ElMessageBox.confirm(`共 ${boxCount} 箱 / ${totalQty} 件，确认发货？发货后将扣减待仓/成品库存（发货后仍可修改装箱方式，不影响库存）。`, '确认发货', { type: 'warning' })
   } catch {
     return
   }
@@ -289,6 +284,11 @@ onActivated(() => {
 .edit-code {
   font-size: var(--font-size-subtitle);
   font-weight: 600;
+}
+
+.edit-shipped-tip {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
 }
 
 .head-form-grid {

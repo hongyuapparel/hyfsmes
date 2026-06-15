@@ -48,7 +48,7 @@
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 2px;
-  color: #9ca3af;
+  color: #1f2329;
 }
 
 .doc-title {
@@ -68,7 +68,7 @@
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 4px;
-  color: #9ca3af;
+  color: #1f2329;
 }
 
 /* 信息区：无边框，靠列对齐 + 留白；标签 muted、中文注释 faint、值 ink 粗体 */
@@ -95,7 +95,7 @@
   margin-left: 3px;
   font-size: 11px;
   font-weight: 400;
-  color: #9ca3af;
+  color: #6b7280;
 }
 
 .doc-meta-value {
@@ -129,12 +129,12 @@
   display: block;
   font-size: 11px;
   font-weight: 400;
-  color: #9ca3af;
+  color: #1f2329;
 }
 
 .doc-table .col-style,
 .doc-table .col-color {
-  text-align: left;
+  text-align: center;
 }
 
 .doc-table .num {
@@ -149,13 +149,20 @@
   font-weight: 700;
 }
 
+/* 图片列：收紧内边距、列宽贴合图片，避免图片四周大片留白（对齐其他模块紧凑表的做法） */
+.doc-table .col-img {
+  width: 1%;
+  padding: 2px;
+  white-space: nowrap;
+}
+
 .doc-total td {
   background: #f4f6f8;
   font-weight: 700;
 }
 
 .doc-total td:first-child {
-  text-align: right;
+  text-align: center;
 }
 
 .doc-footer {
@@ -192,5 +199,59 @@
     max-width: none;
     width: 100%;
     padding: 0;
+  }
+
+  /* 单据很长时跨多页：表头每页自动重复（thead 默认行为），数据行不被拦腰拆页 */
+  #packing-print-root .doc-table thead {
+    display: table-header-group;
+  }
+
+  #packing-print-root .doc-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* 屏幕预览：文档铺满弹窗宽度，字号/内边距用容器单位随容器等比缩放（弹窗越大越大）。
+   仅 @media screen 生效，打印仍走上面的固定 px，不受影响。 */
+@media screen {
+  .packing-doc-print-area {
+    container-type: inline-size;
+  }
+
+  .packing-doc {
+    max-width: none;
+    padding: clamp(24px, 2.6cqw, 40px) clamp(28px, 3cqw, 44px);
+    font-size: clamp(13px, 1.45cqw, 19px);
+  }
+
+  .doc-brand-en {
+    font-size: clamp(19px, 2.4cqw, 30px);
+  }
+
+  .doc-brand-cn {
+    font-size: clamp(12px, 1.5cqw, 18px);
+  }
+
+  .doc-title-en {
+    font-size: clamp(24px, 3cqw, 38px);
+  }
+
+  .doc-title-cn {
+    font-size: clamp(13px, 1.6cqw, 20px);
+  }
+
+  .doc-meta-label .cn,
+  .doc-table thead th .cn {
+    font-size: clamp(11px, 1.3cqw, 16px);
+  }
+
+  .doc-table th,
+  .doc-table td {
+    padding: clamp(7px, 0.8cqw, 12px) clamp(8px, 0.9cqw, 14px);
+  }
+
+  .doc-footer {
+    font-size: clamp(12px, 1.45cqw, 18px);
   }
 }

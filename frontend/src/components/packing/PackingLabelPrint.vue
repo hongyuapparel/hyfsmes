@@ -33,7 +33,8 @@
           打印此箱
         </el-checkbox>
 
-        <table class="label-table">
+        <div class="label-body">
+          <table class="label-table">
           <tbody>
             <tr class="lt-title-row">
               <td :colspan="totalCols(box)" class="lt-title-cell">
@@ -92,7 +93,8 @@
               <td :colspan="totalCols(box)" class="lt-madein" contenteditable="true">MADE IN CHINA</td>
             </tr>
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </div>
   </AppDialog>
@@ -190,6 +192,23 @@ const printAreaRef = ref<HTMLElement | null>(null)
 let printRoot: HTMLElement | null = null
 let pageStyle: HTMLStyleElement | null = null
 
+// A4 横版去掉左右 14mm 页边后的可放内容宽；一页可放内容高目标 180mm
+//（= .packing-label 的 min-height，已被实际打印验证可单页容纳，留约 10mm 余量给页眉页脚/打印机硬边距）
+const PRINT_CONTENT_WIDTH = '269mm'
+const PAGE_FIT_PX = (180 * 96) / 25.4
+
+// 保证「一箱 = 一页」：克隆已是打印尺寸，量出每箱实际内容高，超过一页就按比例 zoom 整体缩小塞进一页。
+function fitLabelsToPage(root: HTMLElement) {
+  root.style.width = PRINT_CONTENT_WIDTH
+  root.querySelectorAll<HTMLElement>('.packing-label').forEach((label) => {
+    const body = label.querySelector<HTMLElement>('.label-body')
+    if (!body) return
+    body.style.setProperty('zoom', '1')
+    const height = body.getBoundingClientRect().height
+    body.style.setProperty('zoom', height > PAGE_FIT_PX ? String(PAGE_FIT_PX / height) : '1')
+  })
+}
+
 function onBeforePrint() {
   if (!props.visible || !printAreaRef.value) return
   printRoot = document.createElement('div')
@@ -197,9 +216,10 @@ function onBeforePrint() {
   printRoot.appendChild(printAreaRef.value.cloneNode(true))
   document.body.appendChild(printRoot)
   pageStyle = document.createElement('style')
-  pageStyle.textContent = '@page { size: A4 landscape; margin: 12mm 16mm; }'
+  pageStyle.textContent = '@page { size: A4 landscape; margin: 10mm 14mm; }'
   document.head.appendChild(pageStyle)
   document.body.classList.add('printing-packing-label')
+  fitLabelsToPage(printRoot)
 }
 
 function onAfterPrint() {
@@ -226,262 +246,5 @@ function onPrint() {
 }
 </script>
 
-<style scoped>
-.label-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
-}
-
-/* 横版唛头：抬头band → 客户/箱号左右大字 → 横向尺码表 → 横向底部信息 */
-.packing-label {
-  position: relative;
-  width: 100%;
-  max-width: 1000px;
-  margin: 0 auto var(--space-md);
-  padding: 28px 44px;
-  border: 1px dashed var(--color-border);
-  background: #ffffff;
-  color: #000000;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-.label-select {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-}
-
-/* 整张箱贴 = 一张边框表格（全英文，给国外客户） */
-.label-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.label-table th,
-.label-table td {
-  border: 1.5px solid #000;
-  padding: 8px 10px;
-  font-size: 18px;
-  text-align: center;
-  vertical-align: middle;
-  word-break: break-word;
-}
-
-/* 标题行：左上角大圈号 + 居中品牌/PACKING LIST + 右上角 CARTON NO. */
-.lt-title-cell {
-  position: relative;
-  height: 104px;
-  padding: 10px 160px;
-  background: #fafafa;
-}
-
-.label-boxno {
-  position: absolute;
-  left: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 86px;
-  height: 86px;
-  border: 5px solid #000;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 50px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.lt-title-text {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.lt-brand {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: 3px;
-}
-
-.lt-cartonno {
-  position: absolute;
-  right: 18px;
-  top: 50%;
-  transform: translateY(-50%);
-  text-align: center;
-  line-height: 1.1;
-}
-
-.lt-cartonno-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 1px;
-}
-
-.lt-cartonno-val {
-  display: block;
-  font-size: 30px;
-  font-weight: 800;
-}
-
-/* 信息行：标签（灰底）+ 值，全部居中 */
-.lt-label {
-  text-align: center;
-  font-weight: 700;
-  background: #f2f2f2;
-  white-space: nowrap;
-}
-
-.lt-info .lt-info-val {
-  text-align: center;
-  font-weight: 700;
-  font-size: 20px;
-}
-
-/* 客户行：客户名放大加粗，作视觉焦点 */
-.label-table .lt-customer-val {
-  text-align: center;
-  font-weight: 800;
-  font-size: 26px;
-  letter-spacing: 1px;
-}
-
-/* 尺码矩阵 */
-.lt-matrix-head th {
-  font-weight: 700;
-  background: #f2f2f2;
-}
-
-.label-table .lt-style,
-.label-table .lt-name,
-.label-table .lt-color {
-  text-align: center;
-  font-weight: 700;
-}
-
-.label-table .lt-total {
-  font-weight: 700;
-}
-
-.label-table .lt-img {
-  width: 110px;
-}
-
-.label-table .lt-img img {
-  width: 88px;
-  height: 88px;
-  object-fit: contain;
-  display: block;
-  margin: 0 auto;
-}
-
-.lt-sum td {
-  font-weight: 700;
-  background: #f8f8f8;
-}
-
-.lt-sum td:first-child {
-  text-align: center;
-}
-
-.label-table .lt-madein {
-  font-weight: 800;
-  letter-spacing: 2px;
-  font-size: 20px;
-}
-
-[contenteditable='true']:hover {
-  outline: 1px dashed var(--color-primary, #409eff);
-  outline-offset: 2px;
-}
-</style>
-
-<style>
-/* 打印：内容已被克隆到 body 顶层 #packing-print-root，隐藏其余 body 子节点，按正常文档流分页 */
-@media print {
-  body.printing-packing-label > *:not(#packing-print-root) {
-    display: none !important;
-  }
-
-  #packing-print-root {
-    display: block !important;
-  }
-
-  #packing-print-root .label-skip-print,
-  #packing-print-root .no-print {
-    display: none !important;
-  }
-
-  /* 每箱独占一页、整页上下居中 */
-  #packing-print-root .packing-label {
-    width: 100%;
-    min-height: 180mm;
-    margin: 0;
-    border: none;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    page-break-after: always;
-    break-after: page;
-  }
-
-  #packing-print-root .packing-label:last-child {
-    page-break-after: auto;
-    break-after: auto;
-  }
-
-  /* 标题行加高容下大圈号；放大字号铺满版面 */
-  #packing-print-root .lt-title-cell {
-    height: 150px;
-    padding: 10px 200px;
-  }
-
-  #packing-print-root .label-boxno {
-    width: 124px;
-    height: 124px;
-    border-width: 7px;
-    font-size: 74px;
-    left: 28px;
-  }
-
-  #packing-print-root .lt-brand {
-    font-size: 48px;
-  }
-
-  #packing-print-root .lt-cartonno-label {
-    font-size: 16px;
-  }
-
-  #packing-print-root .lt-cartonno-val {
-    font-size: 44px;
-  }
-
-  #packing-print-root .label-table th,
-  #packing-print-root .label-table td {
-    font-size: 25px;
-    padding: 12px 14px;
-  }
-
-  #packing-print-root .label-table .lt-customer-val {
-    font-size: 38px;
-  }
-
-  #packing-print-root .lt-info .lt-info-val,
-  #packing-print-root .label-table .lt-madein {
-    font-size: 28px;
-  }
-
-  #packing-print-root .label-table .lt-img img {
-    width: 120px;
-    height: 120px;
-  }
-
-  #packing-print-root .label-table .lt-img {
-    width: 150px;
-  }
-}
-</style>
+<style scoped src="./PackingLabelPrint.css"></style>
+<style src="./PackingLabelPrint.print.css"></style>

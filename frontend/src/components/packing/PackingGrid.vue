@@ -161,12 +161,15 @@ import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { packingItemTotal, type PackingFlatRow, type PackingItemDraft } from '@/composables/usePackingGridRows'
 
-const props = defineProps<{
-  flatRows: PackingFlatRow[]
-  sizeHeaders: string[]
-  totals: { boxCount: number; totalQty: number; totalWeight: number; bySize: Record<string, number> }
-  disabled: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    flatRows: PackingFlatRow[]
+    sizeHeaders: string[]
+    totals: { boxCount: number; totalQty: number; totalWeight: number; bySize: Record<string, number> }
+    disabled?: boolean
+  }>(),
+  { disabled: false },
+)
 
 const emit = defineEmits<{
   'add-size-at': [index: number]

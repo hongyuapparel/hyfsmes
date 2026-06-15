@@ -2,7 +2,7 @@
   <AppDialog
     :model-value="visible"
     title="客户单预览（可直接截图，或打印 A4）"
-    width="900px"
+    width="min(1180px, 94vw)"
     top="3vh"
     modal-class="packing-print-overlay"
     @update:model-value="emit('update:visible', $event)"
@@ -69,7 +69,7 @@
             <tr v-for="row in docRows" :key="row.key">
               <td v-if="row.isFirstOfBox" :rowspan="row.rowspan" class="col-box num">{{ row.boxSeq }}</td>
               <td v-if="hasImage" class="col-img">
-                <AppImageThumb v-if="row.item.imageUrl" :raw-url="row.item.imageUrl" variant="table" :width="40" :height="40" />
+                <AppImageThumb v-if="row.item.imageUrl" :raw-url="row.item.imageUrl" variant="table" :width="48" :height="48" />
                 <span v-else class="muted">—</span>
               </td>
               <td class="col-style">{{ row.item.styleNo || '—' }}</td>
