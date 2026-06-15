@@ -17,16 +17,16 @@
       </el-input>
       <el-input
         v-model="filter.keyword"
-        placeholder="SKU / 款号"
+        placeholder="SKU编号"
         clearable
         class="filter-bar-item"
-        :style="getTextFilterStyle('SKU：', filter.keyword, true)"
+        :style="getSkuCodeFilterStyle(filter.keyword, true)"
         :input-style="getFilterInputStyle(filter.keyword)"
         @input="debouncedSearch"
         @keyup.enter="onSearch(true)"
       >
         <template #prefix>
-          <span v-if="filter.keyword" :style="{ color: ACTIVE_FILTER_COLOR }">SKU：</span>
+          <span v-if="filter.keyword" :style="{ color: ACTIVE_FILTER_COLOR }">SKU编号：</span>
         </template>
       </el-input>
       <el-select
@@ -138,6 +138,7 @@ import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
   getTextFilterStyle,
+  getSkuCodeFilterStyle,
   getFilterRangeStyle,
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
