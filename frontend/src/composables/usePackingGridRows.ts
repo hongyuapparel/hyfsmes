@@ -1,5 +1,6 @@
 import { computed, ref } from 'vue'
 import type { PickableLine } from '@/api/packing-lists'
+import { usePackingSizeHeaders } from './usePackingSizeHeaders'
 
 export interface PackingItemDraft {
   styleNo: string
@@ -107,24 +108,8 @@ export function usePackingGridRows() {
     if (!box.items.length) box.items.push(createEmptyPackingItem())
   }
 
-  function insertSizeHeader(name: string, index?: number): boolean {
-    const trimmed = name.trim()
-    if (!trimmed || sizeHeaders.value.includes(trimmed)) return false
-    const at = index != null && index >= 0 && index <= sizeHeaders.value.length ? index : sizeHeaders.value.length
-    sizeHeaders.value.splice(at, 0, trimmed)
-    return true
-  }
-
-  function removeSizeHeader(name: string): void {
-    const at = sizeHeaders.value.indexOf(name)
-    if (at < 0) return
-    sizeHeaders.value.splice(at, 1)
-    for (const box of boxes.value) {
-      for (const item of box.items) {
-        if (name in item.sizeQuantities) delete item.sizeQuantities[name]
-      }
-    }
-  }
+  const { insertSizeHeader, removeSizeHeader, addSizeColumn, removeSizeColumnAt, commitSizeHeader } =
+    usePackingSizeHeaders(sizeHeaders, boxes)
 
   const flatRows = computed<PackingFlatRow[]>(() => {
     const rows: PackingFlatRow[] = []
@@ -230,6 +215,9 @@ export function usePackingGridRows() {
     removeItem,
     insertSizeHeader,
     removeSizeHeader,
+    addSizeColumn,
+    removeSizeColumnAt,
+    commitSizeHeader,
     validateAgainstPicked,
   }
 }

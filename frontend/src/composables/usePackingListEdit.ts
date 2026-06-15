@@ -8,32 +8,16 @@ import {
   updatePackingList,
   type PackingListDetail,
   type PickableLine,
-  type SavePackingListPayload,
 } from '@/api/packing-lists'
 import { getAllCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
 import { getUsers, type UserItem } from '@/api/users'
 import {
   allocationKey,
   createEmptyPackingItem,
-  packingItemTotal,
   type PackingItemDraft,
   usePackingGridRows,
 } from './usePackingGridRows'
-
-function today(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-}
-
-function isEmptyManualRow(item: PackingItemDraft): boolean {
-  return (
-    item.sourceType === 'manual' &&
-    !item.styleNo &&
-    !item.colorName &&
-    !item.imageUrl &&
-    packingItemTotal(item) === 0
-  )
-}
+import { buildPayload, isEmptyManualRow, today } from './packingListPayload'
 
 export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) {
   const route = useRoute()
@@ -57,7 +41,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
   /** 本次会话选过的货（用于剩余可发与前端超发校验；按 source+color 去重，后选覆盖先选） */
   const pickedLines = ref<PickableLine[]>([])
 
-  const isReadonly = computed(() => detail.value?.status === 'shipped')
+  const isShipped = computed(() => detail.value?.status === 'shipped')
   const code = computed(() => detail.value?.code ?? '')
 
   async function loadOptions() {
@@ -115,7 +99,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
       form.remark = ''
       form.showCompany = true
       pickedLines.value = []
-      grid.sizeHeaders.value = []
+      grid.sizeHeaders.value = ['S']
       grid.boxes.value = []
       grid.addBox()
       return
@@ -131,36 +115,6 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     }
   }
 
-  function buildPayload(): SavePackingListPayload {
-    return {
-      customerId: form.customerId,
-      customerName: form.customerName.trim(),
-      serviceManager: form.serviceManager.trim(),
-      poNo: form.poNo.trim(),
-      packDate: form.packDate || null,
-      remark: form.remark.trim(),
-      showCompany: form.showCompany,
-      sizeHeaders: [...grid.sizeHeaders.value],
-      boxes: grid.boxes.value.map((box) => ({
-        weightKg: box.weightKg,
-        cartonSize: box.cartonSize,
-        remark: box.remark,
-        items: box.items
-          .filter((item) => !isEmptyManualRow(item))
-          .map((item) => ({
-            styleNo: item.styleNo,
-            styleName: item.styleName,
-            colorName: item.colorName,
-            imageUrl: item.imageUrl,
-            sizeQuantities: item.sizeQuantities,
-            totalQty: packingItemTotal(item),
-            sourceType: item.sourceType,
-            sourceId: item.sourceId,
-          })),
-      })),
-    }
-  }
-
   /** 保存草稿。silent 时不弹成功提示（发货前置保存用）。
    * navigate=false 时新建后不做路由替换（路由替换会触发 keep-alive 重挂载、换新组件实例，
    * 发货流程需在当前实例上继续，由调用方在流程结束后自行导航）。返回是否成功 */
@@ -172,12 +126,12 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     saving.value = true
     try {
       if (listId.value) {
-        await updatePackingList(listId.value, buildPayload())
+        await updatePackingList(listId.value, buildPayload(form, grid))
         if (!silent) ElMessage.success('已保存')
         const res = await getPackingListDetail(listId.value)
         applyDetail(res.data)
       } else {
-        const res = await createPackingList(buildPayload())
+        const res = await createPackingList(buildPayload(form, grid))
         listId.value = res.data.id
         if (!silent) ElMessage.success(`已保存（单号 ${res.data.code}）`)
         if (navigate) await router.replace(`/inventory/packing/edit/${res.data.id}`)
@@ -257,7 +211,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     form,
     loading,
     saving,
-    isReadonly,
+    isShipped,
     code,
     customerOptions,
     userOptions,

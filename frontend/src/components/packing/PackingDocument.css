@@ -1,0 +1,257 @@
+/* 统一配色：ink 主文字 / muted 标签 / faint 副文(中文注释) / line 内线 / frame 外框·分隔 / shade 底纹 */
+.doc-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+}
+
+.doc-toolbar-tip {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.packing-doc {
+  margin: 0 auto;
+  background: #ffffff;
+  color: #1f2329;
+  padding: 24px 28px;
+  width: 100%;
+  max-width: 760px;
+  box-sizing: border-box;
+  font-family: Arial, 'Microsoft YaHei', sans-serif;
+  font-size: 13px;
+}
+
+/* 抬头：英文为主，中文小字淡灰；下方深色分隔线（与表格外框同色，形成统一框架） */
+.doc-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #1f2329;
+}
+
+.doc-brand {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.doc-brand-en {
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.doc-brand-cn {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: #1f2329;
+}
+
+.doc-title {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.2;
+}
+
+.doc-title-en {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.doc-title-cn {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 4px;
+  color: #1f2329;
+}
+
+/* 信息区：无边框，靠列对齐 + 留白；标签 muted、中文注释 faint、值 ink 粗体 */
+.doc-meta {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 7px 40px;
+  margin: 16px 0;
+}
+
+.doc-meta-item {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.doc-meta-label {
+  color: #6b7280;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.doc-meta-label .cn {
+  margin-left: 3px;
+  font-size: 11px;
+  font-weight: 400;
+  color: #6b7280;
+}
+
+.doc-meta-value {
+  color: #1f2329;
+  font-weight: 700;
+  flex: 1;
+}
+
+/* 表格：外框与抬头同深色，内线统一浅灰；表头/合计统一浅底 */
+.doc-table {
+  width: 100%;
+  border: 1.5px solid #1f2329;
+  border-collapse: collapse;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid #d4d8de;
+  padding: 7px 8px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.doc-table thead th {
+  background: #f4f6f8;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.doc-table thead th .cn {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: #1f2329;
+}
+
+.doc-table .col-style,
+.doc-table .col-color {
+  text-align: center;
+}
+
+.doc-table .num {
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-table .muted {
+  color: #c0c5cd;
+}
+
+.doc-table .col-box {
+  font-weight: 700;
+}
+
+/* 图片列：收紧内边距、列宽贴合图片，避免图片四周大片留白（对齐其他模块紧凑表的做法） */
+.doc-table .col-img {
+  width: 1%;
+  padding: 2px;
+  white-space: nowrap;
+}
+
+.doc-total td {
+  background: #f4f6f8;
+  font-weight: 700;
+}
+
+.doc-total td:first-child {
+  text-align: center;
+}
+
+.doc-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 12px;
+  font-size: 12px;
+}
+
+.doc-remark {
+  color: #6b7280;
+  flex: 1;
+}
+
+.doc-madein {
+  font-weight: 700;
+  letter-spacing: 1px;
+  white-space: nowrap;
+}
+
+/* 打印：内容已被克隆到 body 顶层 #packing-print-root，隐藏其余 body 子节点（@page 由 onPrint 动态注入） */
+@media print {
+  body.printing-packing-doc > *:not(#packing-print-root) {
+    display: none !important;
+  }
+
+  #packing-print-root {
+    display: block !important;
+  }
+
+  #packing-print-root .packing-doc {
+    max-width: none;
+    width: 100%;
+    padding: 0;
+  }
+
+  /* 单据很长时跨多页：表头每页自动重复（thead 默认行为），数据行不被拦腰拆页 */
+  #packing-print-root .doc-table thead {
+    display: table-header-group;
+  }
+
+  #packing-print-root .doc-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* 屏幕预览：文档铺满弹窗宽度，字号/内边距用容器单位随容器等比缩放（弹窗越大越大）。
+   仅 @media screen 生效，打印仍走上面的固定 px，不受影响。 */
+@media screen {
+  .packing-doc-print-area {
+    container-type: inline-size;
+  }
+
+  .packing-doc {
+    max-width: none;
+    padding: clamp(24px, 2.6cqw, 40px) clamp(28px, 3cqw, 44px);
+    font-size: clamp(13px, 1.45cqw, 19px);
+  }
+
+  .doc-brand-en {
+    font-size: clamp(19px, 2.4cqw, 30px);
+  }
+
+  .doc-brand-cn {
+    font-size: clamp(12px, 1.5cqw, 18px);
+  }
+
+  .doc-title-en {
+    font-size: clamp(24px, 3cqw, 38px);
+  }
+
+  .doc-title-cn {
+    font-size: clamp(13px, 1.6cqw, 20px);
+  }
+
+  .doc-meta-label .cn,
+  .doc-table thead th .cn {
+    font-size: clamp(11px, 1.3cqw, 16px);
+  }
+
+  .doc-table th,
+  .doc-table td {
+    padding: clamp(7px, 0.8cqw, 12px) clamp(8px, 0.9cqw, 14px);
+  }
+
+  .doc-footer {
+    font-size: clamp(12px, 1.45cqw, 18px);
+  }
+}

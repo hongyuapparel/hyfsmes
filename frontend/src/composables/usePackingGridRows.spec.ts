@@ -94,6 +94,75 @@ describe('usePackingGridRows', () => {
     expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({ M: 6 })
   })
 
+  it('addSizeColumn 默认补下一个未用标准码并返回下标', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S']
+    const idx = grid.addSizeColumn()
+    expect(idx).toBe(1)
+    expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
+  })
+
+  it('addSizeColumn 指定下标在该位置前插入', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'L']
+    const idx = grid.addSizeColumn(1)
+    expect(idx).toBe(1)
+    expect(grid.sizeHeaders.value).toEqual(['S', 'M', 'L'])
+  })
+
+  it('addSizeColumn 标准码用尽后留空列', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', 'XS', 'XXS', '均码']
+    const idx = grid.addSizeColumn()
+    expect(grid.sizeHeaders.value[idx]).toBe('')
+  })
+
+  it('commitSizeHeader 改名迁移行内数据', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'M']
+    grid.addBox()
+    grid.boxes.value[0].items[0].sizeQuantities = { S: 5, M: 6 }
+    grid.sizeHeaders.value[1] = 'L'
+    expect(grid.commitSizeHeader(1, 'M')).toBe('ok')
+    expect(grid.sizeHeaders.value).toEqual(['S', 'L'])
+    expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({ S: 5, L: 6 })
+  })
+
+  it('commitSizeHeader 重名拒绝并撤销回旧名', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'M']
+    grid.sizeHeaders.value[1] = 'S'
+    expect(grid.commitSizeHeader(1, 'M')).toBe('duplicate')
+    expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
+  })
+
+  it('commitSizeHeader 空名删除无数据的新列', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', '']
+    expect(grid.commitSizeHeader(1, '')).toBe('removed')
+    expect(grid.sizeHeaders.value).toEqual(['S'])
+  })
+
+  it('commitSizeHeader 空名但旧列有数据则撤销回旧名', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'M']
+    grid.addBox()
+    grid.boxes.value[0].items[0].sizeQuantities = { M: 6 }
+    grid.sizeHeaders.value[1] = ''
+    expect(grid.commitSizeHeader(1, 'M')).toBe('ok')
+    expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
+  })
+
+  it('removeSizeColumnAt 按下标删列并清数据', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S', 'M']
+    grid.addBox()
+    grid.boxes.value[0].items[0].sizeQuantities = { S: 5, M: 6 }
+    grid.removeSizeColumnAt(0)
+    expect(grid.sizeHeaders.value).toEqual(['M'])
+    expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({ M: 6 })
+  })
+
   it('totals 汇总箱数/件数/重量/每码合计；行合计优先取分码和', () => {
     const grid = usePackingGridRows()
     grid.sizeHeaders.value = ['S', 'M']

@@ -1,9 +1,10 @@
 <template>
   <AppDialog
     :model-value="visible"
-    title="箱贴预览（文字可点击修改，仅影响本次打印）"
-    width="860px"
+    title="箱贴预览（A4 横版，每箱一张；文字可点击修改，仅影响本次打印）"
+    width="1060px"
     top="4vh"
+    modal-class="packing-print-overlay"
     @update:model-value="emit('update:visible', $event)"
   >
     <div class="label-toolbar">
@@ -17,7 +18,7 @@
       <el-button type="primary" :disabled="!selectedSeqs.size" @click="onPrint">打印箱贴</el-button>
     </div>
 
-    <div class="packing-label-print-area">
+    <div ref="printAreaRef" class="packing-label-print-area">
       <div
         v-for="box in detail.boxes"
         :key="box.boxSeq"
@@ -32,38 +33,67 @@
           打印此箱
         </el-checkbox>
 
-        <div v-if="detail.showCompany" class="label-topbar">
-          <span contenteditable="true">HONGYU APPAREL</span>
-          <span v-if="detail.serviceManager" contenteditable="true">Service manager: {{ detail.serviceManager }}</span>
-        </div>
+        <div class="label-body">
+          <table class="label-table">
+          <tbody>
+            <tr class="lt-title-row">
+              <td :colspan="totalCols(box)" class="lt-title-cell">
+                <div class="label-boxno">{{ box.boxSeq }}</div>
+                <div class="lt-title-text">
+                  <span class="lt-brand" contenteditable="true">HONGYU APPAREL</span>
+                </div>
+                <div class="lt-cartonno">
+                  <span class="lt-cartonno-label">CARTON NO.</span>
+                  <span class="lt-cartonno-val" contenteditable="true">{{ box.boxSeq }} / {{ detail.boxes.length }}</span>
+                </div>
+              </td>
+            </tr>
+            <tr class="lt-customer">
+              <td class="lt-label" colspan="2">CUSTOMER</td>
+              <td :colspan="totalCols(box) - 2" class="lt-customer-val" contenteditable="true">{{ detail.poNo || detail.customerName }}</td>
+            </tr>
+            <tr v-if="detail.serviceManager" class="lt-info">
+              <td class="lt-label" colspan="2">SHIP MARK</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.serviceManager }}</td>
+            </tr>
 
-        <div class="label-heading">
-          <span class="label-client" contenteditable="true">{{ detail.poNo || detail.customerName }}</span>
-          <span class="label-carton-no" contenteditable="true">CARTON NO# {{ box.boxSeq }} OF {{ detail.boxes.length }}</span>
-        </div>
+            <tr class="lt-matrix-head">
+              <th v-if="boxHasImage(box)" class="lt-img">PHOTO</th>
+              <th class="lt-style">STYLE NO</th>
+              <th v-if="boxHasName(box)" class="lt-name">DESCRIPTION</th>
+              <th class="lt-color">COLOUR</th>
+              <th v-for="size in boxSizes(box)" :key="`h-${size}`">{{ size }}</th>
+              <th class="lt-total">TOTAL</th>
+            </tr>
+            <tr v-for="item in box.items" :key="item.id">
+              <td v-if="boxHasImage(box)" class="lt-img">
+                <img v-if="item.imageUrl" :src="item.imageUrl" alt="" />
+              </td>
+              <td class="lt-style" contenteditable="true">{{ item.styleNo || '-' }}</td>
+              <td v-if="boxHasName(box)" class="lt-name" contenteditable="true">{{ item.styleName || '-' }}</td>
+              <td class="lt-color" contenteditable="true">{{ item.colorName || '-' }}</td>
+              <td v-for="size in boxSizes(box)" :key="`${item.id}-${size}`" contenteditable="true">{{ itemSizeQty(item, size) }}</td>
+              <td class="lt-total" contenteditable="true">{{ itemTotal(item) }}</td>
+            </tr>
+            <tr class="lt-sum">
+              <td :colspan="leadCols(box)">TOTAL</td>
+              <td v-for="size in boxSizes(box)" :key="`s-${size}`">{{ boxSizeTotal(box, size) }}</td>
+              <td class="lt-total">{{ boxTotal(box) }}</td>
+            </tr>
 
-        <div v-for="item in box.items" :key="item.id" class="label-style-block">
-          <img v-if="item.imageUrl" :src="item.imageUrl" class="label-style-image" alt="" />
-          <div class="label-style-info">
-            <div class="label-style-line" contenteditable="true">STYLE NO# {{ item.styleNo || '-' }}</div>
-            <div v-if="item.colorName" class="label-style-line" contenteditable="true">COLOR: {{ item.colorName }}</div>
-            <table class="label-size-table">
-              <tbody>
-                <tr v-for="entry in sizeEntries(item)" :key="entry.size">
-                  <td contenteditable="true">{{ entry.size }}</td>
-                  <td contenteditable="true">{{ entry.qty }} PCS</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="label-footer">
-          <div contenteditable="true">TOTAL PCS: {{ boxTotal(box) }}</div>
-          <div v-if="box.weightKg != null" contenteditable="true">WEIGHT: {{ box.weightKg }} KG</div>
-          <div v-if="box.cartonSize" contenteditable="true">CARTON SIZE: {{ box.cartonSize }} CM</div>
-          <div v-if="box.remark" contenteditable="true">SHIPPING: {{ box.remark }}</div>
-          <div contenteditable="true">MADE IN CHINA</div>
+            <tr class="lt-info">
+              <td class="lt-label" colspan="2">WEIGHT (KG)</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.weightKg != null ? box.weightKg : '' }}</td>
+            </tr>
+            <tr class="lt-info">
+              <td class="lt-label" colspan="2">DIMENSION (CM)</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.cartonSize || '' }}</td>
+            </tr>
+            <tr>
+              <td :colspan="totalCols(box)" class="lt-madein" contenteditable="true">MADE IN CHINA</td>
+            </tr>
+          </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -71,7 +101,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import type { PackingBoxDetail, PackingItemDetail, PackingListDetail } from '@/api/packing-lists'
 
@@ -115,150 +145,106 @@ function sizeEntries(item: PackingItemDetail): Array<{ size: string; qty: number
   return entries
 }
 
-function boxTotal(box: PackingBoxDetail): number {
-  return box.items.reduce((sum, item) => sum + (item.totalQty || 0), 0)
+function itemTotal(item: PackingItemDetail): number {
+  return sizeEntries(item).reduce((sum, entry) => sum + entry.qty, 0)
 }
+
+function boxTotal(box: PackingBoxDetail): number {
+  return box.items.reduce((sum, item) => sum + itemTotal(item), 0)
+}
+
+/** 本箱涉及的尺码列（按整单码序，仅取本箱有量的码） */
+function boxSizes(box: PackingBoxDetail): string[] {
+  return props.detail.sizeHeaders.filter((size) => box.items.some((it) => (Number(it.sizeQuantities[size]) || 0) > 0))
+}
+
+function boxHasImage(box: PackingBoxDetail): boolean {
+  return box.items.some((it) => !!it.imageUrl)
+}
+
+function boxHasName(box: PackingBoxDetail): boolean {
+  return box.items.some((it) => !!it.styleName)
+}
+
+function itemSizeQty(item: PackingItemDetail, size: string): string {
+  const q = Number(item.sizeQuantities[size]) || 0
+  return q > 0 ? String(q) : ''
+}
+
+function boxSizeTotal(box: PackingBoxDetail, size: string): number {
+  return box.items.reduce((sum, it) => sum + (Number(it.sizeQuantities[size]) || 0), 0)
+}
+
+/** 尺码列前的列数：[图片] + 款号 + [描述] + 颜色 */
+function leadCols(box: PackingBoxDetail): number {
+  return (boxHasImage(box) ? 1 : 0) + 1 + (boxHasName(box) ? 1 : 0) + 1
+}
+
+/** 整表总列数 = 前导列 + 各码 + 合计 */
+function totalCols(box: PackingBoxDetail): number {
+  return leadCols(box) + boxSizes(box).length + 1
+}
+
+// 弹窗渲染在 #app 内部，直接打印会被对话框层裁切/无法正常分页。
+// 打印前把内容克隆到 body 顶层的打印根，注入横版 @page，仅当本弹窗打开时生效；打印后清理。
+// 用 beforeprint/afterprint 监听，使点「打印箱贴」按钮和直接按 Ctrl+P 都生效，且与客户单(纵版)互不干扰。
+const printAreaRef = ref<HTMLElement | null>(null)
+let printRoot: HTMLElement | null = null
+let pageStyle: HTMLStyleElement | null = null
+
+// A4 横版去掉左右 14mm 页边后的可放内容宽；一页可放内容高目标 180mm
+//（= .packing-label 的 min-height，已被实际打印验证可单页容纳，留约 10mm 余量给页眉页脚/打印机硬边距）
+const PRINT_CONTENT_WIDTH = '269mm'
+const PAGE_FIT_PX = (180 * 96) / 25.4
+
+// 保证「一箱 = 一页」：克隆已是打印尺寸，量出每箱实际内容高，超过一页就按比例 zoom 整体缩小塞进一页。
+function fitLabelsToPage(root: HTMLElement) {
+  root.style.width = PRINT_CONTENT_WIDTH
+  root.querySelectorAll<HTMLElement>('.packing-label').forEach((label) => {
+    const body = label.querySelector<HTMLElement>('.label-body')
+    if (!body) return
+    body.style.setProperty('zoom', '1')
+    const height = body.getBoundingClientRect().height
+    body.style.setProperty('zoom', height > PAGE_FIT_PX ? String(PAGE_FIT_PX / height) : '1')
+  })
+}
+
+function onBeforePrint() {
+  if (!props.visible || !printAreaRef.value) return
+  printRoot = document.createElement('div')
+  printRoot.id = 'packing-print-root'
+  printRoot.appendChild(printAreaRef.value.cloneNode(true))
+  document.body.appendChild(printRoot)
+  pageStyle = document.createElement('style')
+  pageStyle.textContent = '@page { size: A4 landscape; margin: 10mm 14mm; }'
+  document.head.appendChild(pageStyle)
+  document.body.classList.add('printing-packing-label')
+  fitLabelsToPage(printRoot)
+}
+
+function onAfterPrint() {
+  document.body.classList.remove('printing-packing-label')
+  printRoot?.remove()
+  printRoot = null
+  pageStyle?.remove()
+  pageStyle = null
+}
+
+onMounted(() => {
+  window.addEventListener('beforeprint', onBeforePrint)
+  window.addEventListener('afterprint', onAfterPrint)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('beforeprint', onBeforePrint)
+  window.removeEventListener('afterprint', onAfterPrint)
+  onAfterPrint()
+})
 
 function onPrint() {
   window.print()
 }
 </script>
 
-<style scoped>
-.label-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
-}
-
-.packing-label {
-  position: relative;
-  width: 100%;
-  max-width: 720px;
-  margin: 0 auto var(--space-md);
-  padding: 24px 28px;
-  border: 1px dashed var(--color-border);
-  background: #ffffff;
-  color: #000000;
-  font-family: Arial, Helvetica, sans-serif;
-}
-
-.label-select {
-  position: absolute;
-  top: 8px;
-  right: 12px;
-}
-
-.label-topbar {
-  display: flex;
-  justify-content: space-between;
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 2px solid #000;
-  padding-bottom: 6px;
-  margin-bottom: 12px;
-}
-
-.label-heading {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
-}
-
-.label-client {
-  font-size: 26px;
-  font-weight: 700;
-}
-
-.label-carton-no {
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.label-style-block {
-  display: flex;
-  gap: 16px;
-  align-items: flex-start;
-  margin-bottom: 12px;
-}
-
-.label-style-image {
-  width: 96px;
-  height: 96px;
-  object-fit: contain;
-}
-
-.label-style-info {
-  flex: 1;
-}
-
-.label-style-line {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 4px;
-}
-
-.label-size-table {
-  border-collapse: collapse;
-  margin-top: 4px;
-}
-
-.label-size-table td {
-  border: 1px solid #000;
-  padding: 2px 14px;
-  font-size: 14px;
-  text-align: center;
-}
-
-.label-footer {
-  margin-top: 14px;
-  border-top: 2px solid #000;
-  padding-top: 8px;
-  font-size: 15px;
-  font-weight: 600;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-
-[contenteditable='true']:hover {
-  outline: 1px dashed var(--color-primary, #409eff);
-  outline-offset: 2px;
-}
-</style>
-
-<style>
-/* 打印：只显示箱贴区域，每箱一页（A4 宽 210mm，照 orders/detail.css 基准） */
-@media print {
-  body * {
-    visibility: hidden;
-  }
-
-  .packing-label-print-area,
-  .packing-label-print-area * {
-    visibility: visible;
-  }
-
-  .packing-label-print-area {
-    position: absolute;
-    inset: 0;
-    width: 210mm;
-  }
-
-  .packing-label-print-area .packing-label {
-    max-width: none;
-    width: 100%;
-    margin: 0;
-    border: none;
-    padding: 18mm 16mm;
-    page-break-after: always;
-  }
-
-  .packing-label-print-area .label-skip-print,
-  .packing-label-print-area .label-select.no-print {
-    display: none;
-  }
-}
-</style>
+<style scoped src="./PackingLabelPrint.css"></style>
+<style src="./PackingLabelPrint.print.css"></style>

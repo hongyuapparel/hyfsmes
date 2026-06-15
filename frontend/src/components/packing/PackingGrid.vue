@@ -46,20 +46,39 @@
       </template>
     </el-table-column>
     <el-table-column
-      v-for="size in sizeHeaders"
-      :key="`size-${size}`"
-      min-width="74"
+      v-for="(size, sIndex) in sizeHeaders"
+      :key="`size-col-${sIndex}`"
+      min-width="84"
       align="center"
       header-align="center"
     >
       <template #header>
         <div class="size-header-cell">
-          <span>{{ size }}</span>
-          <el-tooltip v-if="!disabled" content="删除此码列" placement="top">
-            <el-button link type="danger" size="small" class="size-header-remove" @click.stop="emit('remove-size', size)">
-              <el-icon><CircleClose /></el-icon>
-            </el-button>
-          </el-tooltip>
+          <template v-if="!disabled">
+            <el-tooltip v-if="sizeHeaders.length > 1" content="删除此码列" placement="top">
+              <el-button link type="danger" class="size-header-remove" :aria-label="`删除第${sIndex + 1}列`" @click.stop="emit('remove-size-at', sIndex)">
+                <el-icon><CircleClose /></el-icon>
+              </el-button>
+            </el-tooltip>
+            <el-input
+              :ref="(el) => setSizeHeaderRef(el, sIndex)"
+              v-model="sizeHeaders[sIndex]"
+              size="small"
+              placeholder="码"
+              class="size-header-input"
+              :input-style="{ textAlign: 'center' }"
+              @focus="onSizeHeaderFocus(sIndex)"
+              @change="onSizeHeaderChange(sIndex)"
+              @keydown.enter.stop="blurEvent"
+              @click.stop
+            />
+            <el-tooltip content="在此列后新增尺码列" placement="top">
+              <el-button link type="primary" class="size-header-insert" :aria-label="`在第${sIndex + 1}列后新增`" @click.stop="emit('add-size-at', sIndex + 1)">
+                <el-icon><Plus /></el-icon>
+              </el-button>
+            </el-tooltip>
+          </template>
+          <span v-else>{{ size }}</span>
         </div>
       </template>
       <template #default="{ row }">
@@ -74,17 +93,7 @@
         />
       </template>
     </el-table-column>
-    <el-table-column width="92" align="center" header-align="center">
-      <template #header>
-        <div class="size-header-cell">
-          <span>合计</span>
-          <el-tooltip v-if="!disabled" content="新增尺码列" placement="top">
-            <el-button link type="primary" size="small" @click.stop="emit('insert-size')">
-              <el-icon><Plus /></el-icon>
-            </el-button>
-          </el-tooltip>
-        </div>
-      </template>
+    <el-table-column width="92" label="合计" align="center" header-align="center">
       <template #default="{ row }">
         <span v-if="hasSizeQty(row.item)">{{ formatDisplayNumber(packingItemTotal(row.item)) }}</span>
         <el-input-number
@@ -144,29 +153,61 @@
 </template>
 
 <script setup lang="ts">
+import { nextTick } from 'vue'
 import { CircleClose, CopyDocument, Delete, Plus, ShoppingCart } from '@element-plus/icons-vue'
-import type { TableColumnCtx } from 'element-plus'
+import type { InputInstance, TableColumnCtx } from 'element-plus'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { packingItemTotal, type PackingFlatRow, type PackingItemDraft } from '@/composables/usePackingGridRows'
 
-const props = defineProps<{
-  flatRows: PackingFlatRow[]
-  sizeHeaders: string[]
-  totals: { boxCount: number; totalQty: number; totalWeight: number; bySize: Record<string, number> }
-  disabled: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    flatRows: PackingFlatRow[]
+    sizeHeaders: string[]
+    totals: { boxCount: number; totalQty: number; totalWeight: number; bySize: Record<string, number> }
+    disabled?: boolean
+  }>(),
+  { disabled: false },
+)
 
 const emit = defineEmits<{
-  'insert-size': []
-  'remove-size': [size: string]
+  'add-size-at': [index: number]
+  'rename-size': [index: number, oldName: string]
+  'remove-size-at': [index: number]
   'copy-box': [boxIndex: number]
   'remove-box': [boxIndex: number]
   'add-item': [boxIndex: number]
   'pick-goods': [boxIndex: number]
   'remove-item': [boxIndex: number, itemIndex: number]
 }>()
+
+const sizeHeaderRefs = new Map<number, InputInstance>()
+let editingOldName = ''
+
+function setSizeHeaderRef(el: unknown, index: number): void {
+  if (el) sizeHeaderRefs.set(index, el as InputInstance)
+  else sizeHeaderRefs.delete(index)
+}
+
+function onSizeHeaderFocus(index: number): void {
+  editingOldName = props.sizeHeaders[index] ?? ''
+}
+
+function onSizeHeaderChange(index: number): void {
+  emit('rename-size', index, editingOldName)
+}
+
+function blurEvent(e: Event): void {
+  ;(e.target as HTMLElement | null)?.blur()
+}
+
+async function focusSizeHeader(index: number): Promise<void> {
+  await nextTick()
+  sizeHeaderRefs.get(index)?.focus()
+}
+
+defineExpose({ focusSizeHeader })
 
 function hasSizeQty(item: PackingItemDraft): boolean {
   return Object.values(item.sizeQuantities).some((n) => (Number(n) || 0) > 0)
@@ -228,14 +269,70 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
   margin-left: 4px;
 }
 
+/* 列头：码名居中可编辑，左右缝隙在 hover 时浮出「×删除 / +在后插入」（复用 order 编辑列头交互） */
 .size-header-cell {
-  display: inline-flex;
+  position: relative;
+  display: flex;
   align-items: center;
-  gap: 2px;
+  justify-content: center;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0 10px;
+}
+
+/* 码名做成"像表头文字"的可编辑框：常态无边框，聚焦才高亮 */
+.size-header-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.size-header-input :deep(.el-input__wrapper) {
+  background: transparent;
+  box-shadow: none;
+  padding: 0 2px;
+}
+
+.size-header-input :deep(.el-input__inner) {
+  text-align: center;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+
+.size-header-input :deep(.el-input__wrapper.is-focus) {
+  background: var(--color-card);
+  box-shadow: 0 0 0 1px var(--color-primary) inset;
+}
+
+.size-header-insert,
+.size-header-remove {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 12px;
+  min-width: 12px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.15s;
 }
 
 .size-header-remove {
-  opacity: 0.6;
+  left: 0;
+}
+
+.size-header-insert {
+  right: 0;
+}
+
+.size-header-insert :deep(.el-icon),
+.size-header-remove :deep(.el-icon) {
+  font-size: 11px;
+}
+
+.size-header-cell:hover .size-header-insert,
+.size-header-cell:hover .size-header-remove {
+  opacity: 0.7;
 }
 
 .qty-input {

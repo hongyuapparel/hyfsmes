@@ -1,0 +1,107 @@
+/* 打印克隆专用尺寸规则（全局、非 scoped）。#packing-print-root 仅在打印（或派发 beforeprint）时
+   临时挂到 body 上，这些规则刻意不放进 @media print —— 这样克隆挂载的瞬间在屏幕坐标下也是「打印尺寸」，
+   onBeforePrint 才能量出每箱真实高度，超过一页就按比例 zoom 缩小，保证一箱永远落在一页内。
+   隐藏 body 其余节点、显示打印根的开关仍只在 @media print 里。 */
+#packing-print-root .label-skip-print,
+#packing-print-root .no-print {
+  display: none !important;
+}
+
+/* 每箱独占一页并整页居中：盒高 ≈ 一页可打印高度，flex 把内层 .label-body（普通块）水平+垂直居中。
+   不能让 <table> 直接当 flex 子项，否则打印行盒错乱（空白横带/单元格错位），必须隔 .label-body 一层。
+   内容超高时由 onBeforePrint 给 .label-body 加 zoom 缩到一页内；盒高 ≤ 一页，break-inside:avoid 不被迫拆页。 */
+#packing-print-root .packing-label {
+  width: 100%;
+  min-height: 180mm;
+  margin: 0;
+  padding: 0;
+  border: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  page-break-after: always;
+  page-break-inside: avoid;
+  break-after: page;
+  break-inside: avoid;
+}
+
+#packing-print-root .packing-label:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+#packing-print-root .label-body {
+  width: 100%;
+}
+
+/* 外框线显式声明，避免折叠边框在打印克隆顶边被丢，导致标题行上边框消失 */
+#packing-print-root .label-table {
+  border: 2px solid #000;
+}
+
+#packing-print-root .label-table tr {
+  page-break-inside: avoid;
+  break-inside: avoid;
+}
+
+/* 标题行容下大圈号；字号放大但留足整页余量 */
+#packing-print-root .lt-title-cell {
+  height: 128px;
+  padding: 10px 180px;
+}
+
+#packing-print-root .label-boxno {
+  width: 108px;
+  height: 108px;
+  border-width: 6px;
+  font-size: 62px;
+  left: 24px;
+}
+
+#packing-print-root .lt-brand {
+  font-size: 42px;
+}
+
+#packing-print-root .lt-cartonno-label {
+  font-size: 15px;
+}
+
+#packing-print-root .lt-cartonno-val {
+  font-size: 38px;
+}
+
+#packing-print-root .label-table th,
+#packing-print-root .label-table td {
+  font-size: 22px;
+  padding: 9px 12px;
+}
+
+#packing-print-root .label-table .lt-customer-val {
+  font-size: 32px;
+}
+
+#packing-print-root .lt-info .lt-info-val,
+#packing-print-root .label-table .lt-madein {
+  font-size: 23px;
+}
+
+#packing-print-root .label-table .lt-img img {
+  width: 96px;
+  height: 96px;
+}
+
+#packing-print-root .label-table .lt-img {
+  width: 102px;
+  padding: 2px;
+}
+
+@media print {
+  body.printing-packing-label > *:not(#packing-print-root) {
+    display: none !important;
+  }
+
+  #packing-print-root {
+    display: block !important;
+  }
+}

@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
@@ -210,33 +210,52 @@ export class PackingListsService {
     };
   }
 
-  async create(payload: SavePackingListDto, operatorUsername: string): Promise<{ id: number; code: string }> {
-    return this.listRepo.manager.transaction(async (manager) => {
-      const now = new Date();
-      const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
-      const countRows: Array<{ cnt: string }> = await manager.query(
-        `SELECT COUNT(*) AS cnt FROM packing_lists WHERE code LIKE ?`,
-        [`PL-${ymd}-%`],
-      );
-      const seq = (Number(countRows?.[0]?.cnt) || 0) + 1;
-      const code = `PL-${ymd}-${String(seq).padStart(2, '0')}`;
-
-      const list = manager.getRepository(PackingList).create({
-        code,
-        ...this.buildListColumns(payload),
-        status: 'draft',
-        operatorUsername: (operatorUsername ?? '').trim(),
-      });
-      const saved = await manager.getRepository(PackingList).save(list);
-      await this.insertBoxesAndItems(manager.getRepository(PackingListBox), manager.getRepository(PackingListItem), saved.id, payload);
-      return { id: saved.id, code };
-    });
+  /** 当天最大序号+1 生成单号。用 MAX(序号) 而非 COUNT：删除草稿后 COUNT 会回退导致与现存单号撞号。 */
+  private async nextCode(manager: EntityManager, ymd: string): Promise<string> {
+    const rows: Array<{ code: string }> = await manager.query(
+      `SELECT code FROM packing_lists WHERE code LIKE ? ORDER BY code DESC LIMIT 1`,
+      [`PL-${ymd}-%`],
+    );
+    const matched = (rows?.[0]?.code ?? '').match(/-(\d+)$/);
+    const seq = (matched ? Number(matched[1]) : 0) + 1;
+    return `PL-${ymd}-${String(seq).padStart(2, '0')}`;
   }
 
+  private isDuplicateCodeError(e: unknown): boolean {
+    return String((e as { message?: unknown })?.message ?? '').includes('Duplicate entry');
+  }
+
+  async create(payload: SavePackingListDto, operatorUsername: string): Promise<{ id: number; code: string }> {
+    const now = new Date();
+    const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
+    // 并发下两个请求可能算出同一序号；靠 uniq_packing_lists_code 唯一索引报重复，捕获后重算重试。
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await this.listRepo.manager.transaction(async (manager) => {
+          const code = await this.nextCode(manager, ymd);
+          const list = manager.getRepository(PackingList).create({
+            code,
+            ...this.buildListColumns(payload),
+            status: 'draft',
+            operatorUsername: (operatorUsername ?? '').trim(),
+          });
+          const saved = await manager.getRepository(PackingList).save(list);
+          await this.insertBoxesAndItems(manager.getRepository(PackingListBox), manager.getRepository(PackingListItem), saved.id, payload);
+          return { id: saved.id, code };
+        });
+      } catch (e) {
+        if (this.isDuplicateCodeError(e) && attempt < 4) continue;
+        throw e;
+      }
+    }
+    throw new BadRequestException('生成装箱单号失败，请重试');
+  }
+
+  // 已发货单也允许修改：发货后客户常要求改装箱方式（返箱/调箱/补录）。本方法只改单据本身
+  // （表头 + 箱 + 明细），不触碰任何库存——库存只在 /ship 时扣减一次，已发货单的二次编辑不影响库存账。
   async update(id: number, payload: SavePackingListDto): Promise<void> {
     const list = await this.listRepo.findOne({ where: { id } });
     if (!list) throw new NotFoundException('装箱单不存在');
-    if (list.status !== 'draft') throw new BadRequestException('已发货的装箱单不可修改');
     await this.listRepo.manager.transaction(async (manager) => {
       await manager.getRepository(PackingList).update({ id }, this.buildListColumns(payload));
       await manager.getRepository(PackingListItem).delete({ packingListId: id });

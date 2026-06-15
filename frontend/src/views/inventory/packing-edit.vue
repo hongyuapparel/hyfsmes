@@ -7,20 +7,20 @@
           返回列表
         </el-button>
         <span class="edit-code">{{ edit.code.value ? `装箱单 ${edit.code.value}` : '新建装箱单' }}</span>
-        <el-tag v-if="edit.isReadonly.value" type="success" size="small">已发货</el-tag>
+        <el-tag v-if="edit.isShipped.value" type="success" size="small">已发货</el-tag>
         <el-tag v-else-if="edit.listId.value" type="info" size="small">草稿</el-tag>
+        <span v-if="edit.isShipped.value" class="edit-shipped-tip">可修改装箱方式，保存不影响库存</span>
       </div>
       <div class="edit-actions">
+        <el-button v-if="edit.detail.value" :type="edit.isShipped.value ? 'primary' : ''" @click="openDoc">客户单</el-button>
         <el-button v-if="edit.detail.value" @click="openLabels">箱贴</el-button>
         <el-button v-if="edit.detail.value" @click="onExport">导出 Excel</el-button>
-        <template v-if="!edit.isReadonly.value">
-          <el-button @click="grid.addBox()">加箱</el-button>
+        <el-button @click="grid.addBox()">加箱</el-button>
+        <template v-if="!edit.isShipped.value">
           <el-button :loading="edit.saving.value" @click="edit.save()">保存草稿</el-button>
           <el-button type="primary" :loading="shipping" @click="onShip">确认发货</el-button>
         </template>
-        <template v-else>
-          <el-button @click="goBack">返回</el-button>
-        </template>
+        <el-button v-else type="primary" :loading="edit.saving.value" @click="edit.save()">保存修改</el-button>
       </div>
     </div>
 
@@ -33,7 +33,6 @@
             allow-create
             default-first-option
             placeholder="选择或输入客户"
-            :disabled="edit.isReadonly.value"
             @change="edit.onCustomerChange"
           >
             <el-option v-for="c in edit.customerOptions.value" :key="c.id" :label="c.companyName" :value="c.companyName" />
@@ -47,40 +46,41 @@
             default-first-option
             clearable
             placeholder="选择或输入业务员"
-            :disabled="edit.isReadonly.value"
           >
             <el-option v-for="u in edit.userOptions.value" :key="u.id" :label="u.displayName || u.username" :value="u.displayName || u.username" />
           </el-select>
         </el-form-item>
         <el-form-item label="PO#">
-          <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" :disabled="edit.isReadonly.value" />
+          <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
         </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
             v-model="edit.form.packDate"
             type="date"
             value-format="YYYY-MM-DD"
+            style="width: 100%"
             placeholder="装箱日期"
-            :disabled="edit.isReadonly.value"
           />
         </el-form-item>
-        <el-form-item label="公司抬头">
-          <el-switch v-model="edit.form.showCompany" :disabled="edit.isReadonly.value" />
-          <span class="head-form-tip">箱贴是否显示公司名</span>
-        </el-form-item>
         <el-form-item label="备注" class="head-form-remark">
-          <el-input v-model="edit.form.remark" placeholder="整单备注" :disabled="edit.isReadonly.value" />
+          <el-input v-model="edit.form.remark" placeholder="整单备注" />
+        </el-form-item>
+        <el-form-item label="公司抬头">
+          <el-tooltip content="开启后箱贴/客户单顶部显示公司名" placement="top">
+            <el-switch v-model="edit.form.showCompany" />
+          </el-tooltip>
         </el-form-item>
       </div>
     </el-form>
 
     <PackingGrid
+      ref="packingGridRef"
       :flat-rows="grid.flatRows.value"
       :size-headers="grid.sizeHeaders.value"
       :totals="grid.totals.value"
-      :disabled="edit.isReadonly.value"
-      @insert-size="onInsertSize"
-      @remove-size="onRemoveSize"
+      @add-size-at="onAddSizeAt"
+      @rename-size="onRenameSize"
+      @remove-size-at="onRemoveSizeAt"
       @copy-box="grid.copyBox"
       @remove-box="onRemoveBox"
       @add-item="grid.addItemToBox"
@@ -102,6 +102,13 @@
       :detail="edit.detail.value"
       @update:visible="labelsVisible = $event"
     />
+
+    <PackingDocument
+      v-if="edit.detail.value"
+      :visible="docVisible"
+      :detail="edit.detail.value"
+      @update:visible="docVisible = $event"
+    />
   </div>
 </template>
 
@@ -117,6 +124,7 @@ import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
 import PackingGoodsPickerDialog from '@/components/packing/PackingGoodsPickerDialog.vue'
 import PackingLabelPrint from '@/components/packing/PackingLabelPrint.vue'
+import PackingDocument from '@/components/packing/PackingDocument.vue'
 import { exportPackingListExcel } from '@/utils/packing-export'
 
 const route = useRoute()
@@ -124,12 +132,21 @@ const router = useRouter()
 const grid = usePackingGridRows()
 const edit = usePackingListEdit(grid)
 const picker = reactive({ visible: false, boxIndex: 0 })
+const packingGridRef = ref<InstanceType<typeof PackingGrid> | null>(null)
 const shipping = ref(false)
 const labelsVisible = ref(false)
+const docVisible = ref(false)
 
 function openLabels() {
   if (!edit.detail.value) return
+  docVisible.value = false
   labelsVisible.value = true
+}
+
+function openDoc() {
+  if (!edit.detail.value) return
+  labelsVisible.value = false
+  docVisible.value = true
 }
 
 function onExport() {
@@ -141,19 +158,19 @@ function goBack() {
   router.push('/inventory/packing')
 }
 
-async function onInsertSize() {
-  let value = ''
-  try {
-    const res = await ElMessageBox.prompt('请输入尺码名（如 XL）', '新增尺码列', { inputPattern: /\S+/, inputErrorMessage: '尺码名不能为空' })
-    value = res.value
-  } catch {
-    return
-  }
-  if (!grid.insertSizeHeader(value)) ElMessage.warning('该尺码列已存在')
+function onAddSizeAt(index: number) {
+  const at = grid.addSizeColumn(index)
+  // 标准码已自动填好不抢焦点；仅当标准码用尽留了空列时才聚焦让用户手填
+  if (!grid.sizeHeaders.value[at]) packingGridRef.value?.focusSizeHeader(at)
 }
 
-async function onRemoveSize(size: string) {
-  const hasQty = grid.boxes.value.some((box) => box.items.some((item) => (item.sizeQuantities[size] ?? 0) > 0))
+function onRenameSize(index: number, oldName: string) {
+  if (grid.commitSizeHeader(index, oldName) === 'duplicate') ElMessage.warning('该尺码列已存在')
+}
+
+async function onRemoveSizeAt(index: number) {
+  const size = grid.sizeHeaders.value[index]
+  const hasQty = !!size && grid.boxes.value.some((box) => box.items.some((item) => (item.sizeQuantities[size] ?? 0) > 0))
   if (hasQty) {
     try {
       await ElMessageBox.confirm(`「${size}」列已有填写数量，删除将一并清除，是否继续？`, '删除尺码列', { type: 'warning' })
@@ -161,7 +178,7 @@ async function onRemoveSize(size: string) {
       return
     }
   }
-  grid.removeSizeHeader(size)
+  grid.removeSizeColumnAt(index)
 }
 
 async function onRemoveBox(boxIndex: number) {
@@ -202,7 +219,7 @@ async function onShip() {
   }
   const { boxCount, totalQty } = grid.totals.value
   try {
-    await ElMessageBox.confirm(`共 ${boxCount} 箱 / ${totalQty} 件，确认发货？发货后将扣减待仓/成品库存且不可修改。`, '确认发货', { type: 'warning' })
+    await ElMessageBox.confirm(`共 ${boxCount} 箱 / ${totalQty} 件，确认发货？发货后将扣减待仓/成品库存（发货后仍可修改装箱方式，不影响库存）。`, '确认发货', { type: 'warning' })
   } catch {
     return
   }
@@ -229,6 +246,7 @@ onMounted(async () => {
   edit.loadOptions()
   await edit.load()
   if (route.query.action === 'labels') openLabels()
+  if (route.query.action === 'doc') openDoc()
   if (route.query.action === 'export') onExport()
 })
 
@@ -268,10 +286,15 @@ onActivated(() => {
   font-weight: 600;
 }
 
+.edit-shipped-tip {
+  font-size: var(--font-size-caption);
+  color: var(--color-text-secondary);
+}
+
 .head-form-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(220px, 1fr));
-  gap: 0 var(--space-md);
+  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  gap: 0 var(--space-lg);
 }
 
 .head-form-grid :deep(.el-form-item) {
@@ -279,12 +302,6 @@ onActivated(() => {
 }
 
 .head-form-remark {
-  grid-column: span 2;
-}
-
-.head-form-tip {
-  margin-left: var(--space-sm);
-  color: var(--color-text-secondary);
-  font-size: var(--font-size-caption);
+  grid-column: span 3;
 }
 </style>
