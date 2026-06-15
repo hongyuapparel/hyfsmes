@@ -1,4 +1,5 @@
 <template>
+  <div ref="gridWrapRef" class="packing-grid-wrap" @keydown="onGridKeydown">
   <el-table
     :data="flatRows"
     border
@@ -120,9 +121,20 @@
         />
       </template>
     </el-table-column>
-    <el-table-column label="箱规(cm)" width="110" align="center" header-align="center">
+    <el-table-column label="箱规(cm)" width="120" align="center" header-align="center">
       <template #default="{ row }">
-        <el-input v-model="row.box.cartonSize" :disabled="disabled" placeholder="60x40x40" />
+        <el-select
+          v-model="row.box.cartonSize"
+          :disabled="disabled"
+          filterable
+          allow-create
+          default-first-option
+          clearable
+          placeholder="选/输入"
+          class="carton-select"
+        >
+          <el-option v-for="s in CARTON_SIZE_OPTIONS" :key="s" :label="s" :value="s" />
+        </el-select>
       </template>
     </el-table-column>
     <el-table-column label="箱备注" min-width="110" align="center" header-align="center">
@@ -150,16 +162,25 @@
       </template>
     </el-table-column>
   </el-table>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { nextTick } from 'vue'
+import { nextTick, ref } from 'vue'
 import { CircleClose, CopyDocument, Delete, Plus, ShoppingCart } from '@element-plus/icons-vue'
-import type { InputInstance, TableColumnCtx } from 'element-plus'
+import type { InputInstance } from 'element-plus'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { packingItemTotal, type PackingFlatRow, type PackingItemDraft } from '@/composables/usePackingGridRows'
+import { useGridKeyboardNav } from '@/composables/useGridKeyboardNav'
+import { usePackingGridLayout } from '@/composables/usePackingGridLayout'
+
+/** 常用箱规预设（可下拉选，也可直接手输特殊尺寸），按使用频率排序 */
+const CARTON_SIZE_OPTIONS = ['60*35*40', '60*25*40', '48*28*26', '57*35*40', '40*26*28']
+
+const gridWrapRef = ref<HTMLElement>()
+const { onGridKeydown } = useGridKeyboardNav(() => gridWrapRef.value ?? null)
 
 const props = withDefaults(
   defineProps<{
@@ -218,28 +239,10 @@ function setSizeQty(item: PackingItemDraft, size: string, value: number | undefi
   else item.sizeQuantities[size] = value
 }
 
-/** 箱级列（箱号/重量/箱规/箱备注）在箱首行 rowspan 合并 */
-function spanMethod({ row, columnIndex }: { row: PackingFlatRow; column: TableColumnCtx<PackingFlatRow>; rowIndex: number; columnIndex: number }): [number, number] {
-  const sizeCount = props.sizeHeaders.length
-  const boxLevelColumns = new Set([0, 5 + sizeCount, 6 + sizeCount, 7 + sizeCount])
-  if (!boxLevelColumns.has(columnIndex)) return [1, 1]
-  return row.isFirstRow ? [row.rowspan, 1] : [0, 0]
-}
-
-function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatRow>>; data: PackingFlatRow[] }): string[] {
-  const sizeCount = props.sizeHeaders.length
-  return columns.map((_, index) => {
-    if (index === 0) return `${props.totals.boxCount} 箱`
-    if (index >= 4 && index < 4 + sizeCount) {
-      const size = props.sizeHeaders[index - 4]
-      const sum = props.totals.bySize[size] ?? 0
-      return sum > 0 ? formatDisplayNumber(sum) : ''
-    }
-    if (index === 4 + sizeCount) return formatDisplayNumber(props.totals.totalQty)
-    if (index === 5 + sizeCount) return props.totals.totalWeight > 0 ? `${Math.round(props.totals.totalWeight * 100) / 100}` : ''
-    return ''
-  })
-}
+const { spanMethod, summaryMethod } = usePackingGridLayout(
+  () => props.sizeHeaders,
+  () => props.totals,
+)
 </script>
 
 <style scoped>
@@ -336,6 +339,10 @@ function summaryMethod({ columns }: { columns: Array<TableColumnCtx<PackingFlatR
 }
 
 .qty-input {
+  width: 100%;
+}
+
+.carton-select {
   width: 100%;
 }
 </style>

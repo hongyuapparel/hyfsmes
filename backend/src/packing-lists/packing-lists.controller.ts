@@ -57,6 +57,7 @@ export class PackingListsController {
   getList(
     @Query('status') status?: string,
     @Query('customerName') customerName?: string,
+    @Query('keyword') keyword?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
     @Query('page') page?: string,
@@ -65,6 +66,7 @@ export class PackingListsController {
     return this.service.getList({
       status,
       customerName,
+      keyword,
       dateFrom,
       dateTo,
       page: page ? parseInt(page, 10) : 1,

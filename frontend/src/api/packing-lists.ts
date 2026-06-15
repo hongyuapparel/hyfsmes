@@ -26,6 +26,7 @@ export interface PackingListListRes {
 export interface PackingListQuery {
   status?: string
   customerName?: string
+  keyword?: string
   dateFrom?: string
   dateTo?: string
   page?: number
