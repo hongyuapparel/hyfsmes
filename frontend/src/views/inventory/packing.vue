@@ -110,7 +110,9 @@
             <span v-else>{{ row.xiaomanOrderNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="customerName" label="客户" min-width="150" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column label="客户" min-width="150" show-overflow-tooltip align="center" header-align="center">
+          <template #default="{ row }">{{ displayCustomer(row.customerName) }}</template>
+        </el-table-column>
         <el-table-column prop="serviceManager" label="业务员" min-width="100" show-overflow-tooltip align="center" header-align="center" />
         <el-table-column label="款号" min-width="140" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ styleSummary(row) }}</template>
@@ -190,6 +192,12 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 function statusLabel(status: string): string {
   return status === 'shipped' ? '已发货' : '草稿'
+}
+
+/** 客户名为空或纯数字（如"1"等无效占位）时列表显示"-"，不改数据 */
+function displayCustomer(name: string): string {
+  const t = (name || '').trim()
+  return !t || /^\d+$/.test(t) ? '-' : t
 }
 
 function styleSummary(row: PackingListRow): string {
