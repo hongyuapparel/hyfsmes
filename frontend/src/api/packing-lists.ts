@@ -8,6 +8,7 @@ export interface PackingListRow {
   customerName: string
   serviceManager: string
   poNo: string
+  xiaomanOrderNo: string
   packDate: string | null
   status: string
   shippedAt: string | null
@@ -61,6 +62,7 @@ export interface PackingListDetail {
   customerName: string
   serviceManager: string
   poNo: string
+  xiaomanOrderNo: string
   packDate: string | null
   remark: string
   showCompany: boolean
@@ -95,6 +97,7 @@ export interface SavePackingListPayload {
   customerName?: string
   serviceManager?: string
   poNo?: string
+  xiaomanOrderNo?: string
   packDate?: string | null
   remark?: string
   showCompany?: boolean

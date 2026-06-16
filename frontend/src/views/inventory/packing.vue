@@ -84,6 +84,9 @@
         :header-cell-style="compactHeaderCellStyle"
       >
         <el-table-column prop="code" label="单号" min-width="140" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column label="小满单号" min-width="120" show-overflow-tooltip align="center" header-align="center">
+          <template #default="{ row }">{{ row.xiaomanOrderNo || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="customerName" label="客户" min-width="150" show-overflow-tooltip align="center" header-align="center" />
         <el-table-column prop="serviceManager" label="业务员" min-width="100" show-overflow-tooltip align="center" header-align="center" />
         <el-table-column label="款号" min-width="140" show-overflow-tooltip align="center" header-align="center">

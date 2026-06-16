@@ -8,6 +8,7 @@ export interface PackingForm {
   customerName: string
   serviceManager: string
   poNo: string
+  xiaomanOrderNo: string
   packDate: string | null
   remark: string
   showCompany: boolean
@@ -41,6 +42,7 @@ export function buildPayload(form: PackingForm, grid: PackingGridState): SavePac
     customerName: form.customerName.trim(),
     serviceManager: form.serviceManager.trim(),
     poNo: form.poNo.trim(),
+    xiaomanOrderNo: form.xiaomanOrderNo.trim(),
     packDate: form.packDate || null,
     remark: form.remark.trim(),
     showCompany: form.showCompany,

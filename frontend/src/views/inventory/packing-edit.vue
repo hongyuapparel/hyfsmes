@@ -53,6 +53,9 @@
         <el-form-item label="PO#">
           <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
         </el-form-item>
+        <el-form-item label="小满单号">
+          <el-input v-model="edit.form.xiaomanOrderNo" placeholder="选填，仅供财务审核，不打印" />
+        </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
             v-model="edit.form.packDate"
@@ -302,6 +305,6 @@ onActivated(() => {
 }
 
 .head-form-remark {
-  grid-column: span 3;
+  grid-column: span 2;
 }
 </style>

@@ -25,6 +25,10 @@ export class PackingList {
   @Column({ name: 'po_no', length: 255, default: '' })
   poNo: string;
 
+  /** 小满单号：业务员手填、供财务审核，仅内部用，不进客户单/箱贴打印 */
+  @Column({ name: 'xiaoman_order_no', length: 64, default: '' })
+  xiaomanOrderNo: string;
+
   @Column({ name: 'pack_date', type: 'date', nullable: true })
   packDate: string | null;
 
