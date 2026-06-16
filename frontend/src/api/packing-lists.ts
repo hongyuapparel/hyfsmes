@@ -9,6 +9,7 @@ export interface PackingListRow {
   serviceManager: string
   poNo: string
   xiaomanOrderNo: string
+  xiaomanOrderId: string
   packDate: string | null
   status: string
   shippedAt: string | null
@@ -63,6 +64,7 @@ export interface PackingListDetail {
   serviceManager: string
   poNo: string
   xiaomanOrderNo: string
+  xiaomanOrderId: string
   packDate: string | null
   remark: string
   showCompany: boolean
@@ -98,6 +100,7 @@ export interface SavePackingListPayload {
   serviceManager?: string
   poNo?: string
   xiaomanOrderNo?: string
+  xiaomanOrderId?: string
   packDate?: string | null
   remark?: string
   showCompany?: boolean
@@ -160,4 +163,20 @@ export function getPickablePending(params?: PickableQuery) {
 
 export function getPickableFinished(params?: PickableQuery) {
   return request.get<PickableListRes>('/packing-lists/pickable/finished', { params })
+}
+
+export interface XiaomanOrderItem {
+  order_id: number
+  order_no: string
+  name: string
+  company_name: string
+  account_date: string
+  amount: number
+  currency: string
+}
+
+export function searchXiaomanOrders(keyword?: string, page = 1, pageSize = 20) {
+  return request.get<{ list: XiaomanOrderItem[]; total: number }>('/packing-lists/xiaoman/orders', {
+    params: { keyword, page, pageSize },
+  })
 }

@@ -85,7 +85,16 @@
       >
         <el-table-column prop="code" label="单号" min-width="140" show-overflow-tooltip align="center" header-align="center" />
         <el-table-column label="小满单号" min-width="120" show-overflow-tooltip align="center" header-align="center">
-          <template #default="{ row }">{{ row.xiaomanOrderNo || '-' }}</template>
+          <template #default="{ row }">
+            <a
+              v-if="row.xiaomanOrderId"
+              :href="`https://crm.xiaoman.cn/order/detail/${row.xiaomanOrderId}`"
+              target="_blank"
+              rel="noopener"
+              class="xiaoman-cell-link"
+            >{{ row.xiaomanOrderNo || row.xiaomanOrderId }}</a>
+            <span v-else>{{ row.xiaomanOrderNo || '-' }}</span>
+          </template>
         </el-table-column>
         <el-table-column prop="customerName" label="客户" min-width="150" show-overflow-tooltip align="center" header-align="center" />
         <el-table-column prop="serviceManager" label="业务员" min-width="100" show-overflow-tooltip align="center" header-align="center" />
@@ -284,5 +293,14 @@ onActivated(() => {
 .inventory-packing-page .packing-table {
   flex: 1;
   min-height: 0;
+}
+
+.xiaoman-cell-link {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.xiaoman-cell-link:hover {
+  text-decoration: underline;
 }
 </style>

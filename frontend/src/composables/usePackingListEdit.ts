@@ -30,6 +30,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     serviceManager: '',
     poNo: '',
     xiaomanOrderNo: '',
+    xiaomanOrderId: '',
     packDate: today() as string | null,
     remark: '',
     showCompany: true,
@@ -63,6 +64,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     form.serviceManager = data.serviceManager
     form.poNo = data.poNo
     form.xiaomanOrderNo = data.xiaomanOrderNo
+    form.xiaomanOrderId = data.xiaomanOrderId
     form.packDate = data.packDate
     form.remark = data.remark
     form.showCompany = data.showCompany
@@ -98,6 +100,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
       form.serviceManager = ''
       form.poNo = ''
       form.xiaomanOrderNo = ''
+      form.xiaomanOrderId = ''
       form.packDate = today()
       form.remark = ''
       form.showCompany = true

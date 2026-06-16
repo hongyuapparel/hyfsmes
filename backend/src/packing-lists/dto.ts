@@ -88,6 +88,11 @@ export class SavePackingListDto {
   @MaxLength(64)
   xiaomanOrderNo?: string;
 
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  xiaomanOrderId?: string;
+
   /** YYYY-MM-DD */
   @IsOptional()
   @IsString()

@@ -36,11 +36,22 @@ export interface XiaomanCompanyDetail {
   }[];
 }
 
+export interface XiaomanOrderItem {
+  order_id: number;
+  order_no: string;
+  name: string;
+  company_name: string;
+  account_date: string;
+  amount: number;
+  currency: string;
+}
+
 @Injectable()
 export class XiaomanService {
-  private token: string | null = null;
-  private tokenExpiry = 0;
+  /** 按 scope 分别缓存 token：客户用 company、订单用 invoices，互不影响 */
+  private tokenByScope = new Map<string, { token: string; expiry: number }>();
   private companyListCache: { list: XiaomanCompanyItem[]; fetchedAt: number } | null = null;
+  private orderListCache: { list: XiaomanOrderItem[]; fetchedAt: number } | null = null;
   private companyListCacheTtlMs = 5 * 60 * 1000; // 5 分钟
   private listLoggedOnce = false;
 
@@ -73,9 +84,10 @@ export class XiaomanService {
     return this.config.get<string>('XIAOMAN_API_BASE_URL') ?? process.env.XIAOMAN_API_BASE_URL ?? DEFAULT_BASE_URL;
   }
 
-  private async getToken(): Promise<string> {
+  private async getToken(scope = 'company'): Promise<string> {
     const now = Date.now();
-    if (this.token && this.tokenExpiry > now + 60000) return this.token;
+    const cached = this.tokenByScope.get(scope);
+    if (cached && cached.expiry > now + 60000) return cached.token;
 
     const clientId = this.config.get<string>('XIAOMAN_CLIENT_ID') ?? process.env.XIAOMAN_CLIENT_ID;
     const clientSecret = this.config.get<string>('XIAOMAN_CLIENT_SECRET') ?? process.env.XIAOMAN_CLIENT_SECRET;
@@ -91,7 +103,7 @@ export class XiaomanService {
         grant_type: 'client_credentials',
         client_id: clientId,
         client_secret: clientSecret,
-        scope: 'company',
+        scope,
       }),
     });
     const text = await res.text();
@@ -105,9 +117,8 @@ export class XiaomanService {
       const msg = data.message || '小满鉴权失败，请检查 client_id 和 client_secret 是否从小满 CRM 正确复制';
       throw new Error(msg);
     }
-    this.token = data.access_token;
-    this.tokenExpiry = now + (data.expires_in ?? 28800) * 1000;
-    return this.token;
+    this.tokenByScope.set(scope, { token: data.access_token, expiry: now + (data.expires_in ?? 28800) * 1000 });
+    return data.access_token;
   }
 
   async getCompanyList(
@@ -299,5 +310,66 @@ export class XiaomanService {
       results.push(...batchResults);
     }
     return results;
+  }
+
+  private normalizeOrder(raw: Record<string, unknown>): XiaomanOrderItem {
+    const company = (raw.company ?? null) as { name?: string } | null;
+    return {
+      order_id: Number(raw.order_id) || 0,
+      order_no: String(raw.order_no ?? '').trim(),
+      name: String(raw.name ?? '').trim(),
+      company_name: String(raw.company_name ?? company?.name ?? '').trim(),
+      account_date: String(raw.account_date ?? '').trim(),
+      amount: Number(raw.amount) || 0,
+      currency: String(raw.currency ?? '').trim(),
+    };
+  }
+
+  /** 拉取近期销售订单（按更新时间倒序），最多 MAX 条，供后端本地按关键词过滤 */
+  private async fetchRecentOrders(): Promise<XiaomanOrderItem[]> {
+    const token = await this.getToken('invoices');
+    const baseUrl = this.getBaseUrl();
+    const MAX = 2000;
+    const COUNT = 200;
+    const out: XiaomanOrderItem[] = [];
+    for (let startIndex = 1; out.length < MAX; startIndex++) {
+      const url = `${baseUrl}/v1/invoices/order/list?count=${COUNT}&start_index=${startIndex}&time_type=1`;
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+      const text = await res.text();
+      let json: { code?: number; message?: string; data?: { list?: Record<string, unknown>[] } };
+      try {
+        json = JSON.parse(text) as typeof json;
+      } catch {
+        throw new Error(`小满订单接口响应格式异常 (${res.status})`);
+      }
+      if (json.code !== 200) {
+        throw new Error(json.message || `小满订单列表获取失败 (code: ${json.code})，请确认已开通 invoices 接口权限`);
+      }
+      const list = json.data?.list ?? [];
+      out.push(...list.map((o) => this.normalizeOrder(o)));
+      if (list.length < COUNT) break;
+    }
+    return out;
+  }
+
+  /**
+   * 销售订单搜索：小满列表接口无关键词参数，故拉取近期订单后本地按订单号/订单名/客户名过滤（5 分钟缓存）。
+   */
+  async getOrderList(page = 1, pageSize = 20, keyword?: string): Promise<{ list: XiaomanOrderItem[]; total: number }> {
+    const now = Date.now();
+    let all: XiaomanOrderItem[];
+    if (this.orderListCache && now - this.orderListCache.fetchedAt < this.companyListCacheTtlMs) {
+      all = this.orderListCache.list;
+    } else {
+      all = await this.fetchRecentOrders();
+      if (all.length) this.orderListCache = { list: all, fetchedAt: now };
+    }
+    const kw = keyword?.trim().toLowerCase();
+    const filtered = kw
+      ? all.filter((o) => `${o.order_no} ${o.name} ${o.company_name}`.toLowerCase().includes(kw))
+      : all;
+    const total = filtered.length;
+    const start = (page - 1) * pageSize;
+    return { list: filtered.slice(start, start + pageSize), total };
   }
 }

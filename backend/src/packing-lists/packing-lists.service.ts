@@ -25,6 +25,7 @@ export interface PackingListRow {
   serviceManager: string;
   poNo: string;
   xiaomanOrderNo: string;
+  xiaomanOrderId: string;
   packDate: string | null;
   status: string;
   shippedAt: Date | null;
@@ -62,6 +63,7 @@ export interface PackingListDetail {
   serviceManager: string;
   poNo: string;
   xiaomanOrderNo: string;
+  xiaomanOrderId: string;
   packDate: string | null;
   remark: string;
   showCompany: boolean;
@@ -160,6 +162,7 @@ export class PackingListsService {
       serviceManager: l.serviceManager,
       poNo: l.poNo,
       xiaomanOrderNo: l.xiaomanOrderNo,
+      xiaomanOrderId: l.xiaomanOrderId,
       packDate: l.packDate,
       status: l.status,
       shippedAt: l.shippedAt,
@@ -193,6 +196,7 @@ export class PackingListsService {
       serviceManager: list.serviceManager,
       poNo: list.poNo,
       xiaomanOrderNo: list.xiaomanOrderNo,
+      xiaomanOrderId: list.xiaomanOrderId,
       packDate: list.packDate,
       remark: list.remark,
       showCompany: !!list.showCompany,
@@ -299,6 +303,7 @@ export class PackingListsService {
       serviceManager: (payload.serviceManager ?? '').trim(),
       poNo: (payload.poNo ?? '').trim(),
       xiaomanOrderNo: (payload.xiaomanOrderNo ?? '').trim(),
+      xiaomanOrderId: (payload.xiaomanOrderId ?? '').trim(),
       packDate: payload.packDate?.trim() || null,
       remark: (payload.remark ?? '').trim(),
       showCompany: payload.showCompany === false ? 0 : 1,

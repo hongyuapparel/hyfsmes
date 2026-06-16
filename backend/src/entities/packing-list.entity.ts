@@ -25,9 +25,13 @@ export class PackingList {
   @Column({ name: 'po_no', length: 255, default: '' })
   poNo: string;
 
-  /** 小满单号：业务员手填、供财务审核，仅内部用，不进客户单/箱贴打印 */
+  /** 小满单号：业务员选/填，供财务审核，仅内部用，不进客户单/箱贴打印 */
   @Column({ name: 'xiaoman_order_no', length: 64, default: '' })
   xiaomanOrderNo: string;
+
+  /** 小满订单ID：用于跳转 crm.xiaoman.cn/order/detail/{id}，从小满下拉选中时写入 */
+  @Column({ name: 'xiaoman_order_id', length: 32, default: '' })
+  xiaomanOrderId: string;
 
   @Column({ name: 'pack_date', type: 'date', nullable: true })
   packDate: string | null;
