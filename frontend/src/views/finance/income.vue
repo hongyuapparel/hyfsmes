@@ -83,7 +83,7 @@
       <el-table-column prop="occurDate" label="收款日期" width="110" />
       <el-table-column label="收入金额（元）" width="130" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
-          <span class="income-amount">{{ fmtAmt(row.amount) }}</span>
+          <span class="income-amount">{{ formatMoneyAligned(row.amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="incomeTypeName" label="收入类型" width="120" show-overflow-tooltip />
@@ -248,7 +248,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadFinanceImage } from '@/api/uploads'
 import { ACTIVE_FILTER_COLOR, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 
 const options = reactive<{
   incomeTypes: FinanceIncomeType[]

@@ -76,7 +76,7 @@
           </el-table-column>
           <el-table-column label="金额" width="100" align="right" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
-              <span class="income-color">{{ fmtAmt(row.amount) }}</span>
+              <span class="income-color">{{ formatMoneyAligned(row.amount) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -93,7 +93,7 @@
           <el-table-column prop="payeeName" label="收款方" min-width="90" show-overflow-tooltip />
           <el-table-column label="金额" width="100" align="right" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
-              <span class="expense-color">{{ fmtAmt(row.amount) }}</span>
+              <span class="expense-color">{{ formatMoneyAligned(row.amount) }}</span>
             </template>
           </el-table-column>
         </el-table>
@@ -173,7 +173,7 @@ import { getDashboardSummary, type DashboardSummary } from '@/api/finance'
 import { getErrorMessage } from '@/api/request'
 import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 
 const summary = ref<DashboardSummary | null>(null)
 const loading = ref(false)
