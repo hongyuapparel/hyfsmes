@@ -42,8 +42,6 @@ export interface XiaomanOrderItem {
   name: string;
   company_name: string;
   account_date: string;
-  amount: number;
-  currency: string;
 }
 
 @Injectable()
@@ -320,8 +318,6 @@ export class XiaomanService {
       name: String(raw.name ?? '').trim(),
       company_name: String(raw.company_name ?? company?.name ?? '').trim(),
       account_date: String(raw.account_date ?? '').trim(),
-      amount: Number(raw.amount) || 0,
-      currency: String(raw.currency ?? '').trim(),
     };
   }
 

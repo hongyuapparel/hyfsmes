@@ -172,8 +172,6 @@ export interface XiaomanOrderItem {
   name: string
   company_name: string
   account_date: string
-  amount: number
-  currency: string
 }
 
 export function searchXiaomanOrders(keyword?: string, page = 1, pageSize = 20) {
