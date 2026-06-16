@@ -16,6 +16,7 @@
       :can-access-pending-inbound="canAccessPendingInbound"
       :has-any-todo-card="hasAnyTodoCard"
       :pending-review-link="pendingReviewLink"
+      :unquoted-link="unquotedLink"
       :my-merchandiser-link="myMerchandiserLink"
       :due-soon-link="dueSoonLink"
       @orders-list="goOrdersList"
@@ -45,6 +46,7 @@ const {
   showMyMerchandiser,
   hasAnyTodoCard,
   pendingReviewLink,
+  unquotedLink,
   myMerchandiserLink,
   dueSoonLink,
   goOrdersList,

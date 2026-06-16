@@ -11,6 +11,7 @@ export type HomeTodoCounts = {
   pendingReview: number
   myMerchandiser: number
   dueSoon: number
+  unquoted: number
   pendingInbound: number
 }
 
@@ -18,6 +19,7 @@ export type HomeTodoLists = {
   pendingReview: OrderListItem[]
   myMerchandiser: OrderListItem[]
   dueSoon: OrderListItem[]
+  unquoted: OrderListItem[]
   pendingInbound: PendingInboundItem[]
 }
 
@@ -53,6 +55,7 @@ export function useHomeTodo() {
     pendingReview: 0,
     myMerchandiser: 0,
     dueSoon: 0,
+    unquoted: 0,
     pendingInbound: 0,
   })
 
@@ -60,6 +63,7 @@ export function useHomeTodo() {
     pendingReview: [],
     myMerchandiser: [],
     dueSoon: [],
+    unquoted: [],
     pendingInbound: [],
   })
 
@@ -83,6 +87,7 @@ export function useHomeTodo() {
   const dueSoonEnd = computed(() => addDaysYYYYMMDD(7))
 
   const pendingReviewLink = '/orders/list?status=pending_review'
+  const unquotedLink = '/orders/list?unquoted=1'
   const myMerchandiserLink = computed(() => `/orders/list?merchandiser=${encodeURIComponent(displayName.value)}`)
   const dueSoonLink = computed(
     () =>
@@ -187,6 +192,17 @@ export function useHomeTodo() {
 
       if (canAccessOrders.value) {
         tasks.push(loadDueSoonTodo())
+        tasks.push(
+          getOrders({
+            unquoted: true,
+            page: 1,
+            pageSize: TODO_LIST_PAGE_SIZE,
+          }).then((res) => {
+            const data = res.data
+            todoCounts.value.unquoted = data?.total ?? 0
+            todoLists.value.unquoted = data?.list ?? []
+          }),
+        )
       }
 
       if (canAccessPendingInbound.value) {
@@ -218,6 +234,7 @@ export function useHomeTodo() {
     showMyMerchandiser,
     hasAnyTodoCard,
     pendingReviewLink,
+    unquotedLink,
     myMerchandiserLink,
     dueSoonLink,
     goOrdersList,

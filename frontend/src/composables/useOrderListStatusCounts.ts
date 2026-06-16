@@ -18,10 +18,11 @@ interface UseOrderListStatusCountsParams {
   orderDateRange: Ref<[string, string] | null>
   customerDueRange: Ref<[string, string] | null>
   completedRange: Ref<[string, string] | null>
+  unquoted: Ref<boolean>
 }
 
 export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams) {
-  const { filter, orderDateRange, customerDueRange, completedRange } = params
+  const { filter, orderDateRange, customerDueRange, completedRange, unquoted } = params
 
   const statusCounts = ref<Record<string, number>>({})
   const statusTotal = ref<number>(0)
@@ -53,6 +54,7 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
       q.completedStart = completedRange.value[0]
       q.completedEnd = completedRange.value[1]
     }
+    if (unquoted.value) q.unquoted = true
     return q
   }
 

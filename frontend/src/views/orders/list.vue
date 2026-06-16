@@ -14,6 +14,15 @@
         </el-radio-group>
       </div>
       <div class="status-tabs-right">
+        <el-tag
+          v-if="unquoted"
+          type="warning"
+          closable
+          class="unquoted-filter-tag"
+          @close="clearUnquoted"
+        >
+          仅看待报价（样品单已完成未报价）
+        </el-tag>
         <el-button v-if="canEditOrders" type="primary" @click="onCreateOrder">新建订单</el-button>
       </div>
     </div>
@@ -167,6 +176,7 @@ const {
   loading,
   pagination,
   currentStatus,
+  unquoted,
   orderDateRange,
   customerDueRange,
   completedRange,
@@ -192,6 +202,7 @@ const {
   orderDateRange,
   customerDueRange,
   completedRange,
+  unquoted,
 })
 
 const {
@@ -348,10 +359,24 @@ function onReset() {
 }
 
 function onStatusChange() {
+  // 待报价视图限定在「已完成」，切到非「全部/已完成」的状态会与之互斥而恒空，
+  // 此时自动退出待报价视图（清过滤），并刷新角标恢复正常状态统计。
+  let unquotedCleared = false
+  if (unquoted.value && currentStatus.value !== 'all' && currentStatus.value !== 'completed') {
+    unquoted.value = false
+    unquotedCleared = true
+  }
   pagination.page = 1
   resetCardScroll()
   resetSelection()
-  load()
+  load({ refreshCounts: unquotedCleared })
+}
+
+function clearUnquoted() {
+  unquoted.value = false
+  pagination.page = 1
+  resetCardScroll()
+  load({ refreshCounts: true })
 }
 
 function onPageChange(page: number) {
@@ -378,6 +403,7 @@ onMounted(async () => {
   }
   restoreFilterState()
   applyQueryFromRoute(route.query as Record<string, unknown>)
+  unquoted.value = route.query.unquoted === '1' || route.query.unquoted === 'true'
   await load({ refreshCounts: true })
   loadOptions()
   loadStatusTabs()
@@ -439,6 +465,13 @@ watchEffect(() => {
 
 .status-tabs-right {
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.unquoted-filter-tag {
+  cursor: default;
 }
 
 /* 手机端：标签条下边距收紧，给订单卡片让位（筛选区压缩已在全局 design-system 处理） */
