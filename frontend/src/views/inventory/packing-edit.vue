@@ -26,6 +26,30 @@
 
     <el-form class="head-form" label-width="76px" @submit.prevent>
       <div class="head-form-grid">
+        <el-form-item label="小满单号">
+          <div class="xiaoman-field">
+            <el-select
+              v-model="edit.form.xiaomanOrderNo"
+              filterable
+              remote
+              allow-create
+              default-first-option
+              clearable
+              :remote-method="onXiaomanSearch"
+              :loading="xiaomanLoading"
+              placeholder="搜小满订单号/客户，或手填"
+              class="xiaoman-select"
+              @change="onXiaomanChange"
+            >
+              <el-option v-for="o in xiaomanOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <el-tooltip v-if="xiaomanOrderUrl" content="在小满打开该订单" placement="top">
+              <a :href="xiaomanOrderUrl" target="_blank" rel="noopener" class="xiaoman-link">
+                <el-icon><Link /></el-icon>
+              </a>
+            </el-tooltip>
+          </div>
+        </el-form-item>
         <el-form-item label="客户">
           <el-select
             v-model="edit.form.customerName"
@@ -52,30 +76,6 @@
         </el-form-item>
         <el-form-item label="PO#">
           <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
-        </el-form-item>
-        <el-form-item label="小满单号">
-          <div class="xiaoman-field">
-            <el-select
-              v-model="edit.form.xiaomanOrderNo"
-              filterable
-              remote
-              allow-create
-              default-first-option
-              clearable
-              :remote-method="onXiaomanSearch"
-              :loading="xiaomanLoading"
-              placeholder="搜小满订单号/客户，或手填"
-              class="xiaoman-select"
-              @change="onXiaomanChange"
-            >
-              <el-option v-for="o in xiaomanOptions" :key="o.value" :label="o.label" :value="o.value" />
-            </el-select>
-            <el-tooltip v-if="xiaomanOrderUrl" content="在小满打开该订单" placement="top">
-              <a :href="xiaomanOrderUrl" target="_blank" rel="noopener" class="xiaoman-link">
-                <el-icon><Link /></el-icon>
-              </a>
-            </el-tooltip>
-          </div>
         </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
