@@ -280,6 +280,7 @@ async function ensurePackingListTables(dataSource: DataSource) {
       customer_name VARCHAR(255) NOT NULL DEFAULT '',
       service_manager VARCHAR(128) NOT NULL DEFAULT '',
       po_no VARCHAR(255) NOT NULL DEFAULT '',
+      xiaoman_order_no VARCHAR(64) NOT NULL DEFAULT '',
       pack_date DATE NULL,
       remark VARCHAR(1000) NOT NULL DEFAULT '',
       show_company TINYINT NOT NULL DEFAULT 1,
@@ -336,6 +337,15 @@ async function ensurePackingListTables(dataSource: DataSource) {
     } catch (e) {
       console.warn('[Schema] 跳过 packing_lists.code 唯一索引（可能存在重复单号）：', (e as Error).message);
     }
+  }
+
+  // 老表补 xiaoman_order_no 列（小满单号，业务员手填供财务审核）
+  const xiaomanColRows: Array<{ cnt: number }> = await dataSource.query(`
+    SELECT COUNT(*) AS cnt FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'packing_lists' AND column_name = 'xiaoman_order_no'
+  `);
+  if (Number(xiaomanColRows?.[0]?.cnt) === 0) {
+    await dataSource.query(`ALTER TABLE packing_lists ADD COLUMN xiaoman_order_no VARCHAR(64) NOT NULL DEFAULT '' AFTER po_no`);
   }
 
   console.log('[Schema] Ensured packing list tables');
