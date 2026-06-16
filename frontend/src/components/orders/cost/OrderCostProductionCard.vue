@@ -83,7 +83,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="单价(元)" width="90" align="center" header-align="center">
+      <el-table-column label="单价(元)" width="90" align="center" header-align="center" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           <el-input-number
             v-model="row.unitPrice"
@@ -95,7 +95,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="80" align="center" header-align="center">
+      <el-table-column label="数量" width="80" align="center" header-align="center" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           <el-input-number
             v-model="row.quantity"

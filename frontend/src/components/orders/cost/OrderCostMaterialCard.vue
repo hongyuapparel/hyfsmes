@@ -80,7 +80,7 @@
           <el-input-number v-model="row.lossPercent" :min="0" :controls="false" size="small" />
         </template>
       </el-table-column>
-      <el-table-column label="单价(元)" width="90" align="right">
+      <el-table-column label="单价(元)" width="90" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           <el-input-number
             v-model="row.unitPrice"
@@ -92,7 +92,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="金额(元)" width="90" align="right">
+      <el-table-column label="金额(元)" width="90" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           {{ formatMoney(materialAmount(row)) }}
         </template>

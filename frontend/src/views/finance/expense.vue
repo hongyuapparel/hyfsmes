@@ -94,7 +94,7 @@
 
     <el-table v-loading="loading" :data="list" border stripe class="data-table">
       <el-table-column prop="occurDate" label="支出日期" width="110" />
-      <el-table-column label="支出金额（元）" width="130" align="right">
+      <el-table-column label="支出金额（元）" width="130" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           <span class="expense-amount">{{ fmtAmt(row.amount) }}</span>
         </template>

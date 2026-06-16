@@ -74,7 +74,7 @@
           <el-table-column label="部门" min-width="90" show-overflow-tooltip>
             <template #default="{ row }">{{ row.departmentName || '—' }}</template>
           </el-table-column>
-          <el-table-column label="金额" width="100" align="right">
+          <el-table-column label="金额" width="100" align="right" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
               <span class="income-color">{{ fmtAmt(row.amount) }}</span>
             </template>
@@ -91,7 +91,7 @@
           <el-table-column prop="occurDate" label="日期" width="100" />
           <el-table-column prop="expenseTypeName" label="类型" width="110" show-overflow-tooltip />
           <el-table-column prop="payeeName" label="收款方" min-width="90" show-overflow-tooltip />
-          <el-table-column label="金额" width="100" align="right">
+          <el-table-column label="金额" width="100" align="right" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
               <span class="expense-color">{{ fmtAmt(row.amount) }}</span>
             </template>
