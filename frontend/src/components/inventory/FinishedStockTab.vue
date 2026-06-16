@@ -170,12 +170,12 @@
           </el-tooltip>
         </template>
       </el-table-column>
-      <el-table-column label="出厂价" width="100" align="center" header-align="center">
+      <el-table-column label="出厂价" width="100" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           {{ getTableUnitPriceText(row) }}
         </template>
       </el-table-column>
-      <el-table-column label="总价" width="100" align="center" header-align="center">
+      <el-table-column label="总价" width="100" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           {{ getTableGrandTotalText(row) }}
         </template>
@@ -230,7 +230,7 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
@@ -308,16 +308,16 @@ const inboundDateRangeModel = computed({
 function getTableUnitPriceText(row: StockTableRow): string {
   if (isStockTableParentRow(row) && row._mixedUnitPrice) return '多个'
   const n = Number(row.unitPrice ?? '')
-  return Number.isFinite(n) ? `￥${formatDisplayNumber(n)}` : '￥0'
+  return Number.isFinite(n) ? formatMoneyAligned(n) : formatMoneyAligned(0)
 }
 
 function getTableGrandTotalText(row: StockTableRow): string {
   if (isStockTableParentRow(row)) {
     const total = row._children.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0)
-    return `￥${formatDisplayNumber(total)}`
+    return formatMoneyAligned(total)
   }
   const total = (Number(row.quantity) || 0) * (Number(row.unitPrice) || 0)
-  return Number.isFinite(total) ? `￥${formatDisplayNumber(total)}` : '￥0'
+  return Number.isFinite(total) ? formatMoneyAligned(total) : formatMoneyAligned(0)
 }
 
 function getTableInventoryTypeText(row: StockTableRow): string {

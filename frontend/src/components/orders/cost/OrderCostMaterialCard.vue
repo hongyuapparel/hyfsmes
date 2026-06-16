@@ -92,9 +92,9 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="金额(元)" width="90" align="right">
+      <el-table-column label="金额(元)" width="90" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
-          {{ formatMoney(materialAmount(row)) }}
+          {{ formatMoneyAligned(materialAmount(row)) }}
         </template>
       </el-table-column>
       <el-table-column label="计入成本" width="86" align="center">
@@ -126,6 +126,7 @@
 
 <script setup lang="ts">
 import { Delete } from '@element-plus/icons-vue'
+import { formatMoneyAligned } from '@/utils/display-number'
 import { materialAmount, isMaterialIncluded, type MaterialRow } from '@/utils/order-cost'
 
 defineProps<{
