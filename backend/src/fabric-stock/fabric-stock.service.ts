@@ -223,7 +223,7 @@ export class FabricStockService {
     skipTotal?: boolean;
     page?: number;
     pageSize?: number;
-  }): Promise<{ list: FabricStockListRow[]; total: number; page: number; pageSize: number }> {
+  }): Promise<{ list: FabricStockListRow[]; total: number; totalQuantity: number; page: number; pageSize: number }> {
     const { name, customerName, startDate, endDate, inventoryTypeId, skipTotal = false, page = 1, pageSize = 20 } = params;
     const qb = this.stockRepo.createQueryBuilder('s');
     if (name?.trim()) {
@@ -243,6 +243,13 @@ export class FabricStockService {
     if (endDate?.trim()) {
       qb.andWhere('s.created_at <= :inboundEnd', { inboundEnd: `${endDate.trim()} 23:59:59` });
     }
+    const totalQuantityRow = skipTotal
+      ? null
+      : await qb
+          .clone()
+          .select('COALESCE(SUM(s.quantity), 0)', 'sum')
+          .getRawOne<{ sum: string | number | null }>();
+    const totalQuantity = Number(totalQuantityRow?.sum ?? 0) || 0;
     qb.orderBy('s.created_at', 'DESC');
     const total = skipTotal ? 0 : await qb.getCount();
     const rawList = await qb
@@ -250,7 +257,7 @@ export class FabricStockService {
       .take(pageSize)
       .getMany();
     const list = await this.decorateFabricStocks(rawList);
-    return { list, total, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize };
   }
 
   async getOne(id: number): Promise<FabricStockListRow> {

@@ -52,7 +52,7 @@ export function getFabricList(params?: {
   page?: number
   pageSize?: number
 }, config?: AxiosRequestConfig) {
-  return request.get<{ list: FabricItem[]; total: number; page: number; pageSize: number }>(
+  return request.get<{ list: FabricItem[]; total: number; totalQuantity: number; page: number; pageSize: number }>(
     '/inventory/fabric/items',
     { params, ...(config ?? {}) }
   )

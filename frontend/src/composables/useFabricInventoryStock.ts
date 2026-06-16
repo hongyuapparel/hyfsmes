@@ -27,6 +27,8 @@ export function useFabricInventoryStock() {
   const nameLabelVisible = ref(false)
   const list = ref<FabricItem[]>([])
   const loading = ref(false)
+  /** 当前筛选下全量匹配的总数量（接口返回，跨分页） */
+  const stockTotalQuantity = ref(0)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
   const selectedRows = ref<FabricItem[]>([])
   const customerOptions = ref<{ label: string; value: string }[]>([])
@@ -94,6 +96,7 @@ export function useFabricInventoryStock() {
       if (data) {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
+        stockTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
         restoreFabricStockColumnWidths(fabricStockTableRef.value)
       }
     } catch (e: unknown) {
@@ -318,6 +321,7 @@ export function useFabricInventoryStock() {
     nameLabelVisible,
     list,
     loading,
+    stockTotalQuantity,
     pagination,
     selectedRows,
     customerOptions,

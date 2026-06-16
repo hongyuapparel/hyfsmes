@@ -96,7 +96,7 @@ export class InventoryAccessoriesService {
     skipTotal?: boolean;
     page?: number;
     pageSize?: number;
-  }): Promise<{ list: InventoryAccessory[]; total: number; page: number; pageSize: number }> {
+  }): Promise<{ list: InventoryAccessory[]; total: number; totalQuantity: number; page: number; pageSize: number }> {
     const { name, category, customerName, salesperson, startDate, endDate, skipTotal = false, page = 1, pageSize = 20 } = params;
     const qb = this.repo.createQueryBuilder('a');
 
@@ -120,6 +120,13 @@ export class InventoryAccessoriesService {
     if (endDate?.trim()) {
       qb.andWhere('a.created_at <= :inboundEnd', { inboundEnd: `${endDate.trim()} 23:59:59` });
     }
+    const totalQuantityRow = skipTotal
+      ? null
+      : await qb
+          .clone()
+          .select('COALESCE(SUM(a.quantity), 0)', 'sum')
+          .getRawOne<{ sum: string | number | null }>();
+    const totalQuantity = Number(totalQuantityRow?.sum ?? 0) || 0;
     qb.orderBy('a.created_at', 'DESC');
 
     const total = skipTotal ? 0 : await qb.getCount();
@@ -128,7 +135,7 @@ export class InventoryAccessoriesService {
       .take(pageSize)
       .getMany();
 
-    return { list, total, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize };
   }
 
   async getOne(id: number): Promise<InventoryAccessory> {
