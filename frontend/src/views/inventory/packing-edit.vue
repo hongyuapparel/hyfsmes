@@ -162,7 +162,7 @@ const labelsVisible = ref(false)
 const docVisible = ref(false)
 
 // 小满订单：远程搜索下拉（小满列表接口无关键词，后端拉取后本地过滤）+ 选中存订单ID用于跳转
-const xiaomanOptions = ref<{ value: string; label: string; orderId: string }[]>([])
+const xiaomanOptions = ref<{ value: string; label: string; orderId: string; companyName: string }[]>([])
 const xiaomanLoading = ref(false)
 const xiaomanOrderUrl = computed(() =>
   edit.form.xiaomanOrderId ? `https://crm.xiaoman.cn/order/detail/${edit.form.xiaomanOrderId}` : '',
@@ -179,7 +179,12 @@ async function onXiaomanSearch(keyword: string) {
     const res = await searchXiaomanOrders(kw)
     xiaomanOptions.value = res.data.list.map((o) => {
       const value = o.order_no || o.name || String(o.order_id)
-      return { value, label: o.company_name ? `${value} · ${o.company_name}` : value, orderId: String(o.order_id) }
+      return {
+        value,
+        label: o.company_name ? `${value} · ${o.company_name}` : value,
+        orderId: String(o.order_id),
+        companyName: o.company_name || '',
+      }
     })
   } catch (e) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '小满订单获取失败（确认已开通订单接口权限）'))
@@ -190,7 +195,13 @@ async function onXiaomanSearch(keyword: string) {
 }
 
 function onXiaomanChange(val: string) {
-  edit.form.xiaomanOrderId = xiaomanOptions.value.find((o) => o.value === val)?.orderId ?? ''
+  const picked = xiaomanOptions.value.find((o) => o.value === val)
+  edit.form.xiaomanOrderId = picked?.orderId ?? ''
+  // 选中小满订单时自动带出客户名（手填的号无客户信息则不动）；走既有换客户逻辑匹配档案/业务员
+  if (picked?.companyName && picked.companyName !== edit.form.customerName) {
+    edit.form.customerName = picked.companyName
+    edit.onCustomerChange()
+  }
 }
 
 function openLabels() {
