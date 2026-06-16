@@ -217,6 +217,12 @@ a:hover {
   text-align: center !important;
 }
 
+/* 数字/金额列右对齐（数位对齐，便于一眼比大小）：给 el-table-column 加 class-name="col-num-right"。
+   选择器带 .el-table__cell.col-num-right 以高于上面"全站居中 !important"。表头同时加 label-class-name 可右对齐表头。 */
+.el-table .el-table__cell.col-num-right .cell {
+  text-align: right !important;
+}
+
 /* ========== 7.0 列表页主卡片：填满主内容高度，表格在内部滚动（表头固定）========== */
 .page-card.page-card--fill {
   display: flex;
