@@ -65,3 +65,23 @@ export function formatCurrency(value: unknown, options?: FormatCurrencyOptions):
   const symbol = options?.symbol ?? '￥'
   return `${symbol}${formatted}`
 }
+
+/**
+ * 金额对齐展示：货币符号 + 固定两位小数。用于表格金额列，右对齐时小数点自然对齐。
+ * - null / undefined / 空字符串 → emptyDisplay（默认 '-'，不带符号）
+ * - 非数字字符串 → 原样返回
+ * - 合法数字 → `￥{定两位}`，如 10800 → `￥10800.00`，负数 → `￥-27.57`
+ */
+export function formatMoneyAligned(value: unknown, options?: FormatCurrencyOptions): string {
+  const empty = options?.emptyDisplay ?? '-'
+  if (value === null || value === undefined) return empty
+  if (typeof value === 'string') {
+    const t = value.trim()
+    if (t === '') return empty
+    if (!/^-?\d+(?:\.\d+)?$/.test(t)) return value
+  }
+  const n = Number(value)
+  if (!Number.isFinite(n)) return empty
+  const symbol = options?.symbol ?? '￥'
+  return `${symbol}${(Math.round(n * 100) / 100).toFixed(2)}`
+}

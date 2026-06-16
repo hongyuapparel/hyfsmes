@@ -96,7 +96,7 @@
       <el-table-column prop="occurDate" label="支出日期" width="110" />
       <el-table-column label="支出金额（元）" width="130" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
-          <span class="expense-amount">{{ fmtAmt(row.amount) }}</span>
+          <span class="expense-amount">{{ formatMoneyAligned(row.amount) }}</span>
         </template>
       </el-table-column>
       <el-table-column prop="expenseTypeName" label="支出类型" width="110" show-overflow-tooltip />
@@ -268,7 +268,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadFinanceImage } from '@/api/uploads'
 import { ACTIVE_FILTER_COLOR, getFilterRangeStyle, getAdaptiveSelectStyle, getFilterInputStyle } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 
 const options = reactive<{
   expenseTypes: FinanceExpenseType[]
