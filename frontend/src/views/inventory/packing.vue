@@ -117,13 +117,13 @@
         <el-table-column label="款号" min-width="140" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ styleSummary(row) }}</template>
         </el-table-column>
-        <el-table-column label="箱数" width="80" class-name="col-num-right" label-class-name="col-num-right">
+        <el-table-column label="箱数" width="80" align="center" header-align="center">
           <template #default="{ row }">{{ formatDisplayNumber(row.boxCount) }}</template>
         </el-table-column>
-        <el-table-column label="件数" width="90" class-name="col-num-right" label-class-name="col-num-right">
+        <el-table-column label="件数" width="90" align="center" header-align="center">
           <template #default="{ row }">{{ formatDisplayNumber(row.totalQty) }}</template>
         </el-table-column>
-        <el-table-column label="总重(kg)" width="100" class-name="col-num-right" label-class-name="col-num-right">
+        <el-table-column label="总重(kg)" width="100" align="center" header-align="center">
           <template #default="{ row }">{{ row.totalWeight > 0 ? row.totalWeight : '-' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90" align="center" header-align="center">
