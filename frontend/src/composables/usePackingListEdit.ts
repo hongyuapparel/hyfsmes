@@ -151,10 +151,12 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
   }
 
   /** 客户切换：已有来源行时提醒并清空（来源行客户必须一致） */
-  async function onCustomerChange() {
+  /** skipClearSourceRows：小满带入客户/选货自动带客户时只解析客户档案+业务员，不清来源行；仅手动改客户才清。 */
+  async function onCustomerChange(skipClearSourceRows = false) {
     const matched = customerOptions.value.find((c) => c.companyName === form.customerName)
     form.customerId = matched?.id ?? null
     if (matched?.salesperson && !form.serviceManager) form.serviceManager = matched.salesperson
+    if (skipClearSourceRows) return
     const hasSourceRows = grid.boxes.value.some((box) => box.items.some((item) => item.sourceType !== 'manual'))
     if (!hasSourceRows) return
     try {
@@ -204,7 +206,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     }
     if (!form.customerName.trim() && lines[0]?.customerName) {
       form.customerName = lines[0].customerName
-      onCustomerChange()
+      onCustomerChange(true)
     }
   }
 

@@ -57,7 +57,7 @@
             allow-create
             default-first-option
             placeholder="选择或输入客户"
-            @change="edit.onCustomerChange"
+            @change="() => edit.onCustomerChange()"
           >
             <el-option v-for="c in edit.customerOptions.value" :key="c.id" :label="c.companyName" :value="c.companyName" />
           </el-select>
@@ -197,11 +197,10 @@ async function onXiaomanSearch(keyword: string) {
 function onXiaomanChange(val: string) {
   const picked = xiaomanOptions.value.find((o) => o.value === val)
   edit.form.xiaomanOrderId = picked?.orderId ?? ''
-  // 仅当客户还没填时才用小满订单客户名自动带出（走既有换客户逻辑匹配档案/业务员）。
-  // 客户已填（尤其已选货）则不覆盖、不触发清空来源行——避免小满与本地客户名细微差异误删已选的待仓/成品货。
-  if (picked?.companyName && !edit.form.customerName.trim()) {
+  // 选中小满订单总是带入其客户名（解析客户档案/业务员），但 skipClear=true 不清已选的待仓/成品货。
+  if (picked?.companyName) {
     edit.form.customerName = picked.companyName
-    edit.onCustomerChange()
+    edit.onCustomerChange(true)
   }
 }
 
