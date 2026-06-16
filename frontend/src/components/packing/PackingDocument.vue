@@ -41,7 +41,7 @@
             <span class="doc-meta-value">{{ detail.packDate || '—' }}</span>
           </div>
           <div v-if="detail.serviceManager" class="doc-meta-item">
-            <span class="doc-meta-label">Sales</span>
+            <span class="doc-meta-label">Service Manager</span>
             <span class="doc-meta-value">{{ detail.serviceManager }}</span>
           </div>
           <div class="doc-meta-item">
