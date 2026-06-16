@@ -311,6 +311,12 @@ onActivated(() => {
   min-height: 0;
 }
 
+/* 本表无图片列，单元格会塌得很矮；按紧凑表设计行高 52px 托底（compactRowStyle 的 minHeight 作用在 tr 上不生效），
+   与有图的库存表（约 51px）观感统一 */
+.inventory-packing-page .packing-table :deep(.el-table__body .el-table__cell) {
+  height: 52px;
+}
+
 .xiaoman-cell-link {
   color: var(--color-primary);
   text-decoration: none;
