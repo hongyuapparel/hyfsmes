@@ -99,6 +99,8 @@ export interface OrderListQuery {
   customerDueEnd?: string
   factory?: string
   status?: string
+  /** 仅看待报价：样品单 + 已完成 + 未确认报价 */
+  unquoted?: boolean
   page?: number
   pageSize?: number
 }

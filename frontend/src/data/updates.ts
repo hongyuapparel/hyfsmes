@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-06-16-orders-unquoted-todo',
+    date: '2026-06-16',
+    module: '订单',
+    title: '新增待报价款式提醒',
+    description: '样品单做完后，如果跟单忘了报价，系统现在会自动识别。首页待办新增"待报价"卡片，列出所有已进入"订单完成"、但成本页还没点过"确认报价"的样品款式；点"查看全部"直接进过滤好的订单列表。也可在订单列表通过该入口查看，右上角会显示"仅看待报价"标签，点叉即可退出。',
+    link: '/orders/list?unquoted=1',
+  },
+  {
     id: '2026-06-04-dedupe-supplier-processing-options',
     date: '2026-06-04',
     module: '供应商',

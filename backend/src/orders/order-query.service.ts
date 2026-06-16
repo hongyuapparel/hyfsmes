@@ -97,6 +97,31 @@ export class OrderQueryService {
     return Array.from(result);
   }
 
+  /**
+   * 解析"样品单"对应的订单类型 ID 集合：取顶级类目「样品」及其全部子孙节点。
+   * 不按子项名称匹配，样品下子项（头版/修改版/产前版/拍照版/销售版等）增减改名均自动覆盖。
+   */
+  private async resolveSampleOrderTypeIds(): Promise<number[]> {
+    const all = await this.systemOptionsService.findAllByType('order_types');
+    if (!all.length) return [];
+    const byParent = new Map<number, number[]>();
+    for (const item of all) {
+      if (item.parentId == null) continue;
+      const list = byParent.get(item.parentId) ?? [];
+      list.push(item.id);
+      byParent.set(item.parentId, list);
+    }
+    const result = new Set<number>();
+    const queue: number[] = all.filter((o) => o.parentId == null && (o.value ?? '').includes('样品')).map((o) => o.id);
+    while (queue.length) {
+      const cur = queue.shift() as number;
+      if (result.has(cur)) continue;
+      result.add(cur);
+      for (const childId of byParent.get(cur) ?? []) queue.push(childId);
+    }
+    return Array.from(result);
+  }
+
   private async applyListFilters(
     qb: SelectQueryBuilder<Order>,
     query: OrderListQuery,
@@ -151,6 +176,18 @@ export class OrderQueryService {
     }
     if (customerDueEnd) {
       qb.andWhere('o.customer_due_date <= :customerDueEnd', { customerDueEnd: `${customerDueEnd} 23:59:59` });
+    }
+    if (query.unquoted) {
+      qb.andWhere('o.status = :unquotedCompleted', { unquotedCompleted: 'completed' });
+      const sampleOrderTypeIds = await this.resolveSampleOrderTypeIds();
+      if (sampleOrderTypeIds.length) {
+        qb.andWhere('o.order_type_id IN (:...sampleOrderTypeIds)', { sampleOrderTypeIds });
+      } else {
+        qb.andWhere('1 = 0');
+      }
+      qb.andWhere(
+        "NOT EXISTS (SELECT 1 FROM order_cost_snapshots ocs WHERE ocs.order_id = o.id AND JSON_EXTRACT(ocs.snapshot, '$.quoteConfirmedAt') IS NOT NULL)",
+      );
     }
   }
 

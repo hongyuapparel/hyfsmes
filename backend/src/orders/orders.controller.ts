@@ -43,6 +43,7 @@ export class OrdersController {
     @Query('factory') factory?: string,
     @Query('status') status?: string,
     @Query('deletedOnly') deletedOnly?: string,
+    @Query('unquoted') unquoted?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
     @CurrentUser() user?: { userId: number; username: string },
@@ -69,6 +70,7 @@ export class OrdersController {
       factory,
       status,
       deletedOnly: deletedOnly === '1' || deletedOnly === 'true',
+      unquoted: unquoted === '1' || unquoted === 'true',
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     };
@@ -101,6 +103,7 @@ export class OrdersController {
     @Query('customerDueEnd') customerDueEnd?: string,
     @Query('factory') factory?: string,
     @Query('deletedOnly') deletedOnly?: string,
+    @Query('unquoted') unquoted?: string,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
@@ -124,6 +127,7 @@ export class OrdersController {
       customerDueEnd,
       factory,
       deletedOnly: deletedOnly === '1' || deletedOnly === 'true',
+      unquoted: unquoted === '1' || unquoted === 'true',
     };
     return this.orderQueryService.countByStatus(query, user?.userId);
   }

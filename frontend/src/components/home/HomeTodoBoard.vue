@@ -10,6 +10,7 @@
           <p><strong>待审核：</strong>订单状态为「待审单」(pending_review)，即已提交未审核的订单。</p>
           <p><strong>待我跟单：</strong>订单的跟单员等于当前登录用户的显示名（完全一致），仅非管理员显示。</p>
           <p><strong>即将到期：</strong>客户交期在今日起 7 天内（含今天）。</p>
+          <p><strong>待报价：</strong>样品单（订单类型属样品系列）已进入「订单完成」状态，但成本页从未点过「确认报价」。</p>
           <p><strong>待仓处理：</strong>待仓处理表中状态为「待处理」的记录（尾部交接后、仓管未完成入库或直接发货）。</p>
           <p class="todo-rules-hint">全部为 0 时请检查：是否有待审单、交期是否在 7 天内、跟单员是否与当前用户显示名一致、是否有待仓处理记录。</p>
         </div>
@@ -158,6 +159,56 @@
       </section>
 
       <section
+        v-if="canAccessOrders"
+        class="todo-section"
+        :class="{
+          'todo-section--warning': todoCounts.unquoted > 0,
+          'todo-section--default': todoCounts.unquoted <= 0,
+          'todo-section-loading': todoLoading,
+        }"
+      >
+        <div class="todo-section-head">
+          <el-icon v-if="todoCounts.unquoted > 0" class="todo-section-icon"><WarningFilled /></el-icon>
+          <span class="todo-section-title">待报价</span>
+          <span class="todo-section-count">{{ todoCounts.unquoted }}</span>
+          <el-link
+            v-if="todoCounts.unquoted > 0"
+            type="warning"
+            class="todo-section-link"
+            :href="unquotedLink"
+            @click.prevent="emit('orders-list', unquotedLink)"
+          >
+            查看全部
+          </el-link>
+        </div>
+        <div v-if="todoLists.unquoted.length > 0" class="todo-table-wrap">
+          <table class="todo-table">
+            <thead>
+              <tr>
+                <th>订单号</th>
+                <th>SKU</th>
+                <th>客户</th>
+                <th>完成时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="item in todoLists.unquoted"
+                :key="item.id"
+                class="todo-row"
+                @click="emit('order-detail', item.id)"
+              >
+                <td class="ellipsis" :title="item.orderNo">{{ item.orderNo }}</td>
+                <td class="ellipsis" :title="item.skuCode">{{ item.skuCode }}</td>
+                <td class="ellipsis" :title="item.customerName || '-'">{{ item.customerName || '-' }}</td>
+                <td>{{ formatDate(item.statusTime) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section
         v-if="canAccessPendingInbound"
         class="todo-section todo-section--default"
         :class="{ 'todo-section-loading': todoLoading }"
@@ -223,6 +274,7 @@ defineProps<{
   canAccessPendingInbound: boolean
   hasAnyTodoCard: boolean
   pendingReviewLink: string
+  unquotedLink: string
   myMerchandiserLink: string
   dueSoonLink: string
 }>()
