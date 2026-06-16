@@ -197,8 +197,9 @@ async function onXiaomanSearch(keyword: string) {
 function onXiaomanChange(val: string) {
   const picked = xiaomanOptions.value.find((o) => o.value === val)
   edit.form.xiaomanOrderId = picked?.orderId ?? ''
-  // 选中小满订单时自动带出客户名（手填的号无客户信息则不动）；走既有换客户逻辑匹配档案/业务员
-  if (picked?.companyName && picked.companyName !== edit.form.customerName) {
+  // 仅当客户还没填时才用小满订单客户名自动带出（走既有换客户逻辑匹配档案/业务员）。
+  // 客户已填（尤其已选货）则不覆盖、不触发清空来源行——避免小满与本地客户名细微差异误删已选的待仓/成品货。
+  if (picked?.companyName && !edit.form.customerName.trim()) {
     edit.form.customerName = picked.companyName
     edit.onCustomerChange()
   }
