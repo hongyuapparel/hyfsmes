@@ -11,6 +11,8 @@ export interface PackingListQuery {
   customerName?: string;
   /** 按明细款号/SKU 模糊匹配（命中任一明细即返回该单） */
   keyword?: string;
+  /** 按小满单号模糊匹配 */
+  xiaomanOrderNo?: string;
   dateFrom?: string;
   dateTo?: string;
   page: number;
@@ -108,6 +110,9 @@ export class PackingListsService {
         'EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.style_no LIKE :keyword)',
         { keyword: `%${query.keyword.trim()}%` },
       );
+    }
+    if (query.xiaomanOrderNo?.trim()) {
+      qb.andWhere('pl.xiaoman_order_no LIKE :xom', { xom: `%${query.xiaomanOrderNo.trim()}%` });
     }
     if (query.dateFrom?.trim()) qb.andWhere('pl.pack_date >= :dateFrom', { dateFrom: query.dateFrom.trim() });
     if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });

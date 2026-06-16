@@ -29,6 +29,20 @@
           <span v-if="filter.keyword" :style="{ color: ACTIVE_FILTER_COLOR }">SKU编号：</span>
         </template>
       </el-input>
+      <el-input
+        v-model="filter.xiaomanOrderNo"
+        placeholder="小满单号"
+        clearable
+        class="filter-bar-item"
+        :style="getTextFilterStyle('小满单号：', filter.xiaomanOrderNo, true)"
+        :input-style="getFilterInputStyle(filter.xiaomanOrderNo)"
+        @input="debouncedSearch"
+        @keyup.enter="onSearch(true)"
+      >
+        <template #prefix>
+          <span v-if="filter.xiaomanOrderNo" :style="{ color: ACTIVE_FILTER_COLOR }">小满单号：</span>
+        </template>
+      </el-input>
       <el-select
         v-model="filter.status"
         placeholder="状态"
@@ -163,7 +177,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
 
-const filter = reactive<{ customerName: string; status: string; keyword: string }>({ customerName: '', status: '', keyword: '' })
+const filter = reactive<{ customerName: string; status: string; keyword: string; xiaomanOrderNo: string }>({ customerName: '', status: '', keyword: '', xiaomanOrderNo: '' })
 const dateRange = ref<[string, string] | null>(null)
 const customerLabelVisible = ref(true)
 const list = ref<PackingListRow[]>([])
@@ -191,6 +205,7 @@ async function load() {
       customerName: filter.customerName || undefined,
       status: filter.status || undefined,
       keyword: filter.keyword || undefined,
+      xiaomanOrderNo: filter.xiaomanOrderNo || undefined,
       dateFrom: dateRange.value?.[0] || undefined,
       dateTo: dateRange.value?.[1] || undefined,
       page: pagination.page,
@@ -219,6 +234,7 @@ function onReset() {
   filter.customerName = ''
   filter.status = ''
   filter.keyword = ''
+  filter.xiaomanOrderNo = ''
   dateRange.value = null
   onSearch(true)
 }
