@@ -55,7 +55,7 @@
           <el-input v-model="row.remark" placeholder="说明 / 备注" size="small" />
         </template>
       </el-table-column>
-      <el-table-column label="单价(元)" width="90" align="right" class-name="col-num-right" label-class-name="col-num-right">
+      <el-table-column label="单价(元)" width="90" align="right">
         <template #default="{ row }">
           <el-input-number
             v-model="row.unitPrice"
@@ -67,7 +67,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="数量" width="80" align="right" class-name="col-num-right" label-class-name="col-num-right">
+      <el-table-column label="数量" width="80" align="right">
         <template #default="{ row }">
           <el-input-number
             v-model="row.quantity"
@@ -77,7 +77,7 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="金额(元)" width="90" align="right" class-name="col-num-right" label-class-name="col-num-right">
+      <el-table-column label="金额(元)" width="90" align="right">
         <template #default="{ row }">
           {{ formatMoney(processItemAmount(row)) }}
         </template>
