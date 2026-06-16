@@ -192,9 +192,9 @@ const printAreaRef = ref<HTMLElement | null>(null)
 let printRoot: HTMLElement | null = null
 let pageStyle: HTMLStyleElement | null = null
 
-// A4 横版去掉左右 14mm 页边后的可放内容宽；一页可放内容高目标 180mm
-//（= .packing-label 的 min-height，已被实际打印验证可单页容纳，留约 10mm 余量给页眉页脚/打印机硬边距）
-const PRINT_CONTENT_WIDTH = '269mm'
+// @page margin:0（去浏览器页眉页脚），边距改由 .packing-label 自身 padding(10mm 14mm) 补回。
+// 所以打印根用整页宽 297mm，扣掉左右 padding 后内容宽仍是 269mm；内容高目标 180mm 不变。
+const PRINT_CONTENT_WIDTH = '297mm'
 const PAGE_FIT_PX = (180 * 96) / 25.4
 
 // 保证「一箱 = 一页」：克隆已是打印尺寸，量出每箱实际内容高，超过一页就按比例 zoom 整体缩小塞进一页。
@@ -216,7 +216,7 @@ function onBeforePrint() {
   printRoot.appendChild(printAreaRef.value.cloneNode(true))
   document.body.appendChild(printRoot)
   pageStyle = document.createElement('style')
-  pageStyle.textContent = '@page { size: A4 landscape; margin: 10mm 14mm; }'
+  pageStyle.textContent = '@page { size: A4 landscape; margin: 0; }'
   document.head.appendChild(pageStyle)
   document.body.classList.add('printing-packing-label')
   fitLabelsToPage(printRoot)

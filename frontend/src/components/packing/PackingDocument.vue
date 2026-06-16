@@ -16,7 +16,7 @@
       <div class="packing-doc a4-sheet">
         <header class="doc-head">
           <div v-if="detail.showCompany" class="doc-brand">
-            <span class="doc-brand-en">HONGYU APPAREL</span>
+            <span class="doc-brand-en">HONGYU APPAREL CO., LTD.</span>
           </div>
           <div class="doc-title">
             <span class="doc-title-en">PACKING LIST</span>
@@ -198,7 +198,8 @@ function onBeforePrint() {
   printRoot.appendChild(printAreaRef.value.cloneNode(true))
   document.body.appendChild(printRoot)
   pageStyle = document.createElement('style')
-  pageStyle.textContent = '@page { size: A4 landscape; margin: 10mm 12mm; }'
+  // margin:0 让浏览器没有页边可画"页眉页脚"(日期/网址/页码)，留白改由 .packing-doc 自身 padding 补回
+  pageStyle.textContent = '@page { size: A4 landscape; margin: 0; }'
   document.head.appendChild(pageStyle)
   document.body.classList.add('printing-packing-doc')
 }
