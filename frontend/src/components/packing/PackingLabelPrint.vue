@@ -53,7 +53,7 @@
               <td :colspan="totalCols(box) - 2" class="lt-customer-val" contenteditable="true">{{ detail.poNo || detail.customerName }}</td>
             </tr>
             <tr v-if="detail.serviceManager" class="lt-info">
-              <td class="lt-label" colspan="2">SHIP MARK</td>
+              <td class="lt-label" colspan="2">SERVICE MANAGER</td>
               <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.serviceManager }}</td>
             </tr>
 
