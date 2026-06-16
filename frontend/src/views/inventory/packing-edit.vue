@@ -54,7 +54,28 @@
           <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
         </el-form-item>
         <el-form-item label="小满单号">
-          <el-input v-model="edit.form.xiaomanOrderNo" placeholder="选填，仅供财务审核，不打印" />
+          <div class="xiaoman-field">
+            <el-select
+              v-model="edit.form.xiaomanOrderNo"
+              filterable
+              remote
+              allow-create
+              default-first-option
+              clearable
+              :remote-method="onXiaomanSearch"
+              :loading="xiaomanLoading"
+              placeholder="搜小满订单号/客户，或手填"
+              class="xiaoman-select"
+              @change="onXiaomanChange"
+            >
+              <el-option v-for="o in xiaomanOptions" :key="o.value" :label="o.label" :value="o.value" />
+            </el-select>
+            <el-tooltip v-if="xiaomanOrderUrl" content="在小满打开该订单" placement="top">
+              <a :href="xiaomanOrderUrl" target="_blank" rel="noopener" class="xiaoman-link">
+                <el-icon><Link /></el-icon>
+              </a>
+            </el-tooltip>
+          </div>
         </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
@@ -116,12 +137,12 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { ArrowLeft } from '@element-plus/icons-vue'
+import { ArrowLeft, Link } from '@element-plus/icons-vue'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { shipPackingList, type PickableLine } from '@/api/packing-lists'
+import { searchXiaomanOrders, shipPackingList, type PickableLine } from '@/api/packing-lists'
 import { usePackingGridRows } from '@/composables/usePackingGridRows'
 import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
@@ -139,6 +160,38 @@ const packingGridRef = ref<InstanceType<typeof PackingGrid> | null>(null)
 const shipping = ref(false)
 const labelsVisible = ref(false)
 const docVisible = ref(false)
+
+// 小满订单：远程搜索下拉（小满列表接口无关键词，后端拉取后本地过滤）+ 选中存订单ID用于跳转
+const xiaomanOptions = ref<{ value: string; label: string; orderId: string }[]>([])
+const xiaomanLoading = ref(false)
+const xiaomanOrderUrl = computed(() =>
+  edit.form.xiaomanOrderId ? `https://crm.xiaoman.cn/order/detail/${edit.form.xiaomanOrderId}` : '',
+)
+
+async function onXiaomanSearch(keyword: string) {
+  const kw = keyword.trim()
+  if (!kw) {
+    xiaomanOptions.value = []
+    return
+  }
+  xiaomanLoading.value = true
+  try {
+    const res = await searchXiaomanOrders(kw)
+    xiaomanOptions.value = res.data.list.map((o) => {
+      const value = o.order_no || o.name || String(o.order_id)
+      return { value, label: o.company_name ? `${value} · ${o.company_name}` : value, orderId: String(o.order_id) }
+    })
+  } catch (e) {
+    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '小满订单获取失败（确认已开通订单接口权限）'))
+    xiaomanOptions.value = []
+  } finally {
+    xiaomanLoading.value = false
+  }
+}
+
+function onXiaomanChange(val: string) {
+  edit.form.xiaomanOrderId = xiaomanOptions.value.find((o) => o.value === val)?.orderId ?? ''
+}
 
 function openLabels() {
   if (!edit.detail.value) return
@@ -306,5 +359,23 @@ onActivated(() => {
 
 .head-form-remark {
   grid-column: span 2;
+}
+
+.xiaoman-field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  width: 100%;
+}
+
+.xiaoman-select {
+  flex: 1;
+  min-width: 0;
+}
+
+.xiaoman-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
 }
 </style>

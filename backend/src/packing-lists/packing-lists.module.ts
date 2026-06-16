@@ -16,6 +16,7 @@ import { RolePermission } from '../entities/role-permission.entity';
 import { AuthModule } from '../auth/auth.module';
 import { InventoryPendingModule } from '../inventory-pending/inventory-pending.module';
 import { FinishedGoodsStockModule } from '../finished-goods-stock/finished-goods-stock.module';
+import { XiaomanModule } from '../xiaoman/xiaoman.module';
 import { PackingListsController } from './packing-lists.controller';
 import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
@@ -41,6 +42,7 @@ import { PackingListsShipService } from './packing-lists-ship.service';
     AuthModule,
     InventoryPendingModule,
     FinishedGoodsStockModule,
+    XiaomanModule,
   ],
   controllers: [PackingListsController],
   providers: [PackingListsService, PackingListsPickableService, PackingListsShipService],

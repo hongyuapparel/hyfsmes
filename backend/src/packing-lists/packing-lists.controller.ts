@@ -6,6 +6,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
 import { PackingListsShipService } from './packing-lists-ship.service';
+import { XiaomanService } from '../xiaoman/xiaoman.service';
 import { SavePackingListDto } from './dto';
 
 @Controller('packing-lists')
@@ -16,7 +17,17 @@ export class PackingListsController {
     private readonly service: PackingListsService,
     private readonly pickableService: PackingListsPickableService,
     private readonly shipService: PackingListsShipService,
+    private readonly xiaomanService: XiaomanService,
   ) {}
+
+  @Get('xiaoman/orders')
+  searchXiaomanOrders(
+    @Query('keyword') keyword?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.xiaomanService.getOrderList(page ? parseInt(page, 10) : 1, pageSize ? parseInt(pageSize, 10) : 20, keyword);
+  }
 
   @Post(':id/ship')
   ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
