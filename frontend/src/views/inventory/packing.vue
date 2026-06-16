@@ -129,7 +129,7 @@
             <el-tag :type="row.status === 'shipped' ? 'success' : 'info'" size="small">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="packDate" label="装箱日期" width="110" align="center" header-align="center">
+        <el-table-column prop="packDate" label="装箱日期" width="116" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
         <el-table-column label="操作" width="248" align="center" header-align="center" fixed="right">
