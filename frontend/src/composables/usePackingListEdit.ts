@@ -9,8 +9,7 @@ import {
   type PackingListDetail,
   type PickableLine,
 } from '@/api/packing-lists'
-import { getAllCustomerCompanyOptions, type CustomerItem } from '@/api/customers'
-import { getUsers, type UserItem } from '@/api/users'
+import { getAllCustomerCompanyOptions, getSalespeople, type CustomerItem } from '@/api/customers'
 import {
   allocationKey,
   createEmptyPackingItem,
@@ -37,7 +36,8 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
   const loading = ref(false)
   const saving = ref(false)
   const customerOptions = ref<CustomerItem[]>([])
-  const userOptions = ref<UserItem[]>([])
+  /** 仅业务员角色名单（与全站其它业务员下拉同源 /customers/options/salespeople） */
+  const salespersonOptions = ref<string[]>([])
   /** 本次会话选过的货（用于剩余可发与前端超发校验；按 source+color 去重，后选覆盖先选） */
   const pickedLines = ref<PickableLine[]>([])
 
@@ -46,9 +46,9 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
 
   async function loadOptions() {
     try {
-      const [customers, users] = await Promise.all([getAllCustomerCompanyOptions(), getUsers()])
+      const [customers, salespeople] = await Promise.all([getAllCustomerCompanyOptions(), getSalespeople()])
       customerOptions.value = customers
-      userOptions.value = users.data
+      salespersonOptions.value = (salespeople.data ?? []).filter((s) => !!String(s ?? '').trim())
     } catch (e) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载选项失败'))
     }
@@ -214,7 +214,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     isShipped,
     code,
     customerOptions,
-    userOptions,
+    salespersonOptions,
     pickedLines,
     loadOptions,
     load,

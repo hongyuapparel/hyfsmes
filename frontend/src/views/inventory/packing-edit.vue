@@ -47,7 +47,7 @@
             clearable
             placeholder="选择或输入业务员"
           >
-            <el-option v-for="u in edit.userOptions.value" :key="u.id" :label="u.displayName || u.username" :value="u.displayName || u.username" />
+            <el-option v-for="s in edit.salespersonOptions.value" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
         <el-form-item label="PO#">
