@@ -343,6 +343,7 @@ const {
   nameLabelVisible,
   list,
   loading,
+  stockTotalQuantity: stockGrandTotalQuantity,
   pagination,
   selectedRows,
   customerOptions,
@@ -400,7 +401,12 @@ const {
   submitOutbound,
 } = outbound
 
-const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+const stockTotalQuantity = computed(() => {
+  if (selectedRows.value.length > 0) {
+    return selectedRows.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0)
+  }
+  return stockGrandTotalQuantity.value
+})
 const selectedInventoryTypeLabel = computed(() => {
   const id = filter.inventoryTypeId
   if (id == null) return ''

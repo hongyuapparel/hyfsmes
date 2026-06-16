@@ -230,6 +230,8 @@ const filter = reactive({ name: '', category: '', customerName: '', salesperson:
 const inboundDateRange = ref<[string, string] | null>(null)
 const nameLabelVisible = ref(false)
 const list = ref<AccessoryItem[]>([])
+/** 当前筛选下全量匹配的总数量（接口返回，跨分页） */
+const stockGrandTotalQuantity = ref(0)
 const accessoriesStockTableRef = ref()
 const accessoriesStockShellRef = ref<HTMLElement | null>(null)
 const loading = ref(false)
@@ -251,7 +253,12 @@ const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, 
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
 
-const stockTotalQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+const stockTotalQuantity = computed(() => {
+  if (selectedRows.value.length > 0) {
+    return selectedRows.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0)
+  }
+  return stockGrandTotalQuantity.value
+})
 
 function stockSizeDetail(row: AccessoryItem): { headers: string[]; quantities: number[] } | null {
   if (row.isSized && Array.isArray(row.sizeHeaders) && row.sizeHeaders.length) {
@@ -279,6 +286,7 @@ async function load() {
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
+      stockGrandTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       restoreAccessoriesStockColumnWidths(accessoriesStockTableRef.value)
     }
   } catch (e: unknown) {

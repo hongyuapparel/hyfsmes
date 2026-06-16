@@ -40,7 +40,7 @@ export function getAccessoriesList(params?: {
   page?: number
   pageSize?: number
 }, config?: AxiosRequestConfig) {
-  return request.get<{ list: AccessoryItem[]; total: number; page: number; pageSize: number }>(
+  return request.get<{ list: AccessoryItem[]; total: number; totalQuantity: number; page: number; pageSize: number }>(
     '/inventory/accessories/items',
     { params, ...(config ?? {}) }
   )
