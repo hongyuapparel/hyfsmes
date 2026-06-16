@@ -29,6 +29,7 @@ export interface PackingListQuery {
   status?: string
   customerName?: string
   keyword?: string
+  xiaomanOrderNo?: string
   dateFrom?: string
   dateTo?: string
   page?: number
