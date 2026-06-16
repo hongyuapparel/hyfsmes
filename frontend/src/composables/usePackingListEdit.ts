@@ -125,10 +125,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
    * navigate=false 时新建后不做路由替换（路由替换会触发 keep-alive 重挂载、换新组件实例，
    * 发货流程需在当前实例上继续，由调用方在流程结束后自行导航）。返回是否成功 */
   async function save(silent = false, navigate = true): Promise<boolean> {
-    if (!form.customerName.trim()) {
-      ElMessage.warning('请先填写客户')
-      return false
-    }
+    // 客户非必填：仓管可先存装箱信息，业务员后续填小满单号自动带客户。客户在发货时才强制校验。
     saving.value = true
     try {
       if (listId.value) {
