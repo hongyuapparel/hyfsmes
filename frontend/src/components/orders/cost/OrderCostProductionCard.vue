@@ -105,14 +105,14 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="工种价格(元)" width="100" align="center" header-align="center">
+      <el-table-column label="工种价格(元)" width="100" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ $index }">
-          {{ formatMoney(getJobTypeAmountByIndex($index)) }}
+          {{ formatMoneyAligned(getJobTypeAmountByIndex($index)) }}
         </template>
       </el-table-column>
-      <el-table-column label="小计(元)" width="90" align="center" header-align="center">
+      <el-table-column label="小计(元)" width="90" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ $index }">
-          {{ formatMoney(getDepartmentAmountByIndex($index)) }}
+          {{ formatMoneyAligned(getDepartmentAmountByIndex($index)) }}
         </template>
       </el-table-column>
       <el-table-column label="备注" min-width="120" align="center" header-align="center">
@@ -296,7 +296,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Delete } from '@element-plus/icons-vue'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { getJobTypeLabel, type ProductionRow } from '@/utils/order-cost'
 import type { OrderListItem } from '@/api/orders'
 import type { ProductionProcessItem } from '@/api/production-processes'

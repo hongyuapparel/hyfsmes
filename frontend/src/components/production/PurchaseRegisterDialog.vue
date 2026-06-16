@@ -68,8 +68,8 @@
             <el-input v-model="row.otherCost" clearable placeholder="0" :input-style="{ textAlign: 'center' }" />
           </template>
         </el-table-column>
-        <el-table-column label="金额" width="100" align="center">
-          <template #default="{ row }">{{ calcPurchaseRegisterRowAmount(row) }}</template>
+        <el-table-column label="金额" width="100" class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(calcPurchaseRegisterRowAmount(row)) }}</template>
         </el-table-column>
         <el-table-column label="采购凭证" width="110" align="center">
           <template #default="{ row }">
@@ -99,6 +99,7 @@
 import { computed, toRef } from 'vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import { formatMaterialQuantity } from '@/utils/material-quantity-unit'
+import { formatMoneyAligned } from '@/utils/display-number'
 import {
   calcPurchaseRegisterRowAmount,
   type PurchaseRegisterDraftRow,

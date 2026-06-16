@@ -16,8 +16,8 @@
       <el-table-column label="工序" min-width="120" align="center">
         <template #default="{ row }"><template v-if="row.rowType === 'process'">{{ row.processName || '-' }}</template></template>
       </el-table-column>
-      <el-table-column label="价格(元)" width="100" align="center">
-        <template #default="{ row }"><template v-if="row.rowType === 'process'">{{ formatDisplayNumber(row.price) }}</template><template v-else>-</template></template>
+      <el-table-column label="价格(元)" width="100" class-name="col-num-right" label-class-name="col-num-right">
+        <template #default="{ row }"><template v-if="row.rowType === 'process'">{{ formatMoneyAligned(row.price) }}</template><template v-else>-</template></template>
       </el-table-column>
       <el-table-column label="操作" min-width="180">
         <template #default="{ row }">
@@ -84,7 +84,7 @@
             <el-table-column prop="department" label="部门" min-width="100" align="center" />
             <el-table-column prop="jobType" label="工种" min-width="120" align="center" />
             <el-table-column prop="processName" label="工序" min-width="120" align="center" />
-            <el-table-column label="价格(元)" width="100" align="center"><template #default="{ row: item }">{{ formatDisplayNumber(item.unitPrice) }}</template></el-table-column>
+            <el-table-column label="价格(元)" width="100" class-name="col-num-right" label-class-name="col-num-right"><template #default="{ row: item }">{{ formatMoneyAligned(item.unitPrice) }}</template></el-table-column>
           </el-table>
           <p v-if="!quoteTemplateItemsLoadingMap[row.id] && !(quoteTemplateItemsMap[row.id]?.length)" class="empty-hint">该模板暂无工序，可点击右上“编辑工序”维护。</p>
         </div>
@@ -121,7 +121,7 @@
         <el-table-column prop="department" label="部门" width="90" />
         <el-table-column prop="jobType" label="工种" min-width="100" />
         <el-table-column prop="processName" label="工序" min-width="100" />
-        <el-table-column label="单价(元)" width="90" align="right"><template #default="{ row: item }">{{ formatDisplayNumber(item.unitPrice) }}</template></el-table-column>
+        <el-table-column label="单价(元)" width="90" class-name="col-num-right" label-class-name="col-num-right"><template #default="{ row: item }">{{ formatMoneyAligned(item.unitPrice) }}</template></el-table-column>
         <el-table-column label="操作" width="70" align="center"><template #default="{ row: item }"><el-button link type="danger" size="small" @click="removeQuoteTemplateItem(item)">删除</el-button></template></el-table-column>
       </el-table>
       </div>
@@ -133,7 +133,7 @@
 <script setup lang="ts">
 import { watch } from 'vue'
 import { ArrowRight } from '@element-plus/icons-vue'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { useOrderSettingsProductionProcesses } from '@/composables/useOrderSettingsProductionProcesses'
 import { useOrderSettingsQuoteTemplates } from '@/composables/useOrderSettingsQuoteTemplates'
 

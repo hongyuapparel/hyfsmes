@@ -142,19 +142,19 @@
           <el-table-column label="部门" min-width="120" show-overflow-tooltip>
             <template #default="{ row }">{{ row?.departmentName || '—' }}</template>
           </el-table-column>
-          <el-table-column label="收入" min-width="120" align="right">
+          <el-table-column label="收入" min-width="120" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
-              <span class="income-color">￥{{ fmtAmt(row?.totalIncome ?? 0) }}</span>
+              <span class="income-color">{{ formatMoneyAligned(row?.totalIncome ?? 0) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="支出" min-width="120" align="right">
+          <el-table-column label="支出" min-width="120" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
-              <span class="expense-color">￥{{ fmtAmt(row?.totalExpense ?? 0) }}</span>
+              <span class="expense-color">{{ formatMoneyAligned(row?.totalExpense ?? 0) }}</span>
             </template>
           </el-table-column>
-          <el-table-column label="利润" min-width="120" align="right">
+          <el-table-column label="利润" min-width="120" class-name="col-num-right" label-class-name="col-num-right">
             <template #default="{ row }">
-              <span :class="profitClass(row?.profit ?? 0)">￥{{ fmtAmt(row?.profit ?? 0) }}</span>
+              <span :class="profitClass(row?.profit ?? 0)">{{ formatMoneyAligned(row?.profit ?? 0) }}</span>
             </template>
           </el-table-column>
           <el-table-column label="利润率" min-width="110" align="right">

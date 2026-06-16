@@ -77,9 +77,9 @@
           />
         </template>
       </el-table-column>
-      <el-table-column label="金额(元)" width="90" align="right">
+      <el-table-column label="金额(元)" width="90" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
-          {{ formatMoney(processItemAmount(row)) }}
+          {{ formatMoneyAligned(processItemAmount(row)) }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="56" align="center">
@@ -96,6 +96,7 @@
 
 <script setup lang="ts">
 import { Delete } from '@element-plus/icons-vue'
+import { formatMoneyAligned } from '@/utils/display-number'
 import { processItemAmount, type ProcessItemRow } from '@/utils/order-cost'
 
 interface ProcessOptionNode {

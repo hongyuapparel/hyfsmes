@@ -296,26 +296,26 @@
         <el-table-column prop="merchandiser" label="跟单" min-width="90" show-overflow-tooltip />
         <el-table-column prop="salesperson" label="业务员" min-width="90" show-overflow-tooltip />
         <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
-        <el-table-column label="销售价" min-width="100" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(row.salePrice) }}</template>
+        <el-table-column label="销售价" min-width="100" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(row.salePrice) }}</template>
         </el-table-column>
-        <el-table-column label="出厂价" min-width="100" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(row.factoryPrice) }}</template>
+        <el-table-column label="出厂价" min-width="100" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(row.factoryPrice) }}</template>
         </el-table-column>
-        <el-table-column label="材料成本" min-width="120" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(row.materialCost) }}</template>
+        <el-table-column label="材料成本" min-width="120" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(row.materialCost) }}</template>
         </el-table-column>
-        <el-table-column label="工艺项目" min-width="120" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(row.processCost) }}</template>
+        <el-table-column label="工艺项目" min-width="120" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(row.processCost) }}</template>
         </el-table-column>
-        <el-table-column label="生产工序" min-width="120" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(row.productionCost) }}</template>
+        <el-table-column label="生产工序" min-width="120" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(row.productionCost) }}</template>
         </el-table-column>
-        <el-table-column label="单件利润" min-width="120" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(row.unitProfit) }}</template>
+        <el-table-column label="单件利润" min-width="120" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(row.unitProfit) }}</template>
         </el-table-column>
-        <el-table-column label="工厂总利润" min-width="130" show-overflow-tooltip>
-          <template #default="{ row }">{{ formatMoney(calcFactoryTotalProfit(row)) }}</template>
+        <el-table-column label="工厂总利润" min-width="130" show-overflow-tooltip class-name="col-num-right" label-class-name="col-num-right">
+          <template #default="{ row }">{{ formatMoneyAligned(calcFactoryTotalProfit(row)) }}</template>
         </el-table-column>
           </el-table>
         </div>
@@ -340,7 +340,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatCurrency } from '@/utils/display-number'
+import { formatCurrency, formatMoneyAligned } from '@/utils/display-number'
 import {
   ACTIVE_FILTER_COLOR,
   getAdaptiveSelectStyle,
