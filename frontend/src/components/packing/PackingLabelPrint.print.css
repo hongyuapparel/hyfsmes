@@ -12,9 +12,11 @@
    内容超高时由 onBeforePrint 给 .label-body 加 zoom 缩到一页内；盒高 ≤ 一页，break-inside:avoid 不被迫拆页。 */
 #packing-print-root .packing-label {
   width: 100%;
-  min-height: 180mm;
+  /* min-height 200mm = 内容区 180mm + 上下 padding 20mm；padding 替代 @page 边距留白 */
+  min-height: 200mm;
   margin: 0;
-  padding: 0;
+  padding: 10mm 14mm;
+  box-sizing: border-box;
   border: none;
   display: flex;
   flex-direction: column;

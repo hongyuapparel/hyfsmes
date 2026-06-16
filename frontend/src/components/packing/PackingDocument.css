@@ -170,7 +170,8 @@
   #packing-print-root .packing-doc {
     max-width: none;
     width: 100%;
-    padding: 0;
+    /* @page margin:0（去浏览器页眉页脚），改用 padding 留出安全边距 */
+    padding: 10mm 12mm;
   }
 
   /* 单据很长时跨多页：表头每页自动重复（thead 默认行为），数据行不被拦腰拆页 */
