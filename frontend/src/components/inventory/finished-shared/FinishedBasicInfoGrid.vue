@@ -6,9 +6,9 @@
         <slot name="actions" />
       </div>
     </div>
-    <div class="detail-basic-main">
+    <div class="detail-basic-main" :class="{ 'detail-basic-main--no-image': !$slots.image }">
       <div class="detail-basic-grid"><slot /></div>
-      <div class="detail-product-image-panel">
+      <div v-if="$slots.image" class="detail-product-image-panel">
         <div v-if="imageLabel" class="detail-image-label">{{ imageLabel }}</div>
         <slot name="image" />
       </div>
@@ -67,6 +67,9 @@ defineProps<{
   grid-template-columns: minmax(0, 1fr) 170px;
   gap: 12px;
   align-items: stretch;
+}
+.detail-basic-main--no-image {
+  grid-template-columns: minmax(0, 1fr);
 }
 .detail-basic-grid {
   display: grid;
