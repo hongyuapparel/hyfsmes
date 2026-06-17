@@ -13,6 +13,8 @@ export interface PackingListQuery {
   keyword?: string;
   /** 按小满单号模糊匹配 */
   xiaomanOrderNo?: string;
+  /** 按业务员精确匹配（下拉选名单） */
+  serviceManager?: string;
   dateFrom?: string;
   dateTo?: string;
   page: number;
@@ -113,6 +115,9 @@ export class PackingListsService {
     }
     if (query.xiaomanOrderNo?.trim()) {
       qb.andWhere('pl.xiaoman_order_no LIKE :xom', { xom: `%${query.xiaomanOrderNo.trim()}%` });
+    }
+    if (query.serviceManager?.trim()) {
+      qb.andWhere('pl.service_manager = :serviceManager', { serviceManager: query.serviceManager.trim() });
     }
     if (query.dateFrom?.trim()) qb.andWhere('pl.pack_date >= :dateFrom', { dateFrom: query.dateFrom.trim() });
     if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });
