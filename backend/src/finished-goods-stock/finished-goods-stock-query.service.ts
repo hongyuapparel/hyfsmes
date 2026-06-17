@@ -340,8 +340,9 @@ export class FinishedGoodsStockQueryService {
         return {
           id: row.id,
           operatorUsername: operatorDisplayNameMap.get(String(row.operatorUsername ?? '').trim()) ?? row.operatorUsername ?? '',
-          before: row.before ?? null,
-          after: row.after ?? null,
+          // before/after 仅用于服务端生成 summary，前端只用 summary 展示，不下发原始快照以减小响应体
+          before: null,
+          after: null,
           remark: row.remark ?? '',
           sourceOrderNo,
           summary,

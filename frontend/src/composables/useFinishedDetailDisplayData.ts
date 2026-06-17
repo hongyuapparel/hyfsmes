@@ -13,7 +13,7 @@ import {
 import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTableUtils'
 
 type DetailLike = {
-  stock?: { quantity?: number; unitPrice?: string | number | null }
+  stock?: { id?: number; quantity?: number; unitPrice?: string | number | null }
   colorSize?: {
     headers?: string[]
     rows?: Array<{ colorName?: string; imageUrl?: string; quantities?: number[] }>
@@ -23,6 +23,8 @@ type DetailLike = {
 type DisplayColorSizeRow = {
   colorName: string
   imageUrl?: string
+  stockId?: number
+  unitPrice?: string
   quantities: number[]
   department?: string
   inventoryTypeId?: number | null
@@ -58,6 +60,8 @@ export function useFinishedDetailDisplayData(params: {
         .map<DisplayColorSizeRow>((row) => ({
           colorName: row.colorName,
           imageUrl: row.imageUrl,
+          stockId: row.stockId,
+          unitPrice: row.unitPrice,
           quantities: remapValuesByHeaders(groupSnapshot.headers, row.values, displayHeaders),
           department: row.department,
           inventoryTypeId: row.inventoryTypeId,
@@ -81,6 +85,8 @@ export function useFinishedDetailDisplayData(params: {
       const displayRows = visibleRows
         .map<DisplayColorSizeRow>((row) => ({
           colorName: row.colorName,
+          stockId: detail?.stock?.id,
+          unitPrice: detail?.stock?.unitPrice != null ? String(detail.stock.unitPrice) : '',
           quantities: remapValuesByHeaders(normalizedSnapshot.headers, row.values, displayHeaders),
         }))
         .filter((row) => snapshotRowTotal(row.quantities) > 0)
@@ -98,6 +104,8 @@ export function useFinishedDetailDisplayData(params: {
           .map<DisplayColorSizeRow>((row) => ({
             colorName: String(row.colorName ?? ''),
             imageUrl: row.imageUrl,
+            stockId: detail?.stock?.id,
+          unitPrice: detail?.stock?.unitPrice != null ? String(detail.stock.unitPrice) : '',
             quantities: remapValuesByHeaders(headers, row.quantities ?? [], targetHeaders),
           }))
           .filter((row) => snapshotRowTotal(row.quantities) > 0),
@@ -118,6 +126,8 @@ export function useFinishedDetailDisplayData(params: {
         .map<DisplayColorSizeRow>((row) => ({
           colorName: row.colorName,
           imageUrl: row.imageUrl,
+          stockId: detail?.stock?.id,
+          unitPrice: detail?.stock?.unitPrice != null ? String(detail.stock.unitPrice) : '',
           quantities: remapValuesByHeaders(headers, row.quantities, targetHeaders),
         }))
         .filter((row) => snapshotRowTotal(row.quantities) > 0),

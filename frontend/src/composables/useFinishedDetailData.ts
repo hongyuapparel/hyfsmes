@@ -1,6 +1,7 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { type FinishedStockDetailRes, getFinishedStockDetail, updateFinishedStockMeta, upsertFinishedStockColorImage } from '@/api/inventory'
+import { type FinishedStockDetailRes, getFinishedStockDetail, repartitionFinishedStockDetail, upsertFinishedStockColorImage } from '@/api/inventory'
+import type { FinishedDetailColorMeta } from '@/composables/useFinishedDetailMatrixEdit'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { createAdjustLogSummaryBuilder, mergeSizeHeaders } from '@/composables/useFinishedDetailHelpers'
 import { useFinishedDetailDisplayData } from '@/composables/useFinishedDetailDisplayData'
@@ -20,11 +21,7 @@ export type FinishedDetailEditForm = {
 type UseFinishedDetailDataOptions = {
   inventoryTypeOptions: () => Array<{ id: number; label: string }>
   warehouseOptions: () => Array<{ id: number; label: string }>
-  buildEditColorSize?: () => {
-    headers: string[]
-    rows: Array<{ colorName: string; imageUrl?: string; quantities: number[] }>
-  } | null
-  buildEditColorImages?: () => Array<{ colorName: string; imageUrl: string }> | null
+  buildColorMeta?: () => FinishedDetailColorMeta[]
   onColorImagesSynced: (stockId: number, colorImages: unknown[]) => void
   onColorImageSaved: (payload: { stockId: number; colorName: string; imageUrl: string }) => void
   onMetaSaved: () => void
@@ -178,17 +175,11 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   async function saveMeta(stockId: number) {
     saving.value = true
     try {
-      await updateFinishedStockMeta(stockId, {
+      await repartitionFinishedStockDetail(stockId, {
         skuCode: editForm.skuCode?.trim() || '',
-        department: editForm.department,
-        inventoryTypeId: editForm.inventoryTypeId,
-        warehouseId: editForm.warehouseId,
-        location: editForm.location,
-        unitPrice: editForm.unitPrice?.trim() || '0',
         imageUrl: editForm.imageUrl?.trim() || '',
         remark: editForm.remark || undefined,
-        colorSize: options.buildEditColorSize?.() ?? undefined,
-        colorImages: options.buildEditColorImages?.() ?? undefined,
+        colorMeta: options.buildColorMeta?.() ?? [],
       })
       ElMessage.success('保存成功')
       await loadDetail(stockId)

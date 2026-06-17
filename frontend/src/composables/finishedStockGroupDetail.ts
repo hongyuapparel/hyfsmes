@@ -39,6 +39,8 @@ export function buildFinishedGroupColorSizeSnapshot(
         colorName,
         values,
         imageUrl: getLeafImageUrl(leaf, colorName),
+        stockId: leaf.id,
+        unitPrice: leaf.unitPrice != null ? String(leaf.unitPrice) : '',
         department: String(leaf.department ?? ''),
         inventoryTypeId: leaf.inventoryTypeId ?? null,
         warehouseId: leaf.warehouseId ?? null,
