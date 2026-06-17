@@ -326,6 +326,18 @@ async function ensurePackingListTables(dataSource: DataSource) {
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
 
+  await dataSource.query(`
+    CREATE TABLE IF NOT EXISTS packing_list_logs (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      packing_list_id INT NOT NULL,
+      operator_username VARCHAR(128) NOT NULL DEFAULT '',
+      action VARCHAR(32) NOT NULL DEFAULT '',
+      summary VARCHAR(1000) NOT NULL DEFAULT '',
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_pll_list (packing_list_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+
   // packing_lists.code 唯一索引（并发/异常下重复单号的最终防线）。幂等：已存在则跳过；
   // 若老表存在重复单号导致加索引失败，仅告警不中断启动（服务端已用 MAX+1 生成避免撞号）。
   const codeIndexRows: Array<{ cnt: number }> = await dataSource.query(`

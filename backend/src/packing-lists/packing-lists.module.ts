@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
+import { PackingListLog } from '../entities/packing-list-log.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
@@ -28,6 +29,7 @@ import { PackingListsShipService } from './packing-lists-ship.service';
       PackingList,
       PackingListBox,
       PackingListItem,
+      PackingListLog,
       InboundPending,
       FinishedGoodsStock,
       FinishedGoodsStockColorImage,

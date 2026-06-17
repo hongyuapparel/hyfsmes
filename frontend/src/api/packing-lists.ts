@@ -180,3 +180,16 @@ export function searchXiaomanOrders(keyword?: string, page = 1, pageSize = 20) {
     params: { keyword, page, pageSize },
   })
 }
+
+export interface PackingListLogItem {
+  id: number
+  packingListId: number
+  operatorUsername: string
+  action: string
+  summary: string
+  createdAt: string
+}
+
+export function getPackingListLogs(id: number) {
+  return request.get<PackingListLogItem[]>(`/packing-lists/${id}/logs`)
+}

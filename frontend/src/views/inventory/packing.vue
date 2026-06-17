@@ -100,8 +100,16 @@
       </div>
     </el-form>
 
+    <div v-if="selectedRows.length" class="packing-batch-bar">
+      <span class="packing-batch-info">已选 {{ selectedRows.length }} 项</span>
+      <el-button size="small" @click="batchExport">批量导出</el-button>
+      <el-button size="small" type="danger" @click="batchDelete">批量删除</el-button>
+      <el-button size="small" text @click="clearSelection">取消</el-button>
+    </div>
+
     <div ref="tableShellRef" class="list-page-table-shell">
       <el-table
+        ref="tableRef"
         v-loading="loading"
         :data="list"
         border
@@ -111,7 +119,9 @@
         :row-style="compactRowStyle"
         :cell-style="compactCellStyle"
         :header-cell-style="compactHeaderCellStyle"
+        @selection-change="onSelectionChange"
       >
+        <el-table-column type="selection" width="44" align="center" header-align="center" />
         <el-table-column prop="code" label="单号" min-width="140" show-overflow-tooltip align="center" header-align="center" />
         <el-table-column label="小满单号" min-width="120" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">
@@ -149,13 +159,12 @@
         <el-table-column prop="packDate" label="装箱日期" width="116" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="248" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" width="200" align="center" header-align="center" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="goEdit(row)">{{ row.status === 'draft' ? '编辑' : '查看' }}</el-button>
             <el-button link type="primary" size="small" @click="openDoc(row)">客户单</el-button>
             <el-button link type="info" size="small" @click="openLabels(row)">箱贴</el-button>
-            <el-button link type="info" size="small" @click="exportExcel(row)">导出</el-button>
-            <el-button v-if="row.status === 'draft'" link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+            <el-button link type="info" size="small" @click="openLog(row)">记录</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -168,13 +177,20 @@
       @current-change="load"
       @size-change="onPageSizeChange"
     />
+
+    <PackingListLogDrawer
+      v-model:visible="logDrawer.visible"
+      :title="logDrawer.title"
+      :loading="logDrawer.loading"
+      :logs="logDrawer.logs"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { onActivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
@@ -185,12 +201,13 @@ import {
   getFilterRangeStyle,
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
+import { usePackingListActions } from '@/composables/usePackingListActions'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSalespeople } from '@/api/customers'
-import { deletePackingList, getPackingListDetail, getPackingLists, type PackingListRow } from '@/api/packing-lists'
-import { exportPackingListExcel } from '@/utils/packing-export'
+import { getPackingLists, type PackingListRow } from '@/api/packing-lists'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import PackingListLogDrawer from '@/components/inventory/PackingListLogDrawer.vue'
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
@@ -204,6 +221,9 @@ const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const tableShellRef = ref<HTMLElement>()
 const tableHeight = ref<number | undefined>(undefined)
+
+const { tableRef, selectedRows, onSelectionChange, clearSelection, batchExport, batchDelete, logDrawer, openLog } =
+  usePackingListActions(load)
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -284,30 +304,6 @@ function openDoc(row: PackingListRow) {
   router.push(`/inventory/packing/edit/${row.id}?action=doc`)
 }
 
-async function exportExcel(row: PackingListRow) {
-  try {
-    const res = await getPackingListDetail(row.id)
-    exportPackingListExcel(res.data)
-  } catch (e) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '导出失败'))
-  }
-}
-
-async function onDelete(row: PackingListRow) {
-  try {
-    await ElMessageBox.confirm(`确定删除装箱单 ${row.code} 吗？`, '删除确认', { type: 'warning' })
-  } catch {
-    return
-  }
-  try {
-    await deletePackingList(row.id)
-    ElMessage.success('已删除')
-    load()
-  } catch (e) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '删除失败'))
-  }
-}
-
 async function loadSalespersonOptions() {
   try {
     const res = await getSalespeople()
@@ -348,6 +344,18 @@ onActivated(() => {
 .inventory-packing-page .packing-table {
   flex: 1;
   min-height: 0;
+}
+
+.packing-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: var(--space-sm);
+}
+
+.packing-batch-info {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
 }
 
 /* 本表无图片列，单元格会塌得很矮；按紧凑表设计行高 52px 托底（compactRowStyle 的 minHeight 作用在 tr 上不生效），
