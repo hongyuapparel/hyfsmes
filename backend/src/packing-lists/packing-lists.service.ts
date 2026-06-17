@@ -1,9 +1,10 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, In, Repository } from 'typeorm';
 import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
+import { PackingListLog } from '../entities/packing-list-log.entity';
 import { SavePackingListDto } from './dto';
 
 export interface PackingListQuery {
@@ -93,12 +94,25 @@ function sumSizeQuantities(sizeQuantities: Record<string, number>): number {
   return Object.values(sizeQuantities).reduce((acc, n) => acc + n, 0);
 }
 
+/** 操作记录条目（前端展示用） */
+export interface PackingListLogRow {
+  id: number;
+  packingListId: number;
+  operatorUsername: string;
+  action: string;
+  summary: string;
+  createdAt: Date;
+}
+
 @Injectable()
 export class PackingListsService {
+  private readonly logger = new Logger(PackingListsService.name);
+
   constructor(
     @InjectRepository(PackingList) private readonly listRepo: Repository<PackingList>,
     @InjectRepository(PackingListBox) private readonly boxRepo: Repository<PackingListBox>,
     @InjectRepository(PackingListItem) private readonly itemRepo: Repository<PackingListItem>,
+    @InjectRepository(PackingListLog) private readonly logRepo: Repository<PackingListLog>,
   ) {}
 
   async getList(query: PackingListQuery): Promise<{ list: PackingListRow[]; total: number }> {
@@ -257,7 +271,7 @@ export class PackingListsService {
     // 并发下两个请求可能算出同一序号；靠 uniq_packing_lists_code 唯一索引报重复，捕获后重算重试。
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        return await this.listRepo.manager.transaction(async (manager) => {
+        const result = await this.listRepo.manager.transaction(async (manager) => {
           const code = await this.nextCode(manager, ymd);
           const list = manager.getRepository(PackingList).create({
             code,
@@ -269,6 +283,10 @@ export class PackingListsService {
           await this.insertBoxesAndItems(manager.getRepository(PackingListBox), manager.getRepository(PackingListItem), saved.id, payload);
           return { id: saved.id, code };
         });
+        const counts = this.payloadCounts(payload);
+        const cols = this.buildListColumns(payload);
+        await this.recordLog(result.id, 'create', operatorUsername, `新建：客户 ${cols.customerName || '-'}，箱数 ${counts.boxCount}，件数 ${counts.totalQty}`);
+        return result;
       } catch (e) {
         if (this.isDuplicateCodeError(e) && attempt < 4) continue;
         throw e;
@@ -279,18 +297,20 @@ export class PackingListsService {
 
   // 已发货单也允许修改：发货后客户常要求改装箱方式（返箱/调箱/补录）。本方法只改单据本身
   // （表头 + 箱 + 明细），不触碰任何库存——库存只在 /ship 时扣减一次，已发货单的二次编辑不影响库存账。
-  async update(id: number, payload: SavePackingListDto): Promise<void> {
+  async update(id: number, payload: SavePackingListDto, operatorUsername = ''): Promise<void> {
     const list = await this.listRepo.findOne({ where: { id } });
     if (!list) throw new NotFoundException('装箱单不存在');
+    const oldCounts = await this.aggregateCounts(id);
     await this.listRepo.manager.transaction(async (manager) => {
       await manager.getRepository(PackingList).update({ id }, this.buildListColumns(payload));
       await manager.getRepository(PackingListItem).delete({ packingListId: id });
       await manager.getRepository(PackingListBox).delete({ packingListId: id });
       await this.insertBoxesAndItems(manager.getRepository(PackingListBox), manager.getRepository(PackingListItem), id, payload);
     });
+    await this.recordLog(id, 'update', operatorUsername, this.buildUpdateSummary(list, oldCounts, payload));
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, operatorUsername = ''): Promise<void> {
     const list = await this.listRepo.findOne({ where: { id } });
     if (!list) throw new NotFoundException('装箱单不存在');
     if (list.status !== 'draft') throw new BadRequestException('已发货的装箱单不可删除');
@@ -299,11 +319,100 @@ export class PackingListsService {
       await manager.getRepository(PackingListBox).delete({ packingListId: id });
       await manager.getRepository(PackingList).delete({ id });
     });
+    await this.recordLog(id, 'delete', operatorUsername, `删除装箱单 ${list.code}`);
   }
 
   async markShipped(ids: number[]): Promise<void> {
     if (!ids.length) return;
     await this.listRepo.update({ id: In(ids) }, { status: 'shipped', shippedAt: new Date() });
+  }
+
+  /** 写一条操作记录。在主事务提交后调用，任何写入失败都只告警、绝不冒泡，避免审计日志拖垮已成功的业务操作。 */
+  async recordLog(packingListId: number, action: string, operatorUsername: string, summary: string): Promise<void> {
+    try {
+      await this.logRepo.save(
+        this.logRepo.create({
+          packingListId,
+          action,
+          operatorUsername: (operatorUsername ?? '').trim(),
+          summary: (summary ?? '').slice(0, 1000),
+        }),
+      );
+    } catch (e) {
+      this.logger.warn(`写入装箱单操作记录失败（已忽略，不影响主操作）：${(e as Error)?.message ?? e}`);
+    }
+  }
+
+  async getLogs(packingListId: number): Promise<PackingListLogRow[]> {
+    try {
+      const rows = await this.logRepo.find({ where: { packingListId }, order: { createdAt: 'DESC', id: 'DESC' } });
+      return rows.map((r) => ({
+        id: r.id,
+        packingListId: r.packingListId,
+        operatorUsername: r.operatorUsername,
+        action: r.action,
+        summary: r.summary,
+        createdAt: r.createdAt,
+      }));
+    } catch (e) {
+      if (this.isMissingTableError(e)) {
+        this.logger.warn('packing_list_logs 表不存在，已返回空操作记录');
+        return [];
+      }
+      throw e;
+    }
+  }
+
+  private isMissingTableError(error: unknown): boolean {
+    const e = error as { code?: string; errno?: number; message?: string } | undefined;
+    const msg = String(e?.message ?? '').toLowerCase();
+    return e?.code === 'ER_NO_SUCH_TABLE' || e?.errno === 1146 || msg.includes("doesn't exist");
+  }
+
+  /** 现存单的箱数/件数聚合（修改前快照用） */
+  private async aggregateCounts(packingListId: number): Promise<{ boxCount: number; totalQty: number }> {
+    const boxCount = await this.boxRepo.count({ where: { packingListId } });
+    const qtyRow: { t: string | null } | undefined = await this.itemRepo
+      .createQueryBuilder('i')
+      .select('SUM(i.total_qty)', 't')
+      .where('i.packing_list_id = :id', { id: packingListId })
+      .getRawOne();
+    return { boxCount, totalQty: Number(qtyRow?.t) || 0 };
+  }
+
+  /** 提交载荷的箱数/件数（与 insertBoxesAndItems 同口径） */
+  private payloadCounts(payload: SavePackingListDto): { boxCount: number; totalQty: number } {
+    const boxes = Array.isArray(payload.boxes) ? payload.boxes : [];
+    let totalQty = 0;
+    for (const box of boxes) {
+      const items = Array.isArray(box.items) ? box.items : [];
+      for (const item of items) {
+        const sizeTotal = sumSizeQuantities(normalizeSizeQuantities(item.sizeQuantities));
+        totalQty += sizeTotal > 0 ? sizeTotal : Math.max(0, Number(item.totalQty) || 0);
+      }
+    }
+    return { boxCount: boxes.length, totalQty };
+  }
+
+  /** 关键字段 old→new 变更摘要 */
+  private buildUpdateSummary(
+    oldList: PackingList,
+    oldCounts: { boxCount: number; totalQty: number },
+    payload: SavePackingListDto,
+  ): string {
+    const cols = this.buildListColumns(payload);
+    const newCounts = this.payloadCounts(payload);
+    const parts: string[] = [];
+    const diff = (label: string, a: string, b: string) => {
+      if ((a || '') !== (b || '')) parts.push(`${label} ${a || '-'}→${b || '-'}`);
+    };
+    diff('客户', oldList.customerName, cols.customerName ?? '');
+    diff('业务员', oldList.serviceManager, cols.serviceManager ?? '');
+    diff('小满单号', oldList.xiaomanOrderNo, cols.xiaomanOrderNo ?? '');
+    diff('装箱日期', oldList.packDate ?? '', cols.packDate ?? '');
+    if (oldCounts.boxCount !== newCounts.boxCount) parts.push(`箱数 ${oldCounts.boxCount}→${newCounts.boxCount}`);
+    if (oldCounts.totalQty !== newCounts.totalQty) parts.push(`件数 ${oldCounts.totalQty}→${newCounts.totalQty}`);
+    return parts.length ? `修改：${parts.join('；')}` : '修改装箱信息（关键字段无变化）';
   }
 
   private buildListColumns(payload: SavePackingListDto): Partial<PackingList> {

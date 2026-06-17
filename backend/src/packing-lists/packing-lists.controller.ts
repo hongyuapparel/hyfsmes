@@ -89,6 +89,11 @@ export class PackingListsController {
     });
   }
 
+  @Get(':id/logs')
+  getLogs(@Param('id', ParseIntPipe) id: number) {
+    return this.service.getLogs(id);
+  }
+
   @Get(':id')
   getDetail(@Param('id', ParseIntPipe) id: number) {
     return this.service.getDetail(id);
@@ -100,12 +105,16 @@ export class PackingListsController {
   }
 
   @Put(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() payload: SavePackingListDto) {
-    return this.service.update(id, payload);
+  update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() payload: SavePackingListDto,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.service.update(id, payload, user?.username ?? '');
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
+  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+    return this.service.remove(id, user?.username ?? '');
   }
 }

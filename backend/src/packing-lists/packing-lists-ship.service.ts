@@ -72,6 +72,7 @@ export class PackingListsShipService {
       }
     }
     await this.listsService.markShipped([id]);
+    await this.listsService.recordLog(id, 'ship', operatorUsername, `发货 ${detail.code}`);
   }
 
   private groupBySource(detail: PackingListDetail, sourceType: 'pending' | 'finished'): Map<number, SourceGroup> {
