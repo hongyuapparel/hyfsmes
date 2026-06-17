@@ -113,6 +113,7 @@
           :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onFabricStockHeaderDragEnd"
           @selection-change="onSelectionChange"
+          @row-click="onRowClick"
         >
           <el-table-column type="selection" width="48" align="center" header-align="center" />
           <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center" header-align="center">
@@ -140,10 +141,9 @@
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
           </el-table-column>
-          <el-table-column label="操作" width="120" align="center" header-align="center" fixed="right">
+          <el-table-column label="操作" width="90" align="center" header-align="center" fixed="right">
             <template #default="{ row }">
-              <el-button link type="info" size="small" @click="openDetail(row)">详情</el-button>
-              <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
+              <el-button link type="primary" size="small" @click.stop="openForm(row, 'view')">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -264,10 +264,11 @@
       </el-tab-pane>
     </el-tabs>
 
-    <FabricFormDialog
+    <FabricFormDrawer
+      ref="fabricFormDialogRef"
       :visible="formDialog.visible"
       :submitting="formDialog.submitting"
-      :is-edit="formDialog.isEdit"
+      :mode="formDialog.mode"
       :quick-add-source="quickAddSource"
       :form="form"
       :form-rules="formRules"
@@ -277,9 +278,14 @@
       :fabric-supplier-options-loading="fabricSupplierOptionsLoading"
       :warehouse-options="warehouseOptions"
       :inventory-type-options="inventoryTypeOptions"
+      :logs="logs"
+      :logs-loading="formDialog.logsLoading"
+      :format-log-action="formatLogAction"
       @update:visible="formDialog.visible = $event"
       @confirm="submitForm"
       @close="resetForm"
+      @edit="enterEdit"
+      @exit-edit="exitEdit"
     />
 
     <FabricOutboundDialog
@@ -293,14 +299,6 @@
       @confirm="submitOutbound"
       @close="resetOutboundForm"
     />
-
-    <FabricDetailDrawer
-      :visible="detailDrawer.visible"
-      :row="detailDrawer.row"
-      :loading="detailDrawer.loading"
-      :logs="detailDrawer.logs"
-      @update:model-value="detailDrawer.visible = $event"
-    />
   </div>
 </template>
 
@@ -309,6 +307,7 @@ import { onMounted, ref, computed } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useFabricInventoryStock } from '@/composables/useFabricInventoryStock'
+import { useFabricFormDialog, type FabricFormDialogExpose } from '@/composables/useFabricFormDialog'
 import { useFabricInventoryOutbound } from '@/composables/useFabricInventoryOutbound'
 import {
   ACTIVE_FILTER_COLOR,
@@ -317,11 +316,11 @@ import {
   getFilterRangeStyle,
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
+import type { FabricItem } from '@/api/inventory'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
-import FabricFormDialog from '@/components/inventory/FabricFormDialog.vue'
+import FabricFormDrawer from '@/components/inventory/FabricFormDrawer.vue'
 import FabricOutboundDialog from '@/components/inventory/FabricOutboundDialog.vue'
-import FabricDetailDrawer from '@/components/inventory/FabricDetailDrawer.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 const {
   compactHeaderCellStyle,
@@ -348,7 +347,6 @@ const {
   selectedRows,
   customerOptions,
   fabricSupplierOptions,
-  fabricSupplierSelectKey,
   fabricSupplierOptionsLoading,
   warehouseOptions,
   inventoryTypeOptions,
@@ -356,11 +354,6 @@ const {
   fabricStockShellRef,
   fabricStockTableHeight,
   onFabricStockHeaderDragEnd,
-  formDialog,
-  quickAddSource,
-  form,
-  formRules,
-  detailDrawer,
   load,
   onSearch,
   debouncedSearch,
@@ -371,11 +364,28 @@ const {
   loadFabricSupplierOptions,
   loadWarehouseOptions,
   loadInventoryTypeOptions,
+} = stock
+
+const fabricFormDialogRef = ref<FabricFormDialogExpose>()
+const {
+  formDialog,
+  quickAddSource,
+  fabricSupplierSelectKey,
+  form,
+  formRules,
+  logs,
   openForm,
+  enterEdit,
+  exitEdit,
   resetForm,
   submitForm,
-  openDetail,
-} = stock
+  formatLogAction,
+} = useFabricFormDialog(selectedRows, load, fabricFormDialogRef, loadFabricSupplierOptions)
+
+function onRowClick(row: FabricItem, column?: { type?: string; label?: string }) {
+  if (column?.type === 'selection' || column?.label === '操作') return
+  openForm(row, 'view')
+}
 
 const {
   outboundFilter,

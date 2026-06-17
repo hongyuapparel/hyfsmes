@@ -202,7 +202,8 @@ watch(
 )
 
 defineExpose({
-  validate: () => formRef.value?.validate(),
+  // 编辑态没有 el-form(formRef 为空)，返回已 resolve 的 Promise，避免 submitForm 里 .catch 报错
+  validate: () => formRef.value?.validate() ?? Promise.resolve(),
   clearValidate: () => formRef.value?.clearValidate(),
 })
 </script>

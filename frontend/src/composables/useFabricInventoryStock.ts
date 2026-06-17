@@ -1,15 +1,11 @@
-import { nextTick, reactive, ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { reactive, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { getAllCustomerCompanyOptions } from '@/api/customers'
 import {
-  createFabric,
   getFabricList,
-  getFabricOperationLogs,
   getFabricSupplierOptions,
   type FabricItem,
-  type FabricOperationLog,
   type FabricSupplierOption,
-  updateFabric,
 } from '@/api/inventory'
 import { getDictItems } from '@/api/dicts'
 import type { SystemOptionItem } from '@/api/system-options'
@@ -33,8 +29,6 @@ export function useFabricInventoryStock() {
   const selectedRows = ref<FabricItem[]>([])
   const customerOptions = ref<{ label: string; value: string }[]>([])
   const fabricSupplierOptions = ref<FabricSupplierOption[]>([])
-  /** 每次打开表单递增，重置下拉内部筛选关键字，避免从其它页返回后仍停留在旧关键字导致「无匹配」 */
-  const fabricSupplierSelectKey = ref(0)
   const fabricSupplierOptionsLoading = ref(false)
   const warehouseOptions = ref<{ id: number; label: string }[]>([])
   const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
@@ -46,37 +40,6 @@ export function useFabricInventoryStock() {
     onHeaderDragEnd: onFabricStockHeaderDragEnd,
     restoreColumnWidths: restoreFabricStockColumnWidths,
   } = useTableColumnWidthPersist('inventory-fabric-stock')
-
-  const formDialog = reactive<{ visible: boolean; submitting: boolean; isEdit: boolean }>({
-    visible: false,
-    submitting: false,
-    isEdit: false,
-  })
-  const quickAddSource = ref<FabricItem | null>(null)
-  const editId = ref<number | null>(null)
-  const formRef = ref<FormInstance>()
-  const form = reactive({
-    name: '',
-    quantity: 0,
-    unit: '米',
-    customerName: '',
-    supplierId: null as number | null,
-    warehouseId: null as number | null,
-    inventoryTypeId: null as number | null,
-    storageLocation: '',
-    imageUrl: '',
-    remark: '',
-  })
-  const formRules: FormRules = {
-    name: [{ required: true, message: '请输入面料名称', trigger: 'blur' }],
-  }
-
-  const detailDrawer = reactive<{
-    visible: boolean
-    row: FabricItem | null
-    loading: boolean
-    logs: FabricOperationLog[]
-  }>({ visible: false, row: null, loading: false, logs: [] })
 
   async function load() {
     loading.value = true
@@ -143,10 +106,7 @@ export function useFabricInventoryStock() {
   async function loadCustomerOptions() {
     try {
       const list = await getAllCustomerCompanyOptions({ sortBy: 'companyName', sortOrder: 'asc' })
-      customerOptions.value = list.map((c) => ({
-        label: c.companyName,
-        value: c.companyName,
-      }))
+      customerOptions.value = list.map((c) => ({ label: c.companyName, value: c.companyName }))
     } catch {
       console.warn('客户选项加载失败')
     }
@@ -185,136 +145,6 @@ export function useFabricInventoryStock() {
     }
   }
 
-  async function openForm(row: FabricItem | null) {
-    quickAddSource.value = null
-    formDialog.isEdit = !!row
-    editId.value = row ? row.id : null
-    const seed = row ?? (selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
-    if (seed) {
-      form.name = seed.name
-      form.unit = seed.unit ?? '米'
-      form.customerName = seed.customerName ?? ''
-      form.supplierId = seed.supplierId != null && seed.supplierId > 0 ? seed.supplierId : null
-      form.warehouseId = seed.warehouseId != null && seed.warehouseId > 0 ? seed.warehouseId : null
-      form.inventoryTypeId = seed.inventoryTypeId != null && seed.inventoryTypeId > 0 ? seed.inventoryTypeId : null
-      form.storageLocation = seed.storageLocation ?? ''
-      form.imageUrl = seed.imageUrl ?? ''
-      form.remark = seed.remark ?? ''
-      if (row) {
-        form.quantity = parseFloat(String(seed.quantity)) || 0
-      } else {
-        quickAddSource.value = seed
-        form.quantity = 0
-      }
-    } else {
-      form.name = ''
-      form.quantity = 0
-      form.unit = '米'
-      form.customerName = ''
-      form.supplierId = null
-      form.warehouseId = null
-      form.inventoryTypeId = null
-      form.storageLocation = ''
-      form.imageUrl = ''
-      form.remark = ''
-    }
-    fabricSupplierSelectKey.value += 1
-    formDialog.visible = true
-    await nextTick()
-    await loadFabricSupplierOptions()
-  }
-
-  function resetForm() {
-    formRef.value?.clearValidate()
-  }
-
-  async function submitForm() {
-    await formRef.value?.validate().catch(() => {})
-    formDialog.submitting = true
-    try {
-      if (formDialog.isEdit && editId.value != null) {
-        await updateFabric(editId.value, {
-          name: form.name,
-          quantity: form.quantity,
-          unit: form.unit,
-          customerName: form.customerName || undefined,
-          imageUrl: form.imageUrl || undefined,
-          remark: form.remark,
-          supplierId: form.supplierId,
-          warehouseId: form.warehouseId,
-          inventoryTypeId: form.inventoryTypeId,
-          storageLocation: form.storageLocation,
-        })
-        ElMessage.success('保存成功')
-      } else {
-        const inputQty = Number(form.quantity) || 0
-        if (quickAddSource.value) {
-          if (inputQty <= 0) {
-            ElMessage.warning('请输入大于 0 的新增数量')
-            return
-          }
-          await createFabric({
-            name: form.name,
-            quantity: inputQty,
-            unit: form.unit,
-            customerName: form.customerName || undefined,
-            imageUrl: form.imageUrl || undefined,
-            remark: form.remark,
-            supplierId: form.supplierId,
-            warehouseId: form.warehouseId,
-            inventoryTypeId: form.inventoryTypeId,
-            storageLocation: form.storageLocation,
-          })
-          ElMessage.success('库存增加成功')
-        } else {
-          await createFabric({
-            name: form.name,
-            quantity: form.quantity,
-            unit: form.unit,
-            customerName: form.customerName || undefined,
-            imageUrl: form.imageUrl || undefined,
-            remark: form.remark,
-            supplierId: form.supplierId,
-            warehouseId: form.warehouseId,
-            inventoryTypeId: form.inventoryTypeId,
-            storageLocation: form.storageLocation,
-          })
-          ElMessage.success('新增成功')
-        }
-      }
-      formDialog.visible = false
-      load()
-    } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-    } finally {
-      formDialog.submitting = false
-    }
-  }
-
-  function formatLogAction(action: string) {
-    if (action === 'create') return '新建'
-    if (action === 'inbound') return '新增入库'
-    if (action === 'update') return '编辑'
-    if (action === 'outbound') return '出库'
-    if (action === 'delete') return '删除'
-    return action || '操作'
-  }
-
-  async function openDetail(row: FabricItem) {
-    detailDrawer.row = row
-    detailDrawer.visible = true
-    detailDrawer.loading = true
-    try {
-      const res = await getFabricOperationLogs(row.id)
-      detailDrawer.logs = res.data ?? []
-    } catch (e: unknown) {
-      detailDrawer.logs = []
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-    } finally {
-      detailDrawer.loading = false
-    }
-  }
-
   return {
     filter,
     inboundDateRange,
@@ -326,7 +156,6 @@ export function useFabricInventoryStock() {
     selectedRows,
     customerOptions,
     fabricSupplierOptions,
-    fabricSupplierSelectKey,
     fabricSupplierOptionsLoading,
     warehouseOptions,
     inventoryTypeOptions,
@@ -334,12 +163,6 @@ export function useFabricInventoryStock() {
     fabricStockShellRef,
     fabricStockTableHeight,
     onFabricStockHeaderDragEnd,
-    formDialog,
-    quickAddSource,
-    formRef,
-    form,
-    formRules,
-    detailDrawer,
     load,
     onSearch,
     debouncedSearch,
@@ -350,10 +173,5 @@ export function useFabricInventoryStock() {
     loadFabricSupplierOptions,
     loadWarehouseOptions,
     loadInventoryTypeOptions,
-    openForm,
-    resetForm,
-    submitForm,
-    formatLogAction,
-    openDetail,
   }
 }
