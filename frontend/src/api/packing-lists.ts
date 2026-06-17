@@ -30,6 +30,7 @@ export interface PackingListQuery {
   customerName?: string
   keyword?: string
   xiaomanOrderNo?: string
+  serviceManager?: string
   dateFrom?: string
   dateTo?: string
   page?: number

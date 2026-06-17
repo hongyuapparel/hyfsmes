@@ -44,6 +44,21 @@
         </template>
       </el-input>
       <el-select
+        v-model="filter.serviceManager"
+        placeholder="业务员"
+        filterable
+        clearable
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.serviceManager ? `业务员：${filter.serviceManager}` : '', '业务员', 42)"
+        @change="onSearch(true)"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.serviceManager">业务员：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option v-for="s in salespersonOptions" :key="s" :label="s" :value="s" />
+      </el-select>
+      <el-select
         v-model="filter.status"
         placeholder="状态"
         clearable
@@ -172,6 +187,7 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
+import { getSalespeople } from '@/api/customers'
 import { deletePackingList, getPackingListDetail, getPackingLists, type PackingListRow } from '@/api/packing-lists'
 import { exportPackingListExcel } from '@/utils/packing-export'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
@@ -179,7 +195,8 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
 
-const filter = reactive<{ customerName: string; status: string; keyword: string; xiaomanOrderNo: string }>({ customerName: '', status: '', keyword: '', xiaomanOrderNo: '' })
+const filter = reactive<{ customerName: string; status: string; keyword: string; xiaomanOrderNo: string; serviceManager: string }>({ customerName: '', status: '', keyword: '', xiaomanOrderNo: '', serviceManager: '' })
+const salespersonOptions = ref<string[]>([])
 const dateRange = ref<[string, string] | null>(null)
 const customerLabelVisible = ref(true)
 const list = ref<PackingListRow[]>([])
@@ -214,6 +231,7 @@ async function load() {
       status: filter.status || undefined,
       keyword: filter.keyword || undefined,
       xiaomanOrderNo: filter.xiaomanOrderNo || undefined,
+      serviceManager: filter.serviceManager || undefined,
       dateFrom: dateRange.value?.[0] || undefined,
       dateTo: dateRange.value?.[1] || undefined,
       page: pagination.page,
@@ -243,6 +261,7 @@ function onReset() {
   filter.status = ''
   filter.keyword = ''
   filter.xiaomanOrderNo = ''
+  filter.serviceManager = ''
   dateRange.value = null
   onSearch(true)
 }
@@ -289,7 +308,19 @@ async function onDelete(row: PackingListRow) {
   }
 }
 
-onMounted(load)
+async function loadSalespersonOptions() {
+  try {
+    const res = await getSalespeople()
+    salespersonOptions.value = res.data
+  } catch {
+    salespersonOptions.value = []
+  }
+}
+
+onMounted(() => {
+  loadSalespersonOptions()
+  load()
+})
 
 // 编辑页保存/发货后返回本页（keep-alive 缓存恢复）需重新拉列表，否则看不到最新结果
 let initialActivationDone = false
