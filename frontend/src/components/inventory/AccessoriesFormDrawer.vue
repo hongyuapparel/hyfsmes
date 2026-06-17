@@ -11,10 +11,8 @@
     @closed="onClose"
   >
     <div class="accessories-form-scroll">
-      <div v-if="isView" class="view-toolbar">
-        <el-button type="primary" @click="emit('edit')">编辑</el-button>
-      </div>
-      <el-form ref="formRef" :model="form" :rules="formRules" label-width="80px" :disabled="isView">
+      <!-- 新增辅料：录入表单 -->
+      <el-form v-if="isCreate" ref="formRef" :model="form" :rules="formRules" label-width="80px">
         <div class="form-grid">
           <el-alert
             v-if="quickAddSource"
@@ -38,7 +36,7 @@
             >
               <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
             </el-select>
-            <div v-if="categoryOptions.length === 0 && !isView" class="category-empty-tip">
+            <div v-if="categoryOptions.length === 0" class="category-empty-tip">
               暂无可选类别，请先在「系统设置 → 供应商设置 → 辅料供应商」中配置经营范围
             </div>
           </el-form-item>
@@ -61,16 +59,12 @@
             <el-input v-model="form.location" placeholder="请输入存放地址" clearable />
           </el-form-item>
           <el-form-item class="span-2" label="分码" prop="isSized">
-            <el-switch
-              v-model="form.isSized"
-              :disabled="Boolean(quickAddSource)"
-              @change="onSizedChange"
-            />
+            <el-switch v-model="form.isSized" :disabled="Boolean(quickAddSource)" @change="onSizedChange" />
             <span class="sized-tip">商标/吊牌等按尺码记库存时开启；编辑里可把已有辅料转为分码</span>
           </el-form-item>
           <el-form-item v-if="!form.isSized" label="数量" prop="quantity">
             <div class="qty-unit-row">
-              <el-input-number v-model="form.quantity" :min="0" :precision="0" controls-position="right" class="qty-input" :disabled="isEdit" />
+              <el-input-number v-model="form.quantity" :min="0" :precision="0" controls-position="right" class="qty-input" />
               <el-input v-model="form.unit" placeholder="单位（如个、卷）" clearable class="unit-input" :disabled="Boolean(quickAddSource)" />
             </div>
           </el-form-item>
@@ -79,41 +73,19 @@
               <el-input v-model="form.unit" placeholder="单位（如个、卷）" clearable :disabled="Boolean(quickAddSource)" />
             </el-form-item>
             <el-form-item class="span-2" label="分码明细" prop="sizeQuantities">
-              <AccessorySizeMatrix
-                v-model:size-headers="form.sizeHeaders"
-                v-model:size-quantities="form.sizeQuantities"
-                :readonly="isView"
-              />
+              <AccessorySizeMatrix v-model:size-headers="form.sizeHeaders" v-model:size-quantities="form.sizeQuantities" />
             </el-form-item>
           </template>
           <el-form-item class="span-2" label="图片" prop="imageUrls">
             <div class="multi-image-wrap">
               <div class="multi-image-row">
-                <div v-for="(_url, idx) in form.imageUrls" :key="`img-${idx}`" class="multi-image-item">
+                <div v-for="(_url, idx) in form.imageUrls" :key="`c-img-${idx}`" class="multi-image-item">
                   <ImageUploadArea v-model="form.imageUrls[idx]" compact class="multi-image-upload" />
-                  <el-button
-                    v-if="form.imageUrls.length > 1 && !isView"
-                    class="remove-image-btn"
-                    type="danger"
-                    link
-                    size="small"
-                    @click="removeImage(idx)"
-                  >
-                    删除
-                  </el-button>
+                  <el-button v-if="form.imageUrls.length > 1" class="remove-image-btn" type="danger" link size="small" @click="removeImage(idx)">删除</el-button>
                 </div>
-                <el-button
-                  v-if="form.imageUrls.length < 9 && !isView"
-                  class="add-image-btn"
-                  type="primary"
-                  plain
-                  size="small"
-                  @click="addImage"
-                >
-                  + 添加
-                </el-button>
+                <el-button v-if="form.imageUrls.length < 9" class="add-image-btn" type="primary" plain size="small" @click="addImage">+ 添加</el-button>
               </div>
-              <div v-if="!isView" class="image-tip">第一张为主图（用于表格展示）</div>
+              <div class="image-tip">第一张为主图（用于表格展示）</div>
             </div>
           </el-form-item>
           <el-form-item class="span-2" label="备注" prop="remark">
@@ -122,11 +94,31 @@
         </div>
       </el-form>
 
-      <OperationLogsSection v-if="isView" :logs="formattedLogs" class="acc-logs-section" />
+      <!-- 详情 / 编辑：成品同款表格卡片 -->
+      <AccessoryDetailView
+        v-else
+        :form="form"
+        :is-view="isView"
+        :is-edit="isEdit"
+        :submitting="submitting"
+        :category-options="categoryOptions"
+        :customer-options="customerOptions"
+        :salesperson-options="salespersonOptions"
+        :warehouse-options="warehouseOptions"
+        :logs="logs"
+        :logs-loading="logsLoading"
+        :format-log-action="formatLogAction"
+        :on-sized-change="onSizedChange"
+        :add-image="addImage"
+        :remove-image="removeImage"
+        @edit="emit('edit')"
+        @exit-edit="emit('exitEdit')"
+        @confirm="emit('confirm')"
+      />
     </div>
     <template #footer>
-      <el-button @click="emit('update:visible', false)">{{ isView ? '关闭' : '取消' }}</el-button>
-      <el-button v-if="!isView" type="primary" :loading="submitting" @click="emit('confirm')">确定</el-button>
+      <el-button @click="emit('update:visible', false)">{{ isCreate ? '取消' : '关闭' }}</el-button>
+      <el-button v-if="isCreate" type="primary" :loading="submitting" @click="emit('confirm')">确定</el-button>
     </template>
   </AppDrawer>
 </template>
@@ -135,30 +127,12 @@
 import { computed, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { AccessoryItem, AccessoryOperationLog } from '@/api/inventory'
-import type { AccessoriesFormMode } from '@/composables/useAccessoriesFormDialog'
+import type { AccessoriesFormMode, AccessoriesFormModel } from '@/composables/useAccessoriesFormDialog'
 import AppDrawer from '@/components/AppDrawer.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import AccessorySizeMatrix from '@/components/inventory/AccessorySizeMatrix.vue'
-import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
+import AccessoryDetailView from '@/components/inventory/AccessoryDetailView.vue'
 import { DEFAULT_ACCESSORY_SIZE_HEADERS } from '@/utils/accessorySizeMatrix'
-import { formatDateTime as formatDate } from '@/utils/date-format'
-
-interface AccessoriesFormModel {
-  name: string
-  category: string
-  quantity: number
-  isSized: boolean
-  sizeHeaders: string[]
-  sizeQuantities: number[]
-  unit: string
-  warehouseId: number | null
-  location: string
-  customerName: string
-  salesperson: string
-  imageUrl: string
-  imageUrls: string[]
-  remark: string
-}
 
 const props = defineProps<{
   visible: boolean
@@ -181,22 +155,15 @@ const emit = defineEmits<{
   (e: 'confirm'): void
   (e: 'close'): void
   (e: 'edit'): void
+  (e: 'exitEdit'): void
 }>()
 
 const formRef = ref<FormInstance>()
 
 const isView = computed(() => props.mode === 'view')
 const isEdit = computed(() => props.mode === 'edit')
+const isCreate = computed(() => props.mode === 'create')
 const titleText = computed(() => (isView.value ? '辅料详情' : isEdit.value ? '编辑辅料' : '新增辅料'))
-
-const formattedLogs = computed(() =>
-  props.logs.map((log) => ({
-    id: log.id,
-    operatorUsername: log.operatorUsername,
-    createdAt: formatDate(log.createdAt),
-    summary: `${props.formatLogAction(log.action)}${log.remark ? ` · 备注：${log.remark}` : ''}`,
-  })),
-)
 
 function onClose() {
   emit('close')
@@ -225,15 +192,11 @@ function removeImage(index: number) {
 watch(
   () => props.form.customerName,
   (customerName) => {
-    if (props.mode === 'view') return
+    if (isView.value) return
     const name = String(customerName ?? '').trim()
     if (!name) return
     const matched = props.customerOptions.find((opt) => opt.value === name)
     const sp = String(matched?.salesperson ?? '').trim()
-    if (sp && !props.form.salesperson) {
-      props.form.salesperson = sp
-      return
-    }
     if (sp) props.form.salesperson = sp
   },
 )
@@ -246,7 +209,6 @@ defineExpose({
 
 <style scoped>
 .accessories-form-scroll { height: 100%; min-height: 0; overflow-y: auto; padding: 4px 12px 8px 0; }
-.view-toolbar { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 20px; align-items: start; }
 .form-grid :deep(.el-form-item) { margin-bottom: 0; }
 .span-2 { grid-column: 1 / -1; }
@@ -264,5 +226,4 @@ defineExpose({
 .multi-image-upload :deep(.image-upload-area) { min-height: 110px; height: 110px; }
 .multi-image-upload :deep(.preview-img) { aspect-ratio: 1 / 1; max-width: 100px; }
 .image-tip { font-size: var(--font-size-caption); color: var(--color-text-muted); }
-.acc-logs-section { margin-top: 16px; }
 </style>

@@ -115,6 +115,7 @@
           :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onAccessoriesStockHeaderDragEnd"
           @selection-change="onSelectionChange"
+          @row-click="onRowClick"
         >
           <el-table-column type="selection" width="46" fixed />
           <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
@@ -143,7 +144,7 @@
           </el-table-column>
           <el-table-column label="操作" width="90" align="center" fixed="right">
             <template #default="{ row }">
-              <el-button link type="primary" size="small" @click="openForm(row, 'view')">详情</el-button>
+              <el-button link type="primary" size="small" @click.stop="openForm(row, 'view')">详情</el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -184,6 +185,7 @@
       @close="resetForm"
       @confirm="submitForm"
       @edit="enterEdit"
+      @exit-edit="exitEdit"
     />
 
     <AccessoriesOutboundDialog
@@ -248,10 +250,15 @@ const {
   customerOptions, salespersonOptions, categoryOptions, warehouseOptions, loadCustomerOptions, loadSalespersonOptions,
   loadCategoryOptions, loadWarehouseOptions, formatWarehouseLabel, getMainImageUrl,
 } = useAccessoryInventoryOptions()
-const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, resetForm, submitForm, formatLogAction } =
+const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, exitEdit, resetForm, submitForm, formatLogAction } =
   useAccessoriesFormDialog(selectedRows, load, accessoriesFormDialogRef)
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
+
+function onRowClick(row: AccessoryItem, column?: { type?: string; label?: string }) {
+  if (column?.type === 'selection' || column?.label === '操作') return
+  openForm(row, 'view')
+}
 
 const stockTotalQuantity = computed(() => {
   if (selectedRows.value.length > 0) {

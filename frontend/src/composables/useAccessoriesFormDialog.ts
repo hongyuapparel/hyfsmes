@@ -18,6 +18,30 @@ export interface AccessoriesFormDialogExpose {
 
 export type AccessoriesFormMode = 'create' | 'edit' | 'view'
 
+export interface AccessoriesFormModel {
+  name: string
+  category: string
+  quantity: number
+  isSized: boolean
+  sizeHeaders: string[]
+  sizeQuantities: number[]
+  unit: string
+  warehouseId: number | null
+  location: string
+  customerName: string
+  salesperson: string
+  imageUrl: string
+  imageUrls: string[]
+  remark: string
+}
+
+function emptyAccessoryForm(): AccessoriesFormModel {
+  return {
+    name: '', category: '', quantity: 0, isSized: false, sizeHeaders: [], sizeQuantities: [],
+    unit: '个', warehouseId: null, location: '', customerName: '', salesperson: '', imageUrl: '', imageUrls: [''], remark: '',
+  }
+}
+
 type LoadHandler = () => Promise<void> | void
 
 export function useAccessoriesFormDialog(
@@ -33,23 +57,10 @@ export function useAccessoriesFormDialog(
   })
   const quickAddSource = ref<AccessoryItem | null>(null)
   const editId = ref<number | null>(null)
+  /** 当前查看/编辑的行，用于编辑中「取消」时还原表单 */
+  const detailRow = ref<AccessoryItem | null>(null)
   const logs = ref<AccessoryOperationLog[]>([])
-  const form = reactive({
-    name: '',
-    category: '',
-    quantity: 0,
-    isSized: false,
-    sizeHeaders: [] as string[],
-    sizeQuantities: [] as number[],
-    unit: '个',
-    warehouseId: null as number | null,
-    location: '',
-    customerName: '',
-    salesperson: '',
-    imageUrl: '',
-    imageUrls: [] as string[],
-    remark: '',
-  })
+  const form = reactive<AccessoriesFormModel>(emptyAccessoryForm())
   const formRules: FormRules = {
     name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
     salesperson: [{ required: true, message: '请选择业务员', trigger: 'change' }],
@@ -77,55 +88,47 @@ export function useAccessoriesFormDialog(
     }
   }
 
+  /** 把一条已有辅料的全部字段铺进表单（详情/编辑/编辑中取消还原都用它） */
+  function applyRowToForm(seed: AccessoryItem) {
+    form.name = seed.name
+    form.category = seed.category ?? ''
+    form.unit = seed.unit ?? '个'
+    form.warehouseId = seed.warehouseId ?? null
+    form.location = seed.location ?? ''
+    form.customerName = seed.customerName ?? ''
+    form.salesperson = seed.salesperson ?? ''
+    form.imageUrl = seed.imageUrl ?? ''
+    const seedImageUrls = Array.isArray(seed.imageUrls)
+      ? seed.imageUrls.filter((url) => !!String(url ?? '').trim())
+      : (seed.imageUrl ? [seed.imageUrl] : [''])
+    form.imageUrls = seedImageUrls.length ? seedImageUrls : ['']
+    form.remark = seed.remark ?? ''
+    form.isSized = !!seed.isSized
+    form.quantity = seed.quantity ?? 0
+    form.sizeHeaders = Array.isArray(seed.sizeHeaders) ? [...seed.sizeHeaders] : []
+    form.sizeQuantities = Array.isArray(seed.sizeQuantities) ? [...seed.sizeQuantities] : []
+  }
+
   function openForm(row: AccessoryItem | null, mode: AccessoriesFormMode = row ? 'edit' : 'create') {
     formDialog.mode = mode
     quickAddSource.value = null
     logs.value = []
     editId.value = row ? row.id : null
     const isRowMode = mode === 'edit' || mode === 'view'
-    const seed = row ?? (mode === 'create' && selectedRows.value.length === 1 ? selectedRows.value[0]! : null)
-    if (seed) {
-      form.name = seed.name
-      form.category = seed.category ?? ''
-      form.unit = seed.unit ?? '个'
-      form.warehouseId = seed.warehouseId ?? null
-      form.location = seed.location ?? ''
-      form.customerName = seed.customerName ?? ''
-      form.salesperson = seed.salesperson ?? ''
-      form.imageUrl = seed.imageUrl ?? ''
-      const seedImageUrls = Array.isArray(seed.imageUrls)
-        ? seed.imageUrls.filter((url) => !!String(url ?? '').trim())
-        : (seed.imageUrl ? [seed.imageUrl] : [''])
-      form.imageUrls = seedImageUrls.length ? seedImageUrls : ['']
-      form.remark = seed.remark ?? ''
-      form.isSized = !!seed.isSized
-      if (isRowMode) {
-        form.quantity = seed.quantity ?? 0
-        form.sizeHeaders = Array.isArray(seed.sizeHeaders) ? [...seed.sizeHeaders] : []
-        form.sizeQuantities = Array.isArray(seed.sizeQuantities) ? [...seed.sizeQuantities] : []
-      } else {
-        quickAddSource.value = seed
-        form.quantity = 0
-        // 增量入库：沿用源的尺码结构，本次各码数量从 0 开始填
-        const sizedHeaders = seed.isSized && Array.isArray(seed.sizeHeaders) ? seed.sizeHeaders : []
-        form.sizeHeaders = [...sizedHeaders]
-        form.sizeQuantities = sizedHeaders.map(() => 0)
-      }
-    } else {
-      form.name = ''
-      form.category = ''
+    detailRow.value = isRowMode ? row : null
+    if (isRowMode && row) {
+      applyRowToForm(row)
+    } else if (mode === 'create' && selectedRows.value.length === 1) {
+      // 增量入库：沿用源记录的字段，数量从 0 开始、各码清零
+      const seed = selectedRows.value[0]!
+      applyRowToForm(seed)
+      quickAddSource.value = seed
       form.quantity = 0
-      form.isSized = false
-      form.sizeHeaders = []
-      form.sizeQuantities = []
-      form.unit = '个'
-      form.warehouseId = null
-      form.location = ''
-      form.customerName = ''
-      form.salesperson = ''
-      form.imageUrl = ''
-      form.imageUrls = ['']
-      form.remark = ''
+      const sizedHeaders = seed.isSized && Array.isArray(seed.sizeHeaders) ? seed.sizeHeaders : []
+      form.sizeHeaders = [...sizedHeaders]
+      form.sizeQuantities = sizedHeaders.map(() => 0)
+    } else {
+      Object.assign(form, emptyAccessoryForm())
     }
     formDialog.visible = true
     if (mode === 'view' && row) void fetchLogs(row.id)
@@ -133,6 +136,13 @@ export function useAccessoriesFormDialog(
 
   function enterEdit() {
     formDialog.mode = 'edit'
+  }
+
+  /** 编辑中点「取消」：还原表单到原始值并回到详情态 */
+  function exitEdit() {
+    if (detailRow.value) applyRowToForm(detailRow.value)
+    dialogRef.value?.clearValidate()
+    formDialog.mode = 'view'
   }
 
   function resetForm() {
@@ -230,6 +240,7 @@ export function useAccessoriesFormDialog(
     logs,
     openForm,
     enterEdit,
+    exitEdit,
     resetForm,
     submitForm,
     formatLogAction,
