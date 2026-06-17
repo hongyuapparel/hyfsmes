@@ -24,6 +24,7 @@ import { FinishedGoodsStockInboundService } from './finished-goods-stock-inbound
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import { FinishedGoodsStockOutboundService } from './finished-goods-stock-outbound.service';
 import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
+import { FinishedGoodsStockRepartitionService } from './finished-goods-stock-repartition.service';
 import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
 
 @Module({
@@ -56,6 +57,7 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
     FinishedGoodsStockInboundService,
     FinishedGoodsStockOutboundService,
     FinishedGoodsStockOperationService,
+    FinishedGoodsStockRepartitionService,
     FinishedGoodsStockReportService,
   ],
   exports: [

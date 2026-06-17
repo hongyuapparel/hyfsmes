@@ -142,6 +142,25 @@ export class FinishedGoodsStockController {
     );
   }
 
+  @Patch('items/:id/repartition')
+  repartition(
+    @Param('id') id: string,
+    @Body('skuCode') skuCode: string | undefined,
+    @Body('imageUrl') imageUrl: string | undefined,
+    @Body('remark') remark: string | undefined,
+    @Body('colorMeta')
+    colorMeta:
+      | Array<{ stockId: number; colorName: string; department: string; inventoryTypeId: number | null; warehouseId: number | null; location: string; unitPrice: string | number }>
+      | undefined,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.operationService.repartition(
+      Number(id),
+      { skuCode, imageUrl, remark, colorMeta: Array.isArray(colorMeta) ? colorMeta : [] },
+      user?.username ?? '',
+    );
+  }
+
   @Put('items/:id/color-images')
   upsertColorImage(
     @Param('id') id: string,

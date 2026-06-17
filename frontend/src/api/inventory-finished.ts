@@ -143,6 +143,27 @@ export function upsertFinishedStockColorImage(
   return request.put<void>(`/inventory/finished/items/${id}/color-images`, body)
 }
 
+/** 库存详情按颜色重分配：每个颜色按 部门/库存类型/仓库 归入对应库存记录 */
+export function repartitionFinishedStockDetail(
+  id: number,
+  body: {
+    skuCode?: string
+    imageUrl?: string
+    remark?: string
+    colorMeta: Array<{
+      stockId: number
+      colorName: string
+      department: string
+      inventoryTypeId: number | null
+      warehouseId: number | null
+      location: string
+      unitPrice: string
+    }>
+  }
+) {
+  return request.patch<void>(`/inventory/finished/items/${id}/repartition`, body)
+}
+
 export interface FinishedOutboundRecord {
   id: number
   finishedStockId: number

@@ -3,12 +3,14 @@ import type { FinishedGoodsStock } from '../entities/finished-goods-stock.entity
 import type { FinishedOutboundItemInput } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundService } from './finished-goods-stock-inbound.service';
 import { FinishedGoodsStockOutboundService } from './finished-goods-stock-outbound.service';
+import { FinishedGoodsStockRepartitionService, type RepartitionDto } from './finished-goods-stock-repartition.service';
 
 @Injectable()
 export class FinishedGoodsStockOperationService {
   constructor(
     private readonly inboundService: FinishedGoodsStockInboundService,
     private readonly outboundService: FinishedGoodsStockOutboundService,
+    private readonly repartitionService: FinishedGoodsStockRepartitionService,
   ) {}
 
   createManual(
@@ -59,5 +61,9 @@ export class FinishedGoodsStockOperationService {
 
   upsertColorImage(id: number, dto: { colorName: string; imageUrl: string }, operatorUsername = ''): Promise<void> {
     return this.inboundService.upsertColorImage(id, dto, operatorUsername);
+  }
+
+  repartition(id: number, dto: RepartitionDto, operatorUsername: string): Promise<void> {
+    return this.repartitionService.repartition(id, dto, operatorUsername);
   }
 }

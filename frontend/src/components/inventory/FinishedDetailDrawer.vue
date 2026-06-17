@@ -45,12 +45,13 @@
               @remove-size-column="removeDetailSizeColumn"
               @apply-basic-info-to-all-rows="syncRowsFromBasicInfo(detailMatrixMeta)"
               @row-meta-change="onDetailRowMetaChange"
+              @row-unit-price-change="setDetailRowUnitPrice"
               @save-color-image="handleSaveColorImage"
               @update-unit-price="(value) => updateEditFormField('unitPrice', value)"
             />
           </el-tab-pane>
 
-          <el-tab-pane label="操作记录" name="logs">
+          <el-tab-pane label="操作记录" name="logs" lazy>
             <OperationLogsSection :logs="adjustLogs" />
           </el-tab-pane>
         </el-tabs>
@@ -115,8 +116,8 @@ const {
   removeDetailColorRow,
   removeDetailSizeColumn,
   setDetailRowMetaField,
-  buildEditColorSize,
-  buildEditColorImages,
+  setDetailRowUnitPrice,
+  buildColorMeta,
 } = useFinishedDetailMatrixEdit()
 
 const {
@@ -141,8 +142,7 @@ const {
 } = useFinishedDetailData({
   inventoryTypeOptions: () => props.inventoryTypeOptions,
   warehouseOptions: () => props.warehouseOptions,
-  buildEditColorSize: () => buildEditColorSize(),
-  buildEditColorImages: () => buildEditColorImages(),
+  buildColorMeta: () => buildColorMeta(),
   onColorImagesSynced: (stockId, colorImages) => emit('colorImagesSynced', stockId, colorImages),
   onColorImageSaved: (payload) => emit('colorImageSaved', payload),
   onMetaSaved: () => emit('metaSaved'),
@@ -194,15 +194,12 @@ function handleSaveColorImage(colorName: string, url: string) {
 }
 
 function onDetailRowMetaChange(
-  _rowKey: string,
+  rowKey: string,
   field: FinishedCreateRowMetaField,
   value: string | number | null,
 ) {
-  if (field === 'department') updateEditFormField('department', String(value ?? ''))
-  else if (field === 'inventoryTypeId') updateEditFormField('inventoryTypeId', value == null ? null : Number(value))
-  else if (field === 'warehouseId') updateEditFormField('warehouseId', value == null ? null : Number(value))
-  else updateEditFormField('location', String(value ?? ''))
-  setDetailRowMetaField(field, value)
+  // 仅改动该行（互不干扰）；基础信息不再被某一行带着跑，保存时按每行的 stockId 归库
+  setDetailRowMetaField(rowKey, field, value)
 }
 
 watch(
@@ -223,8 +220,10 @@ watch(
   },
 )
 
+// 仅深度监听与矩阵相关的派生数据；不要把整个 data.value（含上百条操作日志快照）放进
+// deep watch，否则每次都会深度遍历数百 KB 数据，拖慢打开/保存。
 watch(
-  () => [displaySizeHeaders.value, displayColorSizeRows.value, colorImageMap.value, data.value] as const,
+  () => [displaySizeHeaders.value, displayColorSizeRows.value, colorImageMap.value] as const,
   () => {
     if (!metaEditing.value) resetDetailMatrixFromDisplay()
   },
@@ -234,13 +233,6 @@ watch(
 watch(
   () => metaEditing.value,
   () => resetDetailMatrixFromDisplay(),
-)
-
-watch(
-  detailMatrixMeta,
-  (meta) => {
-    if (metaEditing.value) syncRowsFromBasicInfo(meta)
-  },
 )
 </script>
 

@@ -103,20 +103,34 @@
           <template #default="{ row }">{{ sumDetailRowQty(row.quantities) }}</template>
         </el-table-column>
         <el-table-column label="出厂价" width="88" align="center" header-align="center">
-          <template #default>
-            <el-input
-              v-if="unitPriceEditable || unitPriceInputReadonly"
-              v-model="unitPrice"
-              placeholder="请输入"
-              clearable
-              size="small"
-              :disabled="unitPriceInputReadonly"
-            />
-            <template v-else>{{ unitPriceReadonlyText }}</template>
+          <template #default="{ row }">
+            <template v-if="unitPricePerRow">
+              <el-input
+                v-if="unitPriceEditable"
+                :model-value="row.unitPrice"
+                placeholder="请输入"
+                clearable
+                size="small"
+                :class="{ 'row-override': row._priceOverride }"
+                @update:model-value="(v) => emit('rowUnitPriceChange', getRowKey(row), String(v ?? ''))"
+              />
+              <template v-else>{{ formatMoneyAligned(Number(row.unitPrice) || 0) }}</template>
+            </template>
+            <template v-else>
+              <el-input
+                v-if="unitPriceEditable || unitPriceInputReadonly"
+                v-model="unitPrice"
+                placeholder="请输入"
+                clearable
+                size="small"
+                :disabled="unitPriceInputReadonly"
+              />
+              <template v-else>{{ unitPriceReadonlyText }}</template>
+            </template>
           </template>
         </el-table-column>
         <el-table-column label="总价" width="120" align="center" header-align="center">
-          <template #default="{ row }">{{ createRowTotalPrice(row.quantities) }}</template>
+          <template #default="{ row }">{{ unitPricePerRow ? formatMoneyAligned((Number(row.unitPrice) || 0) * sumDetailRowQty(row.quantities)) : createRowTotalPrice(row.quantities) }}</template>
         </el-table-column>
 
         <template v-if="showRowMetaColumns">
@@ -126,17 +140,18 @@
             </template>
             <template #default="{ row }">
               <el-select
+                v-if="!rowMetaReadonly"
                 :model-value="row.department"
                 filterable
                 clearable
                 size="small"
-                :disabled="rowMetaReadonly"
                 :placeholder="isRowMetaOverridden(row, 'department') ? '已自定义' : '继承基础信息'"
                 :class="{ 'row-override': isRowMetaOverridden(row, 'department') }"
                 @update:model-value="(v) => emit('rowMetaChange', getRowKey(row), 'department', String(v ?? ''))"
               >
                 <el-option v-for="opt in departmentOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
               </el-select>
+              <span v-else>{{ departmentLabel(row.department) || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="库存类型" width="120" align="center" header-align="center">
@@ -145,17 +160,18 @@
             </template>
             <template #default="{ row }">
               <el-select
+                v-if="!rowMetaReadonly"
                 :model-value="row.inventoryTypeId"
                 filterable
                 clearable
                 size="small"
-                :disabled="rowMetaReadonly"
                 :placeholder="isRowMetaOverridden(row, 'inventoryTypeId') ? '已自定义' : '继承基础信息'"
                 :class="{ 'row-override': isRowMetaOverridden(row, 'inventoryTypeId') }"
                 @update:model-value="(v) => emit('rowMetaChange', getRowKey(row), 'inventoryTypeId', (v as number | null) ?? null)"
               >
                 <el-option v-for="opt in inventoryTypeOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
               </el-select>
+              <span v-else>{{ inventoryTypeLabel(row.inventoryTypeId) || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="仓库" width="120" align="center" header-align="center">
@@ -164,17 +180,18 @@
             </template>
             <template #default="{ row }">
               <el-select
+                v-if="!rowMetaReadonly"
                 :model-value="row.warehouseId"
                 filterable
                 clearable
                 size="small"
-                :disabled="rowMetaReadonly"
                 :placeholder="isRowMetaOverridden(row, 'warehouseId') ? '已自定义' : '继承基础信息'"
                 :class="{ 'row-override': isRowMetaOverridden(row, 'warehouseId') }"
                 @update:model-value="(v) => emit('rowMetaChange', getRowKey(row), 'warehouseId', (v as number | null) ?? null)"
               >
                 <el-option v-for="opt in warehouseOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
               </el-select>
+              <span v-else>{{ warehouseLabel(row.warehouseId) || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="存放地址" width="150" align="center" header-align="center">
@@ -183,15 +200,16 @@
             </template>
             <template #default="{ row }">
               <el-input
+                v-if="!rowMetaReadonly"
                 :model-value="row.location"
                 :placeholder="isRowMetaOverridden(row, 'location') ? '已自定义' : '继承基础信息'"
                 clearable
                 size="small"
-                :disabled="rowMetaReadonly"
                 style="width: 100%"
                 :class="{ 'row-override': isRowMetaOverridden(row, 'location') }"
                 @update:model-value="(v) => emit('rowMetaChange', getRowKey(row), 'location', String(v ?? ''))"
               />
+              <span v-else>{{ row.location || '-' }}</span>
             </template>
           </el-table-column>
           <el-table-column label="操作" width="48" align="center" header-align="center">
@@ -220,6 +238,7 @@ import { computed } from 'vue'
 import { Close, Delete } from '@element-plus/icons-vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
+import { formatMoneyAligned } from '@/utils/display-number'
 import type { FinishedCreateRowMetaField } from '@/composables/useFinishedCreateForm'
 
 type SummaryMethod = (params: { columns: Array<{ label?: string }> }) => string[]
@@ -229,11 +248,13 @@ type FinishedStockSizeMatrixRow = {
   colorName: string
   imageUrl?: string
   quantities: Array<number | null>
+  unitPrice?: string
   department?: string
   inventoryTypeId?: number | null
   warehouseId?: number | null
   location?: string
   _overrides?: Partial<Record<FinishedCreateRowMetaField, boolean>>
+  _priceOverride?: boolean
 }
 
 const props = withDefaults(
@@ -248,6 +269,7 @@ const props = withDefaults(
     unitPriceEditable?: boolean
     unitPriceInputReadonly?: boolean
     unitPriceReadonlyText?: string
+    unitPricePerRow?: boolean
     showRowMetaColumns?: boolean
     showInheritanceTip?: boolean
     showHeaderActions?: boolean
@@ -265,6 +287,7 @@ const props = withDefaults(
     imageEditable: true,
     unitPriceEditable: true,
     unitPriceInputReadonly: false, unitPriceReadonlyText: '-',
+    unitPricePerRow: false,
     showRowMetaColumns: true,
     showInheritanceTip: true,
     showHeaderActions: true, allowStructureActions: true,
@@ -280,6 +303,7 @@ const emit = defineEmits<{
   (e: 'removeSizeColumn', index: number): void
   (e: 'applyBasicInfoToAllRows'): void
   (e: 'rowMetaChange', rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null): void
+  (e: 'rowUnitPriceChange', rowKey: string, value: string): void
   (e: 'saveColorImage', row: FinishedStockSizeMatrixRow, url: string): void
 }>()
 
@@ -298,6 +322,20 @@ function getRowImageUrl(row: FinishedStockSizeMatrixRow): string {
 
 function isRowMetaOverridden(row: FinishedStockSizeMatrixRow, field: FinishedCreateRowMetaField): boolean {
   return Boolean(row._overrides?.[field])
+}
+
+// 只读态用纯文本渲染行级元数据，避免每行实例化 el-select（大列表下显著降低渲染开销）
+const departmentLabelMap = computed(() => new Map(props.departmentOptions.map((opt) => [opt.value, opt.label])))
+const inventoryTypeLabelMap = computed(() => new Map(props.inventoryTypeOptions.map((opt) => [opt.id, opt.label])))
+const warehouseLabelMap = computed(() => new Map(props.warehouseOptions.map((opt) => [opt.id, opt.label])))
+function departmentLabel(value: string | undefined): string {
+  return (value && departmentLabelMap.value.get(value)) || value || ''
+}
+function inventoryTypeLabel(id: number | null | undefined): string {
+  return id == null ? '' : inventoryTypeLabelMap.value.get(id) ?? ''
+}
+function warehouseLabel(id: number | null | undefined): string {
+  return id == null ? '' : warehouseLabelMap.value.get(id) ?? ''
 }
 
 function hasAnyOverride(field: FinishedCreateRowMetaField): boolean {

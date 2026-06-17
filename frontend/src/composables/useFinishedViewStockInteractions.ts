@@ -198,6 +198,10 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
           }))
           .filter((item) => item.colorName && item.imageUrl)
       : []
+    const target = list.value.find((item) => item.id === stockId)
+    if (!target) return
+    // 未变化则跳过：避免每次打开详情都重建整张列表数组、触发上百行列表重渲染
+    if (JSON.stringify(target.colorImages ?? []) === JSON.stringify(normalized)) return
     list.value = list.value.map((item) => (item.id === stockId ? { ...item, colorImages: normalized } : item))
   }
 

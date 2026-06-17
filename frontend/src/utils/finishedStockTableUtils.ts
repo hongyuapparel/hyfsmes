@@ -33,6 +33,8 @@ export type NormalizedStoredBreakdownSnapshot = {
     colorName: string
     values: number[]
     imageUrl?: string
+    stockId?: number
+    unitPrice?: string
     department?: string
     inventoryTypeId?: number | null
     warehouseId?: number | null

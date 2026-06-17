@@ -4,19 +4,34 @@ import type { FinishedCreateRowMetaField } from '@/composables/useFinishedCreate
 
 export type FinishedDetailMatrixRow = {
   _key: string
+  stockId: number | null
   colorName: string
   imageUrl: string
   quantities: number[]
+  unitPrice: string
   department: string
   inventoryTypeId: number | null
   warehouseId: number | null
   location: string
   _overrides: Partial<Record<FinishedCreateRowMetaField, boolean>>
+  _priceOverride?: boolean
+}
+
+export type FinishedDetailColorMeta = {
+  stockId: number
+  colorName: string
+  department: string
+  inventoryTypeId: number | null
+  warehouseId: number | null
+  location: string
+  unitPrice: string
 }
 
 type DetailSourceRow = {
   colorName: string
   imageUrl?: string
+  stockId?: number
+  unitPrice?: string
   quantities: number[]
   department?: string
   inventoryTypeId?: number | null
@@ -50,7 +65,9 @@ export function useFinishedDetailMatrixEdit() {
   ) {
     editSizeHeaders.value = [...headers]
     editSizeRows.value = rows.map((row, index) => ({
-      _key: `${row.colorName || 'color'}-${index}`,
+      _key: `${row.stockId ?? 'na'}-${row.colorName || 'color'}-${index}`,
+      stockId: row.stockId ?? null,
+      unitPrice: row.unitPrice ?? '',
       colorName: row.colorName,
       imageUrl: String(row.imageUrl ?? '').trim() || colorImageMap[row.colorName] || '',
       quantities: [...row.quantities],
@@ -75,8 +92,10 @@ export function useFinishedDetailMatrixEdit() {
   function addDetailColorRow(meta: DetailRowMeta) {
     editSizeRows.value.push({
       _key: `new-${Date.now()}`,
+      stockId: null,
       colorName: '新颜色',
       imageUrl: '',
+      unitPrice: '',
       quantities: editSizeHeaders.value.map(() => 0),
       ...meta,
       _overrides: emptyOverrides(),
@@ -108,31 +127,35 @@ export function useFinishedDetailMatrixEdit() {
     editSizeRows.value.forEach((row) => row.quantities.splice(index, 1))
   }
 
-  function setDetailRowMetaField(field: FinishedCreateRowMetaField, value: string | number | null) {
-    editSizeRows.value.forEach((row) => {
-      if (field === 'department') row.department = String(value ?? '')
-      else if (field === 'inventoryTypeId') row.inventoryTypeId = value == null ? null : Number(value)
-      else if (field === 'warehouseId') row.warehouseId = value == null ? null : Number(value)
-      else row.location = String(value ?? '')
-      row._overrides[field] = false
-    })
+  function setDetailRowMetaField(rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null) {
+    const row = editSizeRows.value.find((item) => item._key === rowKey)
+    if (!row) return
+    if (field === 'department') row.department = String(value ?? '')
+    else if (field === 'inventoryTypeId') row.inventoryTypeId = value == null ? null : Number(value)
+    else if (field === 'warehouseId') row.warehouseId = value == null ? null : Number(value)
+    else row.location = String(value ?? '')
+    row._overrides[field] = true
   }
 
-  function buildEditColorSize() {
-    return {
-      headers: [...editSizeHeaders.value],
-      rows: editSizeRows.value.map((row) => ({
-        colorName: row.colorName,
-        imageUrl: row.imageUrl,
-        quantities: row.quantities.map((value) => Math.max(0, Math.trunc(Number(value) || 0))),
-      })),
-    }
+  function setDetailRowUnitPrice(rowKey: string, value: string) {
+    const row = editSizeRows.value.find((item) => item._key === rowKey)
+    if (!row) return
+    row.unitPrice = String(value ?? '')
+    row._priceOverride = true
   }
 
-  function buildEditColorImages() {
+  function buildColorMeta(): FinishedDetailColorMeta[] {
     return editSizeRows.value
-      .map((row) => ({ colorName: row.colorName.trim(), imageUrl: row.imageUrl.trim() }))
-      .filter((row) => row.colorName)
+      .filter((row) => row.stockId != null && row.colorName.trim())
+      .map((row) => ({
+        stockId: row.stockId as number,
+        colorName: row.colorName.trim(),
+        department: row.department,
+        inventoryTypeId: row.inventoryTypeId,
+        warehouseId: row.warehouseId,
+        location: row.location,
+        unitPrice: row.unitPrice,
+      }))
   }
 
   return {
@@ -145,7 +168,7 @@ export function useFinishedDetailMatrixEdit() {
     removeDetailColorRow,
     removeDetailSizeColumn,
     setDetailRowMetaField,
-    buildEditColorSize,
-    buildEditColorImages,
+    setDetailRowUnitPrice,
+    buildColorMeta,
   }
 }
