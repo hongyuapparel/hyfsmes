@@ -79,9 +79,11 @@ export function useOrderPackaging() {
   async function loadAccessoryItems() {
     accessoryDialogLoading.value = true
     try {
-      const res = await getAccessoriesList({ page: 1, pageSize: 200 })
-      const data = res.data
-      accessoryItems.value = data?.list ?? []
+      // 弹窗内按名称/客户做前端筛选，需一次性取回全部辅料；先查总数再按总数取，避免漏掉排在后面的条目
+      const head = await getAccessoriesList({ page: 1, pageSize: 1 })
+      const total = head.data?.total ?? 0
+      const res = await getAccessoriesList({ page: 1, pageSize: Math.max(total, 1) })
+      accessoryItems.value = res.data?.list ?? []
     } catch (e: unknown) {
       if (!isErrorHandled(e)) console.warn('Failed to load accessory inventory', getErrorMessage(e))
     } finally {

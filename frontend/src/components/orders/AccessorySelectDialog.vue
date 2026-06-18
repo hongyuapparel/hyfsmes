@@ -2,11 +2,26 @@
   <AppDialog v-model="visible" title="选择辅料" width="720px">
     <div class="accessory-dialog-filter">
       <el-input
-        v-model="keyword"
-        placeholder="输入名称进行模糊搜索"
+        v-model="customerKeyword"
+        class="accessory-dialog-filter-customer"
+        placeholder="按客户筛选（留空看全部）"
         clearable
         size="small"
-      />
+      >
+        <template #prefix>
+          <el-icon><User /></el-icon>
+        </template>
+      </el-input>
+      <el-input
+        v-model="keyword"
+        placeholder="按名称模糊搜索"
+        clearable
+        size="small"
+      >
+        <template #prefix>
+          <el-icon><Search /></el-icon>
+        </template>
+      </el-input>
     </div>
     <el-table
       v-loading="loading"
@@ -43,7 +58,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
+import { Search, User } from '@element-plus/icons-vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { useIsMobile } from '@/composables/useIsMobile'
 import type { AccessoryItem } from '@/api/inventory'
@@ -54,6 +70,7 @@ const props = defineProps<{
   modelValue: boolean
   loading: boolean
   items: AccessoryItem[]
+  defaultCustomer?: string
 }>()
 
 const emit = defineEmits<{
@@ -62,16 +79,35 @@ const emit = defineEmits<{
 }>()
 
 const keyword = ref('')
+const customerKeyword = ref('')
 
 const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
+watch(
+  () => props.modelValue,
+  (open) => {
+    if (open) {
+      keyword.value = ''
+      customerKeyword.value = (props.defaultCustomer ?? '').trim()
+    }
+  },
+)
+
 const filteredItems = computed(() => {
-  const kw = keyword.value.trim().toLowerCase()
-  if (!kw) return props.items
-  return props.items.filter((item) => String(item.name ?? '').toLowerCase().includes(kw))
+  const nameKw = keyword.value.trim().toLowerCase()
+  const custKw = customerKeyword.value.trim().toLowerCase()
+  return props.items.filter((item) => {
+    if (nameKw && !String(item.name ?? '').toLowerCase().includes(nameKw)) return false
+    if (custKw) {
+      const itemCustomer = String(item.customerName ?? '').trim()
+      // 客户匹配：命中该客户，或未绑定客户的通用辅料
+      if (itemCustomer && !itemCustomer.toLowerCase().includes(custKw)) return false
+    }
+    return true
+  })
 })
 </script>
 
