@@ -4,6 +4,20 @@
   margin-bottom: var(--space-sm);
 }
 
+.accessory-dialog-filter {
+  display: flex;
+  gap: var(--space-sm);
+}
+
+.accessory-dialog-filter .accessory-dialog-filter-customer {
+  flex: 0 0 240px;
+  width: 240px;
+}
+
+.accessory-dialog-filter > .el-input:not(.accessory-dialog-filter-customer) {
+  flex: 1 1 auto;
+}
+
 .dialog-pagination {
   margin-top: var(--space-sm);
   display: flex;

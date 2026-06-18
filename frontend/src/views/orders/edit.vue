@@ -341,6 +341,7 @@
       v-model="accessoryDialogVisible"
       :loading="accessoryDialogLoading"
       :items="accessoryItems"
+      :default-customer="form.customerName"
       @select="onSelectAccessory"
     />
 
