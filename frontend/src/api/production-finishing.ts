@@ -42,6 +42,8 @@ export interface FinishingListQuery {
   completedEnd?: string
   page?: number
   pageSize?: number
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export function getFinishingTabCounts(params?: Omit<FinishingListQuery, 'tab' | 'page' | 'pageSize'>) {

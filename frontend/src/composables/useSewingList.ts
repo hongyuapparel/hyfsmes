@@ -18,6 +18,7 @@ import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPer
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { useTableSort } from '@/composables/useTableSort'
 
 export const SEWING_TABS = [
   { label: '全部', value: 'all' },
@@ -90,6 +91,11 @@ export function useSewingList() {
     return `${tab.label}(${count})`
   }
 
+  const { sortField, sortOrder, onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+
   function buildQuery(): SewingListQuery {
     const q: SewingListQuery = {
       tab: currentTab.value,
@@ -97,6 +103,7 @@ export function useSewingList() {
       skuCode: normalizeTextFilter(filter.skuCode),
       page: pagination.page,
       pageSize: pagination.pageSize,
+      ...sortParams(),
     }
     if (completedRange.value && completedRange.value.length === 2) {
       q.completedStart = completedRange.value[0]
@@ -268,5 +275,8 @@ export function useSewingList() {
     onTabChange,
     onPageSizeChange,
     onSelectionChange,
+    sortField,
+    sortOrder,
+    onSortChange,
   }
 }

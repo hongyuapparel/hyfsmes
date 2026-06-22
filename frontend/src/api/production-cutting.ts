@@ -39,6 +39,8 @@ export interface CuttingListQuery {
   completedEnd?: string
   page?: number
   pageSize?: number
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export function getCuttingTabCounts(params?: Omit<CuttingListQuery, 'tab' | 'page' | 'pageSize'>) {

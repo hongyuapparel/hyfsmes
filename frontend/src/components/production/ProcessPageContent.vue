@@ -157,6 +157,7 @@
         :header-cell-style="compactHeaderCellStyle"
         @header-dragend="onHeaderDragEnd"
         @selection-change="onSelectionChange"
+        @sort-change="onSortChange"
       >
         <el-table-column type="selection" width="48" align="center" />
         <el-table-column prop="orderNo" label="订单号" min-width="100" />
@@ -180,10 +181,10 @@
         <el-table-column label="订单数量" width="88" align="right">
           <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
         </el-table-column>
-        <el-table-column prop="arrivedAtCraft" label="到工艺时间" width="110" align="center">
+        <el-table-column prop="arrivedAtCraft" label="到工艺时间" width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatDateTime(row.arrivedAtCraft) }}</template>
         </el-table-column>
-        <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+        <el-table-column prop="completedAt" label="完成时间" width="120" align="center" sortable="custom">
           <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
         </el-table-column>
         <el-table-column label="时效判定" width="96" align="center">
@@ -341,6 +342,7 @@ const {
   onTabChange,
   onPageSizeChange,
   onSelectionChange,
+  onSortChange,
   onConfirmComplete,
   orderTypeDisplay,
   collaborationDisplay,

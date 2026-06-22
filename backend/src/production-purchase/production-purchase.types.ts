@@ -37,6 +37,8 @@ export interface PurchaseItemRow {
   pickStatus: string;
   purchaseCompletedAt: string | null;
   pickCompletedAt: string | null;
+  /** 统一完成时间（按路线取 采购/领料 完成时间），用于排序与显示 */
+  completedAt: string | null;
   purchaseUnitPrice: string | null;
   purchaseOtherCost: string | null;
   purchaseRemark: string | null;
@@ -70,4 +72,6 @@ export interface PurchaseListQuery {
   completedEnd?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }

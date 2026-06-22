@@ -12,6 +12,7 @@
     :header-cell-style="compactHeaderCellStyle"
     @header-dragend="onHeaderDragEnd"
     @selection-change="(rows) => emit('selection-change', rows)"
+    @sort-change="(p) => emit('sort-change', p)"
   >
     <el-table-column type="selection" width="48" align="center" />
     <el-table-column prop="orderNo" label="订单号" min-width="100" />
@@ -49,10 +50,10 @@
         </QtyTracePopover>
       </template>
     </el-table-column>
-    <el-table-column prop="arrivedAt" label="到尾部时间" width="110" align="center">
+    <el-table-column prop="arrivedAt" label="到尾部时间" width="120" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
     </el-table-column>
-    <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+    <el-table-column prop="completedAt" label="完成时间" width="120" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
     </el-table-column>
     <el-table-column label="时效判定" width="96" align="center">
@@ -189,6 +190,7 @@ const emit = defineEmits<{
   (e: 'selection-change', rows: FinishingListItem[]): void
   (e: 'show-qty-popover', row: FinishingListItem): void
   (e: 'open-detail', row: FinishingListItem): void
+  (e: 'sort-change', payload: { prop: string; order: 'ascending' | 'descending' | null }): void
 }>()
 
 const tableRef = ref()

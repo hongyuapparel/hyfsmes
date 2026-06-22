@@ -155,6 +155,7 @@
       @header-dragend="onHeaderDragEnd"
       @selection-change="onSelectionChange"
       @open-detail="openPurchaseBriefDrawer"
+      @sort-change="onSortChange"
     />
 
     <AppPaginationBar
@@ -382,6 +383,7 @@ const {
   onTabChange,
   onPageSizeChange,
   onSelectionChange,
+  onSortChange,
   onHeaderDragEnd,
   loadOptions,
   orderTypeDisplay,

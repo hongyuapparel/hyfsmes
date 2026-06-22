@@ -10,6 +10,7 @@ import { SystemOptionsService } from '../system-options/system-options.service';
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { applyRowSort } from '../common/list-row-sort.util';
 
 /** 列表返回：工艺项目行（与 order_ext.process_items 一致） */
 export type CraftProcessItemRow = Pick<ProcessRow, 'processName' | 'supplierName' | 'part' | 'remark'>;
@@ -55,6 +56,8 @@ export interface CraftListQuery {
   completedEnd?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 @Injectable()
@@ -387,10 +390,11 @@ export class ProductionCraftService {
       });
     }
 
-    const total = rows.length;
-    const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
+    const sortedRows = applyRowSort(rows, query.sortField, query.sortOrder, ['arrivedAtCraft', 'completedAt']);
+    const total = sortedRows.length;
+    const totalQuantity = sortedRows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
-    const list = rows.slice(start, start + pageSize);
+    const list = sortedRows.slice(start, start + pageSize);
 
     return { list, total, totalQuantity, page, pageSize };
   }

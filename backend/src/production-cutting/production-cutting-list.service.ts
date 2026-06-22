@@ -7,6 +7,7 @@ import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
+import { applyRowSort } from '../common/list-row-sort.util';
 import type { CuttingListItem, CuttingListQuery } from './production-cutting.types';
 
 @Injectable()
@@ -281,7 +282,8 @@ export class ProductionCuttingListService {
   }> {
     this.scheduleCuttingReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
-    const rows = await this.buildCuttingRows(query);
+    const allRows = await this.buildCuttingRows(query);
+    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['arrivedAt', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;

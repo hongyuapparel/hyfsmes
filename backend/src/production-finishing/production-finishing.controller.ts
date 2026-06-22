@@ -36,6 +36,8 @@ export class ProductionFinishingController {
     @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
   ) {
     const query: FinishingListQuery = {
       tab,
@@ -45,6 +47,8 @@ export class ProductionFinishingController {
       completedEnd,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      sortField,
+      sortOrder: sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : undefined,
     };
     return this.finishingQueryService.getFinishingList(query);
   }

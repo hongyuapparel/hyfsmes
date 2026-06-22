@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { exportCuttingItems, getCuttingItems, getCuttingTabCounts, type CuttingListItem, type CuttingListQuery } from '@/api/production-cutting'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { useTableSort } from '@/composables/useTableSort'
 
 interface CuttingTabLike {
   value: string
@@ -32,6 +33,11 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
+  const { sortField, sortOrder, onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+
   function buildQuery(): CuttingListQuery {
     const q: CuttingListQuery = {
       tab: currentTab.value,
@@ -39,6 +45,7 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
       skuCode: normalizeTextFilter(filter.skuCode),
       page: pagination.page,
       pageSize: pagination.pageSize,
+      ...sortParams(),
     }
     if (completedRange.value && completedRange.value.length === 2) {
       q.completedStart = completedRange.value[0]
@@ -163,5 +170,8 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     onReset,
     onTabChange,
     onPageSizeChange,
+    sortField,
+    sortOrder,
+    onSortChange,
   }
 }

@@ -13,6 +13,7 @@
       :header-cell-style="compactHeaderCellStyle"
       @header-dragend="(newWidth, oldWidth, column) => emit('header-dragend', newWidth, oldWidth, column)"
       @selection-change="emit('selection-change', $event)"
+      @sort-change="(p) => emit('sort-change', p)"
     >
       <el-table-column type="selection" width="48" align="center" :selectable="props.rowSelectable" />
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
@@ -76,14 +77,14 @@
       <el-table-column label="订单件数" width="88" align="center">
         <template #default="{ row }">{{ formatDisplayNumber(row.orderQuantity) }}</template>
       </el-table-column>
-      <el-table-column prop="pendingPurchaseAt" label="到采购时间" width="155" align="center">
+      <el-table-column prop="pendingPurchaseAt" label="到采购时间" width="155" align="center" sortable="custom">
         <template #default="{ row }">
           {{ formatDateTime(row.pendingPurchaseAt) }}
         </template>
       </el-table-column>
-      <el-table-column prop="purchaseCompletedAt" label="完成时间" width="155" align="center">
+      <el-table-column prop="completedAt" label="完成时间" width="155" align="center" sortable="custom">
         <template #default="{ row }">
-          {{ formatDateTime(row.processRoute === 'picking' ? row.pickCompletedAt : row.purchaseCompletedAt) }}
+          {{ formatDateTime(row.completedAt) }}
         </template>
       </el-table-column>
       <el-table-column label="时效判定" width="96" align="center">
@@ -128,6 +129,7 @@ const emit = defineEmits<{
   (e: 'header-dragend', newWidth: number, oldWidth: number, column: unknown): void
   (e: 'selection-change', rows: PurchaseItemRow[]): void
   (e: 'open-detail', row: PurchaseItemRow): void
+  (e: 'sort-change', payload: { prop: string; order: 'ascending' | 'descending' | null }): void
 }>()
 
 const purchaseTableRef = ref()

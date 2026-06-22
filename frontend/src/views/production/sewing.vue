@@ -105,6 +105,7 @@
         @selection-change="onSelectionChange"
         @show-qty-popover="onShowQtyPopover"
         @open-detail="openSewingBriefDrawer"
+        @sort-change="onSortChange"
       />
     </div>
 
@@ -225,6 +226,7 @@ const {
   onTabChange,
   onPageSizeChange,
   onSelectionChange,
+  onSortChange,
 } = useSewingList()
 
 const {
