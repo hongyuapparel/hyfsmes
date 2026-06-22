@@ -3,16 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type CuttingMaterialUsageRow } from '../entities/order-cutting.entity';
+import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { SystemOption } from '../entities/system-option.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
+import { detectSewingStarted } from './production-cutting-downstream.util';
 import type { CuttingCompletedDetailResponse, CuttingRegisterFormMaterialRow, CuttingRegisterFormResponse } from './production-cutting.types';
 
 const ALLOWED_MATERIAL_CATEGORY_VALUES = new Set(['主布', '里布', '配布', '衬布']);
 
 @Injectable()
 export class ProductionCuttingQueryService {
-  constructor(@InjectRepository(Order) private readonly orderRepo: Repository<Order>, @InjectRepository(OrderCutting) private readonly cuttingRepo: Repository<OrderCutting>, @InjectRepository(OrderExt) private readonly orderExtRepo: Repository<OrderExt>, private readonly systemOptionsService: SystemOptionsService) {}
+  constructor(@InjectRepository(Order) private readonly orderRepo: Repository<Order>, @InjectRepository(OrderCutting) private readonly cuttingRepo: Repository<OrderCutting>, @InjectRepository(OrderSewing) private readonly sewingRepo: Repository<OrderSewing>, @InjectRepository(OrderExt) private readonly orderExtRepo: Repository<OrderExt>, private readonly systemOptionsService: SystemOptionsService) {}
 
   private async hasCuttingDepartmentAndCutter(): Promise<boolean> {
     try {
@@ -277,6 +279,7 @@ export class ProductionCuttingQueryService {
       return { colorName: r.colorName ?? '', quantities: len > 0 ? q.slice(0, len) : q, remark: r.remark };
     });
     const extras = await this.fetchSingleOrderCuttingExtras(orderId);
+    const downstream = await detectSewingStarted(this.sewingRepo, orderId);
     return {
       orderBrief: {
         orderNo: order.orderNo ?? '',
@@ -296,6 +299,7 @@ export class ProductionCuttingQueryService {
       actualFabricMeters: extras.fabric,
       arrivedAt: this.toDateTimeLocalString(cutting.arrivedAt),
       completedAt: this.toDateTimeLocalString(cutting.completedAt),
+      downstream,
     };
   }
 }
