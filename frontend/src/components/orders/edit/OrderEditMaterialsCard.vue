@@ -75,13 +75,22 @@
       </el-table-column>
       <el-table-column label="物料名称" min-width="160" header-align="center" align="center">
         <template #default="{ row, $index }">
-          <el-input
+          <el-select
             v-model="row.materialName"
-            placeholder="物料名称"
-            :input-style="{ textAlign: 'center' }"
+            placeholder="选择库存或输入物料名称"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            remote
+            :remote-method="(kw: string) => searchMaterialNames(kw, row)"
+            :loading="materialNameLoading"
+            @visible-change="(visible: boolean) => onMaterialNameVisibleChange(visible, row)"
             :ref="(el) => setMaterialCellRef(el, $index, 3)"
             @keydown.capture.stop="onMaterialCellKeydown($event, $index, 3)"
-          />
+          >
+            <el-option v-for="opt in materialNameOptions" :key="opt.id" :label="opt.name" :value="opt.name" />
+          </el-select>
         </template>
       </el-table-column>
       <el-table-column label="颜色" min-width="120" header-align="center" align="center">
@@ -234,6 +243,10 @@ defineProps<{
   onMaterialTypeChange: (row: MaterialRow) => void
   onMaterialSupplierVisibleChange: (visible: boolean, row: MaterialRow) => void
   searchMaterialSuppliers: (keyword: string, row: MaterialRow) => void
+  materialNameOptions: Array<{ id: number; name: string; imageUrl: string }>
+  materialNameLoading: boolean
+  searchMaterialNames: (keyword: string, row: MaterialRow) => void
+  onMaterialNameVisibleChange: (visible: boolean, row: MaterialRow) => void
 }>()
 </script>
 
