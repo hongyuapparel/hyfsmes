@@ -115,6 +115,7 @@
         @selection-change="onSelectionChange"
         @show-qty-popover="onShowQtyPopover"
         @open-detail="openFinishingBriefDrawer"
+        @sort-change="onSortChange"
       />
     </div>
 
@@ -293,6 +294,7 @@ const {
   onReset,
   onTabChange,
   onPageSizeChange,
+  onSortChange,
 } = useFinishingListData({
   tabs: FINISHING_TABS,
   clearSelection,

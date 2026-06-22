@@ -12,6 +12,7 @@
     :header-cell-style="compactHeaderCellStyle"
     @header-dragend="onHeaderDragEnd"
     @selection-change="onSelectionChange"
+    @sort-change="(p) => emit('sort-change', p)"
   >
     <el-table-column type="selection" width="48" align="center" />
     <el-table-column prop="orderNo" label="订单号" min-width="100" />
@@ -35,13 +36,13 @@
     <el-table-column label="客户交期" width="110" align="center">
       <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
     </el-table-column>
-    <el-table-column label="下单日期" width="110" align="center">
+    <el-table-column prop="orderDate" label="下单日期" width="115" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDate(row.orderDate) }}</template>
     </el-table-column>
-    <el-table-column prop="arrivedAtPattern" label="到纸样时间" width="110" align="center">
+    <el-table-column prop="arrivedAtPattern" label="到纸样时间" width="120" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDateTime(row.arrivedAtPattern) }}</template>
     </el-table-column>
-    <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+    <el-table-column prop="completedAt" label="完成时间" width="120" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
     </el-table-column>
     <el-table-column label="时效判定" width="96" align="center">
@@ -91,6 +92,7 @@ const emit = defineEmits<{
   (e: 'header-dragend', ...args: unknown[]): void
   (e: 'selection-change', rows: PatternListItem[]): void
   (e: 'open-detail', row: PatternListItem): void
+  (e: 'sort-change', payload: { prop: string; order: 'ascending' | 'descending' | null }): void
 }>()
 
 const tableRef = ref()

@@ -8,6 +8,7 @@ import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
+import { applyRowSort } from '../common/list-row-sort.util';
 import type { FinishingListItem, FinishingListQuery } from './production-finishing.types';
 import type { FinishingBatchEvent } from './finishing-batch.types';
 
@@ -287,7 +288,8 @@ export class ProductionFinishingQueryService {
     pageSize: number;
   }> {
     const { page = 1, pageSize = 20 } = query;
-    const rows = await this.buildFinishingRows(query);
+    const allRows = await this.buildFinishingRows(query);
+    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['arrivedAt', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;

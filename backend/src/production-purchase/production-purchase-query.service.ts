@@ -8,6 +8,7 @@ import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
+import { applyRowSort } from '../common/list-row-sort.util';
 import {
   PURCHASE_ORDER_STATUSES,
   type PurchaseItemRow,
@@ -205,6 +206,7 @@ export class ProductionPurchaseQueryService {
           pickStatus: pickStatus === 'completed' ? 'completed' : 'pending',
           purchaseCompletedAt: m.purchaseCompletedAt ?? null,
           pickCompletedAt: m.pickCompletedAt ?? null,
+          completedAt: (processRoute === 'picking' ? m.pickCompletedAt : m.purchaseCompletedAt) ?? null,
           purchaseUnitPrice: m.purchaseUnitPrice ?? null,
           purchaseOtherCost: m.purchaseOtherCost ?? null,
           purchaseRemark: m.purchaseRemark ?? null,
@@ -221,9 +223,10 @@ export class ProductionPurchaseQueryService {
       }
     }
 
-    const total = rows.length;
+    const sortedRows = applyRowSort(rows, query.sortField, query.sortOrder, ['orderDate', 'pendingPurchaseAt', 'completedAt']);
+    const total = sortedRows.length;
     const start = (page - 1) * pageSize;
-    const list = rows.slice(start, start + pageSize);
+    const list = sortedRows.slice(start, start + pageSize);
 
     return { list, total, page, pageSize };
   }

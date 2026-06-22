@@ -53,6 +53,8 @@ export class ProductionPurchaseController {
     @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
@@ -68,6 +70,8 @@ export class ProductionPurchaseController {
       completedEnd,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      sortField,
+      sortOrder: sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : undefined,
     };
     return this.purchaseQueryService.getPurchaseItems(query, user?.userId);
   }

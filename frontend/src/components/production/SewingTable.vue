@@ -12,6 +12,7 @@
       :header-cell-style="compactHeaderCellStyle"
       @header-dragend="onHeaderDragEnd"
       @selection-change="emit('selection-change', $event)"
+      @sort-change="(p) => emit('sort-change', p)"
     >
       <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="100" />
@@ -32,10 +33,10 @@
       <el-table-column label="客户交期" width="110" align="center">
         <template #default="{ row }">{{ formatDate(row.customerDueDate) }}</template>
       </el-table-column>
-      <el-table-column prop="arrivedAt" label="到车缝时间" width="110" align="center">
+      <el-table-column prop="arrivedAt" label="到车缝时间" width="120" align="center" sortable="custom">
         <template #default="{ row }">{{ formatDateTime(row.arrivedAt) }}</template>
       </el-table-column>
-      <el-table-column prop="completedAt" label="完成时间" width="110" align="center">
+      <el-table-column prop="completedAt" label="完成时间" width="120" align="center" sortable="custom">
         <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
       </el-table-column>
       <el-table-column label="时效判定" width="96" align="center">
@@ -44,7 +45,7 @@
         </template>
       </el-table-column>
       <el-table-column prop="factoryName" label="加工供应商" min-width="100" show-overflow-tooltip />
-      <el-table-column label="分单时间" width="110" align="center">
+      <el-table-column prop="distributedAt" label="分单时间" width="120" align="center" sortable="custom">
         <template #default="{ row }">{{ formatDateTime(row.distributedAt) }}</template>
       </el-table-column>
       <el-table-column label="加工供应商交期" width="110" align="center">
@@ -274,6 +275,7 @@ const emit = defineEmits<{
   (e: 'selection-change', rows: SewingListItem[]): void
   (e: 'show-qty-popover', row: SewingListItem): void
   (e: 'open-detail', row: SewingListItem): void
+  (e: 'sort-change', payload: { prop: string; order: 'ascending' | 'descending' | null }): void
 }>()
 
 const tableRef = ref()

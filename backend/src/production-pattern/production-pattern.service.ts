@@ -11,6 +11,7 @@ import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { applyRowSort } from '../common/list-row-sort.util';
 
 export interface PatternListItem {
   orderId: number;
@@ -56,6 +57,8 @@ export interface PatternListQuery {
   completedEnd?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface PatternMaterialRow {
@@ -465,7 +468,8 @@ export class ProductionPatternService {
   }> {
     this.schedulePatternReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
-    const rows = await this.buildPatternRows(query);
+    const allRows = await this.buildPatternRows(query);
+    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['orderDate', 'arrivedAtPattern', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;

@@ -5,6 +5,7 @@ import { getErrorMessage, isErrorHandled, isRequestCanceled } from '@/api/reques
 import { getDictTree, getDictItems } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { useTableSort } from '@/composables/useTableSort'
 import type { ProductionOrderBriefModel } from '@/components/production/ProductionOrderBriefPanel.vue'
 
 const CRAFT_TABS = [
@@ -86,6 +87,11 @@ export function useProductionProcessPage() {
     return `${tab.label}(${count})`
   }
 
+  const { sortField, sortOrder, onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+
   function buildQuery(): CraftListQuery {
     const q: CraftListQuery = {
       tab: currentTab.value,
@@ -95,6 +101,7 @@ export function useProductionProcessPage() {
       collaborationTypeId: filter.collaborationTypeId ?? undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
+      ...sortParams(),
     }
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
@@ -339,6 +346,7 @@ export function useProductionProcessPage() {
     onTabChange,
     onPageSizeChange,
     onSelectionChange,
+    onSortChange,
     onConfirmComplete,
     orderTypeDisplay,
     collaborationDisplay,

@@ -10,6 +10,7 @@ import { OrderStatusConfigService } from '../order-status-config/order-status-co
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { applyRowSort } from '../common/list-row-sort.util';
 import {
   type ColorSizeQuantityRow,
   assertColorRowsShape,
@@ -57,6 +58,8 @@ export interface SewingListQuery {
   completedEnd?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 @Injectable()
@@ -328,7 +331,8 @@ export class ProductionSewingService {
     pageSize: number;
   }> {
     const { page = 1, pageSize = 20 } = query;
-    const rows = await this.buildSewingRows(query);
+    const allRows = await this.buildSewingRows(query);
+    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['arrivedAt', 'distributedAt', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;

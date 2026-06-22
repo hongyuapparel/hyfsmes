@@ -38,6 +38,8 @@ export interface SewingListQuery {
   completedEnd?: string
   page?: number
   pageSize?: number
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export function getSewingTabCounts(params?: Omit<SewingListQuery, 'tab' | 'page' | 'pageSize'>) {

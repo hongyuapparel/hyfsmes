@@ -3,6 +3,7 @@ import { ElMessage } from 'element-plus'
 import { exportFinishingItems, getFinishingItems, getFinishingTabCounts, type FinishingListItem, type FinishingListQuery } from '@/api/production-finishing'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { useTableSort } from '@/composables/useTableSort'
 
 interface FinishingTabLike {
   value: string
@@ -33,6 +34,11 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
 
+  const { sortField, sortOrder, onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+
   function buildQuery(): FinishingListQuery {
     const q: FinishingListQuery = {
       tab: currentTab.value,
@@ -40,6 +46,7 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
       skuCode: normalizeTextFilter(filter.skuCode),
       page: pagination.page,
       pageSize: pagination.pageSize,
+      ...sortParams(),
     }
     if (completedRange.value && completedRange.value.length === 2) {
       q.completedStart = completedRange.value[0]
@@ -165,5 +172,8 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
     onReset,
     onTabChange,
     onPageSizeChange,
+    sortField,
+    sortOrder,
+    onSortChange,
   }
 }

@@ -110,6 +110,7 @@
         @selection-change="onSelectionChange"
         @show-qty-popover="onShowQtyPopover"
         @open-detail="openCuttingDetailDrawer"
+        @sort-change="onSortChange"
       />
     </div>
 
@@ -256,6 +257,7 @@ const {
   onReset,
   onTabChange,
   onPageSizeChange,
+  onSortChange,
 } = useCuttingListData({
   tabs: CUTTING_TABS,
   clearSelection,

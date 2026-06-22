@@ -37,6 +37,8 @@ export interface CuttingListQuery {
   completedEnd?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface CuttingRegisterFormMaterialRow {

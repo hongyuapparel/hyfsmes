@@ -186,6 +186,7 @@
         @header-dragend="onHeaderDragEnd"
         @selection-change="onSelectionChange"
         @open-detail="openPatternDetailDrawer"
+        @sort-change="onSortChange"
       />
     </div>
 
@@ -322,6 +323,7 @@ const {
   onTabChange: changeTab,
   onPageSizeChange: changePageSize,
   onSelectionChange: updateSelection,
+  onSortChange,
 } = usePatternList()
 
 async function load() {
