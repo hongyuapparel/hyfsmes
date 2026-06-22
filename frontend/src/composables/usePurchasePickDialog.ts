@@ -95,6 +95,10 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickDialog.index = 0
     pickDialog.total = options.selectedRows.value.length
     pickDialog.visible = true
+    pickForm.inventorySourceType = 'fabric'
+    currentSourceType = 'fabric'
+    pickDefaultKeyword = computePickDefaultKeyword('fabric', row)
+    void loadPickInventory('fabric', pickDefaultKeyword, true)
   }
 
   function clearPickInventorySearchTimer() {
@@ -111,7 +115,11 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickInventoryLoading.value = false
   }
 
-  async function loadPickInventory(sourceType: PickInventorySourceType | null, name?: string) {
+  async function loadPickInventory(
+    sourceType: PickInventorySourceType | null,
+    name?: string,
+    autoSelectFirst = false,
+  ) {
     if (!sourceType) {
       cancelPickInventoryLoad()
       pickInventoryOptions.value = []
@@ -160,7 +168,12 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
           imageUrl: item.imageUrl ?? '',
         }))
       }
-      if (reqId === pickInventoryReqId) pickInventoryOptions.value = nextOptions
+      if (reqId === pickInventoryReqId) {
+        pickInventoryOptions.value = nextOptions
+        if (autoSelectFirst && pickForm.inventoryId == null && nextOptions.length) {
+          pickForm.inventoryId = nextOptions[0].id
+        }
+      }
     } catch (e: unknown) {
       if (isRequestCanceled(e) || reqId !== pickInventoryReqId) return
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '库存列表加载失败'))
@@ -178,7 +191,8 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
   ): string | undefined {
     if (!sourceType || !row) return undefined
     if (sourceType === 'finished') return row.skuCode?.trim() || undefined
-    return row.materialName?.trim() || undefined
+    if (sourceType === 'fabric') return row.color?.trim() || row.materialName?.trim() || undefined
+    return row.materialName?.trim() || row.color?.trim() || undefined
   }
 
   async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
@@ -187,7 +201,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickInventoryOptions.value = []
     currentSourceType = val
     pickDefaultKeyword = computePickDefaultKeyword(val, pickDialog.row)
-    await loadPickInventory(val, pickDefaultKeyword)
+    await loadPickInventory(val, pickDefaultKeyword, true)
   }
 
   function onPickInventorySearch(query: string) {
