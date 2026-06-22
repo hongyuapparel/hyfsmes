@@ -55,6 +55,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
   const pickInventoryOptions = ref<PurchasePickInventoryOption[]>([])
   const pickInventoryLoading = ref(false)
   let currentSourceType: PickInventorySourceType | null = null
+  let pickDefaultKeyword: string | undefined
   let pickInventorySearchTimer: ReturnType<typeof setTimeout> | null = null
   let pickInventoryReqId = 0
   let pickInventoryAbortController: AbortController | null = null
@@ -171,12 +172,22 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     }
   }
 
+  function computePickDefaultKeyword(
+    sourceType: PickInventorySourceType | null,
+    row: PurchaseItemRow | null,
+  ): string | undefined {
+    if (!sourceType || !row) return undefined
+    if (sourceType === 'finished') return row.skuCode?.trim() || undefined
+    return row.materialName?.trim() || undefined
+  }
+
   async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
     clearPickInventorySearchTimer()
     pickForm.inventoryId = null
     pickInventoryOptions.value = []
     currentSourceType = val
-    await loadPickInventory(val)
+    pickDefaultKeyword = computePickDefaultKeyword(val, pickDialog.row)
+    await loadPickInventory(val, pickDefaultKeyword)
   }
 
   function onPickInventorySearch(query: string) {
@@ -184,7 +195,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     const keyword = query.trim()
     pickInventorySearchTimer = setTimeout(() => {
       pickInventorySearchTimer = null
-      void loadPickInventory(currentSourceType, keyword || undefined)
+      void loadPickInventory(currentSourceType, keyword || pickDefaultKeyword)
     }, PICK_INVENTORY_SEARCH_DELAY_MS)
   }
 
@@ -197,6 +208,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickForm.quantity = null
     pickForm.remark = ''
     currentSourceType = null
+    pickDefaultKeyword = undefined
     cancelPickInventoryLoad()
     pickInventoryOptions.value = []
   }

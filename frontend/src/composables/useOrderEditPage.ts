@@ -13,6 +13,7 @@ import { useOrderEditPayload } from '@/composables/useOrderEditPayload'
 import { useOrderEditSubmit } from '@/composables/useOrderEditSubmit'
 import { useOrderImageUpload } from '@/composables/useOrderImageUpload'
 import { useOrderMaterials } from '@/composables/useOrderMaterials'
+import { useOrderMaterialNameSearch } from '@/composables/useOrderMaterialNameSearch'
 import { useOrderPackaging } from '@/composables/useOrderPackaging'
 import { useOrderProcessItems } from '@/composables/useOrderProcessItems'
 import { useOrderSizeInfo } from '@/composables/useOrderSizeInfo'
@@ -66,6 +67,9 @@ export function useOrderEditPage() {
   const orderImageUploadApi = useOrderImageUpload(form)
   const packagingApi = useOrderPackaging()
   const materialsApi = useOrderMaterials()
+  const materialNameSearchApi = useOrderMaterialNameSearch({
+    getMaterialTypeLabel: materialsApi.getMaterialTypeLabel,
+  })
 
   const rules: FormRules = {
     skuCode: [{ required: true, message: '请选择 SKU', trigger: 'change' }],
@@ -246,6 +250,7 @@ export function useOrderEditPage() {
     ...orderImageUploadApi,
     ...packagingApi,
     ...materialsApi,
+    ...materialNameSearchApi,
     rules,
     ...customerSelectionApi,
     ...skuSelectionApi,

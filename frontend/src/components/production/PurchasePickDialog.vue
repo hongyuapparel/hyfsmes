@@ -49,7 +49,7 @@
             remote
             :remote-method="onInventorySearch"
             :loading="inventoryLoading"
-            placeholder="先选择库存来源类型，再输入关键字搜索"
+            placeholder="已按本行物料预筛，可直接选择或输入关键字"
             :disabled="!form.inventorySourceType"
           >
             <el-option v-for="opt in inventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
