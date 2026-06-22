@@ -153,14 +153,37 @@
       :display-dash="displayDash"
       :money-display="moneyDisplay"
       :fabric-meters-display="fabricMetersDisplay"
+      :can-edit="canCompleteCuttingAction"
       @update:drawer="detailDrawer.visible = $event.visible"
       @closed="onDetailDrawerClosed"
+      @edit="onEditFromDrawer"
+    />
+
+    <CuttingRegisterDialog
+      :dialog="editDialog"
+      :form="editForm"
+      mode="edit"
+      :self-department-label="SELF_DEPARTMENT_LABEL"
+      :cutting-department-options="cuttingDepartmentOptions"
+      :is-self-cutting="isSelfCuttingEdit"
+      :cutter-options="cutterOptions"
+      :actual-cut-grand-total="actualCutGrandTotalEdit"
+      :cutting-unit-price-num="cuttingUnitPriceNumEdit"
+      :cutting-total-cost-display="cuttingTotalCostDisplayEdit"
+      :fabric-net-grand-total="fabricNetGrandTotalEdit"
+      :format-fabric-grand="formatFabricGrandEdit"
+      @update:dialog="editDialog.visible = $event.visible"
+      @update:cutting-unit-price-num="cuttingUnitPriceNumEdit = $event"
+      @close="resetEditForm"
+      @submit="submitEdit"
+      @department-change="onCuttingDepartmentChangeEdit"
     />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { type CuttingListItem } from '@/api/production-cutting'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
@@ -176,6 +199,7 @@ import { useCuttingSelection } from '@/composables/useCuttingSelection'
 import { useCuttingSizePopover } from '@/composables/useCuttingSizePopover'
 import { useCuttingDetail } from '@/composables/useCuttingDetail'
 import { useCuttingRegister } from '@/composables/useCuttingRegister'
+import { useCuttingEdit } from '@/composables/useCuttingEdit'
 import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import CuttingTable from '@/components/production/CuttingTable.vue'
@@ -277,6 +301,42 @@ const {
   reloadList: load,
   reloadTabCounts: loadTabCounts,
 })
+const {
+  editDialog,
+  editForm,
+  isSelfCutting: isSelfCuttingEdit,
+  actualCutGrandTotal: actualCutGrandTotalEdit,
+  cuttingUnitPriceNum: cuttingUnitPriceNumEdit,
+  cuttingTotalCostDisplay: cuttingTotalCostDisplayEdit,
+  fabricNetGrandTotal: fabricNetGrandTotalEdit,
+  formatFabricGrand: formatFabricGrandEdit,
+  onCuttingDepartmentChange: onCuttingDepartmentChangeEdit,
+  openEditDialog,
+  resetEditForm,
+  submitEdit,
+} = useCuttingEdit({
+  reloadList: load,
+  reloadTabCounts: loadTabCounts,
+})
+
+async function onEditFromDrawer() {
+  const row = detailDrawer.row
+  const detail = detailPayload.value
+  if (!row || !detail) return
+  if (detail.downstream?.sewingStarted) {
+    try {
+      await ElMessageBox.confirm(
+        `下游车缝已登记 ${detail.downstream.sewingQuantity} 件，修改裁床数据可能导致数据不一致。确认继续编辑？`,
+        '修改已完成的裁床数据',
+        { type: 'warning', confirmButtonText: '继续编辑', cancelButtonText: '取消' },
+      )
+    } catch {
+      return
+    }
+  }
+  detailDrawer.visible = false
+  openEditDialog(row, detail)
+}
 
 const cuttingDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
 

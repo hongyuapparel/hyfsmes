@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting, type ActualCutRow, type CuttingMaterialUsageRow } from '../entities/order-cutting.entity';
+import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { SystemOption } from '../entities/system-option.entity';
 import { OrderStatus } from '../entities/order-status.entity';
@@ -12,6 +13,8 @@ import { SystemOptionsService } from '../system-options/system-options.service';
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { getSewnDetail, findCutBelowSewn } from './production-cutting-downstream.util';
+import { buildCuttingLogDetail, buildCuttingEditLogDetail } from './production-cutting-log.util';
 import { CUTTING_ABNORMAL_REASONS } from './production-cutting.types';
 
 const ALLOWED_MATERIAL_CATEGORY_VALUES = new Set(['主布', '里布', '配布', '衬布']);
@@ -23,6 +26,8 @@ export class ProductionCuttingMutationService {
     private readonly orderRepo: Repository<Order>,
     @InjectRepository(OrderCutting)
     private readonly cuttingRepo: Repository<OrderCutting>,
+    @InjectRepository(OrderSewing)
+    private readonly sewingRepo: Repository<OrderSewing>,
     @InjectRepository(OrderExt)
     private readonly orderExtRepo: Repository<OrderExt>,
     @InjectRepository(OrderStatus)
@@ -257,15 +262,26 @@ export class ProductionCuttingMutationService {
     return { normalized, fabricNetSum };
   }
 
-  private buildCuttingLogDetail(rows: ActualCutRow[]): string {
-    if (!rows.length) return '裁床登记：已完成';
-    const segments = rows.map((row) => {
-      const color = (row.colorName ?? '-').trim() || '-';
-      const qtys = Array.isArray(row.quantities) ? row.quantities : [];
-      const sum = qtys.reduce((acc, q) => acc + (Number.isFinite(Number(q)) ? Number(q) : 0), 0);
-      return `${color} ${sum} 件`;
-    });
-    return `裁床登记：${segments.join(' / ')}`;
+  /** 编辑前读取旧的单价/部门/裁剪人（select:false 列，需原生查询；列不存在则返回 null） */
+  private async fetchOldEditFields(
+    orderId: number,
+  ): Promise<{ unitPrice: string | null; department: string | null; cutter: string | null }> {
+    const out = { unitPrice: null as string | null, department: null as string | null, cutter: null as string | null };
+    try {
+      const rows = await this.cuttingRepo.query(
+        'SELECT cutting_unit_price AS u, cutting_department AS d, cutter_name AS c FROM `order_cutting` WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const r = Array.isArray(rows) && rows[0] ? (rows[0] as { u?: unknown; d?: unknown; c?: unknown }) : null;
+      if (r) {
+        out.unitPrice = r.u != null ? String(r.u) : null;
+        out.department = r.d != null ? String(r.d) : null;
+        out.cutter = r.c != null ? String(r.c) : null;
+      }
+    } catch {
+      /* 列不存在（旧库）时忽略 */
+    }
+    return out;
   }
 
   async completeCutting(
@@ -280,15 +296,45 @@ export class ProductionCuttingMutationService {
       materialUsage?: CuttingMaterialUsageRow[] | null;
     },
     actor?: { userId?: number; username?: string },
+    options?: { mode?: 'complete' | 'edit'; confirmDownstream?: boolean },
   ): Promise<void> {
+    const isEdit = options?.mode === 'edit';
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
-    if (order.status !== 'pending_cutting') throw new NotFoundException('仅待裁床订单可完成登记');
+    let editOldRows: ActualCutRow[] | null = null;
+    if (!isEdit) {
+      if (order.status !== 'pending_cutting') throw new NotFoundException('仅待裁床订单可完成登记');
+    } else {
+      const existing = await this.cuttingRepo.findOne({ where: { orderId } });
+      if (!existing || String(existing.status ?? '').toLowerCase() !== 'completed') {
+        throw new NotFoundException('仅已完成裁床的订单可编辑裁床数据');
+      }
+      editOldRows = Array.isArray(existing.actualCutRows) ? existing.actualCutRows : [];
+    }
 
     const rowsIn = Array.isArray(actualCutRows) ? actualCutRows : [];
     this.validateActualCutRows(rowsIn);
     const piecesGrand = this.sumActualCutPieces(rowsIn);
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+
+    // 编辑模式：下游车缝冲突判定
+    let editOldMeta = { unitPrice: null as string | null, department: null as string | null, cutter: null as string | null };
+    if (isEdit) {
+      const sewn = await getSewnDetail(this.sewingRepo, orderId);
+      const violation = findCutBelowSewn(ext?.colorSizeHeaders ?? [], rowsIn, sewn);
+      if (violation) {
+        const where = violation.colorName ? `「${violation.colorName}」${violation.sizeLabel}` : '该订单';
+        throw new BadRequestException(
+          `${where}已车缝 ${violation.sewnQty} 件，裁床数量不能少于已车缝数（当前填 ${violation.cutQty}）。请先回退车缝再修改。`,
+        );
+      }
+      if (sewn.started && !options?.confirmDownstream) {
+        throw new BadRequestException(
+          `车缝已登记 ${sewn.sewingQuantity} 件，修改裁床数据可能导致下游数据不一致，请确认后再提交`,
+        );
+      }
+      editOldMeta = await this.fetchOldEditFields(orderId);
+    }
     const typeOptions = await this.systemOptionsService.findAllByType('material_types');
     const template = this.buildMaterialTemplateRows(ext?.materials ?? null, typeOptions);
     const mergedUsage = this.mergeMaterialUsageWithClient(template, body.materialUsage ?? null);
@@ -370,7 +416,7 @@ export class ProductionCuttingMutationService {
     } else {
       cutting.status = 'completed';
       cutting.arrivedAt = cutting.arrivedAt ?? arrivedAt;
-      cutting.completedAt = now;
+      cutting.completedAt = isEdit ? cutting.completedAt : now;
       cutting.cuttingCost = costNorm;
       cutting.actualCutRows = rowsIn.length ? rowsIn : null;
       if (hasColumns) {
@@ -380,19 +426,23 @@ export class ProductionCuttingMutationService {
       if (hasFabricCol) (cutting as { actualFabricMeters?: string | null }).actualFabricMeters = depNorm === SELF ? fabricNorm : null;
     }
 
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'cutting_completed',
-      actorUserId: actor?.userId ?? 0,
-    });
-    if (!next) {
-      throw new BadRequestException('未匹配到“裁床完成”流转规则，请先在订单设置中检查流程链路配置');
+    // 编辑模式只更新裁床记录，不触发状态流转、不改订单状态
+    let next: string | null = null;
+    if (!isEdit) {
+      next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'cutting_completed',
+        actorUserId: actor?.userId ?? 0,
+      });
+      if (!next) {
+        throw new BadRequestException('未匹配到“裁床完成”流转规则，请先在订单设置中检查流程链路配置');
+      }
     }
 
     await this.cuttingRepo.save(cutting);
     await this.persistCuttingRegisterV2Columns(hasV2Columns, orderId, unitStr, totalStr, materialNorm);
 
-    if (next && next !== order.status) {
+    if (!isEdit && next && next !== order.status) {
       order.status = next;
       order.statusTime = now;
       await this.orderRepo.save(order);
@@ -401,13 +451,21 @@ export class ProductionCuttingMutationService {
 
     try {
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
-      const detail = this.buildCuttingLogDetail(rowsIn);
+      const detail = isEdit
+        ? buildCuttingEditLogDetail(
+            ext?.colorSizeHeaders ?? [],
+            editOldRows,
+            rowsIn,
+            editOldMeta,
+            { unitPrice: unitStr, department: depNorm || null, cutter: depNorm === SELF ? cutterNorm || null : null },
+          )
+        : buildCuttingLogDetail(rowsIn, '裁床登记');
       await this.orderLogRepo.save(
         this.orderLogRepo.create({
           orderId,
           orderNo: order.orderNo,
           operatorUsername: operator,
-          action: 'production_cutting_register',
+          action: isEdit ? 'production_cutting_edit' : 'production_cutting_register',
           detail,
           targetType: 'order',
           targetRef: null,

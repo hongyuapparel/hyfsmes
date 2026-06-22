@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCutting } from '../entities/order-cutting.entity';
+import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
@@ -23,6 +24,7 @@ import { ProductionCuttingMutationService } from './production-cutting-mutation.
     TypeOrmModule.forFeature([
       Order,
       OrderCutting,
+      OrderSewing,
       OrderExt,
       OrderStatus,
       OrderStatusHistory,

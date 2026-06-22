@@ -13,7 +13,20 @@
         </ProductionDetailSection>
         <template v-if="detailPayload">
           <ProductionDetailSection>
-            <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" show-extended />
+            <div class="cut-detail-toolbar">
+              <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" show-extended />
+              <el-button
+                v-if="canEdit"
+                type="primary"
+                size="small"
+                @click="emit('edit')"
+              >
+                编辑
+              </el-button>
+            </div>
+            <p v-if="detailPayload.downstream?.sewingStarted" class="register-hint register-hint--warn">
+              下游车缝已登记 {{ detailPayload.downstream.sewingQuantity }} 件，修改裁床数据可能导致数据不一致。
+            </p>
             <p class="register-hint">以下为该订单裁床完成时登记的裁剪数量与物料用量（只读）。</p>
             <CuttingQuantityMatrix
               :model-value="detailPayload.actualCutRows"
@@ -114,11 +127,13 @@ const props = defineProps<{
   displayDash: (v: string | null | undefined) => string
   moneyDisplay: (v: string | null | undefined) => string
   fabricMetersDisplay: (v: string | null | undefined) => string
+  canEdit?: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'update:drawer', val: DrawerState): void
   (e: 'closed'): void
+  (e: 'edit'): void
 }>()
 
 const visible = computed({
@@ -132,10 +147,21 @@ const visible = computed({
   min-height: 120px;
 }
 
+.cut-detail-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-sm);
+}
+
 .register-hint {
   margin-bottom: var(--space-sm);
   color: var(--el-text-color-secondary);
   font-size: var(--font-size-caption, 12px);
+}
+
+.register-hint--warn {
+  color: var(--el-color-warning);
 }
 
 .cut-detail-meta {
