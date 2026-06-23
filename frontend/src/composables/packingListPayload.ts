@@ -8,6 +8,8 @@ export interface PackingForm {
   customerName: string
   serviceManager: string
   poNo: string
+  country: string
+  postalCode: string
   xiaomanOrderNo: string
   xiaomanOrderId: string
   packDate: string | null
@@ -43,6 +45,8 @@ export function buildPayload(form: PackingForm, grid: PackingGridState): SavePac
     customerName: form.customerName.trim(),
     serviceManager: form.serviceManager.trim(),
     poNo: form.poNo.trim(),
+    country: form.country.trim(),
+    postalCode: form.postalCode.trim(),
     xiaomanOrderNo: form.xiaomanOrderNo.trim(),
     xiaomanOrderId: form.xiaomanOrderId.trim(),
     packDate: form.packDate || null,

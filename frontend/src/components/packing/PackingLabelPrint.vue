@@ -50,11 +50,10 @@
             </tr>
             <tr class="lt-customer">
               <td class="lt-label" colspan="2">CUSTOMER</td>
-              <td :colspan="totalCols(box) - 2" class="lt-customer-val" contenteditable="true">{{ detail.poNo || detail.customerName }}</td>
-            </tr>
-            <tr v-if="detail.serviceManager" class="lt-info">
-              <td class="lt-label" colspan="2">SERVICE MANAGER</td>
-              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ detail.serviceManager }}</td>
+              <td :colspan="totalCols(box) - 2" class="lt-customer-val" contenteditable="true">
+                {{ detail.poNo || detail.customerName }}
+                <span v-if="addressLine" class="lt-addr">{{ addressLine }}</span>
+              </td>
             </tr>
 
             <tr class="lt-matrix-head">
@@ -92,6 +91,9 @@
             <tr>
               <td :colspan="totalCols(box)" class="lt-madein" contenteditable="true">MADE IN CHINA</td>
             </tr>
+            <tr v-if="detail.serviceManager">
+              <td :colspan="totalCols(box)" class="lt-svc-sm" contenteditable="true">Service Manager: {{ detail.serviceManager }}</td>
+            </tr>
           </tbody>
           </table>
         </div>
@@ -101,7 +103,7 @@
 </template>
 
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import type { PackingBoxDetail, PackingItemDetail, PackingListDetail } from '@/api/packing-lists'
 
@@ -109,6 +111,11 @@ const props = defineProps<{
   visible: boolean
   detail: PackingListDetail
 }>()
+
+/** 收货地址行：国家 · 邮编，跟客户名组成地址块 */
+const addressLine = computed(() =>
+  [props.detail.country, props.detail.postalCode].map((s) => (s || '').trim()).filter(Boolean).join(' · '),
+)
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]

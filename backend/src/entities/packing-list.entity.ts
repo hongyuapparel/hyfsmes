@@ -25,6 +25,14 @@ export class PackingList {
   @Column({ name: 'po_no', length: 255, default: '' })
   poNo: string;
 
+  /** 收货国家：英文国名（前端中英对照下拉选/小满带出），进客户单+箱贴打印 */
+  @Column({ name: 'country', length: 64, default: '' })
+  country: string;
+
+  /** 邮编：手填，进客户单+箱贴打印 */
+  @Column({ name: 'postal_code', length: 32, default: '' })
+  postalCode: string;
+
   /** 小满单号：业务员选/填，供财务审核，仅内部用，不进客户单/箱贴打印 */
   @Column({ name: 'xiaoman_order_no', length: 64, default: '' })
   xiaomanOrderNo: string;

@@ -86,6 +86,16 @@ export class SavePackingListDto {
   @IsOptional()
   @IsString()
   @MaxLength(64)
+  country?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
   xiaomanOrderNo?: string;
 
   @IsOptional()

@@ -121,6 +121,23 @@
   letter-spacing: 1px;
 }
 
+/* 地址块：客户名下另起一行小字显示 国家 · 邮编 */
+.label-table .lt-addr {
+  display: block;
+  margin-top: 4px;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+/* 业务员挪到底部小灰字，不抢主信息 */
+.label-table .lt-svc-sm {
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: #888;
+}
+
 /* 尺码矩阵 */
 .lt-matrix-head th {
   font-weight: 700;

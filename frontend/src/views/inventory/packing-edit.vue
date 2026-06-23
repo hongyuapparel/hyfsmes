@@ -77,6 +77,21 @@
         <el-form-item label="PO#">
           <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
         </el-form-item>
+        <el-form-item label="国家">
+          <el-select
+            v-model="edit.form.country"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="选择或输入国家（印英文国名）"
+          >
+            <el-option v-for="c in COUNTRY_OPTIONS" :key="c.en" :label="`${c.cn} ${c.en}`" :value="c.en" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="邮编">
+          <el-input v-model="edit.form.postalCode" placeholder="选填，收货邮编" />
+        </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
             v-model="edit.form.packDate"
@@ -142,7 +157,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Link } from '@element-plus/icons-vue'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { searchXiaomanOrders, shipPackingList, type PickableLine } from '@/api/packing-lists'
+import { getXiaomanCompanyCountry, searchXiaomanOrders, shipPackingList, type PickableLine } from '@/api/packing-lists'
+import { COUNTRY_OPTIONS, matchCountryEn } from '@/constants/countries'
 import { usePackingGridRows } from '@/composables/usePackingGridRows'
 import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
@@ -162,7 +178,7 @@ const labelsVisible = ref(false)
 const docVisible = ref(false)
 
 // 小满订单：远程搜索下拉（小满列表接口无关键词，后端拉取后本地过滤）+ 选中存订单ID用于跳转
-const xiaomanOptions = ref<{ value: string; label: string; orderId: string; companyName: string }[]>([])
+const xiaomanOptions = ref<{ value: string; label: string; orderId: string; companyId: number; companyName: string }[]>([])
 const xiaomanLoading = ref(false)
 const xiaomanOrderUrl = computed(() =>
   edit.form.xiaomanOrderId ? `https://crm.xiaoman.cn/order/detail/${edit.form.xiaomanOrderId}` : '',
@@ -183,6 +199,7 @@ async function onXiaomanSearch(keyword: string) {
         value,
         label: o.company_name ? `${value} · ${o.company_name}` : value,
         orderId: String(o.order_id),
+        companyId: o.company_id || 0,
         companyName: o.company_name || '',
       }
     })
@@ -194,13 +211,23 @@ async function onXiaomanSearch(keyword: string) {
   }
 }
 
-function onXiaomanChange(val: string) {
+async function onXiaomanChange(val: string) {
   const picked = xiaomanOptions.value.find((o) => o.value === val)
   edit.form.xiaomanOrderId = picked?.orderId ?? ''
   // 选中小满订单总是带入其客户名（解析客户档案/业务员），但 skipClear=true 不清已选的待仓/成品货。
   if (picked?.companyName) {
     edit.form.customerName = picked.companyName
     edit.onCustomerChange(true)
+  }
+  // best-effort 带出国家：按客户 company_id 拉一次小满国家，能匹配下拉就自动选中，匹配不上不动现值。
+  if (picked?.companyId) {
+    try {
+      const res = await getXiaomanCompanyCountry(picked.companyId)
+      const matched = matchCountryEn(res.data.country)
+      if (matched) edit.form.country = matched
+    } catch {
+      /* 取国家失败不影响选单，静默忽略 */
+    }
   }
 }
 

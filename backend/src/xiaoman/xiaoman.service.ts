@@ -40,6 +40,7 @@ export interface XiaomanOrderItem {
   order_id: number;
   order_no: string;
   name: string;
+  company_id: number;
   company_name: string;
   account_date: string;
 }
@@ -311,14 +312,23 @@ export class XiaomanService {
   }
 
   private normalizeOrder(raw: Record<string, unknown>): XiaomanOrderItem {
-    const company = (raw.company ?? null) as { name?: string } | null;
+    const company = (raw.company ?? null) as { name?: string; company_id?: number } | null;
     return {
       order_id: Number(raw.order_id) || 0,
       order_no: String(raw.order_no ?? '').trim(),
       name: String(raw.name ?? '').trim(),
+      company_id: Number(raw.company_id ?? company?.company_id) || 0,
       company_name: String(raw.company_name ?? company?.name ?? '').trim(),
       account_date: String(raw.account_date ?? '').trim(),
     };
+  }
+
+  /** 取某客户在小满里的国家（选订单后按 company_id 拉一次详情），用于带出装箱单收货国家。取不到返回 ''。 */
+  async getCompanyCountry(companyId: number): Promise<string> {
+    if (!companyId) return '';
+    const detail = await this.getCompanyDetail(companyId);
+    if (!detail) return '';
+    return String(detail.country ?? detail.country_region?.country ?? '').trim();
   }
 
   /** 拉取近期销售订单（按更新时间倒序），最多 MAX 条，供后端本地按关键词过滤 */

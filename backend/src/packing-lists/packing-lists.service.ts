@@ -67,6 +67,8 @@ export interface PackingListDetail {
   customerName: string;
   serviceManager: string;
   poNo: string;
+  country: string;
+  postalCode: string;
   xiaomanOrderNo: string;
   xiaomanOrderId: string;
   packDate: string | null;
@@ -219,6 +221,8 @@ export class PackingListsService {
       customerName: list.customerName,
       serviceManager: list.serviceManager,
       poNo: list.poNo,
+      country: list.country,
+      postalCode: list.postalCode,
       xiaomanOrderNo: list.xiaomanOrderNo,
       xiaomanOrderId: list.xiaomanOrderId,
       packDate: list.packDate,
@@ -408,6 +412,8 @@ export class PackingListsService {
     };
     diff('客户', oldList.customerName, cols.customerName ?? '');
     diff('业务员', oldList.serviceManager, cols.serviceManager ?? '');
+    diff('国家', oldList.country, cols.country ?? '');
+    diff('邮编', oldList.postalCode, cols.postalCode ?? '');
     diff('小满单号', oldList.xiaomanOrderNo, cols.xiaomanOrderNo ?? '');
     diff('装箱日期', oldList.packDate ?? '', cols.packDate ?? '');
     if (oldCounts.boxCount !== newCounts.boxCount) parts.push(`箱数 ${oldCounts.boxCount}→${newCounts.boxCount}`);
@@ -421,6 +427,8 @@ export class PackingListsService {
       customerName: (payload.customerName ?? '').trim(),
       serviceManager: (payload.serviceManager ?? '').trim(),
       poNo: (payload.poNo ?? '').trim(),
+      country: (payload.country ?? '').trim(),
+      postalCode: (payload.postalCode ?? '').trim(),
       xiaomanOrderNo: (payload.xiaomanOrderNo ?? '').trim(),
       xiaomanOrderId: (payload.xiaomanOrderId ?? '').trim(),
       packDate: payload.packDate?.trim() || null,
