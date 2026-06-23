@@ -24,9 +24,12 @@
         </header>
 
         <div class="doc-meta">
-          <div class="doc-meta-item">
+          <div class="doc-meta-item doc-meta-address">
             <span class="doc-meta-label">Customer</span>
-            <span class="doc-meta-value">{{ detail.customerName || '—' }}</span>
+            <span class="doc-meta-value">
+              {{ detail.customerName || '—' }}
+              <span v-if="addressLine" class="doc-addr">{{ addressLine }}</span>
+            </span>
           </div>
           <div class="doc-meta-item">
             <span class="doc-meta-label">No.</span>
@@ -40,15 +43,13 @@
             <span class="doc-meta-label">Date</span>
             <span class="doc-meta-value">{{ detail.packDate || '—' }}</span>
           </div>
-          <div v-if="detail.serviceManager" class="doc-meta-item">
-            <span class="doc-meta-label">Service Manager</span>
-            <span class="doc-meta-value">{{ detail.serviceManager }}</span>
-          </div>
           <div class="doc-meta-item">
             <span class="doc-meta-label">Cartons</span>
             <span class="doc-meta-value">{{ totals.boxCount }}</span>
           </div>
         </div>
+
+        <div v-if="detail.remark" class="doc-remark-top">Remark: {{ detail.remark }}</div>
 
         <table class="doc-table">
           <thead>
@@ -88,7 +89,7 @@
         </table>
 
         <div class="doc-footer">
-          <div v-if="detail.remark" class="doc-remark">Remark: {{ detail.remark }}</div>
+          <div v-if="detail.serviceManager" class="doc-foot-svc">Service Manager: {{ detail.serviceManager }}</div>
           <div class="doc-madein">MADE IN CHINA</div>
         </div>
       </div>
@@ -147,6 +148,11 @@ const docRows = computed<DocRow[]>(() => {
   }
   return rows
 })
+
+/** 收货地址行：国家 · 邮编（英文国名），跟在客户名下面组成地址块 */
+const addressLine = computed(() =>
+  [props.detail.country, props.detail.postalCode].map((s) => (s || '').trim()).filter(Boolean).join(' · '),
+)
 
 const hasImage = computed(() => props.detail.boxes.some((box) => box.items.some((item) => !!item.imageUrl)))
 

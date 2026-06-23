@@ -280,6 +280,8 @@ async function ensurePackingListTables(dataSource: DataSource) {
       customer_name VARCHAR(255) NOT NULL DEFAULT '',
       service_manager VARCHAR(128) NOT NULL DEFAULT '',
       po_no VARCHAR(255) NOT NULL DEFAULT '',
+      country VARCHAR(64) NOT NULL DEFAULT '',
+      postal_code VARCHAR(32) NOT NULL DEFAULT '',
       xiaoman_order_no VARCHAR(64) NOT NULL DEFAULT '',
       xiaoman_order_id VARCHAR(32) NOT NULL DEFAULT '',
       pack_date DATE NULL,
@@ -368,6 +370,22 @@ async function ensurePackingListTables(dataSource: DataSource) {
   `);
   if (Number(xiaomanIdColRows?.[0]?.cnt) === 0) {
     await dataSource.query(`ALTER TABLE packing_lists ADD COLUMN xiaoman_order_id VARCHAR(32) NOT NULL DEFAULT '' AFTER xiaoman_order_no`);
+  }
+
+  // 老表补 country / postal_code 列（收货国家+邮编，进客户单/箱贴打印）
+  const countryColRows: Array<{ cnt: number }> = await dataSource.query(`
+    SELECT COUNT(*) AS cnt FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'packing_lists' AND column_name = 'country'
+  `);
+  if (Number(countryColRows?.[0]?.cnt) === 0) {
+    await dataSource.query(`ALTER TABLE packing_lists ADD COLUMN country VARCHAR(64) NOT NULL DEFAULT '' AFTER po_no`);
+  }
+  const postalColRows: Array<{ cnt: number }> = await dataSource.query(`
+    SELECT COUNT(*) AS cnt FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'packing_lists' AND column_name = 'postal_code'
+  `);
+  if (Number(postalColRows?.[0]?.cnt) === 0) {
+    await dataSource.query(`ALTER TABLE packing_lists ADD COLUMN postal_code VARCHAR(32) NOT NULL DEFAULT '' AFTER country`);
   }
 
   console.log('[Schema] Ensured packing list tables');
