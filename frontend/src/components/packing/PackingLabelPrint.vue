@@ -112,10 +112,12 @@ const props = defineProps<{
   detail: PackingListDetail
 }>()
 
-/** 收货地址行：国家 · 邮编，跟客户名组成地址块 */
-const addressLine = computed(() =>
-  [props.detail.country, props.detail.postalCode].map((s) => (s || '').trim()).filter(Boolean).join(' · '),
-)
+/** 收货地址行：邮编 + 国家（国名大写，便于卡车/报关扫读），跟客户名组成地址块 */
+const addressLine = computed(() => {
+  const zip = (props.detail.postalCode || '').trim()
+  const country = (props.detail.country || '').trim().toUpperCase()
+  return [zip, country].filter(Boolean).join(' ')
+})
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
