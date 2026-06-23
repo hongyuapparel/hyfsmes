@@ -31,10 +31,6 @@
               <span v-if="addressLine" class="doc-addr">{{ addressLine }}</span>
             </span>
           </div>
-          <div class="doc-meta-item">
-            <span class="doc-meta-label">No.</span>
-            <span class="doc-meta-value">{{ detail.code || '—' }}</span>
-          </div>
           <div v-if="detail.poNo" class="doc-meta-item">
             <span class="doc-meta-label">PO#</span>
             <span class="doc-meta-value">{{ detail.poNo }}</span>
