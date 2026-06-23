@@ -51,6 +51,8 @@ export class XiaomanService {
   private tokenByScope = new Map<string, { token: string; expiry: number }>();
   private companyListCache: { list: XiaomanCompanyItem[]; fetchedAt: number } | null = null;
   private orderListCache: { list: XiaomanOrderItem[]; fetchedAt: number } | null = null;
+  /** 并发去重：缓存冷时多个请求(预热+正式搜索)共用同一次拉取，避免重复全量拉小满 */
+  private orderListInflight: Promise<XiaomanOrderItem[]> | null = null;
   private companyListCacheTtlMs = 5 * 60 * 1000; // 5 分钟
   private listLoggedOnce = false;
 
@@ -336,7 +338,8 @@ export class XiaomanService {
     const token = await this.getToken('invoices');
     const baseUrl = this.getBaseUrl();
     const MAX = 2000;
-    const COUNT = 200;
+    // 每页 500（与客户列表同口径，已验证小满允许），减少翻页次数：1449 单从 ~8 次顺序请求降到 ~3 次，冷拉取明显变快
+    const COUNT = 500;
     const out: XiaomanOrderItem[] = [];
     for (let startIndex = 1; out.length < MAX; startIndex++) {
       const url = `${baseUrl}/v1/invoices/order/list?count=${COUNT}&start_index=${startIndex}&time_type=1`;
@@ -367,8 +370,17 @@ export class XiaomanService {
     if (this.orderListCache && now - this.orderListCache.fetchedAt < this.companyListCacheTtlMs) {
       all = this.orderListCache.list;
     } else {
-      all = await this.fetchRecentOrders();
-      if (all.length) this.orderListCache = { list: all, fetchedAt: now };
+      if (!this.orderListInflight) {
+        this.orderListInflight = this.fetchRecentOrders()
+          .then((list) => {
+            if (list.length) this.orderListCache = { list, fetchedAt: Date.now() };
+            return list;
+          })
+          .finally(() => {
+            this.orderListInflight = null;
+          });
+      }
+      all = await this.orderListInflight;
     }
     const kw = keyword?.trim().toLowerCase();
     const filtered = kw

@@ -39,6 +39,7 @@
               :loading="xiaomanLoading"
               placeholder="搜小满订单号/客户，或手填"
               class="xiaoman-select"
+              @focus="onXiaomanFocus"
               @change="onXiaomanChange"
             >
               <el-option v-for="o in xiaomanOptions" :key="o.value" :label="o.label" :value="o.value" />
@@ -183,6 +184,17 @@ const xiaomanLoading = ref(false)
 const xiaomanOrderUrl = computed(() =>
   edit.form.xiaomanOrderId ? `https://crm.xiaoman.cn/order/detail/${edit.form.xiaomanOrderId}` : '',
 )
+
+// 小满订单列表接口无关键词参数，后端需先拉取近期订单(较慢、首拉后缓存5分钟)再本地过滤。
+// 聚焦时就后台预热缓存，让用户输入完成时正式搜索直接命中缓存，避免输入后长时间等待。
+const xiaomanWarmed = ref(false)
+function onXiaomanFocus() {
+  if (xiaomanWarmed.value) return
+  xiaomanWarmed.value = true
+  searchXiaomanOrders('a').catch(() => {
+    xiaomanWarmed.value = false
+  })
+}
 
 async function onXiaomanSearch(keyword: string) {
   const kw = keyword.trim()
@@ -387,7 +399,9 @@ onActivated(() => {
 
 .head-form-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  /* 填写框收窄并左对齐：每项上限 300px，不再整行拉伸 */
+  grid-template-columns: repeat(4, minmax(180px, 300px));
+  justify-content: start;
   gap: 0 var(--space-lg);
 }
 
@@ -397,6 +411,34 @@ onActivated(() => {
 
 .head-form-remark {
   grid-column: span 2;
+}
+
+/* 手机端：表头表单按屏宽收缩列数，沿用同一套桌面控件，不另做移动专属交互 */
+@media (max-width: 960px) {
+  .head-form-grid {
+    grid-template-columns: repeat(2, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .head-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .head-form-remark {
+    grid-column: span 1;
+  }
+
+  .edit-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
 }
 
 .xiaoman-field {
