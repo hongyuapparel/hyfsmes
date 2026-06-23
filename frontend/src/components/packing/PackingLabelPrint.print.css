@@ -12,6 +12,8 @@
    内容超高时由 onBeforePrint 给 .label-body 加 zoom 缩到一页内；盒高 ≤ 一页，break-inside:avoid 不被迫拆页。 */
 #packing-print-root .packing-label {
   width: 100%;
+  /* 打印根宽 297mm(~1122px)，必须解除屏幕态的 max-width:1000px，否则箱贴只占 1000px、右侧留大片空白 */
+  max-width: none;
   /* min-height 200mm = 内容区 180mm + 上下 padding 20mm；padding 替代 @page 边距留白 */
   min-height: 200mm;
   margin: 0;
