@@ -145,9 +145,9 @@ const docRows = computed<DocRow[]>(() => {
   return rows
 })
 
-/** 收货地址行：国家 · 邮编（英文国名），跟在客户名下面组成地址块 */
+/** 收货地址行：邮编 + 国家（英文国名），跟在客户名下面组成地址块（贸易单据惯例：邮编在前） */
 const addressLine = computed(() =>
-  [props.detail.country, props.detail.postalCode].map((s) => (s || '').trim()).filter(Boolean).join(' · '),
+  [props.detail.postalCode, props.detail.country].map((s) => (s || '').trim()).filter(Boolean).join(' '),
 )
 
 const hasImage = computed(() => props.detail.boxes.some((box) => box.items.some((item) => !!item.imageUrl)))
