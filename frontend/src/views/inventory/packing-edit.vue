@@ -75,6 +75,15 @@
             <el-option v-for="s in edit.salespersonOptions.value" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
+        <el-form-item label="装箱日期">
+          <el-date-picker
+            v-model="edit.form.packDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            style="width: 100%"
+            placeholder="装箱日期"
+          />
+        </el-form-item>
         <el-form-item label="PO#">
           <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
         </el-form-item>
@@ -92,15 +101,6 @@
         </el-form-item>
         <el-form-item label="邮编">
           <el-input v-model="edit.form.postalCode" placeholder="选填，收货邮编" />
-        </el-form-item>
-        <el-form-item label="装箱日期">
-          <el-date-picker
-            v-model="edit.form.packDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            style="width: 100%"
-            placeholder="装箱日期"
-          />
         </el-form-item>
         <el-form-item label="备注">
           <el-input v-model="edit.form.remark" placeholder="整单备注" />
