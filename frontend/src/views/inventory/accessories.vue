@@ -3,7 +3,7 @@
     <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs">
       <el-tab-pane label="库存" name="stock">
         <div class="tab-pane-scroll">
-        <el-form class="filter-bar" @submit.prevent>
+        <el-form class="filter-bar has-filter-collapse" @submit.prevent>
           <el-input
             v-model="filter.name"
             placeholder="名称"
@@ -33,6 +33,8 @@
             </template>
             <el-option v-for="opt in categoryOptions" :key="opt" :label="opt" :value="opt" />
           </el-select>
+          <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+          <div class="filter-rest" v-show="!isMobile || !collapsed">
           <el-select
             v-model="filter.customerName"
             placeholder="客户"
@@ -83,6 +85,7 @@
               :class="['filter-range', { 'range-single': !inboundDateRange }]"
               @change="onSearch(true)"
             />
+          </div>
           </div>
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
@@ -226,11 +229,23 @@ import AccessoryQtyCell from '@/components/inventory/AccessoryQtyCell.vue'
 import { formatDateTime as formatDate } from '@/utils/date-format'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const filter = reactive({ name: '', category: '', customerName: '', salesperson: '' })
 const inboundDateRange = ref<[string, string] | null>(null)
 const nameLabelVisible = ref(false)
+const { collapsed, isMobile } = useFilterCollapse('inventory-accessories')
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.name) n++
+  if (filter.category) n++
+  if (filter.customerName) n++
+  if (filter.salesperson) n++
+  if (inboundDateRange.value) n++
+  return n
+})
 const list = ref<AccessoryItem[]>([])
 /** 当前筛选下全量匹配的总数量（接口返回，跨分页） */
 const stockGrandTotalQuantity = ref(0)

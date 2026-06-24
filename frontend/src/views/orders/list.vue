@@ -40,22 +40,36 @@
       :salesperson-options="salespersonOptions"
       :merchandiser-options="merchandiserOptions"
       :factory-options="factoryOptions"
-      :can-delete-orders="canDeleteOrders"
-      :has-selection="hasSelection"
-      :can-delete-selected-by-status="canDeleteSelectedByStatus"
-      :can-edit-orders="canEditOrders"
-      :can-review-orders="canReviewOrders"
-      :is-pending-review-tab="isPendingReviewTab"
-      :can-review-selected-by-status="canReviewSelectedByStatus"
       :find-order-type-label-by-id="findOrderTypeLabelById"
       :get-process-item-display-label="getProcessItemDisplayLabel"
       :on-search="onSearch"
       :on-reset="onReset"
       :debounced-search="debouncedSearch"
-      :on-batch-delete="onBatchDelete"
-      :on-batch-copy-to-draft="onBatchCopyToDraft"
-      :open-review-dialog="openReviewDialog"
     />
+
+    <div v-if="hasSelection" class="orders-batch-bar">
+      <span class="orders-batch-info">已选 {{ selectedIds.length }} 项</span>
+      <el-button
+        v-if="canDeleteOrders && canDeleteSelectedByStatus"
+        size="small"
+        type="danger"
+        @click="onBatchDelete"
+      >
+        删除
+      </el-button>
+      <el-button v-if="canEditOrders" size="small" type="warning" @click="onBatchCopyToDraft">
+        复制为草稿
+      </el-button>
+      <el-button
+        v-if="canReviewOrders && isPendingReviewTab && canReviewSelectedByStatus"
+        size="small"
+        type="success"
+        @click="openReviewDialog"
+      >
+        审单
+      </el-button>
+      <el-button size="small" text @click="resetSelection">取消</el-button>
+    </div>
 
     <!-- 订单卡片宫格 -->
     <div ref="cardScrollRef" class="orders-card-scroll" @scroll="onCardScroll">
@@ -447,6 +461,19 @@ watchEffect(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.orders-batch-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm);
+}
+
+.orders-batch-info {
+  font-size: var(--font-size-caption);
+  color: var(--el-text-color-secondary);
 }
 
 .status-tabs {

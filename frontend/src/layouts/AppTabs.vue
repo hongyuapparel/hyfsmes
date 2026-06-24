@@ -1,26 +1,46 @@
 <template>
   <div class="app-tabs">
-    <el-tabs
-      v-model="activeKey"
-      type="card"
-      class="app-tabs-inner"
-      @tab-click="onTabClick"
-      @tab-remove="onTabRemove"
+    <div v-show="canScrollLeft" class="app-tabs-fade app-tabs-fade--left" aria-hidden="true" />
+    <div
+      ref="stripRef"
+      class="app-tabs-strip"
+      :class="{ 'is-grabbing': isDraggingScroll }"
+      role="tablist"
+      @scroll="updateScrollState"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointercancel="onPointerUp"
     >
-      <el-tab-pane
+      <button
         v-for="tab in tabs"
         :key="tab.key"
-        :label="tab.title"
-        :name="tab.key"
-        closable
-      />
-    </el-tabs>
+        type="button"
+        class="app-tab"
+        :class="{ 'is-active': tab.key === activeKey }"
+        :data-key="tab.key"
+        role="tab"
+        :aria-selected="tab.key === activeKey"
+        @click="onTabClick(tab.key)"
+      >
+        <span class="app-tab__label">{{ tab.title }}</span>
+        <el-icon
+          class="app-tab__close"
+          :aria-label="`关闭 ${tab.title}`"
+          @click.stop="onTabRemove(tab.key)"
+        >
+          <Close />
+        </el-icon>
+      </button>
+    </div>
+    <div v-show="canScrollRight" class="app-tabs-fade app-tabs-fade--right" aria-hidden="true" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, watch } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
+import { Close } from '@element-plus/icons-vue'
 import { getRouteTabKey, markRouteCacheDropped } from '@/composables/useRouteCacheControl'
 
 interface TabItem {
@@ -35,6 +55,57 @@ const router = useRouter()
 
 const tabs = ref<TabItem[]>([])
 const activeKey = ref('')
+
+const stripRef = ref<HTMLElement | null>(null)
+const canScrollLeft = ref(false)
+const canScrollRight = ref(false)
+
+// 鼠标按住拖动横滚（桌面端：触摸端本就能原生滑动，这里只接管鼠标）
+const isDraggingScroll = ref(false)
+let dragPointerId: number | null = null
+let dragStartX = 0
+let dragStartScroll = 0
+let dragMoved = false
+
+function onPointerDown(e: PointerEvent) {
+  dragMoved = false
+  if (e.pointerType !== 'mouse') return
+  const el = stripRef.value
+  if (!el) return
+  dragPointerId = e.pointerId
+  dragStartX = e.clientX
+  dragStartScroll = el.scrollLeft
+  try {
+    el.setPointerCapture(e.pointerId)
+  } catch {
+    // 指针未激活时忽略（不影响拖动滚动）
+  }
+}
+
+function onPointerMove(e: PointerEvent) {
+  if (dragPointerId === null || e.pointerId !== dragPointerId) return
+  const el = stripRef.value
+  if (!el) return
+  const dx = e.clientX - dragStartX
+  if (!dragMoved && Math.abs(dx) < 4) return
+  dragMoved = true
+  isDraggingScroll.value = true
+  el.scrollLeft = dragStartScroll - dx
+  updateScrollState()
+  e.preventDefault()
+}
+
+function onPointerUp(e: PointerEvent) {
+  if (dragPointerId === null) return
+  const el = stripRef.value
+  try {
+    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
+  } catch {
+    // 忽略释放失败
+  }
+  dragPointerId = null
+  isDraggingScroll.value = false
+}
 
 function getTitle(r: RouteLocationNormalizedLoaded) {
   if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit' || r.name === 'OrdersCost') {
@@ -81,86 +152,161 @@ function closeByKey(key: string) {
   }
 }
 
-function onTabClick(pane: { paneName?: string | number }) {
-  const key = String(pane.paneName ?? '')
+function onTabClick(key: string) {
+  if (dragMoved) return
   if (!key || key === activeKey.value) return
   const tab = tabs.value.find((t) => t.key === key)
   if (tab) router.push(tab.fullPath)
 }
 
-function onTabRemove(name: string | number) {
-  closeByKey(String(name))
+function onTabRemove(key: string) {
+  if (dragMoved) return
+  closeByKey(key)
+}
+
+function updateScrollState() {
+  const el = stripRef.value
+  if (!el) return
+  canScrollLeft.value = el.scrollLeft > 1
+  canScrollRight.value = el.scrollLeft + el.clientWidth < el.scrollWidth - 1
+}
+
+function scrollActiveIntoView() {
+  const el = stripRef.value
+  if (!el) return
+  const active = el.querySelector<HTMLElement>('.app-tab.is-active')
+  if (!active) return
+  const tabLeft = active.offsetLeft
+  const tabRight = tabLeft + active.offsetWidth
+  const viewLeft = el.scrollLeft
+  const viewRight = viewLeft + el.clientWidth
+  if (tabLeft < viewLeft) {
+    el.scrollLeft = Math.max(0, tabLeft - 8)
+  } else if (tabRight > viewRight) {
+    el.scrollLeft = tabRight - el.clientWidth + 8
+  }
+}
+
+function refreshTabsLayout() {
+  nextTick(() => {
+    scrollActiveIntoView()
+    updateScrollState()
+  })
 }
 
 onMounted(() => {
   addTab(route)
+  refreshTabsLayout()
+  window.addEventListener('resize', updateScrollState)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', updateScrollState)
 })
 
 watch(
   () => [route.fullPath, route.query?.tabKey, route.query?.tabTitle],
   () => {
     addTab(route)
+    refreshTabsLayout()
   }
+)
+
+watch(
+  () => tabs.value.length,
+  () => refreshTabsLayout()
 )
 </script>
 
 <style scoped>
 .app-tabs {
+  position: relative;
   display: flex;
   align-items: center;
   flex: 1;
   min-width: 0;
 }
 
-.app-tabs-inner {
+.app-tabs-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
+  padding: 4px 10px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+  cursor: grab;
 }
 
-.app-tabs :deep(.el-tabs__header) {
-  margin: 0;
-  border-bottom: none;
+.app-tabs-strip.is-grabbing {
+  cursor: grabbing;
 }
 
-.app-tabs :deep(.el-tabs__nav-wrap) {
-  margin-bottom: 0;
-  padding-left: 10px;
+.app-tabs-strip.is-grabbing .app-tab {
+  cursor: grabbing;
 }
 
-.app-tabs :deep(.el-tabs__nav) {
-  border: none;
-  margin-top: 4px;
-  margin-left: 0;
+.app-tabs-strip::-webkit-scrollbar {
+  display: none;
 }
 
-.app-tabs :deep(.el-tabs__item) {
+.app-tab {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
   height: 36px;
-  line-height: 36px;
-  font-size: var(--font-size-body);
   padding: 0 14px;
-  border-radius: 4px;
-  margin-right: 6px;
+  font-size: var(--font-size-body);
   color: #4e5969;
-  border: 1px solid #e5e6eb;
   background-color: #f7f8fa;
+  border: 1px solid #e5e6eb;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
 }
 
-.app-tabs :deep(.el-tabs__item.is-active) {
+.app-tab.is-active {
   font-weight: 500;
+  color: #165dff;
   background-color: #e8f3ff;
   border-color: #165dff;
-  color: #165dff;
 }
 
-.app-tabs :deep(.el-tabs__item .is-icon-close) {
+.app-tab__label {
+  line-height: 1;
+}
+
+.app-tab__close {
   margin-left: 4px;
+  font-size: 14px;
+  border-radius: 50%;
+  transition: background-color 0.15s;
 }
 
-/* Element Plus card 模式会把第一个 tab 的左边框去掉，
-   官方未提供配置项，这里仅恢复设计系统统一的边框样式 */
-.app-tabs :deep(.el-tabs--card > .el-tabs__header .el-tabs__item:first-child) {
-  border-left-width: 1px;
-  border-left-style: solid;
-  border-left-color: var(--color-border);
+.app-tab__close:hover {
+  background-color: rgba(0, 0, 0, 0.08);
+}
+
+.app-tabs-fade {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 24px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.app-tabs-fade--left {
+  left: 0;
+  background: linear-gradient(to right, var(--color-white), transparent);
+}
+
+.app-tabs-fade--right {
+  right: 0;
+  background: linear-gradient(to left, var(--color-white), transparent);
 }
 </style>
-

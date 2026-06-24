@@ -1,6 +1,6 @@
 <template>
   <div class="finished-stock-tab-root">
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.skuCode"
         placeholder="SKU编号"
@@ -30,6 +30,8 @@
         </template>
         <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
       </el-select>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-select
         v-model="filter.inventoryTypeId"
         placeholder="库存类型"
@@ -65,6 +67,7 @@
           :class="['filter-range', { 'range-single': !inboundDateRangeModel }]"
           @change="emit('search', true)"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="emit('search', true)">搜索</el-button>
@@ -236,6 +239,8 @@ import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle, getAda
 import { isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 
 type FinishedStockFilter = {
   skuCode: string
@@ -299,6 +304,16 @@ const stockShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(stockShellRef)
 
 const { stockPrimaryColumns, stockTailColumns } = useFinishedViewColumns()
+
+const { collapsed, isMobile } = useFilterCollapse('inventory-finished-stock')
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (props.filter.skuCode) n++
+  if (props.filter.customerName) n++
+  if (props.filter.inventoryTypeId != null) n++
+  if (props.inboundDateRange) n++
+  return n
+})
 
 const inboundDateRangeModel = computed({
   get: () => props.inboundDateRange,

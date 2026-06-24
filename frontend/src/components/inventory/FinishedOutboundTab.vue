@@ -1,6 +1,6 @@
 <template>
   <div class="finished-outbound-tab-root">
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="outboundFilter.orderNo"
         placeholder="订单号"
@@ -27,6 +27,8 @@
           <span v-if="outboundFilter.skuCode" :style="{ color: ACTIVE_FILTER_COLOR }">SKU编号：</span>
         </template>
       </el-input>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-select
         v-model="outboundFilter.customerName"
         placeholder="客户"
@@ -62,6 +64,7 @@
           :class="['filter-range', { 'range-single': !(dateRangeModel && dateRangeModel.length === 2) }]"
           @change="emit('search', true)"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="emit('search', true)">搜索</el-button>
@@ -173,6 +176,8 @@ import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import type { FinishedOutboundRecord } from '@/api/inventory'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 
 type OutboundFilter = {
   orderNo: string
@@ -211,6 +216,16 @@ const outboundShellRef = ref<HTMLElement | null>(null)
 const { tableHeight: outboundTableHeight } = useFlexShellTableHeight(outboundShellRef)
 
 const { outboundPrimaryColumns, outboundTailColumns, getInventoryOutboundRangeStyle } = useFinishedViewColumns()
+
+const { collapsed, isMobile } = useFilterCollapse('inventory-finished-outbound')
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (props.outboundFilter.orderNo) n++
+  if (props.outboundFilter.skuCode) n++
+  if (props.outboundFilter.customerName) n++
+  if (props.outboundFilter.dateRange && props.outboundFilter.dateRange.length === 2) n++
+  return n
+})
 
 const dateRangeModel = computed({
   get: () => props.outboundFilter.dateRange,

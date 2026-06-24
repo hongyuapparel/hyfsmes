@@ -1,5 +1,5 @@
 <template>
-  <div class="filter-bar">
+  <div class="filter-bar has-filter-collapse">
     <el-input
       v-model="filters.orderNo"
       placeholder="订单号"
@@ -38,6 +38,8 @@
         </span>
       </template>
     </el-input>
+    <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+    <div class="filter-rest" v-show="!isMobile || !collapsed">
     <el-select
       v-model="filters.customer"
       placeholder="客户"
@@ -244,31 +246,11 @@
         :value="opt.value"
       />
     </el-select>
+    </div>
 
     <div class="filter-bar-actions">
       <el-button type="primary" @click="onSearch(true)">搜索</el-button>
       <el-button @click="onReset">清空</el-button>
-      <el-button
-        v-if="canDeleteOrders && hasSelection && canDeleteSelectedByStatus"
-        type="danger"
-        @click="onBatchDelete"
-      >
-        删除
-      </el-button>
-      <el-button
-        v-if="canEditOrders && hasSelection"
-        type="warning"
-        @click="onBatchCopyToDraft"
-      >
-        复制为草稿
-      </el-button>
-      <el-button
-        v-if="canReviewOrders && isPendingReviewTab && hasSelection && canReviewSelectedByStatus"
-        type="success"
-        @click="openReviewDialog"
-      >
-        审单
-      </el-button>
     </div>
   </div>
 </template>
@@ -284,9 +266,13 @@ import {
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
+import { computed } from 'vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
+const { collapsed, isMobile } = useFilterCollapse('orders-list')
 
 function getAdaptiveRangeStyle(range: [string, string] | [] | null | undefined, placeholder: string) {
   const hasValue = Array.isArray(range) && range.length === 2
@@ -321,6 +307,23 @@ const completedRange = defineModel<[string, string] | null>('completedRange', { 
 const orderNoLabelVisible = defineModel<boolean>('orderNoLabelVisible', { required: true })
 const skuCodeLabelVisible = defineModel<boolean>('skuCodeLabelVisible', { required: true })
 
+const activeFilterCount = computed(() => {
+  const f = filters.value
+  let n = 0
+  if (f.orderNo) n++
+  if (f.skuCode) n++
+  if (f.customer) n++
+  if (f.orderTypeId != null) n++
+  if (f.processItem) n++
+  if (f.salesperson) n++
+  if (f.merchandiser) n++
+  if (f.factory) n++
+  if (orderDateRange.value) n++
+  if (customerDueRange.value) n++
+  if (completedRange.value) n++
+  return n
+})
+
 defineProps<{
   customerOptions: Array<{ label: string; value: string }>
   orderTypeTreeSelectData: OrderTypeTreeSelectNode[]
@@ -328,21 +331,11 @@ defineProps<{
   salespersonOptions: string[]
   merchandiserOptions: string[]
   factoryOptions: Array<{ label: string; value: string }>
-  canDeleteOrders: boolean
-  hasSelection: boolean
-  canDeleteSelectedByStatus: boolean
-  canEditOrders: boolean
-  canReviewOrders: boolean
-  isPendingReviewTab: boolean
-  canReviewSelectedByStatus: boolean
   findOrderTypeLabelById: (id: number) => string
   getProcessItemDisplayLabel: (value: string) => string
   onSearch: (byUser?: boolean) => void
   onReset: () => void
   debouncedSearch: () => void
-  onBatchDelete: () => void
-  onBatchCopyToDraft: () => void
-  openReviewDialog: () => void
 }>()
 </script>
 

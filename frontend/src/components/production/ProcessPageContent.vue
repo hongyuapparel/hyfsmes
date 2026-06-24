@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.supplier"
         placeholder="供应商"
@@ -43,6 +43,8 @@
           <span v-if="filter.processItem" :style="{ color: ACTIVE_FILTER_COLOR }">工艺项目：</span>
         </template>
       </el-input>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-tree-select
         v-model="filter.orderTypeId"
         :data="orderTypeTreeSelectData"
@@ -125,6 +127,7 @@
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch">搜索</el-button>
@@ -284,6 +287,8 @@ import {
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import { formatDate, formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
@@ -301,6 +306,7 @@ const authStore = useAuthStore()
 const canCompleteProcessAction = computed(() => authStore.hasPermission('production_process_complete'))
 
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
+const { collapsed, isMobile } = useFilterCollapse('production-process')
 
 const tableShellRef = ref<HTMLElement | null>(null)
 const craftTableRef = ref()
@@ -349,6 +355,17 @@ const {
   craftBriefFromRow,
   load,
 } = useProductionProcessPage()
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.supplier) n++
+  if (filter.processItem) n++
+  if (filter.orderTypeId != null) n++
+  if (filter.collaborationTypeId != null) n++
+  if (orderDateRange.value) n++
+  if (completedRange.value) n++
+  return n
+})
 
 const craftDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
 

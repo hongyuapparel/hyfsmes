@@ -34,7 +34,7 @@
       </aside>
 
       <main ref="tableShellRef" class="products-main">
-        <div class="filter-bar">
+        <div class="filter-bar has-filter-collapse">
           <el-input
             v-model="filter.productName"
             placeholder="产品名称"
@@ -63,6 +63,8 @@
               <span v-if="filter.companyName && companyNameLabelVisible" :style="{ color: ACTIVE_FILTER_COLOR }">客户：</span>
             </template>
           </el-input>
+          <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+          <div class="filter-rest" v-show="!isMobile || !collapsed">
           <el-input
             v-model="filter.skuCode"
             placeholder="SKU编号"
@@ -107,6 +109,7 @@
             </template>
             <el-option v-for="s in salespeople" :key="s" :label="s" :value="s" />
           </el-select>
+          </div>
           <el-button type="primary" @click="onFilterChange(true)">搜索</el-button>
           <el-button @click="resetFilter">清空</el-button>
           <div class="filter-bar-actions">
@@ -221,8 +224,10 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
 import { ArrowDown, ArrowLeft, ArrowRight, Delete } from '@element-plus/icons-vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import type { ProductItem } from '@/api/products'
 import OrderProductColumnConfigDialog from '@/components/orders/OrderProductColumnConfigDialog.vue'
 import OrderProductFormDialog from '@/components/orders/OrderProductFormDialog.vue'
@@ -285,6 +290,18 @@ const {
   cleanup,
 } = useOrderProductsList({
   onListUpdated: scheduleProductTableLayout,
+})
+
+const { collapsed, isMobile } = useFilterCollapse('orders-products')
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.productName) n++
+  if (filter.companyName) n++
+  if (filter.skuCode) n++
+  if (filter.applicablePeopleId != null) n++
+  if (filter.salesperson) n++
+  return n
 })
 
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)

@@ -1,6 +1,6 @@
 <template>
   <div class="page-card page-card--fill hr-page">
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.name"
         placeholder="姓名"
@@ -36,6 +36,8 @@
           <span v-if="filter.departmentId" :style="{ color: ACTIVE_FILTER_COLOR }">部门：</span>
         </template>
       </el-tree-select>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-select
         v-model="filter.jobTitleId"
         placeholder="岗位"
@@ -127,6 +129,7 @@
           :class="['filter-range', { 'range-single': !filter.leaveDateRange }]"
           @change="onSearch(true)"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
@@ -253,8 +256,12 @@ import {
   genderLabel,
 } from '@/composables/useHrEmployeeList'
 import HrEmployeeDrawer from '@/components/hr/HrEmployeeDrawer.vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import type { EmployeeItem } from '@/api/hr'
 import { invalidateSharedGetCache } from '@/api/shared-request-cache'
+
+const { collapsed, isMobile } = useFilterCollapse('hr-list')
 
 const currentMonth = computed(() => new Date().getMonth() + 1)
 
@@ -291,6 +298,18 @@ const {
   onBatchDelete,
   onExport,
 } = useHrEmployeeList()
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.name) n++
+  if (filter.departmentId != null) n++
+  if (filter.jobTitleId != null) n++
+  if (filter.status) n++
+  if (filter.birthMonths.length) n++
+  if (filter.entryDateRange) n++
+  if (filter.leaveDateRange) n++
+  return n
+})
 
 /**
  * 部门下拉 popper 宽度兜底：visible-change 触发太早时 el-tree 节点还没渲染，

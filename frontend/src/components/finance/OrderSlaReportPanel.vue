@@ -9,7 +9,7 @@
       {{ activeTab === 'sla' ? '用于查看订单整体交期与超期情况，支持按下单时间、完成时间、当前状态筛选，并支持勾选导出。' : '用于查看订单利润相关指标，支持同步筛选与导出。' }}
     </p>
 
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.orderNo"
         placeholder="订单号"
@@ -48,6 +48,8 @@
           </span>
         </template>
       </el-input>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': filter.orderDateRange }"
@@ -132,6 +134,7 @@
         </template>
         <el-option v-for="opt in orderTypeOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
+      </div>
 
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch">搜索</el-button>
@@ -334,9 +337,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -400,6 +405,20 @@ const {
   onPageChange,
   onPageSizeChange,
 } = useOrderSlaReport()
+
+const { collapsed, isMobile } = useFilterCollapse('finance-sla-report')
+const activeFilterCount = computed(() => {
+  const f = filter.value
+  let n = 0
+  if (f.orderNo) n++
+  if (f.skuCode) n++
+  if (Array.isArray(f.orderDateRange) && f.orderDateRange.length === 2) n++
+  if (Array.isArray(f.completedRange) && f.completedRange.length === 2) n++
+  if (f.statusId != null) n++
+  if (f.collaborationTypeId != null) n++
+  if (f.orderTypeId != null) n++
+  return n
+})
 
 const slaTableShellRef = ref<HTMLElement | null>(null)
 const profitTableShellRef = ref<HTMLElement | null>(null)

@@ -376,6 +376,7 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 12px;
   flex: 1;
+  min-width: 0;
   padding-top: 4px;
 }
 
@@ -539,6 +540,11 @@ onBeforeUnmount(() => {
   .header-left-section {
     gap: 6px;
     min-width: 0;
+  }
+
+  /* 侧栏开合按钮在手机上太不显眼：见 design-system.css 全局放大图标 */
+  .header-toggle {
+    flex-shrink: 0;
   }
 
   .header-actions {

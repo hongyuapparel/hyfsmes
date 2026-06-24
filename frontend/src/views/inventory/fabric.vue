@@ -3,7 +3,7 @@
     <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
       <el-tab-pane label="库存" name="stock">
         <div class="tab-pane-scroll">
-        <el-form class="filter-bar" @submit.prevent>
+        <el-form class="filter-bar has-filter-collapse" @submit.prevent>
           <el-input
             v-model="filter.name"
             placeholder="面料名称"
@@ -43,6 +43,8 @@
               :value="opt.value"
             />
           </el-select>
+          <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+          <div class="filter-rest" v-show="!isMobile || !collapsed">
           <el-select
             v-model="filter.inventoryTypeId"
             placeholder="库存类型"
@@ -83,6 +85,7 @@
               :class="['filter-range', { 'range-single': !inboundDateRange }]"
               @change="onSearch(true)"
             />
+          </div>
           </div>
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
@@ -322,6 +325,8 @@ import { formatDisplayNumber } from '@/utils/display-number'
 import FabricFormDrawer from '@/components/inventory/FabricFormDrawer.vue'
 import FabricOutboundDialog from '@/components/inventory/FabricOutboundDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 const {
   compactHeaderCellStyle,
   compactCellStyle,
@@ -423,6 +428,16 @@ const selectedInventoryTypeLabel = computed(() => {
   return inventoryTypeOptions.value.find((o) => o.id === id)?.label ?? ''
 })
 const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
+
+const { collapsed, isMobile } = useFilterCollapse('inventory-fabric-stock')
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.name) n++
+  if (filter.customerName) n++
+  if (filter.inventoryTypeId != null) n++
+  if (inboundDateRange.value) n++
+  return n
+})
 
 function onPageTabChange() {
   if (pageTab.value === 'outbounds') {

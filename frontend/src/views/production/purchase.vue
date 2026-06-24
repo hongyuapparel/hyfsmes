@@ -14,7 +14,7 @@
       </div>
     </div>
 
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.orderNo"
         placeholder="订单号"
@@ -53,6 +53,8 @@
           </span>
         </template>
       </el-input>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-input
         v-model="filter.supplier"
         placeholder="供应商"
@@ -129,6 +131,7 @@
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
@@ -333,8 +336,11 @@ import {
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
+const { collapsed, isMobile } = useFilterCollapse('production-purchase')
 import { PURCHASE_TABS, usePurchaseList } from '@/composables/usePurchaseList'
 import { usePurchaseDialogs } from '@/composables/usePurchaseDialogs'
 import type { PurchaseItemRow } from '@/api/production-purchase'
@@ -389,6 +395,17 @@ const {
   purchaseBriefFromRow,
   displayMaterialType,
 } = usePurchaseList()
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.orderNo) n++
+  if (filter.skuCode) n++
+  if (filter.supplier) n++
+  if (filter.orderTypeId != null) n++
+  if (orderDateRange.value) n++
+  if (completedRange.value) n++
+  return n
+})
 
 const {
   registerDialog,

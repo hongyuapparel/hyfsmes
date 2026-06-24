@@ -1,9 +1,15 @@
+import { isMobileViewport } from './useViewport'
+
 export const ACTIVE_FILTER_COLOR = 'var(--el-color-primary)'
 export const FILTER_CHAR_PX = 14
 export const ACTIVE_SELECT_STYLE = { '--el-text-color-regular': ACTIVE_FILTER_COLOR }
 
 const FILTER_AUTO_MIN_WIDTH = 140
 const FILTER_AUTO_MAX_WIDTH = 320
+
+/** 手机端：取消写死宽度，改为可收缩两列布局，避免内联宽度撑破屏幕。 */
+const MOBILE_FIELD_STYLE = { flex: '1 1 calc(50% - 4px)', minWidth: '0', width: 'auto' }
+const MOBILE_RANGE_STYLE = { flex: '1 1 100%', minWidth: '0', width: 'auto' }
 
 /** CJK/全角字符按 14px，ASCII/拉丁字符按 9px，更贴近实际渲染宽度 */
 function estimateTextWidth(text: string): number {
@@ -19,6 +25,7 @@ function estimateTextWidth(text: string): number {
  * extraPadding：图标/箭头等 UI 装饰占位，默认 60px。
  */
 export function getAdaptiveWidthStyle(text: unknown, extraPadding = 60) {
+  if (isMobileViewport.value) return { ...MOBILE_FIELD_STYLE }
   const raw = String(text ?? '').trim() || ' '
   const width = estimateTextWidth(raw) + extraPadding
   return { width: `${width}px`, minWidth: 'unset', flex: `0 0 ${width}px` }
@@ -81,6 +88,7 @@ export function getFilterRangeStyle(
 ) {
   const hasValue = Array.isArray(v) && v.length === 2
   if (hasValue) {
+    if (isMobileViewport.value) return { ...MOBILE_RANGE_STYLE, ...ACTIVE_SELECT_STYLE }
     return { width: '320px', minWidth: 'unset', flex: '0 0 320px', ...ACTIVE_SELECT_STYLE }
   }
   return getAdaptiveWidthStyle(placeholder, 60)

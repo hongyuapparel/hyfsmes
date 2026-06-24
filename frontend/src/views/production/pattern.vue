@@ -10,7 +10,7 @@
       </div>
     </div>
 
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.orderNo"
         placeholder="订单号"
@@ -43,6 +43,8 @@
           </span>
         </template>
       </el-input>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-select
         v-model="filter.patternMaster"
         placeholder="纸样师"
@@ -150,6 +152,7 @@
           :class="['filter-range', { 'range-single': !completedRange }]"
           @change="onSearch"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
@@ -259,6 +262,8 @@ import {
   getAdaptiveSelectStyle,
 } from '@/composables/useFilterBarHelpers'
 import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
@@ -279,6 +284,7 @@ const canAssignPattern = computed(() => authStore.hasPermission('production_patt
 const canCompletePattern = computed(() => authStore.hasPermission('production_pattern_complete'))
 
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
+const { collapsed, isMobile } = useFilterCollapse('production-pattern')
 
 const patternTableRef = ref<{ getTableRef?: () => unknown } | null>(null)
 const tableShellRef = ref<HTMLElement | null>(null)
@@ -323,6 +329,19 @@ const {
   onPageSizeChange: changePageSize,
   onSelectionChange: updateSelection,
 } = usePatternList()
+
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.orderNo) n++
+  if (filter.skuCode) n++
+  if (filter.patternMaster) n++
+  if (filter.sampleMaker) n++
+  if (filter.orderTypeId != null) n++
+  if (filter.collaborationTypeId != null) n++
+  if (orderDateRange.value) n++
+  if (completedRange.value) n++
+  return n
+})
 
 async function load() {
   await loadList(() => restoreColumnWidths(patternTableRef.value?.getTableRef?.()))

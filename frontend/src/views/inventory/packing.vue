@@ -1,6 +1,6 @@
 <template>
   <div class="page-card page-card--fill inventory-packing-page">
-    <el-form class="filter-bar" @submit.prevent>
+    <el-form class="filter-bar has-filter-collapse" @submit.prevent>
       <el-input
         v-model="filter.customerName"
         placeholder="客户"
@@ -29,6 +29,8 @@
           <span v-if="filter.keyword" :style="{ color: ACTIVE_FILTER_COLOR }">SKU编号：</span>
         </template>
       </el-input>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-input
         v-model="filter.xiaomanOrderNo"
         placeholder="小满单号"
@@ -92,6 +94,7 @@
           :class="['filter-range', { 'range-single': !(dateRange && dateRange.length === 2) }]"
           @change="onSearch(true)"
         />
+      </div>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
@@ -159,12 +162,16 @@
         <el-table-column prop="packDate" label="装箱日期" width="116" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="200" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" :width="isMobile ? 56 : 200" align="center" header-align="center" fixed="right">
           <template #default="{ row }">
-            <el-button link type="primary" size="small" @click="goEdit(row)">{{ row.status === 'draft' ? '编辑' : '查看' }}</el-button>
-            <el-button link type="primary" size="small" @click="openDoc(row)">客户单</el-button>
-            <el-button link type="info" size="small" @click="openLabels(row)">箱贴</el-button>
-            <el-button link type="info" size="small" @click="openLog(row)">记录</el-button>
+            <TableRowActions
+              :actions="[
+                { key: 'edit', label: row.status === 'draft' ? '编辑' : '查看', onClick: () => goEdit(row), type: 'primary' },
+                { key: 'doc', label: '客户单', onClick: () => openDoc(row), type: 'primary' },
+                { key: 'labels', label: '箱贴', onClick: () => openLabels(row), type: 'info' },
+                { key: 'log', label: '记录', onClick: () => openLog(row), type: 'info' },
+              ]"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -188,7 +195,7 @@
 </template>
 
 <script setup lang="ts">
-import { onActivated, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -208,6 +215,9 @@ import { getSalespeople } from '@/api/customers'
 import { getPackingLists, type PackingListRow } from '@/api/packing-lists'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import PackingListLogDrawer from '@/components/inventory/PackingListLogDrawer.vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import TableRowActions from '@/components/common/TableRowActions.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
@@ -216,6 +226,17 @@ const filter = reactive<{ customerName: string; status: string; keyword: string;
 const salespersonOptions = ref<string[]>([])
 const dateRange = ref<[string, string] | null>(null)
 const customerLabelVisible = ref(true)
+const { collapsed, isMobile } = useFilterCollapse('packing')
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (filter.customerName) n++
+  if (filter.keyword) n++
+  if (filter.xiaomanOrderNo) n++
+  if (filter.serviceManager) n++
+  if (filter.status) n++
+  if (dateRange.value) n++
+  return n
+})
 const list = ref<PackingListRow[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })

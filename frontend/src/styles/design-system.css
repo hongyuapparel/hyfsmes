@@ -708,6 +708,12 @@ a:hover {
   margin-left: auto;
 }
 
+/* 折叠分组：display:contents 让内部筛选项仍作为 .filter-bar 的 flex 项参与换行，
+   收起时由 v-show 置 display:none 整体隐藏（桌面端恒展开） */
+.filter-rest {
+  display: contents;
+}
+
 /* ── 日期选择器外包装盒（含字段标签 + picker）── */
 .filter-date-box {
   display: flex;
@@ -967,6 +973,11 @@ a:hover {
     flex-wrap: wrap;
   }
 
+  /* 侧栏开合按钮：手机上图标偏小不显眼，放大图标字号（图标尺寸，非正文） */
+  .header-toggle .el-icon {
+    font-size: 24px;
+  }
+
   /* 状态标签条：窄屏改「单行横向滚动 + 更矮」，省垂直空间、不撑破整页，
      给列表/卡片让出位置。覆盖订单列表(flex:1 会换行) 与 生产各页(flex-shrink:0 会溢出)。 */
   .status-tabs {
@@ -993,5 +1004,36 @@ a:hover {
   }
   .filter-date-box {
     height: 34px;
+  }
+  /* 手机端筛选项一律可收缩、不被内联宽度撑破（宽度改由 useFilterBarHelpers 给两列弹性值） */
+  .filter-bar > .el-input,
+  .filter-bar > .el-select,
+  .filter-bar > .el-date-editor,
+  .filter-bar .filter-bar-item {
+    min-width: 0;
+  }
+  .filter-bar .filter-date-box .el-date-editor,
+  .filter-bar .filter-date-box .filter-range {
+    width: 100%;
+  }
+  /* 操作按钮整排换行、不再 margin-left:auto 顶出屏幕 */
+  .filter-bar-actions {
+    margin-left: 0;
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  /* 带折叠开关的筛选栏：右侧留出绝对定位的折叠按钮位置（与第一行对齐） */
+  .filter-bar.has-filter-collapse {
+    position: relative;
+    padding-right: 48px;
+  }
+
+  /* 分页：手机端避免被挤成逐字竖排换行（摘要整行不断字，整体换行排列） */
+  .pagination-wrap {
+    flex-wrap: wrap;
+    row-gap: var(--space-xs);
+  }
+  .pagination-summary {
+    white-space: nowrap;
   }
 }

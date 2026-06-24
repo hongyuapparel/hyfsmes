@@ -1,6 +1,6 @@
 ﻿<template>
   <div class="page-card finance-page">
-    <div class="filter-bar">
+    <div class="filter-bar has-filter-collapse">
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': hasDateRangeValue(filter.occurDateRange) }"
@@ -38,6 +38,8 @@
         </template>
         <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
       </el-select>
+      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
+      <div class="filter-rest" v-show="!isMobile || !collapsed">
       <el-select
         v-model="filter.fundAccountId"
         placeholder="支出账户"
@@ -81,6 +83,7 @@
           <span v-if="filter.orderNo" :style="{ color: ACTIVE_FILTER_COLOR }">订单号：</span>
         </template>
       </el-input>
+      </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch">查询</el-button>
         <el-button @click="onReset">清空</el-button>
@@ -125,10 +128,14 @@
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="120" align="center" fixed="right">
+      <el-table-column label="操作" :width="isMobile ? 56 : 120" align="center" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" size="small" @click="openForm(row)">编辑</el-button>
-          <el-button link type="danger" size="small" @click="onDelete(row)">删除</el-button>
+          <TableRowActions
+            :actions="[
+              { key: 'edit', label: '编辑', onClick: () => openForm(row), type: 'primary' },
+              { key: 'delete', label: '删除', onClick: () => onDelete(row), type: 'danger' },
+            ]"
+          />
         </template>
       </el-table-column>
     </el-table>
@@ -269,6 +276,11 @@ import { uploadFinanceImage } from '@/api/uploads'
 import { ACTIVE_FILTER_COLOR, getFilterRangeStyle, getAdaptiveSelectStyle, getFilterInputStyle } from '@/composables/useFilterBarHelpers'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
+import TableRowActions from '@/components/common/TableRowActions.vue'
+import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useFilterCollapse } from '@/composables/useFilterCollapse'
+
+const { collapsed, isMobile } = useFilterCollapse('finance-expense')
 
 const options = reactive<{
   expenseTypes: FinanceExpenseType[]
@@ -288,6 +300,15 @@ const filter = reactive({
   fundAccountId: null as number | null,
   payeeKeyword: '',
   orderNo: '',
+})
+const activeFilterCount = computed(() => {
+  let n = 0
+  if (hasDateRangeValue(filter.occurDateRange)) n++
+  if (filter.expenseTypeId != null) n++
+  if (filter.fundAccountId != null) n++
+  if (filter.payeeKeyword) n++
+  if (filter.orderNo) n++
+  return n
 })
 const list = ref<ExpenseRecordItem[]>([])
 const loading = ref(false)
