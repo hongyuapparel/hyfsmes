@@ -39,6 +39,8 @@ export interface CuttingListQuery {
   completedEnd?: string
   page?: number
   pageSize?: number
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export function getCuttingTabCounts(params?: Omit<CuttingListQuery, 'tab' | 'page' | 'pageSize'>) {
@@ -133,6 +135,8 @@ export interface CuttingCompletedDetailRes {
   actualFabricMeters: string | null
   arrivedAt: string | null
   completedAt: string | null
+  /** 下游车缝是否已登记数量（编辑前风险提示用） */
+  downstream: { sewingStarted: boolean; sewingQuantity: number }
 }
 
 export function getCuttingCompletedDetail(orderId: number) {
@@ -151,4 +155,19 @@ export function completeCutting(payload: {
   materialUsage?: CuttingMaterialUsagePayloadRow[]
 }) {
   return request.post<void>('/production/cutting/items/complete', payload)
+}
+
+export function editCutting(payload: {
+  orderId: number
+  actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[]
+  cuttingDepartment?: string | null
+  cutterName?: string | null
+  cuttingUnitPrice?: string | null
+  cuttingTotalCost?: string | null
+  cuttingCost?: string | null
+  materialUsage?: CuttingMaterialUsagePayloadRow[]
+  /** 下游已登记时需置 true 以确认强改 */
+  confirmDownstream?: boolean
+}) {
+  return request.post<void>(`/production/cutting/items/${payload.orderId}/edit`, payload)
 }

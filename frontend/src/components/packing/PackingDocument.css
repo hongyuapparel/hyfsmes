@@ -83,6 +83,26 @@
   flex: 1;
 }
 
+/* 客户地址块：客户名下另起一行小字显示 国家 · 邮编 */
+.doc-meta-address {
+  align-items: flex-start;
+}
+
+.doc-addr {
+  display: block;
+  margin-top: 2px;
+  font-weight: 600;
+  font-size: 0.85em;
+  color: #1f2329;
+}
+
+/* 备注移到表格上方整行显示 */
+.doc-remark-top {
+  margin: 0 0 10px;
+  color: #1f2329;
+  font-weight: 600;
+}
+
 /* 表格：外框与抬头同深色，内线统一浅灰；表头/合计统一浅底 */
 .doc-table {
   width: 100%;
@@ -143,11 +163,13 @@
   justify-content: space-between;
   gap: 16px;
   margin-top: 12px;
-  font-size: 12px;
+  font-size: 13px;
 }
 
-.doc-remark {
-  color: #6b7280;
+/* 业务员移到页脚小灰字，不抢主信息 */
+.doc-foot-svc {
+  color: #9aa1ac;
+  font-size: 0.85em;
   flex: 1;
 }
 

@@ -57,6 +57,8 @@ export interface CraftListQuery {
   completedEnd?: string
   page?: number
   pageSize?: number
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export function getCraftTabCounts(

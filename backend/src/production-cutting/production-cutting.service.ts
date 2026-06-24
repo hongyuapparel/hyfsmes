@@ -89,4 +89,29 @@ export class ProductionCuttingService {
       actor,
     );
   }
+
+  editCompletedCutting(
+    orderId: number,
+    actualCutRows: ActualCutRow[],
+    cuttingDepartment: string | null | undefined,
+    cutterName: string | null | undefined,
+    body: {
+      cuttingUnitPrice?: string | null;
+      cuttingTotalCost?: string | null;
+      cuttingCostLegacy?: string | null;
+      materialUsage?: CuttingMaterialUsageRow[] | null;
+    },
+    actor?: { userId?: number; username?: string },
+    confirmDownstream?: boolean,
+  ): Promise<void> {
+    return this.mutationService.completeCutting(
+      orderId,
+      actualCutRows,
+      cuttingDepartment,
+      cutterName,
+      body,
+      actor,
+      { mode: 'edit', confirmDownstream },
+    );
+  }
 }

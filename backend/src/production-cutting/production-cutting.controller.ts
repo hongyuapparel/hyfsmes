@@ -33,6 +33,8 @@ export class ProductionCuttingController {
     @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     const query: CuttingListQuery = {
@@ -43,6 +45,8 @@ export class ProductionCuttingController {
       completedEnd,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      sortField,
+      sortOrder: sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : undefined,
     };
     return this.cuttingService.getCuttingList(query, user?.userId);
   }
@@ -159,6 +163,36 @@ export class ProductionCuttingController {
         materialUsage: Array.isArray(materialUsage) ? (materialUsage as CuttingMaterialUsageRow[]) : null,
       },
       user ? { userId: user.userId, username: user.username } : undefined,
+    );
+  }
+
+  @Post('items/:orderId/edit')
+  @RequirePermission('production_cutting_complete')
+  edit(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body('actualCutRows') actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[],
+    @Body('cuttingDepartment') cuttingDepartment?: string,
+    @Body('cutterName') cutterName?: string,
+    @Body('cuttingUnitPrice') cuttingUnitPrice?: string,
+    @Body('cuttingTotalCost') cuttingTotalCost?: string,
+    @Body('cuttingCost') cuttingCostLegacy?: string,
+    @Body('materialUsage') materialUsage?: unknown,
+    @Body('confirmDownstream') confirmDownstream?: boolean,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.cuttingService.editCompletedCutting(
+      orderId,
+      Array.isArray(actualCutRows) ? actualCutRows : [],
+      cuttingDepartment ?? null,
+      cutterName ?? null,
+      {
+        cuttingUnitPrice: cuttingUnitPrice ?? null,
+        cuttingTotalCost: cuttingTotalCost ?? null,
+        cuttingCostLegacy: cuttingCostLegacy ?? null,
+        materialUsage: Array.isArray(materialUsage) ? (materialUsage as CuttingMaterialUsageRow[]) : null,
+      },
+      user ? { userId: user.userId, username: user.username } : undefined,
+      confirmDownstream === true,
     );
   }
 }

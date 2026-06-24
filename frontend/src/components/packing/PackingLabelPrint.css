@@ -88,14 +88,14 @@
 
 .lt-cartonno-label {
   display: block;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: 1px;
 }
 
 .lt-cartonno-val {
   display: block;
-  font-size: 30px;
+  font-size: 26px;
   font-weight: 800;
 }
 
@@ -110,7 +110,7 @@
 .lt-info .lt-info-val {
   text-align: center;
   font-weight: 700;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 /* 客户行：客户名放大加粗，作视觉焦点 */
@@ -119,6 +119,23 @@
   font-weight: 800;
   font-size: 26px;
   letter-spacing: 1px;
+}
+
+/* 地址块：客户名下另起一行小字显示 国家 · 邮编 */
+.label-table .lt-addr {
+  display: block;
+  margin-top: 4px;
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0;
+}
+
+/* 业务员挪到底部小灰字，不抢主信息 */
+.label-table .lt-svc-sm {
+  text-align: center;
+  font-weight: 600;
+  font-size: 13px;
+  color: #888;
 }
 
 /* 尺码矩阵 */
@@ -164,7 +181,7 @@
 .label-table .lt-madein {
   font-weight: 800;
   letter-spacing: 2px;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 [contenteditable='true']:hover {

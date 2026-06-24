@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     v-model="visible"
-    title="裁床登记"
+    :title="dialogTitle"
     class="cutting-register-dialog"
     width="1020px"
     align-center
@@ -10,7 +10,10 @@
   >
     <template v-if="dialog.row">
       <CuttingBasicInfoBar :order-brief="form.orderBrief" />
-      <p class="register-hint">
+      <p v-if="mode === 'edit'" class="register-hint register-hint--warn">
+        正在<strong>编辑已完成的裁床数据</strong>，保存后将影响后续工序读取的裁床数量；修改记录会写入操作日志。
+      </p>
+      <p v-else class="register-hint">
         按颜色、尺码填写<strong>实际裁剪件数</strong>（与订单 B 区一致）；下方登记布料领用与裁剪单价。
       </p>
       <CuttingQuantityMatrix
@@ -82,7 +85,7 @@
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
       <el-button type="primary" :loading="dialog.submitting" @click="emit('submit')">
-        完成
+        {{ mode === 'edit' ? '保存' : '完成' }}
       </el-button>
     </template>
   </AppDialog>
@@ -111,19 +114,25 @@ interface DialogState {
   row: CuttingListItem | null
 }
 
-const props = defineProps<{
-  dialog: DialogState
-  form: RegisterForm
-  selfDepartmentLabel: string
-  cuttingDepartmentOptions: string[]
-  isSelfCutting: boolean
-  cutterOptions: string[]
-  actualCutGrandTotal: number
-  cuttingUnitPriceNum: number | undefined
-  cuttingTotalCostDisplay: number
-  fabricNetGrandTotal: number
-  formatFabricGrand: (v: number) => string
-}>()
+const props = withDefaults(
+  defineProps<{
+    dialog: DialogState
+    form: RegisterForm
+    selfDepartmentLabel: string
+    cuttingDepartmentOptions: string[]
+    isSelfCutting: boolean
+    cutterOptions: string[]
+    actualCutGrandTotal: number
+    cuttingUnitPriceNum: number | undefined
+    cuttingTotalCostDisplay: number
+    fabricNetGrandTotal: number
+    formatFabricGrand: (v: number) => string
+    mode?: 'register' | 'edit'
+  }>(),
+  { mode: 'register' },
+)
+
+const dialogTitle = computed(() => (props.mode === 'edit' ? '编辑裁床数据' : '裁床登记'))
 
 const emit = defineEmits<{
   (e: 'update:dialog', val: DialogState): void
@@ -144,6 +153,10 @@ const visible = computed({
   margin-bottom: var(--space-sm);
   color: var(--el-text-color-secondary);
   font-size: var(--font-size-caption, 12px);
+}
+
+.register-hint--warn {
+  color: var(--el-color-warning);
 }
 
 .cut-cost-form {

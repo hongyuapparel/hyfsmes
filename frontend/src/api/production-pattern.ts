@@ -54,6 +54,8 @@ export interface PatternListQuery {
   completedEnd?: string
   page?: number
   pageSize?: number
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
 }
 
 export function getPatternTabCounts(params?: Omit<PatternListQuery, 'tab' | 'page' | 'pageSize'>) {

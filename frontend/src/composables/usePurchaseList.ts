@@ -6,6 +6,7 @@ import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { useTableSort } from '@/composables/useTableSort'
 import type { ProductionOrderBriefModel } from '@/components/production/ProductionOrderBriefPanel.vue'
 
 export const PURCHASE_TABS = [
@@ -78,6 +79,11 @@ export function usePurchaseList() {
     return `${tab.label}(${count})`
   }
 
+  const { sortField, sortOrder, onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+
   function buildQuery(): PurchaseListQuery {
     const q: PurchaseListQuery = {
       tab: currentTab.value,
@@ -87,6 +93,7 @@ export function usePurchaseList() {
       orderTypeId: filter.orderTypeId ?? undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
+      ...sortParams(),
     }
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
@@ -277,6 +284,7 @@ export function usePurchaseList() {
     onTabChange,
     onPageSizeChange,
     onSelectionChange,
+    onSortChange,
     onHeaderDragEnd,
     loadOptions,
     orderTypeDisplay,

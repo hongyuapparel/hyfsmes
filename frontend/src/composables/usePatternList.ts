@@ -5,6 +5,7 @@ import { getDictTree, getDictItems } from '@/api/dicts'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import type { SystemOptionTreeNode } from '@/api/system-options'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
+import { useTableSort } from '@/composables/useTableSort'
 
 export const PATTERN_TABS = [
   { label: '全部', value: 'all' },
@@ -104,6 +105,11 @@ export function usePatternList() {
     return `${tab.label}(${count})`
   }
 
+  const { sortField, sortOrder, onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+
   function buildQuery(): PatternListQuery {
     const q: PatternListQuery = {
       tab: currentTab.value,
@@ -115,6 +121,7 @@ export function usePatternList() {
       collaborationTypeId: filter.collaborationTypeId ?? undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
+      ...sortParams(),
     }
     if (orderDateRange.value && orderDateRange.value.length === 2) {
       q.orderDateStart = orderDateRange.value[0]
@@ -296,5 +303,6 @@ export function usePatternList() {
     onTabChange,
     onPageSizeChange,
     onSelectionChange,
+    onSortChange,
   }
 }

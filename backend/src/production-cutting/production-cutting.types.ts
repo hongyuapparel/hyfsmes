@@ -37,6 +37,8 @@ export interface CuttingListQuery {
   completedEnd?: string;
   page?: number;
   pageSize?: number;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface CuttingRegisterFormMaterialRow {
@@ -85,4 +87,6 @@ export interface CuttingCompletedDetailResponse {
   actualFabricMeters: string | null;
   arrivedAt: string | null;
   completedAt: string | null;
+  /** 下游车缝是否已登记数量（编辑裁床数据前用于风险提示） */
+  downstream: { sewingStarted: boolean; sewingQuantity: number };
 }

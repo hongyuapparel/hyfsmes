@@ -39,6 +39,7 @@
               :loading="xiaomanLoading"
               placeholder="搜小满订单号/客户，或手填"
               class="xiaoman-select"
+              @focus="onXiaomanFocus"
               @change="onXiaomanChange"
             >
               <el-option v-for="o in xiaomanOptions" :key="o.value" :label="o.label" :value="o.value" />
@@ -74,9 +75,6 @@
             <el-option v-for="s in edit.salespersonOptions.value" :key="s" :label="s" :value="s" />
           </el-select>
         </el-form-item>
-        <el-form-item label="PO#">
-          <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
-        </el-form-item>
         <el-form-item label="装箱日期">
           <el-date-picker
             v-model="edit.form.packDate"
@@ -86,7 +84,25 @@
             placeholder="装箱日期"
           />
         </el-form-item>
-        <el-form-item label="备注" class="head-form-remark">
+        <el-form-item label="PO#">
+          <el-input v-model="edit.form.poNo" placeholder="选填，箱贴抬头优先用 PO" />
+        </el-form-item>
+        <el-form-item label="国家">
+          <el-select
+            v-model="edit.form.country"
+            filterable
+            allow-create
+            default-first-option
+            clearable
+            placeholder="选择或输入国家（印英文国名）"
+          >
+            <el-option v-for="c in COUNTRY_OPTIONS" :key="c.en" :label="`${c.cn} ${c.en}`" :value="c.en" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="邮编">
+          <el-input v-model="edit.form.postalCode" placeholder="选填，收货邮编" />
+        </el-form-item>
+        <el-form-item label="备注">
           <el-input v-model="edit.form.remark" placeholder="整单备注" />
         </el-form-item>
         <el-form-item label="公司抬头">
@@ -142,7 +158,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Link } from '@element-plus/icons-vue'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { searchXiaomanOrders, shipPackingList, type PickableLine } from '@/api/packing-lists'
+import { getXiaomanCompanyCountry, searchXiaomanOrders, shipPackingList, type PickableLine } from '@/api/packing-lists'
+import { COUNTRY_OPTIONS, matchCountryEn } from '@/constants/countries'
 import { usePackingGridRows } from '@/composables/usePackingGridRows'
 import { usePackingListEdit } from '@/composables/usePackingListEdit'
 import PackingGrid from '@/components/packing/PackingGrid.vue'
@@ -162,11 +179,22 @@ const labelsVisible = ref(false)
 const docVisible = ref(false)
 
 // 小满订单：远程搜索下拉（小满列表接口无关键词，后端拉取后本地过滤）+ 选中存订单ID用于跳转
-const xiaomanOptions = ref<{ value: string; label: string; orderId: string; companyName: string }[]>([])
+const xiaomanOptions = ref<{ value: string; label: string; orderId: string; companyId: number; companyName: string }[]>([])
 const xiaomanLoading = ref(false)
 const xiaomanOrderUrl = computed(() =>
   edit.form.xiaomanOrderId ? `https://crm.xiaoman.cn/order/detail/${edit.form.xiaomanOrderId}` : '',
 )
+
+// 小满订单列表接口无关键词参数，后端需先拉取近期订单(较慢、首拉后缓存5分钟)再本地过滤。
+// 聚焦时就后台预热缓存，让用户输入完成时正式搜索直接命中缓存，避免输入后长时间等待。
+const xiaomanWarmed = ref(false)
+function onXiaomanFocus() {
+  if (xiaomanWarmed.value) return
+  xiaomanWarmed.value = true
+  searchXiaomanOrders('a').catch(() => {
+    xiaomanWarmed.value = false
+  })
+}
 
 async function onXiaomanSearch(keyword: string) {
   const kw = keyword.trim()
@@ -183,6 +211,7 @@ async function onXiaomanSearch(keyword: string) {
         value,
         label: o.company_name ? `${value} · ${o.company_name}` : value,
         orderId: String(o.order_id),
+        companyId: o.company_id || 0,
         companyName: o.company_name || '',
       }
     })
@@ -194,13 +223,23 @@ async function onXiaomanSearch(keyword: string) {
   }
 }
 
-function onXiaomanChange(val: string) {
+async function onXiaomanChange(val: string) {
   const picked = xiaomanOptions.value.find((o) => o.value === val)
   edit.form.xiaomanOrderId = picked?.orderId ?? ''
   // 选中小满订单总是带入其客户名（解析客户档案/业务员），但 skipClear=true 不清已选的待仓/成品货。
   if (picked?.companyName) {
     edit.form.customerName = picked.companyName
     edit.onCustomerChange(true)
+  }
+  // best-effort 带出国家：按客户 company_id 拉一次小满国家，能匹配下拉就自动选中，匹配不上不动现值。
+  if (picked?.companyId) {
+    try {
+      const res = await getXiaomanCompanyCountry(picked.companyId)
+      const matched = matchCountryEn(res.data.country)
+      if (matched) edit.form.country = matched
+    } catch {
+      /* 取国家失败不影响选单，静默忽略 */
+    }
   }
 }
 
@@ -360,7 +399,8 @@ onActivated(() => {
 
 .head-form-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(190px, 1fr));
+  /* 5 列等宽：9 个表单项按顺序排，正好 2 行(末位空一格)，所有字段同宽不跨列 */
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 0 var(--space-lg);
 }
 
@@ -368,8 +408,34 @@ onActivated(() => {
   margin-bottom: var(--space-sm);
 }
 
-.head-form-remark {
-  grid-column: span 2;
+/* 手机端：表头表单按屏宽收缩列数，沿用同一套桌面控件，不另做移动专属交互 */
+@media (max-width: 960px) {
+  .head-form-grid {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .head-form-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .head-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .edit-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .edit-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs);
+  }
 }
 
 .xiaoman-field {

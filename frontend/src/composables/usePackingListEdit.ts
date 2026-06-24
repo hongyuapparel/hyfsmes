@@ -29,6 +29,8 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     customerName: '',
     serviceManager: '',
     poNo: '',
+    country: '',
+    postalCode: '',
     xiaomanOrderNo: '',
     xiaomanOrderId: '',
     packDate: today() as string | null,
@@ -63,6 +65,8 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     form.customerName = data.customerName
     form.serviceManager = data.serviceManager
     form.poNo = data.poNo
+    form.country = data.country
+    form.postalCode = data.postalCode
     form.xiaomanOrderNo = data.xiaomanOrderNo
     form.xiaomanOrderId = data.xiaomanOrderId
     form.packDate = data.packDate
@@ -99,6 +103,8 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
       form.customerName = ''
       form.serviceManager = ''
       form.poNo = ''
+      form.country = ''
+      form.postalCode = ''
       form.xiaomanOrderNo = ''
       form.xiaomanOrderId = ''
       form.packDate = today()

@@ -65,6 +65,8 @@ export interface PackingListDetail {
   customerName: string
   serviceManager: string
   poNo: string
+  country: string
+  postalCode: string
   xiaomanOrderNo: string
   xiaomanOrderId: string
   packDate: string | null
@@ -101,6 +103,8 @@ export interface SavePackingListPayload {
   customerName?: string
   serviceManager?: string
   poNo?: string
+  country?: string
+  postalCode?: string
   xiaomanOrderNo?: string
   xiaomanOrderId?: string
   packDate?: string | null
@@ -171,6 +175,7 @@ export interface XiaomanOrderItem {
   order_id: number
   order_no: string
   name: string
+  company_id: number
   company_name: string
   account_date: string
 }
@@ -179,6 +184,11 @@ export function searchXiaomanOrders(keyword?: string, page = 1, pageSize = 20) {
   return request.get<{ list: XiaomanOrderItem[]; total: number }>('/packing-lists/xiaoman/orders', {
     params: { keyword, page, pageSize },
   })
+}
+
+/** 选中小满订单后按客户 company_id 取小满里的国家（best-effort，取不到返回空） */
+export function getXiaomanCompanyCountry(companyId: number) {
+  return request.get<{ country: string }>(`/packing-lists/xiaoman/company/${companyId}/country`)
 }
 
 export interface PackingListLogItem {

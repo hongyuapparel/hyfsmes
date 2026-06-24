@@ -31,6 +31,8 @@ export class ProductionSewingController {
     @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
   ) {
     const query: SewingListQuery = {
       tab,
@@ -40,6 +42,8 @@ export class ProductionSewingController {
       completedEnd,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
+      sortField,
+      sortOrder: sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : undefined,
     };
     return this.sewingService.getSewingList(query);
   }

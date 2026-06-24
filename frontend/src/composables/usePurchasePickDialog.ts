@@ -55,6 +55,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
   const pickInventoryOptions = ref<PurchasePickInventoryOption[]>([])
   const pickInventoryLoading = ref(false)
   let currentSourceType: PickInventorySourceType | null = null
+  let pickDefaultKeyword: string | undefined
   let pickInventorySearchTimer: ReturnType<typeof setTimeout> | null = null
   let pickInventoryReqId = 0
   let pickInventoryAbortController: AbortController | null = null
@@ -94,6 +95,10 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickDialog.index = 0
     pickDialog.total = options.selectedRows.value.length
     pickDialog.visible = true
+    pickForm.inventorySourceType = 'fabric'
+    currentSourceType = 'fabric'
+    pickDefaultKeyword = computePickDefaultKeyword('fabric', row)
+    void loadPickInventory('fabric', pickDefaultKeyword, true)
   }
 
   function clearPickInventorySearchTimer() {
@@ -110,7 +115,11 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickInventoryLoading.value = false
   }
 
-  async function loadPickInventory(sourceType: PickInventorySourceType | null, name?: string) {
+  async function loadPickInventory(
+    sourceType: PickInventorySourceType | null,
+    name?: string,
+    autoSelectFirst = false,
+  ) {
     if (!sourceType) {
       cancelPickInventoryLoad()
       pickInventoryOptions.value = []
@@ -159,7 +168,12 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
           imageUrl: item.imageUrl ?? '',
         }))
       }
-      if (reqId === pickInventoryReqId) pickInventoryOptions.value = nextOptions
+      if (reqId === pickInventoryReqId) {
+        pickInventoryOptions.value = nextOptions
+        if (autoSelectFirst && pickForm.inventoryId == null && nextOptions.length) {
+          pickForm.inventoryId = nextOptions[0].id
+        }
+      }
     } catch (e: unknown) {
       if (isRequestCanceled(e) || reqId !== pickInventoryReqId) return
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '库存列表加载失败'))
@@ -171,12 +185,23 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     }
   }
 
+  function computePickDefaultKeyword(
+    sourceType: PickInventorySourceType | null,
+    row: PurchaseItemRow | null,
+  ): string | undefined {
+    if (!sourceType || !row) return undefined
+    if (sourceType === 'finished') return row.skuCode?.trim() || undefined
+    if (sourceType === 'fabric') return row.color?.trim() || row.materialName?.trim() || undefined
+    return row.materialName?.trim() || row.color?.trim() || undefined
+  }
+
   async function onPickSourceTypeChange(val: PickInventorySourceType | null) {
     clearPickInventorySearchTimer()
     pickForm.inventoryId = null
     pickInventoryOptions.value = []
     currentSourceType = val
-    await loadPickInventory(val)
+    pickDefaultKeyword = computePickDefaultKeyword(val, pickDialog.row)
+    await loadPickInventory(val, pickDefaultKeyword, true)
   }
 
   function onPickInventorySearch(query: string) {
@@ -184,7 +209,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     const keyword = query.trim()
     pickInventorySearchTimer = setTimeout(() => {
       pickInventorySearchTimer = null
-      void loadPickInventory(currentSourceType, keyword || undefined)
+      void loadPickInventory(currentSourceType, keyword || pickDefaultKeyword)
     }, PICK_INVENTORY_SEARCH_DELAY_MS)
   }
 
@@ -197,6 +222,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     pickForm.quantity = null
     pickForm.remark = ''
     currentSourceType = null
+    pickDefaultKeyword = undefined
     cancelPickInventoryLoad()
     pickInventoryOptions.value = []
   }

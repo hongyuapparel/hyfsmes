@@ -13,6 +13,20 @@ export default defineConfig(({ mode }) => {
       '@': path.resolve(__dirname, 'src'),
     },
   },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('element-plus')) return 'element-plus'
+          if (id.includes('@vue') || id.includes('vue-router') || id.includes('pinia') || /node_modules[\\/]vue[\\/]/.test(id)) {
+            return 'vue-vendor'
+          }
+        },
+      },
+    },
+  },
   server: {
     port: parseInt(process.env.PORT || '5173'),
     host: true,

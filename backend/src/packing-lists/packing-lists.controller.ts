@@ -29,6 +29,11 @@ export class PackingListsController {
     return this.xiaomanService.getOrderList(page ? parseInt(page, 10) : 1, pageSize ? parseInt(pageSize, 10) : 20, keyword);
   }
 
+  @Get('xiaoman/company/:companyId/country')
+  async getXiaomanCompanyCountry(@Param('companyId', ParseIntPipe) companyId: number) {
+    return { country: await this.xiaomanService.getCompanyCountry(companyId) };
+  }
+
   @Post(':id/ship')
   ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
     return this.shipService.ship(id, user?.username ?? '');
