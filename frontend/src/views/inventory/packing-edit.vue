@@ -51,7 +51,7 @@
             </el-tooltip>
           </div>
         </el-form-item>
-        <el-form-item label="客户" class="head-form-customer">
+        <el-form-item label="客户">
           <el-select
             v-model="edit.form.customerName"
             filterable
@@ -102,13 +102,13 @@
             placeholder="装箱日期"
           />
         </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="edit.form.remark" placeholder="整单备注" />
+        </el-form-item>
         <el-form-item label="公司抬头">
           <el-tooltip content="开启后箱贴/客户单顶部显示公司名" placement="top">
             <el-switch v-model="edit.form.showCompany" />
           </el-tooltip>
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="edit.form.remark" placeholder="整单备注" />
         </el-form-item>
       </div>
     </el-form>
@@ -399,7 +399,7 @@ onActivated(() => {
 
 .head-form-grid {
   display: grid;
-  /* 5 列等宽铺满：客户占两列(名字长)，9 项正好排成 2 行 5 列，无空洞、不留右白 */
+  /* 5 列等宽：9 个表单项按顺序排，正好 2 行(末位空一格)，所有字段同宽不跨列 */
   grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 0 var(--space-lg);
 }
@@ -408,18 +408,10 @@ onActivated(() => {
   margin-bottom: var(--space-sm);
 }
 
-.head-form-customer {
-  grid-column: span 2;
-}
-
 /* 手机端：表头表单按屏宽收缩列数，沿用同一套桌面控件，不另做移动专属交互 */
 @media (max-width: 960px) {
   .head-form-grid {
     grid-template-columns: repeat(3, minmax(160px, 1fr));
-  }
-
-  .head-form-customer {
-    grid-column: auto;
   }
 }
 
