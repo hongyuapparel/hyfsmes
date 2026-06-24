@@ -51,7 +51,7 @@
             </el-tooltip>
           </div>
         </el-form-item>
-        <el-form-item label="客户">
+        <el-form-item label="客户" class="head-form-customer">
           <el-select
             v-model="edit.form.customerName"
             filterable
@@ -399,8 +399,8 @@ onActivated(() => {
 
 .head-form-grid {
   display: grid;
-  /* 3 列等宽铺满：9 个表单项正好排成 3×3，无空洞、不留右侧空白，备注即普通单列宽 */
-  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  /* 5 列等宽铺满：客户占两列(名字长)，9 项正好排成 2 行 5 列，无空洞、不留右白 */
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
   gap: 0 var(--space-lg);
 }
 
@@ -408,14 +408,28 @@ onActivated(() => {
   margin-bottom: var(--space-sm);
 }
 
+.head-form-customer {
+  grid-column: span 2;
+}
+
 /* 手机端：表头表单按屏宽收缩列数，沿用同一套桌面控件，不另做移动专属交互 */
 @media (max-width: 960px) {
   .head-form-grid {
-    grid-template-columns: repeat(2, minmax(160px, 1fr));
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+
+  .head-form-customer {
+    grid-column: auto;
   }
 }
 
-@media (max-width: 600px) {
+@media (max-width: 720px) {
+  .head-form-grid {
+    grid-template-columns: repeat(2, minmax(150px, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
   .head-form-grid {
     grid-template-columns: 1fr;
   }
