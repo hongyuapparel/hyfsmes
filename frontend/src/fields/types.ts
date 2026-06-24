@@ -22,6 +22,8 @@ export interface FieldDefinition {
   placeholder?: string
   /** 电话类型时，第二个输入框（号码）的占位符 */
   placeholderSuffix?: string
+  /** 列表中该列的最小宽度（px）；不设则按类型默认。用于内容较长的列（如编号/公司名）避免截断 */
+  minWidth?: number
   /** 表单/列表中的显示顺序（数字越小越靠前），后续由系统配置覆盖 */
   order: number
 }

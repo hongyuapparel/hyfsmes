@@ -4,13 +4,9 @@
     <div
       ref="stripRef"
       class="app-tabs-strip"
-      :class="{ 'is-grabbing': isDraggingScroll }"
       role="tablist"
       @scroll="updateScrollState"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
+      @wheel="onWheel"
     >
       <button
         v-for="tab in tabs"
@@ -41,6 +37,7 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { Close } from '@element-plus/icons-vue'
+import Sortable from 'sortablejs'
 import { getRouteTabKey, markRouteCacheDropped } from '@/composables/useRouteCacheControl'
 
 interface TabItem {
@@ -60,52 +57,9 @@ const stripRef = ref<HTMLElement | null>(null)
 const canScrollLeft = ref(false)
 const canScrollRight = ref(false)
 
-// 鼠标按住拖动横滚（桌面端：触摸端本就能原生滑动，这里只接管鼠标）
-const isDraggingScroll = ref(false)
-let dragPointerId: number | null = null
-let dragStartX = 0
-let dragStartScroll = 0
-let dragMoved = false
-
-function onPointerDown(e: PointerEvent) {
-  dragMoved = false
-  if (e.pointerType !== 'mouse') return
-  const el = stripRef.value
-  if (!el) return
-  dragPointerId = e.pointerId
-  dragStartX = e.clientX
-  dragStartScroll = el.scrollLeft
-  try {
-    el.setPointerCapture(e.pointerId)
-  } catch {
-    // 指针未激活时忽略（不影响拖动滚动）
-  }
-}
-
-function onPointerMove(e: PointerEvent) {
-  if (dragPointerId === null || e.pointerId !== dragPointerId) return
-  const el = stripRef.value
-  if (!el) return
-  const dx = e.clientX - dragStartX
-  if (!dragMoved && Math.abs(dx) < 4) return
-  dragMoved = true
-  isDraggingScroll.value = true
-  el.scrollLeft = dragStartScroll - dx
-  updateScrollState()
-  e.preventDefault()
-}
-
-function onPointerUp(e: PointerEvent) {
-  if (dragPointerId === null) return
-  const el = stripRef.value
-  try {
-    if (el && el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId)
-  } catch {
-    // 忽略释放失败
-  }
-  dragPointerId = null
-  isDraggingScroll.value = false
-}
+let sortable: Sortable | null = null
+// 拖动重排刚结束时抑制紧随的 click，避免误切到刚拖过的页签
+let justSorted = false
 
 function getTitle(r: RouteLocationNormalizedLoaded) {
   if (r.name === 'OrdersDetail' || r.name === 'OrdersEdit' || r.name === 'OrdersCost') {
@@ -153,14 +107,13 @@ function closeByKey(key: string) {
 }
 
 function onTabClick(key: string) {
-  if (dragMoved) return
+  if (justSorted) return
   if (!key || key === activeKey.value) return
   const tab = tabs.value.find((t) => t.key === key)
   if (tab) router.push(tab.fullPath)
 }
 
 function onTabRemove(key: string) {
-  if (dragMoved) return
   closeByKey(key)
 }
 
@@ -194,13 +147,61 @@ function refreshTabsLayout() {
   })
 }
 
+// 鼠标滚轮横向滚动页签（仅在溢出时接管，避免影响整页滚动）
+function onWheel(e: WheelEvent) {
+  const el = stripRef.value
+  if (!el || el.scrollWidth <= el.clientWidth || e.deltaY === 0) return
+  el.scrollLeft += e.deltaY
+  updateScrollState()
+  e.preventDefault()
+}
+
+function initSortable() {
+  const el = stripRef.value
+  if (!el) return
+  sortable = Sortable.create(el, {
+    animation: 150,
+    draggable: '.app-tab',
+    filter: '.app-tab__close',
+    preventOnFilter: false,
+    ghostClass: 'app-tab--ghost',
+    chosenClass: 'app-tab--chosen',
+    scroll: true,
+    onEnd: (evt: Sortable.SortableEvent) => {
+      const oldIndex = evt.oldIndex
+      const newIndex = evt.newIndex
+      if (oldIndex == null || newIndex == null || oldIndex === newIndex) return
+      if (
+        oldIndex < 0 ||
+        newIndex < 0 ||
+        oldIndex >= tabs.value.length ||
+        newIndex >= tabs.value.length
+      ) {
+        return
+      }
+      const arr = tabs.value.slice()
+      const [moved] = arr.splice(oldIndex, 1)
+      if (!moved) return
+      arr.splice(newIndex, 0, moved)
+      tabs.value = arr
+      justSorted = true
+      setTimeout(() => {
+        justSorted = false
+      }, 0)
+    },
+  })
+}
+
 onMounted(() => {
   addTab(route)
   refreshTabsLayout()
+  initSortable()
   window.addEventListener('resize', updateScrollState)
 })
 
 onBeforeUnmount(() => {
+  sortable?.destroy()
+  sortable = null
   window.removeEventListener('resize', updateScrollState)
 })
 
@@ -238,15 +239,6 @@ watch(
   overflow-y: hidden;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
-  cursor: grab;
-}
-
-.app-tabs-strip.is-grabbing {
-  cursor: grabbing;
-}
-
-.app-tabs-strip.is-grabbing .app-tab {
-  cursor: grabbing;
 }
 
 .app-tabs-strip::-webkit-scrollbar {
@@ -274,6 +266,15 @@ watch(
   color: #165dff;
   background-color: #e8f3ff;
   border-color: #165dff;
+}
+
+/* 拖动重排：被拖元素占位与抓取态 */
+.app-tab--ghost {
+  opacity: 0.4;
+}
+
+.app-tab--chosen {
+  cursor: grabbing;
 }
 
 .app-tab__label {

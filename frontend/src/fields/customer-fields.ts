@@ -6,7 +6,7 @@
 import type { FieldDefinition } from './types'
 
 export const CUSTOMER_FIELDS: FieldDefinition[] = [
-  { code: 'customerId', label: '客户编号', type: 'text', order: 1, filterable: false },
+  { code: 'customerId', label: '客户编号', type: 'text', order: 1, filterable: false, minWidth: 130 },
   { code: 'country', label: '国家', type: 'text', order: 2, filterable: false },
   {
     code: 'companyName',
@@ -15,9 +15,10 @@ export const CUSTOMER_FIELDS: FieldDefinition[] = [
     order: 3,
     filterable: true,
     placeholder: '输入公司名称或联系人',
+    minWidth: 170,
   },
-  { code: 'contactPerson', label: '联系人', type: 'text', order: 4, filterable: false },
-  { code: 'contactInfo', label: '联系方式', type: 'phone', order: 5, filterable: false, placeholder: '国家代码', placeholderSuffix: '电话号码' },
+  { code: 'contactPerson', label: '联系人', type: 'text', order: 4, filterable: false, minWidth: 120 },
+  { code: 'contactInfo', label: '联系方式', type: 'phone', order: 5, filterable: false, placeholder: '国家代码', placeholderSuffix: '电话号码', minWidth: 140 },
   { code: 'cooperationDate', label: '合作日期', type: 'date', order: 6, sortable: true, filterable: false },
   { code: 'salesperson', label: '业务员', type: 'select', order: 7, filterable: true, optionsKey: 'salespeople', placeholder: '选择业务员' },
   { code: 'createdAt', label: '创建日期', type: 'date', order: 8, sortable: true, filterable: false },

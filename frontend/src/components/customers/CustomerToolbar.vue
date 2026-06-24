@@ -36,10 +36,9 @@
       <el-option v-for="sales in salespeople" :key="sales" :label="sales" :value="sales" />
     </el-select>
 
-    <el-button type="primary" @click="$emit('search', true)">搜索</el-button>
-    <el-button @click="$emit('reset')">清空</el-button>
-
     <div class="filter-bar-actions">
+      <el-button type="primary" @click="$emit('search', true)">搜索</el-button>
+      <el-button @click="$emit('reset')">清空</el-button>
       <el-button type="primary" @click="$emit('create')">新建客户</el-button>
       <el-tooltip v-if="selectedCount" content="删除" placement="top">
         <el-button

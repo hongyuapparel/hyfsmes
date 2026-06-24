@@ -24,7 +24,7 @@
           :key="field.code"
           :prop="field.code"
           :label="field.label"
-          :min-width="field.type === 'date' ? 110 : 100"
+          :min-width="field.minWidth ?? (field.type === 'date' ? 110 : 100)"
           :sortable="field.sortable ? 'custom' : false"
           show-overflow-tooltip
         >

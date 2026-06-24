@@ -497,6 +497,11 @@ a:hover {
   transition: all 0.2s ease-in-out;
 }
 
+/* 侧栏开合按钮：图标放大、更显眼，桌面与手机统一（它控制侧栏收展，是常用入口） */
+.header-toggle .el-icon {
+  font-size: 24px;
+}
+
 .el-button--primary {
   --el-button-bg-color: var(--color-primary);
   --el-button-text-color: var(--color-white);
@@ -973,11 +978,6 @@ a:hover {
     flex-wrap: wrap;
   }
 
-  /* 侧栏开合按钮：手机上图标偏小不显眼，放大图标字号（图标尺寸，非正文） */
-  .header-toggle .el-icon {
-    font-size: 24px;
-  }
-
   /* 状态标签条：窄屏改「单行横向滚动 + 更矮」，省垂直空间、不撑破整页，
      给列表/卡片让出位置。覆盖订单列表(flex:1 会换行) 与 生产各页(flex-shrink:0 会溢出)。 */
   .status-tabs {
@@ -1016,16 +1016,23 @@ a:hover {
   .filter-bar .filter-date-box .filter-range {
     width: 100%;
   }
-  /* 操作按钮整排换行、不再 margin-left:auto 顶出屏幕 */
+  /* 操作按钮整排换行、不再 margin-left:auto 顶出屏幕；按钮间距与筛选项一致(8px) */
   .filter-bar-actions {
     margin-left: 0;
     width: 100%;
     flex-wrap: wrap;
+    gap: var(--space-xs);
   }
   /* 带折叠开关的筛选栏：右侧留出绝对定位的折叠按钮位置（与第一行对齐） */
   .filter-bar.has-filter-collapse {
     position: relative;
     padding-right: 48px;
+  }
+  /* 折叠按钮只在第一行右上角，操作按钮行在其下方、不该为它让出 48px——
+     把这一行还原成整条筛选栏宽度，三个按钮就能挤进同一行 */
+  .filter-bar.has-filter-collapse .filter-bar-actions {
+    width: calc(100% + 48px);
+    margin-right: -48px;
   }
 
   /* 分页：手机端避免被挤成逐字竖排换行（摘要整行不断字，整体换行排列） */
