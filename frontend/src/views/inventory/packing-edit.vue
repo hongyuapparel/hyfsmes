@@ -102,13 +102,13 @@
             placeholder="装箱日期"
           />
         </el-form-item>
-        <el-form-item label="备注" class="head-form-remark">
-          <el-input v-model="edit.form.remark" placeholder="整单备注" />
-        </el-form-item>
         <el-form-item label="公司抬头">
           <el-tooltip content="开启后箱贴/客户单顶部显示公司名" placement="top">
             <el-switch v-model="edit.form.showCompany" />
           </el-tooltip>
+        </el-form-item>
+        <el-form-item label="备注" class="head-form-remark">
+          <el-input v-model="edit.form.remark" placeholder="整单备注" />
         </el-form-item>
       </div>
     </el-form>
@@ -410,7 +410,8 @@ onActivated(() => {
 }
 
 .head-form-remark {
-  grid-column: span 2;
+  /* 备注独占整行(满铺当前列数)，避免跨列换行留下中间空格 */
+  grid-column: 1 / -1;
 }
 
 /* 手机端：表头表单按屏宽收缩列数，沿用同一套桌面控件，不另做移动专属交互 */
@@ -423,10 +424,6 @@ onActivated(() => {
 @media (max-width: 600px) {
   .head-form-grid {
     grid-template-columns: 1fr;
-  }
-
-  .head-form-remark {
-    grid-column: span 1;
   }
 
   .edit-header {
