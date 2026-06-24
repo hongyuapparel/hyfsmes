@@ -107,7 +107,7 @@
             <el-switch v-model="edit.form.showCompany" />
           </el-tooltip>
         </el-form-item>
-        <el-form-item label="备注" class="head-form-remark">
+        <el-form-item label="备注">
           <el-input v-model="edit.form.remark" placeholder="整单备注" />
         </el-form-item>
       </div>
@@ -399,19 +399,13 @@ onActivated(() => {
 
 .head-form-grid {
   display: grid;
-  /* 填写框收窄并左对齐：每项上限 300px，不再整行拉伸 */
-  grid-template-columns: repeat(4, minmax(180px, 300px));
-  justify-content: start;
+  /* 3 列等宽铺满：9 个表单项正好排成 3×3，无空洞、不留右侧空白，备注即普通单列宽 */
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
   gap: 0 var(--space-lg);
 }
 
 .head-form-grid :deep(.el-form-item) {
   margin-bottom: var(--space-sm);
-}
-
-.head-form-remark {
-  /* 备注独占整行(满铺当前列数)，避免跨列换行留下中间空格 */
-  grid-column: 1 / -1;
 }
 
 /* 手机端：表头表单按屏宽收缩列数，沿用同一套桌面控件，不另做移动专属交互 */
