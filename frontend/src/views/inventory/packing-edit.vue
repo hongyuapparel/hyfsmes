@@ -325,7 +325,7 @@ async function onShip() {
   }
   const { boxCount, totalQty } = grid.totals.value
   try {
-    await ElMessageBox.confirm(`共 ${boxCount} 箱 / ${totalQty} 件，确认发货？发货后将扣减待仓/成品库存（发货后仍可修改装箱方式，不影响库存）。`, '确认发货', { type: 'warning' })
+    await ElMessageBox.confirm(`共 ${boxCount} 箱 / ${totalQty} 件，确认发货？库存来源的明细将扣减待仓/成品库存，手填明细仅作单据不扣库存（发货后仍可修改装箱方式，不影响库存）。`, '确认发货', { type: 'warning' })
   } catch {
     return
   }
