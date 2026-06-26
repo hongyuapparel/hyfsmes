@@ -41,11 +41,15 @@ export class PackingListsShipService {
     const detail = await this.listsService.getDetail(id);
     if (detail.status !== 'draft') throw new BadRequestException('该装箱单已发货');
 
+    // 混合发货：只要单子里有明细行就放行。库存来源行(pending/finished)照常扣减出库；
+    // 手填行(manual)无库存来源，只作单据记录、不扣库存。整单仅手填时也允许发货（仅改状态、不动库存）。
+    const hasAnyItem = detail.boxes.some((box) => box.items.length > 0);
+    if (!hasAnyItem) {
+      throw new BadRequestException('装箱单没有任何明细行，无法发货');
+    }
+
     const pendingGroups = this.groupBySource(detail, 'pending');
     const finishedGroups = this.groupBySource(detail, 'finished');
-    if (!pendingGroups.size && !finishedGroups.size) {
-      throw new BadRequestException('装箱单没有来自待仓处理或成品库存的明细行，无法发货');
-    }
 
     const pendingItems = this.buildOutboundItems(pendingGroups, detail.sizeHeaders);
     const finishedItems = this.buildOutboundItems(finishedGroups, detail.sizeHeaders);
