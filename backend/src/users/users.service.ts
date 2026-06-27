@@ -120,8 +120,10 @@ export class UsersService {
     const user = await this.userRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('用户不存在');
     const patch: Partial<User> = {};
+    const prevUsername = user.username;
+    const prevDisplayName = user.displayName ?? '';
 
-    // 允许修改用户名（登录账号），并做唯一性校验；同时联动更新依赖 username 的业务字段
+    // 允许修改用户名（登录账号），并做唯一性校验
     if (dto.username !== undefined) {
       const next = (dto.username ?? '').trim();
       if (!next) throw new ConflictException('用户名不能为空');
@@ -129,21 +131,7 @@ export class UsersService {
       if (next !== user.username) {
         const exists = await this.userRepo.findOne({ where: { username: next } });
         if (exists) throw new ConflictException('用户名已存在');
-        const prev = user.username;
         patch.username = next;
-        // 订单表目前以字符串保存业务员/跟单员；更改用户名时做一次联动更新，避免历史单据丢失关联
-        await this.orderRepo
-          .createQueryBuilder()
-          .update(Order)
-          .set({ salesperson: next })
-          .where('salesperson = :prev', { prev })
-          .execute();
-        await this.orderRepo
-          .createQueryBuilder()
-          .update(Order)
-          .set({ merchandiser: next })
-          .where('merchandiser = :prev', { prev })
-          .execute();
       }
     }
     if (dto.displayName !== undefined) patch.displayName = dto.displayName;
@@ -156,11 +144,45 @@ export class UsersService {
     if (Object.keys(patch).length) {
       await this.userRepo.update(id, patch);
     }
+
+    // 业务员/跟单员等字段按“显示名（无则登录名）”的文本快照存储，
+    // 改名后联动刷新所有历史业务记录，避免按业务员筛选时丢失关联
+    const nextUsername = patch.username ?? prevUsername;
+    const nextDisplayName =
+      patch.displayName !== undefined ? (patch.displayName ?? '') : prevDisplayName;
+    const prevEffectiveName = (prevDisplayName.trim() || prevUsername).trim();
+    const nextEffectiveName = (nextDisplayName.trim() || nextUsername).trim();
+    if (prevEffectiveName && nextEffectiveName && prevEffectiveName !== nextEffectiveName) {
+      await this.cascadeBusinessRecordRename(prevEffectiveName, nextEffectiveName);
+    }
+
     const full = await this.userRepo.findOne({
       where: { id: user.id },
       relations: ['role', 'userRoles', 'userRoles.role'],
     });
     return full ? this.toSafeUser(full) : this.toSafeUser(user);
+  }
+
+  /**
+   * 业务记录中以文本快照存储的业务员/跟单员名字，随用户改名联动刷新，
+   * 覆盖客户、订单、商品、辅料库存、装箱单。
+   * 注：同名用户无法区分（文本存储固有局限），彻底解决需改存 user_id。
+   */
+  private async cascadeBusinessRecordRename(prev: string, next: string): Promise<void> {
+    const targets: Array<{ table: string; column: string }> = [
+      { table: 'customers', column: 'salesperson' },
+      { table: 'orders', column: 'salesperson' },
+      { table: 'orders', column: 'merchandiser' },
+      { table: 'products', column: 'salesperson' },
+      { table: 'inventory_accessory', column: 'salesperson' },
+      { table: 'packing_lists', column: 'service_manager' },
+    ];
+    for (const { table, column } of targets) {
+      await this.orderRepo.manager.query(
+        `UPDATE ${table} SET ${column} = ? WHERE ${column} = ?`,
+        [next, prev],
+      );
+    }
   }
 
   async resetPassword(id: number, newPassword: string): Promise<void> {
