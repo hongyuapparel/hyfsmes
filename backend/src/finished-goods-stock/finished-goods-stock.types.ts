@@ -75,6 +75,7 @@ export type FinishedGoodsStockDetailResult = {
     sourceOrderNo: string;
     summary: string;
     summaries: string[];
+    canRollback: boolean;
     createdAt: string;
   }>;
   colorSize: { headers: string[]; colors: string[]; rows: Array<{ colorName: string; quantities: number[] }> };

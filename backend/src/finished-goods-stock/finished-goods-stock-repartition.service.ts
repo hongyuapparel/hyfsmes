@@ -40,6 +40,26 @@ type ColorUnit = {
   imageUrl: string;
 };
 
+/** 一次「修改已有库存」前，整组每条记录的完整快照，用于一键回滚（精确还原，可重建被删记录） */
+type UndoRecord = {
+  id: number;
+  orderId: number | null;
+  customerId: number | null;
+  customerName: string;
+  skuCode: string;
+  quantity: number;
+  unitPrice: string;
+  warehouseId: number | null;
+  inventoryTypeId: number | null;
+  department: string;
+  location: string;
+  imageUrl: string;
+  colorSizeSnapshot: unknown;
+  colorImages: Array<{ colorName: string; imageUrl: string }>;
+};
+
+type ColorImageRow = { finishedStockId: number; colorName: string; imageUrl: string };
+
 /**
  * 成品库存「按颜色重分配」：库存详情抽屉是按 SKU 整组聚合显示的，但底层是多条
  * finished_goods_stock 记录（一条记录一套 部门/库存类型/仓库/单价，快照里含多个颜色）。
@@ -90,20 +110,53 @@ export class FinishedGoodsStockRepartitionService {
     return quantities.reduce((sum, q) => sum + Math.max(0, Math.trunc(Number(q) || 0)), 0);
   }
 
-  private async loadGroupColorImages(stockIds: number[]): Promise<Map<string, string>> {
-    const map = new Map<string, string>();
-    if (!stockIds.length) return map;
+  private async loadGroupColorImageRows(stockIds: number[]): Promise<ColorImageRow[]> {
+    if (!stockIds.length) return [];
     try {
       const rows = await this.colorImageRepo.find({ where: { finishedStockId: In(stockIds) } });
-      rows.forEach((row) => {
-        const key = `${row.finishedStockId}::${this.norm(row.colorName)}`;
-        const url = this.norm(row.imageUrl);
-        if (url && !map.has(key)) map.set(key, url);
-      });
+      return rows.map((row) => ({
+        finishedStockId: row.finishedStockId,
+        colorName: this.norm(row.colorName),
+        imageUrl: this.norm(row.imageUrl),
+      }));
     } catch (e) {
       if (!isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+      return [];
     }
+  }
+
+  private buildImageMap(rows: ColorImageRow[]): Map<string, string> {
+    const map = new Map<string, string>();
+    rows.forEach((row) => {
+      if (!row.imageUrl) return;
+      const key = `${row.finishedStockId}::${row.colorName}`;
+      if (!map.has(key)) map.set(key, row.imageUrl);
+    });
     return map;
+  }
+
+  /** 把整组每条记录连同其颜色图片打成完整快照（回滚用） */
+  private captureGroupUndo(group: FinishedGoodsStock[], imageRows: ColorImageRow[]): UndoRecord[] {
+    return group.map((record) => ({
+      id: record.id,
+      orderId: record.orderId ?? null,
+      customerId: record.customerId ?? null,
+      customerName: this.norm(record.customerName),
+      skuCode: this.norm(record.skuCode),
+      quantity: Math.max(0, Math.trunc(Number(record.quantity) || 0)),
+      unitPrice: this.normalizePrice(record.unitPrice),
+      warehouseId: record.warehouseId ?? null,
+      inventoryTypeId: record.inventoryTypeId ?? null,
+      department: this.norm(record.department),
+      location: this.norm(record.location),
+      imageUrl: this.norm(record.imageUrl),
+      colorSizeSnapshot: this.inboundQueryService.cloneColorSizeSnapshot(
+        this.inboundQueryService.parseStoredColorSizeSnapshot(record.colorSizeSnapshot),
+      ),
+      colorImages: imageRows
+        .filter((row) => row.finishedStockId === record.id && row.colorName && row.imageUrl)
+        .map((row) => ({ colorName: row.colorName, imageUrl: row.imageUrl })),
+    }));
   }
 
   /** 把整组每个颜色拆成「颜色单元」，目标元数据来自 colorMeta（缺省则沿用原记录） */
@@ -165,9 +218,10 @@ export class FinishedGoodsStockRepartitionService {
       metaMap.set(`${stockId}::${colorName}`, cm);
     });
 
-    const imageMap = await this.loadGroupColorImages(groupIds);
-    const beforeSnapshots = new Map<number, Record<string, unknown>>();
-    group.forEach((record) => beforeSnapshots.set(record.id, this.inboundQueryService.stockAdjustSnapshot(record)));
+    const imageRows = await this.loadGroupColorImageRows(groupIds);
+    const imageMap = this.buildImageMap(imageRows);
+    // 改动前整组完整快照：写进日志 JSON，供管理员一键回滚（精确还原、可重建被删记录）
+    const groupUndo = this.captureGroupUndo(group, imageRows);
 
     const units = await this.buildColorUnits(group, metaMap, imageMap);
 
@@ -286,23 +340,105 @@ export class FinishedGoodsStockRepartitionService {
         await stockRepo.remove(toDelete);
       }
 
-      // 调整日志：记录受影响记录的前后变化
-      const remark = this.norm(dto.remark) || '库存详情按颜色重分配';
+      // 调整日志：每次保存写一条「可回滚点」，before 里带整组改动前快照
+      const remark = this.norm(dto.remark) || '修改成品库存（可回滚）';
+      const anchorId = survivingIds.has(seedId)
+        ? seedId
+        : keepers.find((k) => k.record.id != null)?.record.id ?? seedId;
       try {
-        for (const keeper of keepers) {
-          const before = keeper.isNew ? { quantity: 0, colorSizeSnapshot: null } : beforeSnapshots.get(keeper.record.id) ?? {};
-          const after = this.inboundQueryService.stockAdjustSnapshot(keeper.record);
-          if (JSON.stringify(before) === JSON.stringify(after)) continue;
-          await adjustLogRepo.save(
-            adjustLogRepo.create({
-              finishedStockId: keeper.record.id,
-              operatorUsername: this.norm(operatorUsername),
-              before: { ...before, logAction: 'repartition' },
-              after: { ...after, logAction: 'repartition' },
-              remark,
-            }),
-          );
+        await adjustLogRepo.save(
+          adjustLogRepo.create({
+            finishedStockId: anchorId,
+            operatorUsername: this.norm(operatorUsername),
+            before: { _groupUndo: groupUndo, logAction: 'edit-save' },
+            after: { logAction: 'edit-save' },
+            remark,
+          }),
+        );
+      } catch (e) {
+        if (!isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
+      }
+    });
+  }
+
+  /** 管理员一键回滚：把某次「可回滚点」对应的 SKU 整组还原到改动前（精确还原，被删记录按原样重建） */
+  async rollback(logId: number, operatorUsername: string): Promise<void> {
+    const log = await this.adjustLogRepo.findOne({ where: { id: logId } });
+    if (!log) throw new NotFoundException('操作记录不存在');
+    const before = (log.before ?? {}) as Record<string, unknown>;
+    const blob = Array.isArray(before._groupUndo) ? (before._groupUndo as UndoRecord[]) : null;
+    if (!blob || !blob.length) throw new BadRequestException('该操作记录不支持回滚');
+    const sku = this.norm(blob[0].skuCode);
+    if (!sku) throw new BadRequestException('回滚数据异常：缺少 SKU');
+
+    await this.stockRepo.manager.transaction(async (manager) => {
+      const stockRepo = manager.getRepository(FinishedGoodsStock);
+      const colorImageRepo = manager.getRepository(FinishedGoodsStockColorImage);
+      const adjustLogRepo = manager.getRepository(FinishedGoodsStockAdjustLog);
+
+      const current = await stockRepo.find({ where: { skuCode: sku } });
+      // 回滚本身也可再回滚：先存当前整组快照
+      const currentImageRows = await this.loadGroupColorImageRows(current.map((r) => r.id));
+      const currentUndo = this.captureGroupUndo(current, currentImageRows);
+
+      const blobIds = new Set(blob.map((b) => Number(b.id)));
+      const toRemove = current.filter((r) => !blobIds.has(r.id));
+
+      for (const b of blob) {
+        const fields = {
+          orderId: b.orderId ?? null,
+          customerId: b.customerId ?? null,
+          customerName: this.norm(b.customerName),
+          skuCode: this.norm(b.skuCode),
+          quantity: Math.max(0, Math.trunc(Number(b.quantity) || 0)),
+          unitPrice: this.normalizePrice(b.unitPrice),
+          warehouseId: b.warehouseId ?? null,
+          inventoryTypeId: b.inventoryTypeId ?? null,
+          department: this.norm(b.department),
+          location: this.norm(b.location),
+          imageUrl: this.norm(b.imageUrl),
+          colorSizeSnapshot: (b.colorSizeSnapshot ?? null) as FinishedGoodsStock['colorSizeSnapshot'],
+        };
+        const existing = current.find((r) => r.id === Number(b.id));
+        if (existing) {
+          Object.assign(existing, fields);
+          await stockRepo.save(existing);
+        } else {
+          await stockRepo.insert({ id: Number(b.id), ...fields });
         }
+        // 还原该记录的颜色图片
+        try {
+          await colorImageRepo.delete({ finishedStockId: Number(b.id) });
+          const imgs = Array.isArray(b.colorImages) ? b.colorImages : [];
+          const entities = imgs
+            .map((img) => ({ colorName: this.norm(img.colorName), imageUrl: this.norm(img.imageUrl) }))
+            .filter((img) => img.colorName && img.imageUrl)
+            .map((img) => colorImageRepo.create({ finishedStockId: Number(b.id), ...img }));
+          if (entities.length) await colorImageRepo.save(entities);
+        } catch (e) {
+          if (!isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+        }
+      }
+
+      if (toRemove.length) {
+        try {
+          await colorImageRepo.delete({ finishedStockId: In(toRemove.map((r) => r.id)) });
+        } catch (e) {
+          if (!isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+        }
+        await stockRepo.remove(toRemove);
+      }
+
+      try {
+        await adjustLogRepo.save(
+          adjustLogRepo.create({
+            finishedStockId: Number(blob[0].id),
+            operatorUsername: this.norm(operatorUsername),
+            before: { _groupUndo: currentUndo, logAction: 'edit-save' },
+            after: { logAction: 'rollback' },
+            remark: `回滚「${this.norm(log.remark) || '修改成品库存'}」`,
+          }),
+        );
       } catch (e) {
         if (!isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
       }

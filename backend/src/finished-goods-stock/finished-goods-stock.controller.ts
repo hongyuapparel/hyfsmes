@@ -163,6 +163,15 @@ export class FinishedGoodsStockController {
     );
   }
 
+  @Patch('items/rollback/:logId')
+  @RequirePermission('inventory_finished_edit')
+  rollback(
+    @Param('logId') logId: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.operationService.rollback(Number(logId), user?.username ?? '');
+  }
+
   @Put('items/:id/color-images')
   @RequirePermission('inventory_finished_edit')
   upsertColorImage(

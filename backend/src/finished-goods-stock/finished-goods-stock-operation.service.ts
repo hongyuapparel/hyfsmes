@@ -66,4 +66,8 @@ export class FinishedGoodsStockOperationService {
   repartition(id: number, dto: RepartitionDto, operatorUsername: string): Promise<void> {
     return this.repartitionService.repartition(id, dto, operatorUsername);
   }
+
+  rollback(logId: number, operatorUsername: string): Promise<void> {
+    return this.repartitionService.rollback(logId, operatorUsername);
+  }
 }

@@ -53,7 +53,7 @@
           </el-tab-pane>
 
           <el-tab-pane label="操作记录" name="logs" lazy>
-            <OperationLogsSection :logs="adjustLogs" />
+            <OperationLogsSection :logs="adjustLogs" :can-rollback="canEditStock" @rollback="handleRollback" />
           </el-tab-pane>
         </el-tabs>
       </div>
@@ -144,6 +144,7 @@ const {
   toggleEditMode,
   saveMeta,
   saveColorImage,
+  rollbackLog,
   openDetail,
 } = useFinishedDetailData({
   inventoryTypeOptions: () => props.inventoryTypeOptions,
@@ -197,6 +198,11 @@ function handleSaveMeta() {
 function handleSaveColorImage(colorName: string, url: string) {
   if (!props.stockId) return
   saveColorImage(props.stockId, colorName, url)
+}
+
+function handleRollback(logId: number) {
+  if (!props.stockId) return
+  rollbackLog(props.stockId, logId)
 }
 
 function onDetailRowMetaChange(
