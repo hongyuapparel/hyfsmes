@@ -48,6 +48,9 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_settings_inventory', name: '库存设置', routePath: '/settings/inventory', type: 'menu' },
   { code: 'menu_settings_hr', name: '组织与人事', routePath: '/settings/hr', type: 'menu' },
   { code: 'menu_settings_finance', name: '财务设置', routePath: '/settings/finance', type: 'menu' },
+  // 操作级权限：成品库存-修改已有库存（详情编辑/按颜色重分配/颜色图片）。默认仅超级管理员拥有，
+  // 其余角色需在「角色与权限」单独授权；不影响查看、录入、出库
+  { code: 'inventory_finished_edit', name: '成品库存-修改已有库存', routePath: '/inventory/finished', type: 'action' },
   // 操作级权限：订单列表勾选后的批量操作
   { code: 'orders_edit', name: '订单列表-编辑订单', routePath: '/orders/list', type: 'action' },
   { code: 'orders_delete', name: '订单列表-删除订单', routePath: '/orders/list', type: 'action' },

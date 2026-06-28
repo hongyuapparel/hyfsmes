@@ -121,6 +121,7 @@ export class FinishedGoodsStockController {
   }
 
   @Patch('items/:id')
+  @RequirePermission('inventory_finished_edit')
   updateMeta(
     @Param('id') id: string,
     @Body('skuCode') skuCode: string | undefined,
@@ -143,6 +144,7 @@ export class FinishedGoodsStockController {
   }
 
   @Patch('items/:id/repartition')
+  @RequirePermission('inventory_finished_edit')
   repartition(
     @Param('id') id: string,
     @Body('skuCode') skuCode: string | undefined,
@@ -162,6 +164,7 @@ export class FinishedGoodsStockController {
   }
 
   @Put('items/:id/color-images')
+  @RequirePermission('inventory_finished_edit')
   upsertColorImage(
     @Param('id') id: string,
     @Body('colorName') colorName: string,

@@ -2,7 +2,7 @@
   <FinishedBasicInfoGrid title="基础信息与产品图" image-label="产品图">
     <template #actions>
       <el-button
-        v-if="!metaEditing"
+        v-if="!metaEditing && canEdit"
         size="small"
         text
         type="primary"
@@ -169,6 +169,7 @@ const props = defineProps<{
   stock: StockInfo
   displayProductImage: string
   metaEditing: boolean
+  canEdit: boolean
   saving: boolean
   editForm: FinishedDetailEditForm
   inventoryTypeOptions: { id: number; label: string }[]
@@ -188,6 +189,7 @@ const {
   stock,
   displayProductImage,
   metaEditing,
+  canEdit,
   saving,
   editForm,
   inventoryTypeOptions,
