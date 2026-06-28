@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { type FinishedStockDetailRes, getFinishedStockDetail, repartitionFinishedStockDetail, upsertFinishedStockColorImage } from '@/api/inventory'
+import { type FinishedStockDetailRes, getFinishedStockDetail, repartitionFinishedStockDetail, rollbackFinishedStockChange, upsertFinishedStockColorImage } from '@/api/inventory'
 import type { FinishedDetailColorMeta } from '@/composables/useFinishedDetailMatrixEdit'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { createAdjustLogSummaryBuilder, mergeSizeHeaders } from '@/composables/useFinishedDetailHelpers'
@@ -86,6 +86,8 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
       const item = (log ?? {}) as Record<string, unknown>
       return {
         id: String(item.id ?? index),
+        rollbackId: Number(item.id) || 0,
+        canRollback: Boolean(item.canRollback),
         operatorUsername: String(item.operatorUsername ?? ''),
         createdAt: String(item.createdAt ?? ''),
         summary: getAdjustLogSummary(item),
@@ -205,6 +207,20 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     }
   }
 
+  async function rollbackLog(stockId: number, logId: number) {
+    saving.value = true
+    try {
+      await rollbackFinishedStockChange(logId)
+      ElMessage.success('已回滚到该次修改前')
+      await loadDetail(stockId)
+      options.onMetaSaved()
+    } catch (error: unknown) {
+      if (!isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
+    } finally {
+      saving.value = false
+    }
+  }
+
   function openDetail(payload: OpenDetailPayload) {
     internalGroupProductImage.value = payload.groupProductImage
     internalGroupSizeHeaders.value = [...payload.groupSizeHeaders]
@@ -236,6 +252,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     toggleEditMode,
     saveMeta,
     saveColorImage,
+    rollbackLog,
     openDetail,
   }
 }

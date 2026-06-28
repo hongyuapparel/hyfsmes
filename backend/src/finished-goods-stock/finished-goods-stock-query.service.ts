@@ -347,6 +347,8 @@ export class FinishedGoodsStockQueryService {
           sourceOrderNo,
           summary,
           summaries: summary ? [summary] : [],
+          // before 里带整组改动前快照(_groupUndo)的，才支持「一键回滚」
+          canRollback: Array.isArray((row.before as Record<string, unknown> | null | undefined)?._groupUndo),
           createdAt: formatDateTimeForResponse(row.createdAt),
         };
       }),

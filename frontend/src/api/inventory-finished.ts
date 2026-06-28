@@ -102,6 +102,7 @@ export interface FinishedStockDetailRes {
     sourceOrderNo?: string
     summary?: string
     summaries?: string[]
+    canRollback?: boolean
     createdAt: string
   }>
   colorSize: {
@@ -162,6 +163,11 @@ export function repartitionFinishedStockDetail(
   }
 ) {
   return request.patch<void>(`/inventory/finished/items/${id}/repartition`, body)
+}
+
+/** 管理员一键回滚：把某次「可回滚」操作还原到改动前 */
+export function rollbackFinishedStockChange(logId: number) {
+  return request.patch<void>(`/inventory/finished/items/rollback/${logId}`)
 }
 
 export interface FinishedOutboundRecord {

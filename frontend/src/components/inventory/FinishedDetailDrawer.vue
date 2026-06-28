@@ -17,6 +17,7 @@
               :stock="stockInfo"
               :display-product-image="displayProductImage"
               :meta-editing="metaEditing"
+              :can-edit="canEditStock"
               :saving="saving"
               :edit-form="editForm"
               :inventory-type-options="inventoryTypeOptions"
@@ -52,7 +53,7 @@
           </el-tab-pane>
 
           <el-tab-pane label="操作记录" name="logs" lazy>
-            <OperationLogsSection :logs="adjustLogs" />
+            <OperationLogsSection :logs="adjustLogs" :can-rollback="canEditStock" @rollback="handleRollback" />
           </el-tab-pane>
         </el-tabs>
       </div>
@@ -63,6 +64,7 @@
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 import AppDrawer from '@/components/AppDrawer.vue'
 import { sumRowQty } from '@/composables/useFinishedDetailHelpers'
 import type { FinishedDetailEditForm } from '@/composables/useFinishedDetailData'
@@ -106,6 +108,10 @@ const emit = defineEmits<{
 
 const activeDetailTab = ref('size')
 
+// 修改已有库存需要 inventory_finished_edit 权限（默认仅超级管理员有，可在角色与权限授权给主管）
+const authStore = useAuthStore()
+const canEditStock = computed(() => authStore.hasPermission('inventory_finished_edit'))
+
 const {
   editSizeHeaders,
   editSizeRows,
@@ -138,6 +144,7 @@ const {
   toggleEditMode,
   saveMeta,
   saveColorImage,
+  rollbackLog,
   openDetail,
 } = useFinishedDetailData({
   inventoryTypeOptions: () => props.inventoryTypeOptions,
@@ -191,6 +198,11 @@ function handleSaveMeta() {
 function handleSaveColorImage(colorName: string, url: string) {
   if (!props.stockId) return
   saveColorImage(props.stockId, colorName, url)
+}
+
+function handleRollback(logId: number) {
+  if (!props.stockId) return
+  rollbackLog(props.stockId, logId)
 }
 
 function onDetailRowMetaChange(

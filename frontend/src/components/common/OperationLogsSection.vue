@@ -7,7 +7,21 @@
           <span class="detail-log-user">{{ log.operatorUsername || '-' }}</span>
           <span class="detail-log-time">{{ log.createdAt }}</span>
         </div>
-        <div class="detail-log-body">{{ log.summary }}</div>
+        <div class="detail-log-body">
+          <span>{{ log.summary }}</span>
+          <el-popconfirm
+            v-if="canRollback && log.canRollback && log.rollbackId"
+            title="回滚到这次修改之前？将精确还原该 SKU 的整组库存。"
+            confirm-button-text="回滚"
+            cancel-button-text="取消"
+            width="240"
+            @confirm="$emit('rollback', log.rollbackId)"
+          >
+            <template #reference>
+              <el-button link type="warning" size="small" class="detail-log-rollback">回滚</el-button>
+            </template>
+          </el-popconfirm>
+        </div>
       </div>
     </div>
     <div v-else class="detail-muted">暂无操作记录</div>
@@ -15,13 +29,23 @@
 </template>
 
 <script setup lang="ts">
-defineProps<{
-  logs: Array<{
-    id: string | number
-    operatorUsername: string
-    createdAt: string
-    summary: string
-  }>
+withDefaults(
+  defineProps<{
+    logs: Array<{
+      id: string | number
+      operatorUsername: string
+      createdAt: string
+      summary: string
+      canRollback?: boolean
+      rollbackId?: number
+    }>
+    canRollback?: boolean
+  }>(),
+  { canRollback: false },
+)
+
+defineEmits<{
+  (e: 'rollback', logId: number): void
 }>()
 </script>
 
@@ -55,5 +79,6 @@ defineProps<{
   font-size: 12px;
   color: var(--el-text-color-secondary);
 }
-.detail-log-body { font-size: 12px; color: var(--el-text-color-regular); line-height: 1.5; }
+.detail-log-body { font-size: 12px; color: var(--el-text-color-regular); line-height: 1.5; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.detail-log-rollback { flex: none; padding: 0; height: auto; }
 </style>

@@ -121,6 +121,7 @@ export class FinishedGoodsStockController {
   }
 
   @Patch('items/:id')
+  @RequirePermission('inventory_finished_edit')
   updateMeta(
     @Param('id') id: string,
     @Body('skuCode') skuCode: string | undefined,
@@ -143,6 +144,7 @@ export class FinishedGoodsStockController {
   }
 
   @Patch('items/:id/repartition')
+  @RequirePermission('inventory_finished_edit')
   repartition(
     @Param('id') id: string,
     @Body('skuCode') skuCode: string | undefined,
@@ -161,7 +163,17 @@ export class FinishedGoodsStockController {
     );
   }
 
+  @Patch('items/rollback/:logId')
+  @RequirePermission('inventory_finished_edit')
+  rollback(
+    @Param('logId') logId: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.operationService.rollback(Number(logId), user?.username ?? '');
+  }
+
   @Put('items/:id/color-images')
+  @RequirePermission('inventory_finished_edit')
   upsertColorImage(
     @Param('id') id: string,
     @Body('colorName') colorName: string,
