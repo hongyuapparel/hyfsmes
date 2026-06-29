@@ -150,15 +150,16 @@ export class FinishedGoodsStockController {
     @Body('skuCode') skuCode: string | undefined,
     @Body('imageUrl') imageUrl: string | undefined,
     @Body('remark') remark: string | undefined,
+    @Body('headers') headers: string[] | undefined,
     @Body('colorMeta')
     colorMeta:
-      | Array<{ stockId: number; colorName: string; department: string; inventoryTypeId: number | null; warehouseId: number | null; location: string; unitPrice: string | number }>
+      | Array<{ stockId: number; colorName: string; department: string; inventoryTypeId: number | null; warehouseId: number | null; location: string; unitPrice: string | number; quantities?: number[] }>
       | undefined,
     @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.operationService.repartition(
       Number(id),
-      { skuCode, imageUrl, remark, colorMeta: Array.isArray(colorMeta) ? colorMeta : [] },
+      { skuCode, imageUrl, remark, headers: Array.isArray(headers) ? headers : [], colorMeta: Array.isArray(colorMeta) ? colorMeta : [] },
       user?.username ?? '',
     );
   }

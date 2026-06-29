@@ -22,6 +22,7 @@ type UseFinishedDetailDataOptions = {
   inventoryTypeOptions: () => Array<{ id: number; label: string }>
   warehouseOptions: () => Array<{ id: number; label: string }>
   buildColorMeta?: () => FinishedDetailColorMeta[]
+  buildColorMetaHeaders?: () => string[]
   onColorImagesSynced: (stockId: number, colorImages: unknown[]) => void
   onColorImageSaved: (payload: { stockId: number; colorName: string; imageUrl: string }) => void
   onMetaSaved: () => void
@@ -181,6 +182,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
         skuCode: editForm.skuCode?.trim() || '',
         imageUrl: editForm.imageUrl?.trim() || '',
         remark: editForm.remark || undefined,
+        headers: options.buildColorMetaHeaders?.() ?? [],
         colorMeta: options.buildColorMeta?.() ?? [],
       })
       ElMessage.success('保存成功')

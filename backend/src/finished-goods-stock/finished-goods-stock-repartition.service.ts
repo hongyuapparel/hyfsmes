@@ -16,12 +16,16 @@ export type ColorMetaInput = {
   warehouseId: number | null;
   location: string;
   unitPrice: string | number;
+  /** 管理员在详情里填的该颜色各尺码数量（对应 RepartitionDto.headers 顺序）；缺省则沿用库里现有数量 */
+  quantities?: number[];
 };
 
 export type RepartitionDto = {
   skuCode?: string;
   imageUrl?: string;
   remark?: string;
+  /** colorMeta.quantities 对应的尺码表头 */
+  headers?: string[];
   colorMeta: ColorMetaInput[];
 };
 
@@ -164,6 +168,7 @@ export class FinishedGoodsStockRepartitionService {
     group: FinishedGoodsStock[],
     metaMap: Map<string, ColorMetaInput>,
     imageMap: Map<string, string>,
+    requestHeaders: string[],
   ): Promise<ColorUnit[]> {
     const units: ColorUnit[] = [];
     for (const record of group) {
@@ -180,13 +185,17 @@ export class FinishedGoodsStockRepartitionService {
       for (const row of snapshot.rows) {
         const colorName = this.norm(row.colorName);
         const cm = metaMap.get(`${record.id}::${colorName}`);
+        // 管理员填了该颜色的数量则原样采用（按 requestHeaders 对齐）；否则沿用库里现有数量
+        const useEnteredQty = !!cm && Array.isArray(cm.quantities) && requestHeaders.length > 0;
         units.push({
           originId: record.id,
           customerId: record.customerId ?? null,
           customerName: this.norm(record.customerName),
           colorName,
-          headers: [...snapshot.headers],
-          quantities: [...row.quantities],
+          headers: useEnteredQty ? [...requestHeaders] : [...snapshot.headers],
+          quantities: useEnteredQty
+            ? requestHeaders.map((_, i) => Math.max(0, Math.trunc(Number(cm!.quantities![i]) || 0)))
+            : [...row.quantities],
           price: cm ? this.normalizePrice(cm.unitPrice) : this.normalizePrice(record.unitPrice),
           department: cm ? this.norm(cm.department) : this.norm(record.department),
           inventoryTypeId: cm ? this.nullableId(cm.inventoryTypeId) : (record.inventoryTypeId ?? null),
@@ -223,7 +232,8 @@ export class FinishedGoodsStockRepartitionService {
     // 改动前整组完整快照：写进日志 JSON，供管理员一键回滚（精确还原、可重建被删记录）
     const groupUndo = this.captureGroupUndo(group, imageRows);
 
-    const units = await this.buildColorUnits(group, metaMap, imageMap);
+    const requestHeaders = Array.isArray(dto.headers) ? dto.headers.map((h) => this.norm(h)).filter(Boolean) : [];
+    const units = await this.buildColorUnits(group, metaMap, imageMap, requestHeaders);
 
     // 按 客户 + 部门 + 库存类型 + 仓库 + 出厂价 + 存放地址 分桶：
     // 同色且这些信息全相同 → 落入同一桶（码数相加合并）；任一不同 → 不同桶（存为两行）
@@ -253,6 +263,13 @@ export class FinishedGoodsStockRepartitionService {
         )
         .sort((a, b) => a.id - b.id)[0];
 
+      const combined = this.inboundQueryService.combineColorSizeSnapshots(
+        bucketUnits.map((unit) => ({ headers: unit.headers, rows: [{ colorName: unit.colorName, quantities: unit.quantities }] })),
+      );
+      const totalQty = this.inboundQueryService.getColorSizeSnapshotTotal(combined);
+      // 该桶被管理员清零（数量全 0）：不保留也不新建；候选记录留给后续按「被搬空」删除
+      if (totalQty <= 0) return;
+
       const record =
         candidate ??
         this.stockRepo.create({
@@ -270,10 +287,6 @@ export class FinishedGoodsStockRepartitionService {
       const isNew = !candidate;
       if (candidate) usedRecordIds.add(candidate.id);
 
-      const combined = this.inboundQueryService.combineColorSizeSnapshots(
-        bucketUnits.map((unit) => ({ headers: unit.headers, rows: [{ colorName: unit.colorName, quantities: unit.quantities }] })),
-      );
-      const totalQty = this.inboundQueryService.getColorSizeSnapshotTotal(combined);
       const imageColors = new Map<string, string>();
       bucketUnits.forEach((unit) => {
         if (unit.imageUrl && !imageColors.has(unit.colorName)) imageColors.set(unit.colorName, unit.imageUrl);

@@ -25,6 +25,7 @@ export type FinishedDetailColorMeta = {
   warehouseId: number | null
   location: string
   unitPrice: string
+  quantities: number[]
 }
 
 type DetailSourceRow = {
@@ -155,7 +156,12 @@ export function useFinishedDetailMatrixEdit() {
         warehouseId: row.warehouseId,
         location: row.location,
         unitPrice: row.unitPrice,
+        quantities: row.quantities.map((q) => Math.max(0, Math.trunc(Number(q) || 0))),
       }))
+  }
+
+  function buildColorMetaHeaders(): string[] {
+    return [...editSizeHeaders.value]
   }
 
   return {
@@ -170,5 +176,6 @@ export function useFinishedDetailMatrixEdit() {
     setDetailRowMetaField,
     setDetailRowUnitPrice,
     buildColorMeta,
+    buildColorMetaHeaders,
   }
 }
