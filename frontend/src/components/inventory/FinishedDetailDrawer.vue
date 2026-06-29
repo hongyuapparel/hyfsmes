@@ -124,6 +124,7 @@ const {
   setDetailRowMetaField,
   setDetailRowUnitPrice,
   buildColorMeta,
+  buildColorMetaHeaders,
 } = useFinishedDetailMatrixEdit()
 
 const {
@@ -150,6 +151,7 @@ const {
   inventoryTypeOptions: () => props.inventoryTypeOptions,
   warehouseOptions: () => props.warehouseOptions,
   buildColorMeta: () => buildColorMeta(),
+  buildColorMetaHeaders: () => buildColorMetaHeaders(),
   onColorImagesSynced: (stockId, colorImages) => emit('colorImagesSynced', stockId, colorImages),
   onColorImageSaved: (payload) => emit('colorImageSaved', payload),
   onMetaSaved: () => emit('metaSaved'),

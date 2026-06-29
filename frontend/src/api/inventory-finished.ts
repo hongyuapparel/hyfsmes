@@ -151,6 +151,7 @@ export function repartitionFinishedStockDetail(
     skuCode?: string
     imageUrl?: string
     remark?: string
+    headers?: string[]
     colorMeta: Array<{
       stockId: number
       colorName: string
@@ -159,6 +160,7 @@ export function repartitionFinishedStockDetail(
       warehouseId: number | null
       location: string
       unitPrice: string
+      quantities: number[]
     }>
   }
 ) {

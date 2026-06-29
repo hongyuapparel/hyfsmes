@@ -8,7 +8,7 @@
     :sum-detail-row-qty="sumRowQty"
     :create-row-total-price="rowTotalPrice"
     :structure-readonly="!metaEditing"
-    :quantity-readonly="true"
+    :quantity-readonly="!metaEditing"
     :image-editable="metaEditing"
     :unit-price-editable="metaEditing"
     :unit-price-readonly-text="tableUnitPrice"
