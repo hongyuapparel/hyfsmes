@@ -327,6 +327,11 @@
           v-model:current-page="pagination.page"
           v-model:page-size="pagination.pageSize"
           :total="profitSummary?.total ?? 0"
+          :total-quantity="profitFooterQuantity"
+          :total-amount="profitFooterAmount"
+          :summary-label="profitFooterQuantityLabel"
+          :total-amount-label="profitFooterAmountLabel"
+          unit="件"
           :page-sizes="[20, 50, 100]"
           @current-change="onPageChange"
           @size-change="onPageSizeChange"
@@ -345,7 +350,7 @@ import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatCurrency, formatMoneyAligned } from '@/utils/display-number'
+import { formatMoneyAligned } from '@/utils/display-number'
 import {
   ACTIVE_FILTER_COLOR,
   getAdaptiveSelectStyle,
@@ -355,10 +360,6 @@ import {
   getOrderNoFilterStyle as getStandardOrderNoFilterStyle,
   getSkuCodeFilterStyle as getStandardSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
-
-function formatMoney(value: unknown): string {
-  return formatCurrency(value)
-}
 
 function getSlaFilterRangeStyle(v: [string, string] | null | undefined, placeholder: string) {
   return getStandardFilterRangeStyle(v as [string, string] | [] | null | undefined, placeholder)
@@ -388,7 +389,10 @@ const {
   filter,
   currentTotal,
   currentSelectionCount,
-  getFilterRangeStyle,
+  profitFooterQuantity,
+  profitFooterAmount,
+  profitFooterQuantityLabel,
+  profitFooterAmountLabel,
   centerStyle,
   currentSegmentSlaLabel,
   onSelectionChange,

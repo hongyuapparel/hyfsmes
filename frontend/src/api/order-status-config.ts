@@ -281,6 +281,12 @@ export interface OrderProfitReportRow {
   factoryTotalProfit: number
 }
 
+export interface OrderProfitReportSummary {
+  total: number
+  shipmentQtyTotal: number
+  factoryTotalProfit: number
+}
+
 export function getOrderProfitReport(params?: {
   status_id?: number
   collaboration_type_id?: number
@@ -294,7 +300,7 @@ export function getOrderProfitReport(params?: {
   page?: number
   page_size?: number
 }) {
-  return request.get<{ list: OrderProfitReportRow[]; summary: { total: number } }>(
+  return request.get<{ list: OrderProfitReportRow[]; summary: OrderProfitReportSummary }>(
     '/order-status-config/profit-report',
     { params },
   )

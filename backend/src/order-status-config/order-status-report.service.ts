@@ -520,7 +520,7 @@ export class OrderStatusReportService {
       unitProfit: number;
       factoryTotalProfit: number;
     }>;
-    summary: { total: number };
+    summary: { total: number; shipmentQtyTotal: number; factoryTotalProfit: number };
   }> {
     const qb = this.orderRepo.createQueryBuilder('o').where('o.deleted_at IS NULL');
     if (params.statusId != null) {
@@ -634,10 +634,15 @@ export class OrderStatusReportService {
       };
     });
 
+    const summary = {
+      total: list.length,
+      shipmentQtyTotal: round2(list.reduce((sum, row) => sum + row.shipmentQty, 0)),
+      factoryTotalProfit: round2(list.reduce((sum, row) => sum + row.factoryTotalProfit, 0)),
+    };
     const pageSize = Math.min(100, Math.max(1, params.pageSize ?? 20));
     const page = Math.max(1, params.page ?? 1);
     const start = (page - 1) * pageSize;
-    return { list: list.slice(start, start + pageSize), summary: { total: list.length } };
+    return { list: list.slice(start, start + pageSize), summary };
   }
 
   async loadProductionSlaJudgeContext(): Promise<ProductionSlaJudgeContext> {

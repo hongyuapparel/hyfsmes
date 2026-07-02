@@ -6,7 +6,7 @@
     <div v-if="hasSummary" class="pagination-summary">
       <span>{{ summaryText }}</span>
       <span v-if="totalAmount !== undefined" class="pagination-summary-amount">
-        总金额：¥{{ formatDisplayNumber(totalAmount) }}
+        {{ totalAmountLabel || '总金额' }}：¥{{ formatDisplayNumber(totalAmount) }}
       </span>
     </div>
     <div class="pagination-controls">
@@ -37,6 +37,7 @@ const props = defineProps<{
   unit?: string
   summaryLabel?: string
   totalAmount?: number
+  totalAmountLabel?: string
 }>()
 
 const emit = defineEmits<{

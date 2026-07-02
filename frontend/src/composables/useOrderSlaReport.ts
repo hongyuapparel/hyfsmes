@@ -5,6 +5,7 @@ import {
   getOrderProfitReport,
   getOrderStatuses,
   type OrderProfitReportRow,
+  type OrderProfitReportSummary,
   type OrderSlaReportRow,
   type OrderStatusItem,
 } from '@/api/order-status-config'
@@ -47,7 +48,7 @@ export function useOrderSlaReport() {
   const list = ref<OrderSlaReportRow[]>([])
   const summary = ref<{ total: number; overdue: number } | null>(null)
   const profitList = ref<OrderProfitReportRow[]>([])
-  const profitSummary = ref<{ total: number } | null>(null)
+  const profitSummary = ref<OrderProfitReportSummary | null>(null)
   const statusOptions = ref<OrderStatusItem[]>([])
   const collaborationOptions = ref<Array<{ id: number; value: string }>>([])
   const orderTypeOptions = ref<Array<{ id: number; value: string }>>([])
@@ -93,6 +94,7 @@ export function useOrderSlaReport() {
   const currentSelectionCount = computed(() =>
     activeTab.value === 'sla' ? selection.value.length : profitSelection.value.length,
   )
+  const hasProfitSelection = computed(() => profitSelection.value.length > 0)
 
   function formatBizNumberForTable(v: unknown): string {
     if (v === null || v === undefined || v === '') return '-'
@@ -105,6 +107,21 @@ export function useOrderSlaReport() {
     if (!Number.isFinite(unit) || !Number.isFinite(qty)) return 0
     return Math.round(unit * qty * 100) / 100
   }
+
+  const profitFooterQuantity = computed(() => {
+    if (hasProfitSelection.value) {
+      return profitSelection.value.reduce((sum, row) => sum + (Number(row.shipmentQty) || 0), 0)
+    }
+    return profitSummary.value?.shipmentQtyTotal ?? 0
+  })
+  const profitFooterAmount = computed(() => {
+    if (hasProfitSelection.value) {
+      return Math.round(profitSelection.value.reduce((sum, row) => sum + calcFactoryTotalProfit(row), 0) * 100) / 100
+    }
+    return profitSummary.value?.factoryTotalProfit ?? 0
+  })
+  const profitFooterQuantityLabel = computed(() => (hasProfitSelection.value ? '已选出货数量' : '出货数量'))
+  const profitFooterAmountLabel = computed(() => (hasProfitSelection.value ? '已选总利润' : '总利润'))
 
   function buildCsv(rows: OrderSlaReportRow[]): string {
     const headers = ['订单号', 'SKU', '合作方式', '订单类型', '数量', '跟单员', '业务员', '客户', '下单时间', '客户交期', '审单时间', '审单耗时（小时）', '审单判定', '到采购时间', '采购完成时间', '采购判定', '到纸样时间', '纸样完成时间', '纸样判定', '到裁床时间', '裁床完成时间', '裁床判定', '到工艺时间', '工艺完成时间', '工艺判定', '到车缝时间', '车缝完成时间', '车缝判定', '到尾部时间', '尾部完成时间', '尾部判定', '完成时间', '状态', '订单总耗时（天）', '时效判定']
@@ -350,6 +367,10 @@ export function useOrderSlaReport() {
     filter,
     currentTotal,
     currentSelectionCount,
+    profitFooterQuantity,
+    profitFooterAmount,
+    profitFooterQuantityLabel,
+    profitFooterAmountLabel,
     getFilterRangeStyle,
     centerStyle,
     currentSegmentSlaLabel,
