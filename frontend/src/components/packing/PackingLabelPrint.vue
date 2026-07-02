@@ -88,10 +88,6 @@
               <td class="lt-label" colspan="2">DIMENSION (CM)</td>
               <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.cartonSize || '' }}</td>
             </tr>
-            <tr v-if="labelRemark(box)" class="lt-info lt-remark">
-              <td class="lt-label" colspan="2">REMARK</td>
-              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ labelRemark(box) }}</td>
-            </tr>
             <tr>
               <td :colspan="totalCols(box)" class="lt-madein" contenteditable="true">MADE IN CHINA</td>
             </tr>
@@ -186,11 +182,6 @@ function itemSizeQty(item: PackingItemDetail, size: string): string {
 
 function boxSizeTotal(box: PackingBoxDetail, size: string): number {
   return box.items.reduce((sum, it) => sum + (Number(it.sizeQuantities[size]) || 0), 0)
-}
-
-/** 箱贴备注：单箱特殊备注优先，最后回退整单备注。 */
-function labelRemark(box: PackingBoxDetail): string {
-  return box.remark.trim() || props.detail.remark.trim()
 }
 
 /** 尺码列前的列数：[图片] + 款号 + [描述] + 颜色 */
