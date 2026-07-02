@@ -88,6 +88,10 @@
               <td class="lt-label" colspan="2">DIMENSION (CM)</td>
               <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ box.cartonSize || '' }}</td>
             </tr>
+            <tr v-if="orderRemark" class="lt-info">
+              <td class="lt-label" colspan="2">REMARK</td>
+              <td :colspan="totalCols(box) - 2" class="lt-info-val" contenteditable="true">{{ orderRemark }}</td>
+            </tr>
             <tr>
               <td :colspan="totalCols(box)" class="lt-madein" contenteditable="true">MADE IN CHINA</td>
             </tr>
@@ -118,6 +122,8 @@ const addressLine = computed(() => {
   const country = (props.detail.country || '').trim().toUpperCase()
   return [zip, country].filter(Boolean).join(' ')
 })
+
+const orderRemark = computed(() => props.detail.remark.trim())
 
 const emit = defineEmits<{
   'update:visible': [visible: boolean]
