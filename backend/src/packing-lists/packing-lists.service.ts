@@ -5,7 +5,7 @@ import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
 import { PackingListLog } from '../entities/packing-list-log.entity';
-import { SavePackingListDto } from './dto';
+import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
 
 export interface PackingListQuery {
   status?: string;
@@ -297,6 +297,90 @@ export class PackingListsService {
       }
     }
     throw new BadRequestException('生成装箱单号失败，请重试');
+  }
+
+  async copyToDraft(id: number, payload: CopyPackingListToDraftDto, operatorUsername = ''): Promise<{ id: number; code: string }> {
+    const list = await this.listRepo.findOne({ where: { id } });
+    if (!list) throw new NotFoundException('装箱单不存在');
+    if (list.status !== 'draft') throw new BadRequestException('仅草稿装箱单可拆分/复制');
+
+    const rawFrom = Number(payload.boxFrom);
+    const rawTo = Number(payload.boxTo);
+    if (!Number.isSafeInteger(rawFrom) || !Number.isSafeInteger(rawTo)) throw new BadRequestException('箱号范围不正确');
+    const boxFrom = Math.max(1, Math.floor(Math.min(rawFrom, rawTo)));
+    const boxTo = Math.max(1, Math.floor(Math.max(rawFrom, rawTo)));
+
+    const selectedBoxes = await this.boxRepo.find({
+      where: { packingListId: id },
+      order: { boxSeq: 'ASC' },
+    });
+    if (!selectedBoxes.length) throw new BadRequestException('源单暂无箱子');
+
+    const maxBoxSeq = selectedBoxes.reduce((max, box) => Math.max(max, box.boxSeq), 0);
+    if (boxTo > maxBoxSeq) throw new BadRequestException(`箱号范围超出源单箱数：最多 ${maxBoxSeq} 箱`);
+    if (boxTo - boxFrom + 1 > selectedBoxes.length) throw new BadRequestException('箱号范围包含源单不存在的箱号');
+
+    const boxBySeq = new Map(selectedBoxes.map((box) => [box.boxSeq, box]));
+    const boxes: PackingListBox[] = [];
+    const missingSeqs: number[] = [];
+    for (let seq = boxFrom; seq <= boxTo; seq++) {
+      const box = boxBySeq.get(seq);
+      if (box) boxes.push(box);
+      else missingSeqs.push(seq);
+    }
+    if (missingSeqs.length) {
+      const shownMissingSeqs = missingSeqs.slice(0, 20).join(', ');
+      const suffix = missingSeqs.length > 20 ? ` 等 ${missingSeqs.length} 个箱号` : '';
+      throw new BadRequestException(`箱号范围包含源单不存在的箱号：${shownMissingSeqs}${suffix}`);
+    }
+
+    const items = await this.itemRepo.find({
+      where: { packingListId: id, boxId: In(boxes.map((box) => box.id)) },
+      order: { id: 'ASC' },
+    });
+    const itemsByBox = new Map<number, PackingListItem[]>();
+    for (const item of items) {
+      const arr = itemsByBox.get(item.boxId) ?? [];
+      arr.push(item);
+      itemsByBox.set(item.boxId, arr);
+    }
+
+    const remarkOverride = payload.remark?.trim();
+    const copyPayload: SavePackingListDto = {
+      customerId: list.customerId,
+      customerName: list.customerName,
+      serviceManager: list.serviceManager,
+      poNo: list.poNo,
+      country: list.country,
+      postalCode: list.postalCode,
+      xiaomanOrderNo: list.xiaomanOrderNo,
+      xiaomanOrderId: list.xiaomanOrderId,
+      packDate: list.packDate,
+      remark: remarkOverride || list.remark,
+      showCompany: !!list.showCompany,
+      sizeHeaders: Array.isArray(list.sizeHeaders) ? list.sizeHeaders : [],
+      boxes: boxes.map((box) => ({
+        weightKg: box.weightKg != null ? Number(box.weightKg) : null,
+        cartonSize: box.cartonSize,
+        remark: box.remark,
+        items: (itemsByBox.get(box.id) ?? []).map((item) => ({
+          styleNo: item.styleNo,
+          styleName: item.styleName,
+          colorName: item.colorName,
+          imageUrl: item.imageUrl,
+          sizeQuantities: normalizeSizeQuantities(item.sizeQuantities),
+          totalQty: item.totalQty,
+          sourceType: item.sourceType,
+          sourceId: item.sourceId,
+        })),
+      })),
+    };
+
+    const result = await this.create(copyPayload, operatorUsername);
+    const range = boxFrom === boxTo ? `${boxFrom}` : `${boxFrom}-${boxTo}`;
+    await this.recordLog(id, 'copy_to_draft', operatorUsername, `复制箱 ${range} 生成 ${result.code}（新单 ${boxes.length} 箱，箱号从 1 重新编号）`);
+    await this.recordLog(result.id, 'copy_from', operatorUsername, `由 ${list.code} 复制箱 ${range} 生成`);
+    return result;
   }
 
   // 已发货单也允许修改：发货后客户常要求改装箱方式（返箱/调箱/补录）。本方法只改单据本身

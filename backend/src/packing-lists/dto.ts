@@ -128,3 +128,20 @@ export class SavePackingListDto {
   @Type(() => PackingBoxPayloadDto)
   boxes: PackingBoxPayloadDto[];
 }
+
+export class CopyPackingListToDraftDto {
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  boxFrom: number;
+
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  boxTo: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  remark?: string;
+}

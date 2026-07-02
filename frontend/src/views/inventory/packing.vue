@@ -162,11 +162,12 @@
         <el-table-column prop="packDate" label="装箱日期" width="116" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" :width="isMobile ? 56 : 200" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" :width="isMobile ? 56 : 240" align="center" header-align="center" fixed="right">
           <template #default="{ row }">
             <TableRowActions
               :actions="[
                 { key: 'edit', label: row.status === 'draft' ? '编辑' : '查看', onClick: () => goEdit(row), type: 'primary' },
+                { key: 'copy', label: '拆分', onClick: () => openCopyDialog(row), type: 'warning', show: row.status === 'draft' },
                 { key: 'doc', label: '客户单', onClick: () => openDoc(row), type: 'primary' },
                 { key: 'labels', label: '箱贴', onClick: () => openLabels(row), type: 'info' },
                 { key: 'log', label: '记录', onClick: () => openLog(row), type: 'info' },
@@ -191,6 +192,53 @@
       :loading="logDrawer.loading"
       :logs="logDrawer.logs"
     />
+
+    <AppDialog v-model="copyDialog.visible" title="拆分/复制装箱单" width="480px">
+      <el-form label-width="84px" @submit.prevent>
+        <el-form-item label="源单">
+          <span>{{ copyDialog.source?.code || '-' }}</span>
+        </el-form-item>
+        <el-form-item label="箱号范围">
+          <div class="copy-range">
+            <el-input-number
+              v-model="copyDialog.boxFrom"
+              :min="1"
+              :max="copyMaxBox"
+              :step="1"
+              :precision="0"
+              step-strictly
+              :controls="false"
+            />
+            <span class="copy-range-separator">至</span>
+            <el-input-number
+              v-model="copyDialog.boxTo"
+              :min="1"
+              :max="copyMaxBox"
+              :step="1"
+              :precision="0"
+              step-strictly
+              :controls="false"
+            />
+            <span class="copy-range-count">共 {{ copyRangeCount }} 箱</span>
+          </div>
+        </el-form-item>
+        <el-form-item label="新单备注">
+          <el-input
+            v-model="copyDialog.remark"
+            type="textarea"
+            :rows="3"
+            maxlength="1000"
+            show-word-limit
+            placeholder="空运/海运/货代地址等，留空沿用源单备注"
+          />
+        </el-form-item>
+      </el-form>
+      <div class="copy-dialog-note">新草稿会复制所选箱子并从 1 重新编号；源单不会自动删除。</div>
+      <template #footer>
+        <el-button :disabled="copyDialog.submitting" @click="copyDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="copyDialog.submitting" @click="submitCopyToDraft">生成新草稿</el-button>
+      </template>
+    </AppDialog>
   </div>
 </template>
 
@@ -213,11 +261,13 @@ import { formatDisplayNumber } from '@/utils/display-number'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSalespeople } from '@/api/customers'
 import { getPackingLists, type PackingListRow } from '@/api/packing-lists'
+import AppDialog from '@/components/AppDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import PackingListLogDrawer from '@/components/inventory/PackingListLogDrawer.vue'
 import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import TableRowActions from '@/components/common/TableRowActions.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import { usePackingListCopyToDraft } from '@/composables/usePackingListCopyToDraft'
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
@@ -245,6 +295,7 @@ const tableHeight = ref<number | undefined>(undefined)
 
 const { tableRef, selectedRows, onSelectionChange, clearSelection, batchExport, batchDelete, logDrawer, openLog } =
   usePackingListActions(load)
+const { copyDialog, copyMaxBox, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePackingListCopyToDraft(load)
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -392,5 +443,27 @@ onActivated(() => {
 
 .xiaoman-cell-link:hover {
   text-decoration: underline;
+}
+
+.copy-range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  flex-wrap: wrap;
+}
+
+.copy-range :deep(.el-input-number) {
+  width: 86px;
+}
+
+.copy-range-separator,
+.copy-range-count,
+.copy-dialog-note {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-caption);
+}
+
+.copy-dialog-note {
+  margin: 0 0 var(--space-sm) 84px;
 }
 </style>

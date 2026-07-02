@@ -94,7 +94,7 @@
             allow-create
             default-first-option
             clearable
-            placeholder="选择或输入国家（印英文国名）"
+            placeholder="选填，选择或输入国家（印英文国名）"
           >
             <el-option v-for="c in COUNTRY_OPTIONS" :key="c.en" :label="`${c.cn} ${c.en}`" :value="c.en" />
           </el-select>
@@ -149,6 +149,7 @@
       :detail="edit.detail.value"
       @update:visible="docVisible = $event"
     />
+
   </div>
 </template>
 
@@ -455,4 +456,5 @@ onActivated(() => {
   align-items: center;
   color: var(--color-primary);
 }
+
 </style>

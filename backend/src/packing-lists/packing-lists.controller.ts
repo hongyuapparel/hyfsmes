@@ -7,7 +7,7 @@ import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
 import { PackingListsShipService } from './packing-lists-ship.service';
 import { XiaomanService } from '../xiaoman/xiaoman.service';
-import { SavePackingListDto } from './dto';
+import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
 
 @Controller('packing-lists')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -37,6 +37,15 @@ export class PackingListsController {
   @Post(':id/ship')
   ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
     return this.shipService.ship(id, user?.username ?? '');
+  }
+
+  @Post('copy-to-draft/:id')
+  copyToDraft(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() payload: CopyPackingListToDraftDto,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.service.copyToDraft(id, payload, user?.username ?? '');
   }
 
   @Get('pickable/pending')

@@ -114,6 +114,12 @@ export interface SavePackingListPayload {
   boxes: PackingBoxPayload[]
 }
 
+export interface CopyPackingListToDraftPayload {
+  boxFrom: number
+  boxTo: number
+  remark?: string
+}
+
 export interface PickableLine {
   sourceType: 'pending' | 'finished'
   sourceId: number
@@ -149,6 +155,10 @@ export function getPackingListDetail(id: number) {
 
 export function createPackingList(payload: SavePackingListPayload) {
   return request.post<{ id: number; code: string }>('/packing-lists', payload)
+}
+
+export function copyPackingListToDraft(id: number, payload: CopyPackingListToDraftPayload) {
+  return request.post<{ id: number; code: string }>(`/packing-lists/copy-to-draft/${id}`, payload)
 }
 
 export function updatePackingList(id: number, payload: SavePackingListPayload) {
