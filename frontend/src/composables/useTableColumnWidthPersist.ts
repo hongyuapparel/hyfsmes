@@ -7,6 +7,7 @@ type ColumnLike = {
   columnKey?: string
   label?: string
   width?: number | string
+  minWidth?: number | string
   realWidth?: number
 }
 
@@ -26,6 +27,11 @@ function buildColumnKey(col: ColumnLike | null | undefined): string {
   const label = String(col.label ?? '').trim()
   if (label) return `label:${label}`
   return ''
+}
+
+function clampWidthToColumnMin(col: ColumnLike, width: number): number {
+  const minWidth = toNumberWidth(col.minWidth)
+  return minWidth != null && width < minWidth ? minWidth : width
 }
 
 export function useTableColumnWidthPersist(tableId: string) {
@@ -68,7 +74,7 @@ export function useTableColumnWidthPersist(tableId: string) {
     const width = toNumberWidth(newWidth)
     if (!key || width == null) return
     const map = readMap()
-    map[key] = width
+    map[key] = clampWidthToColumnMin(column, width)
     writeMap(map)
   }
 
@@ -86,8 +92,9 @@ export function useTableColumnWidthPersist(tableId: string) {
       if (!key) return
       const width = map[key]
       if (!width) return
-      col.width = width
-      col.realWidth = width
+      const nextWidth = clampWidthToColumnMin(col, width)
+      col.width = nextWidth
+      col.realWidth = nextWidth
     })
     tableRef.doLayout?.()
   }

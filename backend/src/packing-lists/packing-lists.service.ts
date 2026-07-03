@@ -5,6 +5,8 @@ import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
 import { PackingListLog } from '../entities/packing-list-log.entity';
+import { User } from '../entities/user.entity';
+import { resolveOperatorDisplayName } from '../common/operator.util';
 import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
 
 export interface PackingListQuery {
@@ -18,6 +20,8 @@ export interface PackingListQuery {
   serviceManager?: string;
   dateFrom?: string;
   dateTo?: string;
+  sortField?: string;
+  sortOrder?: 'asc' | 'desc';
   page: number;
   pageSize: number;
 }
@@ -120,12 +124,17 @@ export class PackingListsService {
     @InjectRepository(PackingListBox) private readonly boxRepo: Repository<PackingListBox>,
     @InjectRepository(PackingListItem) private readonly itemRepo: Repository<PackingListItem>,
     @InjectRepository(PackingListLog) private readonly logRepo: Repository<PackingListLog>,
+    @InjectRepository(User) private readonly userRepo: Repository<User>,
   ) {}
+
+  resolveOperatorName(actor?: { userId?: number; username?: string }): Promise<string> {
+    return resolveOperatorDisplayName(this.userRepo, actor ?? {});
+  }
 
   async getList(query: PackingListQuery): Promise<{ list: PackingListRow[]; total: number; summary: PackingListSummary }> {
     const qb = this.listRepo.createQueryBuilder('pl');
     this.applyListFilters(qb, query);
-    qb.orderBy('pl.id', 'DESC');
+    this.applyListOrdering(qb, query);
 
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
@@ -215,6 +224,15 @@ export class PackingListsService {
     if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });
   }
 
+  private applyListOrdering(qb: SelectQueryBuilder<PackingList>, query: PackingListQuery): void {
+    if (query.sortField === 'packDate' && (query.sortOrder === 'asc' || query.sortOrder === 'desc')) {
+      const direction = query.sortOrder === 'asc' ? 'ASC' : 'DESC';
+      qb.orderBy('pl.pack_date', direction).addOrderBy('pl.id', 'DESC');
+      return;
+    }
+    qb.orderBy('pl.id', 'DESC');
+  }
+
   private async getListSummary(query: PackingListQuery): Promise<PackingListSummary> {
     const qb = this.listRepo.createQueryBuilder('pl');
     this.applyListFilters(qb, query);
@@ -234,9 +252,10 @@ export class PackingListsService {
   async getDetail(id: number): Promise<PackingListDetail> {
     const list = await this.listRepo.findOne({ where: { id } });
     if (!list) throw new NotFoundException('装箱单不存在');
-    const [boxes, items] = await Promise.all([
+    const [boxes, items, operatorName] = await Promise.all([
       this.boxRepo.find({ where: { packingListId: id }, order: { boxSeq: 'ASC' } }),
       this.itemRepo.find({ where: { packingListId: id }, order: { id: 'ASC' } }),
+      this.resolveStoredOperatorName(list.operatorUsername),
     ]);
     const itemsByBox = new Map<number, PackingListItem[]>();
     for (const item of items) {
@@ -261,7 +280,7 @@ export class PackingListsService {
       sizeHeaders: Array.isArray(list.sizeHeaders) ? list.sizeHeaders : [],
       status: list.status,
       shippedAt: list.shippedAt,
-      operatorUsername: list.operatorUsername,
+      operatorUsername: operatorName,
       createdAt: list.createdAt,
       boxes: boxes.map((box) => ({
         id: box.id,
@@ -495,10 +514,11 @@ export class PackingListsService {
   async getLogs(packingListId: number): Promise<PackingListLogRow[]> {
     try {
       const rows = await this.logRepo.find({ where: { packingListId }, order: { createdAt: 'DESC', id: 'DESC' } });
+      const operatorDisplayNameMap = await this.getOperatorDisplayNameMap(rows.map((row) => row.operatorUsername));
       return rows.map((r) => ({
         id: r.id,
         packingListId: r.packingListId,
-        operatorUsername: r.operatorUsername,
+        operatorUsername: operatorDisplayNameMap.get(String(r.operatorUsername ?? '').trim()) ?? r.operatorUsername,
         action: r.action,
         summary: r.summary,
         createdAt: r.createdAt,
@@ -510,6 +530,23 @@ export class PackingListsService {
       }
       throw e;
     }
+  }
+
+  private async resolveStoredOperatorName(operatorUsername: string): Promise<string> {
+    const raw = String(operatorUsername ?? '').trim();
+    if (!raw) return '';
+    const map = await this.getOperatorDisplayNameMap([raw]);
+    return map.get(raw) ?? raw;
+  }
+
+  private async getOperatorDisplayNameMap(operatorUsernames: string[]): Promise<Map<string, string>> {
+    const names = Array.from(new Set(operatorUsernames.map((item) => String(item ?? '').trim()).filter(Boolean)));
+    if (!names.length) return new Map();
+    const users = await this.userRepo.find({
+      where: { username: In(names) },
+      select: ['username', 'displayName'],
+    });
+    return new Map(users.map((user) => [user.username, (user.displayName?.trim() || user.username || '').trim()]));
   }
 
   private isMissingTableError(error: unknown): boolean {

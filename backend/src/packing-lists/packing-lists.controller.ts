@@ -35,17 +35,20 @@ export class PackingListsController {
   }
 
   @Post(':id/ship')
-  ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
-    return this.shipService.ship(id, user?.username ?? '');
+  @RequirePermission('inventory_packing_ship')
+  async ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+    const operatorName = await this.service.resolveOperatorName(user);
+    return this.shipService.ship(id, operatorName);
   }
 
   @Post('copy-to-draft/:id')
-  copyToDraft(
+  async copyToDraft(
     @Param('id', ParseIntPipe) id: number,
     @Body() payload: CopyPackingListToDraftDto,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.copyToDraft(id, payload, user?.username ?? '');
+    const operatorName = await this.service.resolveOperatorName(user);
+    return this.service.copyToDraft(id, payload, operatorName);
   }
 
   @Get('pickable/pending')
@@ -87,6 +90,8 @@ export class PackingListsController {
     @Query('serviceManager') serviceManager?: string,
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -98,6 +103,8 @@ export class PackingListsController {
       serviceManager,
       dateFrom,
       dateTo,
+      sortField,
+      sortOrder: sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : undefined,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -114,21 +121,24 @@ export class PackingListsController {
   }
 
   @Post()
-  create(@Body() payload: SavePackingListDto, @CurrentUser() user: { userId: number; username: string }) {
-    return this.service.create(payload, user?.username ?? '');
+  async create(@Body() payload: SavePackingListDto, @CurrentUser() user: { userId: number; username: string }) {
+    const operatorName = await this.service.resolveOperatorName(user);
+    return this.service.create(payload, operatorName);
   }
 
   @Put(':id')
-  update(
+  async update(
     @Param('id', ParseIntPipe) id: number,
     @Body() payload: SavePackingListDto,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.service.update(id, payload, user?.username ?? '');
+    const operatorName = await this.service.resolveOperatorName(user);
+    return this.service.update(id, payload, operatorName);
   }
 
   @Delete(':id')
-  remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
-    return this.service.remove(id, user?.username ?? '');
+  async remove(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
+    const operatorName = await this.service.resolveOperatorName(user);
+    return this.service.remove(id, operatorName);
   }
 }

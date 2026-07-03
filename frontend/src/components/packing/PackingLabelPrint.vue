@@ -59,7 +59,6 @@
             <tr class="lt-matrix-head">
               <th v-if="boxHasImage(box)" class="lt-img">PHOTO</th>
               <th class="lt-style">STYLE NO</th>
-              <th v-if="boxHasName(box)" class="lt-name">DESCRIPTION</th>
               <th class="lt-color">COLOUR</th>
               <th v-for="size in boxSizes(box)" :key="`h-${size}`">{{ size }}</th>
               <th class="lt-total">TOTAL</th>
@@ -69,7 +68,6 @@
                 <img v-if="item.imageUrl" :src="item.imageUrl" alt="" />
               </td>
               <td class="lt-style" contenteditable="true">{{ item.styleNo || '-' }}</td>
-              <td v-if="boxHasName(box)" class="lt-name" contenteditable="true">{{ item.styleName || '-' }}</td>
               <td class="lt-color" contenteditable="true">{{ item.colorName || '-' }}</td>
               <td v-for="size in boxSizes(box)" :key="`${item.id}-${size}`" contenteditable="true">{{ itemSizeQty(item, size) }}</td>
               <td class="lt-total" contenteditable="true">{{ itemTotal(item) }}</td>
@@ -177,10 +175,6 @@ function boxHasImage(box: PackingBoxDetail): boolean {
   return box.items.some((it) => !!it.imageUrl)
 }
 
-function boxHasName(box: PackingBoxDetail): boolean {
-  return box.items.some((it) => !!it.styleName)
-}
-
 function itemSizeQty(item: PackingItemDetail, size: string): string {
   const q = Number(item.sizeQuantities[size]) || 0
   return q > 0 ? String(q) : ''
@@ -190,9 +184,9 @@ function boxSizeTotal(box: PackingBoxDetail, size: string): number {
   return box.items.reduce((sum, it) => sum + (Number(it.sizeQuantities[size]) || 0), 0)
 }
 
-/** 尺码列前的列数：[图片] + 款号 + [描述] + 颜色 */
+/** 尺码列前的列数：[图片] + 款号 + 颜色 */
 function leadCols(box: PackingBoxDetail): number {
-  return (boxHasImage(box) ? 1 : 0) + 1 + (boxHasName(box) ? 1 : 0) + 1
+  return (boxHasImage(box) ? 1 : 0) + 1 + 1
 }
 
 /** 整表总列数 = 前导列 + 各码 + 合计 */

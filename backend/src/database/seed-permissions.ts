@@ -32,6 +32,8 @@ const PERMISSIONS: { code: string; name: string; routePath: string; type: 'menu'
   { code: 'menu_inventory_accessories', name: '辅料库存', routePath: '/inventory/accessories', type: 'menu' },
   { code: 'menu_inventory_fabric', name: '面料库存', routePath: '/inventory/fabric', type: 'menu' },
   { code: 'menu_inventory_packing', name: '装箱单', routePath: '/inventory/packing', type: 'menu' },
+  // 操作级权限：装箱单确认发货会扣减待仓/成品库存，并把单据状态改为已发货；可单独授权给财务审核后提交的人。
+  { code: 'inventory_packing_ship', name: '装箱单-确认发货', routePath: '/inventory/packing', type: 'action' },
   { code: 'menu_finance', name: '财务管理', routePath: '/finance', type: 'menu' },
   { code: 'menu_finance_dashboard', name: '财务看板', routePath: '/finance/dashboard', type: 'menu' },
   { code: 'menu_finance_income', name: '收入流水', routePath: '/finance/income', type: 'menu' },

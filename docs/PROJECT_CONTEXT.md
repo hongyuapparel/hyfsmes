@@ -76,6 +76,7 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2026-07-03`：装箱单「确认发货」拆成操作级权限 `inventory_packing_ship`：进入装箱单页面只需要 `/inventory/packing`，把草稿变成已发货并扣减库存必须另行在「角色与权限」中授权，适合给财务审核后提交的人。
 - `2026-07-02`：装箱单分批发货采用「列表页按箱号范围复制成独立草稿」方案：一张正式装箱单只对应一个发运去向/方式/备注；如 1-5 箱空运、6-10 箱海运，应从源草稿分别复制成两张新草稿，也支持 1,3,5 这类跳箱拆分；新单箱号从 1 重新编号。国家与邮编保持选填。
 - `2026-06-12`：库存管理新增「装箱单」模块：从待仓处理/成品库存选货（含手工行）做 Excel 式分箱录入（editable-grid + 箱级单元格 rowspan 合并），确认发货复用 `InventoryPendingService.doOutbound` 与 `FinishedGoodsStockOutboundService.outbound` 联动扣减（发货前预校验超发），支持可改字箱贴 A4 打印与中英双语 Excel 导出；后端新增 `packing-lists` 模块与 3 张表（启动自动建表，SQL 见 `backend/scripts/create-packing-list-tables.sql`），权限 `/inventory/packing`。
 - `2026-05-16`：生产管理抽屉视觉刷新后修复 3 项：DrawerShell 支持垂直滚动（避免操作记录段被截）；纸样抽屉业务扩展/时效与节点改双列且删除重复订单号/SKU；纸样物料引入「查看/编辑」模式切换（编辑/取消/保存按钮在 section 标题区）。

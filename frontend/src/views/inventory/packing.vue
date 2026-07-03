@@ -107,12 +107,14 @@
         border
         stripe
         class="packing-table"
+        :fit="false"
         :height="tableHeight"
         :row-style="compactRowStyle"
         :cell-style="compactCellStyle"
         :header-cell-style="compactHeaderCellStyle"
         @header-dragend="onPackingHeaderDragEnd"
         @selection-change="onSelectionChange"
+        @sort-change="onSortChange"
       >
         <el-table-column type="selection" width="40" align="center" header-align="center" />
         <el-table-column prop="code" label="单号" width="132" show-overflow-tooltip align="center" header-align="center" />
@@ -128,12 +130,15 @@
             <span v-else>{{ row.xiaomanOrderNo || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="客户" min-width="150" show-overflow-tooltip align="center" header-align="center">
+        <el-table-column label="客户" width="130" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ displayCustomer(row.customerName) }}</template>
         </el-table-column>
         <el-table-column prop="serviceManager" label="业务员" width="82" show-overflow-tooltip align="center" header-align="center" />
-        <el-table-column label="款号" min-width="128" show-overflow-tooltip align="center" header-align="center">
+        <el-table-column label="款号" width="116" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ styleSummary(row) }}</template>
+        </el-table-column>
+        <el-table-column prop="packDate" label="装箱日期" width="126" min-width="126" show-overflow-tooltip sortable="custom" align="center" header-align="center">
+          <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
         <el-table-column label="箱数" width="64" align="center" header-align="center">
           <template #default="{ row }">{{ formatDisplayNumber(row.boxCount) }}</template>
@@ -149,10 +154,7 @@
             <el-tag :type="row.status === 'shipped' ? 'success' : 'info'" size="small">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="packDate" label="装箱日期" width="102" show-overflow-tooltip align="center" header-align="center">
-          <template #default="{ row }">{{ row.packDate || '-' }}</template>
-        </el-table-column>
-        <el-table-column label="操作" :width="isMobile ? 56 : 240" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" :width="isMobile ? 56 : 240" align="center" header-align="center">
           <template #default="{ row }">
             <TableRowActions
               :actions="[
@@ -251,6 +253,7 @@ import TableRowActions from '@/components/common/TableRowActions.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import { usePackingListCopyToDraft } from '@/composables/usePackingListCopyToDraft'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
+import { useTableSort } from '@/composables/useTableSort'
 
 const STATUS_TABS = [
   { label: '全部', name: 'all', status: '' },
@@ -289,6 +292,10 @@ const { tableRef, selectedRows, onSelectionChange, clearSelection, batchExport, 
 const { copyDialog, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePackingListCopyToDraft(load)
 const { onHeaderDragEnd: onPackingHeaderDragEnd, restoreColumnWidths: restorePackingColumnWidths } =
   useTableColumnWidthPersist('inventory-packing-list')
+const { onSortChange, sortParams } = useTableSort(() => {
+  pagination.page = 1
+  void load()
+})
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 let loadSeq = 0
@@ -331,6 +338,7 @@ function buildListQuery(page = pagination.page, pageSize = pagination.pageSize):
     serviceManager: filter.serviceManager || undefined,
     dateFrom: dateRange.value?.[0] || undefined,
     dateTo: dateRange.value?.[1] || undefined,
+    ...sortParams(),
     page,
     pageSize,
   }
@@ -511,10 +519,13 @@ onActivated(() => {
   color: var(--el-text-color-secondary);
 }
 
-/* 本表无图片列，单元格会塌得很矮；按紧凑表设计行高 52px 托底（compactRowStyle 的 minHeight 作用在 tr 上不生效），
-   与有图的库存表（约 51px）观感统一 */
+/* 装箱单列表是纯文本表，不需要沿用带图片库存表的 52px 行高；保留按钮/标签的点击空间即可。 */
 .inventory-packing-page .packing-table :deep(.el-table__body .el-table__cell) {
-  height: 52px;
+  height: 44px;
+}
+
+.inventory-packing-page .packing-table :deep(.cell) {
+  line-height: 20px;
 }
 
 .inventory-packing-page .packing-table :deep(.row-actions-inline) {

@@ -37,6 +37,8 @@ export interface PackingListQuery {
   serviceManager?: string
   dateFrom?: string
   dateTo?: string
+  sortField?: string
+  sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number
 }

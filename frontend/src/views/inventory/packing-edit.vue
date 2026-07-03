@@ -18,7 +18,7 @@
         <el-button @click="grid.addBox()">加箱</el-button>
         <template v-if="!edit.isShipped.value">
           <el-button :loading="edit.saving.value" @click="edit.save()">保存草稿</el-button>
-          <el-button type="primary" :loading="shipping" @click="onShip">确认发货</el-button>
+          <el-button v-if="canShipPacking" type="primary" :loading="shipping" @click="onShip">确认发货</el-button>
         </template>
         <el-button v-else type="primary" :loading="edit.saving.value" @click="edit.save()">保存修改</el-button>
       </div>
@@ -168,9 +168,11 @@ import PackingGoodsPickerDialog from '@/components/packing/PackingGoodsPickerDia
 import PackingLabelPrint from '@/components/packing/PackingLabelPrint.vue'
 import PackingDocument from '@/components/packing/PackingDocument.vue'
 import { exportPackingListExcel } from '@/utils/packing-export'
+import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const grid = usePackingGridRows()
 const edit = usePackingListEdit(grid)
 const picker = reactive({ visible: false, boxIndex: 0 })
@@ -178,6 +180,7 @@ const packingGridRef = ref<InstanceType<typeof PackingGrid> | null>(null)
 const shipping = ref(false)
 const labelsVisible = ref(false)
 const docVisible = ref(false)
+const canShipPacking = computed(() => authStore.hasPermission('inventory_packing_ship'))
 
 // 小满订单：远程搜索下拉（小满列表接口无关键词，后端拉取后本地过滤）+ 选中存订单ID用于跳转
 const xiaomanOptions = ref<{ value: string; label: string; orderId: string; companyId: number; companyName: string }[]>([])
@@ -312,6 +315,10 @@ function onPicked(lines: PickableLine[]) {
 }
 
 async function onShip() {
+  if (!canShipPacking.value) {
+    ElMessage.warning('没有确认发货权限，请在角色与权限中授权')
+    return
+  }
   if (!edit.form.customerName.trim()) {
     ElMessage.warning('请先填写客户')
     return
