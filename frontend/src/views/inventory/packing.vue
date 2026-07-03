@@ -1,18 +1,8 @@
 <template>
   <div class="page-card page-card--fill inventory-packing-page">
-    <div class="status-tabs">
-      <div class="status-tabs-left">
-        <el-radio-group v-model="filter.status" @change="onStatusTabChange">
-          <el-radio-button
-            v-for="tab in STATUS_TABS"
-            :key="tab.value"
-            :value="tab.value"
-          >
-            {{ tab.label }}
-          </el-radio-button>
-        </el-radio-group>
-      </div>
-    </div>
+    <el-tabs v-model="statusTab" class="inventory-tabs packing-status-tabs" @tab-change="onStatusTabChange">
+      <el-tab-pane v-for="tab in STATUS_TABS" :key="tab.name" :label="tab.label" :name="tab.name" />
+    </el-tabs>
 
     <el-form class="filter-bar has-filter-collapse" @submit.prevent>
       <el-input
@@ -121,6 +111,7 @@
         :row-style="compactRowStyle"
         :cell-style="compactCellStyle"
         :header-cell-style="compactHeaderCellStyle"
+        @header-dragend="onPackingHeaderDragEnd"
         @selection-change="onSelectionChange"
       >
         <el-table-column type="selection" width="40" align="center" header-align="center" />
@@ -259,17 +250,20 @@ import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import TableRowActions from '@/components/common/TableRowActions.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import { usePackingListCopyToDraft } from '@/composables/usePackingListCopyToDraft'
+import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 
 const STATUS_TABS = [
-  { label: '全部', value: '' },
-  { label: '草稿', value: 'draft' },
-  { label: '已发货', value: 'shipped' },
+  { label: '全部', name: 'all', status: '' },
+  { label: '草稿', name: 'draft', status: 'draft' },
+  { label: '已发货', name: 'shipped', status: 'shipped' },
 ] as const
+type StatusTabName = (typeof STATUS_TABS)[number]['name']
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
 
 const filter = reactive<{ customerName: string; status: string; keyword: string; xiaomanOrderNo: string; serviceManager: string }>({ customerName: '', status: '', keyword: '', xiaomanOrderNo: '', serviceManager: '' })
+const statusTab = ref<StatusTabName>('all')
 const salespersonOptions = ref<string[]>([])
 const dateRange = ref<[string, string] | null>(null)
 const customerLabelVisible = ref(true)
@@ -293,6 +287,8 @@ const tableHeight = ref<number | undefined>(undefined)
 const { tableRef, selectedRows, onSelectionChange, clearSelection, batchExport, batchDelete, logDrawer, openLog } =
   usePackingListActions(load)
 const { copyDialog, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePackingListCopyToDraft(load)
+const { onHeaderDragEnd: onPackingHeaderDragEnd, restoreColumnWidths: restorePackingColumnWidths } =
+  useTableColumnWidthPersist('inventory-packing-list')
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -338,6 +334,7 @@ async function load() {
     pagination.total = res.data.total
     filterSummary.boxCount = res.data.summary?.boxCount ?? 0
     filterSummary.totalQty = res.data.summary?.totalQty ?? 0
+    restorePackingColumnWidths(tableRef.value)
   } catch (e) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载装箱单失败'))
   } finally {
@@ -350,7 +347,9 @@ function onSearch(resetPage: boolean) {
   load()
 }
 
-function onStatusTabChange() {
+function onStatusTabChange(name: string | number) {
+  const tab = STATUS_TABS.find((item) => item.name === name)
+  filter.status = tab?.status ?? ''
   onSearch(true)
 }
 
@@ -362,6 +361,7 @@ function debouncedSearch() {
 function onReset() {
   filter.customerName = ''
   filter.status = ''
+  statusTab.value = 'all'
   filter.keyword = ''
   filter.xiaomanOrderNo = ''
   filter.serviceManager = ''
@@ -429,17 +429,16 @@ onActivated(() => {
   min-height: 0;
 }
 
-.status-tabs {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-md);
+.packing-status-tabs {
   flex-shrink: 0;
 }
 
-.status-tabs-left {
-  flex: 1;
-  min-width: 0;
+.packing-status-tabs :deep(.el-tabs__header) {
+  margin-bottom: var(--space-sm);
+}
+
+.packing-status-tabs :deep(.el-tabs__content) {
+  display: none;
 }
 
 .packing-batch-bar {
