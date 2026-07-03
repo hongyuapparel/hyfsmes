@@ -86,6 +86,26 @@
         </span>
       </template>
     </el-tree-select>
+    <el-select
+      v-model="filters.collaborationTypeId"
+      placeholder="合作方式"
+      filterable
+      clearable
+      class="filter-bar-item"
+      :style="getAdaptiveSelectStyle(filters.collaborationTypeId && `合作方式：${findCollaborationLabelById(filters.collaborationTypeId)}`, '合作方式')"
+      @change="onSearch()"
+    >
+      <template #label="{ label }">
+        <span v-if="filters.collaborationTypeId">合作方式：{{ label }}</span>
+        <span v-else>{{ label }}</span>
+      </template>
+      <el-option
+        v-for="opt in collaborationOptions"
+        :key="opt.id"
+        :label="opt.value"
+        :value="opt.id"
+      />
+    </el-select>
     <el-tree-select
       v-model="filters.processItem"
       :data="processOptions"
@@ -287,6 +307,7 @@ interface OrderListFilters {
   skuCode: string
   customer: string
   orderTypeId: number | null
+  collaborationTypeId: number | null
   processItem: string
   salesperson: string
   merchandiser: string
@@ -314,6 +335,7 @@ const activeFilterCount = computed(() => {
   if (f.skuCode) n++
   if (f.customer) n++
   if (f.orderTypeId != null) n++
+  if (f.collaborationTypeId != null) n++
   if (f.processItem) n++
   if (f.salesperson) n++
   if (f.merchandiser) n++
@@ -327,11 +349,13 @@ const activeFilterCount = computed(() => {
 defineProps<{
   customerOptions: Array<{ label: string; value: string }>
   orderTypeTreeSelectData: OrderTypeTreeSelectNode[]
+  collaborationOptions: Array<{ id: number; value: string }>
   processOptions: Array<Record<string, unknown>>
   salespersonOptions: string[]
   merchandiserOptions: string[]
   factoryOptions: Array<{ label: string; value: string }>
   findOrderTypeLabelById: (id: number) => string
+  findCollaborationLabelById: (id: number) => string
   getProcessItemDisplayLabel: (value: string) => string
   onSearch: (byUser?: boolean) => void
   onReset: () => void

@@ -7,6 +7,7 @@ interface OrderListFilterStateLike {
   skuCode: string
   customer: string
   orderTypeId: number | null
+  collaborationTypeId: number | null
   processItem: string
   salesperson: string
   merchandiser: string
@@ -37,6 +38,7 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
       skuCode: filter.skuCode || undefined,
       customer: filter.customer || undefined,
       orderTypeId: filter.orderTypeId ?? undefined,
+      collaborationTypeId: filter.collaborationTypeId ?? undefined,
       processItem: filter.processItem || undefined,
       salesperson: filter.salesperson || undefined,
       merchandiser: filter.merchandiser || undefined,
