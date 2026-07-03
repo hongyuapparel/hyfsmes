@@ -1,5 +1,19 @@
 <template>
   <div class="page-card page-card--fill inventory-packing-page">
+    <div class="status-tabs">
+      <div class="status-tabs-left">
+        <el-radio-group v-model="filter.status" @change="onStatusTabChange">
+          <el-radio-button
+            v-for="tab in STATUS_TABS"
+            :key="tab.value"
+            :value="tab.value"
+          >
+            {{ tab.label }}
+          </el-radio-button>
+        </el-radio-group>
+      </div>
+    </div>
+
     <el-form class="filter-bar has-filter-collapse" @submit.prevent>
       <el-input
         v-model="filter.customerName"
@@ -59,21 +73,6 @@
           <span v-else>{{ label }}</span>
         </template>
         <el-option v-for="s in salespersonOptions" :key="s" :label="s" :value="s" />
-      </el-select>
-      <el-select
-        v-model="filter.status"
-        placeholder="状态"
-        clearable
-        class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.status ? `状态：${statusLabel(filter.status)}` : '', '状态', 42)"
-        @change="onSearch(true)"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.status">状态：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option label="草稿" value="draft" />
-        <el-option label="已发货" value="shipped" />
       </el-select>
       <div
         class="filter-bar-item filter-date-box"
@@ -162,14 +161,15 @@
         <el-table-column prop="packDate" label="装箱日期" width="116" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" :width="isMobile ? 56 : 240" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" :width="isMobile ? 56 : 180" align="center" header-align="center" fixed="right">
           <template #default="{ row }">
             <TableRowActions
+              :inline-limit="3"
               :actions="[
                 { key: 'edit', label: row.status === 'draft' ? '编辑' : '查看', onClick: () => goEdit(row), type: 'primary' },
-                { key: 'copy', label: '拆分', onClick: () => openCopyDialog(row), type: 'warning', show: row.status === 'draft' },
                 { key: 'doc', label: '客户单', onClick: () => openDoc(row), type: 'primary' },
                 { key: 'labels', label: '箱贴', onClick: () => openLabels(row), type: 'info' },
+                { key: 'copy', label: '拆分', onClick: () => openCopyDialog(row), type: 'warning', show: row.status === 'draft' },
                 { key: 'log', label: '记录', onClick: () => openLog(row), type: 'info' },
               ]"
             />
@@ -182,6 +182,12 @@
       v-model:current-page="pagination.page"
       v-model:page-size="pagination.pageSize"
       :total="pagination.total"
+      :total-quantity="pageBoxCount"
+      summary-label="本页箱数"
+      unit="箱"
+      :secondary-quantity="pageTotalQty"
+      secondary-label="本页件数"
+      secondary-unit="件"
       @current-change="load"
       @size-change="onPageSizeChange"
     />
@@ -198,26 +204,12 @@
         <el-form-item label="源单">
           <span>{{ copyDialog.source?.code || '-' }}</span>
         </el-form-item>
-        <el-form-item label="箱号范围">
+        <el-form-item label="箱号">
           <div class="copy-range">
-            <el-input-number
-              v-model="copyDialog.boxFrom"
-              :min="1"
-              :max="copyMaxBox"
-              :step="1"
-              :precision="0"
-              step-strictly
-              :controls="false"
-            />
-            <span class="copy-range-separator">至</span>
-            <el-input-number
-              v-model="copyDialog.boxTo"
-              :min="1"
-              :max="copyMaxBox"
-              :step="1"
-              :precision="0"
-              step-strictly
-              :controls="false"
+            <el-input
+              v-model="copyDialog.boxSeqText"
+              placeholder="例：1-5 或 1,3,5"
+              clearable
             />
             <span class="copy-range-count">共 {{ copyRangeCount }} 箱</span>
           </div>
@@ -233,7 +225,7 @@
           />
         </el-form-item>
       </el-form>
-      <div class="copy-dialog-note">新草稿会复制所选箱子并从 1 重新编号；源单不会自动删除。</div>
+      <div class="copy-dialog-note">支持连续范围和跳箱，例如 1-5、1,3,5、1-3,6；新草稿会按原箱号顺序从 1 重新编号，源单不会自动删除。</div>
       <template #footer>
         <el-button :disabled="copyDialog.submitting" @click="copyDialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="copyDialog.submitting" @click="submitCopyToDraft">生成新草稿</el-button>
@@ -269,6 +261,12 @@ import TableRowActions from '@/components/common/TableRowActions.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
 import { usePackingListCopyToDraft } from '@/composables/usePackingListCopyToDraft'
 
+const STATUS_TABS = [
+  { label: '全部', value: '' },
+  { label: '草稿', value: 'draft' },
+  { label: '已发货', value: 'shipped' },
+] as const
+
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
 const router = useRouter()
 
@@ -283,7 +281,6 @@ const activeFilterCount = computed(() => {
   if (filter.keyword) n++
   if (filter.xiaomanOrderNo) n++
   if (filter.serviceManager) n++
-  if (filter.status) n++
   if (dateRange.value) n++
   return n
 })
@@ -295,9 +292,12 @@ const tableHeight = ref<number | undefined>(undefined)
 
 const { tableRef, selectedRows, onSelectionChange, clearSelection, batchExport, batchDelete, logDrawer, openLog } =
   usePackingListActions(load)
-const { copyDialog, copyMaxBox, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePackingListCopyToDraft(load)
+const { copyDialog, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePackingListCopyToDraft(load)
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+
+const pageBoxCount = computed(() => list.value.reduce((sum, row) => sum + (Number(row.boxCount) || 0), 0))
+const pageTotalQty = computed(() => list.value.reduce((sum, row) => sum + (Number(row.totalQty) || 0), 0))
 
 function statusLabel(status: string): string {
   return status === 'shipped' ? '已发货' : '草稿'
@@ -341,6 +341,10 @@ async function load() {
 function onSearch(resetPage: boolean) {
   if (resetPage) pagination.page = 1
   load()
+}
+
+function onStatusTabChange() {
+  onSearch(true)
 }
 
 function debouncedSearch() {
@@ -418,6 +422,19 @@ onActivated(() => {
   min-height: 0;
 }
 
+.status-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-md);
+  flex-shrink: 0;
+}
+
+.status-tabs-left {
+  flex: 1;
+  min-width: 0;
+}
+
 .packing-batch-bar {
   display: flex;
   align-items: center;
@@ -452,11 +469,10 @@ onActivated(() => {
   flex-wrap: wrap;
 }
 
-.copy-range :deep(.el-input-number) {
-  width: 86px;
+.copy-range :deep(.el-input) {
+  width: 220px;
 }
 
-.copy-range-separator,
 .copy-range-count,
 .copy-dialog-note {
   color: var(--color-text-secondary);

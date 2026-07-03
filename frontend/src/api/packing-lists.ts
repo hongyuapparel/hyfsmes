@@ -115,8 +115,9 @@ export interface SavePackingListPayload {
 }
 
 export interface CopyPackingListToDraftPayload {
-  boxFrom: number
-  boxTo: number
+  boxFrom?: number
+  boxTo?: number
+  boxSeqs?: number[]
   remark?: string
 }
 

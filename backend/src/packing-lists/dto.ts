@@ -1,4 +1,4 @@
-import { IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PackingItemPayloadDto {
@@ -130,15 +130,25 @@ export class SavePackingListDto {
 }
 
 export class CopyPackingListToDraftDto {
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  boxFrom: number;
+  boxFrom?: number;
 
+  @IsOptional()
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  boxTo: number;
+  boxTo?: number;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(1000)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  boxSeqs?: number[];
 
   @IsOptional()
   @IsString()

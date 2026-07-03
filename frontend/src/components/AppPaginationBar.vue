@@ -5,6 +5,9 @@
   >
     <div v-if="hasSummary" class="pagination-summary">
       <span>{{ summaryText }}</span>
+      <span v-if="secondaryQuantity !== undefined" class="pagination-summary-extra">
+        {{ secondarySummaryText }}
+      </span>
       <span v-if="totalAmount !== undefined" class="pagination-summary-amount">
         {{ totalAmountLabel || '总金额' }}：¥{{ formatDisplayNumber(totalAmount) }}
       </span>
@@ -36,6 +39,9 @@ const props = defineProps<{
   totalQuantity?: number
   unit?: string
   summaryLabel?: string
+  secondaryQuantity?: number
+  secondaryLabel?: string
+  secondaryUnit?: string
   totalAmount?: number
   totalAmountLabel?: string
 }>()
@@ -64,6 +70,11 @@ const summaryText = computed(() => {
   const quantity = props.totalQuantity ?? 0
   return `${label}：${formatDisplayNumber(quantity)}${props.unit ? ` ${props.unit}` : ''}`
 })
+const secondarySummaryText = computed(() => {
+  const label = props.secondaryLabel || '合计'
+  const quantity = props.secondaryQuantity ?? 0
+  return `${label}：${formatDisplayNumber(quantity)}${props.secondaryUnit ? ` ${props.secondaryUnit}` : ''}`
+})
 
 defineOptions({ name: 'AppPaginationBar' })
 </script>
@@ -83,6 +94,7 @@ defineOptions({ name: 'AppPaginationBar' })
   white-space: nowrap;
 }
 
+.pagination-summary-extra,
 .pagination-summary-amount {
   margin-left: var(--space-md);
 }
