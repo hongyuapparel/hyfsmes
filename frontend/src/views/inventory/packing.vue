@@ -242,7 +242,7 @@ import { usePackingListActions } from '@/composables/usePackingListActions'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSalespeople } from '@/api/customers'
-import { getPackingLists, type PackingListRow } from '@/api/packing-lists'
+import { getPackingLists, type PackingListQuery, type PackingListRow, type PackingListListRes } from '@/api/packing-lists'
 import AppDialog from '@/components/AppDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import PackingListLogDrawer from '@/components/inventory/PackingListLogDrawer.vue'
@@ -291,6 +291,7 @@ const { onHeaderDragEnd: onPackingHeaderDragEnd, restoreColumnWidths: restorePac
   useTableColumnWidthPersist('inventory-packing-list')
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
+let loadSeq = 0
 
 const selectedBoxCount = computed(() => selectedRows.value.reduce((sum, row) => sum + (Number(row.boxCount) || 0), 0))
 const selectedTotalQty = computed(() => selectedRows.value.reduce((sum, row) => sum + (Number(row.totalQty) || 0), 0))
@@ -299,6 +300,11 @@ const footerBoxCount = computed(() => hasSelectedRows.value ? selectedBoxCount.v
 const footerTotalQty = computed(() => hasSelectedRows.value ? selectedTotalQty.value : filterSummary.totalQty)
 const footerBoxLabel = computed(() => hasSelectedRows.value ? '已选箱数' : '全部箱数')
 const footerQtyLabel = computed(() => hasSelectedRows.value ? '已选件数' : '全部件数')
+
+interface PackingFooterSummary {
+  boxCount: number
+  totalQty: number
+}
 
 function statusLabel(status: string): string {
   return status === 'shipped' ? '已发货' : '草稿'
@@ -316,29 +322,81 @@ function styleSummary(row: PackingListRow): string {
   return row.styleNos.length > 1 ? `${first} 等${row.styleNos.length}款` : first
 }
 
+function buildListQuery(page = pagination.page, pageSize = pagination.pageSize): PackingListQuery {
+  return {
+    customerName: filter.customerName || undefined,
+    status: filter.status || undefined,
+    keyword: filter.keyword || undefined,
+    xiaomanOrderNo: filter.xiaomanOrderNo || undefined,
+    serviceManager: filter.serviceManager || undefined,
+    dateFrom: dateRange.value?.[0] || undefined,
+    dateTo: dateRange.value?.[1] || undefined,
+    page,
+    pageSize,
+  }
+}
+
+function normalizeSummary(summary: PackingListListRes['summary'] | undefined): PackingFooterSummary | null {
+  if (!summary) return null
+  return {
+    boxCount: Math.max(0, Number(summary.boxCount) || 0),
+    totalQty: Math.max(0, Number(summary.totalQty) || 0),
+  }
+}
+
+function sumRows(rows: PackingListRow[]): PackingFooterSummary {
+  return rows.reduce<PackingFooterSummary>(
+    (sum, row) => ({
+      boxCount: sum.boxCount + (Number(row.boxCount) || 0),
+      totalQty: sum.totalQty + (Number(row.totalQty) || 0),
+    }),
+    { boxCount: 0, totalQty: 0 },
+  )
+}
+
+async function resolveFilterSummary(params: PackingListQuery, firstResponse: PackingListListRes): Promise<PackingFooterSummary> {
+  const directSummary = normalizeSummary(firstResponse.summary)
+  const currentPageSummary = sumRows(firstResponse.list ?? [])
+  const directSummaryLooksStale =
+    !!directSummary &&
+    directSummary.boxCount === 0 &&
+    directSummary.totalQty === 0 &&
+    (currentPageSummary.boxCount > 0 || currentPageSummary.totalQty > 0)
+  if (directSummary && !directSummaryLooksStale) return directSummary
+
+  const total = Math.max(0, Number(firstResponse.total) || 0)
+  if (!total) return { boxCount: 0, totalQty: 0 }
+
+  const pageSize = 100
+  const pageCount = Math.ceil(total / pageSize)
+  const rows: PackingListRow[] = []
+  for (let page = 1; page <= pageCount; page += 1) {
+    const res = await getPackingLists({ ...params, page, pageSize })
+    const summary = normalizeSummary(res.data.summary)
+    if (summary) return summary
+    rows.push(...(res.data.list ?? []))
+  }
+  return sumRows(rows)
+}
+
 async function load() {
+  const seq = ++loadSeq
   loading.value = true
   try {
-    const res = await getPackingLists({
-      customerName: filter.customerName || undefined,
-      status: filter.status || undefined,
-      keyword: filter.keyword || undefined,
-      xiaomanOrderNo: filter.xiaomanOrderNo || undefined,
-      serviceManager: filter.serviceManager || undefined,
-      dateFrom: dateRange.value?.[0] || undefined,
-      dateTo: dateRange.value?.[1] || undefined,
-      page: pagination.page,
-      pageSize: pagination.pageSize,
-    })
+    const params = buildListQuery()
+    const res = await getPackingLists(params)
+    if (seq !== loadSeq) return
     list.value = res.data.list
     pagination.total = res.data.total
-    filterSummary.boxCount = res.data.summary?.boxCount ?? 0
-    filterSummary.totalQty = res.data.summary?.totalQty ?? 0
+    const summary = await resolveFilterSummary(params, res.data)
+    if (seq !== loadSeq) return
+    filterSummary.boxCount = summary.boxCount
+    filterSummary.totalQty = summary.totalQty
     restorePackingColumnWidths(tableRef.value)
   } catch (e) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载装箱单失败'))
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
