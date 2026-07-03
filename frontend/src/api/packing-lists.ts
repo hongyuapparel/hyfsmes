@@ -23,6 +23,10 @@ export interface PackingListRow {
 export interface PackingListListRes {
   list: PackingListRow[]
   total: number
+  summary: {
+    boxCount: number
+    totalQty: number
+  }
 }
 
 export interface PackingListQuery {

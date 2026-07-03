@@ -123,9 +123,9 @@
         :header-cell-style="compactHeaderCellStyle"
         @selection-change="onSelectionChange"
       >
-        <el-table-column type="selection" width="44" align="center" header-align="center" />
-        <el-table-column prop="code" label="单号" min-width="140" show-overflow-tooltip align="center" header-align="center" />
-        <el-table-column label="小满单号" min-width="120" show-overflow-tooltip align="center" header-align="center">
+        <el-table-column type="selection" width="40" align="center" header-align="center" />
+        <el-table-column prop="code" label="单号" width="132" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column label="小满单号" width="96" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">
             <a
               v-if="row.xiaomanOrderId"
@@ -140,31 +140,30 @@
         <el-table-column label="客户" min-width="150" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ displayCustomer(row.customerName) }}</template>
         </el-table-column>
-        <el-table-column prop="serviceManager" label="业务员" min-width="100" show-overflow-tooltip align="center" header-align="center" />
-        <el-table-column label="款号" min-width="140" show-overflow-tooltip align="center" header-align="center">
+        <el-table-column prop="serviceManager" label="业务员" width="82" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column label="款号" min-width="128" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ styleSummary(row) }}</template>
         </el-table-column>
-        <el-table-column label="箱数" width="80" align="center" header-align="center">
+        <el-table-column label="箱数" width="64" align="center" header-align="center">
           <template #default="{ row }">{{ formatDisplayNumber(row.boxCount) }}</template>
         </el-table-column>
-        <el-table-column label="件数" width="90" align="center" header-align="center">
+        <el-table-column label="件数" width="72" align="center" header-align="center">
           <template #default="{ row }">{{ formatDisplayNumber(row.totalQty) }}</template>
         </el-table-column>
-        <el-table-column label="总重(kg)" width="100" align="center" header-align="center">
+        <el-table-column label="总重(kg)" width="84" align="center" header-align="center">
           <template #default="{ row }">{{ row.totalWeight > 0 ? row.totalWeight : '-' }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="90" align="center" header-align="center">
+        <el-table-column label="状态" width="76" align="center" header-align="center">
           <template #default="{ row }">
             <el-tag :type="row.status === 'shipped' ? 'success' : 'info'" size="small">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="packDate" label="装箱日期" width="116" show-overflow-tooltip align="center" header-align="center">
+        <el-table-column prop="packDate" label="装箱日期" width="102" show-overflow-tooltip align="center" header-align="center">
           <template #default="{ row }">{{ row.packDate || '-' }}</template>
         </el-table-column>
-        <el-table-column label="操作" :width="isMobile ? 56 : 180" align="center" header-align="center" fixed="right">
+        <el-table-column label="操作" :width="isMobile ? 56 : 240" align="center" header-align="center" fixed="right">
           <template #default="{ row }">
             <TableRowActions
-              :inline-limit="3"
               :actions="[
                 { key: 'edit', label: row.status === 'draft' ? '编辑' : '查看', onClick: () => goEdit(row), type: 'primary' },
                 { key: 'doc', label: '客户单', onClick: () => openDoc(row), type: 'primary' },
@@ -182,11 +181,11 @@
       v-model:current-page="pagination.page"
       v-model:page-size="pagination.pageSize"
       :total="pagination.total"
-      :total-quantity="pageBoxCount"
-      summary-label="本页箱数"
+      :total-quantity="footerBoxCount"
+      :summary-label="footerBoxLabel"
       unit="箱"
-      :secondary-quantity="pageTotalQty"
-      secondary-label="本页件数"
+      :secondary-quantity="footerTotalQty"
+      :secondary-label="footerQtyLabel"
       secondary-unit="件"
       @current-change="load"
       @size-change="onPageSizeChange"
@@ -287,6 +286,7 @@ const activeFilterCount = computed(() => {
 const list = ref<PackingListRow[]>([])
 const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
+const filterSummary = reactive({ boxCount: 0, totalQty: 0 })
 const tableShellRef = ref<HTMLElement>()
 const tableHeight = ref<number | undefined>(undefined)
 
@@ -296,8 +296,13 @@ const { copyDialog, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePac
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
 
-const pageBoxCount = computed(() => list.value.reduce((sum, row) => sum + (Number(row.boxCount) || 0), 0))
-const pageTotalQty = computed(() => list.value.reduce((sum, row) => sum + (Number(row.totalQty) || 0), 0))
+const selectedBoxCount = computed(() => selectedRows.value.reduce((sum, row) => sum + (Number(row.boxCount) || 0), 0))
+const selectedTotalQty = computed(() => selectedRows.value.reduce((sum, row) => sum + (Number(row.totalQty) || 0), 0))
+const hasSelectedRows = computed(() => selectedRows.value.length > 0)
+const footerBoxCount = computed(() => hasSelectedRows.value ? selectedBoxCount.value : filterSummary.boxCount)
+const footerTotalQty = computed(() => hasSelectedRows.value ? selectedTotalQty.value : filterSummary.totalQty)
+const footerBoxLabel = computed(() => hasSelectedRows.value ? '已选箱数' : '全部箱数')
+const footerQtyLabel = computed(() => hasSelectedRows.value ? '已选件数' : '全部件数')
 
 function statusLabel(status: string): string {
   return status === 'shipped' ? '已发货' : '草稿'
@@ -331,6 +336,8 @@ async function load() {
     })
     list.value = res.data.list
     pagination.total = res.data.total
+    filterSummary.boxCount = res.data.summary?.boxCount ?? 0
+    filterSummary.totalQty = res.data.summary?.totalQty ?? 0
   } catch (e) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载装箱单失败'))
   } finally {
@@ -451,6 +458,14 @@ onActivated(() => {
    与有图的库存表（约 51px）观感统一 */
 .inventory-packing-page .packing-table :deep(.el-table__body .el-table__cell) {
   height: 52px;
+}
+
+.inventory-packing-page .packing-table :deep(.row-actions-inline) {
+  gap: 6px;
+}
+
+.inventory-packing-page .packing-table :deep(.row-actions-inline .el-button) {
+  margin-left: 0;
 }
 
 .xiaoman-cell-link {

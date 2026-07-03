@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository } from 'typeorm';
+import { EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
 import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
@@ -39,6 +39,11 @@ export interface PackingListRow {
   totalQty: number;
   totalWeight: number;
   styleNos: string[];
+}
+
+export interface PackingListSummary {
+  boxCount: number;
+  totalQty: number;
 }
 
 export interface PackingBoxDetail {
@@ -117,34 +122,22 @@ export class PackingListsService {
     @InjectRepository(PackingListLog) private readonly logRepo: Repository<PackingListLog>,
   ) {}
 
-  async getList(query: PackingListQuery): Promise<{ list: PackingListRow[]; total: number }> {
+  async getList(query: PackingListQuery): Promise<{ list: PackingListRow[]; total: number; summary: PackingListSummary }> {
     const qb = this.listRepo.createQueryBuilder('pl');
-    if (query.status?.trim()) qb.andWhere('pl.status = :status', { status: query.status.trim() });
-    if (query.customerName?.trim()) {
-      qb.andWhere('pl.customer_name LIKE :customerName', { customerName: `%${query.customerName.trim()}%` });
-    }
-    if (query.keyword?.trim()) {
-      qb.andWhere(
-        'EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.style_no LIKE :keyword)',
-        { keyword: `%${query.keyword.trim()}%` },
-      );
-    }
-    if (query.xiaomanOrderNo?.trim()) {
-      qb.andWhere('pl.xiaoman_order_no LIKE :xom', { xom: `%${query.xiaomanOrderNo.trim()}%` });
-    }
-    if (query.serviceManager?.trim()) {
-      qb.andWhere('pl.service_manager = :serviceManager', { serviceManager: query.serviceManager.trim() });
-    }
-    if (query.dateFrom?.trim()) qb.andWhere('pl.pack_date >= :dateFrom', { dateFrom: query.dateFrom.trim() });
-    if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });
+    this.applyListFilters(qb, query);
     qb.orderBy('pl.id', 'DESC');
 
     const page = Math.max(1, Number(query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
-    const [lists, total] = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getManyAndCount();
+    const totalQb = qb.clone();
+    const [lists, total, summary] = await Promise.all([
+      qb
+        .skip((page - 1) * pageSize)
+        .take(pageSize)
+        .getMany(),
+      totalQb.getCount(),
+      this.getListSummary(query),
+    ]);
 
     const ids = lists.map((l) => l.id);
     const boxAgg = new Map<number, { boxCount: number; totalWeight: number }>();
@@ -198,7 +191,44 @@ export class PackingListsService {
       totalWeight: boxAgg.get(l.id)?.totalWeight ?? 0,
       styleNos: itemAgg.get(l.id)?.styleNos ?? [],
     }));
-    return { list, total };
+    return { list, total, summary };
+  }
+
+  private applyListFilters(qb: SelectQueryBuilder<PackingList>, query: PackingListQuery): void {
+    if (query.status?.trim()) qb.andWhere('pl.status = :status', { status: query.status.trim() });
+    if (query.customerName?.trim()) {
+      qb.andWhere('pl.customer_name LIKE :customerName', { customerName: `%${query.customerName.trim()}%` });
+    }
+    if (query.keyword?.trim()) {
+      qb.andWhere(
+        'EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.style_no LIKE :keyword)',
+        { keyword: `%${query.keyword.trim()}%` },
+      );
+    }
+    if (query.xiaomanOrderNo?.trim()) {
+      qb.andWhere('pl.xiaoman_order_no LIKE :xom', { xom: `%${query.xiaomanOrderNo.trim()}%` });
+    }
+    if (query.serviceManager?.trim()) {
+      qb.andWhere('pl.service_manager = :serviceManager', { serviceManager: query.serviceManager.trim() });
+    }
+    if (query.dateFrom?.trim()) qb.andWhere('pl.pack_date >= :dateFrom', { dateFrom: query.dateFrom.trim() });
+    if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });
+  }
+
+  private async getListSummary(query: PackingListQuery): Promise<PackingListSummary> {
+    const qb = this.listRepo.createQueryBuilder('pl');
+    this.applyListFilters(qb, query);
+    const row: { boxCount: string | null; totalQty: string | null } | undefined = await qb
+      .select('COALESCE(SUM((SELECT COUNT(*) FROM packing_list_boxes b WHERE b.packing_list_id = pl.id)), 0)', 'boxCount')
+      .addSelect(
+        'COALESCE(SUM((SELECT COALESCE(SUM(i.total_qty), 0) FROM packing_list_items i WHERE i.packing_list_id = pl.id)), 0)',
+        'totalQty',
+      )
+      .getRawOne();
+    return {
+      boxCount: Number(row?.boxCount) || 0,
+      totalQty: Number(row?.totalQty) || 0,
+    };
   }
 
   async getDetail(id: number): Promise<PackingListDetail> {
