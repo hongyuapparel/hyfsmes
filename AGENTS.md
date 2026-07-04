@@ -38,7 +38,7 @@
 
 - 优先做根因修复，禁止临时补丁、绕过机制、兜底掩盖问题。
 - 优先沿用框架、组件库官方 API、DTO、校验器、现有模块结构和项目既有模式。
-- 前端优先使用 Composition API；后端接口保持现有 NestJS 模块边界。
+- 前端使用 Composition API；后端接口保持现有 NestJS 模块边界。
 - 新逻辑优先复用现有工具、字段定义、接口封装和公共组件。
 - 新建文件前必须读 ≥2 个同目录/同类型现有文件，照搬 import 路径、导出方式、命名、结构。禁止凭印象写路径（如 `request` 工具位于 `api/` 还是 `utils/` 必须查证，`@/xxx` 还是 `./xxx` 必须查证）。
 - 新建 API 接口/类型前，必须先打开所有调用方（template + script + 后端 controller）按它们实际访问的字段/嵌套结构定义类型；禁止先编类型再让调用方报错。
@@ -58,11 +58,12 @@
 
 ## 6. UI 与组件
 
-- UI 编辑必须沿用原来的系统组件和项目既有基础组件，例如 Element Plus、`AppDrawer`、`AppDialog`、设计 token、现有字段配置。
+- UI 编辑必须沿用原来的系统组件和项目既有基础组件，例如 Element Plus、`AppDrawer`、`AppDialog`、设计 token、现有字段配置；抽屉必须使用 `AppDrawer`，弹窗必须使用 `AppDialog`，不自行实现同类组件。
 - 抽屉、弹窗、表单区、工具栏、列表操作区等同类交互必须保持结构和视觉一致；特殊偏离先说明原因并获得确认。
 - 禁止用补丁样式覆盖原组件机制：不用大段私有 CSS、`!important`、深层选择器、外层包裹遮盖、复制视觉结构来绕过系统组件。
 - 字号只用设计变量：`--font-size-title`、`--font-size-subtitle`、`--font-size-body`、`--font-size-caption`。
 - `el-radio` / `el-radio-button` 必须显式使用 `value` / `:value`，禁止用 `label` 充当选中值；改动后执行 `npm run check:el-radio-value`。
+- 可编辑/填写型表格（单元格内放 `el-input`、`el-select`、`el-input-number`、textarea 等录入控件）统一在 `<el-table>` 上添加 `class="editable-grid"`，外观复用 `design-system.css` 的全局 `.editable-grid` 规则：填写框无内框并铺满单元格，以表格线分隔，hover/focus 时整格高亮；表头、数据行、合计行使用 `--editable-grid-header-h` / `--editable-grid-row-h` 保持等高；内容上下左右居中。新建此类表禁止各自编写单元格内边距、边框或对齐样式；调整密度只改全局变量。含图片列的表（如尺码矩阵）应在该表局部恢复自适应行高，避免图片被压缩。
 
 ## 7. 数据与字段
 
@@ -85,7 +86,10 @@
   - 禁止 `git add 目录/` 或 `git add .`；必须用具体文件路径分批 add。
 - 交付结果不得新增技术债：不留下临时兜底、重复逻辑、补丁式覆盖、超长文件/函数、未验证的 TODO 或“以后再处理”的半成品。
 - 如正确方案超出本次范围，先说明影响和拆分方案，获得确认后再做；不得用错误但省事的方案交付。
-- 页面 `views` 只做编排；组件只处理 UI 交互并通过 props/emit 通信；业务逻辑进 `composables`；API 层只做 HTTP 封装。
+- `views` 只做编排（读取路由参数、调用 composable、组合子组件），不写业务计算。
+- `components` 只处理 UI 交互并通过 props/emit 通信，不直接调用 API 或 store。
+- `composables` 只承载业务逻辑，不引入 UI 组件，不直接操作 DOM。
+- `api/` 只做 HTTP 封装，不包含业务判断；请求参数和响应必须有 TypeScript 类型定义。
 - Pinia store 只存跨页面共享或需持久化状态；单页临时状态放组件/composable；store action 不直接操作路由。
 - 文件接近警戒线必须拆分，超过警戒线不得继续堆代码：
   - `views/*.vue`：300 行警戒，500 行硬上限。
@@ -93,8 +97,15 @@
   - `composables/use*.ts`：150 行警戒，250 行硬上限。
   - `stores/*.ts`：150 行警戒，200 行硬上限。
   - backend `*.service.ts`：300 行警戒，500 行硬上限。
-- 一个 `.vue` 超过 2 个独立业务区块、一个 composable 超过 3 个关注点、同一逻辑出现 2 次以上，都应拆分或抽取。
+- 一个 `.vue` 超过 2 个独立业务区块、一个 composable 超过 3 个关注点、同一逻辑出现 2 次以上，都必须拆分或抽取。
 - Vue `props` 用 `defineProps<{...}>()`，`emit` 用 `defineEmits<{...}>()`，Pinia state 显式声明类型。
+
+## 8.1 已知技术债（勿加重）
+
+- `inventory/finished.vue` 超过 2700 行。
+- `orders/edit.vue`、`orders/list.vue`、`production/*.vue` 超过 800 行。
+- backend 仍存在 `: any`。
+- 库存/生产抽屉尚未统一到 `AppDrawer`。
 
 ## 9. 页面与业务变更
 
