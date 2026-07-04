@@ -108,6 +108,35 @@ export class OrderMutationService {
     });
   }
 
+  private resetMaterialOperationFieldsForNewDraft(
+    rows: OrderMaterialRow[] | null | undefined,
+  ): OrderMaterialRow[] | null {
+    if (!Array.isArray(rows)) return null;
+    return this.normalizeMaterialRows(rows).map((row) => {
+      const {
+        purchaseStatus: _dropPurchaseStatus,
+        actualPurchaseQuantity: _dropActualPurchaseQuantity,
+        purchaseAmount: _dropPurchaseAmount,
+        purchaseCompletedAt: _dropPurchaseCompletedAt,
+        purchaseUnitPrice: _dropPurchaseUnitPrice,
+        purchaseOtherCost: _dropPurchaseOtherCost,
+        purchaseRemark: _dropPurchaseRemark,
+        purchaseImageUrl: _dropPurchaseImageUrl,
+        pickStatus: _dropPickStatus,
+        pickCompletedAt: _dropPickCompletedAt,
+        pickRemark: _dropPickRemark,
+        pickLogs: _dropPickLogs,
+        ...rest
+      } = row;
+      return rest as OrderMaterialRow;
+    });
+  }
+
+  private shouldPreserveMaterialOperationFields(status: string | null | undefined): boolean {
+    const code = (status ?? '').trim();
+    return !!code && !['draft', 'pending_review'].includes(code);
+  }
+
   private normalizeDecimalInput(v: unknown): string {
     if (v === null || v === undefined) return '0';
     if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '0';
@@ -272,7 +301,9 @@ export class OrderMutationService {
     });
     const saved = await this.saveOrderWithRetry(entity, () => this.generateNextOrderNo());
     const extPayload: Partial<OrderExt> = { orderId: saved.id };
-    if (payload.materials && Array.isArray(payload.materials)) extPayload.materials = this.normalizeMaterialRows(payload.materials);
+    if (payload.materials && Array.isArray(payload.materials)) {
+      extPayload.materials = this.resetMaterialOperationFieldsForNewDraft(payload.materials);
+    }
     if (payload.colorSizeHeaders && Array.isArray(payload.colorSizeHeaders)) extPayload.colorSizeHeaders = payload.colorSizeHeaders;
     if (payload.colorSizeRows && Array.isArray(payload.colorSizeRows)) extPayload.colorSizeRows = payload.colorSizeRows;
     if (payload.sizeInfoMetaHeaders && Array.isArray(payload.sizeInfoMetaHeaders)) extPayload.sizeInfoMetaHeaders = payload.sizeInfoMetaHeaders;
@@ -334,7 +365,11 @@ export class OrderMutationService {
       if (!ext) {
         ext = this.orderExtRepo.create({
           orderId: id,
-          materials: payload.materials && Array.isArray(payload.materials) ? this.normalizeMaterialRows(payload.materials) : null,
+          materials: payload.materials && Array.isArray(payload.materials)
+            ? this.shouldPreserveMaterialOperationFields(order.status)
+              ? this.normalizeMaterialRows(payload.materials)
+              : this.resetMaterialOperationFieldsForNewDraft(payload.materials)
+            : null,
           colorSizeHeaders: payload.colorSizeHeaders ?? null,
           colorSizeRows: payload.colorSizeRows ?? null,
           sizeInfoMetaHeaders: payload.sizeInfoMetaHeaders ?? null,
@@ -350,7 +385,9 @@ export class OrderMutationService {
       } else {
         if (payload.materials !== undefined) {
           ext.materials = Array.isArray(payload.materials)
-            ? this.preserveMaterialOperationFields(this.normalizeMaterialRows(payload.materials), ext.materials)
+            ? this.shouldPreserveMaterialOperationFields(order.status)
+              ? this.preserveMaterialOperationFields(this.normalizeMaterialRows(payload.materials), ext.materials)
+              : this.resetMaterialOperationFieldsForNewDraft(payload.materials)
             : payload.materials;
         }
         if (payload.colorSizeHeaders !== undefined) ext.colorSizeHeaders = payload.colorSizeHeaders;
@@ -454,7 +491,7 @@ export class OrderMutationService {
       if (srcExt) {
         const newExt = this.orderExtRepo.create({
           orderId: saved.id,
-          materials: srcExt.materials ?? null,
+          materials: this.resetMaterialOperationFieldsForNewDraft(srcExt.materials),
           colorSizeHeaders: srcExt.colorSizeHeaders ?? null,
           colorSizeRows: srcExt.colorSizeRows ?? null,
           sizeInfoMetaHeaders: srcExt.sizeInfoMetaHeaders ?? null,
