@@ -178,11 +178,7 @@ export class FinishedGoodsStockInboundService {
     }
   }
 
-  private async consolidateDuplicateFinishedStocks(
-    seed: FinishedGoodsStock,
-    operatorUsername: string,
-    remark: string,
-  ): Promise<FinishedGoodsStock> {
+  private async consolidateDuplicateFinishedStocks(seed: FinishedGoodsStock): Promise<FinishedGoodsStock> {
     const stocks = await this.inboundQueryService.findDuplicateStocksForMergeKey(seed);
     if (stocks.length <= 1) {
       const normalized = this.inboundQueryService.parseStoredColorSizeSnapshot(seed.colorSizeSnapshot);
@@ -195,7 +191,6 @@ export class FinishedGoodsStockInboundService {
 
     const keeper = stocks.find((stock) => stock.id === seed.id) ?? stocks[0];
     const sourceStocks = stocks.filter((stock) => stock.id !== keeper.id);
-    const before = this.inboundQueryService.stockAdjustSnapshot(keeper);
     const snapshots: ColorSizeSnapshot[] = [];
     for (const stock of stocks) {
       const qty = Math.max(0, Math.trunc(Number(stock.quantity) || 0));
@@ -236,7 +231,6 @@ export class FinishedGoodsStockInboundService {
       if (!this.isTableMissingError(e, 'finished_goods_stock_adjust_logs')) throw e;
     }
     await this.stockRepo.remove(sourceStocks);
-    await this.appendFinishedStockAdjustLog(saved.id, operatorUsername, before, this.inboundQueryService.stockAdjustSnapshot(saved), remark);
     return saved;
   }
 
@@ -323,7 +317,7 @@ export class FinishedGoodsStockInboundService {
           inboundRemark,
           { sourceOrderNo: orderNo, action: 'inbound' },
         );
-        return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
+        return this.consolidateDuplicateFinishedStocks(saved);
       } catch (e: unknown) {
         const msg = String((e as { message?: unknown })?.message ?? '');
         if (this.isOrderIdNullSchemaError(msg)) throw new BadRequestException(this.orderIdNullableMigrationHint());
@@ -343,7 +337,7 @@ export class FinishedGoodsStockInboundService {
         inboundRemark,
         { sourceOrderNo: orderNo, action: 'inbound' },
       );
-      return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
+      return this.consolidateDuplicateFinishedStocks(saved);
     } catch (e: unknown) {
       const msg = String((e as { message?: unknown })?.message ?? '');
       if (this.isOrderIdNullSchemaError(msg)) throw new BadRequestException(this.orderIdNullableMigrationHint());
@@ -388,7 +382,7 @@ export class FinishedGoodsStockInboundService {
         action: 'meta',
       });
     }
-    return this.consolidateDuplicateFinishedStocks(saved, operatorUsername, '合并重复库存');
+    return this.consolidateDuplicateFinishedStocks(saved);
   }
 
   async upsertColorImage(id: number, dto: { colorName: string; imageUrl: string }, operatorUsername = ''): Promise<void> {
@@ -408,7 +402,7 @@ export class FinishedGoodsStockInboundService {
             action: 'image',
           });
         }
-        await this.consolidateDuplicateFinishedStocks(stock, operatorUsername, '合并重复库存');
+        await this.consolidateDuplicateFinishedStocks(stock);
         return;
       }
       if (existing) {
@@ -420,7 +414,7 @@ export class FinishedGoodsStockInboundService {
             action: 'image',
           });
         }
-        await this.consolidateDuplicateFinishedStocks(stock, operatorUsername, '合并重复库存');
+        await this.consolidateDuplicateFinishedStocks(stock);
         return;
       }
       await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: id, colorName, imageUrl }));
@@ -428,7 +422,7 @@ export class FinishedGoodsStockInboundService {
       await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, `更新颜色图片：${colorName}`, {
         action: 'image',
       });
-      await this.consolidateDuplicateFinishedStocks(stock, operatorUsername, '合并重复库存');
+      await this.consolidateDuplicateFinishedStocks(stock);
     } catch (e) {
       if (this.isTableMissingError(e, 'finished_goods_stock_color_images')) {
         throw new InternalServerErrorException(
