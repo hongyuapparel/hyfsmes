@@ -147,6 +147,11 @@ export class FinishedGoodsStockQueryService {
     return (!beforeCustomer && !afterCustomer) || beforeCustomer === customerName || afterCustomer === customerName;
   }
 
+  private isInternalConsolidationLog(log: FinishedGoodsStockAdjustLog): boolean {
+    const action = this.getLogSnapshotText(log.after, 'logAction') || this.getLogSnapshotText(log.before, 'logAction');
+    return action === 'merge-duplicates' || String(log.remark ?? '').trim() === '合并重复库存';
+  }
+
   private async getDetailAdjustLogs(stock: FinishedGoodsStock): Promise<FinishedGoodsStockAdjustLog[]> {
     const stockIds = await this.getSkuCustomerStockIds(stock);
     const [directLogs, recentLogs] = await Promise.all([
@@ -154,8 +159,11 @@ export class FinishedGoodsStockQueryService {
       this.adjustLogRepo.find({ order: { createdAt: 'DESC' }, take: 500 }),
     ]);
     const map = new Map<number, FinishedGoodsStockAdjustLog>();
-    directLogs.forEach((log) => map.set(log.id, log));
+    directLogs
+      .filter((log) => !this.isInternalConsolidationLog(log))
+      .forEach((log) => map.set(log.id, log));
     recentLogs
+      .filter((log) => !this.isInternalConsolidationLog(log))
       .filter((log) => this.isDetailLogForStockGroup(log, stock, stockIds))
       .forEach((log) => map.set(log.id, log));
     return Array.from(map.values()).sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()).slice(0, 100);
