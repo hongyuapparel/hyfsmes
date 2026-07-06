@@ -221,10 +221,23 @@ export class FabricStockService {
     endDate?: string;
     inventoryTypeId?: number | null;
     skipTotal?: boolean;
+    sortField?: string;
+    sortOrder?: string;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: FabricStockListRow[]; total: number; totalQuantity: number; page: number; pageSize: number }> {
-    const { name, customerName, startDate, endDate, inventoryTypeId, skipTotal = false, page = 1, pageSize = 20 } = params;
+    const {
+      name,
+      customerName,
+      startDate,
+      endDate,
+      inventoryTypeId,
+      skipTotal = false,
+      sortField,
+      sortOrder,
+      page = 1,
+      pageSize = 20,
+    } = params;
     const qb = this.stockRepo.createQueryBuilder('s');
     if (name?.trim()) {
       qb.andWhere('s.name LIKE :name', { name: `%${name.trim()}%` });
@@ -250,7 +263,13 @@ export class FabricStockService {
           .select('COALESCE(SUM(s.quantity), 0)', 'sum')
           .getRawOne<{ sum: string | number | null }>();
     const totalQuantity = Number(totalQuantityRow?.sum ?? 0) || 0;
-    qb.orderBy('s.created_at', 'DESC');
+    if (sortField === 'quantity' && (sortOrder === 'asc' || sortOrder === 'desc')) {
+      qb.orderBy('s.quantity', sortOrder === 'asc' ? 'ASC' : 'DESC')
+        .addOrderBy('s.created_at', 'DESC')
+        .addOrderBy('s.id', 'DESC');
+    } else {
+      qb.orderBy('s.created_at', 'DESC').addOrderBy('s.id', 'DESC');
+    }
     const total = skipTotal ? 0 : await qb.getCount();
     const rawList = await qb
       .skip((page - 1) * pageSize)

@@ -40,6 +40,8 @@ export class FabricStockController {
     @Query('endDate') endDate?: string,
     @Query('inventoryTypeId') inventoryTypeIdStr?: string,
     @Query('skipTotal') skipTotal?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -54,6 +56,8 @@ export class FabricStockController {
       endDate,
       inventoryTypeId: Number.isFinite(inventoryTypeId) && (inventoryTypeId ?? 0) > 0 ? inventoryTypeId : null,
       skipTotal: skipTotal === 'true' || skipTotal === '1',
+      sortField,
+      sortOrder,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });

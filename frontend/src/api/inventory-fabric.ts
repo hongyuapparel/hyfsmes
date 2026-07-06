@@ -49,6 +49,8 @@ export function getFabricList(params?: {
   endDate?: string
   inventoryTypeId?: number | null
   skipTotal?: boolean
+  sortField?: 'quantity'
+  sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number
 }, config?: AxiosRequestConfig) {

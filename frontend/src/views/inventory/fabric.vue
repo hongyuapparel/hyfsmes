@@ -116,6 +116,7 @@
           :header-cell-style="compactHeaderCellStyle"
           @header-dragend="onFabricStockHeaderDragEnd"
           @selection-change="onSelectionChange"
+          @sort-change="onSortChange"
           @row-click="onRowClick"
         >
           <el-table-column type="selection" width="48" align="center" header-align="center" />
@@ -136,7 +137,7 @@
           <el-table-column prop="inventoryTypeLabel" label="库存类型" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="warehouseLabel" label="仓库" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="storageLocation" label="存放地址" min-width="120" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="数量" width="100" align="center" header-align="center">
+          <el-table-column prop="quantity" label="数量" width="100" align="center" header-align="center" sortable="custom">
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
           </el-table-column>
           <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
@@ -359,6 +360,7 @@ const {
   fabricStockShellRef,
   fabricStockTableHeight,
   onFabricStockHeaderDragEnd,
+  onSortChange,
   load,
   onSearch,
   debouncedSearch,

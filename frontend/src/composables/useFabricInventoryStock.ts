@@ -12,6 +12,7 @@ import type { SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
+import { useTableSort } from '@/composables/useTableSort'
 
 export function useFabricInventoryStock() {
   const filter = reactive<{ name: string; customerName: string; inventoryTypeId: number | null }>({
@@ -40,12 +41,18 @@ export function useFabricInventoryStock() {
     onHeaderDragEnd: onFabricStockHeaderDragEnd,
     restoreColumnWidths: restoreFabricStockColumnWidths,
   } = useTableColumnWidthPersist('inventory-fabric-stock')
+  const { onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
 
   async function load() {
     loading.value = true
     try {
       const [startDate, endDate] =
         inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
+      const sort = sortParams()
+      const sortField = sort.sortField === 'quantity' ? sort.sortField : undefined
       const res = await getFabricList({
         name: filter.name || undefined,
         customerName: filter.customerName || undefined,
@@ -54,6 +61,8 @@ export function useFabricInventoryStock() {
         endDate: endDate || undefined,
         page: pagination.page,
         pageSize: pagination.pageSize,
+        sortField,
+        sortOrder: sortField ? sort.sortOrder : undefined,
       })
       const data = res.data
       if (data) {
@@ -163,6 +172,7 @@ export function useFabricInventoryStock() {
     fabricStockShellRef,
     fabricStockTableHeight,
     onFabricStockHeaderDragEnd,
+    onSortChange,
     load,
     onSearch,
     debouncedSearch,
