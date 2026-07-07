@@ -8,6 +8,7 @@ import { Supplier } from '../entities/supplier.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { SystemOption } from '../entities/system-option.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
+import { formatDateTimeForResponse } from '../common/date-time.util';
 
 const FABRIC_SUPPLIER_TYPE_VALUE = '面料供应商';
 
@@ -575,9 +576,7 @@ export class FabricStockService {
         remark: r.remark ?? '',
         pickupUserId: pid,
         pickupUserName: pid != null ? (pickupMap.get(pid) ?? '') : '',
-        createdAt: r.createdAt
-          ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ')
-          : '',
+        createdAt: formatDateTimeForResponse(r.createdAt),
       };
     });
     return { list, total, page, pageSize };

@@ -1,6 +1,7 @@
 import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
 import { getSizeHeaderKey, normalizeSizeHeader, normalizeSizeMatrix } from '../common/size-headers.util';
+import { formatDateTimeForResponse } from '../common/date-time.util';
 
 export type AccessorySizeBreakdown = { headers: string[]; quantities: number[] };
 
@@ -173,7 +174,7 @@ export function mapOutboundRawRow(r: AccessoryOutboundRawRow) {
     afterQuantity: Number(r.afterQuantity) || 0,
     operatorUsername: r.operatorUsername ?? '',
     remark: r.remark ?? '',
-    createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
+    createdAt: formatDateTimeForResponse(r.createdAt),
     imageUrl: r.imageUrl ?? '',
     customerName: r.customerName ?? '',
     category: r.category ?? '',
