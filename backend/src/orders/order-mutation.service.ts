@@ -53,6 +53,7 @@ export class OrderMutationService {
     return Number.isFinite(n) ? String(Number(n.toFixed(6))) : String(v).trim();
   }
 
+  /** 匹配采购/领料操作字段时只用物料身份键，用量变更不应丢失已完成状态。 */
   private materialOperationMatchKey(row: OrderMaterialRow): string {
     return [
       this.materialNumberKeyPart(row.materialSourceId),
@@ -61,11 +62,6 @@ export class OrderMutationService {
       this.materialTextKeyPart(row.materialName),
       this.materialTextKeyPart(row.color),
       this.materialTextKeyPart(row.fabricWidth),
-      this.materialNumberKeyPart(row.usagePerPiece),
-      this.materialNumberKeyPart(row.lossPercent),
-      this.materialNumberKeyPart(row.orderPieces),
-      this.materialNumberKeyPart(row.purchaseQuantity),
-      this.materialNumberKeyPart(row.cuttingQuantity),
     ].join('|');
   }
 

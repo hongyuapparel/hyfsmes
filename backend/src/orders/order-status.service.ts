@@ -132,29 +132,33 @@ export class OrderStatusService {
     await orderLogRepo.save(log);
   }
 
-  private normalizeWorkflowMaterialRows(rows: unknown): OrderMaterialRow[] {
-    return Array.isArray(rows)
-      ? (rows as OrderMaterialRow[]).map((row) => {
-          const {
-            materialType: _dropType,
-            materialSource: _dropSource,
-            purchaseStatus: _dropPurchaseStatus,
-            actualPurchaseQuantity: _dropActualPurchaseQuantity,
-            purchaseAmount: _dropPurchaseAmount,
-            purchaseCompletedAt: _dropPurchaseCompletedAt,
-            purchaseUnitPrice: _dropPurchaseUnitPrice,
-            purchaseOtherCost: _dropPurchaseOtherCost,
-            purchaseRemark: _dropPurchaseRemark,
-            purchaseImageUrl: _dropPurchaseImageUrl,
-            pickStatus: _dropPickStatus,
-            pickCompletedAt: _dropPickCompletedAt,
-            pickRemark: _dropPickRemark,
-            pickLogs: _dropPickLogs,
-            ...rest
-          } = row;
-          return rest as OrderMaterialRow;
-        })
-      : [];
+  /** 仅比较会影响采购/领料路线或物料结构的字段；用量、损耗等补录资料不算流程变更。 */
+  private workflowMaterialTextPart(v: unknown): string {
+    return String(v ?? '').trim();
+  }
+
+  private workflowMaterialNumberPart(v: unknown): string {
+    if (v === null || v === undefined || v === '') return '';
+    const n = Number(v);
+    return Number.isFinite(n) ? String(Number(n.toFixed(6))) : String(v).trim();
+  }
+
+  private workflowMaterialSignature(row: OrderMaterialRow): string {
+    return [
+      this.workflowMaterialNumberPart(row.materialSourceId),
+      this.workflowMaterialNumberPart(row.materialTypeId),
+      this.workflowMaterialTextPart(row.supplierName),
+      this.workflowMaterialTextPart(row.materialName),
+      this.workflowMaterialTextPart(row.color),
+      this.workflowMaterialTextPart(row.fabricWidth),
+    ].join('|');
+  }
+
+  private normalizeWorkflowMaterialRows(rows: unknown): string[] {
+    if (!Array.isArray(rows)) return [];
+    return (rows as OrderMaterialRow[])
+      .map((row) => this.workflowMaterialSignature(row))
+      .sort();
   }
 
   private normalizeWorkflowPayloadValue(key: keyof OrderEditPayload, value: unknown): unknown {
@@ -183,10 +187,9 @@ export class OrderStatusService {
             ? before.processItems ?? []
             : (before as Order)[key as keyof Order];
       const nextValue = (payload as OrderEditPayload)[key];
-      if (
-        JSON.stringify(this.normalizeWorkflowPayloadValue(key, beforeValue)) !==
-        JSON.stringify(this.normalizeWorkflowPayloadValue(key, nextValue))
-      ) {
+      const beforeNorm = this.normalizeWorkflowPayloadValue(key, beforeValue);
+      const nextNorm = this.normalizeWorkflowPayloadValue(key, nextValue);
+      if (JSON.stringify(beforeNorm) !== JSON.stringify(nextNorm)) {
         return true;
       }
     }
