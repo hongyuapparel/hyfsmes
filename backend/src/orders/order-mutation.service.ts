@@ -325,7 +325,7 @@ export class OrderMutationService {
     const order = await this.orderQueryService.findOne(id);
     const before = { ...order };
     const shouldRebaseWorkflow =
-      this.orderStatusService.canRebaseWorkflowStatus(order.status) &&
+      (await this.orderStatusService.canRebaseWorkflowStatus(order.status)) &&
       this.orderStatusService.hasWorkflowRelevantChanges(before, payload);
 
     if (payload.skuCode !== undefined) order.skuCode = payload.skuCode.trim();

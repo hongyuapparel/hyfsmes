@@ -199,9 +199,20 @@ export class OrderStatusService {
     );
   }
 
-  canRebaseWorkflowStatus(status: string | null | undefined): boolean {
+  private async isFinalWorkflowStatus(status: string | null | undefined): Promise<boolean> {
     const code = (status ?? '').trim();
-    return !!code && !['draft', 'pending_review', 'completed'].includes(code);
+    if (!code) return false;
+
+    // 保留 completed 兜底，避免状态配置缺失时让已完成订单重新参与流程计算。
+    if (code === 'completed') return true;
+
+    const definition = await this.orderStatusRepo.findOne({ where: { code } });
+    return definition?.isFinal === true;
+  }
+
+  async canRebaseWorkflowStatus(status: string | null | undefined): Promise<boolean> {
+    const code = (status ?? '').trim();
+    return !!code && !['draft', 'pending_review'].includes(code) && !(await this.isFinalWorkflowStatus(code));
   }
 
   private resolveMaterialRouteBySourceLabel(sourceLabel: string): 'purchase' | 'picking' {
@@ -337,7 +348,7 @@ export class OrderStatusService {
 
   async rebaseWorkflowStatusAfterOrderEdit(orderId: number, actor: OrderActor): Promise<Order | null> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order || !this.canRebaseWorkflowStatus(order.status)) return order;
+    if (!order || !(await this.canRebaseWorkflowStatus(order.status))) return order;
     const next = await this.resolveWorkflowStatusFromCurrentOrder(order, actor.userId);
     if (!next.status || next.status === order.status) return order;
     const beforeStatus = order.status;
@@ -358,9 +369,13 @@ export class OrderStatusService {
     this.workflowReconcileRunning = true;
     this.workflowReconcileLastRunAt = now;
     try {
+      const finalDefinitions = await this.orderStatusRepo.find({ where: { isFinal: true } });
+      const excludedStatuses = Array.from(
+        new Set(['draft', 'pending_review', 'completed', ...finalDefinitions.map((status) => status.code.trim()).filter(Boolean)]),
+      );
       const qb = this.orderRepo
         .createQueryBuilder('o')
-        .where('o.status NOT IN (:...excluded)', { excluded: ['draft', 'pending_review', 'completed'] });
+        .where('o.status NOT IN (:...excluded)', { excluded: excludedStatuses });
       if (options?.orderNo?.trim()) {
         qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${options.orderNo.trim()}%` });
       }
