@@ -163,6 +163,8 @@ export class ProductionPurchaseQueryService {
             : pickStatus === 'completed'
               ? 'completed'
               : 'pending';
+        // 已完成订单后续补充的物料/辅料只是资料完善，不再进入采购待办。
+        if (order.status === 'completed' && routeStatus === 'pending') continue;
         if (tab === 'pending' && !(processRoute === 'purchase' && routeStatus === 'pending')) continue;
         if (tab === 'picking' && !(processRoute === 'picking' && routeStatus === 'pending')) continue;
         if (tab === 'completed' && routeStatus !== 'completed') continue;
