@@ -9,6 +9,12 @@ import { Product } from '../entities/product.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
 import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
+import { applyPendingOutboundSizeDeduction } from './inventory-pending-outbound.helpers';
+import {
+  loadFinishingFallbackBundles,
+  resolvePendingCurrentSnapshot,
+} from './inventory-pending-snapshot.helpers';
+import { parseStoredColorSizeSnapshot } from '../finished-goods-stock/finished-goods-stock-query.utils';
 
 export interface PendingListItem {
   id: number;
@@ -226,150 +232,34 @@ export class InventoryPendingService {
       }>();
 
     const parseSnapshot = (raw: unknown): PendingListItem['colorSizeSnapshot'] => {
-      if (raw == null) return null;
-      let parsed: unknown = raw;
-      if (typeof raw === 'string') {
-        try { parsed = JSON.parse(raw); } catch { return null; }
-      }
-      if (!parsed || typeof parsed !== 'object') return null;
-      const rec = parsed as { headers?: unknown; rows?: unknown };
-      const headers = Array.isArray(rec.headers) ? rec.headers.map((h) => String(h ?? '')) : [];
-      const rowsArr = Array.isArray(rec.rows) ? rec.rows : [];
-      const rowsOut: Array<{ colorName: string; quantities: number[] }> = [];
-      for (const item of rowsArr) {
-        if (!item || typeof item !== 'object') continue;
-        const r = item as { colorName?: unknown; quantities?: unknown };
-        const colorName = String(r.colorName ?? '').trim();
-        const q = Array.isArray(r.quantities) ? r.quantities : [];
-        rowsOut.push({ colorName, quantities: q.map((n) => Math.max(0, Math.trunc(Number(n) || 0))) });
-      }
-      return headers.length > 0 && rowsOut.length > 0 ? { headers, rows: rowsOut } : null;
+      const parsed = parseStoredColorSizeSnapshot(raw);
+      return parsed ? { headers: parsed.headers, rows: parsed.rows } : null;
     };
 
-    // 兜底：commit 521389ba 之前完成入库的订单，inbound_pending.color_size_snapshot
-    // 全为 NULL；同一订单的 order_finishing.*_by_color / *_qty_row 通常已有数据。
-    // 该订单只有一条同 sourceType 的 pending 时，把累计真值直接当作"本批"显示，
-    // 让 hover 至少看到尺码/颜色明细，不再卡在"未留存"。
+    // 兜底：DB 无 snapshot 时，与发货校验同源——从尾部累计还原（仅单条 pending 可还原）
     const fallbackTargets = rows
-      .map((r) => ({ id: Number(r.id), orderId: Number(r.orderId), sourceType: String(r.sourceType ?? 'normal'), hasSnapshot: r.colorSizeSnapshot != null }))
+      .map((r) => ({
+        id: Number(r.id),
+        orderId: Number(r.orderId),
+        sourceType: String(r.sourceType ?? 'normal'),
+        hasSnapshot: parseSnapshot(r.colorSizeSnapshot) != null,
+      }))
       .filter((r) => !r.hasSnapshot && r.orderId > 0);
     const orderIdsForFallback = Array.from(new Set(fallbackTargets.map((r) => r.orderId)));
-    const fallbackByOrder = new Map<number, {
-      headers: string[];
-      normalByColor: Array<{ colorName: string; quantities: number[] }> | null;
-      defectByColor: Array<{ colorName: string; quantities: number[] }> | null;
-      normalRow: number[] | null;
-      defectRow: number[] | null;
-    }>();
-    const pendingCountByOrderType = new Map<string, number>();
-    if (orderIdsForFallback.length > 0) {
-      const countRows = (await this.pendingRepo.manager.query(
-        `SELECT order_id AS orderId, source_type AS sourceType, COUNT(*) AS cnt
-         FROM inbound_pending WHERE order_id IN (${orderIdsForFallback.map(() => '?').join(',')}) AND status = 'pending'
-         GROUP BY order_id, source_type`,
-        orderIdsForFallback,
-      )) as Array<{ orderId: number | string; sourceType: string; cnt: number | string }>;
-      for (const c of countRows) {
-        pendingCountByOrderType.set(`${Number(c.orderId)}|${c.sourceType}`, Number(c.cnt));
-      }
-      const finRows = (await this.pendingRepo.manager.query(
-        `SELECT f.order_id AS orderId,
-                f.tail_inbound_quantities_by_color AS inboundByColor,
-                f.defect_quantities_by_color AS defectByColor,
-                f.tail_inbound_qty_row AS inboundRow,
-                f.defect_quantity_row AS defectRow,
-                e.color_size_headers AS headers
-         FROM order_finishing f
-         LEFT JOIN order_ext e ON e.order_id = f.order_id
-         WHERE f.order_id IN (${orderIdsForFallback.map(() => '?').join(',')})`,
-        orderIdsForFallback,
-      )) as Array<{
-        orderId: number | string;
-        inboundByColor: unknown;
-        defectByColor: unknown;
-        inboundRow: unknown;
-        defectRow: unknown;
-        headers: unknown;
-      }>;
-      const parseJsonArr = (raw: unknown): unknown[] | null => {
-        if (raw == null) return null;
-        if (Array.isArray(raw)) return raw;
-        if (typeof raw === 'string') {
-          try { const j = JSON.parse(raw); return Array.isArray(j) ? j : null; } catch { return null; }
-        }
-        return null;
-      };
-      const parseByColorList = (raw: unknown): Array<{ colorName: string; quantities: number[] }> | null => {
-        const arr = parseJsonArr(raw);
-        if (!arr || arr.length === 0) return null;
-        const out: Array<{ colorName: string; quantities: number[] }> = [];
-        for (const item of arr) {
-          if (!item || typeof item !== 'object') continue;
-          const it = item as { colorName?: unknown; quantities?: unknown };
-          const name = String(it.colorName ?? '').trim();
-          const qs = Array.isArray(it.quantities) ? it.quantities : [];
-          out.push({ colorName: name, quantities: qs.map((n) => Math.max(0, Math.trunc(Number(n) || 0))) });
-        }
-        return out.length > 0 ? out : null;
-      };
-      const parseNumberRow = (raw: unknown): number[] | null => {
-        const arr = parseJsonArr(raw);
-        if (!arr || arr.length === 0) return null;
-        return arr.map((n) => Math.max(0, Math.trunc(Number(n) || 0)));
-      };
-      const parseHeaders = (raw: unknown): string[] => {
-        const arr = parseJsonArr(raw);
-        if (!arr) return [];
-        return arr.map((h) => String(h ?? ''));
-      };
-      for (const f of finRows) {
-        fallbackByOrder.set(Number(f.orderId), {
-          headers: parseHeaders(f.headers),
-          normalByColor: parseByColorList(f.inboundByColor),
-          defectByColor: parseByColorList(f.defectByColor),
-          normalRow: parseNumberRow(f.inboundRow),
-          defectRow: parseNumberRow(f.defectRow),
-        });
-      }
-    }
-
-    const buildFallbackSnapshot = (
-      orderId: number,
-      sourceType: string,
-      quantity: number,
-    ): PendingListItem['colorSizeSnapshot'] => {
-      const f = fallbackByOrder.get(orderId);
-      if (!f) return null;
-      // 仅当该订单 + 该 sourceType 的 pending 只有一条时，累计真值即"本批"真值；
-      // 多条时无法可靠拆分到批次，回退不输出（保留"未留存"提示，不做估算）。
-      if ((pendingCountByOrderType.get(`${orderId}|${sourceType}`) ?? 0) !== 1) return null;
-      const headers = f.headers;
-      if (headers.length === 0) return null;
-      const sizeLen = headers.length;
-      const byColor = sourceType === 'defect' ? f.defectByColor : f.normalByColor;
-      if (byColor && byColor.length > 0) {
-        const rows = byColor.map((r) => {
-          const q = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(r.quantities[i]) || 0)));
-          return { colorName: r.colorName || '-', quantities: q };
-        });
-        const grand = rows.reduce((s, r) => s + r.quantities.reduce((a, b) => a + b, 0), 0);
-        if (grand === quantity) return { headers, rows };
-      }
-      const oneRow = sourceType === 'defect' ? f.defectRow : f.normalRow;
-      if (oneRow && oneRow.length > 0) {
-        // 后端写入的 _qty_row 末尾可能含合计列（headers.length + 1），剪到 sizeLen
-        const perSize = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(oneRow[i]) || 0)));
-        const total = perSize.reduce((a, b) => a + b, 0);
-        if (total === quantity) {
-          return { headers, rows: [{ colorName: '-', quantities: perSize }] };
-        }
-      }
-      return null;
-    };
+    const { byOrder: finishingByOrder, pendingCountByOrderType } =
+      orderIdsForFallback.length > 0
+        ? await loadFinishingFallbackBundles(this.pendingRepo.manager, orderIdsForFallback)
+        : { byOrder: new Map(), pendingCountByOrderType: new Map() };
 
     const list: PendingListItem[] = rows.map((r) => {
-      const parsed = parseSnapshot(r.colorSizeSnapshot);
-      const snapshot = parsed ?? buildFallbackSnapshot(Number(r.orderId), String(r.sourceType ?? 'normal'), Number(r.quantity) || 0);
+      const resolved = resolvePendingCurrentSnapshot({
+        dbSnapshotRaw: r.colorSizeSnapshot,
+        orderId: Number(r.orderId),
+        sourceType: String(r.sourceType ?? 'normal'),
+        quantity: Number(r.quantity) || 0,
+        finishingByOrder,
+        pendingCountByOrderType,
+      });
       return {
         id: r.id,
         tabType: 'pending',
@@ -384,7 +274,7 @@ export class InventoryPendingService {
         operatorUsername: '',
         remark: '',
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
-        colorSizeSnapshot: snapshot,
+        colorSizeSnapshot: resolved.snapshot,
       };
     });
 
@@ -427,11 +317,21 @@ export class InventoryPendingService {
     for (const o of orders) {
       orderMap.set(o.id, o);
     }
+    const { byOrder: finishingByOrder, pendingCountByOrderType } = await loadFinishingFallbackBundles(
+      this.pendingRepo.manager,
+      orderIds,
+    );
     for (const p of pendings) {
       const order = orderMap.get(p.orderId);
-      // 优先使用 inbound_pending 上的颜色×尺码 snapshot（尾部入库登记的真值）；
-      // 缺失时（老数据）回退到 createManual 内部的 buildOrderColorSizeSnapshot 兜底反推。
-      const snapshot = (p as { colorSizeSnapshot?: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null }).colorSizeSnapshot ?? null;
+      // 与列表/发货同源：DB snapshot → 尾部累计兜底 → 再交给 createManual
+      const resolved = resolvePendingCurrentSnapshot({
+        dbSnapshotRaw: (p as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
+        orderId: p.orderId,
+        sourceType: p.sourceType ?? 'normal',
+        quantity: p.quantity ?? 0,
+        finishingByOrder,
+        pendingCountByOrderType,
+      });
       await this.finishedGoodsStockService.createManual(
         {
           orderNo: order?.orderNo ?? '',
@@ -443,7 +343,7 @@ export class InventoryPendingService {
           department: department?.trim() ?? '',
           location: location?.trim() ?? '',
           imageUrl: img,
-          colorSize: snapshot ?? undefined,
+          colorSize: resolved.snapshot ?? undefined,
         },
         operatorUsername,
       );
@@ -474,13 +374,21 @@ export class InventoryPendingService {
       throw new BadRequestException('同一条待仓处理记录不能重复发货');
     }
 
-    const pendings = await this.pendingRepo.find({
-      where: { id: In(uniqueIds), status: 'pending' },
-    });
+    const pendings = await this.pendingRepo
+      .createQueryBuilder('p')
+      .where('p.id IN (:...ids) AND p.status = :status', { ids: uniqueIds, status: 'pending' })
+      .addSelect('p.color_size_snapshot')
+      .getMany();
     if (pendings.length !== uniqueIds.length) {
       throw new NotFoundException('存在待仓处理记录不存在或已失效');
     }
     const pendingMap = new Map(pendings.map((pending) => [pending.id, pending]));
+    const orderIds = Array.from(new Set(pendings.map((pending) => pending.orderId).filter((id): id is number => id > 0)));
+    const { byOrder: finishingByOrder, pendingCountByOrderType } = await loadFinishingFallbackBundles(
+      this.pendingRepo.manager,
+      orderIds,
+    );
+
     for (const item of normalizedItems) {
       const pending = pendingMap.get(item.id);
       if (!pending) throw new NotFoundException('未找到有效的待仓处理记录');
@@ -493,9 +401,25 @@ export class InventoryPendingService {
       if (item.quantity > (pending.quantity ?? 0)) {
         throw new BadRequestException(`记录 ${pending.skuCode || pending.id} 的发货数量不能大于当前待处理数量`);
       }
+      const resolved = resolvePendingCurrentSnapshot({
+        dbSnapshotRaw: (pending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
+        orderId: pending.orderId,
+        sourceType: pending.sourceType ?? 'normal',
+        quantity: pending.quantity ?? 0,
+        finishingByOrder,
+        pendingCountByOrderType,
+      });
+      // 预检尺码（与事务内同一规则），尽早失败避免半写入
+      applyPendingOutboundSizeDeduction({
+        label: `记录 ${pending.skuCode || pending.id}`,
+        pendingQty: pending.quantity ?? 0,
+        shipQty: item.quantity,
+        currentSnapshot: resolved.snapshot,
+        currentSource: resolved.source,
+        outgoingSizeBreakdown: item.sizeBreakdown,
+      });
     }
 
-    const orderIds = Array.from(new Set(pendings.map((pending) => pending.orderId).filter((id): id is number => id > 0)));
     const skuCodes = Array.from(new Set(pendings.map((pending) => pending.skuCode?.trim()).filter((code): code is string => !!code)));
     const [orders, products, pickupInfo] = await Promise.all([
       orderIds.length ? this.orderRepo.find({ where: { id: In(orderIds) } }) : Promise.resolve([]),
@@ -516,11 +440,14 @@ export class InventoryPendingService {
     try {
       await this.pendingRepo.manager.transaction(async (manager) => {
         const txPendingRepo = manager.getRepository(InboundPending);
+        const txFallback = await loadFinishingFallbackBundles(manager, orderIds);
 
         for (const item of normalizedItems) {
-          const txPending = await txPendingRepo.findOne({
-            where: { id: item.id, status: 'pending' },
-          });
+          const txPending = await txPendingRepo
+            .createQueryBuilder('p')
+            .where('p.id = :id AND p.status = :status', { id: item.id, status: 'pending' })
+            .addSelect('p.color_size_snapshot')
+            .getOne();
           if (!txPending) {
             throw new NotFoundException('未找到有效的待仓处理记录');
           }
@@ -532,6 +459,30 @@ export class InventoryPendingService {
           }
 
           const pending = pendingMap.get(item.id) ?? txPending;
+          const label = `记录 ${txPending.skuCode || txPending.id}`;
+          const resolved = resolvePendingCurrentSnapshot({
+            dbSnapshotRaw: (txPending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
+            orderId: txPending.orderId,
+            sourceType: txPending.sourceType ?? 'normal',
+            quantity: txPending.quantity ?? 0,
+            finishingByOrder: txFallback.byOrder,
+            pendingCountByOrderType: txFallback.pendingCountByOrderType,
+          });
+          const { remainingSnapshot, outgoingSnapshot } = applyPendingOutboundSizeDeduction({
+            label,
+            pendingQty: txPending.quantity ?? 0,
+            shipQty: item.quantity,
+            currentSnapshot: resolved.snapshot,
+            currentSource: resolved.source,
+            outgoingSizeBreakdown: item.sizeBreakdown,
+          });
+          const sizeBreakdownJson =
+            outgoingSnapshot != null
+              ? JSON.stringify(outgoingSnapshot)
+              : item.sizeBreakdown != null
+                ? JSON.stringify(item.sizeBreakdown)
+                : null;
+
           const order = orderMap.get(txPending.orderId) ?? null;
           const product = productMap.get(txPending.skuCode?.trim() ?? '') ?? null;
           const resolvedOrderId = Number(order?.id ?? pending.orderId ?? txPending.orderId ?? 0);
@@ -583,7 +534,7 @@ export class InventoryPendingService {
             null,
             pickupInfo.pickupId,
             pickupInfo.pickupUserName,
-            item.sizeBreakdown != null ? JSON.stringify(item.sizeBreakdown) : null,
+            sizeBreakdownJson,
             (operatorUsername ?? '').trim(),
             '待仓直发',
           ];
@@ -614,10 +565,16 @@ export class InventoryPendingService {
             await manager.query(completeSql, completeParams);
           } else {
             const remainQty = (txPending.quantity ?? 0) - item.quantity;
-            const updateSql = 'UPDATE inbound_pending SET quantity = ? WHERE id = ?';
-            const updateParams = [remainQty, txPending.id];
-            this.logger.log(`[doOutbound] step=update_pending_quantity table=inbound_pending sql=${updateSql}`);
-            this.logger.log(`[doOutbound] step=update_pending_quantity parameters=${JSON.stringify(updateParams)}`);
+            const updateSql = 'UPDATE inbound_pending SET quantity = ?, color_size_snapshot = ? WHERE id = ?';
+            const updateParams = [
+              remainQty,
+              remainingSnapshot != null ? JSON.stringify(remainingSnapshot) : null,
+              txPending.id,
+            ];
+            this.logger.log(`[doOutbound] step=update_pending_quantity_snapshot table=inbound_pending sql=${updateSql}`);
+            this.logger.log(
+              `[doOutbound] step=update_pending_quantity_snapshot parameters=${JSON.stringify(updateParams)}`,
+            );
             await manager.query(updateSql, updateParams);
           }
         }

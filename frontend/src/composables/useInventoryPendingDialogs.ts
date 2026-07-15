@@ -11,7 +11,8 @@ import { getDictItems } from '@/api/dicts'
 import type { SystemOptionItem } from '@/api/system-options'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import {
-  distributePendingToColorSizeGrid,
+  buildInboundPreviewItem,
+  buildOutboundDialogItem,
   getInboundPreviewRowTotal,
   getOutboundItemTotal,
   getOutboundRowTotal,
@@ -103,29 +104,21 @@ export function useInventoryPendingDialogs({
     outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
   )
   const inboundPreviewItems = computed<InboundPreviewItem[]>(() =>
-    selectedRows.value.map((row) => {
-      const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-      const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-      return {
-        id: row.id,
-        orderId: row.orderId,
-        orderNo: row.orderNo,
-        skuCode: row.skuCode,
-        quantity: row.quantity,
-        headers,
-        rows: breakdown?.rows ?? [],
-      }
-    }),
+    selectedRows.value.map((row) => buildInboundPreviewItem(row, colorSizeCache)),
   )
 
   async function openInboundDialog() {
     if (!selectedRows.value.length) return
-    await Promise.all(
-      selectedRows.value
-        .map((row) => row.orderId)
-        .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-        .map((orderId) => ensureColorSizeBreakdown(orderId)),
-    )
+    const needPlanIds = selectedRows.value
+      .filter((row) => {
+        const snap = row.colorSizeSnapshot
+        return !(snap?.headers?.length && snap.rows?.length)
+      })
+      .map((row) => row.orderId)
+      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
+    if (needPlanIds.length) {
+      await Promise.all(needPlanIds.map((orderId) => ensureColorSizeBreakdown(orderId)))
+    }
     inboundDialog.visible = true
   }
 
@@ -223,27 +216,25 @@ export function useInventoryPendingDialogs({
     outboundForm.pickupUserId = null
     outboundDialog.submitting = true
     try {
-      await Promise.all(
-        rows
-          .map((row) => row.orderId)
-          .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-          .map((orderId) => ensureColorSizeBreakdown(orderId)),
-      )
+      const needPlanIds = rows
+        .filter((row) => {
+          const snap = row.colorSizeSnapshot
+          return !(snap?.headers?.length && snap.rows?.length)
+        })
+        .map((row) => row.orderId)
+        .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
+      if (needPlanIds.length) {
+        await Promise.all(needPlanIds.map((orderId) => ensureColorSizeBreakdown(orderId)))
+      }
+      const warnings: string[] = []
       outboundDialog.items = rows.map((row) => {
-        const breakdown = row.orderId ? colorSizeCache[row.orderId] : undefined
-        const headers = (breakdown?.headers ?? []).filter((h) => h !== '合计')
-        const br = breakdown?.rows ?? []
-        const dialogRows = br.map((r) => ({
-          colorName: r.colorName,
-          quantities: headers.map(() => 0),
-        }))
-        distributePendingToColorSizeGrid(dialogRows, br, headers.length, Number(row.quantity) || 0)
-        return {
-          row,
-          headers,
-          rows: dialogRows,
-        }
+        const { item, warning } = buildOutboundDialogItem(row, colorSizeCache)
+        if (warning) warnings.push(warning)
+        return item
       })
+      if (warnings.length) {
+        ElMessage.warning(warnings[0] + (warnings.length > 1 ? `（另有 ${warnings.length - 1} 条）` : ''))
+      }
       outboundDialog.visible = true
     } catch (e: unknown) {
       outboundDialog.items = []
