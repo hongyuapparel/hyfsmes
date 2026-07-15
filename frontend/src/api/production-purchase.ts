@@ -38,6 +38,7 @@ export interface PurchaseItemRow {
   purchaseOtherCost: string | null
   purchaseRemark: string | null
   purchaseImageUrl: string | null
+  pickRemark?: string | null
   /** 时效判定 */
   timeRating: string
   customerName: string
@@ -119,6 +120,13 @@ export function registerPurchaseBatch(payload: {
   return request.post<void>('/production/purchase/items/register/batch', payload)
 }
 
+/** 纠错编辑已采购完成物料（需 production_admin_edit） */
+export function editCompletedPurchaseBatch(payload: {
+  items: RegisterPurchaseBatchItem[]
+}) {
+  return request.post<void>('/production/purchase/items/edit/batch', payload)
+}
+
 export function registerPick(payload: {
   orderId: number
   materialIndex: number
@@ -131,4 +139,13 @@ export function registerPick(payload: {
   remark?: string | null
 }) {
   return request.post<void>('/production/purchase/items/pick', payload)
+}
+
+/** 纠错编辑已领料完成备注（需 production_admin_edit，不重新扣库存） */
+export function editCompletedPick(payload: {
+  orderId: number
+  materialIndex: number
+  remark: string
+}) {
+  return request.post<void>('/production/purchase/items/pick/edit', payload)
 }

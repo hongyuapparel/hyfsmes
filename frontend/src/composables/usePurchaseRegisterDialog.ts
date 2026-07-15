@@ -1,6 +1,10 @@
 import { reactive, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { registerPurchaseBatch, type PurchaseItemRow } from '@/api/production-purchase'
+import {
+  editCompletedPurchaseBatch,
+  registerPurchaseBatch,
+  type PurchaseItemRow,
+} from '@/api/production-purchase'
 import { searchSuppliers as searchSupplierOptions } from '@/api/suppliers'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -26,6 +30,7 @@ export interface PurchaseRegisterDraftRow {
 export interface PurchaseRegisterDialogState {
   visible: boolean
   submitting: boolean
+  mode: 'register' | 'edit'
   rows: PurchaseRegisterDraftRow[]
 }
 
@@ -64,6 +69,10 @@ export function isRegisterablePurchaseRow(row: PurchaseItemRow): boolean {
   return row.processRoute === 'purchase' && row.purchaseStatus !== 'completed'
 }
 
+export function isEditableCompletedPurchaseRow(row: PurchaseItemRow): boolean {
+  return row.processRoute === 'purchase' && row.purchaseStatus === 'completed'
+}
+
 function toRegisterDraftRow(row: PurchaseItemRow): PurchaseRegisterDraftRow {
   return {
     key: `${row.orderId}:${row.materialIndex}`,
@@ -88,6 +97,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
   const registerDialog = reactive<PurchaseRegisterDialogState>({
     visible: false,
     submitting: false,
+    mode: 'register',
     rows: [],
   })
   const registerSupplierOptions = ref<PurchaseSupplierOption[]>([])
@@ -124,11 +134,24 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
     if (rows.length !== options.selectedRows.value.length) {
       ElMessage.warning('已自动排除非等待采购的记录')
     }
+    registerDialog.mode = 'register'
+    registerDialog.rows = rows.map(toRegisterDraftRow)
+    registerDialog.visible = true
+  }
+
+  function openEditCompletedDialog() {
+    const rows = options.selectedRows.value.filter(isEditableCompletedPurchaseRow)
+    if (!rows.length) {
+      ElMessage.warning('请选择已采购完成的物料')
+      return
+    }
+    registerDialog.mode = 'edit'
     registerDialog.rows = rows.map(toRegisterDraftRow)
     registerDialog.visible = true
   }
 
   function resetRegisterForm() {
+    registerDialog.mode = 'register'
     registerDialog.rows = []
   }
 
@@ -149,25 +172,29 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
     }
     registerDialog.submitting = true
     try {
-      await registerPurchaseBatch({
-        items: registerDialog.rows.map((row) => ({
-          orderId: row.orderId,
-          materialIndex: row.materialIndex,
-          supplierName: normalizeText(row.supplierName),
-          actualPurchaseQuantity: Number(row.actualPurchaseQuantity) || 0,
-          unitPrice: row.unitPrice.trim() || '0',
-          otherCost: row.otherCost.trim() || '0',
-          remark: row.remark.trim() || undefined,
-          imageUrl: row.imageUrl.trim() || undefined,
-        })),
-      })
-      ElMessage.success(`已登记 ${registerDialog.rows.length} 条采购`)
+      const items = registerDialog.rows.map((row) => ({
+        orderId: row.orderId,
+        materialIndex: row.materialIndex,
+        supplierName: normalizeText(row.supplierName),
+        actualPurchaseQuantity: Number(row.actualPurchaseQuantity) || 0,
+        unitPrice: row.unitPrice.trim() || '0',
+        otherCost: row.otherCost.trim() || '0',
+        remark: row.remark.trim() || undefined,
+        imageUrl: row.imageUrl.trim() || undefined,
+      }))
+      if (registerDialog.mode === 'edit') {
+        await editCompletedPurchaseBatch({ items })
+        ElMessage.success(`已纠错保存 ${registerDialog.rows.length} 条采购（主状态未改）`)
+      } else {
+        await registerPurchaseBatch({ items })
+        ElMessage.success(`已登记 ${registerDialog.rows.length} 条采购`)
+      }
       registerDialog.visible = false
       await options.reload()
       await options.reloadTabCounts()
       options.clearSelection()
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记失败'))
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, registerDialog.mode === 'edit' ? '纠错保存失败' : '登记失败'))
     } finally {
       registerDialog.submitting = false
     }
@@ -179,6 +206,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
     registerSupplierLoading,
     onRegisterSupplierVisibleChange,
     openRegisterDialog,
+    openEditCompletedDialog,
     resetRegisterForm,
     searchRegisterSuppliers,
     submitRegister,

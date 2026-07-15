@@ -41,6 +41,8 @@
   ```
   会先执行 `stop.ps1` 再等几秒后执行 `start.ps1`，避免端口未释放导致“打不开、反复修复”。不要先关窗口再直接运行 `start.ps1`，否则容易遇到端口仍被占用。
 
+- **排查日志**：`logs/backend-3000.log`、`logs/frontend-5173.log`（`.err.log` 为 stderr，不等于报错）
+
 ---
 
 ### 生产部署
@@ -54,4 +56,5 @@
 ```
 frontend/   # Vue 3 + Vite + Element Plus
 backend/    # NestJS + TypeORM + MySQL
+logs/       # 本地 dev 服务日志（git 忽略，由 start.ps1 写入）
 ```

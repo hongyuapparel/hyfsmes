@@ -147,6 +147,11 @@ export class ProductionSewingService {
     orderColorRows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>;
     /** 裁床实际按颜色×尺码（车缝/入库的每格上限） */
     cutColorRows: Array<{ colorName: string; quantities: number[] }>;
+    /** 已完成车缝时带回当前登记，供纠错编辑预填 */
+    sewingCompleted?: boolean;
+    sewingQuantitiesByColor?: ColorSizeQuantityRow[] | null;
+    defectQuantity?: number;
+    defectReason?: string;
   }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
@@ -209,6 +214,28 @@ export class ProductionSewingService {
       return { colorName: name, quantities };
     });
 
+    const sewing = await this.sewingRepo.findOne({ where: { orderId } });
+    const sewingCompleted = String(sewing?.status ?? '').toLowerCase() === 'completed';
+    let sewingQuantitiesByColor: ColorSizeQuantityRow[] | null = null;
+    if (sewingCompleted) {
+      const rawRows: Array<{ sewing_quantities_by_color?: unknown }> = await this.sewingRepo.manager.query(
+        'SELECT sewing_quantities_by_color FROM order_sewing WHERE order_id = ? LIMIT 1',
+        [orderId],
+      );
+      const raw = rawRows[0]?.sewing_quantities_by_color;
+      let parsed: unknown = raw;
+      if (typeof raw === 'string') {
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          parsed = null;
+        }
+      }
+      if (Array.isArray(parsed)) {
+        sewingQuantitiesByColor = normalizeColorRows(parsed as ColorSizeQuantityRow[], sizeLen);
+      }
+    }
+
     return {
       headers,
       sizeHeaders,
@@ -220,6 +247,10 @@ export class ProductionSewingService {
         (headers.length === 1 ? [cutTotal != null ? cutTotal : null] : [...Array(headers.length).fill(null)]),
       orderColorRows,
       cutColorRows,
+      sewingCompleted,
+      sewingQuantitiesByColor,
+      defectQuantity: sewingCompleted ? (sewing?.defectQuantity ?? 0) : undefined,
+      defectReason: sewingCompleted ? (sewing?.defectReason ?? '') : undefined,
     };
   }
 
@@ -544,6 +575,174 @@ export class ProductionSewingService {
       );
     } catch (err) {
       console.warn('[sewing complete] write operation log failed:', err);
+    }
+  }
+
+  /**
+   * 纠错：编辑已完成的车缝登记（数量 + 分单信息一并写）。
+   * 不改订单主状态、不触发流程流转；不依赖 pending_sewing / assign 权限。
+   */
+  async editCompletedSewing(
+    orderId: number,
+    sewingQuantity: number,
+    defectQuantity: number,
+    defectReason: string,
+    sewingQuantities?: number[] | null,
+    sewingQuantitiesByColor?: ColorSizeQuantityRow[] | null,
+    actor?: { userId?: number; username?: string },
+    assignPatch?: {
+      distributedAt?: string | Date | null;
+      factoryDueDate?: string | Date | null;
+      factoryName?: string | null;
+      sewingFee?: string | null;
+    } | null,
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const sewing = await this.sewingRepo.findOne({ where: { orderId } });
+    if (!sewing || String(sewing.status ?? '').toLowerCase() !== 'completed') {
+      throw new NotFoundException('仅已完成车缝的订单可纠错编辑');
+    }
+
+    const factoryName = (assignPatch?.factoryName ?? '').trim();
+    if (assignPatch && !factoryName) {
+      throw new BadRequestException('请选择加工供应商');
+    }
+
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const cutting = await this.cuttingRepo.findOne({ where: { orderId } });
+    const headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
+    const sizeLen = headers.length;
+    const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) =>
+      String(r?.colorName ?? '').trim(),
+    );
+
+    let byColor: ColorSizeQuantityRow[] | null = null;
+    if (Array.isArray(sewingQuantitiesByColor) && sewingQuantitiesByColor.length > 0) {
+      byColor = normalizeColorRows(sewingQuantitiesByColor, sizeLen);
+      if (planColors.length > 0 && sizeLen > 0) {
+        assertColorRowsShape(byColor, planColors, sizeLen);
+      }
+    } else if (Array.isArray(sewingQuantities) && sewingQuantities.length > 0) {
+      if (planColors.length === 1 && sizeLen > 0) {
+        byColor = normalizeColorRows([{ colorName: planColors[0], quantities: sewingQuantities }], sizeLen);
+      } else if (planColors.length > 1) {
+        throw new BadRequestException('多色订单必须按颜色×尺码填写车缝数量');
+      }
+    }
+
+    const totalQty = byColor
+      ? sumColorRows(byColor)
+      : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
+        ? sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
+        : sewingQuantity;
+    if (totalQty <= 0) throw new BadRequestException('车缝数量必须大于 0');
+
+    if (byColor && sizeLen > 0) {
+      this.assertSewingNotExceedCut(byColor, cutting?.actualCutRows ?? null, sizeLen);
+    }
+
+    const sewingQuantityRow = byColor
+      ? sumColorRowsBySize(byColor, sizeLen)
+      : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
+        ? sewingQuantities
+        : null;
+
+    const beforeQty = sewing.sewingQuantity;
+    const beforeFactory = (order.factoryName ?? '').trim();
+    const beforeFee = sewing.sewingFee != null ? String(sewing.sewingFee) : '0';
+
+    if (assignPatch) {
+      const distributedRaw = assignPatch.distributedAt;
+      if (distributedRaw != null && String(distributedRaw).trim() !== '') {
+        const d = distributedRaw instanceof Date ? distributedRaw : new Date(String(distributedRaw));
+        if (!Number.isNaN(d.getTime())) sewing.distributedAt = d;
+      }
+      // 与分单时间一致：空串/未传保留原交期，避免误清空（仅非空才更新）
+      const dueRaw = assignPatch.factoryDueDate;
+      if (dueRaw != null && String(dueRaw).trim() !== '') {
+        const d = dueRaw instanceof Date ? dueRaw : new Date(String(dueRaw));
+        if (!Number.isNaN(d.getTime())) {
+          sewing.factoryDueDate = d;
+        }
+      }
+      sewing.sewingFee = (assignPatch.sewingFee ?? '').toString().trim() || '0';
+      order.factoryName = factoryName;
+    }
+
+    sewing.sewingQuantity = totalQty;
+    sewing.sewingQuantityRow = sewingQuantityRow;
+    sewing.sewingQuantitiesByColor = byColor;
+    sewing.defectQuantity = defectQuantity ?? 0;
+    sewing.defectReason = (defectReason ?? '').trim();
+
+    await this.sewingRepo.manager.transaction(async (manager) => {
+      if (assignPatch) {
+        await manager.getRepository(Order).save(order);
+      }
+      await manager.getRepository(OrderSewing).save(sewing);
+      await manager.query('UPDATE order_sewing SET sewing_quantities_by_color = ? WHERE order_id = ?', [
+        byColor ? JSON.stringify(byColor) : null,
+        orderId,
+      ]);
+      try {
+        const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+        const parts = [`数量 ${beforeQty} → ${totalQty}`];
+        if (assignPatch) {
+          parts.push(`供应商 ${beforeFactory || '-'} → ${factoryName || '-'}`);
+          parts.push(`加工费 ${beforeFee} → ${sewing.sewingFee}`);
+        }
+        await manager.getRepository(OrderOperationLog).save(
+          manager.getRepository(OrderOperationLog).create({
+            orderId,
+            orderNo: order.orderNo,
+            operatorUsername: operator,
+            action: 'production_sewing_admin_edit',
+            detail: `纠错编辑车缝登记：${parts.join('；')}`,
+            targetType: 'order',
+            targetRef: null,
+          }),
+        );
+      } catch (err) {
+        console.warn('[sewing edit] write operation log failed:', err);
+      }
+    });
+  }
+
+  /**
+   * 已过裁床（矩阵有非 0）时，纠错车缝数不得大于对应色×码裁床数。
+   * 未过裁床（全 0）跳过，与前端登记上限一致。
+   */
+  private assertSewingNotExceedCut(
+    byColor: ColorSizeQuantityRow[],
+    actualCutRows: ActualCutRow[] | null,
+    sizeLen: number,
+  ): void {
+    const rows = Array.isArray(actualCutRows) ? actualCutRows : [];
+    const cutByName = new Map<string, number[]>();
+    let anyCut = false;
+    for (const r of rows) {
+      const name = String(r?.colorName ?? '').trim();
+      const q = Array.isArray(r?.quantities) ? r.quantities : [];
+      const filled = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
+      if (filled.some((n) => n > 0)) anyCut = true;
+      if (name) cutByName.set(name, filled);
+    }
+    if (!anyCut) return;
+
+    for (const sew of byColor) {
+      const colorName = String(sew.colorName ?? '').trim();
+      const sewQ = Array.isArray(sew.quantities) ? sew.quantities : [];
+      const cutQ = cutByName.get(colorName) ?? Array.from({ length: sizeLen }, () => 0);
+      for (let i = 0; i < sizeLen; i++) {
+        const s = Math.max(0, Math.trunc(Number(sewQ[i]) || 0));
+        const c = Math.max(0, Math.trunc(Number(cutQ[i]) || 0));
+        if (s > c) {
+          throw new BadRequestException(
+            `颜色「${colorName || '-'}」第 ${i + 1} 码车缝数 ${s} 超过裁床数 ${c}`,
+          );
+        }
+      }
     }
   }
 }

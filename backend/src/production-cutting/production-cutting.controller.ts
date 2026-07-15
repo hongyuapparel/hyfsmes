@@ -167,7 +167,7 @@ export class ProductionCuttingController {
   }
 
   @Post('items/:orderId/edit')
-  @RequirePermission('production_cutting_complete')
+  @RequirePermission('production_admin_edit')
   edit(
     @Param('orderId', ParseIntPipe) orderId: number,
     @Body('actualCutRows') actualCutRows: { colorName?: string; quantities?: number[]; remark?: string }[],

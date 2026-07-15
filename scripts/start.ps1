@@ -5,10 +5,14 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $BackendDir = $ProjectRoot + "\backend"
 $FrontendDir = $ProjectRoot + "\frontend"
-$BackendLog = Join-Path $ProjectRoot ".codex-backend-3000.log"
-$BackendErrLog = Join-Path $ProjectRoot ".codex-backend-3000.err.log"
-$FrontendLog = Join-Path $ProjectRoot ".codex-frontend-5173.log"
-$FrontendErrLog = Join-Path $ProjectRoot ".codex-frontend-5173.err.log"
+$LogDir = Join-Path $ProjectRoot "logs"
+if (-not (Test-Path $LogDir)) {
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+}
+$BackendLog = Join-Path $LogDir "backend-3000.log"
+$BackendErrLog = Join-Path $LogDir "backend-3000.err.log"
+$FrontendLog = Join-Path $LogDir "frontend-5173.log"
+$FrontendErrLog = Join-Path $LogDir "frontend-5173.err.log"
 
 function Repair-DuplicatePathEnvironment {
     $pathKeys = @([System.Environment]::GetEnvironmentVariables("Process").Keys | Where-Object { $_ -ieq "PATH" })
@@ -29,7 +33,8 @@ $FrontendPort = 5173
 
 function Test-PortFree {
     param ([int]$Port)
-    $null -eq (Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue)
+    # 仅把 Listen 视为占用；TIME_WAIT/残留连接不挡启动
+    $null -eq (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue)
 }
 
 function Start-DetachedNpm {
@@ -86,5 +91,5 @@ Start-DetachedNpm -WorkingDirectory $BackendDir -Arguments 'run start:dev' -Stdo
 Start-Sleep -Seconds 2
 Start-DetachedNpm -WorkingDirectory $FrontendDir -Arguments 'run dev' -StdoutLog $FrontendLog -StderrLog $FrontendErrLog
 Write-Host "Done. Services started with hidden windows. Run scripts\check.ps1 to verify." -ForegroundColor Green
-Write-Host ("Logs: " + $BackendLog + ", " + $FrontendLog) -ForegroundColor Gray
+Write-Host ("Logs: logs\\backend-3000.log, logs\\frontend-5173.log") -ForegroundColor Gray
 Write-Host "Tip: Code changes auto-reload; only restart when changing .env or deps. Use scripts\restart.ps1 to restart." -ForegroundColor Gray

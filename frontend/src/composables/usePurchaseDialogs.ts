@@ -1,6 +1,7 @@
 import { computed, type Ref } from 'vue'
 import type { PurchaseItemRow } from '@/api/production-purchase'
 import {
+  isEditableCompletedPurchaseRow,
   isRegisterablePurchaseRow,
   usePurchaseRegisterDialog,
 } from '@/composables/usePurchaseRegisterDialog'
@@ -10,6 +11,7 @@ type UsePurchaseDialogsOptions = {
   currentTab: Ref<string>
   hasSelection: Ref<boolean>
   selectedRows: Ref<PurchaseItemRow[]>
+  canAdminEditSubmitted: Ref<boolean>
   reload: () => Promise<void>
   reloadTabCounts: () => Promise<void>
   clearSelection: () => void
@@ -30,10 +32,12 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
   })
 
   function isPurchaseRowSelectable(row: PurchaseItemRow): boolean {
-    if (options.currentTab.value === 'picking') {
-      return row.processRoute === 'picking' && row.pickStatus !== 'completed'
+    if (row.processRoute === 'picking') {
+      if (row.pickStatus !== 'completed') return true
+      return options.canAdminEditSubmitted.value
     }
-    return isRegisterablePurchaseRow(row)
+    if (isRegisterablePurchaseRow(row)) return true
+    return options.canAdminEditSubmitted.value && isEditableCompletedPurchaseRow(row)
   }
 
   function onBatchHandle() {

@@ -130,7 +130,7 @@ export interface OrderMaterialRow {
   pickLogs?: Array<{
     handledAt: string;
     handledBy: string;
-    mode: 'with_stock' | 'remark_only';
+    mode: 'with_stock' | 'remark_only' | 'admin_edit';
     inventorySourceType?: 'fabric' | 'accessory' | 'finished' | null;
     inventoryId?: number | null;
     inventoryName?: string | null;

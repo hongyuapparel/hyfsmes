@@ -17,6 +17,7 @@ import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { OrderCutting, type ActualCutRow } from '../entities/order-cutting.entity';
 import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
+import { User } from '../entities/user.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderStatusService } from './order-status.service';
 import { type OrderDetail, type OrderListQuery } from './order.types';
@@ -38,6 +39,8 @@ export class OrderQueryService {
     private readonly orderSewingRepo: Repository<OrderSewing>,
     @InjectRepository(OrderFinishing)
     private readonly orderFinishingRepo: Repository<OrderFinishing>,
+    @InjectRepository(User)
+    private readonly userRepo: Repository<User>,
     @InjectRepository(Product)
     private readonly productRepo: Repository<Product>,
     @InjectRepository(OrderCostSnapshot)
@@ -249,6 +252,24 @@ export class OrderQueryService {
     };
   }
 
+  /** 回收站 deletedBy：优先按 username 解析展示名；兼容历史误存的 displayName */
+  private async resolveDeletedByDisplayMap(rawValues: Array<string | null | undefined>): Promise<Map<string, string>> {
+    const keys = [...new Set(rawValues.map((v) => (v ?? '').trim()).filter(Boolean))];
+    const map = new Map<string, string>();
+    if (!keys.length) return map;
+    const users = await this.userRepo.find({
+      where: [{ username: In(keys) }, { displayName: In(keys) }],
+      select: ['username', 'displayName'],
+    });
+    for (const user of users) {
+      const username = (user.username ?? '').trim();
+      const display = (user.displayName && user.displayName.trim()) || username;
+      if (username) map.set(username, display);
+      if (display) map.set(display, display);
+    }
+    return map;
+  }
+
   async findAll(query: OrderListQuery, actorUserId?: number) {
     void actorUserId;
     const { page = 1, pageSize = 20 } = query;
@@ -302,14 +323,22 @@ export class OrderQueryService {
       });
     }
 
-    const listWithCount = list.map((o) => ({
-      ...o,
-      remarkCount: remarkCountMap[o.id] ?? 0,
-      actualCutTotal: cutTotalMap[o.id] ?? null,
-      sewingQuantity: sewingQtyMap[o.id] ?? null,
-      tailReceivedQty: tailReceivedMap[o.id] ?? null,
-      tailShippedQty: tailShippedMap[o.id] ?? null,
-    }));
+    const deletedByDisplayMap = await this.resolveDeletedByDisplayMap(list.map((o) => o.deletedBy));
+    const listWithCount = list.map((o) => {
+      const rawDeletedBy = (o.deletedBy ?? '').trim();
+      const deletedBy = rawDeletedBy
+        ? deletedByDisplayMap.get(rawDeletedBy) ?? rawDeletedBy
+        : o.deletedBy;
+      return {
+        ...o,
+        deletedBy,
+        remarkCount: remarkCountMap[o.id] ?? 0,
+        actualCutTotal: cutTotalMap[o.id] ?? null,
+        sewingQuantity: sewingQtyMap[o.id] ?? null,
+        tailReceivedQty: tailReceivedMap[o.id] ?? null,
+        tailShippedQty: tailShippedMap[o.id] ?? null,
+      };
+    });
     return { list: listWithCount, total, totalQuantity, page, pageSize };
   }
 

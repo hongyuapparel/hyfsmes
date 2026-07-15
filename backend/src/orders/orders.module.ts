@@ -15,6 +15,7 @@ import { OrderSewing } from '../entities/order-sewing.entity';
 import { OrderFinishing } from '../entities/order-finishing.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
+import { InboundPending } from '../entities/inbound-pending.entity';
 import { Product } from '../entities/product.entity';
 import { RoleOrderPolicy } from '../entities/role-order-policy.entity';
 import { Role } from '../entities/role.entity';
@@ -31,9 +32,9 @@ import { OrderQueryService } from './order-query.service';
 import { OrderMutationService } from './order-mutation.service';
 import { OrderStatusService } from './order-status.service';
 import { OrderLifecycleService } from './order-lifecycle.service';
+import { OrderAdminOverrideService } from './order-admin-override.service';
 import { OrderReconcileScheduler } from './order-reconcile.scheduler';
 import { OrderCostSnapshotService } from './order-cost-snapshot.service';
-
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -47,6 +48,7 @@ import { OrderCostSnapshotService } from './order-cost-snapshot.service';
       OrderFinishing,
       OrderCraft,
       OrderPattern,
+      InboundPending,
       User,
       RolePermission,
       RoleOrderPolicy,
@@ -71,8 +73,9 @@ import { OrderCostSnapshotService } from './order-cost-snapshot.service';
     OrderCostSnapshotService,
     OrderStatusService,
     OrderLifecycleService,
+    OrderAdminOverrideService,
     OrderReconcileScheduler,
   ],
-  exports: [OrdersService, OrderQueryService, OrderMutationService, OrderCostSnapshotService, OrderStatusService, OrderLifecycleService],
+  exports: [OrdersService, OrderQueryService, OrderMutationService, OrderCostSnapshotService, OrderStatusService, OrderLifecycleService, OrderAdminOverrideService],
 })
 export class OrdersModule {}

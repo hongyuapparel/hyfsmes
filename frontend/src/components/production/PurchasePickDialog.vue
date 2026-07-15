@@ -1,7 +1,7 @@
 ﻿<template>
   <AppDialog
     v-model="dialogVisible"
-    title="领料"
+    :title="dialog.mode === 'edit' ? '编辑已提交领料' : '领料'"
     width="620"
     destroy-on-close
     @close="emit('closed')"
@@ -22,58 +22,74 @@
         </div>
       </div>
       <el-alert
-        v-if="dialog.row.materialSource === '客供面料'"
+        v-if="dialog.mode === 'edit'"
+        type="warning"
+        :closable="false"
+        title="仅修改领料备注，不会重新扣库存，也不会改变订单主状态"
+        style="margin-bottom: 12px"
+      />
+      <el-alert
+        v-else-if="dialog.row.materialSource === '客供面料'"
         type="warning"
         :closable="false"
         title="请联系对应业务员或跟单领取客供面料"
         style="margin-bottom: 12px"
       />
       <el-form ref="pickFormRef" :model="form" :rules="rules" label-width="120px">
-        <el-form-item label="库存来源类型">
-          <el-select
-            v-model="form.inventorySourceType"
-            clearable
-            placeholder="可选（不选则仅备注处理）"
-            @change="onSourceTypeChange"
-          >
-            <el-option label="面料库存" value="fabric" />
-            <el-option label="辅料库存" value="accessory" />
-            <el-option label="成衣库存" value="finished" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="具体库存">
-          <el-select
-            v-model="form.inventoryId"
-            clearable
-            filterable
-            remote
-            :remote-method="onInventorySearch"
-            :loading="inventoryLoading"
-            placeholder="已按本行物料预筛，可直接选择或输入关键字"
-            :disabled="!form.inventorySourceType"
-          >
-            <el-option v-for="opt in inventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
-              <div class="pick-stock-option">
-                <AppImageThumb
-                  v-if="opt.imageUrl"
-                  :raw-url="opt.imageUrl"
-                  :width="28"
-                  :height="28"
-                />
-                <span v-else class="pick-stock-thumb-empty">-</span>
-                <span class="pick-stock-option-label">{{ opt.label }}</span>
-              </div>
-            </el-option>
-          </el-select>
-        </el-form-item>
-        <el-form-item label="调取数量" prop="quantity">
-          <div class="pick-qty-row">
-            <el-input-number v-model="form.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
-            <span class="pick-qty-unit">{{ getMaterialQuantityUnit(dialog.row) || '单位' }}</span>
-          </div>
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="300" show-word-limit />
+        <template v-if="dialog.mode !== 'edit'">
+          <el-form-item label="库存来源类型">
+            <el-select
+              v-model="form.inventorySourceType"
+              clearable
+              placeholder="可选（不选则仅备注处理）"
+              @change="onSourceTypeChange"
+            >
+              <el-option label="面料库存" value="fabric" />
+              <el-option label="辅料库存" value="accessory" />
+              <el-option label="成衣库存" value="finished" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="具体库存">
+            <el-select
+              v-model="form.inventoryId"
+              clearable
+              filterable
+              remote
+              :remote-method="onInventorySearch"
+              :loading="inventoryLoading"
+              placeholder="已按本行物料预筛，可直接选择或输入关键字"
+              :disabled="!form.inventorySourceType"
+            >
+              <el-option v-for="opt in inventoryOptions" :key="opt.id" :label="opt.label" :value="opt.id">
+                <div class="pick-stock-option">
+                  <AppImageThumb
+                    v-if="opt.imageUrl"
+                    :raw-url="opt.imageUrl"
+                    :width="28"
+                    :height="28"
+                  />
+                  <span v-else class="pick-stock-thumb-empty">-</span>
+                  <span class="pick-stock-option-label">{{ opt.label }}</span>
+                </div>
+              </el-option>
+            </el-select>
+          </el-form-item>
+          <el-form-item label="调取数量" prop="quantity">
+            <div class="pick-qty-row">
+              <el-input-number v-model="form.quantity" :min="0" :precision="2" :controls="false" style="width: 100%" />
+              <span class="pick-qty-unit">{{ getMaterialQuantityUnit(dialog.row) || '单位' }}</span>
+            </div>
+          </el-form-item>
+        </template>
+        <el-form-item :label="dialog.mode === 'edit' ? '纠错备注' : '备注'" prop="remark">
+          <el-input
+            v-model="form.remark"
+            type="textarea"
+            :rows="3"
+            maxlength="300"
+            show-word-limit
+            :placeholder="dialog.mode === 'edit' ? '必填：说明本次纠错内容' : ''"
+          />
         </el-form-item>
       </el-form>
     </template>

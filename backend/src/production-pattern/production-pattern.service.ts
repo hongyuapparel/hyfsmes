@@ -558,4 +558,38 @@ export class ProductionPatternService {
       await this.appendStatusHistory(order.id, next);
     }
   }
+
+  /** 纠错：编辑已完成纸样的样衣图等字段，不推进主状态 */
+  async editCompletedPattern(
+    orderId: number,
+    sampleImageUrl: string,
+    actor?: { userId?: number; username?: string },
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const pattern = await this.patternRepo.findOne({ where: { orderId } });
+    if (!pattern || String(pattern.status ?? '').toLowerCase() !== 'completed') {
+      throw new NotFoundException('仅已完成纸样的订单可纠错编辑');
+    }
+    const before = pattern.sampleImageUrl ?? '';
+    pattern.sampleImageUrl = (sampleImageUrl ?? '').trim();
+    await this.patternRepo.save(pattern);
+
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_pattern_admin_edit',
+          detail: `纸样纠错编辑样衣图：${before || '（空）'} → ${pattern.sampleImageUrl || '（空）'}`,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[pattern edit] write operation log failed:', err);
+    }
+  }
 }

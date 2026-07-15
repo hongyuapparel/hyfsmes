@@ -5,11 +5,20 @@
         <el-button link type="primary" @click="goBack">返回列表</el-button>
         <span class="title">订单编辑</span>
         <span v-if="orderNo" class="sub-title">订单号：{{ orderNo }}</span>
+        <el-tag v-if="orderStatus" size="small" type="info" class="order-status-tag">
+          {{ getStatusLabel(orderStatus) }}
+        </el-tag>
       </div>
       <div class="right">
+        <el-button v-if="canForceOrderStatus && orderId" type="danger" plain @click="openForceStatusDialog">
+          强制改状态
+        </el-button>
         <el-button @click="goBack">取消</el-button>
-        <el-button v-if="orderStatus === 'draft'" @click="onSaveDraft" :loading="saving">保存草稿</el-button>
-        <el-button type="primary" @click="onSaveAndSubmit" :loading="submitting">提交</el-button>
+        <el-button v-if="isDraftOrder && canSaveCurrentOrder" @click="onSaveDraft" :loading="saving">保存草稿</el-button>
+        <el-button v-if="!isDraftOrder && canSaveCurrentOrder" type="primary" @click="onSaveChanges" :loading="saving">
+          保存修改
+        </el-button>
+        <el-button v-if="isDraftOrder && canSaveCurrentOrder" type="primary" @click="onSaveAndSubmit" :loading="submitting">提交</el-button>
       </div>
     </div>
 
@@ -390,6 +399,13 @@
       :on-attachment-drop="onAttachmentDrop"
       :on-attachment-drag-end="onAttachmentDragEnd"
     />
+
+    <OrderAdminForceStatusDialog
+      v-model="forceStatusDialogVisible"
+      :order-ids="orderId ? [orderId] : []"
+      :get-status-label="getStatusLabel"
+      @done="onForceStatusDone"
+    />
   </div>
 </template>
 
@@ -403,10 +419,155 @@ import OrderEditSizeInfoCard from '@/components/orders/edit/OrderEditSizeInfoCar
 import OrderEditProcessItemsCard from '@/components/orders/edit/OrderEditProcessItemsCard.vue'
 import OrderEditPackagingCard from '@/components/orders/edit/OrderEditPackagingCard.vue'
 import OrderEditAttachmentsCard from '@/components/orders/edit/OrderEditAttachmentsCard.vue'
+import OrderAdminForceStatusDialog from '@/components/orders/OrderAdminForceStatusDialog.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useOrderEditPage } from '@/composables/useOrderEditPage'
 
-const { pageLoading, goBack, orderNo, orderStatus, saving, submitting, onSaveDraft, onSaveAndSubmit, form, rules, openSkuDialog, orderImageFileInputRef, triggerOrderImageUpload, onOrderImageFileChange, onOrderImageDrop, selectedSkuMeta, collaborationOptions, orderTypeTreeSelectData, orderTypeTreeSelectProps, customerDisplayText, customerLoading, clearSelectedCustomer, openCustomerDialog, userLoading, merchandiserOptions, salespersonOptions, onMerchandiserChange, bTableRef, colorRows, sizeHeaders, editingCell, colorNameInputRef, remarkInputRef, bSummaryMethod, addSizeColumn, addColorRow, startEditBCell, onBCellBlur, insertSizeColumnBefore, removeSizeColumn, setColorCellRef, setActiveColorCell, onColorCellKeydown, onColorCellPaste, calcRowTotal, removeColorRow, setEditingCellNull, materials, materialSourceOptions, materialTypeOptions, supplierOptions, supplierLoading, setMaterialCellRef, setMaterialsTableRef, onMaterialCellKeydown, addMaterialRow, removeMaterialRow, recalcPurchaseQuantity, onSupplierChange, onMaterialTypeChange, onMaterialSupplierVisibleChange, searchMaterialSuppliers, materialNameOptions, materialNameLoading, searchMaterialNames, onMaterialNameVisibleChange, setSizeInfoTableRef, sizeInfoRows, sizeMetaHeaders, setSizeGridCellRef, onSizeGridKeydown, onSizeGridPaste, addSizeMetaColumn, removeSizeMetaColumn, addSizeInfoRow, removeSizeInfoRow, copySizeInfoToClipboard, processItems, processOptions, addProcessRow, removeProcessRow, searchProcessSuppliers, revisionNotes, productionRequirement, packagingHeaders, packagingCells, packagingCellKeys, packagingMethod, addPackagingHeader, removePackagingHeader, movePackagingHeader, openAccessoryDialog, accessoryDialogVisible, accessoryDialogLoading, accessoryItems, onSelectAccessory, skuDialogVisible, skuDialogLoading, skuProducts, skuTotal, skuPage, skuPageSize, onSelectSku, onSkuPageChange, onSkuPageSizeChange, onSkuKeywordChange, customerDialogVisible, customerDialogLoading, customerDialogList, customerTotal, customerPage, customerPageSize, onSelectCustomer, onCustomerPageChange, onCustomerPageSizeChange, onCustomerKeywordChange, attachments, draggingAttachmentIndex, dragOverAttachmentIndex, attachmentsFileDragover, onAttachmentFileChange, onAttachmentsAreaDragOver, onAttachmentsAreaDragLeave, onAttachmentsAreaDrop, removeAttachment, onAttachmentDragStart, onAttachmentDragOver, onAttachmentDrop, onAttachmentDragEnd } = useOrderEditPage()
+const {
+  pageLoading,
+  goBack,
+  orderId,
+  orderNo,
+  orderStatus,
+  saving,
+  submitting,
+  onSaveDraft,
+  onSaveChanges,
+  onSaveAndSubmit,
+  canForceOrderStatus,
+  isSuperAdmin,
+  isDraftOrder,
+  canSaveCurrentOrder,
+  forceStatusDialogVisible,
+  getStatusLabel,
+  openForceStatusDialog,
+  loadDetail,
+  form,
+  rules,
+  openSkuDialog,
+  orderImageFileInputRef,
+  triggerOrderImageUpload,
+  onOrderImageFileChange,
+  onOrderImageDrop,
+  selectedSkuMeta,
+  collaborationOptions,
+  orderTypeTreeSelectData,
+  orderTypeTreeSelectProps,
+  customerDisplayText,
+  customerLoading,
+  clearSelectedCustomer,
+  openCustomerDialog,
+  userLoading,
+  merchandiserOptions,
+  salespersonOptions,
+  onMerchandiserChange,
+  bTableRef,
+  colorRows,
+  sizeHeaders,
+  editingCell,
+  colorNameInputRef,
+  remarkInputRef,
+  bSummaryMethod,
+  addSizeColumn,
+  addColorRow,
+  startEditBCell,
+  onBCellBlur,
+  insertSizeColumnBefore,
+  removeSizeColumn,
+  setColorCellRef,
+  setActiveColorCell,
+  onColorCellKeydown,
+  onColorCellPaste,
+  calcRowTotal,
+  removeColorRow,
+  setEditingCellNull,
+  materials,
+  materialSourceOptions,
+  materialTypeOptions,
+  supplierOptions,
+  supplierLoading,
+  setMaterialCellRef,
+  setMaterialsTableRef,
+  onMaterialCellKeydown,
+  addMaterialRow,
+  removeMaterialRow,
+  recalcPurchaseQuantity,
+  onSupplierChange,
+  onMaterialTypeChange,
+  onMaterialSupplierVisibleChange,
+  searchMaterialSuppliers,
+  materialNameOptions,
+  materialNameLoading,
+  searchMaterialNames,
+  onMaterialNameVisibleChange,
+  setSizeInfoTableRef,
+  sizeInfoRows,
+  sizeMetaHeaders,
+  setSizeGridCellRef,
+  onSizeGridKeydown,
+  onSizeGridPaste,
+  addSizeMetaColumn,
+  removeSizeMetaColumn,
+  addSizeInfoRow,
+  removeSizeInfoRow,
+  copySizeInfoToClipboard,
+  processItems,
+  processOptions,
+  addProcessRow,
+  removeProcessRow,
+  searchProcessSuppliers,
+  revisionNotes,
+  productionRequirement,
+  packagingHeaders,
+  packagingCells,
+  packagingCellKeys,
+  packagingMethod,
+  addPackagingHeader,
+  removePackagingHeader,
+  movePackagingHeader,
+  openAccessoryDialog,
+  accessoryDialogVisible,
+  accessoryDialogLoading,
+  accessoryItems,
+  onSelectAccessory,
+  skuDialogVisible,
+  skuDialogLoading,
+  skuProducts,
+  skuTotal,
+  skuPage,
+  skuPageSize,
+  onSelectSku,
+  onSkuPageChange,
+  onSkuPageSizeChange,
+  onSkuKeywordChange,
+  customerDialogVisible,
+  customerDialogLoading,
+  customerDialogList,
+  customerTotal,
+  customerPage,
+  customerPageSize,
+  onSelectCustomer,
+  onCustomerPageChange,
+  onCustomerPageSizeChange,
+  onCustomerKeywordChange,
+  attachments,
+  draggingAttachmentIndex,
+  dragOverAttachmentIndex,
+  attachmentsFileDragover,
+  onAttachmentFileChange,
+  onAttachmentsAreaDragOver,
+  onAttachmentsAreaDragLeave,
+  onAttachmentsAreaDrop,
+  removeAttachment,
+  onAttachmentDragStart,
+  onAttachmentDragOver,
+  onAttachmentDrop,
+  onAttachmentDragEnd,
+} = useOrderEditPage()
+
+async function onForceStatusDone() {
+  await loadDetail()
+}
 </script>
 
 <style scoped src="./edit.css"></style>

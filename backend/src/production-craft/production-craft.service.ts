@@ -421,6 +421,12 @@ export class ProductionCraftService {
     if (!order.processItem?.trim()) {
       throw new NotFoundException('该订单无工艺项目');
     }
+    const existingCraft = await this.craftRepo.findOne({ where: { orderId } });
+    if (existingCraft && String(existingCraft.status ?? '').toLowerCase() === 'completed') {
+      throw new BadRequestException(
+        '工艺已完成且无独立登记字段可改；纠错请用「强制改状态」或在订单编辑中修改工艺项目',
+      );
+    }
 
     const now = new Date();
     const nextStatus = await this.orderWorkflowService.resolveNextStatus({

@@ -11,6 +11,8 @@ interface AuthStoreLike {
   hasPermission: (permission: string) => boolean
   user?: {
     orderPolicies?: OrderPolicies
+    roleCode?: string
+    roleCodes?: string[]
   }
 }
 
@@ -18,11 +20,12 @@ interface UseOrderListSelectionParams {
   list: Ref<OrderListItem[]>
   totalQuantity: Ref<number>
   currentStatus: Ref<string>
+  isRecycleBin: Ref<boolean>
   authStore: AuthStoreLike
 }
 
 export function useOrderListSelection(params: UseOrderListSelectionParams) {
-  const { list, totalQuantity, currentStatus, authStore } = params
+  const { list, totalQuantity, currentStatus, isRecycleBin, authStore } = params
 
   const cardSelected = ref<Record<number, boolean>>({})
   const selectedIds = computed(() => {
@@ -49,6 +52,12 @@ export function useOrderListSelection(params: UseOrderListSelectionParams) {
   const canEditOrders = computed(() => authStore.hasPermission('orders_edit'))
   const canDeleteOrders = computed(() => authStore.hasPermission('orders_delete'))
   const canReviewOrders = computed(() => authStore.hasPermission('orders_review'))
+  const canRestoreOrders = computed(() => authStore.hasPermission('orders_restore'))
+  const canForceOrderStatus = computed(() => authStore.hasPermission('orders_force_status'))
+  const isSuperAdmin = computed(() => {
+    const u = authStore.user
+    return u?.roleCode === 'admin' || u?.roleCodes?.includes('admin') === true
+  })
 
   const deleteAllowedStatuses = computed(() => {
     const arr = authStore.user?.orderPolicies?.delete ?? []
@@ -89,7 +98,9 @@ export function useOrderListSelection(params: UseOrderListSelectionParams) {
   }
 
   function canEditOrderItem(item: OrderListItem): boolean {
+    if (isRecycleBin.value) return false
     if (!canEditOrders.value) return false
+    if (isSuperAdmin.value) return true
     const allowed = authStore.user?.orderPolicies?.edit
     if (!allowed) return true
     const allowedSet = new Set((allowed ?? []).map((s) => (s ?? '').trim()).filter(Boolean))
@@ -107,6 +118,9 @@ export function useOrderListSelection(params: UseOrderListSelectionParams) {
     canEditOrders,
     canDeleteOrders,
     canReviewOrders,
+    canRestoreOrders,
+    canForceOrderStatus,
+    isSuperAdmin,
     canDeleteSelectedByStatus,
     canReviewSelectedByStatus,
     resetSelection,

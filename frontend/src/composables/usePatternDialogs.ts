@@ -3,6 +3,7 @@ import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import {
   assignPattern,
   completePattern,
+  editCompletedPattern,
   getPatternMaterials,
   savePatternMaterials,
   type PatternListItem,
@@ -52,9 +53,15 @@ export function usePatternDialogs(
   const patternMasterOptions = ref<StaffOptionItem[]>([])
   const sampleMakerOptions = ref<StaffOptionItem[]>([])
 
-  const completeDialog = reactive<{ visible: boolean; submitting: boolean; row: PatternListItem | null }>({
+  const completeDialog = reactive<{
+    visible: boolean
+    submitting: boolean
+    mode: 'complete' | 'edit'
+    row: PatternListItem | null
+  }>({
     visible: false,
     submitting: false,
+    mode: 'complete',
     row: null,
   })
   const completeFormRef = ref<FormInstance>()
@@ -189,13 +196,24 @@ export function usePatternDialogs(
 
   function openCompleteDialog() {
     if (selectedRows.value.length === 0) return
+    completeDialog.mode = 'complete'
     completeDialog.row = selectedRows.value[0]
     completeForm.sampleImageUrl = ''
     completeDialog.visible = true
   }
 
+  function openEditCompletedDialog() {
+    const completed = selectedRows.value.filter((r) => r.patternStatus === 'completed')
+    if (!completed.length) return
+    completeDialog.mode = 'edit'
+    completeDialog.row = completed[0]
+    completeForm.sampleImageUrl = (completed[0].sampleImageUrl ?? '').trim()
+    completeDialog.visible = true
+  }
+
   function resetCompleteForm() {
     completeDialog.row = null
+    completeDialog.mode = 'complete'
     completeForm.sampleImageUrl = ''
     completeFormRef.value?.clearValidate()
     if (sampleImageFileInputRef.value) sampleImageFileInputRef.value.value = ''
@@ -231,11 +249,17 @@ export function usePatternDialogs(
     if (!completeDialog.row) return
     completeDialog.submitting = true
     try {
-      await completePattern({
+      const payload = {
         orderId: completeDialog.row.orderId,
         sampleImageUrl: (completeForm.sampleImageUrl ?? '').trim(),
-      })
-      ElMessage.success('纸样已完成，订单已进入样品完成')
+      }
+      if (completeDialog.mode === 'edit') {
+        await editCompletedPattern(payload)
+        ElMessage.success('已保存纸样纠错（主状态未改）')
+      } else {
+        await completePattern(payload)
+        ElMessage.success('纸样已完成，订单已进入样品完成')
+      }
       completeDialog.visible = false
       await loaders.reloadList()
       void loaders.reloadTabCounts()
@@ -298,6 +322,7 @@ export function usePatternDialogs(
     resetAssignForm,
     submitAssign,
     openCompleteDialog,
+    openEditCompletedDialog,
     resetCompleteForm,
     triggerSampleImageUpload,
     clearSampleImage,

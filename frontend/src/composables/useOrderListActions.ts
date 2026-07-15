@@ -1,6 +1,6 @@
 import { reactive, type Ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { copyOrdersToDraft, deleteOrders, getOrderLogs, type OrderListItem, type OrderOperationLogItem } from '@/api/orders'
+import { copyOrdersToDraft, getOrderLogs, restoreOrders, type OrderListItem, type OrderOperationLogItem } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 interface UseOrderListActionsParams {
@@ -55,22 +55,38 @@ export function useOrderListActions(params: UseOrderListActionsParams) {
     orderIds: [],
   })
 
-  async function onBatchDelete() {
+  const deleteDialog = reactive<{ visible: boolean; orderIds: number[] }>({
+    visible: false,
+    orderIds: [],
+  })
+
+  function openDeleteDialog() {
+    if (!hasSelection.value) return
+    deleteDialog.orderIds = [...selectedIds.value]
+    deleteDialog.visible = true
+  }
+
+  async function onOrdersDeleted() {
+    pagination.page = 1
+    await reloadWithCounts()
+  }
+
+  async function onBatchRestore() {
     if (!hasSelection.value) return
     try {
-      await ElMessageBox.confirm(`确定删除选中的 ${selectedIds.value.length} 条订单吗？`, '提示', {
+      await ElMessageBox.confirm(`确定恢复选中的 ${selectedIds.value.length} 条订单吗？`, '恢复订单', {
         type: 'warning',
       })
     } catch {
       return
     }
     try {
-      await deleteOrders(selectedIds.value)
-      ElMessage.success('已删除选中订单')
+      await restoreOrders(selectedIds.value)
+      ElMessage.success('已恢复选中订单')
       pagination.page = 1
       await reloadWithCounts()
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '删除失败'))
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '恢复失败'))
     }
   }
 
@@ -140,7 +156,10 @@ export function useOrderListActions(params: UseOrderListActionsParams) {
     logDialog,
     remarkDialog,
     reviewDialog,
-    onBatchDelete,
+    deleteDialog,
+    openDeleteDialog,
+    onOrdersDeleted,
+    onBatchRestore,
     openReviewDialog,
     onReviewed,
     onBatchCopyToDraft,

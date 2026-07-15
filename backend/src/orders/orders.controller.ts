@@ -7,6 +7,7 @@ import { type OrderListQuery, type OrderEditPayload, type OrderActor } from './o
 import { OrderQueryService } from './order-query.service';
 import { OrderMutationService } from './order-mutation.service';
 import { OrderStatusService } from './order-status.service';
+import { OrderAdminOverrideService } from './order-admin-override.service';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -16,6 +17,7 @@ export class OrdersController {
     private readonly orderQueryService: OrderQueryService,
     private readonly orderMutationService: OrderMutationService,
     private readonly orderStatusService: OrderStatusService,
+    private readonly orderAdminOverrideService: OrderAdminOverrideService,
   ) {}
 
   /**
@@ -190,6 +192,25 @@ export class OrdersController {
   }
 
   /**
+   * 强制改订单状态（需 orders_force_status）
+   * POST /orders/:id/admin/force-status
+   */
+  @Post(':id/admin/force-status')
+  @RequirePermission('orders_force_status')
+  forceStatus(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { targetStatus?: string; reason?: string; resetSubsequent?: boolean },
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    const actor: OrderActor = { userId: user.userId, username: user.username };
+    return this.orderAdminOverrideService.forceStatus(id, {
+      targetStatus: body?.targetStatus ?? '',
+      reason: body?.reason ?? '',
+      resetSubsequent: body?.resetSubsequent === true,
+    }, actor);
+  }
+
+  /**
    * 保存并提交（状态改为 pending_review）
    * POST /orders/:id/submit
    */
@@ -210,11 +231,12 @@ export class OrdersController {
   @RequirePermission('orders_delete')
   async batchDelete(
     @Body('ids') ids: number[],
+    @Body('deleteReason') deleteReason: string | undefined,
     @CurrentUser() user: { userId: number; username: string },
   ) {
     await this.orderStatusService.assertOrderActionByIds(ids ?? [], user.userId, 'delete');
     const actor: OrderActor = { userId: user.userId, username: user.username };
-    return this.orderMutationService.deleteMany(ids ?? [], actor);
+    return this.orderMutationService.deleteMany(ids ?? [], actor, deleteReason);
   }
 
   /**

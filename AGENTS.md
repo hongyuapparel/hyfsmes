@@ -1,134 +1,61 @@
-# AGENTS.md — 项目 Agent 协作规则
+# AGENTS.md — 项目 Agent 规则目录
 
-本文件是 Codex 和其他代码 Agent 在本仓库工作的默认规则入口。开始任何任务前，必须先读取并遵守本文件。
+本文件是 Agent 协作的**唯一入口**：只说明读什么、何时读。详细规则在 `docs/`，不要在此重复正文。
 
-如本文件与系统指令、开发者指令或用户当前明确要求冲突，按更高优先级指令执行，并在必要时说明冲突点。
+如与系统指令或用户当前明确要求冲突，按更高优先级执行，并在必要时说明冲突点。
 
-## 1. 项目定位与技术栈
+---
 
-- 本项目是服装工贸一体 B2B ERP，面向内部业务流程：订单、客户、商品、仓储、生产、权限等；不是电商发货系统。
-- 前端：Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus + Axios。
-- 后端：NestJS + TypeORM + MySQL + JWT/Passport + class-validator。
-- 测试：Vitest。前端默认开发地址：`http://localhost:5173`。
+## 1. 项目定位
 
-## 2. 任务前读取
+服装工贸一体 B2B ERP（订单、客户、商品、仓储、生产、权限），非电商发货系统。
 
-- 默认先读取本文件。
-- 涉及业务逻辑、字段配置、订单流程、页面结构设计或现有方案延续时，先读 `docs/PROJECT_CONTEXT.md`。
-- 涉及字段配置、列设置、显示顺序、表单/表格字段复用时，再读 `docs/FIELD_CONFIG_DESIGN.md`。
-- 涉及订单状态、订单列表/编辑、生产流程时，再读 `docs/ORDER_STATUS_FLOW_DESIGN.md`。
-- 涉及部署、上线、服务器路径、宝塔、PM2、部署脚本时，必须先读 `docs/DEPLOY_GUIDE.md`，并以其中路径为准，不凭记忆写命令。
-- 用户当前额外指定的文档或说明优先于本文件。
+- 前端：Vue 3 + TypeScript + Vite + Pinia + Vue Router + Element Plus + Axios
+- 后端：NestJS + TypeORM + MySQL + JWT/Passport + class-validator
+- 测试：Vitest · 本地前端：`http://localhost:5173`
 
-## 2.1 上线环境
+---
+
+## 2. 上线环境（摘要）
 
 - 线上：`https://erp.hyfsmes.com`
-- 部署：宝塔面板终端（跑 `scripts/deploy-frontend.sh` / `deploy-backend.sh` / `deploy-full.sh`，路径与 PM2 名以 `docs/DEPLOY_GUIDE.md` 为准）。
-- 数据库：阿里云 RDS（MySQL）。用户不在命令行操作数据库，改库结构/数据时必须给**可直接粘贴执行的 SQL**（写成 `backend/scripts/*.sql` 文件或聊天里贴出来），不要让用户跑脚本/命令。
+- 部署路径与 PM2 名以 [`docs/DEPLOY_GUIDE.md`](docs/DEPLOY_GUIDE.md) 为准
+- 改库结构/数据：给可直接粘贴执行的 SQL（`backend/scripts/*.sql` 或聊天贴出），不要让用户跑脚本
 
-## 3. 执行边界
+---
 
-- 只修改用户明确要求的页面、模块、文件或问题范围，不顺手扩散。
-- 如必须改动未点名内容，先说明原因、范围、影响，获得确认后再改。
-- 不主动改数据库结构、接口契约、全局样式、公共基础组件；必须改时先确认。
-- 不覆盖、不回退、不清理用户已有改动，除非用户明确要求。
-- 发现代码、文档、规则冲突时，先说明冲突点，再继续。
+## 3. 按需读取（需要什么读什么）
 
-## 4. 实现原则
+完整索引见 [`docs/README.md`](docs/README.md)。
 
-- 优先做根因修复，禁止临时补丁、绕过机制、兜底掩盖问题。
-- 优先沿用框架、组件库官方 API、DTO、校验器、现有模块结构和项目既有模式。
-- 前端使用 Composition API；后端接口保持现有 NestJS 模块边界。
-- 新逻辑优先复用现有工具、字段定义、接口封装和公共组件。
-- 新建文件前必须读 ≥2 个同目录/同类型现有文件，照搬 import 路径、导出方式、命名、结构。禁止凭印象写路径（如 `request` 工具位于 `api/` 还是 `utils/` 必须查证，`@/xxx` 还是 `./xxx` 必须查证）。
-- 新建 API 接口/类型前，必须先打开所有调用方（template + script + 后端 controller）按它们实际访问的字段/嵌套结构定义类型；禁止先编类型再让调用方报错。
+| 场景 | 读取 |
+|------|------|
+| 每次任务 | 本文件 |
+| 业务背景、模块总览 | [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) |
+| 协作边界、验证、设置页 | [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md) |
+| 类型、分层、复用、build | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md) |
+| 前端 UI、组件、样式 | [`docs/FRONTEND_UI.md`](docs/FRONTEND_UI.md) |
+| 字段配置、列设置 | [`docs/FIELD_CONFIG_DESIGN.md`](docs/FIELD_CONFIG_DESIGN.md) |
+| 订单状态、生产流程 | [`docs/ORDER_STATUS_FLOW_DESIGN.md`](docs/ORDER_STATUS_FLOW_DESIGN.md) |
+| 部署、上线 | [`docs/DEPLOY_GUIDE.md`](docs/DEPLOY_GUIDE.md) |
+| 用户 @ 指定文档 | 优先于本文件 |
 
-## 5. 复用优先强制流程
+---
 
-任何 UI 或功能改动前，必须先执行复用优先检查：
+## 4. 规范文档（指针，正文在 docs/）
 
-1. 使用 `rg` 搜索同类组件、同类页面、同类交互、helper、composable、API 封装和样式。
-2. 优先复用已有组件、composable、utils、设计 token 和交互模式。
-3. 现有组件可扩展时，优先扩展 `props` / `slots` / 配置，不复制一份新实现。
-4. 如果没有可直接复用的组件，必须沿用最接近的既有页面或组件结构与视觉风格。
-5. 如果新增了重复逻辑，必须说明为什么不能复用或抽公共 helper。
-6. 对非微小 UI/功能改动，最终回复必须说明本次复用了哪些已有组件、模式或 helper。
+| 主题 | 文档 |
+|------|------|
+| 执行边界、验证回复、优先级 | [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md) |
+| 代码规范（含原「代码健康」） | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md) |
+| 前端 UI | [`docs/FRONTEND_UI.md`](docs/FRONTEND_UI.md) |
+| 字段业务设计 | [`docs/FIELD_CONFIG_DESIGN.md`](docs/FIELD_CONFIG_DESIGN.md) |
 
-如果尚未搜索同类实现，不要开始写 UI 或功能代码。
+---
 
-## 6. UI 与组件
+## 5. 优先级
 
-- UI 编辑必须沿用原来的系统组件和项目既有基础组件，例如 Element Plus、`AppDrawer`、`AppDialog`、设计 token、现有字段配置；抽屉必须使用 `AppDrawer`，弹窗必须使用 `AppDialog`，不自行实现同类组件。
-- 抽屉、弹窗、表单区、工具栏、列表操作区等同类交互必须保持结构和视觉一致；特殊偏离先说明原因并获得确认。
-- 禁止用补丁样式覆盖原组件机制：不用大段私有 CSS、`!important`、深层选择器、外层包裹遮盖、复制视觉结构来绕过系统组件。
-- 字号只用设计变量：`--font-size-title`、`--font-size-subtitle`、`--font-size-body`、`--font-size-caption`。
-- `el-radio` / `el-radio-button` 必须显式使用 `value` / `:value`，禁止用 `label` 充当选中值；改动后执行 `npm run check:el-radio-value`。
-- 可编辑/填写型表格（单元格内放 `el-input`、`el-select`、`el-input-number`、textarea 等录入控件）统一在 `<el-table>` 上添加 `class="editable-grid"`，外观复用 `design-system.css` 的全局 `.editable-grid` 规则：填写框无内框并铺满单元格，以表格线分隔，hover/focus 时整格高亮；表头、数据行、合计行使用 `--editable-grid-header-h` / `--editable-grid-row-h` 保持等高；内容上下左右居中。新建此类表禁止各自编写单元格内边距、边框或对齐样式；调整密度只改全局变量。含图片列的表（如尺码矩阵）应在该表局部恢复自适应行高，避免图片被压缩。
-
-## 7. 数据与字段
-
-- 同一业务字段全系统使用统一 `code`、统一含义、统一展示方式和统一数据源。
-- 表单、表格、筛选、排序优先基于 `fields/*` 或现有字段配置，不在页面内硬编码。
-- 配置项持久化只存 `xxx_id`，禁止持久化名称、路径等冗余字段。
-- 已约定为树形、级联、可搜索下拉等形态的字段，不得随意改成其他控件。
-
-## 8. 代码健康
-
-- 不新增 `any` 技术债；所有新代码、本次触碰代码禁止 `: any`、`as any`、`any[]`、`Record<string, any>`、`Promise<any>` 等写法，必须使用具体类型或 `unknown` + 类型守卫。
-- Vue 3 + vue-tsc 已知坑（踩过的不再踩）：
-  - composable 返回 reactive 对象做 prop 类型，必须用 `ShallowUnwrapRef<ReturnType<typeof useXxx>>`，直接用 `ReturnType<typeof useXxx>` 会暴露 Ref 包裹导致模板访问报错。
-  - `<script setup>` 中判别联合类型 narrowing 不稳定：`if (!row.flag)`、`if (row.flag) return` 之后访问独有字段仍可能报 union 错。统一用 `(row as ConcreteType).field` 显式断言或抽 type predicate `function isX(v): v is X`。
-  - 移除一个 `any` 不只是改一处类型注解；必须沿调用链跑完整 build 确认所有消费方都通得过。
-- 构建验证：
-  - 涉及类型或逻辑的改动，**commit 前**（不是 commit 后、不是 push 后）必须本地跑对应 `npm run build`（前端含 `vue-tsc`，后端 `nest build`）通过；`npm run dev` 不做类型检查、不能替代；单文件 `vue-tsc --noEmit` 也不能替代完整 build。
-  - 多文件重构/拆分、批量类型改动、sub-agent 完成的工作，merge 回主干前本人必须在项目根目录跑一次完整 build，不能只看 agent 报告。
-  - push 前 `git status` 二次确认改动范围，所有新建文件已 staged，没有把无关 untracked 文件带上。
-  - 禁止 `git add 目录/` 或 `git add .`；必须用具体文件路径分批 add。
-- 交付结果不得新增技术债：不留下临时兜底、重复逻辑、补丁式覆盖、超长文件/函数、未验证的 TODO 或“以后再处理”的半成品。
-- 如正确方案超出本次范围，先说明影响和拆分方案，获得确认后再做；不得用错误但省事的方案交付。
-- `views` 只做编排（读取路由参数、调用 composable、组合子组件），不写业务计算。
-- `components` 只处理 UI 交互并通过 props/emit 通信，不直接调用 API 或 store。
-- `composables` 只承载业务逻辑，不引入 UI 组件，不直接操作 DOM。
-- `api/` 只做 HTTP 封装，不包含业务判断；请求参数和响应必须有 TypeScript 类型定义。
-- Pinia store 只存跨页面共享或需持久化状态；单页临时状态放组件/composable；store action 不直接操作路由。
-- 文件接近警戒线必须拆分，超过警戒线不得继续堆代码：
-  - `views/*.vue`：300 行警戒，500 行硬上限。
-  - `components/*.vue`：200 行警戒，350 行硬上限。
-  - `composables/use*.ts`：150 行警戒，250 行硬上限。
-  - `stores/*.ts`：150 行警戒，200 行硬上限。
-  - backend `*.service.ts`：300 行警戒，500 行硬上限。
-- 一个 `.vue` 超过 2 个独立业务区块、一个 composable 超过 3 个关注点、同一逻辑出现 2 次以上，都必须拆分或抽取。
-- Vue `props` 用 `defineProps<{...}>()`，`emit` 用 `defineEmits<{...}>()`，Pinia state 显式声明类型。
-
-## 8.1 已知技术债（勿加重）
-
-- `inventory/finished.vue` 超过 2700 行。
-- `orders/edit.vue`、`orders/list.vue`、`production/*.vue` 超过 800 行。
-- backend 仍存在 `: any`。
-- 库存/生产抽屉尚未统一到 `AppDrawer`。
-
-## 9. 页面与业务变更
-
-- 用户只描述业务需求且方案不清时，先明确目标、角色、核心操作和信息优先级，给 1 到 3 个方案；用户确认后再大面积实现。
-- 设置类页面新增、编辑、删除后，当前界面必须立即可见结果，禁止依赖 F5、`location.reload`、`router.go(0)` 或外层动态 `key` 重建。
-- 需求级变更完成后轻量同步文档，例如新增模块、调整关键流程、修改订单状态、统一字段配置、重构核心页面；小 bug 和小样式可不更新文档。
-- 历史遗留问题不要加重；触碰相关区域时优先偿还，不能继续复制历史问题。
-
-## 10. 验证与回复
-
-- bug 反馈证据不足时不猜结论，先说明不确定点，并主动索取控制台、Network、复现步骤或后端日志。
-- 修复后必须说明验证了什么、结果是什么；不能验证时明确告诉用户还需如何验证。
-- 不能确认修复时，不说“已修复完成”，只说“已按分析修改，请按步骤验证”。
-- 同一问题修复超过 2 次仍未解决时，停止猜测，列出已排除方向和仍需的新证据。
-- sub-agent 返回"完成"不等于真完成；本人必须跑 build + 看 git diff 验证再向用户回报。
-- 完成较大修改后简要说明：改了什么、关键文件、是否同步文档、验证结果、风险点。
-- 本地启动或重启前后端时，默认使用 `scripts/start.ps1` 或 `scripts/restart.ps1` 隐藏窗口启动；不要主动打开可见命令窗口。需要排查时看 `.codex-backend-3000.log`、`.codex-frontend-5173.log` 或运行 `scripts/check.ps1`。
-
-## 11. 优先级
-
-1. 用户当前明确要求。
-2. 用户当前指定的文档或设计说明。
-3. 本文件。
-4. 项目当前代码中的既有实现模式。
-
-低优先级规则与高优先级规则冲突时，按高优先级执行，并在必要时说明。
+1. 用户当前明确要求
+2. 用户指定的文档或设计说明
+3. 本文件及 `docs/` 引用的规范
+4. 项目代码中的既有实现模式

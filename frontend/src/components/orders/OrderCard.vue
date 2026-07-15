@@ -152,6 +152,22 @@
           {{ tag }}
         </el-tag>
       </div>
+      <div v-if="showRecycleInfo" class="recycle-info-block">
+        <div class="field-row">
+          <span class="field-label">删除时间：</span>
+          <span class="field-value recycle-datetime" :title="formatDateTime(item.deletedAt)">{{
+            formatDateTime(item.deletedAt)
+          }}</span>
+        </div>
+        <div class="field-row">
+          <span class="field-label">操作人：</span>
+          <span class="field-value">{{ item.deletedBy || '-' }}</span>
+        </div>
+        <div v-if="showRecycleInfo && isMeaningfulOrderDeleteReason(item.deleteReason)" class="field-row">
+          <span class="field-label">原因：</span>
+          <span class="field-value">{{ item.deleteReason }}</span>
+        </div>
+      </div>
     </div>
     <div class="order-card-footer">
       <div v-if="item.factoryName" class="footer-factory ellipsis" :title="item.factoryName">{{ item.factoryName }}</div>
@@ -237,6 +253,7 @@
 <script setup lang="ts">
 import { Edit, Printer, Clock, Coin, ChatDotRound } from '@element-plus/icons-vue'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { isMeaningfulOrderDeleteReason } from '@/constants/order-delete-reasons'
 import type { OrderListItem, OrderSizeBreakdownRes } from '@/api/orders'
 
 interface SizePopoverBlockRow {
@@ -264,6 +281,7 @@ defineProps<{
   sizePopoverBlocks: (orderId: number) => SizePopoverBlock[]
   getOrderMetaTags: (item: OrderListItem) => string[]
   canEditOrderItem: (item: OrderListItem) => boolean
+  showRecycleInfo?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -496,6 +514,25 @@ const emit = defineEmits<{
 }
 
 .order-tags-row .order-meta-tag {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recycle-info-block {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 8px;
+  border-radius: var(--radius-md, 6px);
+  background: var(--el-color-warning-light-9, #fdf6ec);
+  border: 1px dashed var(--el-color-warning-light-5, #f5dab1);
+}
+
+.recycle-info-block .field-row {
+  white-space: nowrap;
+}
+
+.recycle-info-block .field-value.recycle-datetime {
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }

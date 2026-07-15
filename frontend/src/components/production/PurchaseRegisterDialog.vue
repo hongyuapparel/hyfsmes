@@ -1,7 +1,7 @@
 ﻿<template>
   <AppDialog
     v-model="dialogVisible"
-    title="登记实际采购"
+    :title="mode === 'edit' ? '编辑已提交采购' : '登记实际采购'"
     width="1300"
     destroy-on-close
     @close="emit('closed')"
@@ -106,13 +106,17 @@ import {
   type PurchaseSupplierOption,
 } from '@/composables/usePurchaseRegisterDialog'
 
-const props = defineProps<{
-  modelValue: boolean
-  rows: PurchaseRegisterDraftRow[]
-  submitting: boolean
-  supplierOptions: PurchaseSupplierOption[]
-  supplierLoading: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    rows: PurchaseRegisterDraftRow[]
+    submitting: boolean
+    supplierOptions: PurchaseSupplierOption[]
+    supplierLoading: boolean
+    mode?: 'register' | 'edit'
+  }>(),
+  { mode: 'register' },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]

@@ -213,6 +213,7 @@ export class ProductionPurchaseQueryService {
           purchaseOtherCost: m.purchaseOtherCost ?? null,
           purchaseRemark: m.purchaseRemark ?? null,
           purchaseImageUrl: m.purchaseImageUrl ?? null,
+          pickRemark: m.pickRemark ?? null,
           materialSourceId,
           materialSource,
           processRoute,

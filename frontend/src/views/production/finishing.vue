@@ -87,7 +87,7 @@
           登记入库
         </el-button>
         <el-button
-          v-if="hasSelection && canAmendPackagingSelection && canPackagingAction"
+          v-if="hasSelection && canAmendPackagingSelection && canAdminEditSubmitted"
           type="primary"
           @click="openPackagingAmendDialog"
         >
@@ -136,7 +136,10 @@
       :row="finishingBriefDrawer.row"
       :brief="finishingBriefDrawer.row ? finishingBriefFromRow(finishingBriefDrawer.row) : emptyBrief"
       :logs="finishingDrawerLogs"
+      :can-amend="canAdminEditSubmitted && finishingBriefDrawer.row?.finishingStatus === 'inbound'"
+      :reload-token="finishingDrawerReloadToken"
       @closed="finishingBriefDrawer.row = null"
+      @amend="onFinishingDrawerAmend"
     />
 
     <FinishingReceiveDialog
@@ -197,6 +200,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 const authStore = useAuthStore()
 const canRegisterReceiveAction = computed(() => authStore.hasPermission('production_finishing_receive'))
 const canPackagingAction = computed(() => authStore.hasPermission('production_finishing_packaging'))
+const canAdminEditSubmitted = computed(() => authStore.hasPermission('production_admin_edit'))
 
 const FINISHING_TABS = [
   { label: '全部', value: 'all' },
@@ -341,12 +345,30 @@ const {
   remainingQty,
   openPackagingCompleteDialog,
   openPackagingAmendDialog,
+  openPackagingAmendForRow,
   submitPackagingComplete,
 } = useFinishingPackaging({
   selectedRows,
   reloadList: load,
   reloadTabCounts: loadTabCounts,
 })
+
+const finishingDrawerReloadToken = ref(0)
+async function onFinishingDrawerAmend(row: FinishingListItem) {
+  finishingBriefDrawer.visible = false
+  await openPackagingAmendForRow(row)
+}
+watch(
+  () => packagingCompleteDialog.visible,
+  (visible, prev) => {
+    if (prev && !visible && finishingBriefDrawer.visible && finishingBriefDrawer.row) {
+      const id = finishingBriefDrawer.row.orderId
+      const updated = list.value.find((r) => r.orderId === id)
+      if (updated) finishingBriefDrawer.row = updated
+      finishingDrawerReloadToken.value += 1
+    }
+  },
+)
 
 onMounted(() => {
   void (async () => {

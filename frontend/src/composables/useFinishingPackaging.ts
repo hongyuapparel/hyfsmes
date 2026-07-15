@@ -1,6 +1,7 @@
 import { reactive, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
+  amendFinishingPackaging,
   getFinishingRegisterFormData,
   registerFinishingPackagingComplete,
   type FinishingListItem,
@@ -296,6 +297,18 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
   async function openPackagingAmendDialog() {
     const rows = selectedRows.value.filter((r) => r.finishingStatus === 'inbound')
     if (rows.length === 0) return
+    await openPackagingAmendForRows(rows)
+  }
+
+  async function openPackagingAmendForRow(row: FinishingListItem) {
+    if (row.finishingStatus !== 'inbound') {
+      ElMessage.warning('仅尾部已入库的订单可修改入库/次品')
+      return
+    }
+    await openPackagingAmendForRows([row])
+  }
+
+  async function openPackagingAmendForRows(rows: FinishingListItem[]) {
     packagingCompleteDialog.mode = 'amend'
     packagingCompleteDialog.visible = true
     packagingCompleteDialog.formLoading = true
@@ -355,9 +368,8 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
         const defect1D = sumColorRowsBySize(item.defectQuantitiesByColor, sizeLen)
         const sumInbound = inboundTotal(item)
         const defect = defectTotal(item)
-        await registerFinishingPackagingComplete({
+        const payload = {
           orderId: item.row.orderId,
-          mode: isAmend ? 'full' : mode,
           tailInboundQty: sumInbound,
           defectQuantity: defect,
           remark: item.remark?.trim() || undefined,
@@ -365,7 +377,12 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
           defectQuantities: defect1D,
           tailInboundQuantitiesByColor: item.inboundQuantitiesByColor,
           defectQuantitiesByColor: item.defectQuantitiesByColor,
-        })
+        }
+        if (isAmend) {
+          await amendFinishingPackaging(payload)
+        } else {
+          await registerFinishingPackagingComplete({ ...payload, mode })
+        }
       }
       ElMessage.success(
         isAmend
@@ -400,6 +417,7 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     defectCellMax,
     openPackagingCompleteDialog,
     openPackagingAmendDialog,
+    openPackagingAmendForRow,
     submitPackagingComplete,
   }
 }

@@ -147,6 +147,9 @@ export class ProductionPurchaseService {
     if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'purchase') {
       throw new NotFoundException('该物料来源不在等待采购流程，请使用领料处理');
     }
+    if ((row.purchaseStatus ?? 'pending').toLowerCase() === 'completed') {
+      throw new BadRequestException('已采购完成，请使用纠错编辑；勿重复登记');
+    }
 
     const normalizedQty = Number.isFinite(actualPurchaseQuantity) ? actualPurchaseQuantity : 0;
     const normalizedUnit = Number(this.normalizeDecimalInput(unitPrice)) || 0;
@@ -376,6 +379,131 @@ export class ProductionPurchaseService {
     await this.suppliersService.touchLastActiveByNames([...touchedSupplierNames]);
   }
 
+  /**
+   * 纠错：覆盖已采购完成物料的登记字段。不推进订单主状态、不改流程。
+   */
+  async editCompletedPurchaseBatch(params: {
+    items: RegisterPurchaseBatchItem[];
+    actorUserId?: number;
+  }): Promise<void> {
+    const items = Array.isArray(params.items) ? params.items : [];
+    if (!items.length) throw new BadRequestException('请选择要纠错的采购物料');
+
+    const touchedSupplierNames = new Set<string>();
+    const logEntries: Array<{
+      orderId: number;
+      orderNo: string;
+      materialIndex: number;
+      materialName: string;
+      color: string;
+      qty: number;
+    }> = [];
+
+    await this.orderRepo.manager.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      const orderExtRepo = manager.getRepository(OrderExt);
+      const itemsByOrderId = new Map<number, RegisterPurchaseBatchItem[]>();
+      const seenMaterialKeys = new Set<string>();
+
+      for (const item of items) {
+        const orderId = Number(item.orderId);
+        const materialIndex = Number(item.materialIndex);
+        if (!Number.isInteger(orderId) || orderId <= 0) throw new BadRequestException('订单 ID 无效');
+        if (!Number.isInteger(materialIndex) || materialIndex < 0) throw new BadRequestException('物料索引无效');
+        const key = `${orderId}:${materialIndex}`;
+        if (seenMaterialKeys.has(key)) throw new BadRequestException('不能重复编辑同一条物料');
+        seenMaterialKeys.add(key);
+        const group = itemsByOrderId.get(orderId) ?? [];
+        group.push({ ...item, orderId, materialIndex });
+        itemsByOrderId.set(orderId, group);
+      }
+
+      for (const [orderId, orderItems] of itemsByOrderId.entries()) {
+        const order = await orderRepo.findOne({ where: { id: orderId } });
+        if (!order) throw new NotFoundException('订单不存在');
+        const ext = await orderExtRepo.findOne({ where: { orderId } });
+        if (!ext || !Array.isArray(ext.materials)) throw new NotFoundException('该订单无物料数据');
+
+        const materials = [...ext.materials];
+        for (const item of orderItems) {
+          if (item.materialIndex < 0 || item.materialIndex >= materials.length) {
+            throw new NotFoundException('物料索引无效');
+          }
+          const row = materials[item.materialIndex] as OrderMaterialRow;
+          const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
+          if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'purchase') {
+            throw new NotFoundException('该物料来源不在采购流程');
+          }
+          if ((row.purchaseStatus ?? 'pending').toLowerCase() !== 'completed') {
+            throw new BadRequestException('仅已采购完成的物料可纠错编辑');
+          }
+
+          const supplierName = (item.supplierName ?? '').trim();
+          if (!supplierName || supplierName === '-') {
+            throw new BadRequestException('请填写供应商');
+          }
+          const normalizedQty = this.normalizeNonNegativeNumber(item.actualPurchaseQuantity);
+          const unitPrice = this.normalizeDecimalInput(item.unitPrice);
+          const otherCost = this.normalizeDecimalInput(item.otherCost);
+          const normalizedUnit = Number(unitPrice) || 0;
+          const normalizedOther = Number(otherCost) || 0;
+          const total = normalizedQty * normalizedUnit + normalizedOther;
+          const totalStr = Number.isFinite(total) ? total.toFixed(2) : '0';
+
+          materials[item.materialIndex] = {
+            ...row,
+            supplierName,
+            purchaseStatus: 'completed',
+            actualPurchaseQuantity: normalizedQty,
+            purchaseUnitPrice: unitPrice,
+            purchaseOtherCost: otherCost,
+            purchaseAmount: totalStr,
+            purchaseCompletedAt: row.purchaseCompletedAt ?? this.toDateTimeLocalString(new Date()),
+            purchaseRemark: (item.remark ?? '').trim() || null,
+            purchaseImageUrl: (item.imageUrl ?? '').trim() || null,
+          };
+          touchedSupplierNames.add(supplierName);
+          logEntries.push({
+            orderId: order.id,
+            orderNo: order.orderNo,
+            materialIndex: item.materialIndex,
+            materialName: row.materialName ?? '-',
+            color: (row.color ?? '').trim(),
+            qty: normalizedQty,
+          });
+        }
+
+        ext.materials = materials;
+        await orderExtRepo.save(ext);
+      }
+    });
+
+    for (const entry of logEntries) {
+      try {
+        const operator = await resolveOperatorDisplayName(this.userRepo, {
+          userId: params.actorUserId,
+          username: '',
+        });
+        const colorPart = entry.color ? ` ${entry.color}` : '';
+        await this.orderLogRepo.save(
+          this.orderLogRepo.create({
+            orderId: entry.orderId,
+            orderNo: entry.orderNo,
+            operatorUsername: operator,
+            action: 'production_purchase_admin_edit',
+            detail: `采购纠错编辑：${entry.materialName}${colorPart} ${entry.qty}`,
+            targetType: 'purchase_item',
+            targetRef: `${entry.orderId}_${entry.materialIndex}`,
+          }),
+        );
+      } catch (err) {
+        console.warn('[purchase edit] write operation log failed:', err);
+      }
+    }
+
+    await this.suppliersService.touchLastActiveByNames([...touchedSupplierNames]);
+  }
+
   async registerPicking(params: {
     orderId: number;
     materialIndex: number;
@@ -401,6 +529,9 @@ export class ProductionPurchaseService {
     const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
     if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'picking') {
       throw new NotFoundException('该物料来源不在待领料流程，请使用采购登记');
+    }
+    if ((row.pickStatus ?? 'pending').toLowerCase() === 'completed') {
+      throw new BadRequestException('已领料完成，请使用纠错编辑；勿重复领料以免重复扣库存');
     }
 
     const statusCheckedMaterials = [...materials];
@@ -510,6 +641,86 @@ export class ProductionPurchaseService {
       order.statusTime = new Date();
       await this.orderRepo.save(order);
       await this.appendStatusHistory(order.id, nextStatus);
+    }
+  }
+
+  /**
+   * 纠错：编辑已领料完成的备注。不重新扣库存、不推进主状态。
+   */
+  async editCompletedPicking(params: {
+    orderId: number;
+    materialIndex: number;
+    remark?: string | null;
+    actorUserId?: number;
+    actorUsername?: string;
+  }): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: params.orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const ext = await this.orderExtRepo.findOne({ where: { orderId: params.orderId } });
+    if (!ext || !Array.isArray(ext.materials)) throw new NotFoundException('该订单无物料数据');
+    if (params.materialIndex < 0 || params.materialIndex >= ext.materials.length) {
+      throw new NotFoundException('物料索引无效');
+    }
+    await this.ensureMaterialSourceOptionCache();
+
+    const materials = [...ext.materials];
+    const row = { ...(materials[params.materialIndex] as OrderMaterialRow) };
+    const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
+    if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'picking') {
+      throw new NotFoundException('该物料来源不在领料流程');
+    }
+    if ((row.pickStatus ?? 'pending').toLowerCase() !== 'completed') {
+      throw new BadRequestException('仅已领料完成的物料可纠错编辑');
+    }
+
+    const remark = (params.remark ?? '').trim();
+    if (!remark) throw new BadRequestException('请填写纠错备注');
+
+    const operatorName = await resolveOperatorDisplayName(this.userRepo, {
+      userId: params.actorUserId,
+      username: params.actorUsername ?? '',
+    });
+    const now = this.toDateTimeLocalString(new Date()) ?? '';
+    const before = (row.pickRemark ?? '').trim();
+    const nextLogs = Array.isArray(row.pickLogs) ? [...row.pickLogs] : [];
+    nextLogs.push({
+      handledAt: now,
+      handledBy: operatorName,
+      mode: 'admin_edit',
+      inventorySourceType: null,
+      inventoryId: null,
+      inventoryName: null,
+      stockBatch: null,
+      stockColorCode: null,
+      stockSpec: null,
+      quantity: null,
+      remark: `纠错备注：${remark}`,
+    });
+
+    materials[params.materialIndex] = {
+      ...row,
+      pickStatus: 'completed',
+      pickCompletedAt: row.pickCompletedAt ?? now,
+      pickRemark: remark,
+      pickLogs: nextLogs,
+    };
+    ext.materials = materials;
+    await this.orderExtRepo.save(ext);
+
+    try {
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId: order.id,
+          orderNo: order.orderNo,
+          operatorUsername: operatorName,
+          action: 'production_purchase_pick_admin_edit',
+          detail: `领料纠错编辑备注：${before || '（空）'} → ${remark}；物料 ${row.materialName ?? '-'}（不重新扣库存）`,
+          targetType: 'purchase_item',
+          targetRef: `${order.id}_${params.materialIndex}`,
+        }),
+      );
+    } catch (err) {
+      console.warn('[purchase pick edit] write operation log failed:', err);
     }
   }
 }

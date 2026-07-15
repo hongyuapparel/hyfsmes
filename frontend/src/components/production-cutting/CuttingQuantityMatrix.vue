@@ -8,7 +8,7 @@
       :max-height="matrixMaxHeight"
       table-layout="fixed"
     >
-      <el-table-column label="颜色" width="100" fixed>
+      <el-table-column label="颜色" min-width="120" width="148" fixed>
         <template #default="{ row }">
           <span class="cutting-qty-matrix__color">
             <AppImageThumb

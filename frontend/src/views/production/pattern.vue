@@ -168,6 +168,13 @@
         >
           确认完成
         </el-button>
+        <el-button
+          v-if="hasSelection && canEditCompletedPatternSelection && canAdminEditSubmitted"
+          type="primary"
+          @click="openEditCompletedDialog"
+        >
+          编辑
+        </el-button>
       </div>
     </div>
 
@@ -238,6 +245,7 @@
     <PatternCompleteDialog
       ref="completeDialogRef"
       v-model="completeDialog.visible"
+      :mode="completeDialog.mode"
       :row="completeDialog.row"
       :form="completeForm"
       :rules="completeRules"
@@ -283,6 +291,7 @@ import type { ProductionOrderBriefModel } from '@/components/production/Producti
 const authStore = useAuthStore()
 const canAssignPattern = computed(() => authStore.hasPermission('production_pattern_assign'))
 const canCompletePattern = computed(() => authStore.hasPermission('production_pattern_complete'))
+const canAdminEditSubmitted = computed(() => authStore.hasPermission('production_admin_edit'))
 
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
 const { collapsed, isMobile } = useFilterCollapse('production-pattern')
@@ -396,6 +405,7 @@ const {
   resetAssignForm,
   submitAssign,
   openCompleteDialog,
+  openEditCompletedDialog,
   resetCompleteForm,
   clearSampleImage,
   onSampleImageFileChange,
@@ -406,6 +416,10 @@ const {
   selectedRows,
   { reloadList: load, reloadTabCounts: loadTabCounts },
   { findOrderTypeLabelById, findCollaborationLabelById },
+)
+
+const canEditCompletedPatternSelection = computed(
+  () => selectedRows.value.length > 0 && selectedRows.value.every((r) => r.patternStatus === 'completed'),
 )
 
 const emptyBrief: ProductionOrderBriefModel = {

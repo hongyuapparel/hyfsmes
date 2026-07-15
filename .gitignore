@@ -31,7 +31,9 @@ frontend/.env.development
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs (local dev server output from scripts/start.ps1)
+logs/*
+!logs/.gitkeep
 *.log
 npm-debug.log*
 **/package-lock.json1

@@ -7,14 +7,14 @@ $FrontendPort = 5173
 function Stop-ProcessOnPort {
     param ([int]$Port)
     for ($retry = 0; $retry -lt 2; $retry++) {
-        $conn = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+        $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
         if (-not $conn) {
             if ($retry -eq 0) { Write-Host ("Port " + $Port + " not in use.") -ForegroundColor Gray }
             return
         }
         $pids = $conn | Select-Object -ExpandProperty OwningProcess -Unique | Where-Object { $_ -and $_ -ne 0 }
         if (-not $pids) {
-            Write-Host ("Port " + $Port + " in use but no valid PID (e.g. OwningProcess=0). Wait a few seconds and try start again.") -ForegroundColor Yellow
+            Write-Host ("Port " + $Port + " Listen but no valid PID. Wait a few seconds and try start again.") -ForegroundColor Yellow
             return
         }
         foreach ($procId in $pids) {
@@ -29,7 +29,7 @@ function Stop-ProcessOnPort {
         }
         Start-Sleep -Seconds 2
     }
-    $still = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
+    $still = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
     if ($still) {
         Write-Host ("Port " + $Port + " may still be in use. Wait 5s and run start.ps1 again, or restart PC.") -ForegroundColor Yellow
     }

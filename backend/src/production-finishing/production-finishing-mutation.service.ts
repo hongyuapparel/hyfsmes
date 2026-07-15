@@ -269,20 +269,11 @@ export class ProductionFinishingMutationService {
     const alreadyDefect = Number(finishing.defectQuantity) || 0;
     const remaining = received - alreadyInbound - alreadyDefect;
 
-    // 已完成订单（status='inbound'）走 amend 分支，沿用旧语义
+    // 已完成入库的修订请走 amendCompletedPackaging（需 production_admin_edit）
     if (finishing.status === 'inbound') {
-      await this.amendPackagingComplete(
-        order,
-        finishing,
-        tailInboundQtyThisBatch,
-        defectQuantityThisBatch,
-        remark,
-        tailInboundQuantitiesThisBatch,
-        defectQuantitiesThisBatch,
-        tailInboundQuantitiesThisBatchByColor,
-        defectQuantitiesThisBatchByColor,
+      throw new BadRequestException(
+        '该订单尾部已完成，修改入库/次品请使用纠错接口（需「编辑已提交生产数据」权限）',
       );
-      return;
     }
 
     if (finishing.status !== 'pending_assign') {
@@ -733,6 +724,60 @@ export class ProductionFinishingMutationService {
         }
       }
     });
+  }
+
+  /** 纠错：修订已完成（inbound）尾部入库/次品，不推进主状态 */
+  async amendCompletedPackaging(
+    orderId: number,
+    tailInboundQty: number,
+    defectQuantity: number,
+    remark?: string | null,
+    actorUserId?: number,
+    actorUsername?: string,
+    tailInboundQuantities?: number[] | null,
+    defectQuantities?: number[] | null,
+    tailInboundQuantitiesByColor?: ColorSizeQuantityRow[] | null,
+    defectQuantitiesByColor?: ColorSizeQuantityRow[] | null,
+  ): Promise<void> {
+    const order = await this.orderRepo.findOne({ where: { id: orderId } });
+    if (!order) throw new NotFoundException('订单不存在');
+    const finishing = await this.finishingRepo.findOne({ where: { orderId } });
+    if (!finishing) throw new NotFoundException('请先登记收货');
+    if (finishing.status !== 'inbound') {
+      throw new BadRequestException('仅尾部已完成订单可纠错修订入库/次品');
+    }
+    const beforeInbound = Number(finishing.tailInboundQty) || 0;
+    const beforeDefect = Number(finishing.defectQuantity) || 0;
+    await this.amendPackagingComplete(
+      order,
+      finishing,
+      tailInboundQty,
+      defectQuantity,
+      remark,
+      tailInboundQuantities,
+      defectQuantities,
+      tailInboundQuantitiesByColor,
+      defectQuantitiesByColor,
+    );
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, {
+        userId: actorUserId,
+        username: actorUsername ?? '',
+      });
+      await this.orderLogRepo.save(
+        this.orderLogRepo.create({
+          orderId,
+          orderNo: order.orderNo,
+          operatorUsername: operator,
+          action: 'production_finishing_admin_edit',
+          detail: `尾部纠错修订入库/次品：入库 ${beforeInbound}→${Number(tailInboundQty) || 0}，次品 ${beforeDefect}→${Number(defectQuantity) || 0}`,
+          targetType: 'order',
+          targetRef: null,
+        }),
+      );
+    } catch (err) {
+      console.warn('[finishing amend] write operation log failed:', err);
+    }
   }
 
   async registerPackaging(orderId: number, tailReceivedQty: number, defectQuantity: number): Promise<void> {

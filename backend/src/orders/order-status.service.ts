@@ -415,6 +415,8 @@ export class OrderStatusService {
   }
 
   private async assertOrderActionByStatuses(statuses: string[], userId: number, action: string): Promise<void> {
+    if (await this.isAdminUser(userId)) return;
+
     const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'roleId'] });
     if (!user?.roleId) throw new ForbiddenException('无权限访问');
     const links = await this.userRoleRepo.find({ where: { userId }, select: ['roleId'] });
@@ -437,6 +439,17 @@ export class OrderStatusService {
     const allowSet = new Set(rows.map((r) => (r.statusCode ?? '').trim()).filter(Boolean));
     const denied = normalized.filter((s) => !allowSet.has(s));
     if (denied.length) throw new ForbiddenException(`当前状态不允许该操作: ${denied.join('、')}`);
+  }
+
+  async isAdminUser(userId: number): Promise<boolean> {
+    if (!userId) return false;
+    const user = await this.userRepo.findOne({ where: { id: userId }, select: ['id', 'roleId'] });
+    if (!user?.roleId) return false;
+    const links = await this.userRoleRepo.find({ where: { userId }, select: ['roleId'] });
+    const roleIds = Array.from(new Set([user.roleId, ...links.map((x) => x.roleId)].filter(Boolean))) as number[];
+    if (!roleIds.length) return false;
+    const roles = await this.roleRepo.find({ where: { id: In(roleIds) }, select: ['code'] });
+    return roles.some((r) => r.code === 'admin');
   }
 
   scheduleCraftReconcile(actorUserId?: number): void {

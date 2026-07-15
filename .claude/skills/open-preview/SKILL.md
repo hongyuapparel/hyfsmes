@@ -72,8 +72,8 @@ if ($backendOk -and $frontendOk) {
 
 ## After it opens
 
-- Backend log: `.codex-backend-3000.log`
-- Frontend log: `.codex-frontend-5173.log`
+- Backend log: `logs/backend-3000.log`
+- Frontend log: `logs/frontend-5173.log`
 - If anything's wrong, the user has `scripts/check.ps1` for a health check summary.
 
 ## Related scripts (still in `scripts/`)

@@ -1,6 +1,6 @@
 import { onBeforeUnmount, reactive, ref } from 'vue'
 import { ElMessage, type FormRules } from 'element-plus'
-import { registerPick, type PurchaseItemRow } from '@/api/production-purchase'
+import { editCompletedPick, registerPick, type PurchaseItemRow } from '@/api/production-purchase'
 import { getAccessoriesList, getFabricList, getFinishedStockList } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled, isRequestCanceled } from '@/api/request'
 
@@ -9,6 +9,7 @@ export type PickInventorySourceType = 'fabric' | 'accessory' | 'finished'
 export interface PurchasePickDialogState {
   visible: boolean
   submitting: boolean
+  mode: 'register' | 'edit'
   row: PurchaseItemRow | null
   index: number
   total: number
@@ -42,6 +43,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
   const pickDialog = reactive<PurchasePickDialogState>({
     visible: false,
     submitting: false,
+    mode: 'register',
     row: null,
     index: 0,
     total: 0,
@@ -78,9 +80,12 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     remark: [
       {
         validator: (_rule, value, callback) => {
+          if (String(value ?? '').trim()) return callback()
+          if (pickDialog.mode === 'edit') {
+            return callback(new Error('请填写纠错备注'))
+          }
           const hasStock = !!(pickForm.inventorySourceType && pickForm.inventoryId && Number(pickForm.quantity) > 0)
           if (hasStock) return callback()
-          if (String(value ?? '').trim()) return callback()
           callback(new Error('未选择库存时请至少填写备注说明'))
         },
         trigger: 'blur',
@@ -89,16 +94,50 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
   }
 
   function openPickDialog() {
-    const row = options.selectedRows.value[0]
-    if (!row) return
+    const pending = options.selectedRows.value.filter(
+      (r) => r.processRoute === 'picking' && r.pickStatus !== 'completed',
+    )
+    const row = pending[0]
+    if (!row) {
+      ElMessage.warning('请选择待领料物料；已完成请用「编辑已提交领料」')
+      return
+    }
+    pickDialog.mode = 'register'
     pickDialog.row = row
     pickDialog.index = 0
-    pickDialog.total = options.selectedRows.value.length
+    pickDialog.total = pending.length
     pickDialog.visible = true
     pickForm.inventorySourceType = 'fabric'
+    pickForm.inventoryId = null
+    pickForm.quantity = null
+    pickForm.remark = ''
     currentSourceType = 'fabric'
     pickDefaultKeyword = computePickDefaultKeyword('fabric', row)
     void loadPickInventory('fabric', pickDefaultKeyword, true)
+  }
+
+  function openEditCompletedPickDialog() {
+    const completed = options.selectedRows.value.filter(
+      (r) => r.processRoute === 'picking' && r.pickStatus === 'completed',
+    )
+    const row = completed[0]
+    if (!row) {
+      ElMessage.warning('请选择已领料完成的物料')
+      return
+    }
+    pickDialog.mode = 'edit'
+    pickDialog.row = row
+    pickDialog.index = 0
+    pickDialog.total = completed.length
+    pickDialog.visible = true
+    pickForm.inventorySourceType = null
+    pickForm.inventoryId = null
+    pickForm.quantity = null
+    pickForm.remark = (row.pickRemark ?? '').trim()
+    currentSourceType = null
+    pickDefaultKeyword = undefined
+    cancelPickInventoryLoad()
+    pickInventoryOptions.value = []
   }
 
   function clearPickInventorySearchTimer() {
@@ -214,6 +253,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
   }
 
   function resetPickForm() {
+    pickDialog.mode = 'register'
     pickDialog.row = null
     pickDialog.index = 0
     pickDialog.total = 0
@@ -229,31 +269,74 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
 
   async function submitPick() {
     if (!pickDialog.row) return
-    const rows = options.selectedRows.value.slice()
-    if (!rows.length) return
+    if (pickDialog.mode === 'edit') {
+      if (!pickForm.remark.trim()) {
+        ElMessage.warning('请填写纠错备注')
+        return
+      }
+    }
+    const editRows =
+      pickDialog.mode === 'edit'
+        ? options.selectedRows.value.filter(
+            (r) => r.processRoute === 'picking' && r.pickStatus === 'completed',
+          )
+        : []
+    const registerRows =
+      pickDialog.mode === 'register'
+        ? options.selectedRows.value.filter(
+            (r) => r.processRoute === 'picking' && r.pickStatus !== 'completed',
+          )
+        : []
+    if (pickDialog.mode === 'edit' && !editRows.length) {
+      ElMessage.warning('请选择已领料完成的物料')
+      return
+    }
+    if (pickDialog.mode === 'register' && !registerRows.length) {
+      ElMessage.warning('请选择待领料物料')
+      return
+    }
+
     pickDialog.submitting = true
     try {
-      for (let i = 0; i < rows.length; i++) {
-        const row = rows[i]
-        pickDialog.row = row
-        pickDialog.index = i
-        pickDialog.total = rows.length
-        await registerPick({
-          orderId: row.orderId,
-          materialIndex: row.materialIndex,
-          inventorySourceType: pickForm.inventorySourceType,
-          inventoryId: pickForm.inventoryId,
-          quantity: pickForm.quantity,
-          remark: pickForm.remark.trim() || null,
-        })
+      if (pickDialog.mode === 'edit') {
+        const remark = pickForm.remark.trim()
+        for (let i = 0; i < editRows.length; i++) {
+          const row = editRows[i]
+          pickDialog.row = row
+          pickDialog.index = i
+          pickDialog.total = editRows.length
+          await editCompletedPick({
+            orderId: row.orderId,
+            materialIndex: row.materialIndex,
+            remark,
+          })
+        }
+        ElMessage.success('已保存领料纠错备注（未重新扣库存）')
+      } else {
+        for (let i = 0; i < registerRows.length; i++) {
+          const row = registerRows[i]
+          pickDialog.row = row
+          pickDialog.index = i
+          pickDialog.total = registerRows.length
+          await registerPick({
+            orderId: row.orderId,
+            materialIndex: row.materialIndex,
+            inventorySourceType: pickForm.inventorySourceType,
+            inventoryId: pickForm.inventoryId,
+            quantity: pickForm.quantity,
+            remark: pickForm.remark.trim() || null,
+          })
+        }
+        ElMessage.success('领料处理成功')
       }
-      ElMessage.success('领料处理成功')
       pickDialog.visible = false
       await options.reload()
       await options.reloadTabCounts()
       options.clearSelection()
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '领料处理失败'))
+      if (!isErrorHandled(e)) {
+        ElMessage.error(getErrorMessage(e, pickDialog.mode === 'edit' ? '领料纠错失败' : '领料处理失败'))
+      }
     } finally {
       pickDialog.submitting = false
     }
@@ -272,6 +355,7 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
     onPickSourceTypeChange,
     onPickInventorySearch,
     openPickDialog,
+    openEditCompletedPickDialog,
     resetPickForm,
     submitPick,
   }

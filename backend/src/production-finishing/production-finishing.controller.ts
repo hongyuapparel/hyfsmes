@@ -180,6 +180,34 @@ export class ProductionFinishingController {
     );
   }
 
+  /** 纠错：修订已完成尾部入库/次品（需 production_admin_edit） */
+  @Post('items/amend-packaging')
+  @RequirePermission('production_admin_edit')
+  amendPackaging(
+    @Body('orderId') orderId: number,
+    @Body('tailInboundQty') tailInboundQty: number,
+    @Body('defectQuantity') defectQuantity: number,
+    @Body('remark') remark?: string,
+    @Body('tailInboundQuantities') tailInboundQuantities?: number[],
+    @Body('defectQuantities') defectQuantities?: number[],
+    @Body('tailInboundQuantitiesByColor') tailInboundQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
+    @Body('defectQuantitiesByColor') defectQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.finishingMutationService.amendCompletedPackaging(
+      Number(orderId),
+      Number(tailInboundQty ?? 0),
+      Number(defectQuantity ?? 0),
+      remark ?? null,
+      user?.userId,
+      user?.username,
+      Array.isArray(tailInboundQuantities) ? tailInboundQuantities : null,
+      Array.isArray(defectQuantities) ? defectQuantities : null,
+      Array.isArray(tailInboundQuantitiesByColor) ? tailInboundQuantitiesByColor : null,
+      Array.isArray(defectQuantitiesByColor) ? defectQuantitiesByColor : null,
+    );
+  }
+
   @Post('items/register')
   @RequirePermission('production_finishing_packaging')
   registerPackaging(

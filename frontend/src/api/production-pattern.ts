@@ -87,6 +87,12 @@ export function assignPattern(payload: {
   return request.post<void>('/production/pattern/items/assign', payload)
 }
 
+export function editCompletedPattern(payload: { orderId: number; sampleImageUrl: string }) {
+  return request.post<void>(`/production/pattern/items/${payload.orderId}/edit`, {
+    sampleImageUrl: payload.sampleImageUrl,
+  })
+}
+
 export function completePattern(payload: { orderId: number; sampleImageUrl: string }) {
   return request.post<void>('/production/pattern/items/complete', payload)
 }

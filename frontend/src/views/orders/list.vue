@@ -3,7 +3,16 @@
     <!-- 状态切换 + 新建订单 -->
     <div class="status-tabs">
       <div class="status-tabs-left">
-        <el-radio-group v-model="currentStatus" @change="onStatusChange">
+        <el-radio-group v-model="listViewMode" class="list-view-mode" @change="onListViewModeChange">
+          <el-radio-button value="normal">订单列表</el-radio-button>
+          <el-radio-button value="recycle">回收站</el-radio-button>
+        </el-radio-group>
+        <el-radio-group
+          v-if="!isRecycleBin"
+          v-model="currentStatus"
+          class="status-filter-tabs"
+          @change="onStatusChange"
+        >
           <el-radio-button
             v-for="tab in STATUS_TABS"
             :key="tab.value"
@@ -15,7 +24,7 @@
       </div>
       <div class="status-tabs-right">
         <el-tag
-          v-if="unquoted"
+          v-if="unquoted && !isRecycleBin"
           type="warning"
           closable
           class="unquoted-filter-tag"
@@ -23,7 +32,7 @@
         >
           仅看待报价（样品单已完成未报价）
         </el-tag>
-        <el-button v-if="canEditOrders" type="primary" @click="onCreateOrder">新建订单</el-button>
+        <el-button v-if="canEditOrders && !isRecycleBin" type="primary" @click="onCreateOrder">新建订单</el-button>
       </div>
     </div>
 
@@ -52,23 +61,40 @@
     <div v-if="hasSelection" class="orders-batch-bar">
       <span class="orders-batch-info">已选 {{ selectedIds.length }} 项</span>
       <el-button
-        v-if="canDeleteOrders && canDeleteSelectedByStatus"
+        v-if="isRecycleBin && canRestoreOrders"
+        size="small"
+        type="success"
+        @click="onBatchRestore"
+      >
+        恢复
+      </el-button>
+      <el-button
+        v-if="!isRecycleBin && canDeleteOrders && canDeleteSelectedByStatus"
         size="small"
         type="danger"
-        @click="onBatchDelete"
+        @click="openDeleteDialog"
       >
         删除
       </el-button>
-      <el-button v-if="canEditOrders" size="small" type="warning" @click="onBatchCopyToDraft">
+      <el-button v-if="!isRecycleBin && canEditOrders" size="small" type="warning" @click="onBatchCopyToDraft">
         复制为草稿
       </el-button>
       <el-button
-        v-if="canReviewOrders && isPendingReviewTab && canReviewSelectedByStatus"
+        v-if="!isRecycleBin && canReviewOrders && isPendingReviewTab && canReviewSelectedByStatus"
         size="small"
         type="success"
         @click="openReviewDialog"
       >
         审单
+      </el-button>
+      <el-button
+        v-if="!isRecycleBin && canForceOrderStatus && hasSelection"
+        size="small"
+        type="danger"
+        plain
+        @click="openForceStatusDialog"
+      >
+        强制改状态
       </el-button>
       <el-button size="small" text @click="resetSelection">取消</el-button>
     </div>
@@ -91,6 +117,7 @@
         :size-popover-blocks="sizePopoverBlocks"
         :get-order-meta-tags="getOrderMetaTags"
         :can-edit-order-item="canEditOrderItem"
+        :show-recycle-info="isRecycleBin"
         @toggle-select="onCardToggle"
         @show-size-popover="onShowSizePopover"
         @edit="openEdit"
@@ -140,11 +167,22 @@
       :order-ids="reviewDialog.orderIds"
       @reviewed="onReviewed"
     />
+    <OrderDeleteDialog
+      v-model="deleteDialog.visible"
+      :order-ids="deleteDialog.orderIds"
+      @deleted="onOrdersDeleted"
+    />
+    <OrderAdminForceStatusDialog
+      v-model="forceStatusDialog.visible"
+      :order-ids="forceStatusDialog.orderIds"
+      :get-status-label="getStatusLabel"
+      @done="onForceStatusDone"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watchEffect, nextTick, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
+import { ref, computed, watchEffect, nextTick, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -161,6 +199,8 @@ import OrderViewDialog from '@/components/orders/OrderViewDialog.vue'
 import OrderLogDialog from '@/components/orders/OrderLogDialog.vue'
 import OrderRemarkDialog from '@/components/orders/OrderRemarkDialog.vue'
 import OrderReviewDialog from '@/components/orders/OrderReviewDialog.vue'
+import OrderDeleteDialog from '@/components/orders/OrderDeleteDialog.vue'
+import OrderAdminForceStatusDialog from '@/components/orders/OrderAdminForceStatusDialog.vue'
 import OrderCardGrid from '@/components/orders/OrderCardGrid.vue'
 import OrderListFilterBar from '@/views/orders/components/OrderListFilterBar.vue'
 
@@ -192,6 +232,7 @@ const {
   loading,
   pagination,
   currentStatus,
+  isRecycleBin,
   unquoted,
   orderDateRange,
   customerDueRange,
@@ -239,6 +280,9 @@ const {
   canEditOrders,
   canDeleteOrders,
   canReviewOrders,
+  canRestoreOrders,
+  canForceOrderStatus,
+  isSuperAdmin,
   canDeleteSelectedByStatus,
   canReviewSelectedByStatus,
   resetSelection,
@@ -248,6 +292,7 @@ const {
   list,
   totalQuantity,
   currentStatus,
+  isRecycleBin,
   authStore,
 })
 
@@ -277,7 +322,10 @@ const {
   logDialog,
   remarkDialog,
   reviewDialog,
-  onBatchDelete,
+  deleteDialog,
+  openDeleteDialog,
+  onOrdersDeleted,
+  onBatchRestore,
   openReviewDialog,
   onReviewed,
   onBatchCopyToDraft,
@@ -372,6 +420,40 @@ function onReset() {
   resetCardScroll()
   resetSelection()
   void refreshStatusCounts()
+}
+
+const listViewMode = computed({
+  get: () => (isRecycleBin.value ? 'recycle' : 'normal'),
+  set: (v: 'normal' | 'recycle') => {
+    isRecycleBin.value = v === 'recycle'
+  },
+})
+
+const forceStatusDialog = ref({
+  visible: false,
+  orderIds: [] as number[],
+})
+
+function openForceStatusDialog() {
+  if (!selectedIds.value.length) return
+  forceStatusDialog.value.orderIds = [...selectedIds.value]
+  forceStatusDialog.value.visible = true
+}
+
+async function onForceStatusDone() {
+  pagination.page = 1
+  resetSelection()
+  await load({ refreshCounts: true })
+}
+
+function onListViewModeChange() {
+  pagination.page = 1
+  resetCardScroll()
+  resetSelection()
+  if (isRecycleBin.value) {
+    unquoted.value = false
+  }
+  load({ refreshCounts: !isRecycleBin.value })
 }
 
 function onStatusChange() {
@@ -488,6 +570,19 @@ watchEffect(() => {
 }
 
 .status-tabs-left {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.list-view-mode {
+  flex-shrink: 0;
+}
+
+.status-filter-tabs {
   flex: 1;
   min-width: 0;
 }

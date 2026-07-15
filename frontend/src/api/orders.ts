@@ -64,6 +64,12 @@ export interface OrderListItem {
   updatedAt: string
   /** 备注条数（列表接口附带，用于角标展示） */
   remarkCount?: number
+  /** 软删除时间（回收站列表） */
+  deletedAt?: string | null
+  /** 软删除操作人 */
+  deletedBy?: string | null
+  /** 软删除原因 */
+  deleteReason?: string | null
 }
 
 export interface OrderListRes {
@@ -101,6 +107,8 @@ export interface OrderListQuery {
   status?: string
   /** 仅看待报价：样品单 + 已完成 + 未确认报价 */
   unquoted?: boolean
+  /** 仅查回收站（已软删订单） */
+  deletedOnly?: boolean
   page?: number
   pageSize?: number
 }
@@ -359,9 +367,31 @@ export function submitOrder(id: number) {
   return request.post<OrderDetail>(`/orders/${id}/submit`)
 }
 
-/** 批量删除订单 */
-export function deleteOrders(ids: number[]) {
-  return request.post<void>('/orders/batch-delete', { ids })
+/** 批量删除订单（移入回收站） */
+export function deleteOrders(ids: number[], deleteReason: string) {
+  return request.post<void>('/orders/batch-delete', { ids, deleteReason })
+}
+
+/** 从回收站恢复订单 */
+export function restoreOrders(ids: number[]) {
+  return request.post<void>('/orders/restore', { ids })
+}
+
+export interface ForceOrderStatusPayload {
+  targetStatus: string
+  reason: string
+  resetSubsequent?: boolean
+}
+
+export interface ForceOrderStatusResult {
+  id: number
+  status: string
+  warning?: string
+}
+
+/** 超级管理员强制改订单状态 */
+export function forceOrderStatus(id: number, payload: ForceOrderStatusPayload) {
+  return request.post<ForceOrderStatusResult>(`/orders/${id}/admin/force-status`, payload)
 }
 
 /** 审核扣减辅料后被扣成负数（缺货）的明细 */

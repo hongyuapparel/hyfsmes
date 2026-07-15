@@ -24,6 +24,7 @@ const pagination = reactive({
 })
 
 const currentStatus = ref<'all' | string>('all')
+const isRecycleBin = ref(false)
 const unquoted = ref(false)
 const orderDateRange = ref<[string, string] | null>(null)
 const customerDueRange = ref<[string, string] | null>(null)
@@ -48,7 +49,11 @@ function buildQuery(): OrderListQuery {
     page: pagination.page,
     pageSize: pagination.pageSize,
   }
-  if (currentStatus.value !== 'all') q.status = currentStatus.value
+  if (isRecycleBin.value) {
+    q.deletedOnly = true
+  } else if (currentStatus.value !== 'all') {
+    q.status = currentStatus.value
+  }
   if (unquoted.value) q.unquoted = true
   if (orderDateRange.value && orderDateRange.value.length === 2) {
     q.orderDateStart = orderDateRange.value[0]
@@ -119,6 +124,7 @@ function onReset(totalQuantity?: { value: number }) {
   customerDueRange.value = null
   completedRange.value = null
   currentStatus.value = 'all'
+  isRecycleBin.value = false
   unquoted.value = false
   pagination.page = 1
   void loadList(totalQuantity)
@@ -161,6 +167,7 @@ export function useOrderListData() {
     loading,
     pagination,
     currentStatus,
+    isRecycleBin,
     unquoted,
     orderDateRange,
     customerDueRange,

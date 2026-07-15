@@ -81,6 +81,10 @@ export interface CompleteFormDataRes {
   sizeHeaders?: string[]
   orderColorRows?: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>
   cutColorRows?: Array<{ colorName: string; quantities: number[] }>
+  sewingCompleted?: boolean
+  sewingQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }> | null
+  defectQuantity?: number
+  defectReason?: string
 }
 
 export function getCompleteFormData(orderId: number) {
@@ -98,4 +102,30 @@ export function completeSewing(payload: {
   sewingQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
 }) {
   return request.post<void>('/production/sewing/items/complete', payload)
+}
+
+/** 纠错编辑已完成车缝登记（需 production_admin_edit；分单字段与数量同请求写入） */
+export function editSewing(payload: {
+  orderId: number
+  sewingQuantity: number
+  defectQuantity: number
+  defectReason: string
+  sewingQuantities?: number[]
+  sewingQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
+  distributedAt?: string
+  factoryDueDate?: string
+  factoryName?: string
+  sewingFee?: string
+}) {
+  return request.post<void>(`/production/sewing/items/${payload.orderId}/edit`, {
+    sewingQuantity: payload.sewingQuantity,
+    defectQuantity: payload.defectQuantity,
+    defectReason: payload.defectReason,
+    sewingQuantities: payload.sewingQuantities,
+    sewingQuantitiesByColor: payload.sewingQuantitiesByColor,
+    distributedAt: payload.distributedAt,
+    factoryDueDate: payload.factoryDueDate,
+    factoryName: payload.factoryName,
+    sewingFee: payload.sewingFee,
+  })
 }

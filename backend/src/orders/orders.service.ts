@@ -60,8 +60,8 @@ export class OrdersService {
     return this.orderMutationService.submit(id, actor);
   }
 
-  deleteMany(ids: number[], actor: OrderActor) {
-    return this.orderMutationService.deleteMany(ids, actor);
+  deleteMany(ids: number[], actor: OrderActor, deleteReason?: string) {
+    return this.orderMutationService.deleteMany(ids, actor, deleteReason);
   }
 
   restoreMany(ids: number[], actor: OrderActor) {

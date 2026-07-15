@@ -19,6 +19,7 @@
         :size-popover-blocks="sizePopoverBlocks"
         :get-order-meta-tags="getOrderMetaTags"
         :can-edit-order-item="canEditOrderItem"
+        :show-recycle-info="showRecycleInfo"
         @toggle-select="(id, val) => emit('toggle-select', id, val)"
         @show-size-popover="(order) => emit('show-size-popover', order)"
         @edit="(order) => emit('edit', order)"
@@ -61,6 +62,7 @@ defineProps<{
   sizePopoverBlocks: (orderId: number) => SizePopoverBlock[]
   getOrderMetaTags: (item: OrderListItem) => string[]
   canEditOrderItem: (item: OrderListItem) => boolean
+  showRecycleInfo?: boolean
 }>()
 
 const emit = defineEmits<{

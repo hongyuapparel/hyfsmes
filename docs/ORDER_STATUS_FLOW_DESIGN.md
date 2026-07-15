@@ -208,10 +208,29 @@
 
 ## 六、异常与边界情况
 
-请列出你能想到的「特殊情况」：
+### 6.1 回收站（软删除）
 
--  
-- 
+- 订单列表「删除」为**移入回收站**（`orders.deleted_at` 非空），非物理删除。
+- 前端入口：订单列表顶部 **回收站** 切换；列表查询 `GET /orders?deletedOnly=1`。
+- 恢复：`POST /orders/restore`，权限 `orders_restore`（可在角色权限中授权给跟单主管等，不必是超级管理员）。
+- 恢复后订单回到原 `status`，不改状态历史。
+
+### 6.2 强制改状态（权限 `orders_force_status`）
+
+- 角色权限中勾选 `orders_force_status` 可用：`POST /orders/:id/admin/force-status`（不再绑定仅超级管理员角色）。
+- 必填：目标状态 `targetStatus`、原因 `reason`。
+- **默认只改** `orders.status` / `status_time`，**不**重置生产子表、**不**回滚辅料出库 / 成品入库。
+- 接口仍接受 `resetSubsequent`（仅显式 `true` 时清目标环节及之后完成标记），前端 P0 不暴露该选项；纠错以 `production_admin_edit` 手改生产登记为主。
+- 若子工序仍为完成：定时调和约 2 分钟内可能再次推进主状态；UI 需强提示并配合改正工序数据。
+- 写入 `order_operation_logs`（action=`admin_force_status`）与 `order_status_history`。
+
+### 6.3 误操作与编辑纠错
+
+- 审单阶段：`pending_review` → `draft` 仍走「退回草稿」（`review_reject`），需填写原因。
+- 主状态点错：持有 `orders_force_status` 的账号使用「强制改状态」（默认只改状态，不重置生产数据）。
+- 生产登记填错：持有 `production_admin_edit` 的账号在对应生产页编辑已提交数据。
+- 超级管理员保存订单内容时**不触发**流程重算（`rebaseWorkflowStatusAfterOrderEdit`）；改状态请用专用入口。
+- 普通账号按 `role_order_policies` 的 `edit` 策略决定能否编辑/保存非草稿订单。
 
 ---
 

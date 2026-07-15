@@ -182,13 +182,26 @@ export class ProductionPatternController {
     return this.patternService.completePattern(Number(orderId), sampleImageUrl ?? '', user?.userId);
   }
 
+  @Post('items/:orderId/edit')
+  @RequirePermission('production_admin_edit')
+  edit(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body('sampleImageUrl') sampleImageUrl: string,
+    @CurrentUser() user: { userId: number; username: string },
+  ) {
+    return this.patternService.editCompletedPattern(orderId, sampleImageUrl ?? '', {
+      userId: user.userId,
+      username: user.username,
+    });
+  }
+
   @Get('items/:orderId/materials')
   getMaterials(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.patternService.getPatternMaterials(orderId);
   }
 
   @Post('items/:orderId/materials')
-  @RequirePermission('production_pattern_materials')
+  @RequirePermission(['production_pattern_materials', 'production_admin_edit'])
   saveMaterials(
     @Param('orderId', ParseIntPipe) orderId: number,
     @CurrentUser() user: { userId: number; username: string },

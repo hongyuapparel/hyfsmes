@@ -1,8 +1,9 @@
-import { onBeforeUnmount, reactive, ref, watch } from 'vue'
+import { onBeforeUnmount, reactive, ref, watch, computed } from 'vue'
 import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessageBox } from 'element-plus'
 import type { OrderFormPayload } from '@/api/orders'
+import { useAuthStore } from '@/stores/auth'
 import { useOrderAttachments } from '@/composables/useOrderAttachments'
 import { useOrderColorSizeMatrix } from '@/composables/useOrderColorSizeMatrix'
 import { useOrderCustomerSelection } from '@/composables/useOrderCustomerSelection'
@@ -22,6 +23,7 @@ import { useOrderSkuSelection } from '@/composables/useOrderSkuSelection'
 export function useOrderEditPage() {
   const route = useRoute()
   const router = useRouter()
+  const authStore = useAuthStore()
   const orderEditOptionsApi = useOrderEditOptions()
   const attachmentsApi = useOrderAttachments()
   const processItemsApi = useOrderProcessItems()
@@ -187,7 +189,7 @@ export function useOrderEditPage() {
     initMaterialsSortable: materialsApi.initMaterialsSortable,
   })
 
-  const { saving, submitting, onSaveDraft, onSaveAndSubmit } = useOrderEditSubmit({
+  const { saving, submitting, onSaveDraft, onSaveChanges, onSaveAndSubmit } = useOrderEditSubmit({
     route,
     router,
     orderId,
@@ -230,6 +232,44 @@ export function useOrderEditPage() {
     router.push({ name: 'OrdersList' })
   }
 
+  const isSuperAdmin = computed(() => {
+    const u = authStore.user
+    return u?.roleCode === 'admin' || u?.roleCodes?.includes('admin') === true
+  })
+  const canForceOrderStatus = computed(() => authStore.hasPermission('orders_force_status'))
+  const isDraftOrder = computed(() => orderStatus.value === 'draft')
+  const canSaveCurrentOrder = computed(() => {
+    if (!authStore.hasPermission('orders_edit')) return false
+    if (isSuperAdmin.value) return true
+    const allowed = authStore.user?.orderPolicies?.edit
+    if (!allowed) return true
+    const allowedSet = new Set((allowed ?? []).map((s) => (s ?? '').trim()).filter(Boolean))
+    if (!allowedSet.size) return false
+    return allowedSet.has((orderStatus.value ?? '').trim())
+  })
+  const forceStatusDialogVisible = ref(false)
+
+  const STATUS_LABEL_FALLBACK: Record<string, string> = {
+    draft: '草稿',
+    pending_review: '待审单',
+    pending_pattern: '待纸样',
+    pending_purchase: '待采购',
+    pending_craft: '待工艺',
+    pending_cutting: '待裁床',
+    pending_sewing: '待车缝',
+    pending_finishing: '待尾部',
+    completed: '订单完成',
+  }
+
+  function getStatusLabel(status: string): string {
+    return STATUS_LABEL_FALLBACK[status] ?? status
+  }
+
+  function openForceStatusDialog() {
+    if (!orderId.value) return
+    forceStatusDialogVisible.value = true
+  }
+
   watch(() => sizeInfoApi.sizeInfoRows.value.length, () => { sizeInfoApi.initSizeInfoSortable() })
   onBeforeUnmount(() => { sizeInfoApi.destroySizeInfoSortable() })
 
@@ -263,7 +303,15 @@ export function useOrderEditPage() {
     saving,
     submitting,
     onSaveDraft,
+    onSaveChanges,
     onSaveAndSubmit,
+    isSuperAdmin,
+    canForceOrderStatus,
+    isDraftOrder,
+    canSaveCurrentOrder,
+    forceStatusDialogVisible,
+    getStatusLabel,
+    openForceStatusDialog,
     loadDetail,
     goBack,
   }

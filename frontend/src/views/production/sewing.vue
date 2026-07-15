@@ -71,15 +71,15 @@
         <el-button v-if="hasSelection && canAssignSelection && canAssignSewingAction" type="primary" @click="openAssignDialog">
           分单
         </el-button>
-        <el-button
-          v-if="hasSelection && canAssignCompletedSelection && canAssignSewingAction"
-          type="primary"
-          @click="openAssignDialog"
-        >
-          补录分单
-        </el-button>
         <el-button v-if="hasSelection && canRegisterSelection && canCompleteSewingAction" type="primary" @click="openRegisterDialog">
-          登记车缝完成
+          登记完成
+        </el-button>
+        <el-button
+          v-if="hasSelection && canEditCompletedSelection && canAdminEditSubmitted"
+          type="primary"
+          @click="openEditCompletedDialog"
+        >
+          编辑
         </el-button>
       </div>
     </div>
@@ -142,6 +142,7 @@
       :sewing-total="registerSewingTotal"
       :get-cell-max="registerSewingCellMax"
       :cut-skipped="registerCutSkipped"
+      :factory-suppliers="factorySuppliers"
       @update:dialog="registerDialog.visible = $event.visible"
       @close="resetRegisterForm"
       @submit="submitRegister"
@@ -151,8 +152,11 @@
       :drawer="sewingBriefDrawer"
       :logs="sewingDrawerLogs"
       :brief-from-row="sewingBriefFromRow"
+      :can-edit="canAdminEditSubmitted && sewingBriefDrawer.row?.sewingStatus === 'completed'"
+      :reload-token="sewingDrawerReloadToken"
       @update:drawer="sewingBriefDrawer.row = $event.row; sewingBriefDrawer.visible = $event.visible"
       @closed="sewingBriefDrawer.row = null"
+      @edit="onSewingDrawerEdit"
     />
   </div>
 </template>
@@ -183,6 +187,7 @@ import type { FormInstance } from 'element-plus'
 const authStore = useAuthStore()
 const canAssignSewingAction = computed(() => authStore.hasPermission('production_sewing_assign'))
 const canCompleteSewingAction = computed(() => authStore.hasPermission('production_sewing_complete'))
+const canAdminEditSubmitted = computed(() => authStore.hasPermission('production_admin_edit'))
 
 const {
   SEWING_TABS,
@@ -199,7 +204,6 @@ const {
   selectedRows,
   hasSelection,
   canAssignSelection,
-  canAssignCompletedSelection,
   canRegisterSelection,
   tableShellRef,
   tableHeight,
@@ -229,6 +233,10 @@ const {
   onSortChange,
 } = useSewingList()
 
+const canEditCompletedSelection = computed(
+  () => selectedRows.value.length > 0 && selectedRows.value.every((r) => r.sewingStatus === 'completed'),
+)
+
 const {
   factorySuppliers,
   assignDialog,
@@ -249,6 +257,8 @@ const {
   resetAssignForm,
   submitAssign,
   openRegisterDialog,
+  openEditCompletedDialog,
+  openEditCompletedForRow,
   resetRegisterForm,
   submitRegister,
 } = useSewingDialogs(selectedRows, refreshAfterMutation)
@@ -267,11 +277,32 @@ const sewingBriefDrawer = reactive<{ visible: boolean; row: SewingListItem | nul
   visible: false,
   row: null,
 })
+const sewingDrawerReloadToken = ref(0)
 
 function openSewingBriefDrawer(row: SewingListItem) {
   sewingBriefDrawer.row = row
   sewingBriefDrawer.visible = true
 }
+
+async function onSewingDrawerEdit(row: SewingListItem) {
+  // 先关抽屉，避免编辑弹窗被抽屉遮罩挡住（看起来像点了没反应）
+  const target = row
+  sewingBriefDrawer.visible = false
+  sewingBriefDrawer.row = null
+  await openEditCompletedForRow(target)
+}
+
+watch(
+  () => registerDialog.visible,
+  (visible, prev) => {
+    if (prev && !visible && sewingBriefDrawer.visible && sewingBriefDrawer.row) {
+      const id = sewingBriefDrawer.row.orderId
+      const updated = list.value.find((r) => r.orderId === id)
+      if (updated) sewingBriefDrawer.row = updated
+      sewingDrawerReloadToken.value += 1
+    }
+  },
+)
 
 const sewingDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
 

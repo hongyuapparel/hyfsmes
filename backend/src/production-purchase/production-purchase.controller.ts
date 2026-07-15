@@ -231,6 +231,40 @@ export class ProductionPurchaseController {
     });
   }
 
+  /** 纠错编辑已采购完成物料（不推进主状态） */
+  @Post('items/edit/batch')
+  @RequirePermission('production_admin_edit')
+  editBatch(
+    @Body('items') items: Array<{
+      orderId: number;
+      materialIndex: number;
+      supplierName: string;
+      actualPurchaseQuantity: number;
+      unitPrice: string;
+      otherCost: string;
+      remark?: string | null;
+      imageUrl?: string | null;
+    }> | undefined,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    const normalizedItems = Array.isArray(items)
+      ? items.map((item) => ({
+          orderId: Number(item.orderId),
+          materialIndex: Number(item.materialIndex),
+          supplierName: item.supplierName == null ? '' : String(item.supplierName),
+          actualPurchaseQuantity: Number(item.actualPurchaseQuantity),
+          unitPrice: item.unitPrice == null ? '0' : String(item.unitPrice),
+          otherCost: item.otherCost == null ? '0' : String(item.otherCost),
+          remark: item.remark == null ? null : String(item.remark),
+          imageUrl: item.imageUrl == null ? null : String(item.imageUrl),
+        }))
+      : [];
+    return this.purchaseService.editCompletedPurchaseBatch({
+      items: normalizedItems,
+      actorUserId: user?.userId,
+    });
+  }
+
   /**
    * 登记领料（可选择库存扣减或仅备注处理）
    */
@@ -257,6 +291,24 @@ export class ProductionPurchaseController {
       stockBatch: stockBatch ?? null,
       stockColorCode: stockColorCode ?? null,
       stockSpec: stockSpec ?? null,
+      remark: remark ?? null,
+      actorUserId: user?.userId,
+      actorUsername: user?.username,
+    });
+  }
+
+  /** 纠错编辑已领料完成备注（不重新扣库存） */
+  @Post('items/pick/edit')
+  @RequirePermission('production_admin_edit')
+  editPick(
+    @Body('orderId') orderId: number,
+    @Body('materialIndex') materialIndex: number,
+    @Body('remark') remark?: string | null,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.purchaseService.editCompletedPicking({
+      orderId: Number(orderId),
+      materialIndex: Number(materialIndex),
       remark: remark ?? null,
       actorUserId: user?.userId,
       actorUsername: user?.username,

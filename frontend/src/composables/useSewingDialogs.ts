@@ -4,6 +4,7 @@ import {
   assignSewing,
   getCompleteFormData,
   completeSewing,
+  editSewing,
   type SewingListItem,
 } from '@/api/production-sewing'
 import { getOrderColorSizeBreakdown } from '@/api/orders'
@@ -44,8 +45,9 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
   const registerDialog = reactive<{
     visible: boolean
     submitting: boolean
+    mode: 'complete' | 'edit'
     row: SewingListItem | null
-  }>({ visible: false, submitting: false, row: null })
+  }>({ visible: false, submitting: false, mode: 'complete', row: null })
   const registerFormCompleteLoading = ref(false)
   const registerFormRef = ref<FormInstance>()
   const registerForm = reactive<{
@@ -58,6 +60,11 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     sewingQuantitiesByColor: Array<{ colorName: string; quantities: number[] }>
     defectQuantity: number
     defectReason: string
+    /** 编辑模式可改分单信息（原「补录分单」） */
+    distributedAt: string
+    factoryDueDate: string
+    factoryName: string
+    sewingFee: string
   }>({
     headers: [],
     sizeHeaders: [],
@@ -68,6 +75,10 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     sewingQuantitiesByColor: [],
     defectQuantity: 0,
     defectReason: '',
+    distributedAt: '',
+    factoryDueDate: '',
+    factoryName: '',
+    sewingFee: '',
   })
   const registerSizeTableRows = computed(() => {
     const h = registerForm.headers
@@ -109,6 +120,16 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
   const registerRules: FormRules = {
     defectQuantity: [],
     defectReason: [],
+    factoryName: [
+      {
+        validator: (_rule, value, callback) => {
+          if (registerDialog.mode !== 'edit') return callback()
+          if (String(value ?? '').trim()) return callback()
+          callback(new Error('请选择加工供应商'))
+        },
+        trigger: 'change',
+      },
+    ],
   }
 
   async function loadFactorySuppliers() {
@@ -157,10 +178,8 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     }
   }
 
-  async function openRegisterDialog() {
-    const pending = selectedRows.value.filter((r) => r.sewingStatus !== 'completed')
-    if (pending.length === 0) return
-    const row = pending[0]
+  async function fillRegisterFormFromApi(row: SewingListItem, mode: 'complete' | 'edit') {
+    registerDialog.mode = mode
     registerDialog.row = row
     registerForm.headers = []
     registerForm.sizeHeaders = []
@@ -171,13 +190,43 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     registerForm.sewingQuantitiesByColor = []
     registerForm.defectQuantity = 0
     registerForm.defectReason = ''
+    registerForm.distributedAt = mode === 'edit'
+      ? (row.distributedAt?.trim() || nowDatetimeStr())
+      : ''
+    registerForm.factoryDueDate = mode === 'edit' ? (row.factoryDueDate?.trim() || '') : ''
+    registerForm.factoryName = mode === 'edit' ? (row.factoryName?.trim() || '') : ''
+    registerForm.sewingFee = mode === 'edit' ? (row.sewingFee != null ? String(row.sewingFee) : '') : ''
+    // 先拉齐供应商选项再打开，避免 el-select 选项未到位时显示空白（值看似丢了）
+    if (mode === 'edit') {
+      await loadFactorySuppliers()
+      const name = registerForm.factoryName
+      if (name && !factorySuppliers.value.some((s) => s.name === name)) {
+        factorySuppliers.value = [
+          {
+            id: -1,
+            name,
+            supplierTypeId: null,
+            businessScopeId: null,
+            businessScopeIds: null,
+            lastActiveAt: null,
+            contactPerson: '',
+            contactInfo: '',
+            factoryAddress: '',
+            settlementTime: '',
+            remark: '',
+            createdAt: '',
+            updatedAt: '',
+          },
+          ...factorySuppliers.value,
+        ]
+      }
+    }
     registerDialog.visible = true
     registerFormCompleteLoading.value = true
     try {
       const res = await getCompleteFormData(row.orderId)
       const data = res.data
       const headers = data?.headers ?? []
-      // 老后端不返回 sizeHeaders：从 headers 末尾去掉「合计」推算
       let sizeHeaders = Array.isArray(data?.sizeHeaders) ? data.sizeHeaders : []
       if (sizeHeaders.length === 0 && headers.length > 0) {
         sizeHeaders = headers[headers.length - 1] === '合计' ? headers.slice(0, -1) : [...headers]
@@ -186,8 +235,6 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
       const cutRow = data?.cutRow ?? []
       let orderColorRows = Array.isArray(data?.orderColorRows) ? data.orderColorRows : []
       let cutColorRows = Array.isArray(data?.cutColorRows) ? data.cutColorRows : []
-      // 老后端不返回 orderColorRows/cutColorRows：调 /orders/:id/color-size-breakdown 兜底取订单计划，
-      // 裁床实际矩阵老接口不暴露——用订单计划作为车缝填写上限（用户可改），避免弹窗空白
       if (sizeHeaders.length > 0 && orderColorRows.length === 0) {
         try {
           const cs = await getOrderColorSizeBreakdown(row.orderId)
@@ -197,9 +244,8 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
           const csRows = Array.isArray(cs.data?.rows) ? cs.data.rows : []
           orderColorRows = csRows.map((r) => {
             const vals = Array.isArray(r.values) ? r.values : []
-            const quantities = Array.from({ length: sizeLen }, (_, ci) => {
-              const idx = ci < sLen ? ci : -1
-              const n = idx >= 0 ? Number(vals[idx]) : 0
+            const quantities = Array.from({ length: sLen }, (_, ci) => {
+              const n = Number(vals[ci])
               return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0
             })
             return { colorName: String(r.colorName ?? ''), quantities }
@@ -208,7 +254,7 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
             cutColorRows = orderColorRows.map((r) => ({ colorName: r.colorName, quantities: [...r.quantities] }))
           }
         } catch {
-          /* color-size-breakdown 也失败：保持空，让弹窗显示"暂无尺码明细"提示 */
+          /* keep empty */
         }
       }
       registerForm.headers = headers
@@ -217,19 +263,33 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
       registerForm.cutRow = cutRow
       registerForm.orderColorRows = orderColorRows
       registerForm.cutColorRows = cutColorRows
-      // 默认：把"裁床按颜色×尺码"作为车缝默认值（用户大概率沿用），可逐格修改
       const sizeLen = sizeHeaders.length
-      registerForm.sewingQuantitiesByColor = orderColorRows.map((plan, ri) => {
-        const cutQ = cutColorRows[ri]?.quantities ?? []
-        const orderQ = plan.quantities ?? []
-        const quantities = Array.from({ length: sizeLen }, (_, ci) => {
-          const c = Number(cutQ[ci])
-          if (Number.isFinite(c) && c > 0) return c
-          const o = Number(orderQ[ci])
-          return Number.isFinite(o) && o > 0 ? o : 0
+      const existingByColor = Array.isArray(data?.sewingQuantitiesByColor) ? data.sewingQuantitiesByColor : []
+      if (mode === 'edit' && existingByColor.length > 0) {
+        const byName = new Map(existingByColor.map((r) => [String(r.colorName ?? '').trim(), r.quantities ?? []]))
+        registerForm.sewingQuantitiesByColor = orderColorRows.map((plan) => {
+          const prev = byName.get(plan.colorName) ?? []
+          const quantities = Array.from({ length: sizeLen }, (_, ci) => {
+            const n = Number(prev[ci])
+            return Number.isFinite(n) && n > 0 ? Math.trunc(n) : 0
+          })
+          return { colorName: plan.colorName, quantities }
         })
-        return { colorName: plan.colorName, quantities }
-      })
+        registerForm.defectQuantity = Number(data?.defectQuantity) || 0
+        registerForm.defectReason = String(data?.defectReason ?? '')
+      } else {
+        registerForm.sewingQuantitiesByColor = orderColorRows.map((plan, ri) => {
+          const cutQ = cutColorRows[ri]?.quantities ?? []
+          const orderQ = plan.quantities ?? []
+          const quantities = Array.from({ length: sizeLen }, (_, ci) => {
+            const c = Number(cutQ[ci])
+            if (Number.isFinite(c) && c > 0) return c
+            const o = Number(orderQ[ci])
+            return Number.isFinite(o) && o > 0 ? o : 0
+          })
+          return { colorName: plan.colorName, quantities }
+        })
+      }
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
       registerDialog.visible = false
@@ -238,8 +298,29 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     }
   }
 
+  async function openRegisterDialog() {
+    const pending = selectedRows.value.filter((r) => r.sewingStatus !== 'completed')
+    if (pending.length === 0) return
+    await fillRegisterFormFromApi(pending[0], 'complete')
+  }
+
+  async function openEditCompletedDialog() {
+    const completed = selectedRows.value.filter((r) => r.sewingStatus === 'completed')
+    if (completed.length === 0) return
+    await fillRegisterFormFromApi(completed[0], 'edit')
+  }
+
+  async function openEditCompletedForRow(row: SewingListItem) {
+    if (row.sewingStatus !== 'completed') {
+      ElMessage.warning('仅已车缝完成的订单可纠错编辑')
+      return
+    }
+    await fillRegisterFormFromApi(row, 'edit')
+  }
+
   function resetRegisterForm() {
     registerDialog.row = null
+    registerDialog.mode = 'complete'
     registerForm.headers = []
     registerForm.sizeHeaders = []
     registerForm.orderRow = []
@@ -249,6 +330,10 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     registerForm.sewingQuantitiesByColor = []
     registerForm.defectQuantity = 0
     registerForm.defectReason = ''
+    registerForm.distributedAt = ''
+    registerForm.factoryDueDate = ''
+    registerForm.factoryName = ''
+    registerForm.sewingFee = ''
     registerFormRef.value?.clearValidate()
   }
 
@@ -259,10 +344,13 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
       ElMessage.warning('请填写车缝数量')
       return
     }
-    await registerFormRef.value?.validate().catch(() => {})
+    try {
+      await registerFormRef.value?.validate()
+    } catch {
+      return
+    }
     registerDialog.submitting = true
     try {
-      // 同时发一维 sewingQuantities：兼容老后端（仅认一维）
       const sizeLen = registerForm.sizeHeaders.length
       const perSize = sizeLen > 0
         ? Array.from({ length: sizeLen }, (_, ci) =>
@@ -272,15 +360,31 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
             ),
           )
         : []
-      await completeSewing({
+      const payload = {
         orderId: registerDialog.row.orderId,
         sewingQuantity: total,
         defectQuantity: registerForm.defectQuantity,
         defectReason: registerForm.defectReason.trim(),
         sewingQuantities: perSize.length > 0 ? perSize : undefined,
         sewingQuantitiesByColor: registerForm.sewingQuantitiesByColor,
-      })
-      ElMessage.success('车缝登记完成，订单已进入待尾部')
+      }
+      if (registerDialog.mode === 'edit') {
+        if (!registerForm.factoryName.trim()) {
+          ElMessage.warning('请选择加工供应商')
+          return
+        }
+        await editSewing({
+          ...payload,
+          distributedAt: registerForm.distributedAt || nowDatetimeStr(),
+          factoryDueDate: registerForm.factoryDueDate || '',
+          factoryName: registerForm.factoryName.trim(),
+          sewingFee: registerForm.sewingFee?.trim() || '0',
+        })
+        ElMessage.success('已保存分单与车缝数量（订单主状态未改）')
+      } else {
+        await completeSewing(payload)
+        ElMessage.success('车缝登记完成，订单已进入待尾部')
+      }
       registerDialog.visible = false
       await refreshAfterMutation()
     } catch (e: unknown) {
@@ -310,6 +414,8 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     resetAssignForm,
     submitAssign,
     openRegisterDialog,
+    openEditCompletedDialog,
+    openEditCompletedForRow,
     resetRegisterForm,
     submitRegister,
   }

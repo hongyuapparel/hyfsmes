@@ -77,7 +77,7 @@ export interface CuttingCompletedDetailResponse {
     orderDate: string | null;
   };
   colorSizeHeaders: string[];
-  actualCutRows: { colorName: string; quantities: number[]; remark?: string }[];
+  actualCutRows: { colorName: string; quantities: number[]; remark?: string; imageUrl?: string }[];
   materialUsageRows: CuttingRegisterFormMaterialRow[];
   cuttingDepartment: string | null;
   cutterName: string | null;

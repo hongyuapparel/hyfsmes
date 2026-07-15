@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     v-model="visible"
-    title="确认完成"
+    :title="mode === 'edit' ? '编辑已提交纸样' : '确认完成'"
     width="480"
     destroy-on-close
     @close="emit('close')"
@@ -40,7 +40,9 @@
     </el-form>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="emit('submit')">完成纸样</el-button>
+      <el-button type="primary" :loading="submitting" @click="emit('submit')">
+        {{ mode === 'edit' ? '保存纠错' : '完成纸样' }}
+      </el-button>
     </template>
   </AppDialog>
 </template>
@@ -50,13 +52,17 @@ import { ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { PatternListItem } from '@/api/production-pattern'
 
-const props = defineProps<{
-  modelValue: boolean
-  row: PatternListItem | null
-  form: { sampleImageUrl: string }
-  rules: FormRules
-  submitting: boolean
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean
+    row: PatternListItem | null
+    form: { sampleImageUrl: string }
+    rules: FormRules
+    submitting: boolean
+    mode?: 'complete' | 'edit'
+  }>(),
+  { mode: 'complete' },
+)
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]

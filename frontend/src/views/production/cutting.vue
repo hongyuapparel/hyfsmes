@@ -154,7 +154,7 @@
       :display-dash="displayDash"
       :money-display="moneyDisplay"
       :fabric-meters-display="fabricMetersDisplay"
-      :can-edit="canCompleteCuttingAction"
+      :can-edit="canAdminEditSubmitted"
       @update:drawer="detailDrawer.visible = $event.visible"
       @closed="onDetailDrawerClosed"
       @edit="onEditFromDrawer"
@@ -211,6 +211,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 
 const authStore = useAuthStore()
 const canCompleteCuttingAction = computed(() => authStore.hasPermission('production_cutting_complete'))
+const canAdminEditSubmitted = computed(() => authStore.hasPermission('production_admin_edit'))
 
 const CUTTING_TABS = [
   { label: '全部', value: 'all' },

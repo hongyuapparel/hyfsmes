@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
@@ -88,18 +88,24 @@ export class OrderLifecycleService {
     return shortages;
   }
 
-  async deleteMany(ids: number[], actor: OrderActor): Promise<void> {
+  async deleteMany(ids: number[], actor: OrderActor, deleteReason?: string): Promise<void> {
     if (!ids?.length) return;
+    const reason = (deleteReason ?? '').trim();
+    if (!reason) throw new BadRequestException('请选择删除原因');
+    if (reason.length > 500) throw new BadRequestException('删除原因不能超过 500 字');
+
     const orders = await this.orderRepo.findByIds(ids);
     if (!orders.length) return;
     const now = new Date();
+    // 存 username，列表再解析为展示名（与 resolveDeletedByDisplayMap 约定一致）
+    const deletedByUsername = (actor.username ?? '').trim() || (await resolveOperatorDisplayName(this.userRepo, actor));
     for (const o of orders) {
       if (o.deletedAt) continue;
       o.deletedAt = now;
-      o.deletedBy = actor.username;
-      o.deleteReason = '移入回收站';
+      o.deletedBy = deletedByUsername;
+      o.deleteReason = reason;
       await this.orderRepo.save(o);
-      await this.orderStatusService.addLog(o, actor, 'delete', '删除订单（移入回收站）');
+      await this.orderStatusService.addLog(o, actor, 'delete', `删除订单（移入回收站）：${reason}`);
     }
   }
 

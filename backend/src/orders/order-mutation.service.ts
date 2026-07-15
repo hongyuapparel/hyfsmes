@@ -320,7 +320,9 @@ export class OrderMutationService {
   async updateDraft(id: number, payload: OrderEditPayload, actor: OrderActor): Promise<Order> {
     const order = await this.orderQueryService.findOne(id);
     const before = { ...order };
+    const isAdmin = await this.orderStatusService.isAdminUser(actor.userId);
     const shouldRebaseWorkflow =
+      !isAdmin &&
       (await this.orderStatusService.canRebaseWorkflowStatus(order.status)) &&
       this.orderStatusService.hasWorkflowRelevantChanges(before, payload);
 
@@ -434,8 +436,8 @@ export class OrderMutationService {
     return saved;
   }
 
-  async deleteMany(ids: number[], actor: OrderActor): Promise<void> {
-    return this.orderLifecycleService.deleteMany(ids, actor);
+  async deleteMany(ids: number[], actor: OrderActor, deleteReason?: string): Promise<void> {
+    return this.orderLifecycleService.deleteMany(ids, actor, deleteReason);
   }
 
   async reviewMany(ids: number[], actor: OrderActor): Promise<ReviewResult> {

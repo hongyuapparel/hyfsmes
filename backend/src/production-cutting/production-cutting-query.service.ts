@@ -270,13 +270,27 @@ export class ProductionCuttingQueryService {
     if (!order) throw new NotFoundException('订单不存在');
     const cutting = await this.cuttingRepo.findOne({ where: { orderId } });
     if (!cutting || String(cutting.status ?? '').toLowerCase() !== 'completed') throw new NotFoundException('该订单尚无裁床完成记录');
-    const headers = (await this.orderExtRepo.findOne({ where: { orderId } }))?.colorSizeHeaders ?? [];
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    const headers = ext?.colorSizeHeaders ?? [];
     const len = headers.length;
+    const imageByColor = new Map<string, string>();
+    for (const plan of ext?.colorSizeRows ?? []) {
+      const name = String(plan?.colorName ?? '').trim();
+      const url = String(plan?.imageUrl ?? '').trim();
+      if (name && url) imageByColor.set(name, url);
+    }
     const rawRows = Array.isArray(cutting.actualCutRows) ? cutting.actualCutRows : [];
     const actualCutRows = rawRows.map((r) => {
       const q = Array.isArray(r.quantities) ? [...r.quantities] : [];
       while (q.length < len) q.push(0);
-      return { colorName: r.colorName ?? '', quantities: len > 0 ? q.slice(0, len) : q, remark: r.remark };
+      const colorName = r.colorName ?? '';
+      const imageUrl = imageByColor.get(String(colorName).trim()) || undefined;
+      return {
+        colorName,
+        quantities: len > 0 ? q.slice(0, len) : q,
+        remark: r.remark,
+        ...(imageUrl ? { imageUrl } : {}),
+      };
     });
     const extras = await this.fetchSingleOrderCuttingExtras(orderId);
     const downstream = await detectSewingStarted(this.sewingRepo, orderId);

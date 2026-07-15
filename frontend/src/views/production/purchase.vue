@@ -144,6 +144,20 @@
         >
           {{ batchButtonLabel }}
         </el-button>
+        <el-button
+          v-if="hasSelection && canEditCompletedPurchaseSelection && canAdminEditSubmitted"
+          type="primary"
+          @click="openEditCompletedDialog"
+        >
+          编辑采购
+        </el-button>
+        <el-button
+          v-if="hasSelection && canEditCompletedPickSelection && canAdminEditSubmitted"
+          type="primary"
+          @click="openEditCompletedPickDialog"
+        >
+          编辑领料
+        </el-button>
       </div>
     </div>
 
@@ -297,6 +311,7 @@
     <PurchaseRegisterDialog
       v-model="registerDialog.visible"
       :rows="registerDialog.rows"
+      :mode="registerDialog.mode"
       :submitting="registerDialog.submitting"
       :supplier-options="registerSupplierOptions"
       :supplier-loading="registerSupplierLoading"
@@ -360,6 +375,7 @@ import AppImageThumb from '@/components/AppImageThumb.vue'
 
 const authStore = useAuthStore()
 const canRegisterPurchase = computed(() => authStore.hasPermission('production_purchase_register'))
+const canAdminEditSubmitted = computed(() => authStore.hasPermission('production_admin_edit'))
 
 const {
   filter,
@@ -429,16 +445,31 @@ const {
   submitPick,
   resetRegisterForm,
   submitRegister,
+  openEditCompletedDialog,
+  openEditCompletedPickDialog,
 } = usePurchaseDialogs({
   currentTab,
   hasSelection,
   selectedRows,
+  canAdminEditSubmitted,
   reload: load,
   reloadTabCounts: loadTabCounts,
   clearSelection: () => {
     selectedRows.value = []
   },
 })
+
+const canEditCompletedPurchaseSelection = computed(
+  () =>
+    selectedRows.value.length > 0
+    && selectedRows.value.every((r) => r.processRoute === 'purchase' && r.purchaseStatus === 'completed'),
+)
+
+const canEditCompletedPickSelection = computed(
+  () =>
+    selectedRows.value.length > 0
+    && selectedRows.value.every((r) => r.processRoute === 'picking' && r.pickStatus === 'completed'),
+)
 
 const purchaseDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
 

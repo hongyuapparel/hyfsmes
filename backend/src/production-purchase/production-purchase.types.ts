@@ -43,6 +43,7 @@ export interface PurchaseItemRow {
   purchaseOtherCost: string | null;
   purchaseRemark: string | null;
   purchaseImageUrl: string | null;
+  pickRemark: string | null;
   materialSourceId: number | null;
   materialSource: string;
   processRoute: 'purchase' | 'picking';

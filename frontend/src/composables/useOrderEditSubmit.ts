@@ -86,6 +86,25 @@ export function useOrderEditSubmit({
     }
   }
 
+  async function onSaveChanges() {
+    const payload = await collectPayload().catch(() => undefined)
+    if (!payload || !orderId.value) return
+
+    saving.value = true
+    try {
+      const res = await updateOrderDraft(orderId.value, payload)
+      ElMessage.success('修改已保存')
+      orderStatus.value = res.data?.status ?? orderStatus.value
+      orderNo.value = res.data?.orderNo ?? orderNo.value
+      hasUnsavedChanges.value = false
+      persistCurrentOrder(orderId.value)
+    } catch (e: unknown) {
+      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    } finally {
+      saving.value = false
+    }
+  }
+
   async function onSaveAndSubmit() {
     const payload = await collectPayload().catch(() => undefined)
     if (!payload) return
@@ -127,6 +146,7 @@ export function useOrderEditSubmit({
     saving,
     submitting,
     onSaveDraft,
+    onSaveChanges,
     onSaveAndSubmit,
   }
 }

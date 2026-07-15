@@ -18,73 +18,22 @@
           </el-descriptions-item>
         </el-descriptions>
       </ProductionDetailSection>
-      <ProductionDetailSection title="颜色×尺码明细">
-        <div v-if="colorBreakdownLoading" class="color-bd-empty">加载中…</div>
-        <div v-else-if="colorBreakdownError" class="color-bd-empty">明细加载失败</div>
-        <template v-else>
-          <!-- 跨色总数：来自 finishing 标量真值（用户登记时填的总数，非估算） -->
-          <div class="color-bd-totals">
-            <span class="color-bd-total-item"><b>订单数量</b> {{ formatDisplayNumber(row.quantity ?? 0) }}</span>
-            <span class="color-bd-total-item"><b>裁床数量</b> {{ row.cutTotal != null ? formatDisplayNumber(row.cutTotal) : '—' }}</span>
-            <span class="color-bd-total-item"><b>车缝数量</b> {{ row.sewingQuantity != null ? formatDisplayNumber(row.sewingQuantity) : '—' }}</span>
-            <span class="color-bd-total-item"><b>尾部收货</b> {{ row.tailReceivedQty != null ? formatDisplayNumber(row.tailReceivedQty) : '—' }}</span>
-            <span class="color-bd-total-item"><b>尾部入库</b> {{ row.tailInboundQty != null ? formatDisplayNumber(row.tailInboundQty) : '—' }}</span>
-            <span class="color-bd-total-item"><b>次品数</b> {{ row.defectQuantity != null ? formatDisplayNumber(row.defectQuantity) : '—' }}</span>
-          </div>
+
+      <ProductionColorSizeBreakdownSection
+        :loading="colorBreakdownLoading"
+        :error="colorBreakdownError"
+        :size-headers="colorBreakdown?.sizeHeaders ?? []"
+        :color-rows="colorBreakdown?.planColorRows ?? []"
+        :stages="stageDefs"
+        :totals="totalItems"
+      >
+        <template v-if="canAmend" #actions>
+          <el-button type="primary" size="small" @click="emit('amend', row!)">
+            编辑
+          </el-button>
         </template>
-        <div v-if="!colorBreakdownLoading && !colorBreakdownError && !hasColorSizeDimension" class="color-bd-empty">本订单无颜色×尺码维度</div>
-        <template v-if="!colorBreakdownLoading && !colorBreakdownError && hasColorSizeDimension">
-          <div
-            v-for="(color, ci) in (colorBreakdown?.planColorRows ?? [])"
-            :key="ci"
-            class="color-bd-block"
-          >
-            <div class="color-bd-color-name">{{ color.colorName || '—' }}</div>
-            <table class="color-bd-table">
-              <thead>
-                <tr>
-                  <th class="color-bd-th-stage">阶段</th>
-                  <th
-                    v-for="(h, hi) in (colorBreakdown?.sizeHeaders ?? [])"
-                    :key="hi"
-                  >{{ h }}</th>
-                  <th>合计</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="(stage, si) in stagesForColor(ci)"
-                  :key="si"
-                >
-                  <td class="color-bd-stage-label">{{ stage.label }}</td>
-                  <template v-if="stage.values">
-                    <td
-                      v-for="(v, vi) in stage.values"
-                      :key="vi"
-                      class="color-bd-num"
-                    >{{ formatDisplayNumber(v) }}</td>
-                    <td class="color-bd-num color-bd-total">
-                      <strong>{{ formatDisplayNumber(sumArr(stage.values)) }}</strong>
-                    </td>
-                  </template>
-                  <template v-else-if="stage.total === null || Number(stage.total) === 0">
-                    <td
-                      :colspan="(colorBreakdown?.sizeHeaders.length ?? 0) + 1"
-                      class="color-bd-not-yet"
-                    >尚未登记</td>
-                  </template>
-                  <template v-else>
-                    <td
-                      :colspan="(colorBreakdown?.sizeHeaders.length ?? 0) + 1"
-                      class="color-bd-no-detail"
-                    >未留存颜色×尺码明细</td>
-                  </template>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </template>
-      </ProductionDetailSection>
+      </ProductionColorSizeBreakdownSection>
+
       <ProductionDetailSection title="时效与节点">
         <el-descriptions :column="1" border size="small" class="finishing-brief-extra">
           <el-descriptions-item label="到尾部时间">{{ formatDateTime(row.arrivedAt) }}</el-descriptions-item>
@@ -119,6 +68,10 @@ import type { ProductionOrderBriefModel } from '@/components/production/Producti
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
+import ProductionColorSizeBreakdownSection, {
+  type ColorSizeStageDef,
+  type ColorSizeTotalItem,
+} from '@/components/production/ProductionColorSizeBreakdownSection.vue'
 import BatchTimelineSection from '@/components/production/BatchTimelineSection.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
@@ -128,29 +81,23 @@ const props = defineProps<{
   row: FinishingListItem | null
   brief: ProductionOrderBriefModel
   logs: Array<{ id: string | number; operatorUsername: string; createdAt: string; summary: string }>
+  canAmend?: boolean
+  reloadToken?: number
 }>()
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   closed: []
+  amend: [row: FinishingListItem]
 }>()
 
 const visible = ref(props.modelValue)
 watch(() => props.modelValue, (v) => { visible.value = v })
 watch(visible, (v) => emit('update:modelValue', v))
 
-// === 颜色×尺码明细 ===
-// 真值优先：调 register-form-data，只展示 DB 里 byColor 真值；缺真值的阶段
-// 显示"未留存颜色×尺码明细"，不做兜底估算。
 const colorBreakdown = ref<FinishingRegisterFormDataRes | null>(null)
 const colorBreakdownLoading = ref(false)
 const colorBreakdownError = ref(false)
-
-const hasColorSizeDimension = computed(() => {
-  const data = colorBreakdown.value
-  if (!data) return false
-  return (data.sizeHeaders?.length ?? 0) > 0 && (data.planColorRows?.length ?? 0) > 0
-})
 
 const FINISHING_STATUS_LABELS: Record<string, string> = {
   pending_receive: '待尾部',
@@ -165,34 +112,76 @@ const finishingStatusText = computed(() => {
   return FINISHING_STATUS_LABELS[s] ?? s
 })
 
-interface StageRow {
-  label: string
-  values: number[] | null
-  /** 该阶段跨色合计（取自 finishing 标量真值）；用来区分"未登记 (0/null)" vs "已登记但缺 byColor 明细" */
-  total: number | null
-}
-function colorRowOrNull(colorIdx: number, rows: Array<{ colorName: string; quantities: number[] }> | undefined | null): number[] | null {
+function colorRowOrNull(
+  colorIdx: number,
+  rows: Array<{ colorName: string; quantities: number[] }> | undefined | null,
+): number[] | null {
   if (!Array.isArray(rows) || rows.length === 0) return null
   return rows[colorIdx]?.quantities ?? null
 }
 
-function stagesForColor(colorIdx: number): StageRow[] {
+const stageDefs = computed<ColorSizeStageDef[]>(() => {
   const data = colorBreakdown.value
   const row = props.row
   if (!data) return []
   return [
-    { label: '订单数量', values: colorRowOrNull(colorIdx, data.planColorRows), total: row?.quantity ?? null },
-    { label: '裁床数量', values: colorRowOrNull(colorIdx, data.cutColorRows), total: row?.cutTotal ?? null },
-    { label: '车缝数量', values: colorRowOrNull(colorIdx, data.sewingColorRows), total: row?.sewingQuantity ?? null },
-    { label: '尾部收货数', values: colorRowOrNull(colorIdx, data.tailReceivedColorRows), total: row?.tailReceivedQty ?? null },
-    { label: '尾部入库数', values: colorRowOrNull(colorIdx, data.tailInboundColorRows), total: row?.tailInboundQty ?? null },
-    { label: '次品数', values: colorRowOrNull(colorIdx, data.defectColorRows), total: row?.defectQuantity ?? null },
+    {
+      label: '订单数量',
+      valuesForColor: (ci) => colorRowOrNull(ci, data.planColorRows),
+      total: row?.quantity ?? null,
+    },
+    {
+      label: '裁床数量',
+      valuesForColor: (ci) => colorRowOrNull(ci, data.cutColorRows),
+      total: row?.cutTotal ?? null,
+    },
+    {
+      label: '车缝数量',
+      valuesForColor: (ci) => colorRowOrNull(ci, data.sewingColorRows),
+      total: row?.sewingQuantity ?? null,
+    },
+    {
+      label: '尾部收货数',
+      valuesForColor: (ci) => colorRowOrNull(ci, data.tailReceivedColorRows),
+      total: row?.tailReceivedQty ?? null,
+    },
+    {
+      label: '尾部入库数',
+      valuesForColor: (ci) => colorRowOrNull(ci, data.tailInboundColorRows),
+      total: row?.tailInboundQty ?? null,
+    },
+    {
+      label: '次品数',
+      valuesForColor: (ci) => colorRowOrNull(ci, data.defectColorRows),
+      total: row?.defectQuantity ?? null,
+    },
   ]
-}
+})
 
-function sumArr(values: number[]): number {
-  return values.reduce((s, n) => s + (Number(n) || 0), 0)
-}
+const totalItems = computed<ColorSizeTotalItem[]>(() => {
+  const row = props.row
+  if (!row) return []
+  return [
+    { label: '订单数量', display: formatDisplayNumber(row.quantity ?? 0) },
+    { label: '裁床数量', display: row.cutTotal != null ? formatDisplayNumber(row.cutTotal) : '—' },
+    {
+      label: '车缝数量',
+      display: row.sewingQuantity != null ? formatDisplayNumber(row.sewingQuantity) : '—',
+    },
+    {
+      label: '尾部收货',
+      display: row.tailReceivedQty != null ? formatDisplayNumber(row.tailReceivedQty) : '—',
+    },
+    {
+      label: '尾部入库',
+      display: row.tailInboundQty != null ? formatDisplayNumber(row.tailInboundQty) : '—',
+    },
+    {
+      label: '次品数',
+      display: row.defectQuantity != null ? formatDisplayNumber(row.defectQuantity) : '—',
+    },
+  ]
+})
 
 async function loadColorBreakdown(orderId: number) {
   colorBreakdownLoading.value = true
@@ -210,9 +199,13 @@ async function loadColorBreakdown(orderId: number) {
 }
 
 watch(
-  () => (props.modelValue && props.row?.orderId) || 0,
-  (orderId) => {
-    if (orderId > 0) void loadColorBreakdown(orderId)
+  () => ({
+    open: props.modelValue,
+    orderId: props.row?.orderId ?? 0,
+    token: props.reloadToken ?? 0,
+  }),
+  ({ open, orderId }) => {
+    if (open && orderId > 0) void loadColorBreakdown(orderId)
     else colorBreakdown.value = null
   },
   { immediate: true },
@@ -220,69 +213,7 @@ watch(
 </script>
 
 <style scoped>
-.color-bd-empty {
-  color: var(--el-text-color-secondary);
-  padding: 8px 0;
-}
-.color-bd-totals {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  padding: 6px 10px;
-  margin-bottom: 10px;
-  background-color: var(--el-fill-color-lighter);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 4px;
-  font-size: var(--font-size-body);
-}
-.color-bd-total-item b {
-  font-weight: 500;
-  color: var(--el-text-color-secondary);
-  margin-right: 4px;
-}
-.color-bd-block + .color-bd-block {
-  margin-top: 12px;
-}
-.color-bd-color-name {
-  font-weight: 600;
-  margin-bottom: 6px;
-  color: var(--el-text-color-primary);
-}
-.color-bd-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: var(--font-size-body);
-}
-.color-bd-table th,
-.color-bd-table td {
-  border: 1px solid var(--el-border-color-lighter);
-  padding: 4px 8px;
-  text-align: center;
-}
-.color-bd-table thead th {
-  background-color: var(--el-fill-color-light);
-  font-weight: 500;
-}
-.color-bd-th-stage,
-.color-bd-stage-label {
-  text-align: left;
-  white-space: nowrap;
-  min-width: 84px;
-}
-.color-bd-num {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-.color-bd-total {
-  background-color: var(--el-fill-color-lighter);
-}
-.color-bd-not-yet {
-  color: var(--el-text-color-placeholder);
-  text-align: center;
-}
-.color-bd-no-detail {
-  color: var(--el-text-color-secondary);
-  font-style: italic;
-  text-align: center;
+.finishing-brief-extra {
+  margin-top: 4px;
 }
 </style>

@@ -8,22 +8,19 @@
   >
     <div v-loading="drawer.loading" class="cutting-detail-drawer__body">
       <template v-if="drawer.row">
-        <ProductionDetailSection v-if="!detailPayload">
-          <ProductionOrderBriefPanel :brief="briefFromRow(drawer.row)" />
+        <ProductionDetailSection>
+          <ProductionOrderBriefPanel
+            :brief="detailOrderBrief"
+          />
         </ProductionDetailSection>
+
         <template v-if="detailPayload">
-          <ProductionDetailSection>
-            <div class="cut-detail-toolbar">
-              <CuttingBasicInfoBar :order-brief="detailPayload.orderBrief" show-extended />
-              <el-button
-                v-if="canEdit"
-                type="primary"
-                size="small"
-                @click="emit('edit')"
-              >
+          <ProductionDetailSection title="裁剪数量与物料">
+            <template v-if="canEdit" #actions>
+              <el-button type="primary" size="small" @click="emit('edit')">
                 编辑
               </el-button>
-            </div>
+            </template>
             <p v-if="detailPayload.downstream?.sewingStarted" class="register-hint register-hint--warn">
               下游车缝已登记 {{ detailPayload.downstream.sewingQuantity }} 件，修改裁床数据可能导致数据不一致。
             </p>
@@ -41,42 +38,42 @@
               :table-max-height="420"
               readonly
             />
-            <div class="cut-detail-meta">
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">到裁床时间</span>
-                <span>{{ formatDateTime(detailPayload.arrivedAt) }}</span>
-              </div>
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">完成时间</span>
-                <span>{{ formatDateTime(detailPayload.completedAt) }}</span>
-              </div>
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">裁剪部门</span>
-                <span>{{ displayDash(detailPayload.cuttingDepartment) }}</span>
-              </div>
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">裁剪人</span>
-                <span>{{ displayDash(detailPayload.cutterName) }}</span>
-              </div>
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">本次净耗合计(米)</span>
-                <span>{{ fabricMetersDisplay(detailPayload.actualFabricMeters) }}</span>
-              </div>
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">裁剪单价(元/件)</span>
-                <span>{{ moneyDisplay(detailPayload.cuttingUnitPrice) }}</span>
-              </div>
-              <div class="cut-detail-meta__row">
-                <span class="cut-detail-meta__label">裁剪总成本(元)</span>
-                <span>{{ moneyDisplay(detailPayload.cuttingTotalCost ?? detailPayload.cuttingCost) }}</span>
-              </div>
-            </div>
+          </ProductionDetailSection>
+
+          <ProductionDetailSection title="时效与成本">
+            <el-descriptions :column="2" border size="small">
+              <el-descriptions-item label="到裁床时间">
+                {{ formatDateTime(detailPayload.arrivedAt) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="完成时间">
+                {{ formatDateTime(detailPayload.completedAt) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="裁剪部门">
+                {{ displayDash(detailPayload.cuttingDepartment) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="裁剪人">
+                {{ displayDash(detailPayload.cutterName) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="本次净耗合计(米)">
+                {{ fabricMetersDisplay(detailPayload.actualFabricMeters) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="裁剪单价(元/件)">
+                {{ moneyDisplay(detailPayload.cuttingUnitPrice) }}
+              </el-descriptions-item>
+              <el-descriptions-item label="裁剪总成本(元)">
+                {{ moneyDisplay(detailPayload.cuttingTotalCost ?? detailPayload.cuttingCost) }}
+              </el-descriptions-item>
+            </el-descriptions>
           </ProductionDetailSection>
         </template>
+
         <ProductionDetailSection v-else title="时效与节点">
-          <el-descriptions :column="1" border size="small">
+          <el-descriptions :column="2" border size="small">
             <el-descriptions-item label="裁床状态">
               {{ drawer.row.cuttingStatus === 'completed' ? '裁床完成' : '等待裁床' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="时效判定">
+              <SlaJudgeTag :text="drawer.row.timeRating" />
             </el-descriptions-item>
             <el-descriptions-item label="到裁床时间">
               {{ formatDateTime(drawer.row.arrivedAt) }}
@@ -84,12 +81,10 @@
             <el-descriptions-item label="完成时间">
               {{ formatDateTime(drawer.row.completedAt) }}
             </el-descriptions-item>
-            <el-descriptions-item label="时效判定">
-              <SlaJudgeTag :text="drawer.row.timeRating" />
-            </el-descriptions-item>
           </el-descriptions>
         </ProductionDetailSection>
       </template>
+
       <ProductionDetailSection v-if="drawer.row">
         <OperationLogsSection :logs="logs" />
       </ProductionDetailSection>
@@ -106,7 +101,6 @@ import type { ProductionOrderBriefModel } from '@/components/production/Producti
 import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
-import CuttingBasicInfoBar from '@/components/production-cutting/CuttingBasicInfoBar.vue'
 import CuttingQuantityMatrix from '@/components/production-cutting/CuttingQuantityMatrix.vue'
 import CuttingMaterialUsageTable from '@/components/production-cutting/CuttingMaterialUsageTable.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
@@ -140,52 +134,40 @@ const visible = computed({
   get: () => props.drawer.visible,
   set: (v) => emit('update:drawer', { ...props.drawer, visible: v }),
 })
+
+/** 用列表行补齐图片/跟单等；下单日期优先取详情接口 */
+const detailOrderBrief = computed<ProductionOrderBriefModel | null>(() => {
+  const row = props.drawer.row
+  if (!row) return null
+  const base = props.briefFromRow(row)
+  const fromDetail = props.detailPayload?.orderBrief
+  if (!fromDetail) return base
+  return {
+    ...base,
+    orderNo: fromDetail.orderNo || base.orderNo,
+    skuCode: fromDetail.skuCode || base.skuCode,
+    orderQuantity: fromDetail.quantity ?? base.orderQuantity,
+    customerName: fromDetail.customerName || base.customerName,
+    orderDate: fromDetail.orderDate ?? base.orderDate,
+  }
+})
 </script>
 
 <style scoped>
 .cutting-detail-drawer__body {
   min-height: 120px;
-}
-
-.cut-detail-toolbar {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-sm);
+  flex-direction: column;
+  gap: 12px;
 }
 
 .register-hint {
-  margin-bottom: var(--space-sm);
+  margin: 0 0 var(--space-sm);
   color: var(--el-text-color-secondary);
-  font-size: var(--font-size-caption, 12px);
+  font-size: var(--font-size-caption);
 }
 
 .register-hint--warn {
   color: var(--el-color-warning);
-}
-
-.cut-detail-meta {
-  margin-top: var(--space-md);
-  padding: 12px;
-  background: var(--el-fill-color-light);
-  border-radius: var(--radius);
-  border: 1px solid var(--el-border-color-lighter);
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.cut-detail-meta__row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: baseline;
-}
-
-.cut-detail-meta__label {
-  color: var(--el-text-color-secondary);
-  min-width: 9em;
-  flex-shrink: 0;
 }
 </style>

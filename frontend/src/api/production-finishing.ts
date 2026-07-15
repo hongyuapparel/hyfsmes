@@ -123,6 +123,11 @@ export function registerFinishingPackagingComplete(payload: RegisterFinishingPac
   return request.post<void>('/production/finishing/items/register-packaging-complete', payload)
 }
 
+/** 纠错修订已完成尾部入库/次品（需 production_admin_edit） */
+export function amendFinishingPackaging(payload: Omit<RegisterFinishingPackagingCompletePayload, 'mode'>) {
+  return request.post<void>('/production/finishing/items/amend-packaging', payload)
+}
+
 export function registerFinishingPackaging(payload: {
   orderId: number
   tailReceivedQty: number

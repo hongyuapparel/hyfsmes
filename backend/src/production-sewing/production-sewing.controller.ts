@@ -158,4 +158,36 @@ export class ProductionSewingController {
       user ? { userId: user.userId, username: user.username } : undefined,
     );
   }
+
+  @Post('items/:orderId/edit')
+  @RequirePermission('production_admin_edit')
+  edit(
+    @Param('orderId', ParseIntPipe) orderId: number,
+    @Body('sewingQuantity') sewingQuantity: number,
+    @Body('defectQuantity') defectQuantity: number,
+    @Body('defectReason') defectReason: string,
+    @Body('sewingQuantities') sewingQuantities?: number[],
+    @Body('sewingQuantitiesByColor') sewingQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
+    @Body('distributedAt') distributedAt?: string,
+    @Body('factoryDueDate') factoryDueDate?: string,
+    @Body('factoryName') factoryName?: string,
+    @Body('sewingFee') sewingFee?: string,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.sewingService.editCompletedSewing(
+      orderId,
+      Number(sewingQuantity),
+      Number(defectQuantity ?? 0),
+      defectReason ?? '',
+      Array.isArray(sewingQuantities) ? sewingQuantities : undefined,
+      Array.isArray(sewingQuantitiesByColor) ? sewingQuantitiesByColor : undefined,
+      user ? { userId: user.userId, username: user.username } : undefined,
+      {
+        distributedAt: distributedAt ?? null,
+        factoryDueDate: factoryDueDate ?? null,
+        factoryName: factoryName ?? null,
+        sewingFee: sewingFee ?? null,
+      },
+    );
+  }
 }
