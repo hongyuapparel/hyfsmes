@@ -3,6 +3,7 @@ import type { OrderDetail, OrderFormPayload } from '@/api/orders'
 import type { ColorRow } from '@/composables/useOrderColorSizeMatrix'
 import type { MaterialRow } from '@/composables/useOrderMaterials'
 import type { SizeInfoRow } from '@/composables/useOrderSizeInfo'
+import { roundMaterialUsageQty } from '@/utils/material-usage-qty'
 
 interface ProcessItemInputRow {
   processName?: string
@@ -102,7 +103,7 @@ export function useOrderDetailHydration(params: UseOrderDetailHydrationParams) {
       weight: m.weight ?? '',
       referenceImageUrl: m.referenceImageUrl ?? '',
       fabricWidth: m.fabricWidth ?? '',
-      usagePerPiece: m.usagePerPiece != null ? params.roundMaterialQty2(Number(m.usagePerPiece)) : null,
+      usagePerPiece: m.usagePerPiece != null ? roundMaterialUsageQty(Number(m.usagePerPiece)) : null,
       lossPercent: m.lossPercent ?? null,
       orderPieces: m.orderPieces ?? null,
       purchaseQuantity:

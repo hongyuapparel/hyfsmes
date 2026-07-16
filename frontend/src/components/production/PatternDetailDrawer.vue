@@ -100,6 +100,8 @@
               <el-input-number
                 v-model="matRow.usagePerPiece"
                 :min="0"
+                :formatter="formatMaterialUsageQtyDisplay"
+                :parser="parseMaterialUsageQtyInput"
                 :controls="false"
                 size="small"
                 :disabled="!canEdit || !editMode"
@@ -169,6 +171,10 @@ import ProductionDetailSection from '@/components/production/ProductionDetailSec
 import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
 import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
+import {
+  formatMaterialUsageQtyDisplay,
+  parseMaterialUsageQtyInput,
+} from '@/utils/material-usage-qty'
 
 interface MaterialsForm {
   materials: PatternMaterialRow[]

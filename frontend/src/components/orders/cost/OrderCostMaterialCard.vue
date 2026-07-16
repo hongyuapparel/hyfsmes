@@ -72,7 +72,14 @@
       </el-table-column>
       <el-table-column label="单件用量" width="82" align="right">
         <template #default="{ row }">
-          <el-input-number v-model="row.usagePerPiece" :min="0" :controls="false" size="small" />
+          <el-input-number
+            v-model="row.usagePerPiece"
+            :min="0"
+            :formatter="formatMaterialUsageQtyDisplay"
+            :parser="parseMaterialUsageQtyInput"
+            :controls="false"
+            size="small"
+          />
         </template>
       </el-table-column>
       <el-table-column label="损耗%" width="72" align="right">
@@ -127,6 +134,10 @@
 <script setup lang="ts">
 import { Delete } from '@element-plus/icons-vue'
 import { formatMoneyAligned } from '@/utils/display-number'
+import {
+  formatMaterialUsageQtyDisplay,
+  parseMaterialUsageQtyInput,
+} from '@/utils/material-usage-qty'
 import { materialAmount, isMaterialIncluded, type MaterialRow } from '@/utils/order-cost'
 
 defineProps<{

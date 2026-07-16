@@ -1,4 +1,4 @@
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatMaterialUsageQtyDisplay } from '@/utils/material-usage-qty'
 
 export interface MaterialQuantityDisplaySource {
   materialType?: string | null
@@ -22,12 +22,17 @@ export function getMaterialQuantityUnit(row: MaterialQuantityDisplaySource): str
   return ''
 }
 
+/**
+ * 物料数量只读展示（采购计划用量、领料数量等）。
+ * 数值部分与单件用量一致：最多 3 位小数，去掉无意义尾随 0。
+ */
 export function formatMaterialQuantity(
   quantity: number | string | null | undefined,
   row: MaterialQuantityDisplaySource,
 ): string {
   if (quantity == null || quantity === '') return '-'
-  const value = formatDisplayNumber(quantity)
+  const value = formatMaterialUsageQtyDisplay(quantity)
+  if (value === '') return '-'
   const unit = getMaterialQuantityUnit(row)
   return unit ? `${value} ${unit}` : value
 }

@@ -26,7 +26,8 @@
             v-else
             :model-value="row.expectedUsagePerPiece ?? undefined"
             :min="0"
-            :precision="2"
+            :formatter="formatMaterialUsageQtyDisplay"
+            :parser="parseMaterialUsageQtyInput"
             :controls="false"
             size="small"
             class="cutting-mat-usage__num"
@@ -34,7 +35,7 @@
             @update:model-value="
               (v) =>
                 patchRow($index, {
-                  expectedUsagePerPiece: v == null ? null : roundMoney2(Number(v)),
+                  expectedUsagePerPiece: v == null ? null : roundMaterialUsageQty(Number(v)),
                 })
             "
           />
@@ -112,14 +113,14 @@
       <el-table-column label="单件实际用量" width="112" align="right">
         <template #default="{ row }">
           <span class="cutting-mat-usage__readonly">{{
-            formatDisplayNumber(perPieceActual(row), { emptyDisplay: '—' })
+            formatMaterialUsageQtyOrDash(perPieceActual(row))
           }}</span>
         </template>
       </el-table-column>
       <el-table-column label="标准单件用量" width="112" align="right">
         <template #default="{ row }">
           <span class="cutting-mat-usage__readonly">{{
-            formatDisplayNumber(standardPerPiece(row), { emptyDisplay: '—' })
+            formatMaterialUsageQtyOrDash(standardPerPiece(row))
           }}</span>
         </template>
       </el-table-column>
@@ -144,6 +145,12 @@
 import type { CuttingMaterialUsagePayloadRow } from '@/api/production-cutting'
 import { CUTTING_ABNORMAL_REASONS } from '@/constants/cutting-register'
 import { formatDisplayNumber } from '@/utils/display-number'
+import {
+  formatMaterialUsageQtyDisplay,
+  formatMaterialUsageQtyOrDash,
+  parseMaterialUsageQtyInput,
+  roundMaterialUsageQty,
+} from '@/utils/material-usage-qty'
 
 const props = withDefaults(
   defineProps<{
@@ -162,8 +169,7 @@ const emit = defineEmits<{
 }>()
 
 function fmtExpected(v: number | null | undefined) {
-  if (v == null || !Number.isFinite(Number(v))) return '—'
-  return formatDisplayNumber(v)
+  return formatMaterialUsageQtyOrDash(v)
 }
 
 function numOrZero(v: number | undefined | null) {
@@ -174,11 +180,6 @@ function numOrZero(v: number | undefined | null) {
 function roundMeters2(v: number | undefined | null) {
   const n = numOrZero(v)
   return Math.round(n * 100) / 100
-}
-
-function roundMoney2(v: number) {
-  if (!Number.isFinite(v) || v < 0) return 0
-  return Math.round(v * 100) / 100
 }
 
 function patchRow(index: number, patch: Partial<CuttingMaterialUsagePayloadRow>) {

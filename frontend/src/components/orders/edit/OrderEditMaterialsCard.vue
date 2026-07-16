@@ -142,7 +142,8 @@
           <el-input-number
             v-model="row.usagePerPiece"
             :min="0"
-            :precision="2"
+            :formatter="formatMaterialUsageQtyDisplay"
+            :parser="parseMaterialUsageQtyInput"
             :controls="false"
             :input-style="{ textAlign: 'center' }"
             @update:modelValue="recalcPurchaseQuantity(row)"
@@ -226,6 +227,10 @@
 import { Delete } from '@element-plus/icons-vue'
 import type { MaterialRow } from '@/composables/useOrderMaterials'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
+import {
+  formatMaterialUsageQtyDisplay,
+  parseMaterialUsageQtyInput,
+} from '@/utils/material-usage-qty'
 
 defineProps<{
   materials: MaterialRow[]

@@ -15,6 +15,7 @@ import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useAuthStore } from '@/stores/auth'
 import type { ProductionOrderBriefModel } from '@/components/production/ProductionOrderBriefPanel.vue'
+import { roundMaterialUsageQty } from '@/utils/material-usage-qty'
 
 type LabelFinders = {
   findOrderTypeLabelById: (id: number | null | undefined) => string
@@ -95,7 +96,8 @@ export function usePatternDialogs(
       materialTypeId: row.materialTypeId ?? null,
       materialName: (row.materialName ?? '').toString(),
       fabricWidth: (row.fabricWidth ?? '').toString(),
-      usagePerPiece: row.usagePerPiece ?? null,
+      usagePerPiece:
+        row.usagePerPiece != null ? roundMaterialUsageQty(Number(row.usagePerPiece)) : null,
       cuttingQuantity: row.cuttingQuantity ?? null,
       remark: (row.remark ?? '').toString(),
     }

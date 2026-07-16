@@ -3,6 +3,7 @@ import { getDictItems } from '@/api/dicts'
 import type { SystemOptionItem } from '@/api/system-options'
 import request, { getErrorMessage, isErrorHandled } from '@/api/request'
 import { nextMaterialRowKey, useOrderMaterialsRowDrag } from '@/composables/useOrderMaterialsRowDrag'
+import { roundMaterialUsageQty } from '@/utils/material-usage-qty'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 
@@ -168,7 +169,7 @@ export function useOrderMaterials() {
 
   function recalcPurchaseQuantity(row: MaterialRow) {
     const usageRaw = Number(row.usagePerPiece) || 0
-    const usage = roundMaterialQty2(usageRaw)
+    const usage = roundMaterialUsageQty(usageRaw)
     if (row.usagePerPiece != null) {
       row.usagePerPiece = usage
     }

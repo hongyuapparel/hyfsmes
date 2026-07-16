@@ -1,6 +1,7 @@
 import { computed, type Ref } from 'vue'
 import type { OrderDetail } from '@/api/orders'
 import { formatDisplayNumber } from '@/utils/display-number'
+import { formatMaterialUsageQtyDisplay } from '@/utils/material-usage-qty'
 
 interface DynamicColumn {
   key: string
@@ -70,7 +71,6 @@ function buildDynamicColumns(
 }
 
 const DETAIL_MATERIAL_NUMERIC_KEYS = new Set([
-  'usagePerPiece',
   'lossPercent',
   'orderPieces',
   'purchaseQuantity',
@@ -82,6 +82,7 @@ const DETAIL_PROCESS_TEXT_KEYS = new Set(['processName', 'supplierName', 'part',
 function formatDetailMaterialCell(row: Record<string, unknown>, key: string): string {
   const value = row[key]
   if (value === null || value === undefined || value === '') return ''
+  if (key === 'usagePerPiece') return formatMaterialUsageQtyDisplay(value)
   if (DETAIL_MATERIAL_NUMERIC_KEYS.has(key)) return formatDisplayNumber(value)
   return String(value)
 }
