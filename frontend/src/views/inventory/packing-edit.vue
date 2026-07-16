@@ -154,7 +154,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onMounted, reactive, ref } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowLeft, Link } from '@element-plus/icons-vue'
@@ -368,6 +368,12 @@ onMounted(async () => {
 // 此时必须重置为全新空单；带 id 的编辑页不在此重置，避免覆盖用户未保存的修改
 onActivated(() => {
   if (!route.params.id && edit.listId.value) edit.load()
+})
+
+// 切走编辑页时关掉箱贴/客户单弹窗，避免 keep-alive 里多个实例都 visible=true，打印时叠多单内容
+onDeactivated(() => {
+  labelsVisible.value = false
+  docVisible.value = false
 })
 </script>
 

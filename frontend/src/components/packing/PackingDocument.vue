@@ -94,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -193,8 +193,21 @@ const printAreaRef = ref<HTMLElement | null>(null)
 let printRoot: HTMLElement | null = null
 let pageStyle: HTMLStyleElement | null = null
 
+function cleanupPrintArtifacts() {
+  document.body.classList.remove('printing-packing-doc')
+  printRoot?.remove()
+  printRoot = null
+  pageStyle?.remove()
+  pageStyle = null
+  document.querySelectorAll('#packing-print-root').forEach((el) => el.remove())
+}
+
+/** keep-alive 缓存页仍挂 beforeprint；只有当前激活页才建打印根 */
+let pageActive = true
+
 function onBeforePrint() {
-  if (!props.visible || !printAreaRef.value) return
+  if (!pageActive || !props.visible || !printAreaRef.value) return
+  cleanupPrintArtifacts()
   printRoot = document.createElement('div')
   printRoot.id = 'packing-print-root'
   printRoot.appendChild(printAreaRef.value.cloneNode(true))
@@ -207,16 +220,21 @@ function onBeforePrint() {
 }
 
 function onAfterPrint() {
-  document.body.classList.remove('printing-packing-doc')
-  printRoot?.remove()
-  printRoot = null
-  pageStyle?.remove()
-  pageStyle = null
+  cleanupPrintArtifacts()
 }
 
 onMounted(() => {
   window.addEventListener('beforeprint', onBeforePrint)
   window.addEventListener('afterprint', onAfterPrint)
+})
+
+onActivated(() => {
+  pageActive = true
+})
+
+onDeactivated(() => {
+  pageActive = false
+  cleanupPrintArtifacts()
 })
 
 onBeforeUnmount(() => {
