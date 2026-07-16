@@ -21,17 +21,21 @@ export function useOrderFormTables() {
     bTable.parseClipboardText,
   )
 
-  // B 区增删尺码列时同步更新 D 区
+  // B 区增删尺码列时按索引同步 D 区尺寸值，避免错位
   function addSizeColumn() {
-    bTable.addSizeColumn(() => dTable.normalizeSizeInfoRows())
+    bTable.addSizeColumn(() => dTable.syncSizeValuesWithHeaderChange({ type: 'append' }))
   }
 
   function insertSizeColumnBefore(sIndex: number) {
-    bTable.insertSizeColumnBefore(sIndex, () => dTable.normalizeSizeInfoRows())
+    bTable.insertSizeColumnBefore(sIndex, () =>
+      dTable.syncSizeValuesWithHeaderChange({ type: 'insert', index: sIndex }),
+    )
   }
 
   function removeSizeColumn(sIndex: number) {
-    bTable.removeSizeColumn(sIndex, () => dTable.normalizeSizeInfoRows())
+    bTable.removeSizeColumn(sIndex, () =>
+      dTable.syncSizeValuesWithHeaderChange({ type: 'remove', index: sIndex }),
+    )
   }
 
   return {

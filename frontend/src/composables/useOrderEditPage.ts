@@ -6,6 +6,7 @@ import type { OrderFormPayload } from '@/api/orders'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderAttachments } from '@/composables/useOrderAttachments'
 import { useOrderColorSizeMatrix } from '@/composables/useOrderColorSizeMatrix'
+import type { SizeHeaderChange } from '@/composables/useOrderColorSizeMatrix'
 import { useOrderCustomerSelection } from '@/composables/useOrderCustomerSelection'
 import { useOrderDetailHydration } from '@/composables/useOrderDetailHydration'
 import { useOrderEditLoad } from '@/composables/useOrderEditLoad'
@@ -94,8 +95,10 @@ export function useOrderEditPage() {
 
   const customerSelectionApi = useOrderCustomerSelection(form)
   const skuSelectionApi = useOrderSkuSelection(form, customerSelectionApi.selectedCustomer, customerSelectionApi.ensureCustomerById)
-  let normalizeSizeInfoRows: (() => void) | undefined
-  const colorSizeApi = useOrderColorSizeMatrix({ onSizeHeadersChange: () => normalizeSizeInfoRows?.() })
+  let syncSizeValuesWithHeaderChange: ((change: SizeHeaderChange) => void) | undefined
+  const colorSizeApi = useOrderColorSizeMatrix({
+    onSizeHeadersChange: (change) => syncSizeValuesWithHeaderChange?.(change),
+  })
 
   function setEditingCellNull() {
     colorSizeApi.editingCell.value = null
@@ -105,7 +108,7 @@ export function useOrderEditPage() {
     sizeHeaders: colorSizeApi.sizeHeaders,
     parseClipboardText: colorSizeApi.parseClipboardText,
   })
-  normalizeSizeInfoRows = sizeInfoApi.normalizeSizeInfoRows
+  syncSizeValuesWithHeaderChange = sizeInfoApi.syncSizeValuesWithHeaderChange
 
   function onMerchandiserChange(val: string) {
     const u = orderEditOptionsApi.merchandiserOptions.value.find((x) => (x.displayName || x.username) === val)

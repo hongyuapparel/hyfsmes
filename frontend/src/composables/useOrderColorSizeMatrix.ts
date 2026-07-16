@@ -11,8 +11,13 @@ export interface ColorRow {
   imageUrl: string
 }
 
+export type SizeHeaderChange =
+  | { type: 'insert'; index: number }
+  | { type: 'remove'; index: number }
+  | { type: 'append' }
+
 export interface UseOrderColorSizeMatrixOptions {
-  onSizeHeadersChange?: () => void
+  onSizeHeadersChange?: (change: SizeHeaderChange) => void
 }
 
 export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions = {}) {
@@ -192,14 +197,14 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
     ensureAtLeastOneColorRow()
   }
 
-  function syncLinkedSizeInfo() {
-    options.onSizeHeadersChange?.()
+  function syncLinkedSizeInfo(change: SizeHeaderChange) {
+    options.onSizeHeadersChange?.(change)
   }
 
   function addSizeColumn() {
     sizeHeaders.value.push(nextSizeLabel(sizeHeaders.value))
     normalizeColorRows()
-    syncLinkedSizeInfo()
+    syncLinkedSizeInfo({ type: 'append' })
   }
 
   function guessSizeLabelBefore(sIndex: number): string {
@@ -223,7 +228,7 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
       editingCell.value = { ...cur, col: cur.col + 1 }
     }
     normalizeColorRows()
-    syncLinkedSizeInfo()
+    syncLinkedSizeInfo({ type: 'insert', index: sIndex })
   }
 
   function removeSizeColumn(sIndex: number) {
@@ -237,7 +242,7 @@ export function useOrderColorSizeMatrix(options: UseOrderColorSizeMatrixOptions 
       if (cur.col === sIndex) editingCell.value = null
       else if (cur.col > sIndex) editingCell.value = { ...cur, col: cur.col - 1 }
     }
-    syncLinkedSizeInfo()
+    syncLinkedSizeInfo({ type: 'remove', index: sIndex })
   }
 
   const sizeTotals = computed(() => {

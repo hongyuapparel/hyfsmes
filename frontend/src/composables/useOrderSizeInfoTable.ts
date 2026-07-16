@@ -1,8 +1,9 @@
 import { nextTick, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { nextRowKey, useTableRowDragSort } from '@/composables/useTableRowDragSort'
+import type { SizeHeaderChange } from '@/composables/useOrderColorSizeMatrix'
 
-export type InputComponentInstance = HTMLElement | { focus?: () => void } | null
+type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 
 export interface SizeInfoRow {
   __rowKey: string
@@ -44,6 +45,29 @@ export function useOrderSizeInfoTable(
         row.sizeValues.splice(sizeLen)
       }
     })
+  }
+
+  function syncSizeValuesWithHeaderChange(change: SizeHeaderChange) {
+    if (change.type === 'insert') {
+      const priorLen = Math.max(getSizeHeaders().length - 1, 0)
+      sizeInfoRows.value.forEach((row) => {
+        if (!Array.isArray(row.sizeValues)) row.sizeValues = []
+        if (row.sizeValues.length < priorLen) {
+          row.sizeValues.push(...Array(priorLen - row.sizeValues.length).fill(''))
+        }
+        row.sizeValues.splice(change.index, 0, '')
+      })
+    } else if (change.type === 'remove') {
+      const priorLen = getSizeHeaders().length + 1
+      sizeInfoRows.value.forEach((row) => {
+        if (!Array.isArray(row.sizeValues)) row.sizeValues = []
+        if (row.sizeValues.length < priorLen) {
+          row.sizeValues.push(...Array(priorLen - row.sizeValues.length).fill(''))
+        }
+        row.sizeValues.splice(change.index, 1)
+      })
+    }
+    normalizeSizeInfoRows()
   }
 
   function setSizeGridCellRef(el: unknown, rowIndex: number, colIndex: number) {
@@ -201,6 +225,7 @@ export function useOrderSizeInfoTable(
     sizeGridRefs,
     nextSizeInfoRowKey,
     normalizeSizeInfoRows,
+    syncSizeValuesWithHeaderChange,
     setSizeGridCellRef,
     focusSizeGridCell,
     onSizeGridKeydown,

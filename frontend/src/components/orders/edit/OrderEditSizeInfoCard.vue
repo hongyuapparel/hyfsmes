@@ -59,7 +59,7 @@
       </el-table-column>
       <el-table-column
         v-for="(size, sIndex) in sizeHeaders"
-        :key="'size-' + size"
+        :key="'size-' + sIndex"
         :label="size"
         min-width="72"
         align="center"

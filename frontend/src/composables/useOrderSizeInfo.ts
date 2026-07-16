@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import { nextTick, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { nextRowKey, useTableRowDragSort } from '@/composables/useTableRowDragSort'
+import type { SizeHeaderChange } from '@/composables/useOrderColorSizeMatrix'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 
@@ -150,6 +151,32 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     })
   }
 
+  /** 与 B 区尺码列增删对齐：按索引插入/删除，避免仅按长度在末尾补空导致错位 */
+  function syncSizeValuesWithHeaderChange(change: SizeHeaderChange) {
+    if (change.type === 'insert') {
+      // headers 已含新列；先补齐到变更前长度，再按索引插入空值
+      const priorLen = Math.max(sizeHeaders.value.length - 1, 0)
+      sizeInfoRows.value.forEach((row) => {
+        if (!Array.isArray(row.sizeValues)) row.sizeValues = []
+        if (row.sizeValues.length < priorLen) {
+          row.sizeValues.push(...Array(priorLen - row.sizeValues.length).fill(''))
+        }
+        row.sizeValues.splice(change.index, 0, '')
+      })
+    } else if (change.type === 'remove') {
+      // headers 已去掉该列；先补齐到变更前长度，再按索引删除，避免短数组 splice 无效
+      const priorLen = sizeHeaders.value.length + 1
+      sizeInfoRows.value.forEach((row) => {
+        if (!Array.isArray(row.sizeValues)) row.sizeValues = []
+        if (row.sizeValues.length < priorLen) {
+          row.sizeValues.push(...Array(priorLen - row.sizeValues.length).fill(''))
+        }
+        row.sizeValues.splice(change.index, 1)
+      })
+    }
+    normalizeSizeInfoRows()
+  }
+
   function addSizeInfoRow() {
     sizeInfoRows.value.push({
       __rowKey: nextSizeInfoRowKey(),
@@ -222,6 +249,7 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     onSizeGridKeydown,
     onSizeGridPaste,
     normalizeSizeInfoRows,
+    syncSizeValuesWithHeaderChange,
     addSizeInfoRow,
     removeSizeInfoRow,
     initSizeInfoSortable: rowDragApi.initSortable,
