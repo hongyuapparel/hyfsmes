@@ -9,7 +9,7 @@
   >
     <div class="doc-toolbar no-print">
       <span class="doc-toolbar-tip">英文单据（A4 横版），截图或打印后即可发客户</span>
-      <el-button type="primary" @click="onPrint">打印 A4</el-button>
+      <el-button type="primary" :loading="printing" @click="onPrint">打印 A4</el-button>
     </div>
 
     <div ref="printAreaRef" class="packing-doc-print-area">
@@ -64,7 +64,7 @@
             <tr v-for="row in docRows" :key="row.key">
               <td v-if="row.isFirstOfBox" :rowspan="row.rowspan" class="col-box num">{{ row.boxSeq }}</td>
               <td v-if="hasImage" class="col-img">
-                <AppImageThumb v-if="row.item.imageUrl" :raw-url="row.item.imageUrl" variant="table" :width="48" :height="48" />
+                <AppImageThumb v-if="row.item.imageUrl" :raw-url="row.item.imageUrl" variant="table" :width="48" :height="48" :lazy="false" />
                 <span v-else class="muted">—</span>
               </td>
               <td class="col-style">{{ row.item.styleNo || '—' }}</td>
@@ -94,11 +94,12 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import type { PackingItemDetail, PackingListDetail } from '@/api/packing-lists'
+import { usePackingPrintRoot } from '@/composables/usePackingPrintRoot'
 
 const props = defineProps<{
   visible: boolean
@@ -187,65 +188,15 @@ function weightDisplay(weight: number | null): string {
   return `${Math.round(weight * 100) / 100}`
 }
 
-// 弹窗渲染在 #app 内部，直接打印会被对话框层裁切。打印前把内容克隆到 body 顶层打印根，
-// 注入横版 @page，仅当本弹窗打开时生效；打印后清理。beforeprint/afterprint 让按钮和 Ctrl+P 都生效，且与箱贴互不干扰。
+// 弹窗渲染在 #app 内部，直接打印会被对话框层裁切。打印前把内容克隆到 body 顶层打印根。
 const printAreaRef = ref<HTMLElement | null>(null)
-let printRoot: HTMLElement | null = null
-let pageStyle: HTMLStyleElement | null = null
 
-function cleanupPrintArtifacts() {
-  document.body.classList.remove('printing-packing-doc')
-  printRoot?.remove()
-  printRoot = null
-  pageStyle?.remove()
-  pageStyle = null
-  document.querySelectorAll('#packing-print-root').forEach((el) => el.remove())
-}
-
-/** keep-alive 缓存页仍挂 beforeprint；只有当前激活页才建打印根 */
-let pageActive = true
-
-function onBeforePrint() {
-  if (!pageActive || !props.visible || !printAreaRef.value) return
-  cleanupPrintArtifacts()
-  printRoot = document.createElement('div')
-  printRoot.id = 'packing-print-root'
-  printRoot.appendChild(printAreaRef.value.cloneNode(true))
-  document.body.appendChild(printRoot)
-  pageStyle = document.createElement('style')
-  // margin:0 让浏览器没有页边可画"页眉页脚"(日期/网址/页码)，留白改由 .packing-doc 自身 padding 补回
-  pageStyle.textContent = '@page { size: A4 landscape; margin: 0; }'
-  document.head.appendChild(pageStyle)
-  document.body.classList.add('printing-packing-doc')
-}
-
-function onAfterPrint() {
-  cleanupPrintArtifacts()
-}
-
-onMounted(() => {
-  window.addEventListener('beforeprint', onBeforePrint)
-  window.addEventListener('afterprint', onAfterPrint)
+const { printing, print: onPrint } = usePackingPrintRoot({
+  printAreaRef,
+  getVisible: () => props.visible,
+  bodyClass: 'printing-packing-doc',
+  getContentVersion: () => props.detail,
 })
-
-onActivated(() => {
-  pageActive = true
-})
-
-onDeactivated(() => {
-  pageActive = false
-  cleanupPrintArtifacts()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('beforeprint', onBeforePrint)
-  window.removeEventListener('afterprint', onAfterPrint)
-  onAfterPrint()
-})
-
-function onPrint() {
-  window.print()
-}
 </script>
 
 <style src="./PackingDocument.css"></style>

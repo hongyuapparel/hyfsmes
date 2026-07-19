@@ -179,6 +179,15 @@
   white-space: nowrap;
 }
 
+/* 屏幕态：克隆根用于量高/等图，避免在页面上闪现 */
+#packing-print-root {
+  visibility: hidden;
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+
 /* 打印：内容已被克隆到 body 顶层 #packing-print-root，隐藏其余 body 子节点（@page 由 onPrint 动态注入） */
 @media print {
   body.printing-packing-doc > *:not(#packing-print-root) {
@@ -187,6 +196,11 @@
 
   #packing-print-root {
     display: block !important;
+    visibility: visible;
+    position: static;
+    inset: auto;
+    pointer-events: auto;
+    z-index: auto;
   }
 
   #packing-print-root .packing-doc {

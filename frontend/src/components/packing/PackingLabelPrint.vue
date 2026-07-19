@@ -15,7 +15,7 @@
       >
         全选（已选 {{ selectedSeqs.size }}/{{ detail.boxes.length }} 箱）
       </el-checkbox>
-      <el-button type="primary" :disabled="!selectedSeqs.size" @click="onPrint">打印箱贴</el-button>
+      <el-button type="primary" :disabled="!selectedSeqs.size" :loading="printing" @click="onPrint">打印箱贴</el-button>
     </div>
 
     <div ref="printAreaRef" class="packing-label-print-area">
@@ -105,9 +105,10 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onActivated, onBeforeUnmount, onDeactivated, onMounted, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import AppDialog from '@/components/AppDialog.vue'
 import type { PackingBoxDetail, PackingItemDetail, PackingListDetail } from '@/api/packing-lists'
+import { usePackingPrintRoot } from '@/composables/usePackingPrintRoot'
 
 const props = defineProps<{
   visible: boolean
@@ -196,17 +197,12 @@ function totalCols(box: PackingBoxDetail): number {
 
 // 弹窗渲染在 #app 内部，直接打印会被对话框层裁切/无法正常分页。
 // 打印前把内容克隆到 body 顶层的打印根，注入横版 @page，仅当本弹窗打开时生效；打印后清理。
-// 用 beforeprint/afterprint 监听，使点「打印箱贴」按钮和直接按 Ctrl+P 都生效，且与客户单(纵版)互不干扰。
 const printAreaRef = ref<HTMLElement | null>(null)
-let printRoot: HTMLElement | null = null
-let pageStyle: HTMLStyleElement | null = null
 
 // @page margin:0（去浏览器页眉页脚），边距改由 .packing-label 自身 padding(10mm 14mm) 补回。
-// 所以打印根用整页宽 297mm，扣掉左右 padding 后内容宽仍是 269mm；内容高目标 180mm 不变。
 const PRINT_CONTENT_WIDTH = '297mm'
 const PAGE_FIT_PX = (180 * 96) / 25.4
 
-// 保证「一箱 = 一页」：克隆已是打印尺寸，量出每箱实际内容高，超过一页就按比例 zoom 整体缩小塞进一页。
 function fitLabelsToPage(root: HTMLElement) {
   root.style.width = PRINT_CONTENT_WIDTH
   root.querySelectorAll<HTMLElement>('.packing-label').forEach((label) => {
@@ -218,60 +214,13 @@ function fitLabelsToPage(root: HTMLElement) {
   })
 }
 
-function cleanupPrintArtifacts() {
-  document.body.classList.remove('printing-packing-label')
-  printRoot?.remove()
-  printRoot = null
-  pageStyle?.remove()
-  pageStyle = null
-  // 清掉历次打印残留（afterprint 偶发未触发、或多 keep-alive 实例叠根时会把前面打开过的装箱单一起打出来）
-  document.querySelectorAll('#packing-print-root').forEach((el) => el.remove())
-}
-
-/** keep-alive 缓存的编辑页仍挂着 beforeprint；只有当前激活页才允许建打印根 */
-let pageActive = true
-
-function onBeforePrint() {
-  if (!pageActive || !props.visible || !printAreaRef.value) return
-  cleanupPrintArtifacts()
-  printRoot = document.createElement('div')
-  printRoot.id = 'packing-print-root'
-  printRoot.appendChild(printAreaRef.value.cloneNode(true))
-  document.body.appendChild(printRoot)
-  pageStyle = document.createElement('style')
-  pageStyle.textContent = '@page { size: A4 landscape; margin: 0; }'
-  document.head.appendChild(pageStyle)
-  document.body.classList.add('printing-packing-label')
-  fitLabelsToPage(printRoot)
-}
-
-function onAfterPrint() {
-  cleanupPrintArtifacts()
-}
-
-onMounted(() => {
-  window.addEventListener('beforeprint', onBeforePrint)
-  window.addEventListener('afterprint', onAfterPrint)
+const { printing, print: onPrint } = usePackingPrintRoot({
+  printAreaRef,
+  getVisible: () => props.visible,
+  bodyClass: 'printing-packing-label',
+  onRootPrepared: fitLabelsToPage,
+  getContentVersion: () => props.detail,
 })
-
-onActivated(() => {
-  pageActive = true
-})
-
-onDeactivated(() => {
-  pageActive = false
-  cleanupPrintArtifacts()
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('beforeprint', onBeforePrint)
-  window.removeEventListener('afterprint', onAfterPrint)
-  onAfterPrint()
-})
-
-function onPrint() {
-  window.print()
-}
 </script>
 
 <style scoped src="./PackingLabelPrint.css"></style>

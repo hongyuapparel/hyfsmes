@@ -1,8 +1,8 @@
 <template>
-  <div class="order-detail-page" v-loading="loading">
+  <div ref="pageRootRef" class="order-detail-page" v-loading="loading">
     <div class="toolbar no-print">
       <el-button @click="goBack">返回列表</el-button>
-      <el-button type="primary" @click="handlePrint" :disabled="!detail">打印</el-button>
+      <el-button type="primary" @click="handlePrint" :disabled="!detail" :loading="printing">打印</el-button>
     </div>
 
     <div class="a4-sheet" v-if="detail">
@@ -59,7 +59,7 @@
                 <tbody>
                   <tr v-for="(row, rowIndex) in colorSizeRowsForView" :key="rowIndex">
                     <td v-if="hasColorImage" class="color-image-cell">
-                      <AppImageThumb :raw-url="row.imageUrl" variant="table" :width="24" :height="24" />
+                      <AppImageThumb :raw-url="row.imageUrl" variant="table" :width="24" :height="24" :lazy="false" />
                     </td>
                     <td>{{ row.colorName }}</td>
                     <td v-for="(header, index) in colorSizeHeadersForView" :key="header + index">
@@ -166,7 +166,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
@@ -178,6 +178,7 @@ import OrderDetailAttachmentsSection from '@/components/orders/detail/OrderDetai
 import { useOrderDetailLoader } from '@/composables/useOrderDetailLoader'
 import { useOrderDetailDictionaries } from '@/composables/useOrderDetailDictionaries'
 import { useOrderDetailView } from '@/composables/useOrderDetailView'
+import { waitForPrintImages } from '@/utils/printImages'
 
 const route = useRoute()
 const router = useRouter()
@@ -232,18 +233,29 @@ function packagingPreviewIndex(imageUrl: string): number {
   return packagingImageList.value.indexOf(imageUrl)
 }
 
+const pageRootRef = ref<HTMLElement | null>(null)
+const printing = ref(false)
+
 function goBack() {
   void router.push({ name: 'OrdersList' })
 }
 
-function handlePrint() {
-  window.print()
+async function handlePrint() {
+  if (printing.value || !pageRootRef.value) return
+  printing.value = true
+  try {
+    await waitForPrintImages(pageRootRef.value)
+    window.print()
+  } finally {
+    printing.value = false
+  }
 }
 
 onMounted(async () => {
   await Promise.all([loadDicts(), loadDetail()])
   if (route.query.print === '1' && detail.value) {
     await nextTick()
+    await waitForPrintImages(pageRootRef.value)
     window.print()
     await router.replace({ name: 'OrdersDetail', params: route.params })
   }
