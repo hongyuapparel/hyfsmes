@@ -91,6 +91,8 @@ export interface OrderListQuery {
   processItem?: string
   /** 合作方式 ID */
   collaborationTypeId?: number
+  /** 产品类型/产品分组 ID */
+  productGroupId?: number
   salesperson?: string
   merchandiser?: string
   orderDateStart?: string

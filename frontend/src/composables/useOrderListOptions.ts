@@ -64,6 +64,7 @@ export function useOrderListOptions() {
   const STATUS_LABEL_MAP = ref<Record<string, string>>({ ...DEFAULT_STATUS_LABEL_MAP })
 
   const orderTypeTree = ref<SystemOptionTreeNode[]>([])
+  const productGroupTree = ref<SystemOptionTreeNode[]>([])
   const collaborationItems = ref<Array<{ id: number; value: string }>>([])
   const processOptions = ref<ProcessOptionNode[]>([])
   const factoryOptions = ref<{ label: string; value: string }[]>([])
@@ -113,10 +114,22 @@ export function useOrderListOptions() {
   }
 
   const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
+  const productGroupTreeSelectData = computed(() => toOrderTypeTreeSelect(productGroupTree.value))
 
   function findOrderTypeLabelById(id: number | null | undefined): string {
     if (!id) return ''
     const stack: SystemOptionTreeNode[] = [...orderTypeTree.value]
+    while (stack.length) {
+      const node = stack.pop()!
+      if (node.id === id) return node.value
+      if (node.children?.length) stack.push(...node.children)
+    }
+    return ''
+  }
+
+  function findProductGroupLabelById(id: number | null | undefined): string {
+    if (!id) return ''
+    const stack: SystemOptionTreeNode[] = [...productGroupTree.value]
     while (stack.length) {
       const node = stack.pop()!
       if (node.id === id) return node.value
@@ -144,6 +157,12 @@ export function useOrderListOptions() {
     const orderTypeRes = await getDictTree('order_types')
     const orderTypeVals = orderTypeRes.data ?? []
     orderTypeTree.value = Array.isArray(orderTypeVals) ? orderTypeVals : []
+  }
+
+  async function loadProductGroupTree() {
+    const productGroupRes = await getDictTree('product_groups')
+    const productGroupVals = productGroupRes.data ?? []
+    productGroupTree.value = Array.isArray(productGroupVals) ? productGroupVals : []
   }
 
   async function loadCollaborationItems() {
@@ -199,13 +218,14 @@ export function useOrderListOptions() {
   }
 
   async function loadOptions() {
-    // 1）基础选项：客户 / 业务员 / 订单类型 / 合作方式 / 工艺项目 / 加工供应商
+    // 1）基础选项：客户 / 业务员 / 订单类型 / 合作方式 / 产品类型 / 工艺项目 / 加工供应商
     try {
       await Promise.all([
         loadCustomerOptions(),
         loadSalespersonOptions(),
         loadOrderTypeTree(),
         loadCollaborationItems(),
+        loadProductGroupTree(),
         loadProcessOptions(),
         loadFactoryOptions(),
       ])
@@ -231,6 +251,8 @@ export function useOrderListOptions() {
     STATUS_LABEL_MAP,
     orderTypeTree,
     orderTypeTreeSelectData,
+    productGroupTree,
+    productGroupTreeSelectData,
     collaborationItems,
     processOptions,
     factoryOptions,
@@ -241,8 +263,10 @@ export function useOrderListOptions() {
     toOrderTypeTreeSelect,
     findOrderTypeLabelById,
     findCollaborationLabelById,
+    findProductGroupLabelById,
     getProcessItemDisplayLabel,
     loadOrderTypeTree,
+    loadProductGroupTree,
     loadCollaborationItems,
     loadProcessOptions,
     loadFactoryOptions,

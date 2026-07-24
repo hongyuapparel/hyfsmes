@@ -100,6 +100,17 @@ export class OrderQueryService {
     return Array.from(result);
   }
 
+  private async resolveProductGroupFilter(
+    productGroupId: number,
+  ): Promise<{ groupIds: number[]; includeUngrouped: boolean }> {
+    const groupIds = await this.systemOptionsService.getSelfAndDescendantIds('product_groups', productGroupId);
+    const ungroupedGroupId = await this.systemOptionsService.findRootIdByValue('product_groups', '未分组');
+    return {
+      groupIds: groupIds.length ? groupIds : [productGroupId],
+      includeUngrouped: ungroupedGroupId === productGroupId,
+    };
+  }
+
   /**
    * 解析"样品单"对应的订单类型 ID 集合：取顶级类目「样品」及其全部子孙节点。
    * 不按子项名称匹配，样品下子项（头版/修改版/产前版/拍照版/销售版等）增减改名均自动覆盖。
@@ -161,6 +172,16 @@ export class OrderQueryService {
     }
     if (typeof query.collaborationTypeId === 'number') {
       qb.andWhere('o.collaboration_type_id = :collaborationTypeId', { collaborationTypeId: query.collaborationTypeId });
+    }
+    if (typeof query.productGroupId === 'number') {
+      const { groupIds, includeUngrouped } = await this.resolveProductGroupFilter(query.productGroupId);
+      const productGroupWhere = includeUngrouped
+        ? '(p.product_group_id IN (:...productGroupIds) OR p.product_group_id IS NULL)'
+        : 'p.product_group_id IN (:...productGroupIds)';
+      qb.andWhere(
+        `EXISTS (SELECT 1 FROM products p WHERE p.sku_code = o.sku_code AND ${productGroupWhere})`,
+        { productGroupIds: groupIds },
+      );
     }
     if (processItem?.trim()) qb.andWhere('o.process_item LIKE :processItem', { processItem: `%${processItem.trim()}%` });
     if (salesperson?.trim()) qb.andWhere('o.salesperson = :salesperson', { salesperson: salesperson.trim() });

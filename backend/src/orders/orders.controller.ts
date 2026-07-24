@@ -34,6 +34,7 @@ export class OrdersController {
     @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('processItem') processItem?: string,
     @Query('collaborationTypeId') collaborationTypeIdStr?: string,
+    @Query('productGroupId') productGroupIdStr?: string,
     @Query('salesperson') salesperson?: string,
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
@@ -52,6 +53,7 @@ export class OrdersController {
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
+    const productGroupId = productGroupIdStr ? parseInt(productGroupIdStr, 10) : undefined;
     const query: OrderListQuery = {
       orderNo,
       skuCode,
@@ -61,6 +63,7 @@ export class OrdersController {
       collaborationTypeId: Number.isNaN(collaborationTypeId as number)
         ? undefined
         : (collaborationTypeId as number),
+      productGroupId: Number.isNaN(productGroupId as number) ? undefined : (productGroupId as number),
       salesperson,
       merchandiser,
       orderDateStart,
@@ -95,6 +98,7 @@ export class OrdersController {
     @Query('orderTypeId') orderTypeIdStr?: string,
     @Query('processItem') processItem?: string,
     @Query('collaborationTypeId') collaborationTypeIdStr?: string,
+    @Query('productGroupId') productGroupIdStr?: string,
     @Query('salesperson') salesperson?: string,
     @Query('merchandiser') merchandiser?: string,
     @Query('orderDateStart') orderDateStart?: string,
@@ -110,6 +114,7 @@ export class OrdersController {
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
+    const productGroupId = productGroupIdStr ? parseInt(productGroupIdStr, 10) : undefined;
     const query: OrderListQuery = {
       orderNo,
       skuCode,
@@ -119,6 +124,7 @@ export class OrdersController {
       collaborationTypeId: Number.isNaN(collaborationTypeId as number)
         ? undefined
         : (collaborationTypeId as number),
+      productGroupId: Number.isNaN(productGroupId as number) ? undefined : (productGroupId as number),
       salesperson,
       merchandiser,
       orderDateStart,

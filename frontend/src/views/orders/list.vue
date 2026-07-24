@@ -46,12 +46,14 @@
       :customer-options="customerOptions"
       :order-type-tree-select-data="orderTypeTreeSelectData"
       :collaboration-options="collaborationItems"
+      :product-group-tree-select-data="productGroupTreeSelectData"
       :process-options="processOptions"
       :salesperson-options="salespersonOptions"
       :merchandiser-options="merchandiserOptions"
       :factory-options="factoryOptions"
       :find-order-type-label-by-id="findOrderTypeLabelById"
       :find-collaboration-label-by-id="findCollaborationLabelById"
+      :find-product-group-label-by-id="findProductGroupLabelById"
       :get-process-item-display-label="getProcessItemDisplayLabel"
       :on-search="onSearch"
       :on-reset="onReset"
@@ -213,6 +215,7 @@ const {
   STATUS_LABEL_MAP,
   orderTypeTree,
   orderTypeTreeSelectData,
+  productGroupTreeSelectData,
   collaborationItems,
   processOptions,
   factoryOptions,
@@ -222,6 +225,7 @@ const {
   loadStatusTabs,
   findOrderTypeLabelById,
   findCollaborationLabelById,
+  findProductGroupLabelById,
   getProcessItemDisplayLabel,
   loadOptions,
 } = useOrderListOptions()

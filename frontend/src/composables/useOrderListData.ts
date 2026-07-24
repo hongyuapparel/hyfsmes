@@ -9,6 +9,7 @@ const filter = reactive({
   customer: '',
   orderTypeId: null as number | null,
   collaborationTypeId: null as number | null,
+  productGroupId: null as number | null,
   processItem: '',
   salesperson: '',
   merchandiser: '',
@@ -42,6 +43,7 @@ function buildQuery(): OrderListQuery {
     customer: filter.customer || undefined,
     orderTypeId: filter.orderTypeId ?? undefined,
     collaborationTypeId: filter.collaborationTypeId ?? undefined,
+    productGroupId: filter.productGroupId ?? undefined,
     processItem: filter.processItem || undefined,
     salesperson: filter.salesperson || undefined,
     merchandiser: filter.merchandiser || undefined,
@@ -116,6 +118,7 @@ function onReset(totalQuantity?: { value: number }) {
   filter.customer = ''
   filter.orderTypeId = null
   filter.collaborationTypeId = null
+  filter.productGroupId = null
   filter.processItem = ''
   filter.salesperson = ''
   filter.merchandiser = ''

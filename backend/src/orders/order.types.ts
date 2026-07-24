@@ -36,6 +36,7 @@ export interface OrderListQuery {
   status?: string;
   orderTypeId?: number | null;
   collaborationTypeId?: number | null;
+  productGroupId?: number | null;
   deletedOnly?: boolean;
   /** 仅看待报价：样品单 + 已完成 + 成本快照未确认报价 */
   unquoted?: boolean;

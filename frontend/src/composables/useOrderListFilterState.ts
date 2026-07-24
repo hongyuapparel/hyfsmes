@@ -6,6 +6,7 @@ interface OrderListFilterStateLike {
   customer: string
   orderTypeId: number | null
   collaborationTypeId: number | null
+  productGroupId: number | null
   processItem: string
   salesperson: string
   merchandiser: string
@@ -57,6 +58,7 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
         customer: filter.customer,
         orderTypeId: filter.orderTypeId,
         collaborationTypeId: filter.collaborationTypeId,
+        productGroupId: filter.productGroupId,
         processItem: filter.processItem,
         salesperson: filter.salesperson,
         merchandiser: filter.merchandiser,
@@ -92,6 +94,7 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
       filter.customer = typeof f.customer === 'string' ? f.customer : ''
       filter.orderTypeId = typeof f.orderTypeId === 'number' ? f.orderTypeId : null
       filter.collaborationTypeId = typeof f.collaborationTypeId === 'number' ? f.collaborationTypeId : null
+      filter.productGroupId = typeof f.productGroupId === 'number' ? f.productGroupId : null
       filter.processItem = typeof f.processItem === 'string' ? f.processItem : ''
       filter.salesperson = typeof f.salesperson === 'string' ? f.salesperson : ''
       filter.merchandiser = typeof f.merchandiser === 'string' ? f.merchandiser : ''
@@ -140,6 +143,7 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
         () => filter.customer,
         () => filter.orderTypeId,
         () => filter.collaborationTypeId,
+        () => filter.productGroupId,
         () => filter.processItem,
         () => filter.salesperson,
         () => filter.merchandiser,

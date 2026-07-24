@@ -107,6 +107,32 @@
       />
     </el-select>
     <el-tree-select
+      v-model="filters.productGroupId"
+      :data="productGroupTreeSelectData"
+      placeholder="产品类型"
+      popper-class="product-type-tree-popper"
+      filterable
+      clearable
+      check-strictly
+      default-expand-all
+      :render-after-expand="false"
+      node-key="value"
+      :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
+      class="filter-bar-item"
+      :style="getAdaptiveSelectStyle(filters.productGroupId && `产品类型：${findProductGroupLabelById(filters.productGroupId)}`, '产品类型')"
+      @change="onSearch()"
+      @visible-change="(v: boolean) => v && adjustTreePopperWidth('product-type-tree-popper')"
+    >
+      <template #prefix>
+        <span
+          v-if="filters.productGroupId"
+          :style="{ color: 'var(--el-color-primary)' }"
+        >
+          产品类型：
+        </span>
+      </template>
+    </el-tree-select>
+    <el-tree-select
       v-model="filters.processItem"
       :data="processOptions"
       placeholder="工艺项目"
@@ -308,6 +334,7 @@ interface OrderListFilters {
   customer: string
   orderTypeId: number | null
   collaborationTypeId: number | null
+  productGroupId: number | null
   processItem: string
   salesperson: string
   merchandiser: string
@@ -336,6 +363,7 @@ const activeFilterCount = computed(() => {
   if (f.customer) n++
   if (f.orderTypeId != null) n++
   if (f.collaborationTypeId != null) n++
+  if (f.productGroupId != null) n++
   if (f.processItem) n++
   if (f.salesperson) n++
   if (f.merchandiser) n++
@@ -350,12 +378,14 @@ defineProps<{
   customerOptions: Array<{ label: string; value: string }>
   orderTypeTreeSelectData: OrderTypeTreeSelectNode[]
   collaborationOptions: Array<{ id: number; value: string }>
+  productGroupTreeSelectData: OrderTypeTreeSelectNode[]
   processOptions: Array<Record<string, unknown>>
   salespersonOptions: string[]
   merchandiserOptions: string[]
   factoryOptions: Array<{ label: string; value: string }>
   findOrderTypeLabelById: (id: number) => string
   findCollaborationLabelById: (id: number) => string
+  findProductGroupLabelById: (id: number) => string
   getProcessItemDisplayLabel: (value: string) => string
   onSearch: (byUser?: boolean) => void
   onReset: () => void
@@ -371,6 +401,7 @@ defineProps<{
    el-tree-select 的节点渲染为 .el-select-dropdown__item，El Plus 已内置 white-space:nowrap
    和 is-selected 高亮色，此处只设 max-width 上限即可。 */
 .order-type-tree-popper.el-popper,
+.product-type-tree-popper.el-popper,
 .process-item-tree-popper.el-popper {
   max-width: 440px;
 }
