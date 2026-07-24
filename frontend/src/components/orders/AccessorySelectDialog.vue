@@ -25,7 +25,7 @@
     </div>
     <el-table
       v-loading="loading"
-      :data="filteredItems"
+      :data="displayItems"
       class="dialog-select-table"
       height="360px"
       border
@@ -51,6 +51,12 @@
         </template>
       </el-table-column>
     </el-table>
+    <p v-if="!itemsFullLoaded && customerKeyword.trim()" class="accessory-dialog-hint">
+      当前优先显示客户匹配辅料。清除客户筛选或输入名称可查找通用辅料。
+    </p>
+    <p v-else-if="itemsFullLoaded && !keyword.trim()" class="accessory-dialog-hint">
+      显示最近 {{ displayItems.length }} 条。更多请用名称搜索。
+    </p>
     <template #footer>
       <el-button @click="visible = false">关闭</el-button>
     </template>
@@ -58,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
 import { Search, User } from '@element-plus/icons-vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { useIsMobile } from '@/composables/useIsMobile'
@@ -70,45 +76,107 @@ const props = defineProps<{
   modelValue: boolean
   loading: boolean
   items: AccessoryItem[]
+  itemsFullLoaded?: boolean
   defaultCustomer?: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'select', item: AccessoryItem): void
+  (e: 'search', query: { name: string; customerName: string }): void
 }>()
 
 const keyword = ref('')
 const customerKeyword = ref('')
+/** 打开弹窗写入 defaultCustomer 时跳过一轮远程搜索 */
+const suppressSearch = ref(false)
+let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const visible = computed({
   get: () => props.modelValue,
   set: (value: boolean) => emit('update:modelValue', value),
 })
 
+function clearSearchTimer() {
+  if (!searchTimer) return
+  clearTimeout(searchTimer)
+  searchTimer = null
+}
+
+function emitSearch() {
+  emit('search', {
+    name: keyword.value.trim(),
+    customerName: customerKeyword.value.trim(),
+  })
+}
+
 watch(
   () => props.modelValue,
   (open) => {
     if (open) {
+      clearSearchTimer()
+      suppressSearch.value = true
       keyword.value = ''
       customerKeyword.value = (props.defaultCustomer ?? '').trim()
+      void nextTick(() => {
+        suppressSearch.value = false
+      })
+    } else {
+      clearSearchTimer()
     }
   },
 )
 
-const filteredItems = computed(() => {
+watch([keyword, customerKeyword], ([nameKw], [prevName]) => {
+  if (!props.modelValue || suppressSearch.value) return
+  clearSearchTimer()
+  const name = nameKw.trim()
+  const prevNameTrim = String(prevName ?? '').trim()
+  // 名称输入防抖；清空名称 / 改客户立即请求
+  if (name && name !== prevNameTrim) {
+    searchTimer = setTimeout(() => {
+      searchTimer = null
+      emitSearch()
+    }, 280)
+    return
+  }
+  emitSearch()
+})
+
+onBeforeUnmount(() => clearSearchTimer())
+
+function customerRank(item: AccessoryItem, custKw: string): number {
+  if (!custKw) return 1
+  const itemCustomer = String(item.customerName ?? '').trim().toLowerCase()
+  if (itemCustomer && itemCustomer.includes(custKw)) return 0
+  if (!itemCustomer) return 1
+  return 2
+}
+
+const displayItems = computed(() => {
   const nameKw = keyword.value.trim().toLowerCase()
   const custKw = customerKeyword.value.trim().toLowerCase()
-  return props.items.filter((item) => {
-    if (nameKw && !String(item.name ?? '').toLowerCase().includes(nameKw)) return false
-    if (custKw) {
-      const itemCustomer = String(item.customerName ?? '').trim()
-      // 客户匹配：命中该客户，或未绑定客户的通用辅料
-      if (itemCustomer && !itemCustomer.toLowerCase().includes(custKw)) return false
-    }
-    return true
-  })
+  return props.items
+    .filter((item) => {
+      // 名称已由服务端过滤时仍做一次本地收紧，避免旧结果闪烁
+      if (nameKw && !String(item.name ?? '').toLowerCase().includes(nameKw)) return false
+      if (custKw) {
+        const itemCustomer = String(item.customerName ?? '').trim()
+        if (itemCustomer && !itemCustomer.toLowerCase().includes(custKw)) return false
+      }
+      return true
+    })
+    .slice()
+    .sort((a, b) => customerRank(a, custKw) - customerRank(b, custKw))
 })
 </script>
 
 <style scoped src="./dialog-select.css"></style>
+<style scoped>
+.accessory-dialog-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  line-height: 1.4;
+}
+</style>

@@ -354,8 +354,10 @@
       v-model="accessoryDialogVisible"
       :loading="accessoryDialogLoading"
       :items="accessoryItems"
+      :items-full-loaded="accessoryItemsFullLoaded"
       :default-customer="form.customerName"
       @select="onSelectAccessory"
+      @search="onAccessoryDialogSearch"
     />
 
     <SkuSelectDialog
@@ -529,6 +531,8 @@ const {
   accessoryDialogVisible,
   accessoryDialogLoading,
   accessoryItems,
+  accessoryItemsFullLoaded,
+  onAccessoryDialogSearch,
   onSelectAccessory,
   skuDialogVisible,
   skuDialogLoading,

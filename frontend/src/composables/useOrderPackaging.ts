@@ -9,9 +9,17 @@ export interface PackagingCell {
   description?: string
 }
 
+export interface AccessoryDialogSearchQuery {
+  name?: string
+  customerName?: string
+}
+
 const defaultPackagingHeaders = ['主唛', '洗水唛', '吊牌', '包装袋', '包装贴纸', '外箱唛头']
 
-export function useOrderPackaging() {
+/** 弹窗列表单页上限：避免一次渲染数百行缩略图 */
+const ACCESSORY_DIALOG_PAGE_SIZE = 100
+
+export function useOrderPackaging(options?: { getPreferredCustomer?: () => string }) {
   const packagingHeaders = ref<string[]>([...defaultPackagingHeaders])
   const packagingCells = ref<PackagingCell[]>([])
   const packagingCellKeys = ref<string[]>([])
@@ -21,8 +29,16 @@ export function useOrderPackaging() {
   const accessoryDialogLoading = ref(false)
   const accessoryItems = ref<AccessoryItem[]>([])
   const accessoryTargetIndex = ref<number | null>(null)
+  /**
+   * true：当前列表已是「浏览/搜索」结果（可含通用辅料），不再提示仅匹配客户。
+   * false：仅订单客户匹配的部分列表。
+   */
+  const accessoryItemsFullLoaded = ref(false)
+  /** 部分缓存对应的客户名 */
+  const accessoryPartialCustomer = ref('')
 
   let packagingCellKeySeed = 0
+  let accessoryLoadSeq = 0
 
   function nextPackagingCellKey() {
     packagingCellKeySeed += 1
@@ -76,27 +92,94 @@ export function useOrderPackaging() {
     packagingCellKeys.value.splice(to, 0, movedKey ?? nextPackagingCellKey())
   }
 
-  async function loadAccessoryItems() {
+  /** 服务端分页/模糊搜索，不再一次拉全库 */
+  async function searchAccessoryItems(query: AccessoryDialogSearchQuery = {}) {
+    const seq = ++accessoryLoadSeq
     accessoryDialogLoading.value = true
     try {
-      // 弹窗内按名称/客户做前端筛选，需一次性取回全部辅料；先查总数再按总数取，避免漏掉排在后面的条目
-      const head = await getAccessoriesList({ page: 1, pageSize: 1 })
-      const total = head.data?.total ?? 0
-      const res = await getAccessoriesList({ page: 1, pageSize: Math.max(total, 1) })
+      const name = query.name?.trim() || undefined
+      // 有名称时不传 customerName，由前端保留「客户匹配 + 通用」过滤；否则按客户拉匹配项
+      const customerName = name ? undefined : query.customerName?.trim() || undefined
+      const res = await getAccessoriesList({
+        name,
+        customerName,
+        page: 1,
+        pageSize: ACCESSORY_DIALOG_PAGE_SIZE,
+        skipTotal: true,
+      })
+      if (seq !== accessoryLoadSeq) return
       accessoryItems.value = res.data?.list ?? []
+      accessoryItemsFullLoaded.value = true
+      accessoryPartialCustomer.value = ''
+    } catch (e: unknown) {
+      if (!isErrorHandled(e)) console.warn('Failed to search accessory inventory', getErrorMessage(e))
+    } finally {
+      if (seq === accessoryLoadSeq) accessoryDialogLoading.value = false
+    }
+  }
+
+  async function loadAccessoryItems(preferredCustomer?: string) {
+    const seq = ++accessoryLoadSeq
+    const cust = (preferredCustomer ?? '').trim()
+    const showBlocking = !accessoryItems.value.length
+    if (showBlocking) accessoryDialogLoading.value = true
+    try {
+      if (cust) {
+        const matched = await getAccessoriesList({
+          customerName: cust,
+          page: 1,
+          pageSize: ACCESSORY_DIALOG_PAGE_SIZE,
+          skipTotal: true,
+        })
+        if (seq !== accessoryLoadSeq) return
+        const list = matched.data?.list ?? []
+        accessoryItems.value = list
+        accessoryPartialCustomer.value = cust
+        accessoryItemsFullLoaded.value = false
+        if (list.length) {
+          accessoryDialogLoading.value = false
+          return
+        }
+      }
+      // 无客户或不匹配：拉一页最近辅料（含通用）
+      await searchAccessoryItems({})
     } catch (e: unknown) {
       if (!isErrorHandled(e)) console.warn('Failed to load accessory inventory', getErrorMessage(e))
     } finally {
-      accessoryDialogLoading.value = false
+      if (seq === accessoryLoadSeq) accessoryDialogLoading.value = false
     }
   }
 
   async function openAccessoryDialog(index: number) {
     accessoryTargetIndex.value = index
     accessoryDialogVisible.value = true
-    if (!accessoryItems.value.length) {
-      await loadAccessoryItems()
+    const preferred = (options?.getPreferredCustomer?.() ?? '').trim()
+    if (accessoryItemsFullLoaded.value) return
+    const samePartial =
+      accessoryItems.value.length > 0 &&
+      accessoryPartialCustomer.value.trim().toLowerCase() === preferred.toLowerCase()
+    if (samePartial) return
+    accessoryItems.value = []
+    accessoryPartialCustomer.value = ''
+    await loadAccessoryItems(preferred)
+  }
+
+  /** 弹窗筛选变化：名称走服务端；清空/切换客户时按需拉一页 */
+  async function onAccessoryDialogSearch(query: AccessoryDialogSearchQuery) {
+    const name = query.name?.trim() ?? ''
+    const customerName = query.customerName?.trim() ?? ''
+    if (name) {
+      await searchAccessoryItems({ name, customerName })
+      return
     }
+    if (!customerName) {
+      await searchAccessoryItems({})
+      return
+    }
+    // 仅客户：回到「客户匹配」轻量列表
+    accessoryItemsFullLoaded.value = false
+    accessoryItems.value = []
+    await loadAccessoryItems(customerName)
   }
 
   function onSelectAccessory(row: AccessoryItem) {
@@ -119,6 +202,7 @@ export function useOrderPackaging() {
     accessoryDialogVisible,
     accessoryDialogLoading,
     accessoryItems,
+    accessoryItemsFullLoaded,
     accessoryTargetIndex,
     normalizePackagingCells,
     getNextPackagingHeader,
@@ -127,6 +211,7 @@ export function useOrderPackaging() {
     movePackagingHeader,
     loadAccessoryItems,
     openAccessoryDialog,
+    onAccessoryDialogSearch,
     onSelectAccessory,
   }
 }

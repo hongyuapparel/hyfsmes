@@ -68,7 +68,9 @@ export function useOrderEditPage() {
   })
 
   const orderImageUploadApi = useOrderImageUpload(form)
-  const packagingApi = useOrderPackaging()
+  const packagingApi = useOrderPackaging({
+    getPreferredCustomer: () => String(form.customerName ?? ''),
+  })
   const materialsApi = useOrderMaterials()
   const materialNameSearchApi = useOrderMaterialNameSearch({
     getMaterialTypeLabel: materialsApi.getMaterialTypeLabel,
