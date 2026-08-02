@@ -142,9 +142,11 @@
         :raw-url="displayProductImage"
         :width="160"
         :height="120"
+        :lazy="false"
+        empty-text="图片加载失败"
         :use-original-src="true"
       />
-      <div v-else class="detail-image-empty">-</div>
+      <div v-else class="detail-image-empty">未设置产品图</div>
     </template>
   </FinishedBasicInfoGrid>
 </template>

@@ -1,7 +1,7 @@
 import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 
 export type FinishedStockColumn = {
-  prop: 'skuCode' | 'department' | 'location' | 'createdAt'
+  prop: 'skuCode' | 'department' | 'customerName' | 'location' | 'createdAt'
   label: string
   minWidth?: number
   width?: number
@@ -20,6 +20,7 @@ const stockPrimaryColumns: FinishedStockColumn[] = [
 
 const stockTailColumns: FinishedStockColumn[] = [
   { prop: 'department', label: '部门', minWidth: 90 },
+  { prop: 'customerName', label: '客户', minWidth: 120 },
   { prop: 'location', label: '存放地址', minWidth: 120 },
   { prop: 'createdAt', label: '入库时间', width: 160 },
 ]

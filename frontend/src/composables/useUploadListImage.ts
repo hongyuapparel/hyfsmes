@@ -2,6 +2,7 @@ import { reactive } from 'vue'
 import {
   advanceListImagePhaseOnError,
   getListImageDisplaySrc,
+  listImageStateKey,
   type ListImagePhase,
 } from '@/utils/image'
 
@@ -22,5 +23,10 @@ export function useUploadListImage() {
     advanceListImagePhaseOnError(raw, sharedPhases)
   }
 
-  return { src, onError, phases: sharedPhases }
+  function reset(raw: string | undefined) {
+    const key = listImageStateKey(raw)
+    if (key) delete sharedPhases[key]
+  }
+
+  return { src, onError, reset, phases: sharedPhases }
 }

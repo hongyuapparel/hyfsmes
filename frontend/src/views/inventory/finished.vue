@@ -14,6 +14,7 @@
           :has-stored-selection="hasStoredSelection"
           :selected-rows="selectedRows"
           :loading="loading"
+          :exporting="exporting"
           :stock-table-data="pagedStockTableData"
           :compact-header-cell-style="compactHeaderCellStyle"
           :compact-cell-style="compactCellStyle"
@@ -40,6 +41,7 @@
           @search="onSearch"
           @debounced-search="debouncedSearch"
           @reset="onReset"
+          @export="onExport"
           @open-create="openCreateDrawer"
           @open-inbound="openInboundDialog"
           @open-outbound="openOutboundDialog"
@@ -128,6 +130,7 @@ import { ACTIVE_FILTER_COLOR } from '@/composables/useFilterBarHelpers'
 import { useFinishedViewStockFilter } from '@/composables/useFinishedViewStockFilter'
 import { type StockTableRow } from '@/utils/finishedStockTableUtils'
 import { useFinishedViewStockInteractions } from '@/composables/useFinishedViewStockInteractions'
+import { useFinishedStockExport } from '@/composables/useFinishedStockExport'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const list = ref<FinishedStockRow[]>([])
@@ -198,6 +201,12 @@ const {
 })
 const { currentTab, filter, skuCodeLabelVisible, inboundDateRange, pagination, onSearch, debouncedSearch, onReset, onPageSizeChange, onCurrentPageChange } =
   useFinishedViewStockFilter(load, clearSelection)
+const { exporting, onExport } = useFinishedStockExport({
+  filter,
+  inboundDateRange,
+  selectedRows,
+  total: () => pagination.total,
+})
 
 /**
  * 成品库存表格的 pageSize 只约束顶层父行数量。

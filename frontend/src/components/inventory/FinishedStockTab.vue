@@ -72,6 +72,7 @@
       <div class="filter-bar-actions">
         <el-button type="primary" @click="emit('search', true)">搜索</el-button>
         <el-button @click="emit('reset')">清空</el-button>
+        <el-button :loading="exporting" @click="emit('export')">{{ exportButtonText }}</el-button>
         <el-button type="primary" @click="emit('open-create')">新增库存</el-button>
         <el-button v-if="hasPendingSelection" type="primary" @click="emit('open-inbound')">
           入库
@@ -82,7 +83,7 @@
       </div>
     </div>
 
-    <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+    <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 条库存明细</div>
 
     <div ref="stockShellRef" class="list-page-table-shell">
     <el-table
@@ -101,7 +102,7 @@
       :cell-style="compactCellStyle"
       :header-cell-style="compactHeaderCellStyle"
       @header-dragend="handleHeaderDragEnd"
-      @selection-change="emit('selection-change', $event)"
+      @selection-change="handleSelectionChange"
     >
       <el-table-column type="selection" width="48" align="center" :selectable="isSelectableStockRow" />
       <el-table-column
@@ -231,12 +232,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onUnmounted, ref, watch } from 'vue'
+import type { TableInstance } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
 import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
+import {
+  buildFinishedStockTableSelection,
+  resolveFinishedStockLeafSelection,
+} from '@/composables/finishedStockSelection'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
@@ -259,6 +265,7 @@ const props = defineProps<{
   hasStoredSelection: boolean
   selectedRows: StockTableLeafRow[]
   loading: boolean
+  exporting: boolean
   stockTableData: StockTableRow[]
   compactHeaderCellStyle: unknown
   compactCellStyle: unknown
@@ -288,6 +295,7 @@ const emit = defineEmits<{
   (e: 'search', byUser: boolean): void
   (e: 'debounced-search'): void
   (e: 'reset'): void
+  (e: 'export'): void
   (e: 'open-create'): void
   (e: 'open-inbound'): void
   (e: 'open-outbound'): void
@@ -299,9 +307,10 @@ const emit = defineEmits<{
   (e: 'table-ref-change', value: unknown | null): void
 }>()
 
-const tableRef = ref<unknown | null>(null)
+const tableRef = ref<TableInstance | null>(null)
 const stockShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(stockShellRef)
+let syncingSelection = false
 
 const { stockPrimaryColumns, stockTailColumns } = useFinishedViewColumns()
 
@@ -314,6 +323,10 @@ const activeFilterCount = computed(() => {
   if (props.inboundDateRange) n++
   return n
 })
+
+const exportButtonText = computed(() =>
+  props.selectedRows.length > 0 ? `导出已选（${props.selectedRows.length}）` : '导出筛选结果',
+)
 
 const inboundDateRangeModel = computed({
   get: () => props.inboundDateRange,
@@ -354,6 +367,34 @@ function shouldShowDetailAction(row: StockTableRow): boolean {
 
 function handleHeaderDragEnd(...args: unknown[]) {
   emit('header-dragend', ...args)
+}
+
+function hasSameSelectedRows(left: StockTableRow[], right: StockTableRow[]): boolean {
+  if (left.length !== right.length) return false
+  const rightKeys = new Set(right.map((row) => row._uiKey))
+  return left.every((row) => rightKeys.has(row._uiKey))
+}
+
+async function handleSelectionChange(rows: StockTableRow[]) {
+  if (syncingSelection) return
+
+  const selectedLeaves = resolveFinishedStockLeafSelection(rows, props.selectedRows)
+  const normalizedRows = buildFinishedStockTableSelection(props.stockTableData, selectedLeaves)
+  if (hasSameSelectedRows(rows, normalizedRows) || !tableRef.value) {
+    emit('selection-change', normalizedRows)
+    return
+  }
+
+  syncingSelection = true
+  try {
+    tableRef.value.clearSelection()
+    await nextTick()
+    normalizedRows.forEach((row) => tableRef.value?.toggleRowSelection(row, true))
+    await nextTick()
+  } finally {
+    syncingSelection = false
+  }
+  emit('selection-change', normalizedRows)
 }
 
 watch(tableRef, (value) => emit('table-ref-change', value), { immediate: true })

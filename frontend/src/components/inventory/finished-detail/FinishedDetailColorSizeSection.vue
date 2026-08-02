@@ -79,7 +79,7 @@ const emit = defineEmits<{
   (e: 'applyBasicInfoToAllRows'): void
   (e: 'rowMetaChange', rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null): void
   (e: 'rowUnitPriceChange', rowKey: string, value: string): void
-  (e: 'saveColorImage', colorName: string, url: string): void
+  (e: 'saveColorImage', stockId: number | null | undefined, colorName: string, url: string): void
   (e: 'updateUnitPrice', value: string): void
 }>()
 
@@ -116,7 +116,7 @@ function getMatrixSummary({ columns }: { columns: Array<{ label?: string }> }) {
 }
 
 function onSaveColorImage(row: MatrixRow, url: string) {
-  emit('saveColorImage', row.colorName, url)
+  emit('saveColorImage', row.stockId, row.colorName, url)
 }
 
 function onRowMetaChange(rowKey: string, field: FinishedCreateRowMetaField, value: string | number | null) {

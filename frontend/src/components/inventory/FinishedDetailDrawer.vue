@@ -197,9 +197,10 @@ function handleSaveMeta() {
   saveMeta(props.stockId)
 }
 
-function handleSaveColorImage(colorName: string, url: string) {
-  if (!props.stockId) return
-  saveColorImage(props.stockId, colorName, url)
+function handleSaveColorImage(rowStockId: number | null | undefined, colorName: string, url: string) {
+  const targetStockId = rowStockId ?? props.stockId
+  if (!targetStockId) return
+  saveColorImage(targetStockId, colorName, url)
 }
 
 function handleRollback(logId: number) {

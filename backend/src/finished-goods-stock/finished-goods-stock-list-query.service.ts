@@ -15,6 +15,8 @@ import {
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import { snapshotToListSizeBreakdown, type StoredStockRawRow } from './finished-goods-stock-list-query.helpers';
 
+const SNAPSHOT_REBUILD_BATCH_SIZE = 8;
+
 @Injectable()
 export class FinishedGoodsStockListQueryService {
   constructor(
@@ -205,50 +207,90 @@ export class FinishedGoodsStockListQueryService {
     return this.getListInternal(params);
   }
 
+  async getStoredRowsForExport(params: {
+    skuCode?: string;
+    customerName?: string;
+    inventoryTypeId?: number | null;
+    startDate?: string;
+    endDate?: string;
+    selectedIds?: number[];
+  }): Promise<FinishedStockRow[]> {
+    const selectedIds = Array.from(
+      new Set(
+        (params.selectedIds ?? [])
+          .map((id) => Number(id))
+          .filter((id) => Number.isInteger(id) && id > 0),
+      ),
+    );
+    const qb = this.createStoredListQueryBuilder().andWhere('s.quantity > 0');
+    if (selectedIds.length > 0) {
+      qb.andWhere('s.id IN (:...selectedIds)', { selectedIds });
+    } else {
+      this.applyStoredListFilters(qb, {
+        skuCode: params.skuCode,
+        customerName: params.customerName,
+        inventoryTypeId: params.inventoryTypeId,
+        startDate: params.startDate,
+        endDate: params.endDate,
+      });
+    }
+    const rows = await qb
+      .orderBy('s.sku_code', 'ASC')
+      .addOrderBy('s.created_at', 'DESC')
+      .addOrderBy('s.id', 'DESC')
+      .getRawMany<StoredStockRawRow>();
+    return this.buildStoredRowsWithDetails(rows);
+  }
+
   private async buildStoredRowsWithDetails(storedRows: StoredStockRawRow[]): Promise<FinishedStockRow[]> {
-    const storedList: FinishedStockRow[] = await Promise.all(storedRows.map(async (r) => {
-      const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
-      // 仅信任与总数量一致的存储快照；历史脏数据回退订单回溯重建，避免列表/出库弹窗展示错误明细。
-      const safeQuantity = Math.max(0, Math.trunc(Number(r.quantity) || 0));
-      const storedBreakdownTotal = storedBreakdown
-        ? storedBreakdown.rows.reduce(
-            (sum, row) =>
-              sum + row.values.reduce((rowSum, value) => rowSum + Math.max(0, Math.trunc(Number(value) || 0)), 0),
-            0,
-          )
-        : 0;
-      let sizeBreakdown =
-        storedBreakdown && storedBreakdownTotal === safeQuantity ? storedBreakdown : null;
-      if (!sizeBreakdown && r.orderId != null) {
-        const stock = this.stockRepo.create({
+    const storedList: FinishedStockRow[] = [];
+    for (let offset = 0; offset < storedRows.length; offset += SNAPSHOT_REBUILD_BATCH_SIZE) {
+      const batch = storedRows.slice(offset, offset + SNAPSHOT_REBUILD_BATCH_SIZE);
+      const batchList = await Promise.all(batch.map(async (r) => {
+        const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
+        // 仅信任与总数量一致的存储快照；历史脏数据回退订单回溯重建，避免列表/出库弹窗展示错误明细。
+        const safeQuantity = Math.max(0, Math.trunc(Number(r.quantity) || 0));
+        const storedBreakdownTotal = storedBreakdown
+          ? storedBreakdown.rows.reduce(
+              (sum, row) =>
+                sum + row.values.reduce((rowSum, value) => rowSum + Math.max(0, Math.trunc(Number(value) || 0)), 0),
+              0,
+            )
+          : 0;
+        let sizeBreakdown =
+          storedBreakdown && storedBreakdownTotal === safeQuantity ? storedBreakdown : null;
+        if (!sizeBreakdown && r.orderId != null) {
+          const stock = this.stockRepo.create({
+            id: r.id,
+            orderId: r.orderId,
+            skuCode: r.skuCode ?? '',
+            customerName: r.customerName ?? '',
+            quantity: r.quantity ?? 0,
+            colorSizeSnapshot: null,
+          });
+          sizeBreakdown = snapshotToListSizeBreakdown(await this.inboundQueryService.buildCurrentStockSnapshot(stock));
+        }
+        return {
           id: r.id,
-          orderId: r.orderId,
-          skuCode: r.skuCode ?? '',
+          orderId: r.orderId ?? null,
+          orderNo: r.orderNo ?? '',
           customerName: r.customerName ?? '',
+          skuCode: r.skuCode ?? '',
           quantity: r.quantity ?? 0,
-          colorSizeSnapshot: null,
-        });
-        sizeBreakdown = snapshotToListSizeBreakdown(await this.inboundQueryService.buildCurrentStockSnapshot(stock));
-      }
-      return {
-        id: r.id,
-        orderId: r.orderId ?? null,
-        orderNo: r.orderNo ?? '',
-        customerName: r.customerName ?? '',
-        skuCode: r.skuCode ?? '',
-        quantity: r.quantity ?? 0,
-        unitPrice: r.unitPrice ?? '0',
-        warehouseId: r.warehouseId ?? null,
-        inventoryTypeId: r.inventoryTypeId ?? null,
-        department: r.department ?? '',
-        location: r.location ?? '',
-        productImageUrl: r.productImageUrl ?? '',
-        imageUrl: r.imageUrl ?? '',
-        createdAt: formatDateTimeForResponse(r.createdAt),
-        type: 'stored' as const,
-        sizeBreakdown,
-      };
-    }));
+          unitPrice: r.unitPrice ?? '0',
+          warehouseId: r.warehouseId ?? null,
+          inventoryTypeId: r.inventoryTypeId ?? null,
+          department: r.department ?? '',
+          location: r.location ?? '',
+          productImageUrl: r.productImageUrl ?? '',
+          imageUrl: r.imageUrl ?? '',
+          createdAt: formatDateTimeForResponse(r.createdAt),
+          type: 'stored' as const,
+          sizeBreakdown,
+        };
+      }));
+      storedList.push(...batchList);
+    }
     if (storedList.length) {
       try {
         const colorImageRows = await this.colorImageRepo.find({

@@ -15,6 +15,7 @@ import { User } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
 import { Role } from '../entities/role.entity';
 import { RolePermission } from '../entities/role-permission.entity';
+import { SystemOption } from '../entities/system-option.entity';
 import { AuthModule } from '../auth/auth.module';
 import { FinishedGoodsStockController } from './finished-goods-stock.controller';
 import { FinishedGoodsStockService } from './finished-goods-stock.service';
@@ -26,6 +27,7 @@ import { FinishedGoodsStockOutboundService } from './finished-goods-stock-outbou
 import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
 import { FinishedGoodsStockRepartitionService } from './finished-goods-stock-repartition.service';
 import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
+import { FinishedGoodsStockExportService } from './finished-goods-stock-export.service';
 
 @Module({
   imports: [
@@ -45,6 +47,7 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
       UserRole,
       Role,
       RolePermission,
+      SystemOption,
     ]),
     AuthModule,
   ],
@@ -59,6 +62,7 @@ import { FinishedGoodsStockReportService } from './finished-goods-stock-report.s
     FinishedGoodsStockOperationService,
     FinishedGoodsStockRepartitionService,
     FinishedGoodsStockReportService,
+    FinishedGoodsStockExportService,
   ],
   exports: [
     FinishedGoodsStockService,

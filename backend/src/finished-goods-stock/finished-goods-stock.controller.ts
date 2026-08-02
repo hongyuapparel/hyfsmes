@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -6,6 +7,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { FinishedGoodsStockQueryService } from './finished-goods-stock-query.service';
 import { FinishedGoodsStockOperationService } from './finished-goods-stock-operation.service';
 import { FinishedGoodsStockReportService } from './finished-goods-stock-report.service';
+import { FinishedGoodsStockExportService, type FinishedStockExportSelection } from './finished-goods-stock-export.service';
 
 @Controller('inventory/finished')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -15,6 +17,7 @@ export class FinishedGoodsStockController {
     private readonly queryService: FinishedGoodsStockQueryService,
     private readonly operationService: FinishedGoodsStockOperationService,
     private readonly reportService: FinishedGoodsStockReportService,
+    private readonly exportService: FinishedGoodsStockExportService,
   ) {}
 
   @Get('items')
@@ -47,6 +50,35 @@ export class FinishedGoodsStockController {
       paginateByVisibleGroup:
         paginateByVisibleGroup === 'true' || paginateByVisibleGroup === '1',
     });
+  }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  async exportItems(
+    @Body('skuCode') skuCode: string | undefined,
+    @Body('customerName') customerName: string | undefined,
+    @Body('inventoryTypeId') inventoryTypeIdRaw: number | string | null | undefined,
+    @Body('startDate') startDate: string | undefined,
+    @Body('endDate') endDate: string | undefined,
+    @Body('selections') selections: FinishedStockExportSelection[] | undefined,
+    @Res() res: Response,
+  ) {
+    const inventoryTypeId = inventoryTypeIdRaw != null && inventoryTypeIdRaw !== ''
+      ? Number(inventoryTypeIdRaw)
+      : undefined;
+    const result = await this.exportService.exportWorkbook({
+      skuCode,
+      customerName,
+      inventoryTypeId: Number.isFinite(inventoryTypeId) ? inventoryTypeId : undefined,
+      startDate,
+      endDate,
+      selections: Array.isArray(selections) ? selections : [],
+    });
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="finished-goods-stock.xlsx"');
+    res.setHeader('X-Image-Failures', String(result.failedImageCount));
+    res.setHeader('X-Export-Row-Count', String(result.rowCount));
+    res.send(result.buffer);
   }
 
   @Post('items')

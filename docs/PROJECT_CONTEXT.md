@@ -76,6 +76,7 @@
 
 示例格式（按时间倒序追加即可）：
 
+- `2026-08-01`：成品库存支持按当前筛选或勾选颜色明细导出 WPS 表格；图片嵌入 SKU 与颜色之间，同一 SKU+颜色+图片纵向合并，图片处理采用有限并发，并在导出文件内附图片加载失败清单。
 - `2026-07-03`：装箱单「确认发货」拆成操作级权限 `inventory_packing_ship`：进入装箱单页面只需要 `/inventory/packing`，把草稿变成已发货并扣减库存必须另行在「角色与权限」中授权，适合给财务审核后提交的人。
 - `2026-07-02`：装箱单分批发货采用「列表页按箱号范围复制成独立草稿」方案：一张正式装箱单只对应一个发运去向/方式/备注；如 1-5 箱空运、6-10 箱海运，应从源草稿分别复制成两张新草稿，也支持 1,3,5 这类跳箱拆分；新单箱号从 1 重新编号。国家与邮编保持选填。
 - `2026-06-12`：库存管理新增「装箱单」模块：从待仓处理/成品库存选货（含手工行）做 Excel 式分箱录入（editable-grid + 箱级单元格 rowspan 合并），确认发货复用 `InventoryPendingService.doOutbound` 与 `FinishedGoodsStockOutboundService.outbound` 联动扣减（发货前预校验超发），支持可改字箱贴 A4 打印与中英双语 Excel 导出；后端新增 `packing-lists` 模块与 3 张表（启动自动建表，SQL 见 `backend/scripts/create-packing-list-tables.sql`），权限 `/inventory/packing`。

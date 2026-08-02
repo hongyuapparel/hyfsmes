@@ -16,6 +16,7 @@ import {
   type StockTableLeafRow,
   type StockTableRow,
 } from '@/utils/finishedStockTableUtils'
+import { resolveFinishedStockLeafSelection } from '@/composables/finishedStockSelection'
 
 type DetailDrawerState = {
   visible: boolean
@@ -82,25 +83,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   const createSeed = ref<FinishedCreateQuickAddSource | null>(null)
 
   function onSelectionChange(rows: StockTableRow[]) {
-    // Parent row selection expands to visible child rows; count by table row key, not stock id.
-    const seen = new Set<string>()
-    const result: StockTableLeafRow[] = []
-    rows.forEach((row) => {
-      if (isStockTableParentRow(row)) {
-        row._children.forEach((child) => {
-          if (!seen.has(child._uiKey)) {
-            seen.add(child._uiKey)
-            result.push(child)
-          }
-        })
-      } else if (isStockTableLeafRow(row)) {
-        if (!seen.has(row._uiKey)) {
-          seen.add(row._uiKey)
-          result.push(row)
-        }
-      }
-    })
-    selectedRows.value = result
+    selectedRows.value = resolveFinishedStockLeafSelection(rows, selectedRows.value)
   }
 
   function openDetail(row: StockTableRow) {

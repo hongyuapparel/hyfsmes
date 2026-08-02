@@ -394,7 +394,7 @@ async function ensurePackingListTables(dataSource: DataSource) {
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.enableCors();
+  app.enableCors({ exposedHeaders: ['X-Image-Failures', 'X-Export-Row-Count'] });
 
   const uploadsDir = join(process.cwd(), 'uploads');
   if (!existsSync(uploadsDir)) mkdirSync(uploadsDir, { recursive: true });

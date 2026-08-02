@@ -250,6 +250,7 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
   const inventoryTypeIds = uniqueNullableNumbers(rows.map((item) => item.inventoryTypeId))
   const warehouseIds = uniqueNullableNumbers(rows.map((item) => item.warehouseId))
   const departments = uniqueStrings(rows.map((item) => item.department))
+  const customerNames = uniqueStrings(rows.map((item) => item.customerName))
   const locations = uniqueStrings(rows.map((item) => item.location))
   const orderNos = uniqueStrings(rows.map((item) => item.orderNo))
   return {
@@ -259,6 +260,7 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
     inventoryTypeId: inventoryTypeIds.length === 1 ? inventoryTypeIds[0] : null,
     warehouseId: warehouseIds.length === 1 ? warehouseIds[0] : null,
     department: departments.length === 1 ? departments[0] : '多个',
+    customerName: customerNames.length === 1 ? customerNames[0] : '多个',
     location: locations.length === 1 ? locations[0] : '多个',
     orderNo: orderNos.length === 1 ? orderNos[0] : '多个',
     sizeBreakdown: null,

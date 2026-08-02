@@ -59,6 +59,26 @@ export function getFinishedStockList(params?: {
   }>('/inventory/finished/items', { params, ...(config ?? {}) })
 }
 
+export type FinishedStockExportSelection = {
+  id: number
+  colorName?: string
+}
+
+export function exportFinishedStock(params: {
+  skuCode?: string
+  customerName?: string
+  inventoryTypeId?: number
+  startDate?: string
+  endDate?: string
+  selections?: FinishedStockExportSelection[]
+}) {
+  return request.post<Blob>('/inventory/finished/export', params, {
+    responseType: 'blob',
+    skipGlobalErrorHandler: true,
+    timeout: 120000,
+  })
+}
+
 export function finishedOutbound(body: {
   items: Array<{
     id: number

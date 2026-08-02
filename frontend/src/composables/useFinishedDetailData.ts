@@ -5,6 +5,7 @@ import type { FinishedDetailColorMeta } from '@/composables/useFinishedDetailMat
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { createAdjustLogSummaryBuilder, mergeSizeHeaders } from '@/composables/useFinishedDetailHelpers'
 import { useFinishedDetailDisplayData } from '@/composables/useFinishedDetailDisplayData'
+import { useUploadListImage } from '@/composables/useUploadListImage'
 import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTableUtils'
 
 export type FinishedDetailEditForm = {
@@ -47,6 +48,7 @@ type StockMeta = Partial<Record<'skuCode' | 'department' | 'location' | 'imageUr
 }
 
 export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
+  const { reset: resetColorImageLoad } = useUploadListImage()
   const loading = ref(false)
   const saving = ref(false)
   const data = ref<FinishedDetailData | null>(null)
@@ -200,8 +202,15 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     const imageUrl = (url ?? '').trim()
     try {
       await upsertFinishedStockColorImage(stockId, { colorName, imageUrl })
-      if (imageUrl) colorImageMap.value[colorName] = imageUrl
-      else delete colorImageMap.value[colorName]
+      if (imageUrl) {
+        // 上传后的图片若曾短暂加载失败，共享缩略图状态会停在占位图；保存成功后允许立即重试。
+        resetColorImageLoad(imageUrl)
+        colorImageMap.value = { ...colorImageMap.value, [colorName]: imageUrl }
+      } else {
+        const nextColorImageMap = { ...colorImageMap.value }
+        delete nextColorImageMap[colorName]
+        colorImageMap.value = nextColorImageMap
+      }
       ElMessage.success(imageUrl ? '已保存图片' : '已清除图片')
       options.onColorImageSaved({ stockId, colorName, imageUrl })
     } catch (error: unknown) {
