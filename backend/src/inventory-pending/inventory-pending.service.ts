@@ -318,7 +318,7 @@ export class InventoryPendingService {
     const pendings = await this.pendingRepo
       .createQueryBuilder('p')
       .where('p.id IN (:...ids) AND p.status = :status', { ids, status: 'pending' })
-      .addSelect('p.color_size_snapshot')
+      .addSelect('p.colorSizeSnapshot')
       .getMany();
     if (pendings.length === 0) {
       throw new NotFoundException('未找到有效的待仓处理记录');
@@ -389,7 +389,7 @@ export class InventoryPendingService {
     const pendings = await this.pendingRepo
       .createQueryBuilder('p')
       .where('p.id IN (:...ids) AND p.status = :status', { ids: uniqueIds, status: 'pending' })
-      .addSelect('p.color_size_snapshot')
+      .addSelect('p.colorSizeSnapshot')
       .getMany();
     if (pendings.length !== uniqueIds.length) {
       throw new NotFoundException('存在待仓处理记录不存在或已失效');
@@ -452,7 +452,7 @@ export class InventoryPendingService {
           const txPending = await txPendingRepo
             .createQueryBuilder('p')
             .where('p.id = :id AND p.status = :status', { id: item.id, status: 'pending' })
-            .addSelect('p.color_size_snapshot')
+            .addSelect('p.colorSizeSnapshot')
             .setLock('pessimistic_write')
             .getOne();
           if (!txPending) {

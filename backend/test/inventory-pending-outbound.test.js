@@ -1,5 +1,7 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const fs = require('node:fs');
+const path = require('node:path');
 
 const {
   applyPendingOutboundSizeDeduction,
@@ -9,6 +11,25 @@ const {
   parseStoredColorSizeSnapshot,
 } = require('../dist/finished-goods-stock/finished-goods-stock-query.utils');
 const { assertColorRowsShape } = require('../dist/common/color-size-row.util');
+
+test('entity queries hydrate select:false pending color-size snapshots through property paths', () => {
+  const pendingServiceSource = fs.readFileSync(
+    path.join(__dirname, '../dist/inventory-pending/inventory-pending.service.js'),
+    'utf8',
+  );
+  const finishingServiceSource = fs.readFileSync(
+    path.join(__dirname, '../dist/production-finishing/production-finishing-mutation.service.js'),
+    'utf8',
+  );
+
+  assert.equal(
+    (pendingServiceSource.match(/\.addSelect\('p\.colorSizeSnapshot'\)/g) ?? []).length,
+    3,
+  );
+  assert.doesNotMatch(pendingServiceSource, /\.addSelect\('p\.color_size_snapshot'\)/);
+  assert.match(finishingServiceSource, /\.addSelect\('pending\.colorSizeSnapshot'\)/);
+  assert.doesNotMatch(finishingServiceSource, /\.addSelect\('pending\.color_size_snapshot'\)/);
+});
 
 function snapshot(quantities) {
   return {

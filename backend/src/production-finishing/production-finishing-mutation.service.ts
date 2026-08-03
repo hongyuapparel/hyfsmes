@@ -586,7 +586,7 @@ export class ProductionFinishingMutationService {
       const existingPendings = await inboundPendingRepoTx
         .createQueryBuilder('pending')
         .where('pending.order_id = :orderId AND pending.status = :status', { orderId: order.id, status: 'pending' })
-        .addSelect('pending.color_size_snapshot')
+        .addSelect('pending.colorSizeSnapshot')
         .setLock('pessimistic_write')
         .getMany();
       const currentTotal = existingPendings.reduce((sum, row) => sum + Math.max(0, Number(row.quantity) || 0), 0);
