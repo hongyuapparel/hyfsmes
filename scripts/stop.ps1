@@ -3,6 +3,25 @@
 
 $BackendPort = 3000
 $FrontendPort = 5173
+$ProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+$LogDir = Join-Path $ProjectRoot "logs"
+$BackendPidFile = Join-Path $LogDir "backend-3000.pid"
+$FrontendPidFile = Join-Path $LogDir "frontend-5173.pid"
+
+function Stop-TrackedProcessTree {
+    param ([string]$PidFile, [string]$Label)
+    if (-not (Test-Path -LiteralPath $PidFile)) { return }
+    $rawPid = (Get-Content -LiteralPath $PidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+    $trackedPid = 0
+    if ([int]::TryParse([string]$rawPid, [ref]$trackedPid) -and $trackedPid -gt 0) {
+        $process = Get-Process -Id $trackedPid -ErrorAction SilentlyContinue
+        if ($process) {
+            $null = cmd /c "taskkill /F /T /PID $trackedPid 2>nul"
+            Write-Host ("Stopped tracked " + $Label + " process tree PID " + $trackedPid) -ForegroundColor Yellow
+        }
+    }
+    Remove-Item -LiteralPath $PidFile -Force -ErrorAction SilentlyContinue
+}
 
 function Stop-ProcessOnPort {
     param ([int]$Port)
@@ -35,6 +54,9 @@ function Stop-ProcessOnPort {
     }
 }
 
+Stop-TrackedProcessTree -PidFile $BackendPidFile -Label "backend"
+Stop-TrackedProcessTree -PidFile $FrontendPidFile -Label "frontend"
+Start-Sleep -Seconds 1
 Stop-ProcessOnPort -Port $BackendPort
 Stop-ProcessOnPort -Port $FrontendPort
 Write-Host "Done." -ForegroundColor Green

@@ -8,7 +8,15 @@
       </div>
       <div class="header-actions">
         <el-button :loading="savingDraft" :disabled="!canSubmitCost || confirmingQuote" @click="saveDraft">保存草稿</el-button>
-        <el-button type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote">
+        <template v-if="isQuoteQueue">
+          <el-button :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('return')">
+            确认并返回列表
+          </el-button>
+          <el-button type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('next')">
+            确认并处理下一条
+          </el-button>
+        </template>
+        <el-button v-else type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote()">
           确认报价
         </el-button>
       </div>
@@ -133,7 +141,15 @@
       <div class="result-actions">
         <el-button @click="goBack">取消</el-button>
         <el-button :loading="savingDraft" :disabled="!canSubmitCost || confirmingQuote" @click="saveDraft">保存草稿</el-button>
-        <el-button type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote">
+        <template v-if="isQuoteQueue">
+          <el-button :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('return')">
+            确认并返回列表
+          </el-button>
+          <el-button type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('next')">
+            确认并处理下一条
+          </el-button>
+        </template>
+        <el-button v-else type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote()">
           确认报价
         </el-button>
       </div>
@@ -172,6 +188,7 @@ const {
   importOrderDialog,
   saveTemplateDialog,
   canSubmitCost,
+  isQuoteQueue,
   costNotice,
   departmentOptions,
   materialTotal,

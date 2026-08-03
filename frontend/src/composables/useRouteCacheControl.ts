@@ -25,6 +25,27 @@ function getRouteVersion(...keys: string[]): string {
   return keys.map((key) => routeCacheVersions[key] ?? 0).join('.')
 }
 
+function getReusableQueryBaseKey(route: RouteLocationNormalizedLoaded): string {
+  const reusableKeys = Array.isArray(route.meta?.reuseQueryKeys)
+    ? route.meta.reuseQueryKeys.map(normalizeKey).filter(Boolean)
+    : []
+  if (!reusableKeys.length) return route.fullPath
+
+  const ignoredKeys = new Set(reusableKeys)
+  const search = new URLSearchParams()
+  Object.entries(route.query ?? {})
+    .filter(([key]) => !ignoredKeys.has(key) && key !== 'tabKey')
+    .sort(([left], [right]) => left.localeCompare(right))
+    .forEach(([key, value]) => {
+      const values = Array.isArray(value) ? value : [value]
+      values.forEach((item) => {
+        if (item != null) search.append(key, String(item))
+      })
+    })
+  const query = search.toString()
+  return query ? `${route.path}?${query}` : route.path
+}
+
 export function markRouteCacheDropped(target: RouteCacheDropTarget): void {
   const keys = new Set([target.key, target.fullPath, target.path].map(normalizeKey).filter(Boolean))
   keys.forEach((key) => {
@@ -39,6 +60,9 @@ export function getOuterRouteCacheKey(route: RouteLocationNormalizedLoaded): str
 
 export function getInnerRouteCacheKey(route: RouteLocationNormalizedLoaded): string {
   const tabKey = normalizeKey(route.query?.tabKey)
-  const baseKey = tabKey || route.fullPath
+  if (tabKey) {
+    return `${tabKey}::${getRouteVersion(tabKey, route.path, route.fullPath, tabKey)}`
+  }
+  const baseKey = getReusableQueryBaseKey(route)
   return `${baseKey}::${getRouteVersion(baseKey, route.path, route.fullPath, tabKey)}`
 }

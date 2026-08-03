@@ -38,7 +38,7 @@ export interface OrderListQuery {
   collaborationTypeId?: number | null;
   productGroupId?: number | null;
   deletedOnly?: boolean;
-  /** 仅看待报价：样品单 + 已完成 + 成本快照未确认报价 */
+  /** 仅看待报价：样品单 + 已完成 + 从未确认或成本变更后待重新确认 */
   unquoted?: boolean;
   page?: number;
   pageSize?: number;

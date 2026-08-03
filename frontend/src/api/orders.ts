@@ -70,6 +70,8 @@ export interface OrderListItem {
   deletedBy?: string | null
   /** 软删除原因 */
   deleteReason?: string | null
+  /** 待报价视图中的报价处理状态 */
+  quoteStatus?: 'unconfirmed' | 'needs_reconfirm' | 'confirmed'
 }
 
 export interface OrderListRes {
@@ -107,7 +109,7 @@ export interface OrderListQuery {
   customerDueEnd?: string
   factory?: string
   status?: string
-  /** 仅看待报价：样品单 + 已完成 + 未确认报价 */
+  /** 仅看待报价：样品单 + 已完成 + 从未确认或成本变更后待重新确认 */
   unquoted?: boolean
   /** 仅查回收站（已软删订单） */
   deletedOnly?: boolean

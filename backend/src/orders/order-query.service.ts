@@ -20,6 +20,7 @@ import { OrderFinishing } from '../entities/order-finishing.entity';
 import { User } from '../entities/user.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { OrderStatusService } from './order-status.service';
+import { resolveOrderQuoteStatus, type OrderQuoteStatus } from './order-quote-status';
 import { type OrderDetail, type OrderListQuery } from './order.types';
 
 @Injectable()
@@ -210,7 +211,32 @@ export class OrderQueryService {
         qb.andWhere('1 = 0');
       }
       qb.andWhere(
-        "NOT EXISTS (SELECT 1 FROM order_cost_snapshots ocs WHERE ocs.order_id = o.id AND JSON_EXTRACT(ocs.snapshot, '$.quoteConfirmedAt') IS NOT NULL)",
+        `(
+          EXISTS (
+            SELECT 1 FROM order_cost_snapshots quote_snapshot
+            WHERE quote_snapshot.order_id = o.id
+              AND JSON_UNQUOTE(JSON_EXTRACT(quote_snapshot.snapshot, '$.quoteNeedsReconfirm')) = 'true'
+          )
+          OR (
+            NOT EXISTS (
+              SELECT 1 FROM order_cost_snapshots confirmed_snapshot
+              WHERE confirmed_snapshot.order_id = o.id
+                AND JSON_EXTRACT(confirmed_snapshot.snapshot, '$.quoteConfirmedAt') IS NOT NULL
+            )
+            AND NOT EXISTS (
+              SELECT 1 FROM order_operation_logs confirmed_log
+              WHERE confirmed_log.order_id = o.id
+                AND confirmed_log.action = :quoteConfirmAction
+                AND NOT EXISTS (
+                  SELECT 1 FROM order_operation_logs later_draft_log
+                  WHERE later_draft_log.order_id = o.id
+                    AND later_draft_log.action = :quoteDraftAction
+                    AND later_draft_log.id > confirmed_log.id
+                )
+            )
+          )
+        )`,
+        { quoteConfirmAction: 'cost_confirm', quoteDraftAction: 'cost_draft' },
       );
     }
   }
@@ -296,7 +322,8 @@ export class OrderQueryService {
     const { page = 1, pageSize = 20 } = query;
     const qb = this.orderRepo.createQueryBuilder('o');
     await this.applyListFilters(qb, query, { includeStatus: true });
-    qb.orderBy('o.id', 'DESC');
+    if (query.unquoted) qb.orderBy('o.status_time', 'ASC').addOrderBy('o.id', 'ASC');
+    else qb.orderBy('o.id', 'DESC');
 
     const total = await qb.getCount();
     const totalQuantityRaw = await qb
@@ -312,9 +339,10 @@ export class OrderQueryService {
     const sewingQtyMap: Record<number, number | null> = {};
     const tailReceivedMap: Record<number, number | null> = {};
     const tailShippedMap: Record<number, number | null> = {};
+    const quoteStatusMap: Record<number, OrderQuoteStatus> = {};
 
     if (ids.length > 0) {
-      const [remarkRows, cuttings, sewings, finishings] = await Promise.all([
+      const [remarkRows, cuttings, sewings, finishings, quoteSnapshots, quoteConfirmRows] = await Promise.all([
         this.orderRemarkRepo
           .createQueryBuilder('r')
           .select('r.order_id', 'orderId')
@@ -328,6 +356,30 @@ export class OrderQueryService {
           where: { orderId: In(ids) },
           select: ['orderId', 'tailReceivedQty', 'tailShippedQty'],
         }),
+        query.unquoted
+          ? this.orderCostSnapshotRepo.find({ where: { orderId: In(ids) }, select: ['orderId', 'snapshot'] })
+          : Promise.resolve([] as OrderCostSnapshot[]),
+        query.unquoted
+          ? this.orderLogRepo
+              .createQueryBuilder('quoteLog')
+              .select('quoteLog.order_id', 'orderId')
+              .addSelect(
+                "MAX(CASE WHEN quoteLog.action = 'cost_confirm' THEN quoteLog.id ELSE 0 END)",
+                'lastConfirmLogId',
+              )
+              .addSelect(
+                "MAX(CASE WHEN quoteLog.action = 'cost_draft' THEN quoteLog.id ELSE 0 END)",
+                'lastDraftLogId',
+              )
+              .where('quoteLog.order_id IN (:...ids)', { ids })
+              .andWhere('quoteLog.action IN (:...quoteActions)', { quoteActions: ['cost_confirm', 'cost_draft'] })
+              .groupBy('quoteLog.order_id')
+              .getRawMany<{ orderId: number | string; lastConfirmLogId: number | string; lastDraftLogId: number | string }>()
+          : Promise.resolve([] as Array<{
+              orderId: number | string;
+              lastConfirmLogId: number | string;
+              lastDraftLogId: number | string;
+            }>),
       ]);
       remarkRows.forEach((r) => {
         remarkCountMap[r.orderId] = Number(r.count) || 0;
@@ -342,6 +394,18 @@ export class OrderQueryService {
         tailReceivedMap[f.orderId] = f.tailReceivedQty ?? null;
         tailShippedMap[f.orderId] = f.tailShippedQty ?? null;
       });
+      if (query.unquoted) {
+        const snapshotByOrderId = new Map(quoteSnapshots.map((row) => [row.orderId, row.snapshot]));
+        const quoteLogStatusByOrderId = new Map(quoteConfirmRows.map((row) => [Number(row.orderId), {
+          lastConfirmLogId: Number(row.lastConfirmLogId) || 0,
+          lastDraftLogId: Number(row.lastDraftLogId) || 0,
+        }]));
+        ids.forEach((orderId) => {
+          const snapshot = snapshotByOrderId.get(orderId);
+          const logStatus = quoteLogStatusByOrderId.get(orderId);
+          quoteStatusMap[orderId] = resolveOrderQuoteStatus(snapshot, logStatus);
+        });
+      }
     }
 
     const deletedByDisplayMap = await this.resolveDeletedByDisplayMap(list.map((o) => o.deletedBy));
@@ -358,6 +422,7 @@ export class OrderQueryService {
         sewingQuantity: sewingQtyMap[o.id] ?? null,
         tailReceivedQty: tailReceivedMap[o.id] ?? null,
         tailShippedQty: tailShippedMap[o.id] ?? null,
+        ...(query.unquoted ? { quoteStatus: quoteStatusMap[o.id] ?? 'unconfirmed' } : {}),
       };
     });
     return { list: listWithCount, total, totalQuantity, page, pageSize };

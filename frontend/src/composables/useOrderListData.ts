@@ -111,6 +111,7 @@ function onSearch(totalQuantity?: { value: number }, byUser = false) {
 }
 
 function onReset(totalQuantity?: { value: number }) {
+  const keepUnquoted = unquoted.value
   orderNoLabelVisible.value = false
   skuCodeLabelVisible.value = false
   filter.orderNo = ''
@@ -126,9 +127,9 @@ function onReset(totalQuantity?: { value: number }) {
   orderDateRange.value = null
   customerDueRange.value = null
   completedRange.value = null
-  currentStatus.value = 'all'
+  currentStatus.value = keepUnquoted ? 'completed' : 'all'
   isRecycleBin.value = false
-  unquoted.value = false
+  unquoted.value = keepUnquoted
   pagination.page = 1
   void loadList(totalQuantity)
 }
@@ -178,6 +179,7 @@ export function useOrderListData() {
     orderNoLabelVisible,
     skuCodeLabelVisible,
     loadList,
+    getCurrentQuery: buildQuery,
     onSearch,
     onReset,
     onPageChange,

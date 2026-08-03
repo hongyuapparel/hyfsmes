@@ -1,11 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { OrderCostSnapshot } from '../entities/order-cost-snapshot.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { Order } from '../entities/order.entity';
 import { User } from '../entities/user.entity';
-import { OrderQueryService } from './order-query.service';
 import { OrderStatusService } from './order-status.service';
 import { type OrderActor } from './order.types';
 import { resolveOperatorDisplayName } from '../common/operator.util';
@@ -21,8 +20,8 @@ export class OrderCostSnapshotService {
     private readonly orderCostSnapshotRepo: Repository<OrderCostSnapshot>,
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
-    private readonly orderQueryService: OrderQueryService,
     private readonly orderStatusService: OrderStatusService,
+    private readonly dataSource: DataSource,
   ) {}
 
   normalizeProfitMargin(v: unknown): number {
@@ -70,9 +69,52 @@ export class OrderCostSnapshotService {
     return Number.isFinite(exFactory) ? Number(exFactory.toFixed(2)) : 0;
   }
 
+  private normalizeComparableSnapshotValue(value: unknown): unknown {
+    if (Array.isArray(value)) return value.map((item) => this.normalizeComparableSnapshotValue(item));
+    if (!value || typeof value !== 'object') return value;
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, this.normalizeComparableSnapshotValue(item)]),
+    );
+  }
+
+  private snapshotContentChanged(
+    previousSnapshot: Record<string, unknown>,
+    nextSnapshot: Record<string, unknown>,
+  ): boolean {
+    const previousContent = this.stripQuoteMetadataFromSnapshot(previousSnapshot);
+    const nextContent = this.stripQuoteMetadataFromSnapshot(nextSnapshot);
+    return JSON.stringify(this.normalizeComparableSnapshotValue(previousContent))
+      !== JSON.stringify(this.normalizeComparableSnapshotValue(nextContent));
+  }
+
   // 报价元数据里的"操作人"一律写显示名(displayName)，保证订单成本页上「确认报价人」前后一致。
-  private withDraftMetadata(snapshot: Record<string, unknown>, operatorName: string): Record<string, unknown> {
-    return { ...snapshot, quoteNeedsReconfirm: true, quoteDraftUpdatedAt: new Date().toISOString(), quoteDraftUpdatedBy: operatorName };
+  // 保存草稿不得抹掉历史确认记录；只有成本内容确实变化时，才进入“待重新确认”。
+  private withDraftMetadata(
+    snapshot: Record<string, unknown>,
+    operatorName: string,
+    previousSnapshot?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    const previous = previousSnapshot ?? {};
+    const confirmedAt = typeof previous.quoteConfirmedAt === 'string' ? previous.quoteConfirmedAt.trim() : '';
+    const confirmedMetadata = confirmedAt
+      ? {
+          quoteConfirmedAt: confirmedAt,
+          quoteConfirmedBy: previous.quoteConfirmedBy,
+          quoteConfirmedExFactoryPrice: previous.quoteConfirmedExFactoryPrice,
+        }
+      : {};
+    const quoteNeedsReconfirm = confirmedAt
+      ? Boolean(previous.quoteNeedsReconfirm) || this.snapshotContentChanged(previous, snapshot)
+      : true;
+    return {
+      ...snapshot,
+      ...confirmedMetadata,
+      quoteNeedsReconfirm,
+      quoteDraftUpdatedAt: new Date().toISOString(),
+      quoteDraftUpdatedBy: operatorName,
+    };
   }
 
   private withConfirmedMetadata(snapshot: Record<string, unknown>, operatorName: string, exFactoryPrice: string): Record<string, unknown> {
@@ -153,19 +195,38 @@ export class OrderCostSnapshotService {
   }
 
   async saveCostSnapshot(orderId: number, payload: { snapshot: Record<string, unknown> }, actor?: OrderActor): Promise<OrderCostSnapshot> {
-    const order = await this.orderQueryService.findOne(orderId);
     const operatorName = actor ? await resolveOperatorDisplayName(this.userRepo, actor) : '系统';
-    const snapshot = this.withDraftMetadata(payload.snapshot ?? {}, operatorName);
-    let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    if (row) row.snapshot = snapshot;
-    else row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
-    const saved = await this.orderCostSnapshotRepo.save(row);
-    if (actor) await this.orderStatusService.addLog(order, actor, 'cost_draft', '保存成本草稿（未同步订单卡片出厂价）');
-    return saved;
+    return this.dataSource.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      const snapshotRepo = manager.getRepository(OrderCostSnapshot);
+      const order = await orderRepo.findOne({
+        where: { id: orderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) throw new NotFoundException('订单不存在');
+
+      let row = await snapshotRepo.findOne({ where: { orderId } });
+      const previousSnapshot = row?.snapshot && typeof row.snapshot === 'object'
+        ? row.snapshot as Record<string, unknown>
+        : undefined;
+      const snapshot = this.withDraftMetadata(payload.snapshot ?? {}, operatorName, previousSnapshot);
+      if (row) row.snapshot = snapshot;
+      else row = snapshotRepo.create({ orderId, snapshot });
+      const saved = await snapshotRepo.save(row);
+      if (actor) {
+        await this.orderStatusService.addLog(
+          order,
+          actor,
+          'cost_draft',
+          '保存成本草稿（未同步订单卡片出厂价）',
+          manager,
+        );
+      }
+      return saved;
+    });
   }
 
   async confirmCostQuote(orderId: number, payload: { snapshot: Record<string, unknown> }, actor: OrderActor): Promise<OrderCostSnapshot> {
-    const order = await this.orderQueryService.findOne(orderId);
     const normalizeDecimalInput = (v: unknown): string => {
       if (v === null || v === undefined) return '0';
       if (typeof v === 'number') return Number.isFinite(v) ? String(v) : '0';
@@ -175,18 +236,34 @@ export class OrderCostSnapshotService {
       }
       return '0';
     };
-    const oldExFactory = normalizeDecimalInput(order.exFactoryPrice);
     const computed = this.calculateExFactoryPriceFromSnapshot(payload.snapshot ?? {});
     const nextExFactory = normalizeDecimalInput(computed.toFixed(2));
     const operatorName = await resolveOperatorDisplayName(this.userRepo, actor);
     const snapshot = this.withConfirmedMetadata(payload.snapshot ?? {}, operatorName, nextExFactory);
-    let row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
-    if (row) row.snapshot = snapshot;
-    else row = this.orderCostSnapshotRepo.create({ orderId, snapshot });
-    const saved = await this.orderCostSnapshotRepo.save(row);
-    order.exFactoryPrice = nextExFactory;
-    await this.orderRepo.save(order);
-    await this.orderStatusService.addLog(order, actor, 'cost_confirm', `确认报价并同步出厂价: ${oldExFactory} -> ${nextExFactory}`);
-    return saved;
+    return this.dataSource.transaction(async (manager) => {
+      const orderRepo = manager.getRepository(Order);
+      const snapshotRepo = manager.getRepository(OrderCostSnapshot);
+      const order = await orderRepo.findOne({
+        where: { id: orderId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!order) throw new NotFoundException('订单不存在');
+
+      const oldExFactory = normalizeDecimalInput(order.exFactoryPrice);
+      let row = await snapshotRepo.findOne({ where: { orderId } });
+      if (row) row.snapshot = snapshot;
+      else row = snapshotRepo.create({ orderId, snapshot });
+      const saved = await snapshotRepo.save(row);
+      order.exFactoryPrice = nextExFactory;
+      await orderRepo.save(order);
+      await this.orderStatusService.addLog(
+        order,
+        actor,
+        'cost_confirm',
+        `确认报价并同步出厂价: ${oldExFactory} -> ${nextExFactory}`,
+        manager,
+      );
+      return saved;
+    });
   }
 }

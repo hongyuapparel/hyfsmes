@@ -31,6 +31,14 @@ export interface SystemUpdate {
 
 export const systemUpdates: SystemUpdate[] = [
   {
+    id: '2026-08-01-orders-quote-queue',
+    date: '2026-08-01',
+    module: '订单',
+    title: '待报价改为连续处理',
+    description: '订单列表右上角新增“待报价 N”快捷筛选，进入后会区分“待首次报价”和“待重新确认”。从这里打开成本页，确认后可直接处理下一条或返回筛选列表，不再需要反复回首页；已经确认且成本未变化的订单不会重复出现。',
+    link: '/orders/list?unquoted=1',
+  },
+  {
     id: '2026-06-16-orders-unquoted-todo',
     date: '2026-06-16',
     module: '订单',
