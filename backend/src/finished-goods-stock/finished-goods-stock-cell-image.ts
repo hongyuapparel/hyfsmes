@@ -129,7 +129,8 @@ export async function embedWpsCellImages(
 
   return zip.generateAsync({
     type: 'nodebuffer',
+    streamFiles: true,
     compression: 'DEFLATE',
-    compressionOptions: { level: 6 },
+    compressionOptions: { level: 3 },
   });
 }

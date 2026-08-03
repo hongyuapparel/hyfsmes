@@ -6,6 +6,7 @@ import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outb
 import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { normalizeSizeMatrix } from '../common/size-headers.util';
+import { InventoryStockExportMode } from '../common/inventory-stock-export.dto';
 import {
   applySizedOutbound,
   distributeProportional,
@@ -16,6 +17,10 @@ import {
   type InventoryAccessoryOutboundParams,
   type InventoryAccessoryOutboundResult,
 } from './inventory-accessory.helpers';
+import {
+  applyInventoryAccessoryListFilters,
+  type InventoryAccessoryListFilters,
+} from './inventory-accessories-list-query';
 
 @Injectable()
 export class InventoryAccessoriesService {
@@ -86,40 +91,13 @@ export class InventoryAccessoriesService {
     }
   }
 
-  async getList(params: {
-    name?: string;
-    category?: string;
-    customerName?: string;
-    salesperson?: string;
-    startDate?: string;
-    endDate?: string;
+  async getList(params: InventoryAccessoryListFilters & {
     skipTotal?: boolean;
     page?: number;
     pageSize?: number;
   }): Promise<{ list: InventoryAccessory[]; total: number; totalQuantity: number; page: number; pageSize: number }> {
-    const { name, category, customerName, salesperson, startDate, endDate, skipTotal = false, page = 1, pageSize = 20 } = params;
-    const qb = this.repo.createQueryBuilder('a');
-
-    if (name?.trim()) {
-      qb.andWhere('a.name LIKE :name', { name: `%${name.trim()}%` });
-    }
-    if (category?.trim()) {
-      qb.andWhere('a.category = :category', { category: category.trim() });
-    }
-    if (customerName?.trim()) {
-      qb.andWhere('a.customer_name LIKE :customerName', {
-        customerName: `%${customerName.trim()}%`,
-      });
-    }
-    if (salesperson?.trim()) {
-      qb.andWhere('a.salesperson = :salesperson', { salesperson: salesperson.trim() });
-    }
-    if (startDate?.trim()) {
-      qb.andWhere('a.created_at >= :inboundStart', { inboundStart: `${startDate.trim()} 00:00:00` });
-    }
-    if (endDate?.trim()) {
-      qb.andWhere('a.created_at <= :inboundEnd', { inboundEnd: `${endDate.trim()} 23:59:59` });
-    }
+    const { skipTotal = false, page = 1, pageSize = 20 } = params;
+    const qb = applyInventoryAccessoryListFilters(this.repo.createQueryBuilder('a'), params);
     const totalQuantityRow = skipTotal
       ? null
       : await qb
@@ -136,6 +114,19 @@ export class InventoryAccessoriesService {
       .getMany();
 
     return { list, total, totalQuantity, page, pageSize };
+  }
+
+  async getRowsForExport(
+    params: InventoryAccessoryListFilters & { mode: InventoryStockExportMode; selectedIds?: number[] },
+  ): Promise<InventoryAccessory[]> {
+    const selectedIds = Array.from(new Set(params.selectedIds ?? []));
+    const qb = this.repo.createQueryBuilder('a');
+    if (params.mode === InventoryStockExportMode.Selected) {
+      qb.andWhere('a.id IN (:...selectedIds)', { selectedIds });
+    } else {
+      applyInventoryAccessoryListFilters(qb, params);
+    }
+    return qb.orderBy('a.created_at', 'DESC').addOrderBy('a.id', 'DESC').getMany();
   }
 
   async getOne(id: number): Promise<InventoryAccessory> {

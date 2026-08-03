@@ -4,23 +4,34 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { FabricStockService } from './fabric-stock.service';
+import { FabricStockExportService } from './fabric-stock-export.service';
+import { FabricStockExportDto } from './fabric-stock-export.dto';
 
 @Controller('inventory/fabric')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/inventory/fabric')
 export class FabricStockController {
-  constructor(private readonly service: FabricStockService) {}
+  constructor(
+    private readonly service: FabricStockService,
+    private readonly exportService: FabricStockExportService,
+  ) {}
 
   @Get('supplier-options')
   getFabricSupplierOptions() {
@@ -61,6 +72,21 @@ export class FabricStockController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
+  }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+  async exportItems(
+    @Body() dto: FabricStockExportDto,
+    @Res() res: Response,
+  ) {
+    const result = await this.exportService.exportWorkbook(dto);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="fabric-stock.xlsx"');
+    res.setHeader('X-Image-Failures', String(result.failedImageCount));
+    res.setHeader('X-Export-Row-Count', String(result.rowCount));
+    res.send(result.buffer);
   }
 
   @Get('items/:id')

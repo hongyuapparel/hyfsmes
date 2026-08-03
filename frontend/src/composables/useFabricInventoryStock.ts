@@ -2,8 +2,10 @@ import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllCustomerCompanyOptions } from '@/api/customers'
 import {
+  exportFabricStock,
   getFabricList,
   getFabricSupplierOptions,
+  type FabricStockExportParams,
   type FabricItem,
   type FabricSupplierOption,
 } from '@/api/inventory'
@@ -13,6 +15,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useTableSort } from '@/composables/useTableSort'
+import { useInventoryWorkbookExport } from '@/composables/useInventoryWorkbookExport'
 
 export function useFabricInventoryStock() {
   const filter = reactive<{ name: string; customerName: string; inventoryTypeId: number | null }>({
@@ -33,6 +36,33 @@ export function useFabricInventoryStock() {
   const fabricSupplierOptionsLoading = ref(false)
   const warehouseOptions = ref<{ id: number; label: string }[]>([])
   const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
+  const { onSortChange, sortParams } = useTableSort(() => {
+    pagination.page = 1
+    void load()
+  })
+  const { exporting, onExport } = useInventoryWorkbookExport<FabricItem, FabricStockExportParams>({
+    selectedRows,
+    total: () => pagination.total,
+    getRowId: (row) => Number(row.id),
+    buildPayload: (selectedIds, selectedMode) => {
+      const [startDate, endDate] = inboundDateRange.value ?? ['', '']
+      const sort = sortParams()
+      const sortField = sort.sortField === 'quantity' ? sort.sortField : undefined
+      return {
+        mode: selectedMode ? 'selected' : 'filtered',
+        name: selectedMode ? undefined : filter.name || undefined,
+        customerName: selectedMode ? undefined : filter.customerName || undefined,
+        inventoryTypeId: selectedMode ? undefined : filter.inventoryTypeId ?? undefined,
+        startDate: selectedMode ? undefined : startDate || undefined,
+        endDate: selectedMode ? undefined : endDate || undefined,
+        selectedIds: selectedMode ? selectedIds : undefined,
+        sortField,
+        sortOrder: sortField ? sort.sortOrder : undefined,
+      }
+    },
+    request: exportFabricStock,
+    filenamePrefix: '面料库存明细',
+  })
 
   const fabricStockTableRef = ref()
   const fabricStockShellRef = ref<HTMLElement | null>(null)
@@ -41,11 +71,6 @@ export function useFabricInventoryStock() {
     onHeaderDragEnd: onFabricStockHeaderDragEnd,
     restoreColumnWidths: restoreFabricStockColumnWidths,
   } = useTableColumnWidthPersist('inventory-fabric-stock')
-  const { onSortChange, sortParams } = useTableSort(() => {
-    pagination.page = 1
-    void load()
-  })
-
   async function load() {
     loading.value = true
     try {
@@ -163,6 +188,8 @@ export function useFabricInventoryStock() {
     stockTotalQuantity,
     pagination,
     selectedRows,
+    exporting,
+    onExport,
     customerOptions,
     fabricSupplierOptions,
     fabricSupplierOptionsLoading,

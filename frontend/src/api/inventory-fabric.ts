@@ -60,6 +60,26 @@ export function getFabricList(params?: {
   )
 }
 
+export type FabricStockExportParams = {
+  mode: 'selected' | 'filtered'
+  name?: string
+  customerName?: string
+  inventoryTypeId?: number
+  startDate?: string
+  endDate?: string
+  selectedIds?: number[]
+  sortField?: 'quantity'
+  sortOrder?: 'asc' | 'desc'
+}
+
+export function exportFabricStock(params: FabricStockExportParams) {
+  return request.post<Blob>('/inventory/fabric/export', params, {
+    responseType: 'blob',
+    skipGlobalErrorHandler: true,
+    timeout: 120000,
+  })
+}
+
 export function getFabricOne(id: number) {
   return request.get<FabricItem>(`/inventory/fabric/items/${id}`)
 }

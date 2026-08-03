@@ -3,23 +3,34 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
   Query,
+  Res,
   UseGuards,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { InventoryAccessoriesService } from './inventory-accessories.service';
+import { InventoryAccessoriesExportService } from './inventory-accessories-export.service';
+import { InventoryAccessoriesExportDto } from './inventory-accessories-export.dto';
 
 @Controller('inventory/accessories')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/inventory/accessories')
 export class InventoryAccessoriesController {
-  constructor(private readonly service: InventoryAccessoriesService) {}
+  constructor(
+    private readonly service: InventoryAccessoriesService,
+    private readonly exportService: InventoryAccessoriesExportService,
+  ) {}
 
   /** 出库弹窗「领取人」下拉（全公司用户） */
   @Get('user-options')
@@ -50,6 +61,21 @@ export class InventoryAccessoriesController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
+  }
+
+  @Post('export')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+  async exportItems(
+    @Body() dto: InventoryAccessoriesExportDto,
+    @Res() res: Response,
+  ) {
+    const result = await this.exportService.exportWorkbook(dto);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="inventory-accessories.xlsx"');
+    res.setHeader('X-Image-Failures', String(result.failedImageCount));
+    res.setHeader('X-Export-Row-Count', String(result.rowCount));
+    res.send(result.buffer);
   }
 
   @Get('items/:id')

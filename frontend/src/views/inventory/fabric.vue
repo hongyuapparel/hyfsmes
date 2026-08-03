@@ -68,15 +68,15 @@
           <div
             class="filter-bar-item filter-date-box"
             :class="{ 'is-active': inboundDateRange }"
-            :style="getFilterRangeStyle(inboundDateRange, '入库时间')"
+            :style="getFilterRangeStyle(inboundDateRange, '创建时间')"
           >
-            <span v-if="inboundDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">入库时间：</span>
+            <span v-if="inboundDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">创建时间：</span>
             <el-date-picker
               v-model="inboundDateRange"
               type="daterange"
               :name="['fabricInboundDateStart', 'fabricInboundDateEnd']"
               :range-separator="inboundDateRange ? '~' : ''"
-              start-placeholder="入库时间"
+              start-placeholder="创建时间"
               end-placeholder=""
               value-format="YYYY-MM-DD"
               :shortcuts="rangeShortcuts"
@@ -90,6 +90,7 @@
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
             <el-button @click="onReset">清空</el-button>
+            <el-button :loading="exporting" @click="onExport">{{ exportButtonText }}</el-button>
             <el-button type="primary" @click="openForm(null)">新增面料</el-button>
             <el-button
               v-if="selectedRows.length"
@@ -101,6 +102,8 @@
             </el-button>
           </div>
         </el-form>
+
+        <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 条库存记录</div>
 
         <div ref="fabricStockShellRef" class="list-page-table-shell">
         <el-table
@@ -351,6 +354,8 @@ const {
   stockTotalQuantity: stockGrandTotalQuantity,
   pagination,
   selectedRows,
+  exporting,
+  onExport,
   customerOptions,
   fabricSupplierOptions,
   fabricSupplierOptionsLoading,
@@ -424,6 +429,9 @@ const stockTotalQuantity = computed(() => {
   }
   return stockGrandTotalQuantity.value
 })
+const exportButtonText = computed(() =>
+  selectedRows.value.length > 0 ? `导出已选（${selectedRows.value.length}）` : '导出筛选结果',
+)
 const selectedInventoryTypeLabel = computed(() => {
   const id = filter.inventoryTypeId
   if (id == null) return ''
@@ -480,6 +488,12 @@ onMounted(() => {
   padding-left: 6px;
   padding-right: 6px;
   line-height: 20px;
+}
+
+.table-selection-count {
+  margin: 8px 0;
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
 }
 
 /* 统一行高：compactRowStyle 的 min-height 对 <tr> 无效，改在 td 上固定高度，

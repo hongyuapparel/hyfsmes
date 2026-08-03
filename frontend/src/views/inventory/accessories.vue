@@ -68,15 +68,15 @@
           <div
             class="filter-bar-item filter-date-box"
             :class="{ 'is-active': inboundDateRange }"
-            :style="getFilterRangeStyle(inboundDateRange, '入库时间')"
+            :style="getFilterRangeStyle(inboundDateRange, '创建时间')"
           >
-            <span v-if="inboundDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">入库时间：</span>
+            <span v-if="inboundDateRange" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">创建时间：</span>
             <el-date-picker
               v-model="inboundDateRange"
               type="daterange"
               :name="['accessoriesInboundDateStart', 'accessoriesInboundDateEnd']"
               :range-separator="inboundDateRange ? '~' : ''"
-              start-placeholder="入库时间"
+              start-placeholder="创建时间"
               end-placeholder=""
               value-format="YYYY-MM-DD"
               :shortcuts="rangeShortcuts"
@@ -90,6 +90,7 @@
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
             <el-button @click="onReset">清空</el-button>
+            <el-button :loading="exporting" @click="onExport">{{ exportButtonText }}</el-button>
             <el-button type="primary" @click="openForm(null)">新增辅料</el-button>
             <el-button
               v-if="selectedRows.length"
@@ -102,7 +103,7 @@
           </div>
         </el-form>
 
-        <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+        <div v-if="selectedRows.length" class="table-selection-count">已选 {{ selectedRows.length }} 条库存记录</div>
 
         <div ref="accessoriesStockShellRef" class="list-page-table-shell">
         <el-table
@@ -207,7 +208,12 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAccessoriesList, type AccessoryItem } from '@/api/inventory'
+import {
+  exportAccessoriesStock,
+  getAccessoriesList,
+  type AccessoriesStockExportParams,
+  type AccessoryItem,
+} from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
@@ -231,6 +237,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import { useInventoryWorkbookExport } from '@/composables/useInventoryWorkbookExport'
 
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const filter = reactive({ name: '', category: '', customerName: '', salesperson: '' })
@@ -256,6 +263,29 @@ const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<AccessoryItem[]>([])
 const accessoriesFormDialogRef = ref<AccessoriesFormDialogExpose>()
 const accessoriesOutboundDialogRef = ref<AccessoriesOutboundDialogExpose>()
+const { exporting, onExport } = useInventoryWorkbookExport<AccessoryItem, AccessoriesStockExportParams>({
+  selectedRows,
+  total: () => pagination.total,
+  getRowId: (row) => Number(row.id),
+  buildPayload: (selectedIds, selectedMode) => {
+    const [startDate, endDate] = inboundDateRange.value ?? ['', '']
+    return {
+      mode: selectedMode ? 'selected' : 'filtered',
+      name: selectedMode ? undefined : filter.name || undefined,
+      category: selectedMode ? undefined : filter.category || undefined,
+      customerName: selectedMode ? undefined : filter.customerName || undefined,
+      salesperson: selectedMode ? undefined : filter.salesperson || undefined,
+      startDate: selectedMode ? undefined : startDate || undefined,
+      endDate: selectedMode ? undefined : endDate || undefined,
+      selectedIds: selectedMode ? selectedIds : undefined,
+    }
+  },
+  request: exportAccessoriesStock,
+  filenamePrefix: '辅料库存明细',
+})
+const exportButtonText = computed(() =>
+  selectedRows.value.length > 0 ? `导出已选（${selectedRows.value.length}）` : '导出筛选结果',
+)
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
 const { tableHeight: accessoriesStockTableHeight } = useFlexShellTableHeight(accessoriesStockShellRef)
@@ -380,6 +410,6 @@ onMounted(() => {
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-caption);
 }
 </style>

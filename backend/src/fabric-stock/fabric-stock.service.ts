@@ -9,6 +9,11 @@ import { User, UserStatus } from '../entities/user.entity';
 import { SystemOption } from '../entities/system-option.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
 import { formatDateTimeForResponse } from '../common/date-time.util';
+import { InventoryStockExportMode } from '../common/inventory-stock-export.dto';
+import {
+  applyFabricStockListFilters,
+  type FabricStockListFilters,
+} from './fabric-stock-list-query';
 
 const FABRIC_SUPPLIER_TYPE_VALUE = '面料供应商';
 
@@ -215,12 +220,7 @@ export class FabricStockService {
     return msg.includes("doesn't exist") && msg.includes(tableName.toLowerCase());
   }
 
-  async getList(params: {
-    name?: string;
-    customerName?: string;
-    startDate?: string;
-    endDate?: string;
-    inventoryTypeId?: number | null;
+  async getList(params: FabricStockListFilters & {
     skipTotal?: boolean;
     sortField?: string;
     sortOrder?: string;
@@ -228,35 +228,13 @@ export class FabricStockService {
     pageSize?: number;
   }): Promise<{ list: FabricStockListRow[]; total: number; totalQuantity: number; page: number; pageSize: number }> {
     const {
-      name,
-      customerName,
-      startDate,
-      endDate,
-      inventoryTypeId,
       skipTotal = false,
       sortField,
       sortOrder,
       page = 1,
       pageSize = 20,
     } = params;
-    const qb = this.stockRepo.createQueryBuilder('s');
-    if (name?.trim()) {
-      qb.andWhere('s.name LIKE :name', { name: `%${name.trim()}%` });
-    }
-    if (customerName?.trim()) {
-      qb.andWhere('s.customer_name LIKE :customerName', {
-        customerName: `%${customerName.trim()}%`,
-      });
-    }
-    if (inventoryTypeId != null) {
-      qb.andWhere('s.inventory_type_id = :inventoryTypeId', { inventoryTypeId });
-    }
-    if (startDate?.trim()) {
-      qb.andWhere('s.created_at >= :inboundStart', { inboundStart: `${startDate.trim()} 00:00:00` });
-    }
-    if (endDate?.trim()) {
-      qb.andWhere('s.created_at <= :inboundEnd', { inboundEnd: `${endDate.trim()} 23:59:59` });
-    }
+    const qb = applyFabricStockListFilters(this.stockRepo.createQueryBuilder('s'), params);
     const totalQuantityRow = skipTotal
       ? null
       : await qb
@@ -278,6 +256,32 @@ export class FabricStockService {
       .getMany();
     const list = await this.decorateFabricStocks(rawList);
     return { list, total, totalQuantity, page, pageSize };
+  }
+
+  async getRowsForExport(
+    params: FabricStockListFilters & {
+      mode: InventoryStockExportMode;
+      selectedIds?: number[];
+      sortField?: 'quantity';
+      sortOrder?: 'asc' | 'desc';
+    },
+  ): Promise<FabricStockListRow[]> {
+    const selectedIds = Array.from(new Set(params.selectedIds ?? []));
+    const qb = this.stockRepo.createQueryBuilder('s');
+    if (params.mode === InventoryStockExportMode.Selected) {
+      qb.andWhere('s.id IN (:...selectedIds)', { selectedIds });
+    } else {
+      applyFabricStockListFilters(qb, params);
+    }
+    if (params.sortField === 'quantity' && (params.sortOrder === 'asc' || params.sortOrder === 'desc')) {
+      qb.orderBy('s.quantity', params.sortOrder === 'asc' ? 'ASC' : 'DESC')
+        .addOrderBy('s.created_at', 'DESC')
+        .addOrderBy('s.id', 'DESC');
+    } else {
+      qb.orderBy('s.created_at', 'DESC').addOrderBy('s.id', 'DESC');
+    }
+    const items = await qb.getMany();
+    return this.decorateFabricStocks(items);
   }
 
   async getOne(id: number): Promise<FabricStockListRow> {

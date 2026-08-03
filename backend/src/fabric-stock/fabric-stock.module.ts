@@ -10,6 +10,7 @@ import { AuthModule } from '../auth/auth.module';
 import { SystemOptionsModule } from '../system-options/system-options.module';
 import { FabricStockController } from './fabric-stock.controller';
 import { FabricStockService } from './fabric-stock.service';
+import { FabricStockExportService } from './fabric-stock-export.service';
 
 @Module({
   imports: [
@@ -25,7 +26,7 @@ import { FabricStockService } from './fabric-stock.service';
     SystemOptionsModule,
   ],
   controllers: [FabricStockController],
-  providers: [FabricStockService],
+  providers: [FabricStockService, FabricStockExportService],
   exports: [FabricStockService],
 })
 export class FabricStockModule {}

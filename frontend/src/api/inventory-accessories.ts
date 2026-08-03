@@ -33,7 +33,7 @@ export function getAccessoriesList(params?: {
   category?: string
   customerName?: string
   salesperson?: string
-  /** 入库时间：created_at，YYYY-MM-DD */
+  /** 创建时间：created_at，YYYY-MM-DD */
   startDate?: string
   endDate?: string
   skipTotal?: boolean
@@ -44,6 +44,25 @@ export function getAccessoriesList(params?: {
     '/inventory/accessories/items',
     { params, ...(config ?? {}) }
   )
+}
+
+export type AccessoriesStockExportParams = {
+  mode: 'selected' | 'filtered'
+  name?: string
+  category?: string
+  customerName?: string
+  salesperson?: string
+  startDate?: string
+  endDate?: string
+  selectedIds?: number[]
+}
+
+export function exportAccessoriesStock(params: AccessoriesStockExportParams) {
+  return request.post<Blob>('/inventory/accessories/export', params, {
+    responseType: 'blob',
+    skipGlobalErrorHandler: true,
+    timeout: 120000,
+  })
 }
 
 export function getAccessoryOne(id: number) {
