@@ -12,6 +12,7 @@ function baseRow(overrides: Partial<PendingListItem> = {}): PendingListItem {
     quantity: 199,
     sourceType: 'normal',
     createdAt: '',
+    detailStatus: 'recorded',
     colorSizeSnapshot: {
       headers: ['S', 'M', 'L', 'XL', '2XL'],
       rows: [{ colorName: '墨绿色', quantities: [50, 49, 50, 25, 25] }],
@@ -22,42 +23,26 @@ function baseRow(overrides: Partial<PendingListItem> = {}): PendingListItem {
 
 describe('buildOutboundDialogItem', () => {
   it('uses finishing snapshot as-is when totals match', () => {
-    const { item, warning } = buildOutboundDialogItem(baseRow(), {})
+    const { item, warning } = buildOutboundDialogItem(baseRow())
     expect(warning).toBeUndefined()
     expect(item.rows[0].quantities).toEqual([50, 49, 50, 25, 25])
   })
 
   it('does not swap M/L when order plan would (regression)', () => {
-    const cache = {
-      10: {
-        loading: false,
-        error: false,
-        headers: ['S', 'M', 'L', 'XL', '2XL', '合计'],
-        rows: [{ colorName: '墨绿色', values: [50, 50, 50, 25, 25, 200] }],
-      },
-    }
-    const { item } = buildOutboundDialogItem(baseRow(), cache)
+    const { item } = buildOutboundDialogItem(baseRow())
     expect(item.rows[0].quantities[1]).toBe(49)
     expect(item.rows[0].quantities[2]).toBe(50)
   })
 
   it('leaves empty grid when snapshot missing (no plan redistribute)', () => {
-    const cache = {
-      10: {
-        loading: false,
-        error: false,
-        headers: ['S', 'M', 'L', 'XL', '2XL', '合计'],
-        rows: [{ colorName: '墨绿色', values: [50, 50, 50, 25, 25, 200] }],
-      },
-    }
-    const { item, warning } = buildOutboundDialogItem(baseRow({ colorSizeSnapshot: null }), cache)
-    expect(item.rows[0].quantities).toEqual([0, 0, 0, 0, 0])
+    const { item, warning } = buildOutboundDialogItem(baseRow({ colorSizeSnapshot: null, detailStatus: 'missing' }))
+    expect(item.rows).toEqual([])
     expect(warning).toMatch(/未留存本批尺码/)
   })
 
-  it('scales from snapshot when legacy pending qty smaller than snap total', () => {
-    const { item, warning } = buildOutboundDialogItem(baseRow({ quantity: 149 }), {})
+  it('rejects a snapshot whose total differs from the pending quantity', () => {
+    const { item, warning } = buildOutboundDialogItem(baseRow({ quantity: 149 }))
     expect(warning).toMatch(/不一致/)
-    expect(item.rows[0].quantities.reduce((a, b) => a + b, 0)).toBe(149)
+    expect(item.rows).toEqual([])
   })
 })

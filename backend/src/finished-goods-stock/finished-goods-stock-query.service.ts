@@ -100,6 +100,7 @@ export class FinishedGoodsStockQueryService {
     const customerName = String(stock.customerName ?? '').trim();
     const groupStocks = await this.stockRepo
       .createQueryBuilder('s')
+      .addSelect('s.color_size_snapshot')
       .where('s.skuCode = :sku', { sku })
       .andWhere('s.customerName = :customerName', { customerName })
       .orderBy('s.id', 'DESC')
@@ -274,7 +275,11 @@ export class FinishedGoodsStockQueryService {
   }
 
   private async getDetailInternal(id: number): Promise<FinishedGoodsStockDetailResult> {
-    const stock = await this.stockRepo.findOne({ where: { id } });
+    const stock = await this.stockRepo
+      .createQueryBuilder('stock')
+      .where('stock.id = :id', { id })
+      .addSelect('stock.color_size_snapshot')
+      .getOne();
     if (!stock) throw new NotFoundException('库存记录不存在');
 
     const [order, product] = await Promise.all([

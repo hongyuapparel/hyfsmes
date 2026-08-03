@@ -485,27 +485,18 @@ export class ProductionSewingService {
     const sizeLen = headers.length;
     const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) => String(r?.colorName ?? '').trim());
 
-    // 真值优先级：byColor（前端二维矩阵）→ 一维兜底（仅单色订单或老客户端）
     let byColor: ColorSizeQuantityRow[] | null = null;
-    if (Array.isArray(sewingQuantitiesByColor) && sewingQuantitiesByColor.length > 0) {
+    if (sizeLen > 0) {
+      if (!Array.isArray(sewingQuantitiesByColor) || sewingQuantitiesByColor.length === 0) {
+        throw new BadRequestException('该订单有尺码明细，必须按实际颜色×尺码填写车缝数量');
+      }
+      if (planColors.length > 0) assertColorRowsShape(sewingQuantitiesByColor, planColors, sizeLen);
       byColor = normalizeColorRows(sewingQuantitiesByColor, sizeLen);
-      if (planColors.length > 0 && sizeLen > 0) {
-        assertColorRowsShape(byColor, planColors, sizeLen);
-      }
-    } else if (Array.isArray(sewingQuantities) && sewingQuantities.length > 0) {
-      if (planColors.length === 1 && sizeLen > 0) {
-        // 单色订单：把一维兜底为单色二维
-        byColor = normalizeColorRows([{ colorName: planColors[0], quantities: sewingQuantities }], sizeLen);
-      } else if (planColors.length > 1) {
-        throw new BadRequestException('多色订单必须按颜色×尺码填写车缝数量');
-      }
     }
 
     const totalQty = byColor
       ? sumColorRows(byColor)
-      : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
-        ? sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
-        : sewingQuantity;
+      : sewingQuantity;
     const sewingQuantityRow = byColor
       ? sumColorRowsBySize(byColor, sizeLen)
       : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
@@ -618,24 +609,17 @@ export class ProductionSewingService {
     );
 
     let byColor: ColorSizeQuantityRow[] | null = null;
-    if (Array.isArray(sewingQuantitiesByColor) && sewingQuantitiesByColor.length > 0) {
+    if (sizeLen > 0) {
+      if (!Array.isArray(sewingQuantitiesByColor) || sewingQuantitiesByColor.length === 0) {
+        throw new BadRequestException('该订单有尺码明细，纠错时必须按实际颜色×尺码填写车缝数量');
+      }
+      if (planColors.length > 0) assertColorRowsShape(sewingQuantitiesByColor, planColors, sizeLen);
       byColor = normalizeColorRows(sewingQuantitiesByColor, sizeLen);
-      if (planColors.length > 0 && sizeLen > 0) {
-        assertColorRowsShape(byColor, planColors, sizeLen);
-      }
-    } else if (Array.isArray(sewingQuantities) && sewingQuantities.length > 0) {
-      if (planColors.length === 1 && sizeLen > 0) {
-        byColor = normalizeColorRows([{ colorName: planColors[0], quantities: sewingQuantities }], sizeLen);
-      } else if (planColors.length > 1) {
-        throw new BadRequestException('多色订单必须按颜色×尺码填写车缝数量');
-      }
     }
 
     const totalQty = byColor
       ? sumColorRows(byColor)
-      : Array.isArray(sewingQuantities) && sewingQuantities.length > 0
-        ? sewingQuantities.reduce((a, b) => a + (Number(b) || 0), 0)
-        : sewingQuantity;
+      : sewingQuantity;
     if (totalQty <= 0) throw new BadRequestException('车缝数量必须大于 0');
 
     if (byColor && sizeLen > 0) {

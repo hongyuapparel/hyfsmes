@@ -41,7 +41,7 @@ vi.mock('@/api/request', () => ({
 }))
 
 import { useFinishingPackaging } from './useFinishingPackaging'
-import { registerFinishingPackagingComplete } from '@/api/production-finishing'
+import { getFinishingRegisterFormData, registerFinishingPackagingComplete } from '@/api/production-finishing'
 
 const makeRow = (overrides: Partial<FinishingListItem> = {}): FinishingListItem => ({
   orderId: 1,
@@ -150,5 +150,34 @@ describe('useFinishingPackaging — byColor', () => {
     const item = c.packagingCompleteDialog.items[0]
     expect(c.remainingQty(item)).toBe(100 - 30 - 5)
     expect(c.alreadyInboundQty(item)).toBe(30)
+  })
+
+  it('尾部收货二维事实缺失时阻断，不按订单计划生成零明细', async () => {
+    vi.mocked(getFinishingRegisterFormData).mockResolvedValueOnce({
+      data: {
+        headers: ['S', 'M', '合计'],
+        sizeHeaders: ['S', 'M'],
+        orderRow: [60, 40, 100],
+        cutRow: [60, 40, 100],
+        sewingRow: [60, 40, 100],
+        tailReceivedRow: [60, 40, 100],
+        tailInboundRow: null,
+        defectRow: null,
+        planColorRows,
+        cutColorRows: planColorRows,
+        sewingColorRows: planColorRows,
+        tailReceivedColorRows: [],
+        tailInboundColorRows: [],
+        defectColorRows: [],
+      },
+    } as Awaited<ReturnType<typeof getFinishingRegisterFormData>>)
+    const c = useFinishingPackaging({
+      selectedRows: ref([makeRow()]),
+      reloadList: async () => {},
+      reloadTabCounts: async () => {},
+    })
+    await c.openPackagingCompleteDialog()
+    expect(c.packagingCompleteDialog.visible).toBe(false)
+    expect(c.packagingCompleteDialog.items).toEqual([])
   })
 })

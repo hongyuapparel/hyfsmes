@@ -141,33 +141,24 @@
             :hide-after="0"
             :disabled="!qtyTooltipEnabled(row)"
             popper-class="finished-qty-popper"
-            @show="onQtyTooltipShow(row)"
           >
             <template #content>
               <div class="qty-tooltip">
-                <template v-if="isQtyTooltipLoading(row)">
-                  <div class="qty-tooltip-loading">加载中...</div>
-                </template>
-                <template v-else-if="isQtyTooltipError(row)">
-                  <div class="qty-tooltip-error">明细加载失败</div>
-                </template>
-                <template v-else>
-                  <div v-if="getPreviewHeaders(row).length === 0 || getPreviewRows(row).length === 0" class="qty-tooltip-empty">
-                    暂无明细
+                <div v-if="getPreviewHeaders(row).length === 0 || getPreviewRows(row).length === 0" class="qty-tooltip-empty">
+                  颜色尺码明细未留存（不会按订单计划推算）
+                </div>
+                <div v-else class="qty-tooltip-grid">
+                  <div class="qty-tooltip-row qty-tooltip-head">
+                    <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
+                    <div v-for="(h, idx) in getPreviewHeaders(row)" :key="idx" class="qty-tooltip-cell">{{ h }}</div>
                   </div>
-                  <div v-else class="qty-tooltip-grid">
-                    <div class="qty-tooltip-row qty-tooltip-head">
-                      <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
-                      <div v-for="(h, idx) in getPreviewHeaders(row)" :key="idx" class="qty-tooltip-cell">{{ h }}</div>
-                    </div>
-                    <div v-for="(r, rIdx) in getPreviewRows(row)" :key="rIdx" class="qty-tooltip-row">
-                      <div class="qty-tooltip-cell qty-tooltip-color">{{ r.colorName || '-' }}</div>
-                      <div v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-tooltip-cell qty-tooltip-num">
-                        {{ formatDisplayNumber(v) }}
-                      </div>
+                  <div v-for="(r, rIdx) in getPreviewRows(row)" :key="rIdx" class="qty-tooltip-row">
+                    <div class="qty-tooltip-cell qty-tooltip-color">{{ r.colorName || '-' }}</div>
+                    <div v-for="(v, vIdx) in r.values" :key="vIdx" class="qty-tooltip-cell qty-tooltip-num">
+                      {{ formatDisplayNumber(v) }}
                     </div>
                   </div>
-                </template>
+                </div>
               </div>
             </template>
             <span class="qty-hover">{{ formatDisplayNumber(row.quantity) }}</span>
@@ -283,9 +274,6 @@ const props = defineProps<{
   getFinishedStockRowClassName: (payload: { row: StockTableRow }) => string
   isSelectableStockRow: (row: StockTableRow) => boolean
   qtyTooltipEnabled: (row: StockTableRow) => boolean
-  onQtyTooltipShow: (row: StockTableRow) => void
-  isQtyTooltipLoading: (row: StockTableRow) => boolean
-  isQtyTooltipError: (row: StockTableRow) => boolean
   getPreviewHeaders: (row: StockTableRow) => string[]
   getPreviewRows: (row: StockTableRow) => Array<{ colorName: string; values: number[] }>
 }>()

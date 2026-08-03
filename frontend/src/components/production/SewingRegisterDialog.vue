@@ -73,7 +73,7 @@
         <template v-else-if="form.sizeHeaders?.length">
           <p class="register-qty-tip">
             <template v-if="dialog.mode === 'edit'">按颜色修改车缝数量，与上方分单信息一并保存。</template>
-            <template v-else-if="cutSkipped">此订单未登记裁床数据，车缝数量按订单计划填写（每格上限 = 订单计划该色该码）。</template>
+            <template v-else-if="cutSkipped">未登记裁床颜色尺码明细，请按实际车缝数量填写；系统不会按订单计划推算。</template>
             <template v-else>按颜色分别登记车缝数量；每格不可超过对应颜色的裁床数。</template>
           </p>
           <div
@@ -232,11 +232,10 @@ type ColorBlockRow =
 function rowsForColor(ri: number): ColorBlockRow[] {
   const orderQ = props.form.orderColorRows[ri]?.quantities ?? []
   const cutQ = props.form.cutColorRows[ri]?.quantities ?? []
-  return [
-    { kind: 'readonly', label: '订单数量', values: orderQ },
-    { kind: 'readonly', label: '裁床数量', values: cutQ },
-    { kind: 'input', label: '车缝数量' },
-  ]
+  const rows: ColorBlockRow[] = [{ kind: 'readonly', label: '订单数量', values: orderQ }]
+  if (cutQ.length > 0) rows.push({ kind: 'readonly', label: '裁床数量', values: cutQ })
+  rows.push({ kind: 'input', label: '车缝数量' })
+  return rows
 }
 
 function sumReadonly(values: number[]): number {

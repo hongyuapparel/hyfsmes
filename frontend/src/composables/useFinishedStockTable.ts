@@ -1,10 +1,8 @@
-import { computed, reactive, type Ref } from 'vue'
+import { computed, type Ref } from 'vue'
 import type { FinishedStockRow } from '@/api/inventory'
-import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getSizeHeaderKey } from '@/utils/sizeHeaders'
 import {
   normalizeColorName,
-  normalizeBreakdownHeaders,
   mergeSizeHeaders,
   isStockTableParentRow,
   isStockTableLeafRow,
@@ -16,19 +14,10 @@ import {
   type StockTableParentRow,
 } from '@/utils/finishedStockTableUtils'
 
-type ColorSizeCacheEntry = {
-  loading: boolean
-  error: boolean
-  headers: string[]
-  rows: Array<{ colorName: string; values: number[] }>
-}
-
 type PreviewDataset = {
   headers: string[]
   rows: Array<{ colorName: string; values: number[] }>
 }
-
-const colorSizeCache = reactive<Record<number, ColorSizeCacheEntry>>({})
 
 function getRowColorImageUrl(row: FinishedStockRow, colorName: string): string {
   const target = normalizeColorName(colorName)
@@ -40,106 +29,6 @@ function getRowColorImageUrl(row: FinishedStockRow, colorName: string): string {
 function getProductImageUrl(row: FinishedStockRow | StockTableRow | null | undefined): string {
   if (!row) return ''
   return String(row.imageUrl ?? '').trim() || String(row.productImageUrl ?? '').trim()
-}
-
-async function ensureColorSizeBreakdown(orderId: number) {
-  if (!orderId) return
-  const existing = colorSizeCache[orderId]
-  if (existing && (existing.loading || existing.headers.length > 0 || existing.error)) return
-  colorSizeCache[orderId] = { loading: true, error: false, headers: [], rows: [] }
-  try {
-    const res = await getOrderColorSizeBreakdown(orderId)
-    const data = (res.data ?? { headers: [], rows: [] }) as OrderColorSizeBreakdownRes
-    colorSizeCache[orderId] = {
-      loading: false,
-      error: false,
-      headers: Array.isArray(data.headers) ? data.headers : [],
-      rows: Array.isArray(data.rows) ? data.rows : [],
-    }
-  } catch {
-    colorSizeCache[orderId] = { loading: false, error: true, headers: [], rows: [] }
-  }
-}
-
-async function prefetchStoredRowBreakdowns(rows: FinishedStockRow[]) {
-  const orderIds = Array.from(
-    new Set(
-      rows
-        .filter(
-          (item) =>
-            item.type === 'stored' &&
-            item.orderId &&
-            !(item.sizeBreakdown?.headers?.length && item.sizeBreakdown.rows?.length),
-        )
-        .map((item) => item.orderId as number),
-    ),
-  )
-  if (!orderIds.length) return
-  await Promise.all(orderIds.map((orderId) => ensureColorSizeBreakdown(orderId)))
-}
-
-function allocateByWeight(weights: number[], total: number): number[] {
-  const safeTotal = Math.max(0, Math.trunc(Number(total) || 0))
-  if (!weights.length) return []
-  const sumWeight = weights.reduce((s, w) => s + Math.max(0, Number(w) || 0), 0)
-  if (safeTotal <= 0) return weights.map(() => 0)
-  if (sumWeight <= 0) {
-    const arr = weights.map(() => 0)
-    arr[0] = safeTotal
-    return arr
-  }
-  const exact = weights.map((w) => (Math.max(0, Number(w) || 0) * safeTotal) / sumWeight)
-  const base = exact.map((v) => Math.floor(v))
-  let remain = safeTotal - base.reduce((s, n) => s + n, 0)
-  const order = exact
-    .map((v, idx) => ({ idx, frac: v - Math.floor(v) }))
-    .sort((a, b) => b.frac - a.frac)
-  let i = 0
-  while (remain > 0 && order.length > 0) {
-    base[order[i % order.length].idx] += 1
-    remain -= 1
-    i += 1
-  }
-  return base
-}
-
-function scaleColorSizeRowsToQuantity(
-  headers: string[],
-  rows: Array<{ colorName?: string; values?: number[] }>,
-  targetQty: number,
-): Array<{ colorName: string; values: number[] }> {
-  if (!headers.length || !rows.length) return []
-  const hasTotalCol = headers[headers.length - 1] === '合计'
-  const sizeColCount = hasTotalCol ? Math.max(0, headers.length - 1) : headers.length
-  if (sizeColCount <= 0) return []
-  const weights: number[] = []
-  rows.forEach((r) => {
-    for (let i = 0; i < sizeColCount; i += 1) {
-      weights.push(Math.max(0, Number(r.values?.[i]) || 0))
-    }
-  })
-  const weightSum = weights.reduce((s, n) => s + n, 0)
-  const safeTarget = Math.max(0, Math.trunc(Number(targetQty) || 0))
-  if (weightSum <= 0) {
-    return rows.map((r) => ({
-      colorName: String(r.colorName ?? ''),
-      values: hasTotalCol ? [...Array(sizeColCount).fill(0), 0] : Array(sizeColCount).fill(0),
-    }))
-  }
-  const allocated = weightSum === safeTarget ? [...weights] : allocateByWeight(weights, safeTarget)
-  let cursor = 0
-  return rows.map((r) => {
-    const sizeValues: number[] = []
-    for (let i = 0; i < sizeColCount; i += 1) {
-      sizeValues.push(allocated[cursor] ?? 0)
-      cursor += 1
-    }
-    const rowTotal = sizeValues.reduce((s, n) => s + n, 0)
-    return {
-      colorName: String(r.colorName ?? ''),
-      values: hasTotalCol ? [...sizeValues, rowTotal] : sizeValues,
-    }
-  })
 }
 
 function getPreviewBaseHeaders(headers: string[]): string[] {
@@ -161,19 +50,7 @@ function getSplitColorBreakdown(row: FinishedStockRow): {
       })),
     }
   }
-  if (!row.orderId) return null
-  const cache = colorSizeCache[row.orderId]
-  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return null
-  const headers = normalizeBreakdownHeaders(cache.headers)
-  if (!headers.length) return null
-  const scaled = scaleColorSizeRowsToQuantity(cache.headers, cache.rows, row.quantity)
-  return {
-    headers,
-    rows: scaled.map((item) => ({
-      colorName: normalizeColorName(item.colorName),
-      values: headers.map((_, index) => Number(item.values?.[index]) || 0),
-    })),
-  }
+  return null
 }
 
 function buildLeafRowsForStock(row: FinishedStockRow): StockTableLeafRow[] {
@@ -279,38 +156,9 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
   } as StockTableParentRow
 }
 
-function isQtyTooltipLoading(row: StockTableRow): boolean {
-  if (isStockTableParentRow(row)) return row._children.some((child) => isQtyTooltipLoading(child))
-  return !!(row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.loading)
-}
-
-function isQtyTooltipError(row: StockTableRow): boolean {
-  if (isStockTableParentRow(row)) return row._children.some((child) => isQtyTooltipError(child))
-  return !!(row.orderId && !row.sizeBreakdown?.headers?.length && colorSizeCache[row.orderId]?.error)
-}
-
 function qtyTooltipEnabled(row: StockTableRow): boolean {
   if (isStockTableParentRow(row)) return row._children.some((child) => qtyTooltipEnabled(child))
-  if (row.sizeBreakdown?.headers?.length && row.sizeBreakdown.rows?.length) return true
-  return !!row.orderId
-}
-
-function onQtyTooltipShow(row: StockTableRow) {
-  if (isStockTableParentRow(row)) {
-    const orderIds = Array.from(
-      new Set(
-        row._children
-          .filter((child) => !child.sizeBreakdown?.headers?.length && child.orderId)
-          .map((child) => Number(child.orderId)),
-      ),
-    )
-    orderIds.forEach((orderId) => {
-      void ensureColorSizeBreakdown(orderId)
-    })
-    return
-  }
-  if (row.sizeBreakdown?.headers?.length && row.sizeBreakdown.rows?.length) return
-  if (row.orderId) void ensureColorSizeBreakdown(row.orderId)
+  return row.type === 'stored'
 }
 
 function getLeafPreviewData(row: StockTableLeafRow): PreviewDataset | null {
@@ -327,17 +175,7 @@ function getLeafPreviewData(row: StockTableLeafRow): PreviewDataset | null {
       }),
     }
   }
-  if (!row.orderId) return null
-  const cache = colorSizeCache[row.orderId]
-  if (!cache || cache.loading || cache.error || !cache.headers.length || !cache.rows.length) return null
-  return {
-    headers: [...cache.headers],
-    rows: scaleColorSizeRowsToQuantity(
-      cache.headers,
-      cache.rows,
-      Math.max(0, Math.trunc(Number(row.quantity) || 0)),
-    ),
-  }
+  return null
 }
 
 function filterEmptyPreviewRows(dataset: PreviewDataset | null): PreviewDataset | null {
@@ -476,7 +314,6 @@ export function useFinishedStockTable(list: Ref<FinishedStockRow[]>) {
   }
 
   return {
-    colorSizeCache,
     stockTableData,
     getGroupLeafRows,
     getGroupSizeHeaders,
@@ -485,13 +322,7 @@ export function useFinishedStockTable(list: Ref<FinishedStockRow[]>) {
     getSharedProductImageUrl,
     getProductImageUrl,
     getSplitColorBreakdown,
-    ensureColorSizeBreakdown,
-    prefetchStoredRowBreakdowns,
-    scaleColorSizeRowsToQuantity,
-    isQtyTooltipLoading,
-    isQtyTooltipError,
     qtyTooltipEnabled,
-    onQtyTooltipShow,
     getLeafPreviewData,
     filterEmptyPreviewRows,
     getPreviewBaseHeaders,

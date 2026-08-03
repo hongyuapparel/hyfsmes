@@ -29,11 +29,6 @@ function snapshotRowTotal(row: { quantities: unknown[] }): number {
   );
 }
 
-function sameSnapshotQuantities(a: number[], b: number[]): boolean {
-  if (a.length !== b.length) return false;
-  return a.every((value, index) => value === b[index]);
-}
-
 function normalizeColorSizeSnapshot(snapshot: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
   if (!snapshot?.headers?.length || !snapshot.rows?.length) return null;
 
@@ -53,7 +48,6 @@ function normalizeColorSizeSnapshot(snapshot: ColorSizeSnapshot | null): ColorSi
 
   const orderedColors: string[] = [];
   const rowMap = new Map<string, number[]>();
-  const blankRows: number[][] = [];
 
   const addRow = (colorName: string, quantities: number[]) => {
     let existing = rowMap.get(colorName);
@@ -79,19 +73,11 @@ function normalizeColorSizeSnapshot(snapshot: ColorSizeSnapshot | null): ColorSi
     if (snapshotRowTotal({ quantities }) <= 0) return;
     const colorName = String(rawRow.colorName ?? '').trim();
     if (!colorName || colorName === '__UNASSIGNED__') {
-      blankRows.push(quantities);
+      // 颜色缺失本身也是数据事实；不得根据其它行或唯一颜色自动归色。
+      addRow('', quantities);
       return;
     }
     addRow(colorName, quantities);
-  });
-
-  blankRows.forEach((quantities) => {
-    const exactMatches = orderedColors.filter((colorName) =>
-      sameSnapshotQuantities(rowMap.get(colorName) ?? [], quantities),
-    );
-    if (exactMatches.length === 1) addRow(exactMatches[0], quantities);
-    else if (orderedColors.length === 1) addRow(orderedColors[0], quantities);
-    else addRow('', quantities);
   });
 
   const sortedHeaders = sortSizeHeaders(headers);
@@ -190,62 +176,4 @@ export function subtractColorSizeSnapshots(current: ColorSizeSnapshot | null, ou
     .filter((row) => row.quantities.some((qty) => qty > 0));
   if (!activeRows.length) return { headers: [], rows: [] };
   return normalizeColorSizeSnapshot({ headers, rows: activeRows });
-}
-
-function allocateByWeight(weights: number[], total: number): number[] {
-  const safeTotal = Math.max(0, Math.trunc(Number(total) || 0));
-  if (!weights.length) return [];
-  const normalized = weights.map((weight) => Math.max(0, Number(weight) || 0));
-  const sumWeight = normalized.reduce((sum, weight) => sum + weight, 0);
-  if (safeTotal <= 0) return normalized.map(() => 0);
-  if (sumWeight <= 0) {
-    const allocated = normalized.map(() => 0);
-    allocated[0] = safeTotal;
-    return allocated;
-  }
-  const exact = normalized.map((weight) => (weight * safeTotal) / sumWeight);
-  const base = exact.map((value) => Math.floor(value));
-  let remain = safeTotal - base.reduce((sum, value) => sum + value, 0);
-  const order = exact
-    .map((value, index) => ({ index, frac: value - Math.floor(value) }))
-    .sort((a, b) => b.frac - a.frac);
-  let cursor = 0;
-  while (remain > 0 && order.length > 0) {
-    base[order[cursor % order.length].index] += 1;
-    remain -= 1;
-    cursor += 1;
-  }
-  return base;
-}
-
-export function scaleColorSizeRowsToQuantity(
-  headers: string[],
-  rows: Array<{ colorName?: string; quantities?: unknown[] }>,
-  targetQty: number,
-): Array<{ colorName: string; quantities: number[] }> {
-  if (!headers.length || !rows.length) return [];
-  const safeTarget = Math.max(0, Math.trunc(Number(targetQty) || 0));
-  const weights: number[] = [];
-  rows.forEach((row) => {
-    for (let i = 0; i < headers.length; i += 1) {
-      weights.push(Math.max(0, Number(row.quantities?.[i]) || 0));
-    }
-  });
-  const weightSum = weights.reduce((sum, value) => sum + value, 0);
-  if (weightSum <= 0) {
-    return rows.map((row) => ({
-      colorName: String(row.colorName ?? '').trim(),
-      quantities: Array(headers.length).fill(0),
-    }));
-  }
-  const allocated = weightSum === safeTarget ? [...weights] : allocateByWeight(weights, safeTarget);
-  let cursor = 0;
-  return rows.map((row) => {
-    const quantities: number[] = [];
-    for (let i = 0; i < headers.length; i += 1) {
-      quantities.push(allocated[cursor] ?? 0);
-      cursor += 1;
-    }
-    return { colorName: String(row.colorName ?? '').trim(), quantities };
-  });
 }

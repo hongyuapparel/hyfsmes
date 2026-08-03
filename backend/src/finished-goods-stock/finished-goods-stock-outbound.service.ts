@@ -353,6 +353,7 @@ export class FinishedGoodsStockOutboundService {
     operatorUsername: string,
     remark: string,
     pickupUserId?: number | null,
+    transactionManager?: EntityManager,
   ): Promise<void> {
     const normalizedItems = Array.isArray(items)
       ? items
@@ -389,13 +390,22 @@ export class FinishedGoodsStockOutboundService {
     const productMap = new Map(products.map((product) => [product.skuCode?.trim() ?? '', product]));
 
     try {
-      await this.stockRepo.manager.transaction(async (manager) => {
+      const execute = async (manager: EntityManager): Promise<void> => {
         const txStockRepo = manager.getRepository(FinishedGoodsStock);
         for (const item of normalizedItems) {
-          const txStock = await txStockRepo.findOne({ where: { id: item.id } });
+          const txStock = await txStockRepo
+            .createQueryBuilder('stock')
+            .where('stock.id = :id', { id: item.id })
+            .addSelect('stock.color_size_snapshot')
+            .setLock('pessimistic_write')
+            .getOne();
           if (!txStock) throw new NotFoundException('库存记录不存在');
           if (item.quantity > txStock.quantity) throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 的出库数量不能大于当前库存`);
           const currentSnapshot = await this.inboundQueryService.buildCurrentStockSnapshot(txStock);
+          const requiresDetail = await this.inboundQueryService.orderRequiresColorSizeDetail(txStock.orderId, manager);
+          if (requiresDetail && !currentSnapshot) {
+            throw new BadRequestException(`库存 ${txStock.skuCode || txStock.id} 的颜色尺码明细未留存或与库存数量不一致，请先按实际数据修正后再出库`);
+          }
           const beforeAdjust = this.stockAdjustSnapshot(txStock, currentSnapshot);
           const outgoingSnapshot = this.parseStoredColorSizeSnapshot(item.sizeBreakdown);
           if (outgoingSnapshot) this.assertColorSizeSnapshotTotal(outgoingSnapshot, item.quantity, '出库尺码明细合计必须等于出库数量');
@@ -435,7 +445,9 @@ export class FinishedGoodsStockOutboundService {
             remark: (remark ?? '').trim(),
           });
         }
-      });
+      };
+      if (transactionManager) await execute(transactionManager);
+      else await this.stockRepo.manager.transaction(execute);
     } catch (e: unknown) {
       const msg = String((e as { message?: unknown })?.message ?? '');
       if (msg.includes('Table') && msg.includes('finished_goods_outbound') && msg.includes("doesn't exist")) {

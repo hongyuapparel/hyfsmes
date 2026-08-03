@@ -1,16 +1,10 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { EntityManager, Repository } from 'typeorm';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
 import { Order } from '../entities/order.entity';
-import { OrderExt } from '../entities/order-ext.entity';
-import { OrderCutting } from '../entities/order-cutting.entity';
-import { OrderFinishing } from '../entities/order-finishing.entity';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
-import { scaleColorSizeRowsToQuantity, subtractColorSizeSnapshots } from './finished-goods-stock-query.utils';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
-
-type OutboundSnapshotRawRow = { quantity: string | number | null; sizeBreakdown: unknown };
 
 @Injectable()
 export class FinishedGoodsStockInboundQueryService {
@@ -19,78 +13,7 @@ export class FinishedGoodsStockInboundQueryService {
     private readonly stockRepo: Repository<FinishedGoodsStock>,
     @InjectRepository(Order)
     private readonly orderRepo: Repository<Order>,
-    @InjectRepository(OrderExt)
-    private readonly orderExtRepo: Repository<OrderExt>,
-    @InjectRepository(OrderCutting)
-    private readonly orderCuttingRepo: Repository<OrderCutting>,
-    @InjectRepository(OrderFinishing)
-    private readonly orderFinishingRepo: Repository<OrderFinishing>,
   ) {}
-
-  /**
-   * 读 order_finishing.tail_inbound_qty_row（实体上 select=false，要原生 SQL 取）。
-   * 格式：[size1, size2, ..., sizeN, total]，最后一项是合计，剥掉。
-   * 仅当尺码数量与 expectedHeaderLength 匹配时才返回，避免 schema 不一致时误用。
-   */
-  private async fetchTailInboundQtyRow(orderId: number, expectedHeaderLength: number): Promise<number[] | null> {
-    if (orderId == null || expectedHeaderLength <= 0) return null;
-    try {
-      const rows = await this.orderFinishingRepo.query(
-        'SELECT tail_inbound_qty_row AS rowJson FROM `order_finishing` WHERE order_id = ? LIMIT 1',
-        [orderId],
-      );
-      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { rowJson?: unknown }).rowJson : null;
-      if (raw == null) return null;
-      let parsed: unknown = raw;
-      if (typeof raw === 'string') {
-        try { parsed = JSON.parse(raw); } catch { return null; }
-      }
-      if (!Array.isArray(parsed)) return null;
-      // 兼容两种历史格式：N+1（尾部为合计）或 N（无合计）
-      const candidates = parsed.length >= expectedHeaderLength + 1
-        ? parsed.slice(0, expectedHeaderLength)
-        : parsed.length === expectedHeaderLength
-          ? parsed
-          : null;
-      if (!candidates) return null;
-      const sizes = candidates.map((v) => Math.max(0, Math.trunc(Number(v) || 0)));
-      return sizes.some((v) => v > 0) ? sizes : null;
-    } catch {
-      return null;
-    }
-  }
-
-  /**
-   * 读 order_finishing.tail_inbound_quantities_by_color（真值）。
-   * select=false，需要原生 SQL；返回 normalize 后的颜色×尺码二维。
-   */
-  private async fetchTailInboundQuantitiesByColor(
-    orderId: number | null,
-  ): Promise<Array<{ colorName: string; quantities: number[] }> | null> {
-    if (orderId == null) return null;
-    try {
-      const rows = await this.orderFinishingRepo.query(
-        'SELECT tail_inbound_quantities_by_color AS rowJson FROM `order_finishing` WHERE order_id = ? LIMIT 1',
-        [orderId],
-      );
-      const raw = Array.isArray(rows) && rows.length > 0 ? (rows[0] as { rowJson?: unknown }).rowJson : null;
-      if (raw == null) return null;
-      let parsed: unknown = raw;
-      if (typeof raw === 'string') {
-        try { parsed = JSON.parse(raw); } catch { return null; }
-      }
-      if (!Array.isArray(parsed) || parsed.length === 0) return null;
-      const out: Array<{ colorName: string; quantities: number[] }> = [];
-      for (const r of parsed as Array<{ colorName?: string; quantities?: unknown }>) {
-        const name = String(r?.colorName ?? '').trim();
-        const q = Array.isArray(r?.quantities) ? (r.quantities as unknown[]) : [];
-        out.push({ colorName: name, quantities: q.map((n) => Math.max(0, Math.trunc(Number(n) || 0))) });
-      }
-      return out.length > 0 ? out : null;
-    } catch {
-      return null;
-    }
-  }
 
   private snapshotRowTotal(row: { quantities: unknown[] }): number {
     return row.quantities.reduce<number>(
@@ -269,104 +192,30 @@ export class FinishedGoodsStockInboundQueryService {
     return this.orderRepo.findOne({ where: { orderNo } });
   }
 
-  /**
-   * 根据订单生成颜色尺码快照（用于 createManual 缺 colorSize 时的兜底反推）。
-   *
-   * 来源优先级（从高到低）：
-   * 1. **OrderFinishing.tail_inbound_qty_row** — 尾部登记入库时强制录入的实际尺码。
-   *    这是与 InboundPending 配对的"真值"，用它反推能让待仓处理 → 成品库存的尺码
-   *    分布与尾部登记完全一致。**单色订单首选**。
-   * 2. **OrderCutting.actualCutRows** — 裁床实际数量。如果尾部尺码缺失但裁床有数据，
-   *    按裁床比例分配总数 quantity，仍接近真实生产分布。
-   * 3. **OrderExt.colorSizeRows** — 订单计划比例。最后兜底，与历史行为一致。
-   *
-   * 历史 bug：原实现仅读取 OrderExt（订单计划），导致 计划比例 ≠ 实际生产 时
-   * 单尺码计算严重失真（用户报告：订单 XXL 计划 25 件 → 旧逻辑反推 27 件，
-   * 但裁床/尾部实际 55 件，出库 18 后剩 9 件而非 37 件）。
-   *
-   * 多色订单注意：tail_inbound_qty_row 没有颜色维度，故仅在 plan 仅一种颜色时使用；
-   * 多色订单仍按 OrderCutting / OrderExt 兜底（含颜色维度）。
-   */
-  async buildOrderColorSizeSnapshot(orderId: number | null, quantity: number): Promise<ColorSizeSnapshot | null> {
-    if (orderId == null) return null;
-
-    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
-    const headers = Array.isArray(ext?.colorSizeHeaders)
-      ? ext.colorSizeHeaders.map(normalizeSizeHeader).filter((header) => header.length > 0)
-      : [];
-    if (!headers.length) {
-      // headers 缺失则无法构造快照（任何来源都需要 headers）
-      return null;
-    }
-    const planRows = Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : [];
-
-    // 0) 最优先：尾部入库登记的真值 颜色×尺码（多色订单也支持）
-    const tailByColor = await this.fetchTailInboundQuantitiesByColor(orderId);
-    if (Array.isArray(tailByColor) && tailByColor.length > 0) {
-      return {
-        headers,
-        rows: scaleColorSizeRowsToQuantity(
-          headers,
-          tailByColor.map((r) => ({ colorName: r.colorName, quantities: r.quantities })),
-          quantity,
-        ),
-      };
-    }
-
-    // 1) 兜底：单色订单可由聚合 tail_inbound_qty_row 直接使用
-    if (planRows.length === 1) {
-      const tailRow = await this.fetchTailInboundQtyRow(orderId, headers.length);
-      if (tailRow) {
-        const colorName = String(planRows[0]?.colorName ?? '').trim();
-        return {
-          headers,
-          rows: scaleColorSizeRowsToQuantity(
-            headers,
-            [{ colorName, quantities: tailRow }],
-            quantity,
-          ),
-        };
+  async orderRequiresColorSizeDetail(
+    orderId: number | null,
+    manager: EntityManager = this.stockRepo.manager,
+  ): Promise<boolean> {
+    if (orderId == null) return false;
+    const rows = (await manager.query(
+      'SELECT color_size_headers AS headers FROM order_ext WHERE order_id = ? LIMIT 1',
+      [orderId],
+    )) as Array<{ headers?: unknown }>;
+    let headers = rows[0]?.headers;
+    if (typeof headers === 'string') {
+      try {
+        headers = JSON.parse(headers) as unknown;
+      } catch {
+        headers = null;
       }
     }
-
-    // 2) 次选：裁床实际数量
-    const cutting = await this.orderCuttingRepo.findOne({ where: { orderId } });
-    const cuttingRows = Array.isArray(cutting?.actualCutRows) ? cutting.actualCutRows : [];
-    const hasCuttingQty = cuttingRows.some((row) =>
-      Array.isArray(row?.quantities) &&
-      row.quantities.some((q) => Math.max(0, Math.trunc(Number(q) || 0)) > 0),
-    );
-    if (hasCuttingQty) {
-      return {
-        headers,
-        rows: scaleColorSizeRowsToQuantity(
-          headers,
-          cuttingRows.map((row) => ({
-            colorName: row?.colorName,
-            quantities: Array.isArray(row?.quantities) ? row.quantities : [],
-          })),
-          quantity,
-        ),
-      };
-    }
-
-    // 3) 兜底：订单计划比例
-    if (!planRows.length) return null;
-    return {
-      headers,
-      rows: scaleColorSizeRowsToQuantity(
-        headers,
-        planRows.map((row: { colorName?: string; quantities?: number[] }) => ({
-          colorName: row?.colorName,
-          quantities: Array.isArray(row?.quantities) ? row.quantities : [],
-        })),
-        quantity,
-      ),
-    };
+    return Array.isArray(headers) && headers.some((header) => String(header ?? '').trim());
   }
 
   async findMergeableFinishedStock(params: {
     skuCode: string;
+    customerId: number | null;
+    customerName: string;
     warehouseId: number | null;
     inventoryTypeId: number | null;
     department: string;
@@ -376,8 +225,11 @@ export class FinishedGoodsStockInboundQueryService {
     if (!sku) return null;
     const qb = this.stockRepo
       .createQueryBuilder('s')
+      .addSelect('s.color_size_snapshot')
       .where('s.skuCode = :sku', { sku })
       .andWhere('s.department = :dep', { dep });
+    if (params.customerId != null) qb.andWhere('s.customerId = :customerId', { customerId: params.customerId });
+    else qb.andWhere('s.customerId IS NULL').andWhere('s.customerName = :customerName', { customerName: params.customerName.trim() });
     if (params.warehouseId != null) qb.andWhere('s.warehouseId = :wid', { wid: params.warehouseId });
     else qb.andWhere('s.warehouseId IS NULL');
     if (params.inventoryTypeId != null) qb.andWhere('s.inventoryTypeId = :iid', { iid: params.inventoryTypeId });
@@ -403,37 +255,10 @@ export class FinishedGoodsStockInboundQueryService {
 
   async buildCurrentStockSnapshot(stock: FinishedGoodsStock): Promise<ColorSizeSnapshot | null> {
     const snapshot = this.parseStoredColorSizeSnapshot(stock.colorSizeSnapshot);
-    // 仅信任与总数量一致的存储快照；历史脏数据（快照合计 ≠ quantity）一律忽略并回退订单回溯，
-    // 让此前已被写坏的库存记录在下次读取/出库时自愈。
     const safeQuantity = Math.max(0, Math.trunc(Number(stock.quantity) || 0));
     if (snapshot && this.getColorSizeSnapshotTotal(snapshot) === safeQuantity) return snapshot;
-    if (stock.orderId == null) return null;
-    const outboundRows = await this.stockRepo.manager.query(
-      'SELECT quantity, size_breakdown AS sizeBreakdown FROM finished_goods_outbound WHERE finished_stock_id = ? ORDER BY created_at ASC, id ASC',
-      [stock.id],
-    ) as OutboundSnapshotRawRow[];
-    if (!outboundRows.length) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
-
-    let outboundTotal = 0;
-    const outboundSnapshots: ColorSizeSnapshot[] = [];
-    for (const row of outboundRows) {
-      const qty = Math.max(0, Math.trunc(Number(row.quantity) || 0));
-      outboundTotal += qty;
-      if (qty <= 0) continue;
-      const outboundSnapshot = this.parseStoredColorSizeSnapshot(row.sizeBreakdown);
-      if (!outboundSnapshot || this.getColorSizeSnapshotTotal(outboundSnapshot) !== qty) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
-      outboundSnapshots.push(outboundSnapshot);
-    }
-    let current = await this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity + outboundTotal);
-    if (!current) return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
-    try {
-      for (const outboundSnapshot of outboundSnapshots) {
-        current = subtractColorSizeSnapshots(current, outboundSnapshot);
-      }
-    } catch {
-      return this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
-    }
-    return this.getColorSizeSnapshotTotal(current) === Math.max(0, Math.trunc(Number(stock.quantity) || 0)) ? current : this.buildOrderColorSizeSnapshot(stock.orderId, stock.quantity);
+    // 缺失或合计不一致都视为数据质量问题；读取时不得从其他工序或订单计划推算。
+    return null;
   }
 
   mergeColorSizeSnapshots(currentRaw: unknown, incoming: ColorSizeSnapshot | null): ColorSizeSnapshot | null {
@@ -534,8 +359,11 @@ export class FinishedGoodsStockInboundQueryService {
     if (!sku) return [seed];
     const qb = this.stockRepo
       .createQueryBuilder('s')
+      .addSelect('s.color_size_snapshot')
       .where('s.skuCode = :sku', { sku })
       .andWhere('s.department = :dep', { dep });
+    if (seed.customerId != null) qb.andWhere('s.customerId = :customerId', { customerId: seed.customerId });
+    else qb.andWhere('s.customerId IS NULL').andWhere('s.customerName = :customerName', { customerName: String(seed.customerName ?? '').trim() });
     if (seed.warehouseId != null) qb.andWhere('s.warehouseId = :wid', { wid: seed.warehouseId });
     else qb.andWhere('s.warehouseId IS NULL');
     if (seed.inventoryTypeId != null) qb.andWhere('s.inventoryTypeId = :iid', { iid: seed.inventoryTypeId });

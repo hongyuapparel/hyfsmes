@@ -6,6 +6,7 @@
     "build": "nest build",
     "test:finished-stock-export": "npm run build && node --test test/finished-goods-stock-export-workbook.test.js",
     "test:inventory-stock-export": "npm run build && node --test test/finished-goods-stock-export-workbook.test.js test/material-stock-export-workbook.test.js",
+    "test:inventory-truth": "npm run build && node --test test/inventory-pending-outbound.test.js",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:debug": "nest start --debug --watch",

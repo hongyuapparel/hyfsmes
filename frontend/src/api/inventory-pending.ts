@@ -21,6 +21,8 @@ export interface PendingListItem {
     headers: string[]
     rows: Array<{ colorName: string; quantities: number[] }>
   } | null
+  /** recorded=批次事实完整；missing=有尺码订单但批次事实缺失/不一致；not_applicable=订单无尺码维度 */
+  detailStatus: 'recorded' | 'missing' | 'not_applicable'
 }
 
 export function getPendingList(params?: {

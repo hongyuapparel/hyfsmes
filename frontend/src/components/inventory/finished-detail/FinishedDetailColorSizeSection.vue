@@ -33,7 +33,7 @@
   />
   <div v-else class="detail-section">
     <div class="detail-section-title">颜色图片与码数明细</div>
-    <div class="detail-muted">暂无颜色尺码明细（未关联订单或订单未维护颜色尺码）。</div>
+    <div class="detail-muted">库存颜色尺码明细未留存；系统不会按订单计划推算。</div>
   </div>
 </template>
 

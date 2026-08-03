@@ -227,9 +227,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     const sizeHeaders = Array.isArray(data?.sizeHeaders) ? data.sizeHeaders : []
     const sizeLen = sizeHeaders.length
     const planColors = Array.isArray(data?.planColorRows) ? data.planColorRows.map((r) => r.colorName) : []
-    const tailReceivedColorRows = Array.isArray(data?.tailReceivedColorRows) && data.tailReceivedColorRows.length
-      ? data.tailReceivedColorRows
-      : planColors.map((name) => ({ colorName: name, quantities: Array(sizeLen).fill(0) }))
+    const tailReceivedColorRows = Array.isArray(data?.tailReceivedColorRows) ? data.tailReceivedColorRows : []
+    if (sizeLen > 0 && tailReceivedColorRows.length === 0) {
+      throw new Error(`订单 ${row.orderNo} 的尾部收货颜色尺码明细未留存，不能据订单计划生成入库明细；请先核实并补录尾部收货事实`)
+    }
     const alreadyInboundColorRows = Array.isArray(data?.tailInboundColorRows) && data.tailInboundColorRows.length
       ? data.tailInboundColorRows
       : emptyColorRows(planColors, sizeLen)

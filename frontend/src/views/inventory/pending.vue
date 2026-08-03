@@ -149,7 +149,7 @@
                   <div class="qty-tooltip-empty">
                     {{ row.sourceType === 'defect' ? `本批次品 ${formatDisplayNumber(row.quantity)} 件` : `本批入库 ${formatDisplayNumber(row.quantity)} 件` }}
                     <br />
-                    <span class="qty-tooltip-empty-sub">（颜色×尺码明细未留存）</span>
+                    <span class="qty-tooltip-empty-sub">（颜色×尺码明细未留存；不会按订单计划推算）</span>
                   </div>
                 </template>
               </div>
@@ -158,6 +158,9 @@
               <span class="qty-hover">{{ formatDisplayNumber(row.quantity) }}</span>
               <el-tag v-if="row.sourceType === 'defect'" type="danger" size="small" effect="light" class="defect-tag">
                 次品
+              </el-tag>
+              <el-tag v-if="row.detailStatus === 'missing'" type="warning" size="small" effect="light" class="defect-tag">
+                明细待补
               </el-tag>
             </span>
           </el-tooltip>
@@ -224,7 +227,6 @@ import {
   getPendingList,
   type PendingListItem,
 } from '@/api/inventory'
-import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
@@ -268,16 +270,6 @@ const canOutboundSelection = computed(
 const { onHeaderDragEnd: onPendingHeaderDragEnd, restoreColumnWidths: restorePendingColumnWidths } =
   useTableColumnWidthPersist('inventory-pending-main')
 
-const colorSizeCache = reactive<Record<
-  number,
-  {
-    loading: boolean
-    error: boolean
-    headers: string[]
-    rows: Array<{ colorName: string; values: number[] }>
-  }
->>({})
-
 // 待仓 tooltip 严格只用 inbound_pending.color_size_snapshot（这一批登记时填的真值）。
 // snapshot 缺失（老数据 byColor 未存）就显示"本批未留存颜色×尺码明细"，不再回退到
 // 订单累计/订单计划，避免显示跟用户本批实际填写不符的数据。
@@ -312,32 +304,11 @@ const {
   selectedRows,
   pageTab,
   load,
-  ensureColorSizeBreakdown,
-  colorSizeCache,
 })
 
 function sumSnapshotRow(values: number[] | undefined): number {
   if (!Array.isArray(values)) return 0
   return values.reduce((s, n) => s + (Number(n) || 0), 0)
-}
-
-async function ensureColorSizeBreakdown(orderId: number) {
-  if (!orderId) return
-  const existing = colorSizeCache[orderId]
-  if (existing && (existing.loading || existing.headers.length > 0 || existing.error)) return
-  colorSizeCache[orderId] = { loading: true, error: false, headers: [], rows: [] }
-  try {
-    const res = await getOrderColorSizeBreakdown(orderId)
-    const data = (res.data ?? { headers: [], rows: [] }) as OrderColorSizeBreakdownRes
-    colorSizeCache[orderId] = {
-      loading: false,
-      error: false,
-      headers: Array.isArray(data.headers) ? data.headers : [],
-      rows: Array.isArray(data.rows) ? data.rows : [],
-    }
-  } catch {
-    colorSizeCache[orderId] = { loading: false, error: true, headers: [], rows: [] }
-  }
 }
 
 async function load() {

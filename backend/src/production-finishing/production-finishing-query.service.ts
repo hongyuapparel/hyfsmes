@@ -392,7 +392,7 @@ export class ProductionFinishingQueryService {
     const tailInboundRow = this.normalizeFinishingQtyRowToHeaders(inboundStored, headers);
     const defectRow = this.normalizeFinishingQtyRowToHeaders(defectStored, headers);
 
-    // === 按颜色×尺码（真值或对齐订单计划的展开） ===
+    // === 按颜色×尺码：只返回各工序已保存的真实二维记录 ===
     const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders.slice() : [];
     const norm = (s: unknown) => String(s ?? '').trim();
     const planRowsArr = Array.isArray((ext as { colorSizeRows?: Array<{ colorName?: string; quantities?: number[]; imageUrl?: string }> })?.colorSizeRows)
@@ -403,28 +403,27 @@ export class ProductionFinishingQueryService {
       const quantities = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
       return { colorName: norm(r?.colorName), quantities, imageUrl: String(r?.imageUrl ?? '').trim() };
     });
-    const buildColorRowsAlignedToPlan = (
+    const buildRecordedColorRows = (
       source: Array<{ colorName?: string; quantities?: number[] }> | null | undefined,
     ): Array<{ colorName: string; quantities: number[] }> => {
       if (!Array.isArray(source) || source.length === 0 || sizeLen === 0) return [];
-      const map = new Map<string, number[]>();
-      for (const r of source) {
+      const rows = source.map((r) => {
         const name = norm(r?.colorName);
         const q = Array.isArray(r?.quantities) ? r.quantities.slice(0, sizeLen) : [];
-        const filled = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
-        if (map.has(name)) {
-          const prev = map.get(name)!;
-          for (let i = 0; i < sizeLen; i++) prev[i] += filled[i];
-        } else {
-          map.set(name, filled);
-        }
+        return {
+          colorName: name,
+          quantities: Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0))),
+        };
+      });
+      if (planColorRows.length > 0) {
+        const shapeMatches = rows.length === planColorRows.length && rows.every(
+          (row, index) => row.colorName === planColorRows[index].colorName,
+        );
+        if (!shapeMatches) return [];
       }
-      return planColorRows.map((p) => ({
-        colorName: p.colorName,
-        quantities: map.get(p.colorName) ?? Array(sizeLen).fill(0),
-      }));
+      return rows;
     };
-    const cutColorRows = buildColorRowsAlignedToPlan(cutting?.actualCutRows ?? null);
+    const cutColorRows = buildRecordedColorRows(cutting?.actualCutRows ?? null);
 
     const fetchByColor = async (column: string): Promise<Array<{ colorName: string; quantities: number[] }>> => {
       try {
@@ -439,7 +438,7 @@ export class ProductionFinishingQueryService {
           try { parsed = JSON.parse(raw); } catch { return []; }
         }
         if (!Array.isArray(parsed)) return [];
-        return buildColorRowsAlignedToPlan(parsed as Array<{ colorName?: string; quantities?: number[] }>);
+        return buildRecordedColorRows(parsed as Array<{ colorName?: string; quantities?: number[] }>);
       } catch {
         return [];
       }
@@ -457,7 +456,7 @@ export class ProductionFinishingQueryService {
           try { parsed = JSON.parse(raw); } catch { return []; }
         }
         if (!Array.isArray(parsed)) return [];
-        return buildColorRowsAlignedToPlan(parsed as Array<{ colorName?: string; quantities?: number[] }>);
+        return buildRecordedColorRows(parsed as Array<{ colorName?: string; quantities?: number[] }>);
       } catch {
         return [];
       }

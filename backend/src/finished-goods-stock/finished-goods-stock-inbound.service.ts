@@ -251,8 +251,8 @@ export class FinishedGoodsStockInboundService {
       customerName = linkedOrder.customerName?.trim() ?? '';
       orderExFactoryPrice = linkedOrder.exFactoryPrice ?? '0';
     }
-    if (!snapshot && orderId != null) {
-      snapshot = await this.inboundQueryService.buildOrderColorSizeSnapshot(orderId, q);
+    if (!snapshot && await this.inboundQueryService.orderRequiresColorSizeDetail(orderId)) {
+      throw new BadRequestException('该订单有颜色尺码维度，新增库存时必须填写实际颜色尺码明细');
     }
     if (snapshot) this.inboundQueryService.assertColorSizeSnapshotTotal(snapshot, q, '新增库存的尺码明细合计必须等于新增数量');
 
@@ -270,6 +270,8 @@ export class FinishedGoodsStockInboundService {
 
     const existing = await this.inboundQueryService.findMergeableFinishedStock({
       skuCode,
+      customerId,
+      customerName,
       warehouseId,
       inventoryTypeId,
       department,
@@ -303,7 +305,6 @@ export class FinishedGoodsStockInboundService {
       } else {
         // 本次入库无法解析尺码明细：必须把快照与 quantity 同步置空，
         // 否则 quantity 增加而旧快照滞留，会写出「快照合计 ≠ 总数量」的脏数据导致出库被永久拦截。
-        // 置空后出库时由 buildCurrentStockSnapshot 从订单回溯重建。
         existing.colorSizeSnapshot = null;
       }
       try {

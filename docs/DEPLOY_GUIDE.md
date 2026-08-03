@@ -143,6 +143,8 @@ sh scripts/deploy-backend.sh
 sh scripts/deploy-full.sh
 ```
 
+后端和完整部署脚本会在 PM2 重启后检查 `/health` 与 `/health/db`。健康检查通过时不再打印历史错误日志；只有新进程或数据库未就绪时，才输出最近 50 行 PM2 日志并以失败状态退出。
+
 ### 改了数据库结构
 
 不要直接只跑脚本就结束，必须额外处理数据库。

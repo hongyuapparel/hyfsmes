@@ -226,7 +226,7 @@ function rowsForColor(item: PackagingCompleteItem, ri: number): BlockRow[] {
   if (hasNonZero(plan)) rows.push({ kind: 'readonly', label: '订单数量', values: plan })
   if (hasNonZero(cut)) rows.push({ kind: 'readonly', label: '裁床数量', values: cut })
   if (hasNonZero(sew)) rows.push({ kind: 'readonly', label: '车缝数量', values: sew })
-  // 尾部收货：即便全 0 也展示（老订单 byColor 缺真值时也要让仓管看到收货 = 0/未登记）
+  // 尾部收货是本次入库的事实基准；缺失时 buildItem 已阻断，不生成计划兜底。
   rows.push({ kind: 'readonly', label: '尾部收货', values: received })
   if (hasNonZero(alreadyIn)) rows.push({ kind: 'readonly', label: '已累计入库', values: alreadyIn })
   if (hasNonZero(alreadyDef)) rows.push({ kind: 'readonly', label: '已累计次品', values: alreadyDef })

@@ -140,12 +140,11 @@ function rowsForColor(ri: number): BlockRow[] {
   const orderQ = props.dialog.planColorRows[ri]?.quantities ?? []
   const cutQ = props.dialog.cutColorRows[ri]?.quantities ?? []
   const sewQ = props.dialog.sewingColorRows[ri]?.quantities ?? []
-  return [
-    { kind: 'readonly', label: '订单数量', values: orderQ },
-    { kind: 'readonly', label: '裁床数量', values: cutQ },
-    { kind: 'readonly', label: '车缝数量', values: sewQ },
-    { kind: 'input', label: '尾部收货数' },
-  ]
+  const rows: BlockRow[] = [{ kind: 'readonly', label: '订单数量', values: orderQ }]
+  if (cutQ.length > 0) rows.push({ kind: 'readonly', label: '裁床数量', values: cutQ })
+  if (sewQ.length > 0) rows.push({ kind: 'readonly', label: '车缝数量', values: sewQ })
+  rows.push({ kind: 'input', label: '尾部收货数' })
+  return rows
 }
 
 function sumReadonly(values: number[]): number {

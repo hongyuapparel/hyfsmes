@@ -173,18 +173,18 @@ export class ProductionFinishingMutationService {
     const arrivedAt = order.statusTime ?? now;
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
-    const headers = sizeHeaders.length > 0 ? [...sizeHeaders, '合计'] : ['合计'];
-    const sizeCount = sizeHeaders.length || 1;
     const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) => String(r?.colorName ?? '').trim());
 
-    // 真值优先 byColor → 一维 → 单总数（仅单色或无尺码订单）
     let byColor: ColorSizeQuantityRow[] | null = null;
     let normalizedTotal: number;
     let tailReceivedQtyRow: number[] | null = null;
 
-    if (Array.isArray(tailReceivedQuantitiesByColor) && tailReceivedQuantitiesByColor.length > 0 && sizeHeaders.length > 0) {
+    if (sizeHeaders.length > 0) {
+      if (!Array.isArray(tailReceivedQuantitiesByColor) || tailReceivedQuantitiesByColor.length === 0) {
+        throw new BadRequestException('该订单有尺码明细，必须按实际颜色×尺码填写尾部收货数');
+      }
+      if (planColors.length > 0) assertColorRowsShape(tailReceivedQuantitiesByColor, planColors, sizeHeaders.length);
       byColor = normalizeColorRows(tailReceivedQuantitiesByColor, sizeHeaders.length);
-      if (planColors.length > 0) assertColorRowsShape(byColor, planColors, sizeHeaders.length);
       const perSize = sumColorRowsBySize(byColor, sizeHeaders.length);
       normalizedTotal = sumColorRows(byColor);
       tailReceivedQtyRow = [...perSize, normalizedTotal];
@@ -194,27 +194,9 @@ export class ProductionFinishingMutationService {
     } else {
       normalizedTotal = Number(tailReceivedQty) || 0;
       if (normalizedTotal <= 0) throw new NotFoundException('请填写尾部收货数');
-      if (planColors.length > 1 && sizeHeaders.length > 0) {
-        throw new BadRequestException('多色订单必须按颜色×尺码填写尾部收货数');
-      }
-      if (Array.isArray(tailReceivedQuantities) && tailReceivedQuantities.length) {
-        const perSize = tailReceivedQuantities.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
-        while (perSize.length < sizeCount) perSize.push(0);
-        const total = perSize.reduce((a, b) => a + b, 0);
-        tailReceivedQtyRow = headers.length === 1 ? [normalizedTotal] : [...perSize, total];
-        if (total !== normalizedTotal) {
-          throw new NotFoundException(`尾部收货数合计(${total})须等于尾部收货数(${normalizedTotal})`);
-        }
-        // 单色订单：把一维兜底为单色二维
-        if (planColors.length === 1 && sizeHeaders.length > 0) {
-          byColor = [{ colorName: planColors[0], quantities: perSize }];
-        }
-      } else {
-        tailReceivedQtyRow = headers.length === 1 ? [normalizedTotal] : [...Array(sizeCount).fill(0), normalizedTotal];
-      }
+      tailReceivedQtyRow = [normalizedTotal];
     }
 
-    const canSaveRow = await this.hasTailReceivedQtyRow();
     const payload: Partial<OrderFinishing> = {
       orderId,
       status: 'pending_assign',
@@ -227,21 +209,34 @@ export class ProductionFinishingMutationService {
       remark: null,
     };
     const finishing = this.finishingRepo.create(payload);
-    await this.finishingRepo.save(finishing);
+    // 总数与颜色×尺码 JSON 必须原子落库，禁止留下“有总数、无明细”的半写入记录。
+    await this.finishingRepo.manager.transaction(async (manager) => {
+      const orderRepoTx = manager.getRepository(Order);
+      const finishingRepoTx = manager.getRepository(OrderFinishing);
+      const lockedOrder = await orderRepoTx
+        .createQueryBuilder('order')
+        .where('order.id = :orderId', { orderId })
+        .setLock('pessimistic_write')
+        .getOne();
+      if (!lockedOrder || lockedOrder.status !== 'pending_finishing') {
+        throw new BadRequestException('订单状态已变化，请刷新后重试');
+      }
+      const concurrentExisting = await finishingRepoTx.findOne({ where: { orderId } });
+      if (concurrentExisting) throw new BadRequestException('该订单已登记收货，请刷新后重试');
 
-    // tail_received_qty_row / tail_received_quantities_by_color 都是 select:false JSON 列，
-    // typeorm save 不会写入。raw UPDATE 显式落库（保留用户填的按颜色×尺码真值）。
-    await this.finishingRepo.manager.query(
-      `UPDATE order_finishing SET
-        tail_received_qty_row = ?,
-        tail_received_quantities_by_color = ?
-      WHERE order_id = ?`,
-      [
-        tailReceivedQtyRow ? JSON.stringify(tailReceivedQtyRow) : null,
-        byColor ? JSON.stringify(byColor) : null,
-        orderId,
-      ],
-    );
+      await finishingRepoTx.save(finishing);
+      await manager.query(
+        `UPDATE order_finishing SET
+          tail_received_qty_row = ?,
+          tail_received_quantities_by_color = ?
+        WHERE order_id = ?`,
+        [
+          tailReceivedQtyRow ? JSON.stringify(tailReceivedQtyRow) : null,
+          byColor ? JSON.stringify(byColor) : null,
+          orderId,
+        ],
+      );
+    });
   }
 
   async registerPackagingComplete(
@@ -296,8 +291,6 @@ export class ProductionFinishingMutationService {
 
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
-    const headers = sizeHeaders.length > 0 ? [...sizeHeaders, '合计'] : ['合计'];
-    const sizeCount = sizeHeaders.length || 1;
     const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) => String(r?.colorName ?? '').trim());
 
     // === byColor 真值优先 ===
@@ -309,24 +302,24 @@ export class ProductionFinishingMutationService {
     let mergedDefectByColorOut: ColorSizeQuantityRow[] | null = null;
     let tailInboundQtyRowOut: number[] | null = null;
     let defectQuantityRowOut: number[] | null = null;
-    if (
-      sizeHeaders.length > 0 &&
-      Array.isArray(tailInboundQuantitiesThisBatchByColor) &&
-      Array.isArray(defectQuantitiesThisBatchByColor)
-    ) {
+    if (sizeHeaders.length > 0) {
+      if (
+        !Array.isArray(tailInboundQuantitiesThisBatchByColor) ||
+        !Array.isArray(defectQuantitiesThisBatchByColor)
+      ) {
+        throw new BadRequestException('该订单有尺码明细，必须按实际颜色×尺码填写本次入库和次品数');
+      }
+      if (planColors.length > 0) {
+        assertColorRowsShape(tailInboundQuantitiesThisBatchByColor, planColors, sizeHeaders.length);
+        assertColorRowsShape(defectQuantitiesThisBatchByColor, planColors, sizeHeaders.length);
+      }
       inboundThisByColor = normalizeColorRows(tailInboundQuantitiesThisBatchByColor, sizeHeaders.length);
       defectThisByColor = normalizeColorRows(defectQuantitiesThisBatchByColor, sizeHeaders.length);
-      if (planColors.length > 0) {
-        assertColorRowsShape(inboundThisByColor, planColors, sizeHeaders.length);
-        assertColorRowsShape(defectThisByColor, planColors, sizeHeaders.length);
-      }
       const sumIn = sumColorRows(inboundThisByColor);
       const sumDef = sumColorRows(defectThisByColor);
       if (sumIn !== inboundThis || sumDef !== defectThis) {
         throw new BadRequestException(`按颜色×尺码填写的合计(入库 ${sumIn} / 次品 ${sumDef})与本次汇总(入库 ${inboundThis} / 次品 ${defectThis})不一致`);
       }
-    } else if (planColors.length > 1 && sizeHeaders.length > 0) {
-      throw new BadRequestException('多色订单必须按颜色×尺码填写本次入库/次品数');
     }
 
     // === 累加：写 byColor 真值字段 + 兼容写一维 row 与标量 ===
@@ -350,54 +343,6 @@ export class ProductionFinishingMutationService {
         (finishing as { defectQuantityRow?: number[] }).defectQuantityRow = defRowFinal;
         tailInboundQtyRowOut = inRowFinal;
         defectQuantityRowOut = defRowFinal;
-      }
-    } else if (await this.hasPackagingQtyRows()) {
-      // 兜底：仅一维入参（单色订单或老客户端）
-      const tin = tailInboundQuantitiesThisBatch;
-      const tdq = defectQuantitiesThisBatch;
-      if (Array.isArray(tin) && Array.isArray(tdq) && tin.length >= sizeCount && tdq.length >= sizeCount) {
-        const perInThis = tin.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
-        const perDefThis = tdq.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
-        const sumIn = perInThis.reduce((a, b) => a + b, 0);
-        const sumDef = perDefThis.reduce((a, b) => a + b, 0);
-        if (sumIn !== inboundThis || sumDef !== defectThis) {
-          throw new BadRequestException('按尺码填写的入库数 / 次品数合计与汇总不一致');
-        }
-        const oldInRow = await this.fetchTailInboundQtyRow(orderId);
-        const oldDefRow = await this.fetchDefectQuantityRow(orderId);
-        const newInRow: number[] = [];
-        const newDefRow: number[] = [];
-        for (let i = 0; i < sizeCount; i++) {
-          newInRow.push((Number(oldInRow?.[i]) || 0) + perInThis[i]);
-          newDefRow.push((Number(oldDefRow?.[i]) || 0) + perDefThis[i]);
-        }
-        // 合计列严格 = sum(前 N 项)（Excel SUM 语义）
-        const tailInboundQtyRow = headers.length === 1
-          ? [newInRow.reduce((a, b) => a + b, 0)]
-          : [...newInRow, newInRow.reduce((a, b) => a + b, 0)];
-        const defectQuantityRow = headers.length === 1
-          ? [newDefRow.reduce((a, b) => a + b, 0)]
-          : [...newDefRow, newDefRow.reduce((a, b) => a + b, 0)];
-        (finishing as { tailInboundQtyRow?: number[] }).tailInboundQtyRow = tailInboundQtyRow;
-        (finishing as { defectQuantityRow?: number[] }).defectQuantityRow = defectQuantityRow;
-        tailInboundQtyRowOut = tailInboundQtyRow;
-        defectQuantityRowOut = defectQuantityRow;
-
-        // 单色订单兜底：把一维转单色二维存到 byColor 真值字段
-        if (planColors.length === 1 && sizeHeaders.length > 0) {
-          const inboundOneColor: ColorSizeQuantityRow[] = [{ colorName: planColors[0], quantities: perInThis }];
-          const defectOneColor: ColorSizeQuantityRow[] = [{ colorName: planColors[0], quantities: perDefThis }];
-          const oldIn = await this.fetchJsonColorRows(orderId, 'tail_inbound_quantities_by_color');
-          const oldDef = await this.fetchJsonColorRows(orderId, 'defect_quantities_by_color');
-          inboundThisByColor = inboundOneColor;
-          defectThisByColor = defectOneColor;
-          const mergedIn = addColorRows(oldIn, inboundOneColor, planColors, sizeHeaders.length);
-          const mergedDef = addColorRows(oldDef, defectOneColor, planColors, sizeHeaders.length);
-          (finishing as { tailInboundQuantitiesByColor?: ColorSizeQuantityRow[] | null }).tailInboundQuantitiesByColor = mergedIn;
-          (finishing as { defectQuantitiesByColor?: ColorSizeQuantityRow[] | null }).defectQuantitiesByColor = mergedDef;
-          mergedInboundByColorOut = mergedIn;
-          mergedDefectByColorOut = mergedDef;
-        }
       }
     }
 
@@ -447,6 +392,29 @@ export class ProductionFinishingMutationService {
       const orderRepoTx = manager.getRepository(Order);
       const inboundPendingRepoTx = manager.getRepository(InboundPending);
 
+      const lockedFinishing = await finishingRepoTx
+        .createQueryBuilder('finishing')
+        .where('finishing.order_id = :orderId', { orderId: order.id })
+        .setLock('pessimistic_write')
+        .getOne();
+      if (
+        !lockedFinishing ||
+        lockedFinishing.status !== 'pending_assign' ||
+        Number(lockedFinishing.tailInboundQty || 0) !== alreadyInbound ||
+        Number(lockedFinishing.defectQuantity || 0) !== alreadyDefect
+      ) {
+        throw new BadRequestException('尾部登记数据已变化，请刷新后重试');
+      }
+      const lockedOrder = await orderRepoTx
+        .createQueryBuilder('order')
+        .where('order.id = :orderId', { orderId: order.id })
+        .setLock('pessimistic_write')
+        .getOne();
+      if (!lockedOrder || lockedOrder.status !== order.status) {
+        throw new BadRequestException('订单状态已变化，请刷新后重试');
+      }
+
+      finishing.id = lockedFinishing.id;
       await finishingRepoTx.save(finishing);
 
       await manager.query(
@@ -465,10 +433,10 @@ export class ProductionFinishingMutationService {
         ],
       );
 
-      if (willComplete && nextStatus && nextStatus !== order.status) {
-        order.status = nextStatus;
-        order.statusTime = new Date();
-        await orderRepoTx.save(order);
+      if (willComplete && nextStatus && nextStatus !== lockedOrder.status) {
+        lockedOrder.status = nextStatus;
+        lockedOrder.statusTime = new Date();
+        await orderRepoTx.save(lockedOrder);
       }
 
       const batchRows = await manager.query(
@@ -547,8 +515,6 @@ export class ProductionFinishingMutationService {
 
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const sizeHeaders = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
-    const headers = sizeHeaders.length > 0 ? [...sizeHeaders, '合计'] : ['合计'];
-    const sizeCount = sizeHeaders.length || 1;
     const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) => String(r?.colorName ?? '').trim());
 
     // byColor 真值优先（amend 为覆盖式，不累加）
@@ -559,17 +525,16 @@ export class ProductionFinishingMutationService {
     let amendDefectByColorOut: ColorSizeQuantityRow[] | null = null;
     let amendTailInboundQtyRowOut: number[] | null = null;
     let amendDefectQuantityRowOut: number[] | null = null;
-    if (
-      sizeHeaders.length > 0 &&
-      Array.isArray(tailInboundQuantitiesByColor) &&
-      Array.isArray(defectQuantitiesByColor)
-    ) {
+    if (sizeHeaders.length > 0) {
+      if (!Array.isArray(tailInboundQuantitiesByColor) || !Array.isArray(defectQuantitiesByColor)) {
+        throw new BadRequestException('该订单有尺码明细，纠错时必须按实际颜色×尺码填写入库和次品数');
+      }
+      if (planColors.length > 0) {
+        assertColorRowsShape(tailInboundQuantitiesByColor, planColors, sizeHeaders.length);
+        assertColorRowsShape(defectQuantitiesByColor, planColors, sizeHeaders.length);
+      }
       amendInboundByColor = normalizeColorRows(tailInboundQuantitiesByColor, sizeHeaders.length);
       amendDefectByColor = normalizeColorRows(defectQuantitiesByColor, sizeHeaders.length);
-      if (planColors.length > 0) {
-        assertColorRowsShape(amendInboundByColor, planColors, sizeHeaders.length);
-        assertColorRowsShape(amendDefectByColor, planColors, sizeHeaders.length);
-      }
       const sumIn = sumColorRows(amendInboundByColor);
       const sumDef = sumColorRows(amendDefectByColor);
       if (sumIn !== inbound || sumDef !== defect) {
@@ -590,53 +555,6 @@ export class ProductionFinishingMutationService {
         amendTailInboundQtyRowOut = inRowFinal;
         amendDefectQuantityRowOut = defRowFinal;
       }
-    } else if (planColors.length > 1 && sizeHeaders.length > 0) {
-      throw new BadRequestException('多色订单必须按颜色×尺码填写入库/次品数');
-    } else if (await this.hasPackagingQtyRows()) {
-      const tin = tailInboundQuantities;
-      const tdq = defectQuantities;
-      const hasArrays = Array.isArray(tin) && Array.isArray(tdq) && tin.length >= sizeCount && tdq.length >= sizeCount;
-      if (hasArrays) {
-        const perIn = tin.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
-        const perDef = tdq.slice(0, sizeCount).map((v) => Math.max(0, Number(v) || 0));
-        while (perIn.length < sizeCount) perIn.push(0);
-        while (perDef.length < sizeCount) perDef.push(0);
-        const sumIn = perIn.reduce((a, b) => a + b, 0);
-        const sumDef = perDef.reduce((a, b) => a + b, 0);
-        if (sumIn !== inbound || sumDef !== defect) {
-          throw new BadRequestException('按尺码填写的入库数、次品数合计与汇总不一致');
-        }
-        const receivedRow = await this.fetchTailReceivedQtyRow(orderId);
-        if (Array.isArray(receivedRow) && receivedRow.length === headers.length && headers.length > 1) {
-          let allNumeric = true;
-          for (let i = 0; i < sizeCount; i++) {
-            const r = receivedRow[i];
-            if (r == null || !Number.isFinite(Number(r))) {
-              allNumeric = false;
-              break;
-            }
-          }
-          if (allNumeric) {
-            for (let i = 0; i < sizeCount; i++) {
-              const r = Number(receivedRow[i]) || 0;
-              if (perIn[i] + perDef[i] !== r) {
-                throw new BadRequestException(`${String(headers[i] ?? '尺码')}：入库数+次品数须等于该码尾部收货数(${r})`);
-              }
-            }
-          }
-        }
-        // 合计列严格 = sum(前 N 项)（Excel SUM 语义）
-        const tailInboundQtyRow = headers.length === 1
-          ? [perIn.reduce((a, b) => a + b, 0)]
-          : [...perIn, perIn.reduce((a, b) => a + b, 0)];
-        const defectQuantityRow = headers.length === 1
-          ? [perDef.reduce((a, b) => a + b, 0)]
-          : [...perDef, perDef.reduce((a, b) => a + b, 0)];
-        (finishing as { tailInboundQtyRow?: number[] }).tailInboundQtyRow = tailInboundQtyRow;
-        (finishing as { defectQuantityRow?: number[] }).defectQuantityRow = defectQuantityRow;
-        amendTailInboundQtyRowOut = tailInboundQtyRow;
-        amendDefectQuantityRowOut = defectQuantityRow;
-      }
     }
 
     finishing.tailShippedQty = 0;
@@ -651,15 +569,52 @@ export class ProductionFinishingMutationService {
       ? { headers: sizeHeaders.slice(), rows: amendDefectByColor }
       : null;
 
-    // 原子写入：finishing 累计 + 删旧 pending + 写新 pending 在同一事务内。
-    // 如果 delete 之后、save 之前 crash/重启，会让 inbound_pending 整表清空但
-    // tail_inbound_qty 仍是新值，产生永久不一致（用户感知为"修好后重启又坏"）。
-    // JSON byColor/Row/snapshot 字段经 typeorm save 不写入（select:false），追加 raw UPDATE。
+    // 原子写入并原位修订待仓批次；保留既有 ID / batch_no，避免外部引用失效。
     await this.finishingRepo.manager.transaction(async (manager) => {
       const finishingRepoTx = manager.getRepository(OrderFinishing);
       const inboundPendingRepoTx = manager.getRepository(InboundPending);
 
-      await finishingRepoTx.save(finishing);
+      const lockedFinishing = await finishingRepoTx
+        .createQueryBuilder('finishing')
+        .where('finishing.order_id = :orderId', { orderId: order.id })
+        .setLock('pessimistic_write')
+        .getOne();
+      if (!lockedFinishing || lockedFinishing.status !== 'inbound') {
+        throw new BadRequestException('尾部状态已变化，请刷新后重试');
+      }
+
+      const existingPendings = await inboundPendingRepoTx
+        .createQueryBuilder('pending')
+        .where('pending.order_id = :orderId AND pending.status = :status', { orderId: order.id, status: 'pending' })
+        .addSelect('pending.color_size_snapshot')
+        .setLock('pessimistic_write')
+        .getMany();
+      const currentTotal = existingPendings.reduce((sum, row) => sum + Math.max(0, Number(row.quantity) || 0), 0);
+      const expectedCurrentTotal = (Number(lockedFinishing.tailInboundQty) || 0) + (Number(lockedFinishing.defectQuantity) || 0);
+      if (currentTotal !== expectedCurrentTotal) {
+        throw new BadRequestException('待仓处理数量已变化，无法在尾部纠错，请刷新并核对仓库处理记录');
+      }
+      for (const sourceType of ['normal', 'defect']) {
+        if (existingPendings.filter((row) => (row.sourceType ?? 'normal') === sourceType).length > 1) {
+          throw new BadRequestException('该订单存在多个待仓批次，无法用累计值安全覆盖，请逐批核对');
+        }
+      }
+      if (existingPendings.length) {
+        const refs = (await manager.query(
+          `SELECT COUNT(*) AS count FROM packing_list_items
+           WHERE source_type = 'pending' AND source_id IN (${existingPendings.map(() => '?').join(',')})`,
+          existingPendings.map((row) => row.id),
+        )) as Array<{ count?: number | string }>;
+        if ((Number(refs[0]?.count) || 0) > 0) {
+          throw new BadRequestException('待仓记录已被装箱单引用，请先从装箱单移除后再纠错');
+        }
+      }
+
+      lockedFinishing.tailShippedQty = 0;
+      lockedFinishing.tailInboundQty = inbound;
+      lockedFinishing.defectQuantity = defect;
+      lockedFinishing.remark = remark?.trim() || null;
+      await finishingRepoTx.save(lockedFinishing);
 
       await manager.query(
         `UPDATE order_finishing SET
@@ -677,52 +632,46 @@ export class ProductionFinishingMutationService {
         ],
       );
 
-      await inboundPendingRepoTx.delete({ orderId: order.id, status: 'pending' });
-
       const batchRows = await manager.query(
         'SELECT COALESCE(MAX(batch_no), 0) AS m FROM inbound_pending WHERE order_id = ?',
         [order.id],
       );
       const nextBatchNo = (Number((batchRows as { m?: number | string }[])?.[0]?.m ?? 0) || 0) + 1;
 
-      const pendingRows: Array<InboundPending & { _snapshot?: typeof amendInboundSnapshot | typeof amendDefectSnapshot }> = [];
-      if (inbound > 0) {
-        const p = inboundPendingRepoTx.create({
-          orderId: order.id,
-          skuCode: order.skuCode ?? '',
-          quantity: inbound,
-          sourceType: 'normal',
-          status: 'pending',
-          batchNo: nextBatchNo,
-          operatorUsername: '',
-        }) as InboundPending & { _snapshot?: typeof amendInboundSnapshot };
-        p._snapshot = amendInboundSnapshot;
-        pendingRows.push(p);
-      }
-      if (defect > 0) {
-        const p = inboundPendingRepoTx.create({
-          orderId: order.id,
-          skuCode: order.skuCode ?? '',
-          quantity: defect,
-          sourceType: 'defect',
-          status: 'pending',
-          batchNo: nextBatchNo,
-          operatorUsername: '',
-        }) as InboundPending & { _snapshot?: typeof amendDefectSnapshot };
-        p._snapshot = amendDefectSnapshot;
-        pendingRows.push(p);
-      }
-      if (pendingRows.length) {
-        await inboundPendingRepoTx.save(pendingRows);
-        for (const row of pendingRows) {
-          if (row._snapshot && row.id) {
-            await manager.query(
-              'UPDATE inbound_pending SET color_size_snapshot = ? WHERE id = ?',
-              [JSON.stringify(row._snapshot), row.id],
-            );
-          }
+      const updatePending = async (
+        sourceType: 'normal' | 'defect',
+        quantity: number,
+        snapshot: typeof amendInboundSnapshot | typeof amendDefectSnapshot,
+      ): Promise<void> => {
+        const existing = existingPendings.find((row) => (row.sourceType ?? 'normal') === sourceType);
+        if (quantity <= 0) {
+          if (existing) await inboundPendingRepoTx.delete(existing.id);
+          return;
         }
-      }
+        if (existing) {
+          await manager.query(
+            'UPDATE inbound_pending SET quantity = ?, color_size_snapshot = ? WHERE id = ?',
+            [quantity, snapshot ? JSON.stringify(snapshot) : null, existing.id],
+          );
+          return;
+        }
+        const created = await inboundPendingRepoTx.save(inboundPendingRepoTx.create({
+          orderId: order.id,
+          skuCode: order.skuCode ?? '',
+          quantity,
+          sourceType,
+          status: 'pending',
+          batchNo: nextBatchNo,
+          operatorUsername: '',
+        }));
+        await manager.query(
+          'UPDATE inbound_pending SET color_size_snapshot = ? WHERE id = ?',
+          [snapshot ? JSON.stringify(snapshot) : null, created.id],
+        );
+      };
+
+      await updatePending('normal', inbound, amendInboundSnapshot);
+      await updatePending('defect', defect, amendDefectSnapshot);
     });
   }
 
@@ -781,122 +730,17 @@ export class ProductionFinishingMutationService {
   }
 
   async registerPackaging(orderId: number, tailReceivedQty: number, defectQuantity: number): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('订单不存在');
-    if (order.status !== 'pending_finishing') throw new NotFoundException('仅待尾部订单可登记包装');
-
-    const now = new Date();
-    const arrivedAt = order.statusTime ?? now;
-    let finishing = await this.finishingRepo.findOne({ where: { orderId } });
-    if (!finishing) {
-      finishing = this.finishingRepo.create({
-        orderId,
-        status: 'pending_ship',
-        arrivedAt,
-        completedAt: now,
-        tailReceivedQty,
-        tailShippedQty: 0,
-        tailInboundQty: 0,
-        defectQuantity: defectQuantity ?? 0,
-      });
-    } else {
-      finishing.arrivedAt = finishing.arrivedAt ?? arrivedAt;
-      finishing.completedAt = now;
-      finishing.tailReceivedQty = tailReceivedQty;
-      finishing.defectQuantity = defectQuantity ?? 0;
-      finishing.status = 'pending_ship';
-    }
-    await this.finishingRepo.save(finishing);
+    void orderId;
+    void tailReceivedQty;
+    void defectQuantity;
+    throw new BadRequestException('旧版尾部包装接口已停用，请刷新页面后按颜色×尺码登记');
   }
 
   async inbound(orderId: number, quantity: number, actorUserId?: number, actorUsername?: string): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('订单不存在');
-    const finishing = await this.finishingRepo.findOne({ where: { orderId } });
-    if (!finishing) throw new NotFoundException('请先登记包装完成');
-    if (finishing.status !== 'shipped') throw new NotFoundException('请先执行发货后再入库');
-
-    const qty = Number(quantity) || 0;
-    if (qty <= 0) throw new NotFoundException('请填写本次入库数');
-    const received = finishing.tailReceivedQty ?? 0;
-    const shipped = finishing.tailShippedQty ?? 0;
-    const defect = finishing.defectQuantity ?? 0;
-    const prevInbound = finishing.tailInboundQty ?? 0;
-    const remainingSpace = received - shipped - prevInbound - defect;
-    const isPartial = remainingSpace > 0 && qty < remainingSpace;
-    const newInbound = prevInbound + qty;
-    if (shipped + newInbound + defect > received) {
-      throw new NotFoundException(`出货数(${shipped})+入库数+次品数(${defect})不能超过尾部收货数(${received})`);
-    }
-
-    finishing.tailInboundQty = newInbound;
-    const total = shipped + newInbound + defect;
-
-    let nextStatus: string | null = null;
-    if (total === received) {
-      nextStatus = await this.orderWorkflowService.resolveNextStatus({
-        order,
-        triggerCode: 'tailing_inbound_completed',
-        actorUserId: actorUserId ?? 0,
-      });
-      if (!nextStatus) {
-        throw new BadRequestException('未匹配到“入库完成”流转规则，请先在订单设置中检查流程链路配置');
-      }
-      finishing.status = 'inbound';
-    }
-
-    // 原子写入：finishing 累计 + 本次 pending + 完结时的 order 状态在同一事务内,
-    // 避免 crash/重启在两步之间留下永久不一致（pending 多一条但 tail_inbound_qty 未涨）。
-    let nextBatchNo = 0;
-    await this.finishingRepo.manager.transaction(async (manager) => {
-      const finishingRepoTx = manager.getRepository(OrderFinishing);
-      const orderRepoTx = manager.getRepository(Order);
-      const inboundPendingRepoTx = manager.getRepository(InboundPending);
-
-      const batchRows = await manager.query(
-        'SELECT COALESCE(MAX(batch_no), 0) AS m FROM inbound_pending WHERE order_id = ?',
-        [order.id],
-      );
-      nextBatchNo = (Number((batchRows as { m?: number | string }[])?.[0]?.m ?? 0) || 0) + 1;
-
-      const pending = inboundPendingRepoTx.create({
-        orderId: order.id,
-        skuCode: order.skuCode ?? '',
-        quantity: qty,
-        sourceType: 'normal',
-        status: 'pending',
-        batchNo: nextBatchNo,
-        operatorUsername: (actorUsername ?? '').trim(),
-      });
-      await inboundPendingRepoTx.save(pending);
-      await finishingRepoTx.save(finishing);
-
-      if (nextStatus && nextStatus !== order.status) {
-        order.status = nextStatus;
-        order.statusTime = new Date();
-        await orderRepoTx.save(order);
-      }
-    });
-
-    try {
-      const operator = await resolveOperatorDisplayName(this.userRepo, {
-        userId: actorUserId,
-        username: actorUsername ?? '',
-      });
-      const detail = `尾部入库：第 ${nextBatchNo} 批次 ${qty} 件${isPartial ? '（部分入库）' : ''}`;
-      await this.orderLogRepo.save(
-        this.orderLogRepo.create({
-          orderId,
-          orderNo: order.orderNo,
-          operatorUsername: operator,
-          action: 'production_finishing_inbound',
-          detail,
-          targetType: 'order',
-          targetRef: null,
-        }),
-      );
-    } catch (err) {
-      console.warn('[finishing inbound] write operation log failed:', err);
-    }
+    void orderId;
+    void quantity;
+    void actorUserId;
+    void actorUsername;
+    throw new BadRequestException('旧版尾部入库接口已停用，请刷新页面后按颜色×尺码登记');
   }
 }

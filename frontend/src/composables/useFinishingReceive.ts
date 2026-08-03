@@ -115,10 +115,8 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
       const sizeHeaders = Array.isArray(data?.sizeHeaders) ? data.sizeHeaders : []
       const sizeLen = sizeHeaders.length
       const planColors = Array.isArray(data?.planColorRows) ? data.planColorRows.map((r) => r.colorName) : []
-      const cutColorRows = Array.isArray(data?.cutColorRows) ? data.cutColorRows : emptyColorRows(planColors, sizeLen)
-      const sewingColorRows = Array.isArray(data?.sewingColorRows) && data.sewingColorRows.length
-        ? data.sewingColorRows
-        : emptyColorRows(planColors, sizeLen)
+      const cutColorRows = Array.isArray(data?.cutColorRows) ? data.cutColorRows : []
+      const sewingColorRows = Array.isArray(data?.sewingColorRows) ? data.sewingColorRows : []
       receiveDialog.headers = headers
       receiveDialog.sizeHeaders = sizeHeaders
       receiveDialog.orderRow = data?.orderRow ?? []
@@ -127,11 +125,8 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
       receiveDialog.planColorRows = Array.isArray(data?.planColorRows) ? data.planColorRows : []
       receiveDialog.cutColorRows = cutColorRows
       receiveDialog.sewingColorRows = sewingColorRows
-      // 默认：把"车缝按颜色×尺码"作为收货默认值（用户大概率收的就是车缝量）
-      receiveDialog.tailReceivedQuantitiesByColor = sewingColorRows.map((r) => ({
-        colorName: r.colorName,
-        quantities: [...r.quantities],
-      }))
+      // 只提供订单颜色/尺码结构；实际收货数量必须由用户填写，不能复制前工序数量。
+      receiveDialog.tailReceivedQuantitiesByColor = emptyColorRows(planColors, sizeLen)
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载尺寸细数失败'))
       receiveDialog.visible = false

@@ -1,7 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { errMsg } from '../common/http-exception.filter';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { Order } from '../entities/order.entity';
 import { Role } from '../entities/role.entity';
@@ -9,11 +8,7 @@ import { Product } from '../entities/product.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
 import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
-import { applyPendingOutboundSizeDeduction } from './inventory-pending-outbound.helpers';
-import {
-  loadFinishingFallbackBundles,
-  resolvePendingCurrentSnapshot,
-} from './inventory-pending-snapshot.helpers';
+import { applyPendingOutboundSizeDeduction, getPendingDetailStatus } from './inventory-pending-outbound.helpers';
 import { parseStoredColorSizeSnapshot } from '../finished-goods-stock/finished-goods-stock-query.utils';
 
 export interface PendingListItem {
@@ -32,6 +27,7 @@ export interface PendingListItem {
   createdAt: string;
   /** 本批入库/次品的颜色×尺码真值快照（来自尾部入库登记） */
   colorSizeSnapshot: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null;
+  detailStatus: 'recorded' | 'missing' | 'not_applicable';
 }
 
 type PendingOutboundItemInput = {
@@ -73,6 +69,46 @@ export class InventoryPendingService {
     @InjectRepository(UserRole)
     private readonly userRoleRepo: Repository<UserRole>,
   ) {}
+
+  private async loadOrdersRequiringColorSizeDetail(
+    manager: EntityManager,
+    orderIds: number[],
+  ): Promise<Set<number>> {
+    const unique = Array.from(new Set(orderIds.filter((id) => Number.isInteger(id) && id > 0)));
+    if (!unique.length) return new Set();
+    const rows = (await manager.query(
+      `SELECT order_id AS orderId, color_size_headers AS headers
+       FROM order_ext WHERE order_id IN (${unique.map(() => '?').join(',')})`,
+      unique,
+    )) as Array<{ orderId: number | string; headers: unknown }>;
+    const required = new Set<number>();
+    for (const row of rows) {
+      let headers = row.headers;
+      if (typeof headers === 'string') {
+        try {
+          headers = JSON.parse(headers) as unknown;
+        } catch {
+          headers = null;
+        }
+      }
+      if (Array.isArray(headers) && headers.some((header) => String(header ?? '').trim())) {
+        required.add(Number(row.orderId));
+      }
+    }
+    return required;
+  }
+
+  private assertRecordedDetail(
+    pending: InboundPending,
+    snapshot: PendingListItem['colorSizeSnapshot'],
+    requiresDetail: boolean,
+  ): void {
+    if (getPendingDetailStatus(snapshot, pending.quantity, requiresDetail) === 'missing') {
+      throw new BadRequestException(
+        `订单 ${pending.skuCode || pending.id} 的本批颜色尺码明细未留存或与待处理数量不一致，请先在尾部纠错中按实际数据补录`,
+      );
+    }
+  }
 
   private async resolvePickupUser(pickupUserId?: number | null): Promise<{ pickupId: number | null; pickupUserName: string }> {
     if (pickupUserId == null) {
@@ -173,6 +209,7 @@ export class InventoryPendingService {
         remark: r.remark ?? '',
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
         colorSizeSnapshot: null,
+        detailStatus: 'not_applicable',
       }));
       return { list, total, page, pageSize };
     }
@@ -236,30 +273,13 @@ export class InventoryPendingService {
       return parsed ? { headers: parsed.headers, rows: parsed.rows } : null;
     };
 
-    // 兜底：DB 无 snapshot 时，与发货校验同源——从尾部累计还原（仅单条 pending 可还原）
-    const fallbackTargets = rows
-      .map((r) => ({
-        id: Number(r.id),
-        orderId: Number(r.orderId),
-        sourceType: String(r.sourceType ?? 'normal'),
-        hasSnapshot: parseSnapshot(r.colorSizeSnapshot) != null,
-      }))
-      .filter((r) => !r.hasSnapshot && r.orderId > 0);
-    const orderIdsForFallback = Array.from(new Set(fallbackTargets.map((r) => r.orderId)));
-    const { byOrder: finishingByOrder, pendingCountByOrderType } =
-      orderIdsForFallback.length > 0
-        ? await loadFinishingFallbackBundles(this.pendingRepo.manager, orderIdsForFallback)
-        : { byOrder: new Map(), pendingCountByOrderType: new Map() };
+    const orderIds = Array.from(new Set(rows.map((row) => Number(row.orderId)).filter((id) => id > 0)));
+    const detailRequiredOrderIds = await this.loadOrdersRequiringColorSizeDetail(this.pendingRepo.manager, orderIds);
 
     const list: PendingListItem[] = rows.map((r) => {
-      const resolved = resolvePendingCurrentSnapshot({
-        dbSnapshotRaw: r.colorSizeSnapshot,
-        orderId: Number(r.orderId),
-        sourceType: String(r.sourceType ?? 'normal'),
-        quantity: Number(r.quantity) || 0,
-        finishingByOrder,
-        pendingCountByOrderType,
-      });
+      const snapshot = parseSnapshot(r.colorSizeSnapshot);
+      const requiresDetail = detailRequiredOrderIds.has(Number(r.orderId));
+      const detailStatus: PendingListItem['detailStatus'] = getPendingDetailStatus(snapshot, r.quantity, requiresDetail);
       return {
         id: r.id,
         tabType: 'pending',
@@ -274,7 +294,8 @@ export class InventoryPendingService {
         operatorUsername: '',
         remark: '',
         createdAt: r.createdAt ? new Date(r.createdAt).toISOString().slice(0, 19).replace('T', ' ') : '',
-        colorSizeSnapshot: resolved.snapshot,
+        colorSizeSnapshot: snapshot,
+        detailStatus,
       };
     });
 
@@ -317,21 +338,11 @@ export class InventoryPendingService {
     for (const o of orders) {
       orderMap.set(o.id, o);
     }
-    const { byOrder: finishingByOrder, pendingCountByOrderType } = await loadFinishingFallbackBundles(
-      this.pendingRepo.manager,
-      orderIds,
-    );
+    const detailRequiredOrderIds = await this.loadOrdersRequiringColorSizeDetail(this.pendingRepo.manager, orderIds);
     for (const p of pendings) {
       const order = orderMap.get(p.orderId);
-      // 与列表/发货同源：DB snapshot → 尾部累计兜底 → 再交给 createManual
-      const resolved = resolvePendingCurrentSnapshot({
-        dbSnapshotRaw: (p as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
-        orderId: p.orderId,
-        sourceType: p.sourceType ?? 'normal',
-        quantity: p.quantity ?? 0,
-        finishingByOrder,
-        pendingCountByOrderType,
-      });
+      const snapshot = parseStoredColorSizeSnapshot((p as { colorSizeSnapshot?: unknown }).colorSizeSnapshot);
+      this.assertRecordedDetail(p, snapshot, detailRequiredOrderIds.has(p.orderId));
       await this.finishedGoodsStockService.createManual(
         {
           orderNo: order?.orderNo ?? '',
@@ -343,7 +354,7 @@ export class InventoryPendingService {
           department: department?.trim() ?? '',
           location: location?.trim() ?? '',
           imageUrl: img,
-          colorSize: resolved.snapshot ?? undefined,
+          colorSize: snapshot,
         },
         operatorUsername,
       );
@@ -356,6 +367,7 @@ export class InventoryPendingService {
     items: PendingOutboundItemInput[],
     operatorUsername: string,
     pickupUserId?: number | null,
+    transactionManager?: EntityManager,
   ): Promise<void> {
     const normalizedItems = Array.isArray(items)
       ? items
@@ -384,10 +396,7 @@ export class InventoryPendingService {
     }
     const pendingMap = new Map(pendings.map((pending) => [pending.id, pending]));
     const orderIds = Array.from(new Set(pendings.map((pending) => pending.orderId).filter((id): id is number => id > 0)));
-    const { byOrder: finishingByOrder, pendingCountByOrderType } = await loadFinishingFallbackBundles(
-      this.pendingRepo.manager,
-      orderIds,
-    );
+    const detailRequiredOrderIds = await this.loadOrdersRequiringColorSizeDetail(this.pendingRepo.manager, orderIds);
 
     for (const item of normalizedItems) {
       const pending = pendingMap.get(item.id);
@@ -401,21 +410,19 @@ export class InventoryPendingService {
       if (item.quantity > (pending.quantity ?? 0)) {
         throw new BadRequestException(`记录 ${pending.skuCode || pending.id} 的发货数量不能大于当前待处理数量`);
       }
-      const resolved = resolvePendingCurrentSnapshot({
-        dbSnapshotRaw: (pending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
-        orderId: pending.orderId,
-        sourceType: pending.sourceType ?? 'normal',
-        quantity: pending.quantity ?? 0,
-        finishingByOrder,
-        pendingCountByOrderType,
-      });
+      const currentSnapshot = parseStoredColorSizeSnapshot(
+        (pending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
+      );
+      this.assertRecordedDetail(pending, currentSnapshot, detailRequiredOrderIds.has(pending.orderId));
+      if (!currentSnapshot && item.sizeBreakdown != null) {
+        throw new BadRequestException(`订单 ${pending.skuCode || pending.id} 没有已登记的颜色尺码明细，不能提交分码出库数据`);
+      }
       // 预检尺码（与事务内同一规则），尽早失败避免半写入
       applyPendingOutboundSizeDeduction({
         label: `记录 ${pending.skuCode || pending.id}`,
         pendingQty: pending.quantity ?? 0,
         shipQty: item.quantity,
-        currentSnapshot: resolved.snapshot,
-        currentSource: resolved.source,
+        currentSnapshot,
         outgoingSizeBreakdown: item.sizeBreakdown,
       });
     }
@@ -437,16 +444,16 @@ export class InventoryPendingService {
       throw new BadRequestException('批量发货仅支持选择同一客户的记录');
     }
 
-    try {
-      await this.pendingRepo.manager.transaction(async (manager) => {
+    const execute = async (manager: EntityManager): Promise<void> => {
         const txPendingRepo = manager.getRepository(InboundPending);
-        const txFallback = await loadFinishingFallbackBundles(manager, orderIds);
+        const txDetailRequiredOrderIds = await this.loadOrdersRequiringColorSizeDetail(manager, orderIds);
 
         for (const item of normalizedItems) {
           const txPending = await txPendingRepo
             .createQueryBuilder('p')
             .where('p.id = :id AND p.status = :status', { id: item.id, status: 'pending' })
             .addSelect('p.color_size_snapshot')
+            .setLock('pessimistic_write')
             .getOne();
           if (!txPending) {
             throw new NotFoundException('未找到有效的待仓处理记录');
@@ -460,20 +467,22 @@ export class InventoryPendingService {
 
           const pending = pendingMap.get(item.id) ?? txPending;
           const label = `记录 ${txPending.skuCode || txPending.id}`;
-          const resolved = resolvePendingCurrentSnapshot({
-            dbSnapshotRaw: (txPending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
-            orderId: txPending.orderId,
-            sourceType: txPending.sourceType ?? 'normal',
-            quantity: txPending.quantity ?? 0,
-            finishingByOrder: txFallback.byOrder,
-            pendingCountByOrderType: txFallback.pendingCountByOrderType,
-          });
+          const currentSnapshot = parseStoredColorSizeSnapshot(
+            (txPending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
+          );
+          this.assertRecordedDetail(
+            txPending,
+            currentSnapshot,
+            txDetailRequiredOrderIds.has(txPending.orderId),
+          );
+          if (!currentSnapshot && item.sizeBreakdown != null) {
+            throw new BadRequestException(`订单 ${txPending.skuCode || txPending.id} 没有已登记的颜色尺码明细，不能提交分码出库数据`);
+          }
           const { remainingSnapshot, outgoingSnapshot } = applyPendingOutboundSizeDeduction({
             label,
             pendingQty: txPending.quantity ?? 0,
             shipQty: item.quantity,
-            currentSnapshot: resolved.snapshot,
-            currentSource: resolved.source,
+            currentSnapshot,
             outgoingSizeBreakdown: item.sizeBreakdown,
           });
           const sizeBreakdownJson =
@@ -578,18 +587,8 @@ export class InventoryPendingService {
             await manager.query(updateSql, updateParams);
           }
         }
-      });
-    } catch (e: unknown) {
-      const err = e as { table?: unknown; query?: unknown; parameters?: unknown; stack?: unknown } | null;
-      this.logger.error(
-        `[doOutbound] controller=InventoryPendingController service=InventoryPendingService method=doOutbound failed`,
-      );
-      this.logger.error(`[doOutbound] table=${String(err?.table || '')} query=${String(err?.query || '')}`);
-      this.logger.error(
-        `[doOutbound] parameters=${JSON.stringify(err?.parameters ?? [])} message=${errMsg(e)}`,
-      );
-      this.logger.error(`[doOutbound] stack=${String(err?.stack || '')}`);
-      throw e;
-    }
+    };
+    if (transactionManager) await execute(transactionManager);
+    else await this.pendingRepo.manager.transaction(execute);
   }
 }

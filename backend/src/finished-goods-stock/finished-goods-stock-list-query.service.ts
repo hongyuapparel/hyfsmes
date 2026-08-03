@@ -12,10 +12,9 @@ import {
   isTableMissingError,
   parseListSizeBreakdownFromSnapshot,
 } from './finished-goods-stock-query.utils';
-import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
-import { snapshotToListSizeBreakdown, type StoredStockRawRow } from './finished-goods-stock-list-query.helpers';
+import type { StoredStockRawRow } from './finished-goods-stock-list-query.helpers';
 
-const SNAPSHOT_REBUILD_BATCH_SIZE = 8;
+const SNAPSHOT_PARSE_BATCH_SIZE = 8;
 
 @Injectable()
 export class FinishedGoodsStockListQueryService {
@@ -30,7 +29,6 @@ export class FinishedGoodsStockListQueryService {
     private readonly productRepo: Repository<Product>,
     @InjectRepository(FinishedGoodsStockColorImage)
     private readonly colorImageRepo: Repository<FinishedGoodsStockColorImage>,
-    private readonly inboundQueryService: FinishedGoodsStockInboundQueryService,
   ) {}
 
   private applyInboundTimeRange<Entity extends ObjectLiteral>(
@@ -244,11 +242,11 @@ export class FinishedGoodsStockListQueryService {
 
   private async buildStoredRowsWithDetails(storedRows: StoredStockRawRow[]): Promise<FinishedStockRow[]> {
     const storedList: FinishedStockRow[] = [];
-    for (let offset = 0; offset < storedRows.length; offset += SNAPSHOT_REBUILD_BATCH_SIZE) {
-      const batch = storedRows.slice(offset, offset + SNAPSHOT_REBUILD_BATCH_SIZE);
+    for (let offset = 0; offset < storedRows.length; offset += SNAPSHOT_PARSE_BATCH_SIZE) {
+      const batch = storedRows.slice(offset, offset + SNAPSHOT_PARSE_BATCH_SIZE);
       const batchList = await Promise.all(batch.map(async (r) => {
         const storedBreakdown = parseListSizeBreakdownFromSnapshot(r.colorSizeSnapshot);
-        // 仅信任与总数量一致的存储快照；历史脏数据回退订单回溯重建，避免列表/出库弹窗展示错误明细。
+        // 仅信任与总数量一致的存储快照；缺失或不一致时明确返回无明细。
         const safeQuantity = Math.max(0, Math.trunc(Number(r.quantity) || 0));
         const storedBreakdownTotal = storedBreakdown
           ? storedBreakdown.rows.reduce(
@@ -257,19 +255,8 @@ export class FinishedGoodsStockListQueryService {
               0,
             )
           : 0;
-        let sizeBreakdown =
+        const sizeBreakdown =
           storedBreakdown && storedBreakdownTotal === safeQuantity ? storedBreakdown : null;
-        if (!sizeBreakdown && r.orderId != null) {
-          const stock = this.stockRepo.create({
-            id: r.id,
-            orderId: r.orderId,
-            skuCode: r.skuCode ?? '',
-            customerName: r.customerName ?? '',
-            quantity: r.quantity ?? 0,
-            colorSizeSnapshot: null,
-          });
-          sizeBreakdown = snapshotToListSizeBreakdown(await this.inboundQueryService.buildCurrentStockSnapshot(stock));
-        }
         return {
           id: r.id,
           orderId: r.orderId ?? null,

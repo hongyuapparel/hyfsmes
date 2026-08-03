@@ -106,13 +106,11 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
   /**
    * 每个颜色×尺码的车缝上限：
    * - 已过裁床（矩阵有非 0）→ 严格用对应裁床数（含 0：该色该码确实没裁，不让超）
-   * - 未过裁床（矩阵全 0）→ 用订单数兜底（让"不裁直接车"的订单能正常登记）
+   * - 未登记裁床二维明细 → 不设置上限，实际车缝数由用户填写，不能用订单计划代替事实
    */
   function registerSewingCellMax(rowIdx: number, colIdx: number): number | undefined {
     if (registerCutSkipped.value) {
-      const order = registerForm.orderColorRows?.[rowIdx]?.quantities?.[colIdx]
-      const orderN = Number(order)
-      return Number.isFinite(orderN) && orderN > 0 ? orderN : undefined
+      return undefined
     }
     const cut = registerForm.cutColorRows?.[rowIdx]?.quantities?.[colIdx]
     return cut != null && Number.isFinite(Number(cut)) ? Number(cut) : undefined
@@ -250,9 +248,6 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
             })
             return { colorName: String(r.colorName ?? ''), quantities }
           })
-          if (cutColorRows.length === 0) {
-            cutColorRows = orderColorRows.map((r) => ({ colorName: r.colorName, quantities: [...r.quantities] }))
-          }
         } catch {
           /* keep empty */
         }
@@ -278,16 +273,8 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
         registerForm.defectQuantity = Number(data?.defectQuantity) || 0
         registerForm.defectReason = String(data?.defectReason ?? '')
       } else {
-        registerForm.sewingQuantitiesByColor = orderColorRows.map((plan, ri) => {
-          const cutQ = cutColorRows[ri]?.quantities ?? []
-          const orderQ = plan.quantities ?? []
-          const quantities = Array.from({ length: sizeLen }, (_, ci) => {
-            const c = Number(cutQ[ci])
-            if (Number.isFinite(c) && c > 0) return c
-            const o = Number(orderQ[ci])
-            return Number.isFinite(o) && o > 0 ? o : 0
-          })
-          return { colorName: plan.colorName, quantities }
+        registerForm.sewingQuantitiesByColor = orderColorRows.map((plan) => {
+          return { colorName: plan.colorName, quantities: Array(sizeLen).fill(0) }
         })
       }
     } catch (e: unknown) {

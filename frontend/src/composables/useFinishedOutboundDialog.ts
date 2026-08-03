@@ -1,7 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { finishedOutbound, getFinishedPickupUserOptions, type FinishedPickupUserOption } from '@/api/inventory'
-import { getOrderColorSizeBreakdown, type OrderColorSizeBreakdownRes } from '@/api/orders'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 
@@ -130,20 +129,7 @@ export function useFinishedOutboundDialog(emitSubmitted: () => void, closeDialog
       const headers = toHeaders(snapshot.headers)
       return { stock, headers, rows: toSnapshotRows(stock, sourceHeaders, headers, snapshot.rows) }
     }
-    if (!stock.orderId) return { stock, headers: [], rows: [] }
-    const res = await getOrderColorSizeBreakdown(stock.orderId)
-    const data = (res.data ?? { headers: [], rows: [] }) as OrderColorSizeBreakdownRes
-    const headers = toHeaders(Array.isArray(data.headers) ? data.headers : [])
-    const sourceRows = Array.isArray(data.rows) ? data.rows : []
-    return {
-      stock,
-      headers,
-      rows: sourceRows.map((item) => ({
-        colorName: normalizeColorName(item.colorName) || '-',
-        imageUrl: getColorImage(stock, normalizeColorName(item.colorName)),
-        quantities: headers.map(() => 0),
-      })),
-    }
+    return { stock, headers: [], rows: [] }
   }
 
   async function initOutboundSizeList(stockItems: FinishedOutboundStockInfo[]) {

@@ -32,9 +32,6 @@
           :get-finished-stock-row-class-name="getFinishedStockRowClassName"
           :is-selectable-stock-row="isSelectableStockRow"
           :qty-tooltip-enabled="qtyTooltipEnabled"
-          :on-qty-tooltip-show="onQtyTooltipShow"
-          :is-qty-tooltip-loading="isQtyTooltipLoading"
-          :is-qty-tooltip-error="isQtyTooltipError"
           :get-preview-headers="getPreviewHeaders"
           :get-preview-rows="getPreviewRows"
           @update:inbound-date-range="inboundDateRange = $event"
@@ -164,11 +161,7 @@ const {
   buildPreviewData,
   getSharedProductImageUrl,
   getProductImageUrl,
-  prefetchStoredRowBreakdowns,
-  isQtyTooltipLoading,
-  isQtyTooltipError,
   qtyTooltipEnabled,
-  onQtyTooltipShow,
 } = useFinishedStockTable(list)
 const loading = ref(false)
 /** 当前筛选下全量匹配的总件数（接口返回）；有表格勾选时底部改为已选行的件数合计 */
@@ -293,7 +286,6 @@ async function load() {
       stockTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       stockTotalAmount.value = Number(data.totalAmount ?? 0) || 0
       restoreFinishedStockColumnWidths(finishedStockTableRef.value)
-      void prefetchStoredRowBreakdowns(list.value)
     }
   } catch (e: unknown) {
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))

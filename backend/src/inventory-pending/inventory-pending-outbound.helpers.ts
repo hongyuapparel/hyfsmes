@@ -15,6 +15,18 @@ export function getColorSizeSnapshotTotal(snapshot: ColorSizeSnapshot | null): n
   );
 }
 
+export function getPendingDetailStatus(
+  snapshot: ColorSizeSnapshot | null,
+  quantity: number,
+  requiresDetail: boolean,
+): 'recorded' | 'missing' | 'not_applicable' {
+  const safeQuantity = Math.max(0, Math.trunc(Number(quantity) || 0));
+  if (snapshot) {
+    return getColorSizeSnapshotTotal(snapshot) === safeQuantity ? 'recorded' : 'missing';
+  }
+  return requiresDetail ? 'missing' : 'not_applicable';
+}
+
 export function assertColorSizeSnapshotTotal(
   snapshot: ColorSizeSnapshot | null,
   expectedQty: number,
@@ -41,10 +53,9 @@ export function applyPendingOutboundSizeDeduction(params: {
   label: string;
   pendingQty: number;
   shipQty: number;
-  /** 已解析的当前尺码（DB 或尾部兜底）；不要只传未解析的 raw */
+  /** 已解析的当前批次数据库快照；不要传订单计划或其他工序累计数据 */
   currentSnapshot: ColorSizeSnapshot | null;
   outgoingSizeBreakdown: unknown;
-  currentSource?: 'db' | 'finishing-fallback' | 'none';
 }): { remainingSnapshot: ColorSizeSnapshot | null; outgoingSnapshot: ColorSizeSnapshot | null } {
   const { label, pendingQty, shipQty, currentSnapshot, outgoingSizeBreakdown } = params;
   const outgoingSnapshot = parseStoredColorSizeSnapshot(outgoingSizeBreakdown);

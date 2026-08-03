@@ -167,6 +167,7 @@ export class PackingListsPickableService {
   async getFinishedPickable(query: PickableQuery): Promise<{ list: PickableLine[]; total: number }> {
     const qb = this.stockRepo
       .createQueryBuilder('s')
+      .addSelect('s.color_size_snapshot')
       .leftJoin(Order, 'o', 'o.id = s.order_id')
       .where('s.quantity > 0');
     if (query.customerName?.trim()) {
@@ -212,7 +213,7 @@ export class PackingListsPickableService {
         styleNo: stock.skuCode ?? '',
         customerName: stock.customerName ?? '',
       };
-      // 与成品出库校验同源：用 buildCurrentStockSnapshot（含历史脏数据自愈回溯），避免选货展示与发货校验不一致
+      // 与成品出库校验同源：只使用库存记录已保存且合计一致的批次快照。
       const snapshot = await this.inboundQueryService.buildCurrentStockSnapshot(stock);
       if (!snapshot || !snapshot.rows.length) {
         list.push({ ...base, colorName: '', imageUrl: fallbackImage, sizeQuantities: {}, totalQty: Number(stock.quantity) || 0, hasSnapshot: false });

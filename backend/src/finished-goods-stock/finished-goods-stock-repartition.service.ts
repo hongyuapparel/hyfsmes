@@ -210,12 +210,20 @@ export class FinishedGoodsStockRepartitionService {
 
   async repartition(seedId: number, dto: RepartitionDto, operatorUsername: string): Promise<void> {
     if (!Array.isArray(dto.colorMeta)) throw new BadRequestException('缺少颜色明细');
-    const seed = await this.stockRepo.findOne({ where: { id: seedId } });
+    const seed = await this.stockRepo
+      .createQueryBuilder('stock')
+      .where('stock.id = :id', { id: seedId })
+      .addSelect('stock.color_size_snapshot')
+      .getOne();
     if (!seed) throw new NotFoundException('库存记录不存在');
     const sku = this.norm(dto.skuCode) || this.norm(seed.skuCode);
     if (!sku) throw new BadRequestException('SKU不能为空');
 
-    const group = await this.stockRepo.find({ where: { skuCode: seed.skuCode } });
+    const group = await this.stockRepo
+      .createQueryBuilder('stock')
+      .where('stock.sku_code = :skuCode', { skuCode: seed.skuCode })
+      .addSelect('stock.color_size_snapshot')
+      .getMany();
     if (!group.length) throw new NotFoundException('库存记录不存在');
     const groupIds = group.map((item) => item.id);
 
@@ -389,7 +397,12 @@ export class FinishedGoodsStockRepartitionService {
       const colorImageRepo = manager.getRepository(FinishedGoodsStockColorImage);
       const adjustLogRepo = manager.getRepository(FinishedGoodsStockAdjustLog);
 
-      const current = await stockRepo.find({ where: { skuCode: sku } });
+      const current = await stockRepo
+        .createQueryBuilder('stock')
+        .where('stock.sku_code = :sku', { sku })
+        .addSelect('stock.color_size_snapshot')
+        .setLock('pessimistic_write')
+        .getMany();
       // 回滚本身也可再回滚：先存当前整组快照
       const currentImageRows = await this.loadGroupColorImageRows(current.map((r) => r.id));
       const currentUndo = this.captureGroupUndo(current, currentImageRows);

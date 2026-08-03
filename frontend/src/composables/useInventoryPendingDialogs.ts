@@ -22,16 +22,6 @@ import {
 
 type PendingPageTab = 'pending' | 'shipped'
 
-export type PendingColorSizeCache = Record<
-  number,
-  {
-    loading: boolean
-    error: boolean
-    headers: string[]
-    rows: Array<{ colorName: string; values: number[] }>
-  }
->
-
 export type PendingOutboundDialogItem = {
   row: PendingListItem
   headers: string[]
@@ -52,16 +42,12 @@ type UseInventoryPendingDialogsParams = {
   selectedRows: Ref<PendingListItem[]>
   pageTab: Ref<PendingPageTab>
   load: () => Promise<void>
-  ensureColorSizeBreakdown: (orderId: number) => Promise<void>
-  colorSizeCache: PendingColorSizeCache
 }
 
 export function useInventoryPendingDialogs({
   selectedRows,
   pageTab,
   load,
-  ensureColorSizeBreakdown,
-  colorSizeCache,
 }: UseInventoryPendingDialogsParams) {
   const inboundDialog = reactive<{ visible: boolean; submitting: boolean }>({
     visible: false,
@@ -104,20 +90,15 @@ export function useInventoryPendingDialogs({
     outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
   )
   const inboundPreviewItems = computed<InboundPreviewItem[]>(() =>
-    selectedRows.value.map((row) => buildInboundPreviewItem(row, colorSizeCache)),
+    selectedRows.value.map((row) => buildInboundPreviewItem(row)),
   )
 
   async function openInboundDialog() {
     if (!selectedRows.value.length) return
-    const needPlanIds = selectedRows.value
-      .filter((row) => {
-        const snap = row.colorSizeSnapshot
-        return !(snap?.headers?.length && snap.rows?.length)
-      })
-      .map((row) => row.orderId)
-      .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-    if (needPlanIds.length) {
-      await Promise.all(needPlanIds.map((orderId) => ensureColorSizeBreakdown(orderId)))
+    const missing = selectedRows.value.find((row) => row.detailStatus === 'missing')
+    if (missing) {
+      ElMessage.warning(`订单 ${missing.orderNo} / ${missing.skuCode} 未留存本批颜色尺码明细，请先在尾部纠错中按实际数据补录`)
+      return
     }
     inboundDialog.visible = true
   }
@@ -216,24 +197,18 @@ export function useInventoryPendingDialogs({
     outboundForm.pickupUserId = null
     outboundDialog.submitting = true
     try {
-      const needPlanIds = rows
-        .filter((row) => {
-          const snap = row.colorSizeSnapshot
-          return !(snap?.headers?.length && snap.rows?.length)
-        })
-        .map((row) => row.orderId)
-        .filter((orderId): orderId is number => Number.isInteger(orderId) && orderId > 0)
-      if (needPlanIds.length) {
-        await Promise.all(needPlanIds.map((orderId) => ensureColorSizeBreakdown(orderId)))
-      }
       const warnings: string[] = []
       outboundDialog.items = rows.map((row) => {
-        const { item, warning } = buildOutboundDialogItem(row, colorSizeCache)
+        const { item, warning } = buildOutboundDialogItem(row)
         if (warning) warnings.push(warning)
         return item
       })
       if (warnings.length) {
         ElMessage.warning(warnings[0] + (warnings.length > 1 ? `（另有 ${warnings.length - 1} 条）` : ''))
+      }
+      if (outboundDialog.items.some((item) => item.headers.length === 0 || item.rows.length === 0)) {
+        outboundDialog.items = []
+        return
       }
       outboundDialog.visible = true
     } catch (e: unknown) {

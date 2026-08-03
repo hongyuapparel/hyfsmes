@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { InboundPending } from '../entities/inbound-pending.entity';
 import { FinishedGoodsStock } from '../entities/finished-goods-stock.entity';
+import { PackingList } from '../entities/packing-list.entity';
+import { PackingListLog } from '../entities/packing-list-log.entity';
 import { InventoryPendingService } from '../inventory-pending/inventory-pending.service';
 import { FinishedGoodsStockOutboundService } from '../finished-goods-stock/finished-goods-stock-outbound.service';
 import { FinishedGoodsStockInboundQueryService } from '../finished-goods-stock/finished-goods-stock-inbound-query.service';
@@ -59,24 +61,38 @@ export class PackingListsShipService {
     errors.push(...(await this.validateFinished(finishedItems)));
     if (errors.length) throw new BadRequestException(`发货校验未通过：${errors.join('；')}`);
 
-    if (pendingItems.length) {
-      await this.inventoryPendingService.doOutbound(pendingItems, operatorUsername, null);
-    }
-    if (finishedItems.length) {
-      try {
-        await this.finishedOutboundService.outbound(finishedItems, operatorUsername, `装箱单发货 ${detail.code}`, null);
-      } catch (e: unknown) {
-        if (pendingItems.length) {
-          const msg = (e as { message?: unknown })?.message;
-          throw new BadRequestException(
-            `成品出库失败：${String(msg ?? '未知错误')}。待仓部分已发出，请勿重复发货，需人工核对装箱单 ${detail.code}`,
-          );
-        }
-        throw e;
+    await this.pendingRepo.manager.transaction(async (manager) => {
+      const lockedList = await manager.getRepository(PackingList)
+        .createQueryBuilder('list')
+        .where('list.id = :id', { id })
+        .setLock('pessimistic_write')
+        .getOne();
+      if (!lockedList) throw new BadRequestException('装箱单不存在');
+      if (lockedList.status !== 'draft') throw new BadRequestException('该装箱单已发货');
+
+      if (pendingItems.length) {
+        await this.inventoryPendingService.doOutbound(pendingItems, operatorUsername, null, manager);
       }
-    }
-    await this.listsService.markShipped([id]);
-    await this.listsService.recordLog(id, 'ship', operatorUsername, `发货 ${detail.code}`);
+      if (finishedItems.length) {
+        await this.finishedOutboundService.outbound(
+          finishedItems,
+          operatorUsername,
+          `装箱单发货 ${detail.code}`,
+          null,
+          manager,
+        );
+      }
+
+      lockedList.status = 'shipped';
+      lockedList.shippedAt = new Date();
+      await manager.getRepository(PackingList).save(lockedList);
+      await manager.getRepository(PackingListLog).save(manager.getRepository(PackingListLog).create({
+        packingListId: id,
+        action: 'ship',
+        operatorUsername: (operatorUsername ?? '').trim(),
+        summary: `发货 ${detail.code}`,
+      }));
+    });
   }
 
   private groupBySource(detail: PackingListDetail, sourceType: 'pending' | 'finished'): Map<number, SourceGroup> {
@@ -163,7 +179,11 @@ export class PackingListsShipService {
   private async validateFinished(items: OutboundItem[]): Promise<string[]> {
     if (!items.length) return [];
     const errors: string[] = [];
-    const stocks = await this.stockRepo.find({ where: { id: In(items.map((i) => i.id)) } });
+    const stocks = await this.stockRepo
+      .createQueryBuilder('stock')
+      .where('stock.id IN (:...ids)', { ids: items.map((item) => item.id) })
+      .addSelect('stock.color_size_snapshot')
+      .getMany();
     const stockById = new Map(stocks.map((s) => [s.id, s]));
     for (const item of items) {
       const stock = stockById.get(item.id);
@@ -181,6 +201,11 @@ export class PackingListsShipService {
         continue;
       }
       const currentSnapshot = await this.inboundQueryService.buildCurrentStockSnapshot(stock);
+      const requiresDetail = await this.inboundQueryService.orderRequiresColorSizeDetail(stock.orderId);
+      if (requiresDetail && !currentSnapshot) {
+        errors.push(`成品库存 ${label} 的颜色尺码明细未留存或与库存数量不一致，请先按实际数据修正`);
+        continue;
+      }
       if (currentSnapshot && !item.sizeBreakdown) {
         errors.push(`成品库存 ${label} 需要按颜色尺码明细出库，请在装箱单中填写分码数量`);
         continue;

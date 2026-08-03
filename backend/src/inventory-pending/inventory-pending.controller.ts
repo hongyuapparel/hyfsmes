@@ -1,17 +1,14 @@
-import { Body, Controller, Get, Logger, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { InventoryPendingService } from './inventory-pending.service';
-import { errMsg } from '../common/http-exception.filter';
 
 @Controller('inventory/pending')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/inventory/pending')
 export class InventoryPendingController {
-  private readonly logger = new Logger(InventoryPendingController.name);
-
   constructor(private readonly service: InventoryPendingService) {}
 
   @Get('items')
@@ -58,7 +55,7 @@ export class InventoryPendingController {
   }
 
   @Post('outbound')
-  async doOutbound(
+  doOutbound(
     @Body('items') items: Array<{ id: number; quantity: number; sizeBreakdown?: unknown }> | undefined,
     @Body('id') id: number,
     @Body('quantity') quantity: number,
@@ -80,18 +77,10 @@ export class InventoryPendingController {
               sizeBreakdown: sizeBreakdown ?? null,
             },
           ];
-    try {
-      return await this.service.doOutbound(
-        normalizedItems,
-        user?.username ?? '',
-        pickupUserId != null ? Number(pickupUserId) : null,
-      );
-    } catch (e: unknown) {
-      const err = e as { stack?: unknown } | null;
-      this.logger.error('[doOutbound] route=POST /inventory/pending/outbound failed');
-      this.logger.error(`[doOutbound] message=${errMsg(e)}`);
-      this.logger.error(`[doOutbound] stack=${String(err?.stack || '')}`);
-      throw e;
-    }
+    return this.service.doOutbound(
+      normalizedItems,
+      user?.username ?? '',
+      pickupUserId != null ? Number(pickupUserId) : null,
+    );
   }
 }

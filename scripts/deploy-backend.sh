@@ -23,6 +23,8 @@ if [ "$ENABLE_GIT_PUSH" = "1" ]; then
   git push origin "$GIT_BRANCH"
 fi
 
+. "$PROJECT_ROOT/scripts/check-backend-health.sh"
+
 cd "$BACKEND_DIR"
 npm install --include=dev
 npm run build
@@ -32,6 +34,6 @@ else
   pm2 start dist/main.js --name "$PM2_APP_NAME"
 fi
 pm2 save
+check_backend_health "$PM2_APP_NAME"
 pm2 status "$PM2_APP_NAME"
-pm2 logs "$PM2_APP_NAME" --lines 50 --nostream
 echo "[deploy-backend] done"
