@@ -1,5 +1,11 @@
 import { useRouter } from 'vue-router'
-import { type OrderListItem } from '@/api/orders'
+import { type OrderListItem, type OrderListQuery } from '@/api/orders'
+import { serializeOrderQuoteQueueQuery } from '@/utils/order-quote-queue'
+
+interface OrderCostQueueContext {
+  returnTo: string
+  query: OrderListQuery
+}
 
 /**
  * 订单列表页的路由导航操作：编辑、详情、成本、打印、新建。
@@ -25,12 +31,22 @@ export function useOrderListNavigation() {
     })
   }
 
-  function openCost(order: OrderListItem) {
+  function openCost(order: OrderListItem, queueContext?: OrderCostQueueContext) {
     const title = `订单成本 ${order.orderNo || order.id}`
     router.push({
       name: 'OrdersCost',
       params: { id: order.id },
-      query: { tabTitle: title, tabKey: `orders-cost-${order.id}` },
+      query: {
+        tabTitle: title,
+        tabKey: `orders-cost-${order.id}`,
+        ...(queueContext
+          ? {
+              from: 'unquoted',
+              returnTo: queueContext.returnTo,
+              queueQuery: serializeOrderQuoteQueueQuery(queueContext.query),
+            }
+          : {}),
+      },
     })
   }
 

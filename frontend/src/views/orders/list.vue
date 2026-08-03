@@ -23,15 +23,20 @@
         </el-radio-group>
       </div>
       <div class="status-tabs-right">
-        <el-tag
-          v-if="unquoted && !isRecycleBin"
+        <el-button
+          v-if="!isRecycleBin"
           type="warning"
-          closable
-          class="unquoted-filter-tag"
-          @close="clearUnquoted"
+          :plain="!unquoted"
+          :loading="quoteQueueSwitching"
+          :disabled="quoteQueueSwitching"
+          :aria-pressed="unquoted"
+          :title="unquoted ? '退出待报价并返回之前的订单列表' : '只看尚未确认报价的订单'"
+          class="unquoted-quick-filter"
+          @click="toggleUnquoted"
         >
-          仅看待报价（样品单已完成未报价）
-        </el-tag>
+          <el-icon><WarningFilled /></el-icon>
+          {{ unquoted ? `待报价中 ${unquotedCount} · 退出` : `待报价 ${unquotedCount}` }}
+        </el-button>
         <el-button v-if="canEditOrders && !isRecycleBin" type="primary" @click="onCreateOrder">新建订单</el-button>
       </div>
     </div>
@@ -120,10 +125,11 @@
         :get-order-meta-tags="getOrderMetaTags"
         :can-edit-order-item="canEditOrderItem"
         :show-recycle-info="isRecycleBin"
+        :show-quote-status="unquoted"
         @toggle-select="onCardToggle"
         @show-size-popover="onShowSizePopover"
         @edit="openEdit"
-        @cost="openCost"
+        @cost="openCostFromList"
         @remark="openRemark"
         @operation-log="openOperationLog"
         @print="printOrder"
@@ -187,6 +193,7 @@
 import { ref, computed, watchEffect, nextTick, onMounted, onBeforeUnmount, onActivated, onDeactivated } from 'vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { useRoute } from 'vue-router'
+import { WarningFilled } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderListOptions } from '@/composables/useOrderListOptions'
 import { useOrderListData } from '@/composables/useOrderListData'
@@ -197,6 +204,7 @@ import { useOrderListFilterState } from '@/composables/useOrderListFilterState'
 import { useOrderSizePopover } from '@/composables/useOrderSizePopover'
 import { useOrderListActions } from '@/composables/useOrderListActions'
 import { useOrderListNavigation } from '@/composables/useOrderListNavigation'
+import { useOrderListQuoteQueue } from '@/composables/useOrderListQuoteQueue'
 import OrderViewDialog from '@/components/orders/OrderViewDialog.vue'
 import OrderLogDialog from '@/components/orders/OrderLogDialog.vue'
 import OrderRemarkDialog from '@/components/orders/OrderRemarkDialog.vue'
@@ -244,6 +252,7 @@ const {
   orderNoLabelVisible,
   skuCodeLabelVisible,
   loadList,
+  getCurrentQuery,
   onSearch: baseOnSearch,
   onReset: baseOnReset,
   onPageChange: baseOnPageChange,
@@ -256,6 +265,7 @@ const totalQuantity = ref<number>(0)
 const {
   statusCounts,
   statusTotal,
+  unquotedCount,
   refreshStatusCounts,
   abortStatusCounts,
 } = useOrderListStatusCounts({
@@ -366,6 +376,24 @@ const {
 })
 const stopPersistWatch = startPersistWatch()
 
+const {
+  quoteQueueSwitching,
+  applyUnquotedState,
+  initializeUnquotedFromRoute,
+  toggleUnquoted,
+  exitUnquotedForStatusChange,
+  openCostFromList,
+} = useOrderListQuoteQueue({
+  currentStatus,
+  unquoted,
+  pagination,
+  resetCardScroll,
+  resetSelection,
+  load,
+  getCurrentQuery,
+  openCost,
+})
+
 // 卡片滚动位置保持
 const cardScrollRef = ref<HTMLElement | null>(null)
 const cardScrollTop = ref(0)
@@ -399,7 +427,7 @@ function resetCardScroll() {
 async function load(options?: { refreshCounts?: boolean }) {
   await loadList(totalQuantity)
   if (options?.refreshCounts) {
-    void refreshStatusCounts()
+    await refreshStatusCounts()
   }
 }
 
@@ -450,35 +478,23 @@ async function onForceStatusDone() {
   await load({ refreshCounts: true })
 }
 
-function onListViewModeChange() {
+async function onListViewModeChange() {
   pagination.page = 1
   resetCardScroll()
   resetSelection()
   if (isRecycleBin.value) {
-    unquoted.value = false
+    await applyUnquotedState(false, { reload: false })
   }
-  load({ refreshCounts: !isRecycleBin.value })
+  await load({ refreshCounts: !isRecycleBin.value })
 }
 
-function onStatusChange() {
-  // 待报价视图限定在「已完成」，切到非「全部/已完成」的状态会与之互斥而恒空，
-  // 此时自动退出待报价视图（清过滤），并刷新角标恢复正常状态统计。
-  let unquotedCleared = false
-  if (unquoted.value && currentStatus.value !== 'all' && currentStatus.value !== 'completed') {
-    unquoted.value = false
-    unquotedCleared = true
-  }
+async function onStatusChange() {
+  // 待报价是“订单完成”的快捷筛选；用户主动切换任何其它状态时退出该筛选。
+  if (await exitUnquotedForStatusChange()) return
   pagination.page = 1
   resetCardScroll()
   resetSelection()
-  load({ refreshCounts: unquotedCleared })
-}
-
-function clearUnquoted() {
-  unquoted.value = false
-  pagination.page = 1
-  resetCardScroll()
-  load({ refreshCounts: true })
+  await load()
 }
 
 function onPageChange(page: number) {
@@ -505,7 +521,7 @@ onMounted(async () => {
   }
   restoreFilterState()
   applyQueryFromRoute(route.query as Record<string, unknown>)
-  unquoted.value = route.query.unquoted === '1' || route.query.unquoted === 'true'
+  initializeUnquotedFromRoute()
   await load({ refreshCounts: true })
   loadOptions()
   loadStatusTabs()
@@ -520,6 +536,7 @@ onBeforeUnmount(() => {
 
 onActivated(() => {
   restoreCardScroll()
+  if (unquoted.value) void load({ refreshCounts: true })
 })
 
 onDeactivated(() => {
@@ -535,6 +552,7 @@ watchEffect(() => {
   // 预留：当筛选条件发生明显变化时，可在此埋点或做其它处理
   void filter.orderNo
 })
+
 </script>
 
 <style scoped>
@@ -598,8 +616,8 @@ watchEffect(() => {
   gap: var(--space-sm);
 }
 
-.unquoted-filter-tag {
-  cursor: default;
+.unquoted-quick-filter {
+  flex-shrink: 0;
 }
 
 /* 手机端：标签条下边距收紧，给订单卡片让位（筛选区压缩已在全局 design-system 处理） */

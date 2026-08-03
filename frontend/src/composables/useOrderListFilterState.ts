@@ -123,6 +123,8 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
     const status = routeQuery.status
     const completedStart = routeQuery.completedStart
     const completedEnd = routeQuery.completedEnd
+    const customerDueStart = routeQuery.customerDueStart
+    const customerDueEnd = routeQuery.customerDueEnd
 
     if (typeof merchandiser === 'string' && merchandiser !== '') {
       filter.merchandiser = merchandiser
@@ -132,6 +134,9 @@ export function useOrderListFilterState(params: UseOrderListFilterStateParams) {
     }
     if (typeof completedStart === 'string' && typeof completedEnd === 'string') {
       completedRange.value = [completedStart, completedEnd]
+    }
+    if (typeof customerDueStart === 'string' && typeof customerDueEnd === 'string') {
+      customerDueRange.value = [customerDueStart, customerDueEnd]
     }
   }
 

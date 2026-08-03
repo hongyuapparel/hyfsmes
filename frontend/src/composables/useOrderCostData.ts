@@ -8,6 +8,7 @@
  *   useOrderCostImport       — 导入订单工序成本 / 导入模板
  *   useOrderCostCalculations — 成本汇总计算（已有）
  */
+import type { MaybeRefOrGetter } from 'vue'
 import { getJobTypeLabel } from '@/utils/order-cost'
 import { useOrderCostCalculations } from './useOrderCostCalculations'
 import { useOrderCostLoader } from './useOrderCostLoader'
@@ -15,7 +16,7 @@ import { useOrderCostMaterialRows } from './useOrderCostMaterialRows'
 import { useOrderCostProductionRows } from './useOrderCostProductionRows'
 import { useOrderCostImport } from './useOrderCostImport'
 
-export function useOrderCostData(orderId: number) {
+export function useOrderCostData(orderId: MaybeRefOrGetter<number>) {
   const loader = useOrderCostLoader(orderId)
 
   const {
@@ -60,6 +61,7 @@ export function useOrderCostData(orderId: number) {
     // loader actions
     loadOrder: loader.loadOrder,
     loadCostSnapshot: loader.loadCostSnapshot,
+    resetOrderCostState: loader.resetOrderCostState,
     reconcileCostRowsFromOrder: loader.reconcileCostRowsFromOrder,
     ensureCostRowsBase: loader.ensureCostRowsBase,
     loadProcesses: loader.loadProcesses,

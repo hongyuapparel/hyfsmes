@@ -1,4 +1,4 @@
-import { ref } from 'vue'
+import { ref, toValue, type MaybeRefOrGetter } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictItems } from '@/api/dicts'
@@ -44,9 +44,10 @@ export interface OrderCostLoaderRefs {
   quoteNeedsReconfirm: ReturnType<typeof ref<boolean>>
 }
 
-export function useOrderCostLoader(orderId: number): OrderCostLoaderRefs & {
+export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCostLoaderRefs & {
   loadOrder: () => Promise<void>
   loadCostSnapshot: () => Promise<boolean>
+  resetOrderCostState: () => void
   loadMaterialTypes: () => Promise<void>
   loadProcesses: () => Promise<void>
   reconcileCostRowsFromOrder: (detail: OrderDetail) => void
@@ -65,6 +66,18 @@ export function useOrderCostLoader(orderId: number): OrderCostLoaderRefs & {
   const quoteConfirmedAt = ref('')
   const quoteConfirmedBy = ref('')
   const quoteNeedsReconfirm = ref(false)
+
+  function resetOrderCostState() {
+    order.value = null
+    materialRows.value = []
+    processItemRows.value = []
+    productionRows.value = []
+    productionCostMultiplier.value = DEFAULT_PRODUCTION_MULTIPLIER
+    profitMargin.value = DEFAULT_PROFIT_MARGIN
+    quoteConfirmedAt.value = ''
+    quoteConfirmedBy.value = ''
+    quoteNeedsReconfirm.value = false
+  }
 
   async function loadMaterialTypes() {
     try {
@@ -106,9 +119,11 @@ export function useOrderCostLoader(orderId: number): OrderCostLoaderRefs & {
   }
 
   async function loadOrder() {
-    if (!orderId) return
+    const currentOrderId = toValue(orderId)
+    if (!currentOrderId) return
     try {
-      const res = await getOrderDetail(orderId)
+      const res = await getOrderDetail(currentOrderId)
+      if (currentOrderId !== toValue(orderId)) return
       order.value = res.data
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载订单失败'))
@@ -116,9 +131,11 @@ export function useOrderCostLoader(orderId: number): OrderCostLoaderRefs & {
   }
 
   async function loadCostSnapshot(): Promise<boolean> {
-    if (!orderId) return false
+    const currentOrderId = toValue(orderId)
+    if (!currentOrderId) return false
     try {
-      const res = await getOrderCost(orderId)
+      const res = await getOrderCost(currentOrderId)
+      if (currentOrderId !== toValue(orderId)) return false
       const snapshot = res.data?.snapshot
       const hasSnapshot = !!snapshot && typeof snapshot === 'object'
       const s = (hasSnapshot ? snapshot : {}) as CostSnapshotPayload
@@ -198,6 +215,7 @@ export function useOrderCostLoader(orderId: number): OrderCostLoaderRefs & {
     quoteConfirmedAt,
     quoteConfirmedBy,
     quoteNeedsReconfirm,
+    resetOrderCostState,
     loadOrder,
     loadCostSnapshot,
     loadMaterialTypes,

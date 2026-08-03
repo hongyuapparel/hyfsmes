@@ -55,7 +55,11 @@ const routes: RouteRecordRaw[] = [
             path: 'list',
             name: 'OrdersList',
             component: () => import('@/views/orders/list.vue'),
-            meta: { title: '订单列表', permissionPath: '/orders/list' },
+            meta: {
+              title: '订单列表',
+              permissionPath: '/orders/list',
+              reuseQueryKeys: ['unquoted'],
+            },
           },
           {
             path: 'detail/:id',

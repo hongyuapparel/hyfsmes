@@ -37,7 +37,7 @@ describe('buildOutboundDialogItem', () => {
   it('leaves empty grid when snapshot missing (no plan redistribute)', () => {
     const { item, warning } = buildOutboundDialogItem(baseRow({ colorSizeSnapshot: null, detailStatus: 'missing' }))
     expect(item.rows).toEqual([])
-    expect(warning).toMatch(/未留存本批尺码/)
+    expect(warning).toMatch(/未留存本批颜色尺码/)
   })
 
   it('rejects a snapshot whose total differs from the pending quantity', () => {

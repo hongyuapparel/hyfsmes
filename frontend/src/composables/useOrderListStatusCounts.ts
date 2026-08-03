@@ -28,12 +28,13 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
 
   const statusCounts = ref<Record<string, number>>({})
   const statusTotal = ref<number>(0)
+  const unquotedCount = ref<number>(0)
   const loading = ref(false)
 
   let countsReqId = 0
   let countsAbortController: AbortController | null = null
 
-  function buildCountQuery(): Omit<OrderListQuery, 'status' | 'page' | 'pageSize'> {
+  function buildCountQuery(includeUnquoted = unquoted.value): Omit<OrderListQuery, 'status' | 'page' | 'pageSize'> {
     const q: Omit<OrderListQuery, 'status' | 'page' | 'pageSize'> = {
       orderNo: filter.orderNo || undefined,
       skuCode: filter.skuCode || undefined,
@@ -58,7 +59,7 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
       q.completedStart = completedRange.value[0]
       q.completedEnd = completedRange.value[1]
     }
-    if (unquoted.value) q.unquoted = true
+    if (includeUnquoted) q.unquoted = true
     return q
   }
 
@@ -72,14 +73,20 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
     const currentReqId = ++countsReqId
     loading.value = true
     try {
-      const countsRes = await getOrderStatusCounts(buildCountQuery(), {
-        signal: controller.signal,
-        skipGlobalErrorHandler: true,
-      })
+      const requestConfig = { signal: controller.signal, skipGlobalErrorHandler: true }
+      const [countsRes, unquotedRes] = await Promise.all([
+        getOrderStatusCounts(buildCountQuery(), requestConfig),
+        unquoted.value
+          ? Promise.resolve(null)
+          : getOrderStatusCounts(buildCountQuery(true), requestConfig),
+      ])
       const countsData = countsRes.data
       if (currentReqId !== countsReqId) return
       statusTotal.value = countsData?.total ?? 0
       statusCounts.value = countsData?.byStatus ?? {}
+      unquotedCount.value = unquoted.value
+        ? countsData?.total ?? 0
+        : unquotedRes?.data?.total ?? 0
     } catch (e: unknown) {
       if (currentReqId !== countsReqId) return
       if (isRequestCanceled(e)) return
@@ -98,6 +105,7 @@ export function useOrderListStatusCounts(params: UseOrderListStatusCountsParams)
   return {
     statusCounts,
     statusTotal,
+    unquotedCount,
     refreshStatusCounts,
     abortStatusCounts,
   }

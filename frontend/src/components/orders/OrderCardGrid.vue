@@ -20,6 +20,7 @@
         :get-order-meta-tags="getOrderMetaTags"
         :can-edit-order-item="canEditOrderItem"
         :show-recycle-info="showRecycleInfo"
+        :show-quote-status="showQuoteStatus"
         @toggle-select="(id, val) => emit('toggle-select', id, val)"
         @show-size-popover="(order) => emit('show-size-popover', order)"
         @edit="(order) => emit('edit', order)"
@@ -63,6 +64,7 @@ defineProps<{
   getOrderMetaTags: (item: OrderListItem) => string[]
   canEditOrderItem: (item: OrderListItem) => boolean
   showRecycleInfo?: boolean
+  showQuoteStatus?: boolean
 }>()
 
 const emit = defineEmits<{

@@ -12,6 +12,15 @@
           >
             {{ getStatusLabel(item.status) }}
           </el-tag>
+          <el-tag
+            v-if="showQuoteStatus && item.quoteStatus !== 'confirmed'"
+            class="quote-status-tag"
+            size="small"
+            effect="plain"
+            :type="item.quoteStatus === 'needs_reconfirm' ? 'danger' : 'warning'"
+          >
+            {{ item.quoteStatus === 'needs_reconfirm' ? '待重新确认' : '待首次报价' }}
+          </el-tag>
         </div>
         <el-checkbox
           :model-value="Boolean(cardSelected[item.id])"
@@ -126,9 +135,15 @@
         </span>
       </div>
       <div class="field-row">
-        <span class="field-label">出厂价：</span>
+        <span class="field-label">{{
+          showQuoteStatus && item.quoteStatus === 'needs_reconfirm'
+            ? '上次确认价：'
+            : '出厂价：'
+        }}</span>
         <span class="field-value price-value">{{
-          item.exFactoryPrice != null && item.exFactoryPrice !== ''
+          isAwaitingFirstQuoteConfirmation(item)
+            ? '未确认'
+            : item.exFactoryPrice != null && item.exFactoryPrice !== ''
             ? `￥${formatDisplayNumber(item.exFactoryPrice)}`
             : '-'
         }}</span>
@@ -266,7 +281,7 @@ interface SizePopoverBlock {
   rows: SizePopoverBlockRow[]
 }
 
-defineProps<{
+const props = defineProps<{
   item: OrderListItem
   cardSelected: Record<number, boolean>
   sizePopoverLoadingId: number | null
@@ -282,7 +297,14 @@ defineProps<{
   getOrderMetaTags: (item: OrderListItem) => string[]
   canEditOrderItem: (item: OrderListItem) => boolean
   showRecycleInfo?: boolean
+  showQuoteStatus?: boolean
 }>()
+
+function isAwaitingFirstQuoteConfirmation(item: OrderListItem): boolean {
+  return Boolean(props.showQuoteStatus)
+    && item.quoteStatus !== 'needs_reconfirm'
+    && item.quoteStatus !== 'confirmed'
+}
 
 const emit = defineEmits<{
   (e: 'toggle-select', orderId: number, checked: boolean): void

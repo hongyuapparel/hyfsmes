@@ -13,6 +13,8 @@ $BackendLog = Join-Path $LogDir "backend-3000.log"
 $BackendErrLog = Join-Path $LogDir "backend-3000.err.log"
 $FrontendLog = Join-Path $LogDir "frontend-5173.log"
 $FrontendErrLog = Join-Path $LogDir "frontend-5173.err.log"
+$BackendPidFile = Join-Path $LogDir "backend-3000.pid"
+$FrontendPidFile = Join-Path $LogDir "frontend-5173.pid"
 
 function Repair-DuplicatePathEnvironment {
     $pathKeys = @([System.Environment]::GetEnvironmentVariables("Process").Keys | Where-Object { $_ -ieq "PATH" })
@@ -46,7 +48,9 @@ function Start-DetachedNpm {
         [Parameter(Mandatory = $true)]
         [string]$StdoutLog,
         [Parameter(Mandatory = $true)]
-        [string]$StderrLog
+        [string]$StderrLog,
+        [Parameter(Mandatory = $true)]
+        [string]$PidFile
     )
 
     if (-not (Test-Path $StdoutLog)) {
@@ -58,13 +62,15 @@ function Start-DetachedNpm {
 
     $npmCmd = (Get-Command npm.cmd -ErrorAction Stop).Source
     $argumentList = $Arguments -split "\s+"
-    Start-Process `
+    $process = Start-Process `
         -FilePath $npmCmd `
         -ArgumentList $argumentList `
         -WorkingDirectory $WorkingDirectory `
         -RedirectStandardOutput $StdoutLog `
         -RedirectStandardError $StderrLog `
-        -WindowStyle Hidden | Out-Null
+        -WindowStyle Hidden `
+        -PassThru
+    Set-Content -LiteralPath $PidFile -Value $process.Id -Encoding ascii
 }
 
 # If port in use, run stop.ps1 once and wait, then re-check
@@ -87,9 +93,9 @@ if ($frontendInUse) {
 }
 
 Write-Host ("Starting backend (port " + $BackendPort + ") and frontend (port " + $FrontendPort + ")...") -ForegroundColor Green
-Start-DetachedNpm -WorkingDirectory $BackendDir -Arguments 'run start:dev' -StdoutLog $BackendLog -StderrLog $BackendErrLog
+Start-DetachedNpm -WorkingDirectory $BackendDir -Arguments 'run start:dev' -StdoutLog $BackendLog -StderrLog $BackendErrLog -PidFile $BackendPidFile
 Start-Sleep -Seconds 2
-Start-DetachedNpm -WorkingDirectory $FrontendDir -Arguments 'run dev' -StdoutLog $FrontendLog -StderrLog $FrontendErrLog
+Start-DetachedNpm -WorkingDirectory $FrontendDir -Arguments 'run dev' -StdoutLog $FrontendLog -StderrLog $FrontendErrLog -PidFile $FrontendPidFile
 Write-Host "Done. Services started with hidden windows. Run scripts\check.ps1 to verify." -ForegroundColor Green
 Write-Host ("Logs: logs\\backend-3000.log, logs\\frontend-5173.log") -ForegroundColor Gray
 Write-Host "Tip: Code changes auto-reload; only restart when changing .env or deps. Use scripts\restart.ps1 to restart." -ForegroundColor Gray
