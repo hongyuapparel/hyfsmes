@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderCraft } from '../entities/order-craft.entity';
 import { OrderExt, type OrderMaterialRow, type ProcessRow } from '../entities/order-ext.entity';
@@ -271,32 +271,58 @@ export class ProductionCraftService {
     }
 
     const [crafts, extList, processItemsMap] = await Promise.all([
-      this.craftRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
-      this.orderExtRepo.find({ where: orderIds.map((id) => ({ orderId: id })) }),
+      this.craftRepo.find({ where: { orderId: In(orderIds) } }),
+      this.orderExtRepo.find({ where: { orderId: In(orderIds) } }),
       this.fetchProcessItemsMap(orderIds),
     ]);
     const craftMap = new Map(crafts.map((c) => [c.orderId, c]));
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
+    const workflowProcessItemsMap = new Map<number, unknown>();
+    for (const orderId of orderIds) {
+      workflowProcessItemsMap.set(
+        orderId,
+        processItemsMap.get(orderId) ?? extMap.get(orderId)?.processItems,
+      );
+    }
     const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
-    // 对历史“已工艺完成但订单未流转”的数据进行一次按规则补流转（无硬编码状态）。
-    // 只在可识别当前操作人时执行；动作权限由 PermissionGuard + role_permissions 控制。
-    if (typeof actorUserId === 'number') {
-      for (const order of orders) {
-        const craft = craftMap.get(order.id);
-        const craftStatus = (craft?.status ?? 'pending').toLowerCase();
-        if (craftStatus !== 'completed') continue;
-        const nextStatus = await this.orderWorkflowService.resolveNextStatus({
-          order,
-          triggerCode: 'craft_completed',
-          actorUserId,
-        });
-        if (nextStatus && nextStatus !== order.status) {
-          order.status = nextStatus;
-          order.statusTime = new Date();
-          await this.orderRepo.save(order);
-        }
+    const completedOrders = orders.filter((order) => {
+      const craftStatus = (craftMap.get(order.id)?.status ?? 'pending').toLowerCase();
+      return craftStatus === 'completed';
+    });
+    // 保留历史已完成订单的补流转行为，只把逐单查规则改为整批解析。
+    if (typeof actorUserId === 'number' && completedOrders.length > 0) {
+      const completedNextStatusByOrderId = await this.orderWorkflowService.resolveNextStatuses({
+        orders: completedOrders,
+        triggerCode: 'craft_completed',
+        processItemsByOrderId: workflowProcessItemsMap,
+      });
+      const ordersToReconcile: Order[] = [];
+      for (const order of completedOrders) {
+        const nextStatus = completedNextStatusByOrderId.get(order.id);
+        if (!nextStatus || nextStatus === order.status) continue;
+        order.status = nextStatus;
+        order.statusTime = new Date();
+        ordersToReconcile.push(order);
       }
+      if (ordersToReconcile.length > 0) {
+        await this.orderRepo.save(ordersToReconcile);
+      }
+    }
+
+    const pendingOrders = orders.filter((order) => {
+      const craftStatus = (craftMap.get(order.id)?.status ?? 'pending').toLowerCase();
+      return craftStatus !== 'completed';
+    });
+    let nextStatusByOrderId = new Map<number, string>();
+    try {
+      nextStatusByOrderId = await this.orderWorkflowService.resolveNextStatuses({
+        orders: pendingOrders,
+        triggerCode: 'craft_completed',
+        processItemsByOrderId: workflowProcessItemsMap,
+      });
+    } catch {
+      // 与原逐单容错保持一致：规则读取失败时不展示无法确认流程资格的待处理订单。
     }
 
     const rows: CraftListItem[] = [];
@@ -312,17 +338,7 @@ export class ProductionCraftService {
 
       // 仅按流程配置展示可执行工艺完成的订单，避免“有工艺项目就都进入工艺管理”的硬编码行为。
       if (craftStatus !== 'completed') {
-        try {
-          const nextByFlow = await this.orderWorkflowService.resolveNextStatus({
-            order,
-            triggerCode: 'craft_completed',
-            actorUserId: typeof actorUserId === 'number' ? actorUserId : 0,
-          });
-          if (!nextByFlow) continue;
-        } catch {
-          // 规则不匹配时，不在工艺管理列表展示该单
-          continue;
-        }
+        if (!nextStatusByOrderId.has(order.id)) continue;
       }
 
       if (tab === 'pending' && craftStatus === 'completed') continue;

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
 import { OrderExt } from '../entities/order-ext.entity';
 import { OrderStatusTransition } from '../entities/order-status-transition.entity';
@@ -16,6 +16,14 @@ type RuleConditions = {
   /** 新版：精确到系统配置中的合作方式 ID 列表 */
   collaborationTypeIds?: number[];
   /** 是否限定「仅有工艺项目」或「仅无工艺项目」；不传则不限制 */
+  hasProcessItem?: boolean;
+};
+
+type OrderWorkflowTags = {
+  orderType?: 'sample' | 'bulk';
+  orderTypeId?: number | null;
+  productForm?: 'finished' | 'cut';
+  collaborationTypeId?: number | null;
   hasProcessItem?: boolean;
 };
 
@@ -36,15 +44,21 @@ export class OrderWorkflowService {
     return (o?.value ?? '').trim();
   }
 
-  private async resolveOrderTags(order: Order): Promise<{
-    orderType?: 'sample' | 'bulk';
-    orderTypeId?: number | null;
-    productForm?: 'finished' | 'cut';
-    collaborationTypeId?: number | null;
-    hasProcessItem?: boolean;
-  }> {
-    const orderTypeValue = await this.getOptionValueById(order.orderTypeId ?? null);
-    const collaborationValue = await this.getOptionValueById(order.collaborationTypeId ?? null);
+  private async resolveOrderTags(order: Order): Promise<OrderWorkflowTags> {
+    const [orderTypeValue, collaborationValue, ext] = await Promise.all([
+      this.getOptionValueById(order.orderTypeId ?? null),
+      this.getOptionValueById(order.collaborationTypeId ?? null),
+      this.orderExtRepo.findOne({ where: { orderId: order.id } }).catch(() => null),
+    ]);
+    return this.buildOrderTags(order, orderTypeValue, collaborationValue, ext?.processItems);
+  }
+
+  private buildOrderTags(
+    order: Order,
+    orderTypeValue: string,
+    collaborationValue: string,
+    processItems: unknown,
+  ): OrderWorkflowTags {
 
     // 订单类型：将「样品系列」统一视为 sample，其余（如大货）视为 bulk。
     // 当前约定：样品 / 修改版 / 产前版 / 试销款 都走样品链路，大货走大货链路。
@@ -67,22 +81,16 @@ export class OrderWorkflowService {
 
     // hasProcessItem 以 E 区 order_ext.process_items 为准，兼容回退到旧字段 orders.process_item。
     let hasProcessItem = !!(order.processItem && String(order.processItem).trim());
-    try {
-      const ext = await this.orderExtRepo.findOne({ where: { orderId: order.id } });
-      const extItems = ext?.processItems;
-      if (Array.isArray(extItems)) {
-        hasProcessItem = extItems.some((it) => {
-          if (!it || typeof it !== 'object') return false;
-          const itObj = it as { processName?: unknown; supplierName?: unknown; part?: unknown; remark?: unknown };
-          const processName = String(itObj.processName ?? '').trim();
-          const supplierName = String(itObj.supplierName ?? '').trim();
-          const part = String(itObj.part ?? '').trim();
-          const remark = String(itObj.remark ?? '').trim();
-          return !!(processName || supplierName || part || remark);
-        });
-      }
-    } catch {
-      // 查询扩展表失败时，回退旧字段判断，避免影响主流程
+    if (Array.isArray(processItems)) {
+      hasProcessItem = processItems.some((it) => {
+        if (!it || typeof it !== 'object') return false;
+        const itObj = it as { processName?: unknown; supplierName?: unknown; part?: unknown; remark?: unknown };
+        const processName = String(itObj.processName ?? '').trim();
+        const supplierName = String(itObj.supplierName ?? '').trim();
+        const part = String(itObj.part ?? '').trim();
+        const remark = String(itObj.remark ?? '').trim();
+        return !!(processName || supplierName || part || remark);
+      });
     }
     return {
       orderType,
@@ -95,13 +103,7 @@ export class OrderWorkflowService {
 
   private matchConditions(
     conditionsJson: unknown,
-    tags: {
-      orderType?: string;
-      orderTypeId?: number | null;
-      productForm?: string;
-      collaborationTypeId?: number | null;
-      hasProcessItem?: boolean;
-    },
+    tags: OrderWorkflowTags,
   ): { ok: boolean; score: number } {
     if (!conditionsJson || typeof conditionsJson !== 'object') return { ok: true, score: 0 };
     const c = conditionsJson as RuleConditions;
@@ -134,6 +136,84 @@ export class OrderWorkflowService {
     return { ok: true, score };
   }
 
+  private selectNextStatus(rules: OrderStatusTransition[], tags: OrderWorkflowTags): string | null {
+    const candidates: Array<{ rule: OrderStatusTransition; score: number }> = [];
+    for (const rule of rules) {
+      const matched = this.matchConditions(rule.conditionsJson, tags);
+      if (!matched.ok) continue;
+      candidates.push({ rule, score: matched.score });
+    }
+    if (!candidates.length) return null;
+
+    candidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const aHasChain = a.rule.chainId != null ? 1 : 0;
+      const bHasChain = b.rule.chainId != null ? 1 : 0;
+      if (bHasChain !== aHasChain) return bHasChain - aHasChain;
+      return b.rule.id - a.rule.id;
+    });
+    return candidates[0].rule.toStatus;
+  }
+
+  async resolveNextStatuses(params: {
+    orders: Order[];
+    triggerCode: string;
+    processItemsByOrderId?: ReadonlyMap<number, unknown>;
+  }): Promise<Map<number, string>> {
+    const result = new Map<number, string>();
+    if (!params.orders.length) return result;
+
+    const fromStatuses = Array.from(new Set(params.orders.map((order) => order.status).filter(Boolean)));
+    const rules = await this.transitionRepo.find({
+      where: { fromStatus: In(fromStatuses), triggerCode: params.triggerCode.trim(), enabled: true },
+      order: { id: 'ASC' },
+    });
+    if (!rules.length) return result;
+
+    const optionIds = Array.from(
+      new Set(
+        params.orders
+          .flatMap((order) => [order.orderTypeId, order.collaborationTypeId])
+          .filter((id): id is number => typeof id === 'number'),
+      ),
+    );
+    const options = optionIds.length
+      ? await this.optionRepo.find({ where: { id: In(optionIds) }, select: ['id', 'value'] })
+      : [];
+    const optionValueById = new Map(options.map((option) => [option.id, (option.value ?? '').trim()]));
+
+    let processItemsMap = params.processItemsByOrderId;
+    if (!processItemsMap) {
+      const extRows = await this.orderExtRepo.find({
+        where: { orderId: In(params.orders.map((order) => order.id)) },
+        select: ['orderId', 'processItems'],
+      });
+      processItemsMap = new Map(extRows.map((ext) => [ext.orderId, ext.processItems]));
+    }
+
+    const rulesByStatus = new Map<string, OrderStatusTransition[]>();
+    for (const rule of rules) {
+      const statusRules = rulesByStatus.get(rule.fromStatus) ?? [];
+      statusRules.push(rule);
+      rulesByStatus.set(rule.fromStatus, statusRules);
+    }
+
+    for (const order of params.orders) {
+      const statusRules = rulesByStatus.get(order.status) ?? [];
+      if (!statusRules.length) continue;
+      const tags = this.buildOrderTags(
+        order,
+        order.orderTypeId == null ? '' : optionValueById.get(order.orderTypeId) ?? '',
+        order.collaborationTypeId == null ? '' : optionValueById.get(order.collaborationTypeId) ?? '',
+        processItemsMap.get(order.id),
+      );
+      const nextStatus = this.selectNextStatus(statusRules, tags);
+      if (nextStatus) result.set(order.id, nextStatus);
+    }
+
+    return result;
+  }
+
   /**
    * 根据当前状态+触发动作，从配置中匹配下一状态。未匹配到返回 null。
    * 操作权限由 PermissionGuard + role_permissions 控制；流程规则只负责匹配下一状态。
@@ -147,30 +227,7 @@ export class OrderWorkflowService {
     if (!rules.length) return null;
 
     const tags = await this.resolveOrderTags(order);
-    const candidates: Array<{ rule: OrderStatusTransition; score: number }> = [];
-    for (const r of rules) {
-      const m = this.matchConditions(r.conditionsJson, tags);
-      if (!m.ok) continue;
-      candidates.push({ rule: r, score: m.score });
-    }
-
-    if (!candidates.length) {
-      // 没有任何规则适用，返回 null 交给调用方走默认分支。
-      return null;
-    }
-
-    // 冲突规则优先级：
-    // 1) 条件命中更具体（score 更高）优先
-    // 2) 链路规则（chainId 非空）优先于独立旧规则
-    // 3) 同优先级下使用最新规则（id 更大）优先，避免历史旧规则覆盖新配置
-    candidates.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      const aHasChain = a.rule.chainId != null ? 1 : 0;
-      const bHasChain = b.rule.chainId != null ? 1 : 0;
-      if (bHasChain !== aHasChain) return bHasChain - aHasChain;
-      return b.rule.id - a.rule.id;
-    });
-    return candidates[0].rule.toStatus;
+    return this.selectNextStatus(rules, tags);
   }
 
 }

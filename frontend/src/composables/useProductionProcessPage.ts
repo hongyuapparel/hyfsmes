@@ -313,10 +313,7 @@ export function useProductionProcessPage() {
 
   onMounted(() => {
     void loadOptions()
-    void (async () => {
-      await load()
-      await loadTabCounts()
-    })()
+    void Promise.all([load(), loadTabCounts()])
   })
 
   return {
