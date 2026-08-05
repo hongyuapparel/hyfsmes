@@ -304,7 +304,7 @@
       :fabric-pickup-user-options="fabricPickupUserOptions"
       @update:visible="outboundDialog.visible = $event"
       @confirm="submitOutbound"
-      @close="resetOutboundForm"
+      @closed="resetOutboundForm"
     />
   </div>
 </template>

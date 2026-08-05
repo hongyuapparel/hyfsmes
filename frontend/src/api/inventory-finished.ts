@@ -232,6 +232,7 @@ export function getFinishedOutboundRecords(params?: {
 
 export function createFinishedStock(body: {
   orderNo?: string
+  inboundSource?: 'order' | 'manual'
   skuCode: string
   quantity: number
   unitPrice?: string | number

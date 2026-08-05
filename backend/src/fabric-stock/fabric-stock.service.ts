@@ -351,12 +351,15 @@ export class FabricStockService {
       imageUrl: dto.imageUrl?.trim() ?? '',
     });
     const saved = await this.stockRepo.save(entity);
+    const beforeSnapshot = this.toSnapshot(saved);
+    beforeSnapshot.quantity = '0';
     await this.addOperationLog({
       fabricStockId: saved.id,
       action: 'create',
       operatorUsername: dto.operatorUsername ?? '',
-      beforeSnapshot: null,
+      beforeSnapshot,
       afterSnapshot: this.toSnapshot(saved),
+      remark: dto.remark ?? '',
     });
     const [row] = await this.decorateFabricStocks([saved]);
     return row;
@@ -453,20 +456,26 @@ export class FabricStockService {
     if (qty > current) {
       throw new NotFoundException('出库数量不能大于当前库存');
     }
+    let pickupUserName = '';
     if (pickupUserId != null && pickupUserId > 0) {
       const u = await this.userRepo.findOne({
         where: { id: pickupUserId, status: UserStatus.ACTIVE },
       });
       if (!u) throw new BadRequestException('领取人无效或已停用');
+      pickupUserName = String(u.displayName ?? '').trim() || String(u.username ?? '').trim();
     }
     const before = this.toSnapshot(stock);
     stock.quantity = String(current - qty);
     const saved = await this.stockRepo.save(stock);
+    const outboundRemark = [
+      pickupUserName ? `领取人：${pickupUserName}` : '',
+      remark?.trim() ?? '',
+    ].filter(Boolean).join('；');
     const out = this.outboundRepo.create({
       fabricStockId: id,
       quantity: String(qty),
       photoUrl: photoUrl?.trim() ?? '',
-      remark: remark?.trim() ?? '',
+      remark: outboundRemark,
       pickupUserId: pickupUserId != null && pickupUserId > 0 ? pickupUserId : null,
     });
     await this.outboundRepo.save(out);
@@ -476,7 +485,7 @@ export class FabricStockService {
       operatorUsername,
       beforeSnapshot: before,
       afterSnapshot: this.toSnapshot(saved),
-      remark: remark?.trim() ?? '',
+      remark: outboundRemark,
     });
   }
 
@@ -589,9 +598,27 @@ export class FabricStockService {
   async getOperationLogs(fabricStockId: number): Promise<FabricStockOperationLog[]> {
     await this.getOne(fabricStockId);
     try {
-      return await this.operationLogRepo.find({
+      const logs = await this.operationLogRepo.find({
         where: { fabricStockId },
         order: { createdAt: 'DESC' },
+      });
+      const usernames = Array.from(new Set(logs.map((log) => String(log.operatorUsername ?? '').trim()).filter(Boolean)));
+      const users = usernames.length
+        ? await this.userRepo.find({ where: [{ username: In(usernames) }, { displayName: In(usernames) }] })
+        : [];
+      const displayNameByStoredValue = new Map<string, string>();
+      users.forEach((user) => {
+        const displayName = String(user.displayName ?? '').trim();
+        if (!displayName) return;
+        displayNameByStoredValue.set(String(user.username ?? '').trim(), displayName);
+        displayNameByStoredValue.set(displayName, displayName);
+      });
+      return logs.map((log) => {
+        const storedValue = String(log.operatorUsername ?? '').trim();
+        return {
+          ...log,
+          operatorUsername: storedValue ? (displayNameByStoredValue.get(storedValue) ?? '未知用户') : '',
+        };
       });
     } catch (error) {
       if (!this.isTableMissingError(error, 'fabric_stock_operation_log')) throw error;

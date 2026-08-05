@@ -16,6 +16,7 @@ export class FinishedGoodsStockOperationService {
   createManual(
     dto: {
       orderNo?: string;
+      inboundSource?: 'order' | 'manual';
       skuCode: string;
       quantity: number;
       unitPrice?: string | number;
@@ -24,6 +25,7 @@ export class FinishedGoodsStockOperationService {
       department: string;
       location: string;
       imageUrl?: string;
+      remark?: string;
       colorSize?: unknown;
     },
     operatorUsername = '',

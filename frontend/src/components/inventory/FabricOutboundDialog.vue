@@ -4,7 +4,7 @@
     title="面料出库"
     width="500"
     destroy-on-close
-    @close="onClose"
+    @closed="onClosed"
   >
     <el-form
       ref="formRef"
@@ -94,7 +94,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   (e: 'update:visible', v: boolean): void
   (e: 'confirm'): void
-  (e: 'close'): void
+  (e: 'closed'): void
 }>()
 
 const formRef = ref<FormInstance>()
@@ -104,9 +104,9 @@ const dialogVisible = computed({
   set: (v: boolean) => emit('update:visible', v),
 })
 
-function onClose() {
+function onClosed() {
   formRef.value?.clearValidate()
-  emit('close')
+  emit('closed')
 }
 
 defineExpose({

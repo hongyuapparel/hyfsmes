@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, Repository } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
 import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
@@ -225,12 +225,18 @@ export class InventoryAccessoriesService {
       salesperson,
     });
     const saved = await this.repo.save(entity);
+    const beforeSnapshot = toAccessorySnapshot(saved);
+    beforeSnapshot.quantity = 0;
+    if (saved.isSized) {
+      beforeSnapshot.sizeQuantities = (saved.sizeQuantities ?? []).map(() => 0);
+    }
     await this.addOperationLog({
       accessoryId: saved.id,
       action: 'create',
       operatorUsername: dto.operatorUsername ?? '',
-      beforeSnapshot: null,
+      beforeSnapshot,
       afterSnapshot: toAccessorySnapshot(saved),
+      remark: dto.remark ?? '',
     });
     return saved;
   }
@@ -508,9 +514,27 @@ export class InventoryAccessoriesService {
   async getOperationLogs(accessoryId: number): Promise<InventoryAccessoryOperationLog[]> {
     await this.getOne(accessoryId);
     try {
-      return await this.operationLogRepo.find({
+      const logs = await this.operationLogRepo.find({
         where: { accessoryId },
         order: { createdAt: 'DESC' },
+      });
+      const usernames = Array.from(new Set(logs.map((log) => String(log.operatorUsername ?? '').trim()).filter(Boolean)));
+      const users = usernames.length
+        ? await this.userRepo.find({ where: [{ username: In(usernames) }, { displayName: In(usernames) }] })
+        : [];
+      const displayNameByStoredValue = new Map<string, string>();
+      users.forEach((user) => {
+        const displayName = String(user.displayName ?? '').trim();
+        if (!displayName) return;
+        displayNameByStoredValue.set(String(user.username ?? '').trim(), displayName);
+        displayNameByStoredValue.set(displayName, displayName);
+      });
+      return logs.map((log) => {
+        const storedValue = String(log.operatorUsername ?? '').trim();
+        return {
+          ...log,
+          operatorUsername: storedValue ? (displayNameByStoredValue.get(storedValue) ?? '未知用户') : '',
+        };
       });
     } catch (error) {
       if (!this.isMissingTableError(error)) throw error;

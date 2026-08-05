@@ -4,7 +4,7 @@
     <div v-if="logs.length" class="detail-logs">
       <div v-for="log in logs" :key="log.id" class="detail-log-item">
         <div class="detail-log-head">
-          <span class="detail-log-user">{{ log.operatorUsername || '-' }}</span>
+          <span class="detail-log-user">{{ showOperatorLabel ? `操作人：${log.operatorUsername || '未记录'}` : (log.operatorUsername || '-') }}</span>
           <span class="detail-log-time">{{ log.createdAt }}</span>
         </div>
         <div class="detail-log-body">
@@ -40,8 +40,9 @@ withDefaults(
       rollbackId?: number
     }>
     canRollback?: boolean
+    showOperatorLabel?: boolean
   }>(),
-  { canRollback: false },
+  { canRollback: false, showOperatorLabel: false },
 )
 
 defineEmits<{

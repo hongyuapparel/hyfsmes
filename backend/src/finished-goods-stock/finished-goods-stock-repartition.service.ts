@@ -7,6 +7,7 @@ import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-ad
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import { isTableMissingError, normalizeOrderUnitPrice } from './finished-goods-stock-query.utils';
+import { buildFinishedEditLogRemark } from './finished-goods-stock-log-summary';
 
 export type ColorMetaInput = {
   stockId: number;
@@ -362,7 +363,7 @@ export class FinishedGoodsStockRepartitionService {
       }
 
       // 调整日志：每次保存写一条「可回滚点」，before 里带整组改动前快照
-      const remark = this.norm(dto.remark) || '修改成品库存（可回滚）';
+      const remark = buildFinishedEditLogRemark(dto.remark);
       const anchorId = survivingIds.has(seedId)
         ? seedId
         : keepers.find((k) => k.record.id != null)?.record.id ?? seedId;

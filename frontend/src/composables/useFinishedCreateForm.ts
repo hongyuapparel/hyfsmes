@@ -370,6 +370,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
         const groupQty = g.rows.reduce((sum, r) => sum + sumDetailRowQty(r.quantities), 0)
         await createFinishedStock({
           orderNo: createForm.orderNo?.trim() || undefined,
+          inboundSource: quickAddSource.value ? 'manual' : (createForm.orderNo?.trim() ? 'order' : 'manual'),
           skuCode,
           quantity: groupQty,
           unitPrice: createForm.unitPrice?.trim() || undefined,

@@ -127,7 +127,8 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     editForm.location = stock?.location ?? ''
     editForm.unitPrice = stock?.unitPrice != null ? String(stock.unitPrice) : ''
     editForm.imageUrl = String(stock?.imageUrl || internalGroupProductImage.value || data.value?.productImageUrl || '')
-    editForm.remark = stock?.remark ?? ''
+    // 库存详情里的备注可能来自上一次入库/出库记录，不能继承为本次编辑说明。
+    editForm.remark = ''
   }
 
   async function loadDetail(stockId: number) {

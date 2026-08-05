@@ -17,12 +17,49 @@ type LogSummaryInput = {
   sourceOrderNo?: string;
 };
 
+export type FinishedInboundLogDetails = {
+  remark: string;
+  sourceOrderNo: string;
+};
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? (value as Record<string, unknown>) : {};
 }
 
 function normalizeText(value: unknown): string {
   return String(value ?? '').trim();
+}
+
+export function buildFinishedInboundLogDetails(input: {
+  orderNo?: string;
+  inboundSource?: 'order' | 'manual';
+  remark?: string;
+}): FinishedInboundLogDetails {
+  const orderNo = normalizeText(input.orderNo);
+  const detailRemark = normalizeText(input.remark).replace(/^备注：/, '');
+  const isOrderSource = !!orderNo && input.inboundSource !== 'manual';
+  const prefix = isOrderSource ? `从订单 ${orderNo} 新增库存` : '手工新增库存';
+  return {
+    remark: detailRemark ? `${prefix}；备注：${detailRemark}` : prefix,
+    sourceOrderNo: isOrderSource ? orderNo : '',
+  };
+}
+
+export function buildFinishedOutboundLogRemark(pickupUserName: string, remark?: string): string {
+  const pickup = normalizeText(pickupUserName);
+  const detailRemark = normalizeText(remark).replace(/^备注：/, '');
+  return [
+    '成品出库',
+    pickup ? `领取人：${pickup}` : '',
+    detailRemark ? `备注：${detailRemark}` : '',
+  ].filter(Boolean).join('；');
+}
+
+export function buildFinishedEditLogRemark(remark?: string): string {
+  const detailRemark = normalizeText(remark).replace(/^备注[:：]\s*/, '');
+  return detailRemark
+    ? `修改成品库存（可回滚）；备注：${detailRemark}`
+    : '修改成品库存（可回滚）';
 }
 
 function normalizeQuantity(value: unknown): number {
@@ -151,9 +188,13 @@ export function buildFinishedStockAdjustLogSummary(input: LogSummaryInput): stri
   const sizeSummaries = buildSizeDeltaSummary(beforeSnapshot, afterSnapshot);
   if (isInbound) {
     const prefix = sourceOrderNo ? `从订单 ${sourceOrderNo} 新增库存` : '手工新增库存';
-    if (sizeSummaries.length) return `${prefix} ${sizeSummaries.join('；')}`;
-    if (hasQuantityDelta) return `${prefix} +${formatQty(afterQuantity - beforeQuantity)}件`;
-    return prefix;
+    const detailRemark = remark.match(/(?:^|；)备注：(.+)$/)?.[1]?.trim() ?? '';
+    const summary = sizeSummaries.length
+      ? `${prefix} ${sizeSummaries.join('；')}`
+      : hasQuantityDelta
+        ? `${prefix} +${formatQty(afterQuantity - beforeQuantity)}件`
+        : prefix;
+    return detailRemark ? `${summary}；备注：${detailRemark}` : summary;
   }
   if (isOutbound) {
     const prefix = remark || '成品出库';

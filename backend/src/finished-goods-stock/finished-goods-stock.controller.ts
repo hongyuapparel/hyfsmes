@@ -85,6 +85,7 @@ export class FinishedGoodsStockController {
   createManual(
     @CurrentUser() user: { userId: number; username: string },
     @Body('orderNo') orderNo: string,
+    @Body('inboundSource') inboundSource: 'order' | 'manual' | undefined,
     @Body('skuCode') skuCode: string,
     @Body('quantity') quantity: number,
     @Body('unitPrice') unitPrice: string | number,
@@ -93,11 +94,13 @@ export class FinishedGoodsStockController {
     @Body('department') department: string,
     @Body('location') location: string,
     @Body('imageUrl') imageUrl?: string,
+    @Body('remark') remark?: string,
     @Body('colorSize') colorSize?: unknown,
   ) {
     return this.operationService.createManual(
       {
         orderNo,
+        inboundSource,
         skuCode,
         quantity: Number(quantity),
         unitPrice,
@@ -106,6 +109,7 @@ export class FinishedGoodsStockController {
         department,
         location,
         imageUrl,
+        remark,
         colorSize,
       },
       user?.username ?? '',

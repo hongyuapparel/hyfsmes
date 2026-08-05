@@ -117,17 +117,17 @@
       <span v-else>{{ stock.location || '-' }}</span>
     </div>
 
-    <div class="detail-basic-label">备注</div>
+    <div class="detail-basic-label">{{ metaEditing ? '本次修改说明' : '备注' }}</div>
     <div class="detail-basic-value">
       <el-input
         v-if="metaEditing"
         :model-value="editForm.remark"
         clearable
         size="small"
-        placeholder="选填"
+        placeholder="选填，仅记录本次修改原因"
         @update:model-value="(value) => updateField('remark', String(value ?? ''))"
       />
-      <span v-else>{{ editForm.remark || '-' }}</span>
+      <span v-else>{{ stock.remark || '-' }}</span>
     </div>
 
     <template #image>
@@ -165,6 +165,7 @@ type StockInfo = {
   warehouseId?: number | null
   department?: string
   location?: string
+  remark?: string
 }
 
 const props = defineProps<{

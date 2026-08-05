@@ -6,9 +6,11 @@ import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-c
 import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-adjust-log.entity';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
+import { buildFinishedInboundLogDetails } from './finished-goods-stock-log-summary';
 
 type ManualInboundDto = {
   orderNo?: string;
+  inboundSource?: 'order' | 'manual';
   skuCode: string;
   quantity: number;
   unitPrice?: string | number;
@@ -17,6 +19,7 @@ type ManualInboundDto = {
   department: string;
   location: string;
   imageUrl?: string;
+  remark?: string;
   colorSize?: unknown;
 };
 
@@ -276,7 +279,11 @@ export class FinishedGoodsStockInboundService {
       inventoryTypeId,
       department,
     });
-    const inboundRemark = orderNo ? `从订单 ${orderNo} 新增库存` : '手工新增库存';
+    const inboundLog = buildFinishedInboundLogDetails({
+      orderNo,
+      inboundSource: dto.inboundSource,
+      remark: dto.remark,
+    });
     if (existing) {
       const before = this.inboundQueryService.stockAdjustSnapshot(existing);
       const oldQty = Math.max(0, Math.trunc(Number(existing.quantity) || 0));
@@ -315,8 +322,8 @@ export class FinishedGoodsStockInboundService {
           operatorUsername,
           before,
           this.inboundQueryService.stockAdjustSnapshot(saved),
-          inboundRemark,
-          { sourceOrderNo: orderNo, action: 'inbound' },
+          inboundLog.remark,
+          { sourceOrderNo: inboundLog.sourceOrderNo, action: 'inbound' },
         );
         return this.consolidateDuplicateFinishedStocks(saved);
       } catch (e: unknown) {
@@ -335,8 +342,8 @@ export class FinishedGoodsStockInboundService {
         operatorUsername,
         { quantity: 0, colorSizeSnapshot: null },
         this.inboundQueryService.stockAdjustSnapshot(saved),
-        inboundRemark,
-        { sourceOrderNo: orderNo, action: 'inbound' },
+        inboundLog.remark,
+        { sourceOrderNo: inboundLog.sourceOrderNo, action: 'inbound' },
       );
       return this.consolidateDuplicateFinishedStocks(saved);
     } catch (e: unknown) {

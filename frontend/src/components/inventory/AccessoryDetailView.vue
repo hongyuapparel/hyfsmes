@@ -103,7 +103,7 @@
     </div>
 
     <div v-if="isView" v-loading="logsLoading" class="acc-section-logs">
-      <OperationLogsSection :logs="formattedLogs" />
+      <OperationLogsSection :logs="formattedLogs" show-operator-label />
     </div>
   </div>
 </template>
@@ -121,6 +121,7 @@ import { formatDateTime as formatDate } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { sumDetailRowQty } from '@/utils/finishedStockTableUtils'
 import type { AccessoriesFormModel } from '@/composables/useAccessoriesFormDialog'
+import { buildInventoryOperationLogSummary } from '@/utils/inventoryOperationLogSummary'
 
 const props = defineProps<{
   form: AccessoriesFormModel
@@ -164,7 +165,7 @@ const formattedLogs = computed(() =>
     id: log.id,
     operatorUsername: log.operatorUsername,
     createdAt: formatDate(log.createdAt),
-    summary: `${props.formatLogAction(log.action)}${log.remark ? ` · 备注：${log.remark}` : ''}`,
+    summary: buildInventoryOperationLogSummary(log),
   })),
 )
 

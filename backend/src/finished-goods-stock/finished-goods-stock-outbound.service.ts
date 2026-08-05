@@ -11,6 +11,7 @@ import { Role } from '../entities/role.entity';
 import { UserRole } from '../entities/user-role.entity';
 import type { ColorSizeSnapshot, FinishedOutboundItemInput } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
+import { buildFinishedOutboundLogRemark } from './finished-goods-stock-log-summary';
 import { subtractColorSizeSnapshots } from './finished-goods-stock-query.utils';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
@@ -421,7 +422,14 @@ export class FinishedGoodsStockOutboundService {
           const afterAdjust = this.stockAdjustSnapshot(txStock, afterSnapshot);
           if (txStock.quantity === 0) await txStockRepo.remove(txStock);
           else await txStockRepo.save(txStock);
-          await this.appendOutboundAdjustLog(manager, item.id, operatorDisplayName, beforeAdjust, afterAdjust, remark);
+          await this.appendOutboundAdjustLog(
+            manager,
+            item.id,
+            operatorDisplayName,
+            beforeAdjust,
+            afterAdjust,
+            buildFinishedOutboundLogRemark(pickupInfo.pickupUserName, remark),
+          );
 
           const stock = stockMap.get(item.id) ?? txStock;
           const order = stock.orderId != null ? orderMap.get(stock.orderId) ?? null : null;
