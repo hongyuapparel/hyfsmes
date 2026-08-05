@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     v-model="visible"
-    :title="dialog.mode === 'amend' ? '修改入库/次品' : '登记入库'"
+    :title="dialog.mode === 'amend' ? '修改尾部数据' : '登记入库'"
     width="1000"
     destroy-on-close
     @close="emit('close')"
@@ -10,7 +10,7 @@
       可分多次登记。「部分入库」保留在「尾部中」等待下一批；「全部入库」补齐剩余并推进到「尾部完成」。
     </p>
     <p v-else class="dialog-tip">
-      在仓库尚未对「待仓处理」记录完成入库或发货前，可修正入库数与次品数；保存后将按新数量重建待仓记录。
+      在仓库尚未对「待仓处理」记录完成入库或发货前，可修正尾部收货、入库与次品；保存后将按新数量重建待仓记录。
     </p>
     <div v-if="dialog.formLoading" class="register-loading">加载尺寸细数...</div>
     <template v-else>
@@ -24,7 +24,7 @@
           <span class="brief-sep">·</span>
           <span><span class="brief-label">SKU</span>{{ item.row.skuCode }}</span>
           <span class="brief-sep">·</span>
-          <span><span class="brief-label">尾部收货</span>{{ formatDisplayNumber(item.row.tailReceivedQty ?? 0) }}</span>
+          <span><span class="brief-label">尾部收货</span>{{ formatDisplayNumber(dialog.mode === 'amend' ? receivedTotal(item) : item.row.tailReceivedQty ?? 0) }}</span>
           <template v-if="dialog.mode === 'register'">
             <template v-if="alreadyInboundQty(item) > 0">
               <span class="brief-sep">·</span>
@@ -38,7 +38,8 @@
 
         <template v-if="item.sizeHeaders?.length">
           <div class="register-qty-toolbar">
-            <p class="register-qty-tip">按颜色分别填写本次入库与本次次品；每格不可超过该颜色"尾部收货 − 已入库 − 已次品"剩余。</p>
+            <p v-if="dialog.mode === 'amend'" class="register-qty-tip">可修正尾部收货、入库与次品；收货不可超过车缝，入库与次品之和须等于收货。</p>
+            <p v-else class="register-qty-tip">按颜色分别填写本次入库与本次次品；每格不可超过该颜色"尾部收货 − 已入库 − 已次品"剩余。</p>
             <div class="register-qty-actions">
               <el-button v-if="dialog.mode === 'register'" size="small" link @click="packagingSetInboundToReceived(item)">
                 按剩余可登记全部填入
@@ -84,8 +85,26 @@
                     {{ formatDisplayNumber(row.values[ci] ?? 0) }}
                   </template>
                   <span
+                    v-else-if="row.field === 'received'"
+                    :data-cell-r="inputRowIndex(row.field)"
+                    :data-cell-c="ci"
+                    class="cell-input"
+                  >
+                    <el-input-number
+                      v-model="item.tailReceivedColorRows[ri].quantities[ci]"
+                      :min="0"
+                      :max="receivedCellMax(item, ri, ci)"
+                      :precision="0"
+                      :controls="false"
+                      size="small"
+                      style="width: 100%"
+                      @keydown="onMatrixCellKeydown"
+                      @focus="selectAllOnFocus"
+                    />
+                  </span>
+                  <span
                     v-else-if="row.field === 'inbound'"
-                    :data-cell-r="0"
+                    :data-cell-r="inputRowIndex(row.field)"
                     :data-cell-c="ci"
                     class="cell-input"
                   >
@@ -101,7 +120,7 @@
                       @focus="selectAllOnFocus"
                     />
                   </span>
-                  <span v-else :data-cell-r="1" :data-cell-c="ci" class="cell-input">
+                  <span v-else :data-cell-r="inputRowIndex(row.field)" :data-cell-c="ci" class="cell-input">
                     <el-input-number
                       v-model="item.defectQuantitiesByColor[ri].quantities[ci]"
                       :min="0"
@@ -118,7 +137,8 @@
               </el-table-column>
               <el-table-column label="合计" width="68" align="right">
                 <template #default="{ row }">
-                  <strong v-if="row.kind === 'input' && row.field === 'inbound'">{{ formatDisplayNumber(sumInputInbound(item, ri)) }}</strong>
+                  <strong v-if="row.kind === 'input' && row.field === 'received'">{{ formatDisplayNumber(sumInputReceived(item, ri)) }}</strong>
+                  <strong v-else-if="row.kind === 'input' && row.field === 'inbound'">{{ formatDisplayNumber(sumInputInbound(item, ri)) }}</strong>
                   <strong v-else-if="row.kind === 'input'">{{ formatDisplayNumber(sumInputDefect(item, ri)) }}</strong>
                   <span v-else>{{ formatDisplayNumber(sumReadonly(row.values)) }}</span>
                 </template>
@@ -126,6 +146,10 @@
             </el-table>
           </div>
           <p class="register-qty-grand">
+            <template v-if="dialog.mode === 'amend'">
+              尾部收货总合计：<strong>{{ formatDisplayNumber(receivedTotal(item)) }}</strong>
+              ｜
+            </template>
             本次入库总合计：<strong>{{ formatDisplayNumber(inboundTotal(item)) }}</strong>
             ｜ 本次次品总合计：<strong>{{ formatDisplayNumber(defectTotal(item)) }}</strong>
           </p>
@@ -187,8 +211,10 @@ const props = defineProps<{
   packagingSizeTableRows: (item: PackagingCompleteItem) => PackagingSizeTableRow[]
   defectTotal: (item: PackagingCompleteItem) => number
   inboundTotal: (item: PackagingCompleteItem) => number
+  receivedTotal: (item: PackagingCompleteItem) => number
   alreadyInboundQty: (item: PackagingCompleteItem) => number
   remainingQty: (item: PackagingCompleteItem) => number
+  receivedCellMax: (item: PackagingCompleteItem, ri: number, ci: number) => number | undefined
   inboundCellMax: (item: PackagingCompleteItem, ri: number, ci: number) => number | undefined
   defectCellMax: (item: PackagingCompleteItem, ri: number, ci: number) => number | undefined
   packagingSetInboundToReceived: (item: PackagingCompleteItem) => void
@@ -207,7 +233,7 @@ watch(visible, (v) => emit('update:modelValue', v))
 
 type BlockRow =
   | { kind: 'readonly'; label: string; values: number[] }
-  | { kind: 'input'; field: 'inbound' | 'defect'; label: string }
+  | { kind: 'input'; field: 'received' | 'inbound' | 'defect'; label: string }
 
 function hasNonZero(values: number[] | undefined | null): boolean {
   if (!Array.isArray(values)) return false
@@ -227,7 +253,8 @@ function rowsForColor(item: PackagingCompleteItem, ri: number): BlockRow[] {
   if (hasNonZero(cut)) rows.push({ kind: 'readonly', label: '裁床数量', values: cut })
   if (hasNonZero(sew)) rows.push({ kind: 'readonly', label: '车缝数量', values: sew })
   // 尾部收货是本次入库的事实基准；缺失时 buildItem 已阻断，不生成计划兜底。
-  rows.push({ kind: 'readonly', label: '尾部收货', values: received })
+  if (props.dialog.mode === 'amend') rows.push({ kind: 'input', field: 'received', label: '尾部收货' })
+  else rows.push({ kind: 'readonly', label: '尾部收货', values: received })
   if (hasNonZero(alreadyIn)) rows.push({ kind: 'readonly', label: '已累计入库', values: alreadyIn })
   if (hasNonZero(alreadyDef)) rows.push({ kind: 'readonly', label: '已累计次品', values: alreadyDef })
   rows.push({ kind: 'input', field: 'inbound', label: '本次入库' })
@@ -243,8 +270,18 @@ function sumInputInbound(item: PackagingCompleteItem, ri: number): number {
   return (item.inboundQuantitiesByColor[ri]?.quantities ?? []).reduce((s, n) => s + (Number(n) || 0), 0)
 }
 
+function sumInputReceived(item: PackagingCompleteItem, ri: number): number {
+  return (item.tailReceivedColorRows[ri]?.quantities ?? []).reduce((s, n) => s + (Number(n) || 0), 0)
+}
+
 function sumInputDefect(item: PackagingCompleteItem, ri: number): number {
   return (item.defectQuantitiesByColor[ri]?.quantities ?? []).reduce((s, n) => s + (Number(n) || 0), 0)
+}
+
+function inputRowIndex(field: 'received' | 'inbound' | 'defect'): number {
+  if (props.dialog.mode === 'register') return field === 'inbound' ? 0 : 1
+  if (field === 'received') return 0
+  return field === 'inbound' ? 1 : 2
 }
 
 function rowClassName({ row }: { row: BlockRow }): string {

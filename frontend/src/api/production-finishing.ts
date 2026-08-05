@@ -123,8 +123,13 @@ export function registerFinishingPackagingComplete(payload: RegisterFinishingPac
   return request.post<void>('/production/finishing/items/register-packaging-complete', payload)
 }
 
-/** 纠错修订已完成尾部入库/次品（需 production_admin_edit） */
-export function amendFinishingPackaging(payload: Omit<RegisterFinishingPackagingCompletePayload, 'mode'>) {
+export interface AmendFinishingPackagingPayload extends Omit<RegisterFinishingPackagingCompletePayload, 'mode'> {
+  tailReceivedQty: number
+  tailReceivedQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>
+}
+
+/** 纠错修订已完成尾部收货/入库/次品（需 production_admin_edit） */
+export function amendFinishingPackaging(payload: AmendFinishingPackagingPayload) {
   return request.post<void>('/production/finishing/items/amend-packaging', payload)
 }
 

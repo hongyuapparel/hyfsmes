@@ -10,6 +10,7 @@ const tailReceivedColorRows = [
 ]
 
 vi.mock('@/api/production-finishing', () => ({
+  amendFinishingPackaging: vi.fn(async () => ({ data: undefined })),
   registerFinishingPackagingComplete: vi.fn(async () => ({ data: undefined })),
   getFinishingRegisterFormData: vi.fn(async () => ({
     data: {
@@ -41,7 +42,11 @@ vi.mock('@/api/request', () => ({
 }))
 
 import { useFinishingPackaging } from './useFinishingPackaging'
-import { getFinishingRegisterFormData, registerFinishingPackagingComplete } from '@/api/production-finishing'
+import {
+  amendFinishingPackaging,
+  getFinishingRegisterFormData,
+  registerFinishingPackagingComplete,
+} from '@/api/production-finishing'
 
 const makeRow = (overrides: Partial<FinishingListItem> = {}): FinishingListItem => ({
   orderId: 1,
@@ -179,5 +184,79 @@ describe('useFinishingPackaging — byColor', () => {
     await c.openPackagingCompleteDialog()
     expect(c.packagingCompleteDialog.visible).toBe(false)
     expect(c.packagingCompleteDialog.items).toEqual([])
+  })
+
+  it('纠错模式使用覆盖式上限，原入库数不会把输入框 max 算成 0', async () => {
+    vi.mocked(getFinishingRegisterFormData).mockResolvedValueOnce({
+      data: {
+        headers: ['S', 'M', '合计'],
+        sizeHeaders: ['S', 'M'],
+        orderRow: [60, 40, 100],
+        cutRow: [60, 40, 100],
+        sewingRow: [60, 40, 100],
+        tailReceivedRow: [60, 40, 100],
+        tailInboundRow: [60, 40, 100],
+        defectRow: [0, 0, 0],
+        planColorRows,
+        cutColorRows: planColorRows,
+        sewingColorRows: planColorRows,
+        tailReceivedColorRows,
+        tailInboundColorRows: [{ colorName: 'red', quantities: [60, 40] }],
+        defectColorRows: [{ colorName: 'red', quantities: [0, 0] }],
+      },
+    } as Awaited<ReturnType<typeof getFinishingRegisterFormData>>)
+    const c = useFinishingPackaging({
+      selectedRows: ref([makeRow({ finishingStatus: 'inbound', tailInboundQty: 100 })]),
+      reloadList: async () => {},
+      reloadTabCounts: async () => {},
+    })
+
+    await c.openPackagingAmendDialog()
+    const item = c.packagingCompleteDialog.items[0]
+
+    expect(c.inboundCellMax(item, 0, 0)).toBe(60)
+    expect(c.inboundCellMax(item, 0, 1)).toBe(40)
+    expect(c.receivedCellMax(item, 0, 0)).toBe(60)
+  })
+
+  it('纠错保存同时提交新的尾部收货、入库和次品明细', async () => {
+    vi.mocked(getFinishingRegisterFormData).mockResolvedValueOnce({
+      data: {
+        headers: ['S', 'M', '合计'],
+        sizeHeaders: ['S', 'M'],
+        orderRow: [60, 40, 100],
+        cutRow: [60, 40, 100],
+        sewingRow: [60, 40, 100],
+        tailReceivedRow: [60, 40, 100],
+        tailInboundRow: [60, 40, 100],
+        defectRow: [0, 0, 0],
+        planColorRows,
+        cutColorRows: planColorRows,
+        sewingColorRows: planColorRows,
+        tailReceivedColorRows,
+        tailInboundColorRows: [{ colorName: 'red', quantities: [60, 40] }],
+        defectColorRows: [{ colorName: 'red', quantities: [0, 0] }],
+      },
+    } as Awaited<ReturnType<typeof getFinishingRegisterFormData>>)
+    const c = useFinishingPackaging({
+      selectedRows: ref([makeRow({ finishingStatus: 'inbound', tailInboundQty: 100 })]),
+      reloadList: async () => {},
+      reloadTabCounts: async () => {},
+    })
+
+    await c.openPackagingAmendDialog()
+    const item = c.packagingCompleteDialog.items[0]
+    item.tailReceivedColorRows = [{ colorName: 'red', quantities: [55, 35] }]
+    item.inboundQuantitiesByColor = [{ colorName: 'red', quantities: [50, 30] }]
+    item.defectQuantitiesByColor = [{ colorName: 'red', quantities: [5, 5] }]
+    await c.submitPackagingComplete('full')
+
+    expect(amendFinishingPackaging).toHaveBeenCalledWith(expect.objectContaining({
+      orderId: 1,
+      tailReceivedQty: 90,
+      tailInboundQty: 80,
+      defectQuantity: 10,
+      tailReceivedQuantitiesByColor: [{ colorName: 'red', quantities: [55, 35] }],
+    }))
   })
 })

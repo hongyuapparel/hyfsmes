@@ -99,6 +99,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     return sumColorRowsTotal(item.inboundQuantitiesByColor)
   }
 
+  function receivedTotal(item: PackagingCompleteItem): number {
+    return sumColorRowsTotal(item.tailReceivedColorRows)
+  }
+
   function alreadyInboundQty(item: PackagingCompleteItem): number {
     return Number(item.row.tailInboundQty ?? 0)
   }
@@ -163,24 +167,32 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     return false
   }
 
+  /** 尾部收货每格上限：对应颜色尺码的车缝完成数。 */
+  function receivedCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    const value = item.sewingColorRows[ri]?.quantities?.[ci]
+    return value != null && Number.isFinite(Number(value)) ? Number(value) : undefined
+  }
+
   /** 入库每格上限：颜色 ri 尺码 ci 剩余 = 尾部收货[ri][ci] − 已入库[ri][ci] − 已次品[ri][ci] − 本次次品[ri][ci]
    *  老订单缺 byColor 真值时返回 undefined（不设 cell 上限），避免输入值被 el-input-number 自动 reset 到 0。 */
   function inboundCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
-    if (!hasReceivedTruth(item)) return undefined
+    if (packagingCompleteDialog.mode === 'register' && !hasReceivedTruth(item)) return undefined
     const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
+    const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+    if (packagingCompleteDialog.mode === 'amend') return Math.max(0, r - td)
     const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
     const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
-    const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
     return Math.max(0, r - a - d - td)
   }
 
   /** 次品每格上限：同理但本次入库占用 */
   function defectCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
-    if (!hasReceivedTruth(item)) return undefined
+    if (packagingCompleteDialog.mode === 'register' && !hasReceivedTruth(item)) return undefined
     const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
+    const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
+    if (packagingCompleteDialog.mode === 'amend') return Math.max(0, r - ti)
     const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
     const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
-    const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
     return Math.max(0, r - a - d - ti)
   }
 
@@ -303,7 +315,7 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
 
   async function openPackagingAmendForRow(row: FinishingListItem) {
     if (row.finishingStatus !== 'inbound') {
-      ElMessage.warning('仅尾部已入库的订单可修改入库/次品')
+      ElMessage.warning('仅尾部已入库的订单可修改尾部收货/入库/次品')
       return
     }
     await openPackagingAmendForRows([row])
@@ -339,7 +351,11 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
         return
       }
       if (isAmend) {
-        const received = item.row.tailReceivedQty ?? 0
+        const received = receivedTotal(item)
+        if (received <= 0) {
+          ElMessage.warning(`订单 ${item.row.orderNo}：尾部收货数必须大于 0`)
+          return
+        }
         if (sumInbound + defect !== received) {
           ElMessage.warning(`订单 ${item.row.orderNo}：入库合计(${sumInbound})+次品(${defect}) 须等于尾部收货数(${received})`)
           return
@@ -367,6 +383,7 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
         const sizeLen = item.sizeHeaders.length
         const inbound1D = sumColorRowsBySize(item.inboundQuantitiesByColor, sizeLen)
         const defect1D = sumColorRowsBySize(item.defectQuantitiesByColor, sizeLen)
+        const received = receivedTotal(item)
         const sumInbound = inboundTotal(item)
         const defect = defectTotal(item)
         const payload = {
@@ -380,7 +397,11 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
           defectQuantitiesByColor: item.defectQuantitiesByColor,
         }
         if (isAmend) {
-          await amendFinishingPackaging(payload)
+          await amendFinishingPackaging({
+            ...payload,
+            tailReceivedQty: received,
+            tailReceivedQuantitiesByColor: item.tailReceivedColorRows,
+          })
         } else {
           await registerFinishingPackagingComplete({ ...payload, mode })
         }
@@ -409,11 +430,13 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     packagingSizeTableRows,
     defectTotal,
     inboundTotal,
+    receivedTotal,
     alreadyInboundQty,
     alreadyDefectQty,
     remainingQty,
     packagingSetZero,
     packagingSetInboundToReceived,
+    receivedCellMax,
     inboundCellMax,
     defectCellMax,
     openPackagingCompleteDialog,

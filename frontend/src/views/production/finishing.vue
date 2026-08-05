@@ -91,7 +91,7 @@
           type="primary"
           @click="openPackagingAmendDialog"
         >
-          修改入库/次品
+          修改尾部数据
         </el-button>
       </div>
     </div>
@@ -158,8 +158,10 @@
       :packaging-size-table-rows="packagingSizeTableRows"
       :defect-total="defectTotal"
       :inbound-total="inboundTotal"
+      :received-total="receivedTotal"
       :already-inbound-qty="alreadyInboundQty"
       :remaining-qty="remainingQty"
+      :received-cell-max="receivedCellMax"
       :inbound-cell-max="inboundCellMax"
       :defect-cell-max="defectCellMax"
       :packaging-set-inbound-to-received="packagingSetInboundToReceived"
@@ -337,6 +339,8 @@ const {
   packagingSizeTableRows,
   defectTotal,
   inboundTotal,
+  receivedTotal,
+  receivedCellMax,
   inboundCellMax,
   defectCellMax,
   packagingSetInboundToReceived,

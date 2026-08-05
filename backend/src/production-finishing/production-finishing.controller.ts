@@ -180,22 +180,25 @@ export class ProductionFinishingController {
     );
   }
 
-  /** 纠错：修订已完成尾部入库/次品（需 production_admin_edit） */
+  /** 纠错：修订已完成尾部收货/入库/次品（需 production_admin_edit） */
   @Post('items/amend-packaging')
   @RequirePermission('production_admin_edit')
   amendPackaging(
     @Body('orderId') orderId: number,
+    @Body('tailReceivedQty') tailReceivedQty: number,
     @Body('tailInboundQty') tailInboundQty: number,
     @Body('defectQuantity') defectQuantity: number,
     @Body('remark') remark?: string,
     @Body('tailInboundQuantities') tailInboundQuantities?: number[],
     @Body('defectQuantities') defectQuantities?: number[],
+    @Body('tailReceivedQuantitiesByColor') tailReceivedQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
     @Body('tailInboundQuantitiesByColor') tailInboundQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
     @Body('defectQuantitiesByColor') defectQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.finishingMutationService.amendCompletedPackaging(
       Number(orderId),
+      Number(tailReceivedQty ?? 0),
       Number(tailInboundQty ?? 0),
       Number(defectQuantity ?? 0),
       remark ?? null,
@@ -203,6 +206,7 @@ export class ProductionFinishingController {
       user?.username,
       Array.isArray(tailInboundQuantities) ? tailInboundQuantities : null,
       Array.isArray(defectQuantities) ? defectQuantities : null,
+      Array.isArray(tailReceivedQuantitiesByColor) ? tailReceivedQuantitiesByColor : null,
       Array.isArray(tailInboundQuantitiesByColor) ? tailInboundQuantitiesByColor : null,
       Array.isArray(defectQuantitiesByColor) ? defectQuantitiesByColor : null,
     );
