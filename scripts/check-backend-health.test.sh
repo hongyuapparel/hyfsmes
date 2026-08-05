@@ -59,7 +59,33 @@ run_delayed_success_case() (
   check_backend_health erp-backend
 )
 
+run_env_port_case() (
+  health_test_env_file="$SCRIPT_DIR/.env"
+  if [ -e "$health_test_env_file" ]; then
+    echo "refusing to overwrite test fixture: $health_test_env_file" >&2
+    return 1
+  fi
+  trap 'rm -f "$health_test_env_file"' EXIT
+  printf '%s\n' 'PORT=3001' >"$health_test_env_file"
+
+  curl() {
+    case "$*" in
+      *'http://127.0.0.1:3001/health/db'*) printf '%s' '{"status":"ok","db":"connected"}' ;;
+      *'http://127.0.0.1:3001/health'*) printf '%s' '{"status":"ok"}' ;;
+      *) printf 'unexpected health URL: %s\n' "$*" >&2; return 22 ;;
+    esac
+  }
+  sleep() { :; }
+  pm2() { :; }
+
+  BACKEND_DIR="$SCRIPT_DIR"
+  BACKEND_HEALTH_ATTEMPTS=1
+  . "$SCRIPT_DIR/check-backend-health.sh"
+  check_backend_health erp-backend
+)
+
 run_success_case
 run_delayed_success_case
+run_env_port_case
 run_failure_case
 echo 'check-backend-health tests passed'

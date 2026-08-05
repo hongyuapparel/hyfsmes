@@ -4,13 +4,20 @@
 # Historical PM2 error logs are printed only when the new process fails health checks.
 check_backend_health() {
   health_app_name="$1"
-  health_base_url="${BACKEND_HEALTH_BASE_URL:-http://127.0.0.1:3000}"
+  health_port="${BACKEND_HEALTH_PORT:-}"
+  if [ -z "$health_port" ] && [ -n "${BACKEND_DIR:-}" ] && [ -f "$BACKEND_DIR/.env" ]; then
+    health_port="$(sed -n 's/^[[:space:]]*PORT[[:space:]]*=[[:space:]]*\([0-9][0-9]*\)[[:space:]]*$/\1/p' "$BACKEND_DIR/.env" | tail -n 1)"
+  fi
+  health_port="${health_port:-3000}"
+  health_base_url="${BACKEND_HEALTH_BASE_URL:-http://127.0.0.1:$health_port}"
   # Production startup runs schema guards and seed checks before Nest begins
   # listening. Give that bootstrap work up to two minutes before declaring the
   # deployment unhealthy.
   health_attempts="${BACKEND_HEALTH_ATTEMPTS:-60}"
   health_delay_seconds="${BACKEND_HEALTH_DELAY_SECONDS:-2}"
   health_attempt=1
+
+  echo "[health] checking $health_base_url/health and /health/db"
 
   while [ "$health_attempt" -le "$health_attempts" ]; do
     health_body="$(curl --fail --silent --max-time 5 "$health_base_url/health" 2>/dev/null || true)"
