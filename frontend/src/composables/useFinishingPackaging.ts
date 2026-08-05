@@ -169,6 +169,9 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
 
   /** 尾部收货每格上限：对应颜色尺码的车缝完成数。 */
   function receivedCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    // 纠错时允许按任意顺序修改收货、入库和次品。动态 max 会让
+    // el-input-number 在失焦时擅自截断用户刚输入的值，统一改为提交时校验。
+    if (packagingCompleteDialog.mode === 'amend') return undefined
     const value = item.sewingColorRows[ri]?.quantities?.[ci]
     return value != null && Number.isFinite(Number(value)) ? Number(value) : undefined
   }
@@ -176,10 +179,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
   /** 入库每格上限：颜色 ri 尺码 ci 剩余 = 尾部收货[ri][ci] − 已入库[ri][ci] − 已次品[ri][ci] − 本次次品[ri][ci]
    *  老订单缺 byColor 真值时返回 undefined（不设 cell 上限），避免输入值被 el-input-number 自动 reset 到 0。 */
   function inboundCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    if (packagingCompleteDialog.mode === 'amend') return undefined
     if (packagingCompleteDialog.mode === 'register' && !hasReceivedTruth(item)) return undefined
     const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
     const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
-    if (packagingCompleteDialog.mode === 'amend') return Math.max(0, r - td)
     const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
     const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
     return Math.max(0, r - a - d - td)
@@ -187,10 +190,10 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
 
   /** 次品每格上限：同理但本次入库占用 */
   function defectCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
+    if (packagingCompleteDialog.mode === 'amend') return undefined
     if (packagingCompleteDialog.mode === 'register' && !hasReceivedTruth(item)) return undefined
     const r = Number(item.tailReceivedColorRows[ri]?.quantities?.[ci] ?? 0)
     const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
-    if (packagingCompleteDialog.mode === 'amend') return Math.max(0, r - ti)
     const a = Number(item.alreadyInboundColorRows[ri]?.quantities?.[ci] ?? 0)
     const d = Number(item.alreadyDefectColorRows[ri]?.quantities?.[ci] ?? 0)
     return Math.max(0, r - a - d - ti)
@@ -203,10 +206,14 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     if (!hasReceivedTruth(item)) return null
     const rows = item.tailReceivedColorRows
     if (mode === 'amend') {
-      // 覆盖式：每格 入库 + 次品 = 尾部收货
+      // 覆盖式：提交时统一校验，编辑过程中不使用动态 max 截断输入。
       for (let ri = 0; ri < rows.length; ri++) {
         for (let ci = 0; ci < sizeLen; ci++) {
           const r = Number(rows[ri]?.quantities?.[ci] ?? 0)
+          const sewingRaw = item.sewingColorRows[ri]?.quantities?.[ci]
+          if (sewingRaw != null && Number.isFinite(Number(sewingRaw)) && r > Number(sewingRaw)) {
+            return `订单 ${item.row.orderNo}：${rows[ri].colorName}/${item.sizeHeaders[ci]} 尾部收货(${r})不能超过车缝数(${Number(sewingRaw)})`
+          }
           const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
           const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
           if (ti + td !== r) {

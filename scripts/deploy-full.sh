@@ -20,6 +20,8 @@ if [ "$ENABLE_GIT_PULL" = "1" ]; then
   git pull --ff-only origin "$GIT_BRANCH"
 fi
 
+echo "[deploy-full] source commit: $(git rev-parse HEAD)"
+
 if [ "$ENABLE_GIT_PUSH" = "1" ]; then
   echo "[deploy-full] git push origin $GIT_BRANCH"
   git push origin "$GIT_BRANCH"
@@ -50,6 +52,16 @@ if [ ! -d "$FRONTEND_DIST" ]; then
 fi
 
 cp -r "$FRONTEND_DIST"/. "$WEB_ROOT"/
+if ! cmp -s "$FRONTEND_DIST/index.html" "$WEB_ROOT/index.html"; then
+  echo "[deploy-full] publish verification failed: $WEB_ROOT/index.html does not match the new build" >&2
+  exit 1
+fi
+frontend_entry="$(sed -n 's/.*src="\/assets\/\([^"]*\.js\)".*/\1/p' "$WEB_ROOT/index.html" | head -n 1)"
+if [ -z "$frontend_entry" ] || [ ! -f "$WEB_ROOT/assets/$frontend_entry" ]; then
+  echo "[deploy-full] publish verification failed: frontend entry asset not found ($frontend_entry)" >&2
+  exit 1
+fi
 echo "[deploy-full] published frontend to $WEB_ROOT"
+echo "[deploy-full] verified frontend entry: assets/$frontend_entry"
 pm2 status "$PM2_APP_NAME"
 echo "[deploy-full] done"

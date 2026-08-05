@@ -186,7 +186,7 @@ describe('useFinishingPackaging — byColor', () => {
     expect(c.packagingCompleteDialog.items).toEqual([])
   })
 
-  it('纠错模式使用覆盖式上限，原入库数不会把输入框 max 算成 0', async () => {
+  it('纠错模式不设置动态 max，允许按任意顺序修改且失焦不归零', async () => {
     vi.mocked(getFinishingRegisterFormData).mockResolvedValueOnce({
       data: {
         headers: ['S', 'M', '合计'],
@@ -214,9 +214,16 @@ describe('useFinishingPackaging — byColor', () => {
     await c.openPackagingAmendDialog()
     const item = c.packagingCompleteDialog.items[0]
 
-    expect(c.inboundCellMax(item, 0, 0)).toBe(60)
-    expect(c.inboundCellMax(item, 0, 1)).toBe(40)
-    expect(c.receivedCellMax(item, 0, 0)).toBe(60)
+    expect(c.inboundCellMax(item, 0, 0)).toBeUndefined()
+    expect(c.defectCellMax(item, 0, 0)).toBeUndefined()
+    expect(c.receivedCellMax(item, 0, 0)).toBeUndefined()
+
+    // 模拟用户先改入库、再改收货：动态 max 不再把前一个值夹回 0。
+    item.tailReceivedColorRows[0].quantities[0] = 0
+    item.inboundQuantitiesByColor[0].quantities[0] = 55
+    expect(item.inboundQuantitiesByColor[0].quantities[0]).toBe(55)
+    item.tailReceivedColorRows[0].quantities[0] = 55
+    expect(item.inboundQuantitiesByColor[0].quantities[0]).toBe(55)
   })
 
   it('纠错保存同时提交新的尾部收货、入库和次品明细', async () => {
