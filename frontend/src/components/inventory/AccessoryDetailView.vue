@@ -180,7 +180,7 @@ defineOptions({ name: 'AccessoryDetailView' })
   border-radius: 8px;
   background: #fff;
 }
-.acc-section-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); margin-bottom: 8px; }
+.acc-section-title { font-weight: 600; font-size: var(--font-size-body); color: var(--el-text-color-primary); margin-bottom: 8px; }
 .acc-images { display: flex; flex-wrap: wrap; gap: 10px; }
 .acc-muted { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 .qty-unit-row { display: flex; gap: var(--space-sm); width: 100%; align-items: center; }

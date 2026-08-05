@@ -432,7 +432,7 @@ watchEffect(() => {
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .text-muted {
@@ -440,7 +440,7 @@ watchEffect(() => {
 }
 
 .craft-sub-attr {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   margin-top: 2px;
 }
 

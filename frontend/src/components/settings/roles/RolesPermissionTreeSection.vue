@@ -168,7 +168,7 @@ defineExpose({
 }
 .perm-tab-desc {
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
   margin-bottom: 12px;
 }
 .perm-tree {
@@ -225,7 +225,7 @@ defineExpose({
 .tree-node-actions-title {
   flex: 0 0 auto;
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 24px;
 }
 .tree-node-action-checks {

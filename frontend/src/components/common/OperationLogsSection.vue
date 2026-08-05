@@ -64,7 +64,7 @@ defineEmits<{
   font-size: var(--font-size-body);
   color: var(--el-text-color-primary);
 }
-.detail-muted { font-size: 12px; color: var(--el-text-color-secondary); }
+.detail-muted { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 .detail-logs { display: flex; flex-direction: column; gap: 10px; }
 .detail-log-item {
   padding: 10px 12px;
@@ -76,9 +76,9 @@ defineEmits<{
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
 }
-.detail-log-body { font-size: 12px; color: var(--el-text-color-regular); line-height: 1.5; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.detail-log-body { font-size: var(--font-size-caption); color: var(--el-text-color-regular); line-height: 1.5; display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .detail-log-rollback { flex: none; padding: 0; height: auto; }
 </style>

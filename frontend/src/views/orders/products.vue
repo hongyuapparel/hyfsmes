@@ -386,7 +386,7 @@ onBeforeUnmount(() => cleanup())
   justify-content: space-between;
   padding: var(--space-md) var(--space-md);
   font-weight: 600;
-  font-size: 15px;
+  font-size: var(--font-size-subtitle);
   color: var(--el-text-color-primary);
   background: var(--el-fill-color-blank, #fff);
 }
@@ -448,7 +448,7 @@ onBeforeUnmount(() => cleanup())
 
 .products-sidebar .group-menu-count {
   margin-left: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary, #909399);
 }
 
@@ -494,7 +494,7 @@ onBeforeUnmount(() => cleanup())
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 .pagination-wrap {
   margin-top: var(--space-sm);

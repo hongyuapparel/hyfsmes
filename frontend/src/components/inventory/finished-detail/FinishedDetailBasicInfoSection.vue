@@ -205,5 +205,5 @@ const {
 
 <style scoped>
 .detail-head-btn { padding-inline: 8px; }
-.detail-image-empty { font-size: 12px; color: var(--el-text-color-secondary); }
+.detail-image-empty { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 </style>

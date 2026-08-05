@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "check:el-radio-value": "node scripts/check-el-radio-value.mjs",
+    "check:typography": "node scripts/check-typography.mjs",
+    "check:ui": "npm run check:el-radio-value && npm run check:typography",
     "dev": "vite",
-    "build": "npm run check:el-radio-value && vue-tsc && vite build",
+    "build": "npm run check:ui && vue-tsc && vite build",
     "preview": "vite preview",
     "test:supplier-settings": "vitest run src/views/settings/supplier-settings.spec.ts"
   },

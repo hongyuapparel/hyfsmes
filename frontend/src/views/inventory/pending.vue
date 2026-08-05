@@ -411,17 +411,17 @@ onMounted(async () => {
 .qty-tooltip-error,
 .qty-tooltip-empty {
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
 .qty-tooltip-empty-sub {
   color: var(--el-text-color-secondary);
-  font-size: 11px;
+  font-size: var(--font-size-caption);
 }
 
 .qty-tooltip-title {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   font-weight: 600;
   margin-bottom: 4px;
   color: var(--el-color-primary);
@@ -445,7 +445,7 @@ onMounted(async () => {
   padding: 4px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.12);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -548,7 +548,7 @@ onMounted(async () => {
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 </style>

@@ -283,7 +283,7 @@ watch(
 
 .app-tab__close {
   margin-left: 4px;
-  font-size: 14px;
+  font-size: var(--font-size-body);
   border-radius: 50%;
   transition: background-color 0.15s;
 }

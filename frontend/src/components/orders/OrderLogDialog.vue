@@ -79,7 +79,7 @@ function formatDateTime(v: string | null | undefined): string {
 
 <style scoped>
 .operation-log-item {
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .operation-log-header {

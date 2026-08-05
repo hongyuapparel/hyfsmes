@@ -173,7 +173,7 @@ async function onSubmit() {
 }
 
 .batch-hint {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
   padding-left: 100px;
 }

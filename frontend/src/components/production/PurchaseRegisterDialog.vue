@@ -177,7 +177,7 @@ function onSupplierVisibleChange(visible: boolean) {
 }
 
 .register-row-upload :deep(.placeholder-text) {
-  font-size: 11px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-placeholder);
 }
 </style>

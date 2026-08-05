@@ -61,7 +61,7 @@ const expanded = ref(true)
 }
 .stat-card.urgent .stat-value { color: var(--el-color-danger); }
 .stat-card.warn .stat-value { color: var(--el-color-warning); }
-.stat-value { font-size: 24px; font-weight: 700; line-height: 1.2; color: var(--color-text-primary); }
+.stat-value { font-size: var(--font-size-title); font-weight: 700; line-height: 1.2; color: var(--color-text-primary); }
 .stat-label { font-size: var(--font-size-caption); color: var(--color-text-secondary); margin-top: 4px; }
 .ops-section {
   background: var(--color-card);

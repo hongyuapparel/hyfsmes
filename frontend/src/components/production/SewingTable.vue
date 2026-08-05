@@ -310,7 +310,7 @@ defineExpose({ getTableRef })
 }
 
 .qty-popover {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .qty-popover-title {
@@ -357,7 +357,7 @@ defineExpose({ getTableRef })
 
 .qty-popover-loading,
 .qty-popover-empty {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--color-text-muted, #909399);
 }
 </style>

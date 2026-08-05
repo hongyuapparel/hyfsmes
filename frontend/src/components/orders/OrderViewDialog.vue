@@ -43,7 +43,7 @@ function closeDialog() {
   background-color: #0f172a;
   color: #e5e7eb;
   font-family: Menlo, Monaco, Consolas, 'Courier New', monospace;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   max-height: 400px;
   overflow: auto;
 }

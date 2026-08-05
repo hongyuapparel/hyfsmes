@@ -517,8 +517,8 @@ onMounted(async () => {
 
 <style scoped>
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
-.summary-bar { padding: 6px 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: 13px; color: #0369a1; margin-bottom: var(--space-sm); }
-.amount-highlight { color: #16a34a; font-size: 15px; }
+.summary-bar { padding: 6px 12px; background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px; font-size: var(--font-size-body); color: #0369a1; margin-bottom: var(--space-sm); }
+.amount-highlight { color: #16a34a; font-size: var(--font-size-subtitle); }
 .income-amount { color: #16a34a; font-weight: 600; }
 .text-muted { color: var(--color-text-muted); }
 .data-table { margin-bottom: var(--space-md); }

@@ -372,7 +372,7 @@ onActivated(() => {
 
 .table-selection-count {
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
   margin: 8px 0;
 }
 </style>

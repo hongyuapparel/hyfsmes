@@ -330,7 +330,7 @@ const { spanMethod, summaryMethod } = usePackingGridLayout(
 
 .size-header-insert :deep(.el-icon),
 .size-header-remove :deep(.el-icon) {
-  font-size: 11px;
+  font-size: var(--icon-size-sm);
 }
 
 .size-header-cell:hover .size-header-insert,

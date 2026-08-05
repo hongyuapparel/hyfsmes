@@ -273,7 +273,7 @@ watch(
 }
 .detail-tabs :deep(.el-tab-pane) { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
 .detail-muted {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
 }
 
@@ -285,7 +285,7 @@ watch(
 :deep(.el-select__selected-item),
 :deep(.el-table),
 :deep(.el-table th),
-:deep(.el-table td) { font-size: 12px; }
+:deep(.el-table td) { font-size: var(--font-size-caption); }
 </style>
 
 <style>
@@ -307,7 +307,7 @@ watch(
 .finished-qty-popper .qty-tooltip-error,
 .finished-qty-popper .qty-tooltip-empty {
   padding: 6px 8px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 1.4;
 }
 
@@ -332,7 +332,7 @@ watch(
   color: var(--el-text-color-regular);
   border: 1px solid var(--el-border-color-lighter);
   text-align: center;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   line-height: 1.2;
   white-space: nowrap;
 }

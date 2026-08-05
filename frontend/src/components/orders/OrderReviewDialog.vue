@@ -151,13 +151,13 @@ async function reviewReject() {
 
 .review-tip {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-regular);
 }
 
 .review-order-no {
   margin: 0;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
 }
 </style>

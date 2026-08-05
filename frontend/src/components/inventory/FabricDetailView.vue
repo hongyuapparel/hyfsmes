@@ -166,7 +166,7 @@ defineOptions({ name: 'FabricDetailView' })
   border-radius: 8px;
   background: #fff;
 }
-.fabric-section-title { font-weight: 600; font-size: 13px; color: var(--el-text-color-primary); margin-bottom: 8px; }
+.fabric-section-title { font-weight: 600; font-size: var(--font-size-body); color: var(--el-text-color-primary); margin-bottom: 8px; }
 .fabric-muted { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 .qty-readonly { color: var(--el-text-color-regular); }
 </style>

@@ -187,7 +187,7 @@ watch(
 .quote-template-title { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: 0 var(--space-sm); }
 .quote-template-name { font-weight: 500; }
 .quote-template-name-wrap { display: inline-flex; align-items: center; gap: 8px; min-width: 0; flex: 1; }
-.quote-template-fold-icon { font-size: 12px; color: var(--el-text-color-secondary); transition: transform 0.2s ease; }
+.quote-template-fold-icon { font-size: var(--icon-size-sm); color: var(--el-text-color-secondary); transition: transform 0.2s ease; }
 .quote-template-fold-icon.expanded { transform: rotate(90deg); }
 .quote-template-actions { display: flex; align-items: center; gap: 8px; flex-wrap: nowrap; }
 .quote-template-collapse :deep(.el-collapse-item__arrow) { display: none; }

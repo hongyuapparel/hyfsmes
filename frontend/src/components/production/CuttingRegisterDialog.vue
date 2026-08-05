@@ -170,7 +170,7 @@ const visible = computed({
 }
 
 .cut-readonly-hint {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
 }
 </style>

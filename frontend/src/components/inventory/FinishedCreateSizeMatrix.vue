@@ -357,15 +357,15 @@ function onRowImageChange(row: FinishedStockSizeMatrixRow, url: string) {
 .b-header-input :deep(.el-input__wrapper) { padding-left: 6px; padding-right: 6px; }
 .b-header-input :deep(.el-input__inner) { text-align: center; }
 .b-header-actions { position: absolute; top: 50%; right: -2px; transform: translateY(-50%); display: flex; align-items: center; gap: 1px; opacity: 0; transition: opacity 0.15s; }
-.b-header-remove { width: 14px; height: 14px; padding: 0; min-height: 14px; min-width: 14px; display: flex; align-items: center; justify-content: center; font-size: 10px; }
-.b-header-remove :deep(.el-icon) { font-size: 8px; line-height: 8px; }
+.b-header-remove { width: 14px; height: 14px; padding: 0; min-height: 14px; min-width: 14px; display: flex; align-items: center; justify-content: center; font-size: var(--icon-size-xs); }
+.b-header-remove :deep(.el-icon) { font-size: var(--icon-size-xs); line-height: 8px; }
 .b-header-cell:hover .b-header-actions { opacity: 1; }
 .create-row-remove-btn { padding: 0; }
 .detail-section { min-width: 0; flex: 1; min-height: 0; display: flex; flex-direction: column; padding: 10px 12px; border: 1px solid var(--el-border-color-lighter); border-radius: 8px; background: #fff; }
-.detail-section-title { font-weight: 600; margin-bottom: 6px; font-size: 13px; color: var(--el-text-color-primary); }
+.detail-section-title { font-weight: 600; margin-bottom: 6px; font-size: var(--font-size-body); color: var(--el-text-color-primary); }
 .detail-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
 .detail-head-actions { display: flex; align-items: center; gap: 6px; }
-.detail-section-tip { font-size: 12px; color: var(--el-text-color-secondary); margin-bottom: 8px; line-height: 1.5; }
+.detail-section-tip { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); margin-bottom: 8px; line-height: 1.5; }
 .col-header-overridden { color: var(--el-color-warning); }
 
 :deep(.create-size-table .el-table__cell) { vertical-align: middle; }

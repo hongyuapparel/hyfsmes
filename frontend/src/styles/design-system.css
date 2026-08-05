@@ -44,6 +44,13 @@
   --font-size-body: 14px;
   --font-size-caption: 12px;
 
+  /* 图标尺寸独立于文字层级，避免用字号 token 控制纯图标 */
+  --icon-size-xs: 8px;
+  --icon-size-sm: 12px;
+  --icon-size-md: 16px;
+  --icon-size-lg: 20px;
+  --icon-size-xl: 24px;
+
   /* 兼容旧变量名 */
   --font-size-h1: var(--font-size-title);
   --font-size-h2: var(--font-size-title);
@@ -102,7 +109,7 @@
 
   --el-font-family: var(--font-family-ui);
   --el-font-size-base: var(--font-size-body);
-  --el-font-size-small: var(--font-size-small);
+  --el-font-size-small: var(--font-size-caption);
 
   --el-box-shadow: 0 1px 3px rgba(45, 61, 80, 0.08),
     0 1px 2px rgba(45, 61, 80, 0.04);
@@ -215,6 +222,33 @@ a:hover {
 .el-table .el-table__cell.is-right,
 .el-table .el-table__cell .cell {
   text-align: center !important;
+}
+
+/* 全站组件字号层级：标题 20 / 容器标题 16 / 正文控件 14 / 表格辅助 12 */
+.el-dialog__title,
+.el-drawer__title,
+.el-card__header {
+  font-size: var(--font-size-subtitle);
+}
+
+.el-button,
+.el-form-item__label,
+.el-tabs__item,
+.el-menu-item,
+.el-sub-menu__title,
+.el-input__inner,
+.el-textarea__inner,
+.el-select__selected-item,
+.el-select__placeholder {
+  font-size: var(--font-size-body);
+}
+
+.el-table,
+.el-table .el-table__cell,
+.el-pagination,
+.el-form-item__error,
+.el-form-item__extra {
+  font-size: var(--font-size-caption);
 }
 
 /* 数字/金额列右对齐（数位对齐，便于一眼比大小）：给 el-table-column 加 class-name="col-num-right"。
@@ -460,7 +494,7 @@ a:hover {
   top: 50%;
   transform: translateY(-50%);
   color: var(--color-text-muted);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   pointer-events: none;
   z-index: 1;
 }
@@ -499,7 +533,7 @@ a:hover {
 
 /* 侧栏开合按钮：图标放大、更显眼，桌面与手机统一（它控制侧栏收展，是常用入口） */
 .header-toggle .el-icon {
-  font-size: 24px;
+  font-size: var(--icon-size-xl);
 }
 
 .el-button--primary {
@@ -629,6 +663,7 @@ a:hover {
 .editable-grid .el-textarea__inner,
 .editable-grid .el-select__selected-item,
 .editable-grid .el-select__placeholder {
+  font-size: var(--font-size-caption);
   text-align: center;
 }
 .editable-grid .el-select__wrapper {
@@ -741,7 +776,7 @@ a:hover {
   box-shadow: 0 0 0 1px var(--el-color-primary) inset;
 }
 .filter-date-label-text {
-  font-size: 14px;
+  font-size: var(--font-size-body);
   white-space: nowrap;
   flex-shrink: 0;
   line-height: 1;

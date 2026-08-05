@@ -141,7 +141,7 @@ async function submitRemark() {
 
 .remark-section-title {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text, #303133);
 }
 
@@ -166,7 +166,7 @@ async function submitRemark() {
   justify-content: space-between;
   gap: 12px;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--color-muted-foreground, #7f8b99);
 }
 
@@ -183,7 +183,7 @@ async function submitRemark() {
 
 .remark-editor-label {
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--color-text, #303133);
 }
 </style>

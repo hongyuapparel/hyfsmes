@@ -235,5 +235,5 @@ watch(
 :deep(.el-select__selected-item),
 :deep(.el-table),
 :deep(.el-table th),
-:deep(.el-table td) { font-size: 12px; }
+:deep(.el-table td) { font-size: var(--font-size-caption); }
 </style>

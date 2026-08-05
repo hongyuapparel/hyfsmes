@@ -397,6 +397,6 @@ onMounted(() => {
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 </style>

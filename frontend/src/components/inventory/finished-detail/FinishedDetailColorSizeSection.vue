@@ -136,8 +136,8 @@ function onRowMetaChange(rowKey: string, field: FinishedCreateRowMetaField, valu
 .detail-section-title {
   font-weight: 600;
   margin-bottom: 6px;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-primary);
 }
-.detail-muted { font-size: 12px; color: var(--el-text-color-secondary); }
+.detail-muted { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 </style>

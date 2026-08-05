@@ -293,7 +293,7 @@ function rowClassName({ row }: { row: BlockRow }): string {
 .dialog-tip {
   margin: 0 0 var(--space-md);
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .register-brief {
@@ -329,13 +329,13 @@ function rowClassName({ row }: { row: BlockRow }): string {
 .register-loading {
   padding: var(--space-md);
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .register-qty-tip {
   margin: 0;
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .register-qty-toolbar {
@@ -361,7 +361,7 @@ function rowClassName({ row }: { row: BlockRow }): string {
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   margin-bottom: 6px;
   color: var(--el-text-color-primary);
 }
@@ -382,13 +382,13 @@ function rowClassName({ row }: { row: BlockRow }): string {
 .register-qty-grand {
   margin: 12px 0 0;
   text-align: right;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-regular);
 }
 
 .register-qty-grand strong {
   color: var(--el-text-color-primary);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 
 .packaging-block {

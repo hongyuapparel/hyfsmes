@@ -318,13 +318,13 @@ defineExpose({ formRef: internalFormRef })
 .register-loading {
   padding: var(--space-md);
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .register-qty-title {
   font-weight: 600;
   margin-bottom: 8px;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .register-qty-table {
@@ -333,7 +333,7 @@ defineExpose({ formRef: internalFormRef })
 
 .register-qty-sum {
   margin: 0 0 var(--space-sm);
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-regular);
 }
 
@@ -375,7 +375,7 @@ defineExpose({ formRef: internalFormRef })
 .register-qty-tip {
   margin: 0 0 12px;
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .color-register-block {
@@ -387,7 +387,7 @@ defineExpose({ formRef: internalFormRef })
   align-items: center;
   gap: 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   margin-bottom: 6px;
   color: var(--el-text-color-primary);
 }
@@ -408,12 +408,12 @@ defineExpose({ formRef: internalFormRef })
 .register-qty-grand {
   margin: 12px 0 0;
   text-align: right;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-regular);
 }
 
 .register-qty-grand strong {
   color: var(--el-text-color-primary);
-  font-size: 14px;
+  font-size: var(--font-size-body);
 }
 </style>

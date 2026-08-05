@@ -46,7 +46,7 @@ defineProps<{
 }
 .detail-section-title {
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--font-size-body);
   color: var(--el-text-color-primary);
   margin: 0;
 }
@@ -75,7 +75,7 @@ defineProps<{
   display: grid;
   grid-template-columns: 96px minmax(0, 1fr) 96px minmax(0, 1fr);
   border: 1px solid var(--el-border-color-lighter);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 :deep(.detail-basic-label),
 :deep(.detail-basic-value) {
@@ -118,7 +118,7 @@ defineProps<{
   min-width: 170px;
 }
 .detail-image-label {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
 }
 

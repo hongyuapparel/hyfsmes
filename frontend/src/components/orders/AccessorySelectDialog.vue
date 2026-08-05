@@ -175,7 +175,7 @@ const displayItems = computed(() => {
 <style scoped>
 .accessory-dialog-hint {
   margin: 8px 0 0;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--el-text-color-secondary);
   line-height: 1.4;
 }

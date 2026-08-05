@@ -328,7 +328,7 @@ onMounted(load)
 .filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); padding: var(--space-sm); background: var(--color-bg-subtle, #f5f6f8); border-radius: var(--radius-lg); }
 .preset-group { display: flex; flex-wrap: wrap; gap: var(--space-xs, 8px); }
 .filter-range { min-width: 170px; margin-left: auto; }
-.summary-bar { padding: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #475569; margin-bottom: var(--space-md); }
+.summary-bar { padding: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: var(--font-size-body); color: #475569; margin-bottom: var(--space-md); }
 .range-single.el-date-editor--daterange :deep(.el-range-separator) { display: none; }
 .range-single.el-date-editor--daterange :deep(.el-range-input:last-child) { display: none; }
 .range-single.el-date-editor--daterange :deep(.el-range-input:first-child) { width: 100%; }

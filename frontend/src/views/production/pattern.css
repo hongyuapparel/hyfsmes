@@ -31,7 +31,7 @@
 .table-selection-count {
   margin: 8px 0;
   color: var(--el-text-color-secondary);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .table-thumb {
@@ -182,7 +182,7 @@
 }
 
 .pattern-sub-attr {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   margin-top: 2px;
 }
 

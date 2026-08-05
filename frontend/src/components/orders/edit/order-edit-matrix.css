@@ -52,7 +52,7 @@
 
 .b-header-insert :deep(.el-icon),
 .b-header-remove :deep(.el-icon) {
-  font-size: 8px;
+  font-size: var(--icon-size-xs);
   line-height: 8px;
 }
 

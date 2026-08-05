@@ -110,7 +110,7 @@ function removeSize(idx: number): void {
 <style scoped>
 .accessory-size-matrix { width: 100%; }
 .size-matrix-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.size-matrix-tip { font-size: 12px; color: var(--el-text-color-secondary); }
+.size-matrix-tip { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 .size-matrix-table-wrap { width: 100%; border: 1px solid var(--el-border-color); border-radius: var(--el-border-radius-base); overflow: hidden; }
 .size-matrix-table { width: 100%; margin: 0; }
 .size-matrix-table :deep(.el-table__inner-wrapper)::before { display: none; }
@@ -120,7 +120,7 @@ function removeSize(idx: number): void {
 .b-header-input :deep(.el-input__inner) { text-align: center; }
 .b-header-actions { position: absolute; top: 50%; right: -2px; transform: translateY(-50%); display: flex; align-items: center; opacity: 0; transition: opacity 0.15s; }
 .b-header-remove { width: 14px; height: 14px; padding: 0; min-height: 14px; min-width: 14px; display: flex; align-items: center; justify-content: center; }
-.b-header-remove :deep(.el-icon) { font-size: 8px; line-height: 8px; }
+.b-header-remove :deep(.el-icon) { font-size: var(--icon-size-xs); line-height: 8px; }
 .b-header-cell:hover .b-header-actions { opacity: 1; }
 .qty-negative { color: var(--el-color-danger); font-weight: 600; }
 :deep(.size-matrix-table .cell) { display: flex; align-items: center; justify-content: center; text-align: center; padding: 2px 4px; }

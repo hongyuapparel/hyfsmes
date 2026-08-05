@@ -60,7 +60,7 @@ defineProps<{
 .block-title {
   font-weight: 600;
   margin-bottom: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .block-body {

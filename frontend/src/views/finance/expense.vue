@@ -523,8 +523,8 @@ onMounted(async () => {
 
 <style scoped>
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
-.summary-bar { padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: 13px; color: #c2410c; margin-bottom: var(--space-sm); }
-.expense-highlight { color: #dc2626; font-size: 15px; }
+.summary-bar { padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: var(--font-size-body); color: #c2410c; margin-bottom: var(--space-sm); }
+.expense-highlight { color: #dc2626; font-size: var(--font-size-subtitle); }
 .expense-amount { color: #dc2626; font-weight: 600; }
 .text-muted { color: var(--color-text-muted); }
 .data-table { margin-bottom: var(--space-md); }

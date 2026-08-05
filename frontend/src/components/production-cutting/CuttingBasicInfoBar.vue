@@ -69,7 +69,7 @@ function display(v: string | null | undefined) {
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .cutting-basic-bar__label {

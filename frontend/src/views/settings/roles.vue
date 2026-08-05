@@ -270,7 +270,7 @@ onBeforeUnmount(() => {
 }
 .action-status-title {
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   margin-bottom: 4px;
 }
 </style>

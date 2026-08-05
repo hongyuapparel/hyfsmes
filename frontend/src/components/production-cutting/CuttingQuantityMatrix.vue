@@ -149,7 +149,7 @@ function onCell(row: CuttingQtyRow, idx: number, v: number | undefined) {
   margin-top: 8px;
   text-align: right;
   color: var(--el-text-color-secondary);
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .cutting-qty-matrix__cell-text {

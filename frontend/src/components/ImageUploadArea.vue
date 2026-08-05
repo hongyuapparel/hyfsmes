@@ -281,7 +281,7 @@ onBeforeUnmount(() => {
 }
 
 .placeholder-plus-icon {
-  font-size: 18px;
+  font-size: var(--icon-size-lg);
   color: var(--el-color-primary);
 }
 
@@ -321,7 +321,7 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   padding: 2px 8px;
   border-radius: 999px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: #fff;
   background: rgba(31, 41, 55, 0.72);
 }
@@ -386,7 +386,7 @@ onBeforeUnmount(() => {
 }
 
 .image-upload-area.is-dense .placeholder-plus-icon {
-  font-size: 16px;
+  font-size: var(--icon-size-md);
 }
 
 .image-upload-area.is-dense .preview-wrap {
@@ -403,7 +403,7 @@ onBeforeUnmount(() => {
   width: 16px;
   height: 16px;
   min-height: 16px;
-  font-size: 11px;
+  font-size: var(--icon-size-sm);
 }
 
 .image-upload-area.is-dense .preview-img {

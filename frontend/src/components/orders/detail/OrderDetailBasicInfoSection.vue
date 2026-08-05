@@ -79,7 +79,7 @@ defineProps<{
 .kv-item {
   display: flex;
   gap: 4px;
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .kv-label {

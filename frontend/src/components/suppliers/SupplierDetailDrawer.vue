@@ -100,7 +100,7 @@ const emit = defineEmits<{
   padding: 10px;
   border-right: 1px solid var(--el-border-color-lighter);
   border-bottom: 1px solid var(--el-border-color-lighter);
-  font-size: 13px;
+  font-size: var(--font-size-body);
 }
 
 .detail-label {
@@ -124,7 +124,7 @@ const emit = defineEmits<{
 }
 
 .recent-title {
-  font-size: 13px;
+  font-size: var(--font-size-body);
   font-weight: 600;
   margin-bottom: 8px;
 }

@@ -25,10 +25,17 @@
 
 仅使用设计系统字号变量，不写死 `font-size` 数值：
 
-- `--font-size-title`（或兼容 `--font-size-h1`）
-- `--font-size-subtitle`（或兼容 `--font-size-h3`）
-- `--font-size-body`（或兼容 `--font-size-small`）
-- `--font-size-caption`（或兼容 `--font-size-xsmall`）
+| 层级 | 变量 | 用途 |
+|------|------|------|
+| 主标题 | `--font-size-title` | 页面主标题、核心数据，20px |
+| 次标题 | `--font-size-subtitle` | 弹窗、抽屉、卡片、区块标题，16px |
+| 正文 | `--font-size-body` | 表单、按钮、菜单、页签、普通说明，14px |
+| 紧凑文字 | `--font-size-caption` | 表格、表格内输入、辅助说明、日期及元数据，12px |
+
+- 数字合计和重点内容优先用字重、颜色强调，不新增临时字号。
+- 纯图标使用 `--icon-size-*`，不得借用文字字号变量。
+- 仅打印标签、装箱单等独立文档版式允许按物理输出需要设置字号，当前例外为 `PackingLabelPrint*.css` 与 `PackingDocument.css`。
+- 修改前端样式后执行 `npm run check:typography`；完整构建会自动运行该检查。
 
 ---
 
@@ -45,5 +52,6 @@
 - 统一在 `<el-table>` 上添加 `class="editable-grid"`。
 - 外观复用 `design-system.css` 的全局 `.editable-grid` 规则：填写框无内框并铺满单元格，以表格线分隔，hover/focus 时整格高亮。
 - 表头、数据行、合计行使用 `--editable-grid-header-h` / `--editable-grid-row-h` 保持等高；内容上下左右居中。
+- 表头、只读单元格及单元格内输入控件统一使用 `--font-size-caption`，不允许输入状态改变字号。
 - 新建此类表禁止各自编写单元格内边距、边框或对齐样式；调整密度只改全局变量。
 - 含图片列的表（如尺码矩阵）应在该表局部恢复自适应行高，避免图片被压缩。

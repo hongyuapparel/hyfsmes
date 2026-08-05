@@ -472,7 +472,7 @@ const emit = defineEmits<{
 }
 
 .qty-popover {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
 }
 
 .qty-popover-title {
@@ -512,7 +512,7 @@ const emit = defineEmits<{
 
 .qty-popover-loading,
 .qty-popover-empty {
-  font-size: 12px;
+  font-size: var(--font-size-caption);
   color: var(--color-text-muted, #909399);
 }
 
@@ -598,7 +598,7 @@ const emit = defineEmits<{
 }
 
 .footer-actions .action-btn :deep(.el-icon) {
-  font-size: 16px;
+  font-size: var(--icon-size-md);
 }
 
 .remark-badge {
@@ -606,7 +606,7 @@ const emit = defineEmits<{
 }
 
 .remark-badge :deep(.el-badge__content) {
-  font-size: 10px;
+  font-size: var(--font-size-caption);
   line-height: 1;
   min-width: 14px;
   height: 14px;
