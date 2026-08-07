@@ -14,15 +14,15 @@
       >
         <div class="operation-log-item">
           <div class="operation-log-header">
-            <span class="operation-log-operator">操作账号：{{ log.operatorUsername }}</span>
+            <span class="operation-log-operator">操作人：{{ log.operatorUsername || '-' }}</span>
             <span class="operation-log-action">操作类型：{{ getActionLabel(log.action) }}</span>
           </div>
           <div class="operation-log-row">
-            <span class="operation-log-label">修改日期：</span>
+            <span class="operation-log-label">操作时间：</span>
             <span class="operation-log-value">{{ formatDateTime(log.createdAt) }}</span>
           </div>
           <div class="operation-log-row">
-            <span class="operation-log-label">修改内容：</span>
+            <span class="operation-log-label">操作内容：</span>
             <span class="operation-log-value">{{ log.detail }}</span>
           </div>
         </div>
@@ -43,7 +43,29 @@ const ACTION_LABEL_MAP: Record<string, string> = {
   submit: '提交',
   review: '审核',
   delete: '删除',
+  restore: '恢复',
   copy_to_draft: '复制为草稿',
+  admin_force_status: '强制修改状态',
+  workflow_rebase: '流程状态重算',
+  cost_draft: '保存成本草稿',
+  cost_confirm: '确认报价',
+  production_purchase_register: '采购/领料登记',
+  production_purchase_admin_edit: '采购纠错编辑',
+  production_purchase_pick_admin_edit: '领料纠错编辑',
+  production_pattern_save: '保存纸样用量',
+  production_pattern_update: '修改纸样用量',
+  production_pattern_assign: '分配纸样',
+  production_pattern_complete: '纸样完成',
+  production_pattern_admin_edit: '纸样纠错编辑',
+  production_process_complete: '工艺完成',
+  production_cutting_register: '裁床登记',
+  production_cutting_edit: '裁床纠错编辑',
+  production_sewing_assign: '车缝分配',
+  production_sewing_register: '车缝完成登记',
+  production_sewing_admin_edit: '车缝纠错编辑',
+  production_finishing_receive: '尾部收货',
+  production_finishing_packaging: '尾部包装登记',
+  production_finishing_admin_edit: '尾部纠错编辑',
 }
 
 defineProps<{

@@ -71,4 +71,43 @@ describe('buildInventoryOperationLogSummary', () => {
       afterSnapshot: { quantity: 15, unit: '个' },
     })).toBe('入库记录异常，库存实际 20个 → 15个')
   })
+
+  it('辅料编辑逐项显示实际字段变化并解析仓库名称', () => {
+    expect(buildInventoryOperationLogSummary({
+      action: 'update',
+      beforeSnapshot: {
+        name: '旧吊牌', customerName: '客户A', warehouseId: 1, location: '', remark: '',
+        quantity: 100, unit: '个', imageUrls: ['/old.png'],
+      },
+      afterSnapshot: {
+        name: '新吊牌', customerName: '客户B', warehouseId: 2, location: 'A-01', remark: '待核对',
+        quantity: 100, unit: '个', imageUrls: ['/new.png', '/detail.png'],
+      },
+    }, {
+      valueLabels: { warehouseId: { 1: '旧仓', 2: '新仓' } },
+    })).toBe('编辑；名称「旧吊牌」→「新吊牌」；客户「客户A」→「客户B」；仓库「旧仓」→「新仓」；存放地址「-」→「A-01」；备注「-」→「待核对」；图片已更新（1张→2张）')
+  })
+
+  it('分码总数不变时仍记录各尺码的真实变化', () => {
+    expect(buildInventoryOperationLogSummary({
+      action: 'update',
+      beforeSnapshot: { quantity: 10, unit: '个', isSized: true, sizeHeaders: ['S', 'M'], sizeQuantities: [4, 6] },
+      afterSnapshot: { quantity: 10, unit: '个', isSized: true, sizeHeaders: ['S', 'M'], sizeQuantities: [5, 5] },
+    })).toBe('编辑；分码：S +1个、M -1个')
+  })
+
+  it('没有字段变化的保存如实标记为未修改', () => {
+    expect(buildInventoryOperationLogSummary({
+      action: 'update',
+      beforeSnapshot: { name: '吊牌', quantity: 10, unit: '个' },
+      afterSnapshot: { name: '吊牌', quantity: 10, unit: '个' },
+    })).toBe('编辑；未修改任何字段')
+  })
+
+  it('删除记录展示被删除对象和删除前库存', () => {
+    expect(buildInventoryOperationLogSummary({
+      action: 'delete',
+      beforeSnapshot: { name: '吊牌', quantity: 10, unit: '个' },
+    })).toBe('删除「吊牌」，删除前库存 10个')
+  })
 })

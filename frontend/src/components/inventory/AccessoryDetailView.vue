@@ -103,7 +103,7 @@
     </div>
 
     <div v-if="isView" v-loading="logsLoading" class="acc-section-logs">
-      <OperationLogsSection :logs="formattedLogs" show-operator-label />
+      <OperationLogsSection :logs="formattedLogs" />
     </div>
   </div>
 </template>
@@ -165,7 +165,11 @@ const formattedLogs = computed(() =>
     id: log.id,
     operatorUsername: log.operatorUsername,
     createdAt: formatDate(log.createdAt),
-    summary: buildInventoryOperationLogSummary(log),
+    summary: buildInventoryOperationLogSummary(log, {
+      valueLabels: {
+        warehouseId: Object.fromEntries(props.warehouseOptions.map((option) => [String(option.id), option.label])),
+      },
+    }),
   })),
 )
 

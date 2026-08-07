@@ -14,6 +14,7 @@ import { OrderLifecycleService } from './order-lifecycle.service';
 import { OrderCostSnapshotService } from './order-cost-snapshot.service';
 import { type OrderActor, type OrderEditPayload, type ReviewResult } from './order.types';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { buildOrderCreateLogDetail, buildOrderUpdateLogDetail } from './order-operation-log-summary';
 
 @Injectable()
 export class OrderMutationService {
@@ -203,55 +204,6 @@ export class OrderMutationService {
     await this.suppliersService.touchLastActiveByNames(names);
   }
 
-  private buildUpdateChangesDescription(before: Order, payload: OrderEditPayload): string {
-    const changes: string[] = [];
-    const trim = (v: unknown) => (typeof v === 'string' ? v.trim() : v);
-    const toDateOnly = (v: string | null | undefined): string => {
-      if (!v) return '';
-      const s = v.trim();
-      if (!s) return '';
-      return s.length > 10 ? s.slice(0, 10) : s;
-    };
-    if (payload.skuCode !== undefined && trim(payload.skuCode) !== before.skuCode) {
-      changes.push(`SKU: ${before.skuCode || '-'} -> ${trim(payload.skuCode) || '-'}`);
-    }
-    if (payload.customerName !== undefined && trim(payload.customerName) !== before.customerName) {
-      changes.push(`客户名称: ${before.customerName || '-'} -> ${trim(payload.customerName) || '-'}`);
-    }
-    if (payload.salesperson !== undefined && trim(payload.salesperson) !== before.salesperson) {
-      changes.push(`业务员: ${before.salesperson || '-'} -> ${trim(payload.salesperson) || '-'}`);
-    }
-    if (payload.merchandiser !== undefined && trim(payload.merchandiser) !== before.merchandiser) {
-      changes.push(`跟单员: ${before.merchandiser || '-'} -> ${trim(payload.merchandiser) || '-'}`);
-    }
-    if (payload.quantity !== undefined && payload.quantity !== before.quantity) {
-      changes.push(`数量: ${before.quantity} -> ${payload.quantity ?? 0}`);
-    }
-    if (payload.exFactoryPrice !== undefined && this.normalizeDecimalInput(payload.exFactoryPrice) !== before.exFactoryPrice) {
-      changes.push(`出厂价: ${before.exFactoryPrice} -> ${this.normalizeDecimalInput(payload.exFactoryPrice)}`);
-    }
-    if (payload.salePrice !== undefined && this.normalizeDecimalInput(payload.salePrice) !== before.salePrice) {
-      changes.push(`销售价: ${before.salePrice} -> ${this.normalizeDecimalInput(payload.salePrice)}`);
-    }
-    if (payload.processItem !== undefined && trim(payload.processItem) !== before.processItem) {
-      changes.push(`工艺项目: ${before.processItem || '-'} -> ${trim(payload.processItem) || '-'}`);
-    }
-    if (payload.orderDate !== undefined) {
-      const beforeVal = before.orderDate ? before.orderDate.toISOString().slice(0, 10) : '';
-      const nextVal = toDateOnly(payload.orderDate ?? null);
-      if (nextVal !== beforeVal) changes.push(`下单日期: ${beforeVal || '-'} -> ${nextVal || '-'}`);
-    }
-    if (payload.customerDueDate !== undefined) {
-      const beforeVal = before.customerDueDate ? before.customerDueDate.toISOString().slice(0, 10) : '';
-      const nextVal = toDateOnly(payload.customerDueDate ?? null);
-      if (nextVal !== beforeVal) changes.push(`客户交期: ${beforeVal || '-'} -> ${nextVal || '-'}`);
-    }
-    if (payload.factoryName !== undefined && trim(payload.factoryName) !== before.factoryName) {
-      changes.push(`加工厂: ${before.factoryName || '-'} -> ${trim(payload.factoryName) || '-'}`);
-    }
-    return changes.length ? changes.join('; ') : '无关键字段变更';
-  }
-
   private async generateNextOrderNo(): Promise<string> {
     const year = new Date().getFullYear();
     const prefix = String(year);
@@ -312,7 +264,7 @@ export class OrderMutationService {
     if (typeof payload.packagingMethod === 'string') extPayload.packagingMethod = payload.packagingMethod;
     if (payload.attachments && Array.isArray(payload.attachments)) extPayload.attachments = payload.attachments;
     if (Object.keys(extPayload).length > 1) await this.orderExtRepo.save(this.orderExtRepo.create(extPayload));
-    await this.orderStatusService.addLog(saved, actor, 'create', '创建订单草稿');
+    await this.orderStatusService.addLog(saved, actor, 'create', buildOrderCreateLogDetail(payload));
     await this.orderStatusService.appendStatusHistory(saved.id, 'draft');
     return saved;
   }
@@ -402,8 +354,7 @@ export class OrderMutationService {
       }
       await this.orderExtRepo.save(ext);
     }
-    const detail = this.buildUpdateChangesDescription(before, payload);
-    if (detail && detail !== '无关键字段变更') await this.orderStatusService.addLog(saved, actor, 'update', detail);
+    await this.orderStatusService.addLog(saved, actor, 'update', buildOrderUpdateLogDetail(before, payload));
     if (shouldRebaseWorkflow) {
       saved = (await this.orderStatusService.rebaseWorkflowStatusAfterOrderEdit(id, actor)) ?? saved;
     }

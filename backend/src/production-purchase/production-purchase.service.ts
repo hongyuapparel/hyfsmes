@@ -201,8 +201,16 @@ export class ProductionPurchaseService {
         userId: actorUserId,
         username: '',
       });
-      const detail =
-        `采购登记：${row.materialName ?? '-'}${row.color ? ` ${row.color}` : ''}` + ` ${normalizedQty}`;
+      const detail = [
+        `采购登记：物料 ${row.materialName ?? '-'}${row.color ? `/${row.color}` : ''}`,
+        `供应商 ${row.supplierName || '-'}`,
+        `数量 ${normalizedQty}`,
+        `单价 ${normalizedUnit}`,
+        `其他费用 ${normalizedOther}`,
+        `金额 ${totalStr}`,
+        `备注 ${(remark ?? '').trim() || '-'}`,
+        `图片 ${(imageUrl ?? '').trim() ? '已上传' : '未上传'}`,
+      ].join('；');
       await this.orderLogRepo.save(
         this.orderLogRepo.create({
           orderId: order.id,
@@ -243,6 +251,12 @@ export class ProductionPurchaseService {
       materialName: string;
       color: string;
       qty: number;
+      supplierName: string;
+      unitPrice: string;
+      otherCost: string;
+      amount: string;
+      remark: string;
+      hasImage: boolean;
     }> = [];
 
     await this.orderRepo.manager.transaction(async (manager) => {
@@ -318,7 +332,13 @@ export class ProductionPurchaseService {
             materialIndex: item.materialIndex,
             materialName: row.materialName ?? '-',
             color: (row.color ?? '').trim(),
+            supplierName,
             qty: normalizedQty,
+            unitPrice,
+            otherCost,
+            amount: totalStr,
+            remark: itemRemark ?? '',
+            hasImage: !!itemImageUrl,
           });
         }
 
@@ -359,7 +379,16 @@ export class ProductionPurchaseService {
           username: '',
         });
         const colorPart = entry.color ? ` ${entry.color}` : '';
-        const detail = `采购登记（批量）：${entry.materialName}${colorPart} ${entry.qty}`;
+        const detail = [
+          `采购登记（批量）：物料 ${entry.materialName}${colorPart}`,
+          `供应商 ${entry.supplierName}`,
+          `数量 ${entry.qty}`,
+          `单价 ${entry.unitPrice}`,
+          `其他费用 ${entry.otherCost}`,
+          `金额 ${entry.amount}`,
+          `备注 ${entry.remark || '-'}`,
+          `图片 ${entry.hasImage ? '已上传' : '未上传'}`,
+        ].join('；');
         await this.orderLogRepo.save(
           this.orderLogRepo.create({
             orderId: entry.orderId,
@@ -396,7 +425,18 @@ export class ProductionPurchaseService {
       materialIndex: number;
       materialName: string;
       color: string;
+      beforeSupplierName: string;
+      supplierName: string;
+      beforeQty: number;
       qty: number;
+      beforeUnitPrice: string;
+      unitPrice: string;
+      beforeOtherCost: string;
+      otherCost: string;
+      beforeRemark: string;
+      remark: string;
+      beforeHasImage: boolean;
+      hasImage: boolean;
     }> = [];
 
     await this.orderRepo.manager.transaction(async (manager) => {
@@ -469,7 +509,18 @@ export class ProductionPurchaseService {
             materialIndex: item.materialIndex,
             materialName: row.materialName ?? '-',
             color: (row.color ?? '').trim(),
+            beforeSupplierName: (row.supplierName ?? '').trim(),
+            supplierName,
+            beforeQty: Number(row.actualPurchaseQuantity) || 0,
             qty: normalizedQty,
+            beforeUnitPrice: String(row.purchaseUnitPrice ?? '0'),
+            unitPrice,
+            beforeOtherCost: String(row.purchaseOtherCost ?? '0'),
+            otherCost,
+            beforeRemark: String(row.purchaseRemark ?? '').trim(),
+            remark: (item.remark ?? '').trim(),
+            beforeHasImage: !!String(row.purchaseImageUrl ?? '').trim(),
+            hasImage: !!String(item.imageUrl ?? '').trim(),
           });
         }
 
@@ -491,7 +542,7 @@ export class ProductionPurchaseService {
             orderNo: entry.orderNo,
             operatorUsername: operator,
             action: 'production_purchase_admin_edit',
-            detail: `采购纠错编辑：${entry.materialName}${colorPart} ${entry.qty}`,
+            detail: `采购纠错编辑：物料 ${entry.materialName}${colorPart}；供应商 ${entry.beforeSupplierName || '-'}→${entry.supplierName || '-'}；数量 ${entry.beforeQty}→${entry.qty}；单价 ${entry.beforeUnitPrice}→${entry.unitPrice}；其他费用 ${entry.beforeOtherCost}→${entry.otherCost}；备注 ${entry.beforeRemark || '-'}→${entry.remark || '-'}；图片 ${entry.beforeHasImage ? '有' : '无'}→${entry.hasImage ? '有' : '无'}`,
             targetType: 'purchase_item',
             targetRef: `${entry.orderId}_${entry.materialIndex}`,
           }),
@@ -641,6 +692,29 @@ export class ProductionPurchaseService {
       order.statusTime = new Date();
       await this.orderRepo.save(order);
       await this.appendStatusHistory(order.id, nextStatus);
+    }
+    try {
+      const detail = [
+        `领料登记：物料 ${row.materialName ?? '-'}${row.color ? `/${row.color}` : ''}`,
+        `来源 ${sourceLabel || '-'}`,
+        `方式 ${shouldUseStock ? '库存出库' : '备注登记'}`,
+        shouldUseStock ? `库存 ${inventoryName || '-'}，数量 ${quantity}` : '',
+        params.stockBatch?.trim() ? `批次 ${params.stockBatch.trim()}` : '',
+        params.stockColorCode?.trim() ? `色号 ${params.stockColorCode.trim()}` : '',
+        params.stockSpec?.trim() ? `规格 ${params.stockSpec.trim()}` : '',
+        `备注 ${remark || '-'}`,
+      ].filter(Boolean).join('；');
+      await this.orderLogRepo.save(this.orderLogRepo.create({
+        orderId: order.id,
+        orderNo: order.orderNo,
+        operatorUsername: operatorName,
+        action: 'production_purchase_register',
+        detail,
+        targetType: 'purchase_item',
+        targetRef: `${order.id}_${params.materialIndex}`,
+      }));
+    } catch (err) {
+      console.warn('[purchase pick] write operation log failed:', err);
     }
   }
 

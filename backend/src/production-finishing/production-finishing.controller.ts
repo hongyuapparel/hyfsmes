@@ -141,12 +141,15 @@ export class ProductionFinishingController {
     @Body('tailReceivedQty') tailReceivedQty: number,
     @Body('tailReceivedQuantities') tailReceivedQuantities?: number[],
     @Body('tailReceivedQuantitiesByColor') tailReceivedQuantitiesByColor?: Array<{ colorName: string; quantities: number[] }>,
+    @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.finishingMutationService.registerReceive(
       Number(orderId),
       Number(tailReceivedQty),
       Array.isArray(tailReceivedQuantities) ? tailReceivedQuantities : null,
       Array.isArray(tailReceivedQuantitiesByColor) ? tailReceivedQuantitiesByColor : null,
+      user?.userId,
+      user?.username,
     );
   }
 

@@ -171,6 +171,74 @@ function buildMetaChangeSummary(before: Record<string, unknown>, after: Record<s
   return items;
 }
 
+function normalizeGroupRows(value: unknown): Record<string, unknown>[] {
+  return Array.isArray(value) ? value.map(asRecord).filter((row) => Object.keys(row).length > 0) : [];
+}
+
+function groupFieldValues(rows: Record<string, unknown>[], field: string): string {
+  const values = rows
+    .map((row) => formatMetaValue(row[field]))
+    .filter((value, index, list) => list.indexOf(value) === index)
+    .sort((left, right) => left.localeCompare(right, 'zh-CN'));
+  return values.join('、') || '-';
+}
+
+function canonicalGroupSnapshots(rows: Record<string, unknown>[]): string {
+  const snapshots = rows.map((row) => ({
+    customerName: formatMetaValue(row.customerName),
+    colorSizeSnapshot: normalizeSnapshot(row.colorSizeSnapshot),
+  }));
+  return JSON.stringify(snapshots.sort((left, right) => (
+    `${left.customerName}:${JSON.stringify(left.colorSizeSnapshot)}`
+      .localeCompare(`${right.customerName}:${JSON.stringify(right.colorSizeSnapshot)}`, 'zh-CN')
+  )));
+}
+
+function canonicalGroupImages(rows: Record<string, unknown>[]): string {
+  const images = rows.flatMap((row) => [
+    normalizeText(row.imageUrl),
+    ...(Array.isArray(row.colorImages)
+      ? row.colorImages.map((item) => {
+          const image = asRecord(item);
+          return `${normalizeText(image.colorName)}:${normalizeText(image.imageUrl)}`;
+        })
+      : []),
+  ]).filter(Boolean).sort();
+  return JSON.stringify(images);
+}
+
+function buildFinishedGroupEditSummary(
+  beforeRows: Record<string, unknown>[],
+  afterRows: Record<string, unknown>[],
+  remark: string,
+): string {
+  const changes: string[] = [];
+  const beforeQuantity = beforeRows.reduce((sum, row) => sum + normalizeQuantity(row.quantity), 0);
+  const afterQuantity = afterRows.reduce((sum, row) => sum + normalizeQuantity(row.quantity), 0);
+  if (beforeQuantity !== afterQuantity) changes.push(`库存 ${beforeQuantity}件 → ${afterQuantity}件`);
+
+  const fields: Array<[string, string]> = [
+    ['skuCode', 'SKU'],
+    ['department', '部门'],
+    ['inventoryTypeId', '库存类型'],
+    ['warehouseId', '仓库'],
+    ['location', '存放地址'],
+    ['unitPrice', '出厂价'],
+  ];
+  fields.forEach(([field, label]) => {
+    const beforeValue = groupFieldValues(beforeRows, field);
+    const afterValue = groupFieldValues(afterRows, field);
+    if (beforeValue !== afterValue) changes.push(`${label}「${beforeValue}」→「${afterValue}」`);
+  });
+  if (canonicalGroupSnapshots(beforeRows) !== canonicalGroupSnapshots(afterRows)) changes.push('颜色/尺码明细已调整');
+  if (canonicalGroupImages(beforeRows) !== canonicalGroupImages(afterRows)) changes.push('产品图或颜色图片已更新');
+  if (beforeRows.length !== afterRows.length) changes.push(`库存分组 ${beforeRows.length}条 → ${afterRows.length}条`);
+
+  const detailRemark = remark.match(/(?:^|；)备注：(.+)$/)?.[1]?.trim() ?? '';
+  if (detailRemark) changes.push(`备注：${detailRemark}`);
+  return `修改成品库存（可回滚）：${changes.length ? changes.join('；') : '未修改任何字段'}`;
+}
+
 export function buildFinishedStockAdjustLogSummary(input: LogSummaryInput): string {
   const before = asRecord(input.before);
   const after = asRecord(input.after);
@@ -182,6 +250,11 @@ export function buildFinishedStockAdjustLogSummary(input: LogSummaryInput): stri
   const afterQuantity = Number(after.quantity);
   const hasQuantityDelta = Number.isFinite(beforeQuantity) && Number.isFinite(afterQuantity) && beforeQuantity !== afterQuantity;
   const action = normalizeText(after.logAction) || normalizeText(before.logAction);
+  const beforeGroup = normalizeGroupRows(before._groupUndo);
+  const afterGroup = normalizeGroupRows(after._groupState);
+  if (action === 'edit-save' && beforeGroup.length && afterGroup.length) {
+    return buildFinishedGroupEditSummary(beforeGroup, afterGroup, remark);
+  }
   const isInbound = action === 'inbound' || afterQuantity > beforeQuantity || remark.includes('新增库存') || remark.includes('合并入库');
   const isOutbound = action === 'outbound' || afterQuantity < beforeQuantity || remark.includes('出库');
 

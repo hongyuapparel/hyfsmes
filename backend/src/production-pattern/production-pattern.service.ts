@@ -285,6 +285,7 @@ export class ProductionPatternService {
     }
     let pattern = await this.patternRepo.findOne({ where: { orderId } });
     const materialsBeforeSave = pattern?.materialsJson;
+    const remarkBeforeSave = pattern?.materialsRemark ?? null;
     const hadUsageBefore =
       Array.isArray(materialsBeforeSave) &&
       (materialsBeforeSave as PatternMaterialRow[]).some((m) => {
@@ -301,16 +302,23 @@ export class ProductionPatternService {
     const isFirstSave = !hadUsageBefore;
     try {
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
-      const summary = materials.map((m) => `${m.materialName ?? '-'} ${m.usagePerPiece ?? '-'}`).join(' / ');
+      const formatMaterials = (rows: PatternMaterialRow[]) => rows
+        .map((m) => `${m.materialName ?? '-'} ${m.usagePerPiece ?? '-'}${m.fabricWidth ? `（门幅${m.fabricWidth}）` : ''}`)
+        .join(' / ') || '无';
+      const beforeSummary = formatMaterials(Array.isArray(materialsBeforeSave) ? materialsBeforeSave as PatternMaterialRow[] : []);
+      const summary = formatMaterials(materials);
       const action = isFirstSave ? 'production_pattern_save' : 'production_pattern_update';
       const verbCN = isFirstSave ? '保存' : '修改';
+      const detail = isFirstSave
+        ? `${verbCN}纸样用量：${summary}；备注：${remark?.trim() || '-'}`
+        : `${verbCN}纸样用量：${beforeSummary}→${summary}；备注：${remarkBeforeSave || '-'}→${remark?.trim() || '-'}`;
       await this.orderLogRepo.save(
         this.orderLogRepo.create({
           orderId,
           orderNo: order.orderNo,
           operatorUsername: operator,
           action,
-          detail: `${verbCN}用量：${summary}`,
+          detail,
           targetType: 'order',
           targetRef: null,
         }),
@@ -491,7 +499,12 @@ export class ProductionPatternService {
     return this.buildPatternRows(query);
   }
 
-  async assignPattern(orderId: number, patternMaster: string, sampleMaker: string): Promise<void> {
+  async assignPattern(
+    orderId: number,
+    patternMaster: string,
+    sampleMaker: string,
+    actor?: { userId?: number; username?: string },
+  ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -501,6 +514,8 @@ export class ProductionPatternService {
     }
 
     let pattern = await this.patternRepo.findOne({ where: { orderId } });
+    const beforePatternMaster = pattern?.patternMaster ?? '';
+    const beforeSampleMaker = pattern?.sampleMaker ?? '';
     if (!pattern) {
       pattern = this.patternRepo.create({
         orderId,
@@ -514,9 +529,31 @@ export class ProductionPatternService {
       pattern.status = 'in_progress';
     }
     await this.patternRepo.save(pattern);
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      const isEdit = !!beforePatternMaster || !!beforeSampleMaker;
+      const detail = isEdit
+        ? `修改纸样分配：纸样师 ${beforePatternMaster || '-'}→${pattern.patternMaster || '-'}；样衣工 ${beforeSampleMaker || '-'}→${pattern.sampleMaker || '-'}`
+        : `纸样分配：纸样师 ${pattern.patternMaster || '-'}；样衣工 ${pattern.sampleMaker || '-'}`;
+      await this.orderLogRepo.save(this.orderLogRepo.create({
+        orderId,
+        orderNo: order.orderNo,
+        operatorUsername: operator,
+        action: 'production_pattern_assign',
+        detail,
+        targetType: 'order',
+        targetRef: null,
+      }));
+    } catch (err) {
+      console.warn('[pattern assign] write operation log failed:', err);
+    }
   }
 
-  async completePattern(orderId: number, sampleImageUrl: string, actorUserId?: number): Promise<void> {
+  async completePattern(
+    orderId: number,
+    sampleImageUrl: string,
+    actor?: { userId?: number; username?: string },
+  ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) {
       throw new NotFoundException('订单不存在');
@@ -528,7 +565,7 @@ export class ProductionPatternService {
     const next = await this.orderWorkflowService.resolveNextStatus({
       order,
       triggerCode: 'pattern_completed',
-      actorUserId: actorUserId ?? 0,
+      actorUserId: actor?.userId ?? 0,
     });
     if (!next) {
       throw new BadRequestException('未匹配到“纸样完成”流转规则，请先在订单设置中检查流程链路配置');
@@ -551,11 +588,26 @@ export class ProductionPatternService {
     }
     await this.patternRepo.save(pattern);
 
+    const beforeStatus = order.status;
     if (next && next !== order.status) {
       order.status = next;
       order.statusTime = new Date();
       await this.orderRepo.save(order);
       await this.appendStatusHistory(order.id, next);
+    }
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      await this.orderLogRepo.save(this.orderLogRepo.create({
+        orderId,
+        orderNo: order.orderNo,
+        operatorUsername: operator,
+        action: 'production_pattern_complete',
+        detail: `纸样完成：样衣图${pattern.sampleImageUrl ? '已上传' : '未上传'}；状态 ${beforeStatus}→${order.status}`,
+        targetType: 'order',
+        targetRef: null,
+      }));
+    } catch (err) {
+      console.warn('[pattern complete] write operation log failed:', err);
     }
   }
 

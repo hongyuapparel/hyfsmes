@@ -367,13 +367,33 @@ export class FinishedGoodsStockRepartitionService {
       const anchorId = survivingIds.has(seedId)
         ? seedId
         : keepers.find((k) => k.record.id != null)?.record.id ?? seedId;
+      const finalGroup = await stockRepo
+        .createQueryBuilder('stock')
+        .where('stock.sku_code = :skuCode', { skuCode: sku })
+        .addSelect('stock.color_size_snapshot')
+        .getMany();
+      let finalImageRows: ColorImageRow[] = [];
+      try {
+        const finalIds = finalGroup.map((record) => record.id);
+        if (finalIds.length) {
+          const rows = await colorImageRepo.find({ where: { finishedStockId: In(finalIds) } });
+          finalImageRows = rows.map((row) => ({
+            finishedStockId: row.finishedStockId,
+            colorName: this.norm(row.colorName),
+            imageUrl: this.norm(row.imageUrl),
+          }));
+        }
+      } catch (e) {
+        if (!isTableMissingError(e, 'finished_goods_stock_color_images')) throw e;
+      }
+      const groupState = this.captureGroupUndo(finalGroup, finalImageRows);
       try {
         await adjustLogRepo.save(
           adjustLogRepo.create({
             finishedStockId: anchorId,
             operatorUsername: this.norm(operatorUsername),
             before: { _groupUndo: groupUndo, logAction: 'edit-save' },
-            after: { logAction: 'edit-save' },
+            after: { _groupState: groupState, logAction: 'edit-save' },
             remark,
           }),
         );

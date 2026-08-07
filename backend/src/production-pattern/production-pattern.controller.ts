@@ -164,11 +164,13 @@ export class ProductionPatternController {
     @Body('orderId') orderId: number,
     @Body('patternMaster') patternMaster: string,
     @Body('sampleMaker') sampleMaker: string,
+    @CurrentUser() user: { userId: number; username: string },
   ) {
     return this.patternService.assignPattern(
       Number(orderId),
       patternMaster ?? '',
       sampleMaker ?? '',
+      { userId: user.userId, username: user.username },
     );
   }
 
@@ -179,7 +181,10 @@ export class ProductionPatternController {
     @Body('sampleImageUrl') sampleImageUrl: string,
     @CurrentUser() user: { userId: number; username: string },
   ) {
-    return this.patternService.completePattern(Number(orderId), sampleImageUrl ?? '', user?.userId);
+    return this.patternService.completePattern(Number(orderId), sampleImageUrl ?? '', {
+      userId: user.userId,
+      username: user.username,
+    });
   }
 
   @Post('items/:orderId/edit')

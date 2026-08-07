@@ -11,6 +11,7 @@ import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 import { applyRowSort } from '../common/list-row-sort.util';
+import { formatColorSizeOperationDetail } from '../common/operation-log-format.util';
 import {
   type ColorSizeQuantityRow,
   assertColorRowsShape,
@@ -384,26 +385,6 @@ export class ProductionSewingService {
     return this.buildSewingRows(query);
   }
 
-  private buildSewingLogDetail(
-    sewingQuantity: number,
-    sewingQuantities: number[] | null | undefined,
-    ext: OrderExt | null,
-  ): string {
-    const qtys = Array.isArray(sewingQuantities) && sewingQuantities.length ? sewingQuantities : null;
-    if (!qtys) {
-      return `车缝登记：合计 ${sewingQuantity} 件`;
-    }
-    const headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
-    const parts: string[] = [];
-    for (let i = 0; i < Math.min(headers.length, qtys.length); i++) {
-      const q = Number(qtys[i]) || 0;
-      if (q > 0) parts.push(`${headers[i]} ${q} 件`);
-    }
-    const total = qtys.reduce((a, b) => a + (Number(b) || 0), 0);
-    if (!parts.length) return `车缝登记：合计 ${total} 件`;
-    return `车缝登记：${parts.join(' / ')}`;
-  }
-
   /** 分单/补录分单：记录分单时间、加工供应商交期、加工供应商名称（写入订单）、车缝加工费 */
   async assignSewing(
     orderId: number,
@@ -422,10 +403,18 @@ export class ProductionSewingService {
       throw new NotFoundException('仅待车缝或待尾部订单可分单');
     }
 
+    const beforeFactoryName = order.factoryName ?? '';
     order.factoryName = (factoryName ?? '').trim();
     await this.orderRepo.save(order);
 
     let sewing = await this.sewingRepo.findOne({ where: { orderId } });
+    const beforeAssignment = sewing
+      ? {
+          distributedAt: sewing.distributedAt,
+          factoryDueDate: sewing.factoryDueDate,
+          sewingFee: sewing.sewingFee,
+        }
+      : null;
     if (!sewing) {
       sewing = this.sewingRepo.create({
         orderId,
@@ -443,14 +432,17 @@ export class ProductionSewingService {
 
     try {
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
-      const nameForLog = (order.factoryName ?? (factoryName ?? '').trim()) || '-';
+      const nextFactory = order.factoryName || '-';
+      const detail = beforeAssignment
+        ? `修改车缝分配：加工厂 ${beforeFactoryName || '-'}→${nextFactory}；分单日期 ${this.toDateOnlyString(beforeAssignment.distributedAt) || '-'}→${this.toDateOnlyString(distributedAt) || '-'}；加工厂交期 ${this.toDateOnlyString(beforeAssignment.factoryDueDate) || '-'}→${this.toDateOnlyString(factoryDueDate) || '-'}；加工费 ${beforeAssignment.sewingFee || '0'}→${sewing.sewingFee || '0'}`
+        : `车缝分配：加工厂 ${nextFactory}；分单日期 ${this.toDateOnlyString(distributedAt) || '-'}；加工厂交期 ${this.toDateOnlyString(factoryDueDate) || '-'}；加工费 ${sewing.sewingFee || '0'}`;
       await this.orderLogRepo.save(
         this.orderLogRepo.create({
           orderId,
           orderNo: order.orderNo,
           operatorUsername: operator,
-          action: 'production_sewing_register',
-          detail: `车缝分配：${nameForLog}`,
+          action: 'production_sewing_assign',
+          detail,
           targetType: 'order',
           targetRef: null,
         }),
@@ -552,7 +544,9 @@ export class ProductionSewingService {
 
     try {
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
-      const detail = this.buildSewingLogDetail(sewingQuantity, sewingQuantities ?? null, ext);
+      const quantityDetail = formatColorSizeOperationDetail(headers, byColor, totalQty);
+      const defectDetail = `次品 ${Number(defectQuantity) || 0}件${String(defectReason ?? '').trim() ? `（${String(defectReason).trim()}）` : ''}`;
+      const detail = `车缝完成：${quantityDetail}；${defectDetail}`;
       await this.orderLogRepo.save(
         this.orderLogRepo.create({
           orderId,

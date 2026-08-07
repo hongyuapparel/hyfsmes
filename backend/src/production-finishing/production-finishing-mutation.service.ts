@@ -10,6 +10,7 @@ import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { formatColorSizeOperationDetail } from '../common/operation-log-format.util';
 import {
   type ColorSizeQuantityRow,
   assertColorRowsShape,
@@ -165,6 +166,8 @@ export class ProductionFinishingMutationService {
     tailReceivedQty: number,
     tailReceivedQuantities?: number[] | null,
     tailReceivedQuantitiesByColor?: ColorSizeQuantityRow[] | null,
+    actorUserId?: number,
+    actorUsername?: string,
   ): Promise<void> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
@@ -240,6 +243,23 @@ export class ProductionFinishingMutationService {
         ],
       );
     });
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, {
+        userId: actorUserId,
+        username: actorUsername ?? '',
+      });
+      await this.orderLogRepo.save(this.orderLogRepo.create({
+        orderId,
+        orderNo: order.orderNo,
+        operatorUsername: operator,
+        action: 'production_finishing_receive',
+        detail: `尾部收货：${formatColorSizeOperationDetail(sizeHeaders, byColor, normalizedTotal)}`,
+        targetType: 'order',
+        targetRef: null,
+      }));
+    } catch (err) {
+      console.warn('[finishing receive] write operation log failed:', err);
+    }
   }
 
   async registerPackagingComplete(
@@ -487,6 +507,26 @@ export class ProductionFinishingMutationService {
         }
       }
     });
+    try {
+      const operator = await resolveOperatorDisplayName(this.userRepo, {
+        userId: actorUserId,
+        username: actorUsername ?? '',
+      });
+      const inboundDetail = formatColorSizeOperationDetail(sizeHeaders, inboundThisByColor, inboundThis);
+      const defectDetail = formatColorSizeOperationDetail(sizeHeaders, defectThisByColor, defectThis);
+      const modeLabel = mode === 'partial' ? '部分登记' : '全部登记';
+      await this.orderLogRepo.save(this.orderLogRepo.create({
+        orderId,
+        orderNo: order.orderNo,
+        operatorUsername: operator,
+        action: 'production_finishing_packaging',
+        detail: `尾部包装${modeLabel}：本批入库 ${inboundDetail}；本批次品 ${defectDetail}；累计入库 ${newInboundTotal}件；累计次品 ${newDefectTotal}件${remark?.trim() ? `；备注：${remark.trim()}` : ''}`,
+        targetType: 'order',
+        targetRef: null,
+      }));
+    } catch (err) {
+      console.warn('[finishing packaging] write operation log failed:', err);
+    }
   }
 
   /**

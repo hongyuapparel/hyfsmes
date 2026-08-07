@@ -8,6 +8,7 @@ import { User } from '../entities/user.entity';
 import { OrderStatusService } from './order-status.service';
 import { type OrderActor } from './order.types';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { buildCostDraftLogDetail } from './order-operation-log-summary';
 
 @Injectable()
 export class OrderCostSnapshotService {
@@ -214,11 +215,13 @@ export class OrderCostSnapshotService {
       else row = snapshotRepo.create({ orderId, snapshot });
       const saved = await snapshotRepo.save(row);
       if (actor) {
+        const previousPrice = this.calculateExFactoryPriceFromSnapshot(previousSnapshot);
+        const nextPrice = this.calculateExFactoryPriceFromSnapshot(snapshot);
         await this.orderStatusService.addLog(
           order,
           actor,
           'cost_draft',
-          '保存成本草稿（未同步订单卡片出厂价）',
+          buildCostDraftLogDetail(previousSnapshot, snapshot, previousPrice, nextPrice),
           manager,
         );
       }

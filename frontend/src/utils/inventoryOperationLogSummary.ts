@@ -5,6 +5,10 @@ type InventoryOperationLogLike = {
   remark?: string
 }
 
+export type InventoryOperationLogSummaryOptions = {
+  valueLabels?: Partial<Record<'supplierId' | 'warehouseId' | 'inventoryTypeId', Record<string, string>>>
+}
+
 function asSnapshot(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' ? value as Record<string, unknown> : null
 }
@@ -63,8 +67,89 @@ function actionLabel(action: string): string {
   return action || '操作'
 }
 
+function normalizeText(value: unknown): string {
+  return String(value ?? '').trim()
+}
+
+function displayText(value: unknown): string {
+  return normalizeText(value) || '-'
+}
+
+function valuesEqual(left: unknown, right: unknown): boolean {
+  if (Array.isArray(left) || Array.isArray(right)) {
+    return JSON.stringify(Array.isArray(left) ? left : []) === JSON.stringify(Array.isArray(right) ? right : [])
+  }
+  return normalizeText(left) === normalizeText(right)
+}
+
+function displayOptionValue(
+  field: 'supplierId' | 'warehouseId' | 'inventoryTypeId',
+  value: unknown,
+  options: InventoryOperationLogSummaryOptions,
+): string {
+  if (value == null || normalizeText(value) === '') return '-'
+  const key = normalizeText(value)
+  return options.valueLabels?.[field]?.[key] || `#${key}`
+}
+
+function buildEditChangeSummaries(
+  before: Record<string, unknown>,
+  after: Record<string, unknown>,
+  unit: string,
+  options: InventoryOperationLogSummaryOptions,
+): string[] {
+  const changes: string[] = []
+  const addTextChange = (field: string, label: string) => {
+    if (!valuesEqual(before[field], after[field])) {
+      changes.push(`${label}「${displayText(before[field])}」→「${displayText(after[field])}」`)
+    }
+  }
+  const addOptionChange = (field: 'supplierId' | 'warehouseId' | 'inventoryTypeId', label: string) => {
+    if (!valuesEqual(before[field], after[field])) {
+      changes.push(`${label}「${displayOptionValue(field, before[field], options)}」→「${displayOptionValue(field, after[field], options)}」`)
+    }
+  }
+
+  addTextChange('name', '名称')
+  addTextChange('category', '类别')
+  addTextChange('customerName', '客户')
+  addTextChange('salesperson', '业务员')
+  addTextChange('unit', '单位')
+  addOptionChange('supplierId', '供应商')
+  addOptionChange('warehouseId', '仓库')
+  addOptionChange('inventoryTypeId', '库存类型')
+  addTextChange('location', '存放地址')
+  addTextChange('storageLocation', '存放地址')
+  addTextChange('remark', '备注')
+
+  if (!!before.isSized !== !!after.isSized) {
+    changes.push(`分码「${before.isSized ? '开启' : '关闭'}」→「${after.isSized ? '开启' : '关闭'}」`)
+  }
+  const sizeSummary = buildSizeDeltaSummary(before, after, unit)
+  if (sizeSummary) changes.push(sizeSummary)
+
+  const getImages = (snapshot: Record<string, unknown>): string[] => {
+    const imageUrls = Array.isArray(snapshot.imageUrls)
+      ? snapshot.imageUrls.map(normalizeText).filter(Boolean)
+      : []
+    const mainImageUrl = normalizeText(snapshot.imageUrl)
+    return imageUrls.length ? imageUrls : [mainImageUrl].filter(Boolean)
+  }
+  const beforeImages = getImages(before)
+  const afterImages = getImages(after)
+  if (!valuesEqual(beforeImages, afterImages)) {
+    if (!afterImages.length) changes.push('图片已删除')
+    else if (!beforeImages.length) changes.push(`图片已添加（${afterImages.length}张）`)
+    else changes.push(`图片已更新（${beforeImages.length}张→${afterImages.length}张）`)
+  }
+  return changes
+}
+
 /** 仅根据日志已保存的前后快照生成摘要；缺少事实时明确提示，不估算。 */
-export function buildInventoryOperationLogSummary(log: InventoryOperationLogLike): string {
+export function buildInventoryOperationLogSummary(
+  log: InventoryOperationLogLike,
+  options: InventoryOperationLogSummaryOptions = {},
+): string {
   const action = String(log.action ?? '').trim()
   const before = asSnapshot(log.beforeSnapshot)
   const after = asSnapshot(log.afterSnapshot)
@@ -89,6 +174,17 @@ export function buildInventoryOperationLogSummary(log: InventoryOperationLogLike
       const sizeSummary = buildSizeDeltaSummary(before, after, unit)
       if (sizeSummary) parts.push(sizeSummary)
     }
+  } else if (action === 'update' && before && after) {
+    if (beforeQuantity != null && afterQuantity != null && beforeQuantity !== afterQuantity) {
+      parts.push(`库存 ${withUnit(beforeQuantity, normalizeText(before.unit))} → ${withUnit(afterQuantity, normalizeText(after.unit))}`)
+    }
+    parts.push(...buildEditChangeSummaries(before, after, unit, options))
+    if (!parts.length) parts.push('未修改任何字段')
+    parts.unshift(label)
+  } else if (action === 'delete' && before) {
+    const deletedName = displayText(before.name)
+    const deletedQuantity = beforeQuantity == null ? '' : `，删除前库存 ${withUnit(beforeQuantity, unit)}`
+    parts.push(`${label}「${deletedName}」${deletedQuantity}`)
   } else if (beforeQuantity != null && afterQuantity != null && beforeQuantity !== afterQuantity) {
     parts.push(`${label}，库存 ${withUnit(beforeQuantity, unit)} → ${withUnit(afterQuantity, unit)}`)
   } else {

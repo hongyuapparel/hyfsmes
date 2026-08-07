@@ -729,7 +729,12 @@ export class OrderQueryService {
 
   async getLogs(orderId: number) {
     const logs = await this.orderLogRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
-    return logs.map((log) => ({ ...log, detail: this.orderStatusService.formatLogDetail(log.detail) }));
+    const displayNameMap = await this.getOperatorDisplayNameMap(logs.map((log) => log.operatorUsername));
+    return logs.map((log) => ({
+      ...log,
+      operatorUsername: displayNameMap.get(String(log.operatorUsername ?? '').trim()) ?? log.operatorUsername,
+      detail: this.orderStatusService.formatLogDetail(log.detail),
+    }));
   }
 
   async getOperationLogs(
@@ -750,7 +755,22 @@ export class OrderQueryService {
     if (targetRef) {
       qb.andWhere('log.targetRef = :targetRef', { targetRef });
     }
-    return qb.orderBy('log.createdAt', 'DESC').limit(200).getMany();
+    const logs = await qb.orderBy('log.createdAt', 'DESC').limit(200).getMany();
+    const displayNameMap = await this.getOperatorDisplayNameMap(logs.map((log) => log.operatorUsername));
+    return logs.map((log) => ({
+      ...log,
+      operatorUsername: displayNameMap.get(String(log.operatorUsername ?? '').trim()) ?? log.operatorUsername,
+    }));
+  }
+
+  private async getOperatorDisplayNameMap(values: string[]): Promise<Map<string, string>> {
+    const usernames = Array.from(new Set(values.map((value) => String(value ?? '').trim()).filter(Boolean)));
+    if (!usernames.length) return new Map();
+    const users = await this.userRepo.find({
+      where: { username: In(usernames) },
+      select: ['username', 'displayName'],
+    });
+    return new Map(users.map((user) => [user.username, user.displayName?.trim() || user.username]));
   }
 
   async getRemarks(orderId: number) {

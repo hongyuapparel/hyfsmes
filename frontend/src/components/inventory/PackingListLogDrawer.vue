@@ -10,7 +10,7 @@
         <el-timeline-item
           v-for="log in logs"
           :key="log.id"
-          :timestamp="formatDate(log.createdAt)"
+          :timestamp="`操作时间：${formatDate(log.createdAt)}`"
           :type="actionType(log.action)"
           placement="top"
         >
@@ -18,7 +18,7 @@
             <span class="packing-log-action">{{ formatAction(log.action) }}</span>
             <span class="packing-log-operator">操作人：{{ log.operatorUsername || '-' }}</span>
           </div>
-          <div v-if="log.summary" class="packing-log-summary">{{ log.summary }}</div>
+          <div class="packing-log-summary">操作内容：{{ log.summary || '-' }}</div>
         </el-timeline-item>
         <div v-if="!loading && logs.length === 0" class="packing-log-empty">暂无操作记录</div>
       </el-timeline>
@@ -47,6 +47,8 @@ const ACTION_LABELS: Record<string, string> = {
   update: '修改',
   ship: '发货',
   delete: '删除',
+  copy_to_draft: '复制为草稿',
+  copy_from: '复制生成',
 }
 
 function formatAction(action: string): string {

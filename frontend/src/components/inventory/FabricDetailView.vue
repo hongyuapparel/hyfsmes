@@ -86,7 +86,7 @@
     </div>
 
     <div v-if="isView" v-loading="logsLoading" class="fabric-section-logs">
-      <OperationLogsSection :logs="formattedLogs" show-operator-label />
+      <OperationLogsSection :logs="formattedLogs" />
     </div>
   </div>
 </template>
@@ -151,7 +151,13 @@ const formattedLogs = computed(() =>
     id: log.id,
     operatorUsername: log.operatorUsername,
     createdAt: formatDate(log.createdAt),
-    summary: buildInventoryOperationLogSummary(log),
+    summary: buildInventoryOperationLogSummary(log, {
+      valueLabels: {
+        supplierId: Object.fromEntries(props.fabricSupplierOptions.map((option) => [String(option.id), option.name])),
+        warehouseId: Object.fromEntries(props.warehouseOptions.map((option) => [String(option.id), option.label])),
+        inventoryTypeId: Object.fromEntries(props.inventoryTypeOptions.map((option) => [String(option.id), option.label])),
+      },
+    }),
   })),
 )
 

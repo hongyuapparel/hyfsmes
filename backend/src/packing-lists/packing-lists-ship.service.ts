@@ -10,6 +10,7 @@ import { FinishedGoodsStockOutboundService } from '../finished-goods-stock/finis
 import { FinishedGoodsStockInboundQueryService } from '../finished-goods-stock/finished-goods-stock-inbound-query.service';
 import { getSizeHeaderKey } from '../common/size-headers.util';
 import { PackingListsService, PackingListDetail } from './packing-lists.service';
+import { buildPackingListShipSummary } from './packing-list-log-summary';
 
 interface ColorSizeSnapshot {
   headers: string[];
@@ -90,7 +91,7 @@ export class PackingListsShipService {
         packingListId: id,
         action: 'ship',
         operatorUsername: (operatorUsername ?? '').trim(),
-        summary: `发货 ${detail.code}`,
+        summary: buildPackingListShipSummary(detail),
       }));
     });
   }

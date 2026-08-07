@@ -4,11 +4,11 @@
     <div v-if="logs.length" class="detail-logs">
       <div v-for="log in logs" :key="log.id" class="detail-log-item">
         <div class="detail-log-head">
-          <span class="detail-log-user">{{ showOperatorLabel ? `操作人：${log.operatorUsername || '未记录'}` : (log.operatorUsername || '-') }}</span>
-          <span class="detail-log-time">{{ log.createdAt }}</span>
+          <span class="detail-log-user">操作人：{{ log.operatorUsername || '未记录' }}</span>
+          <span class="detail-log-time">操作时间：{{ log.createdAt || '-' }}</span>
         </div>
         <div class="detail-log-body">
-          <span>{{ log.summary }}</span>
+          <span>操作内容：{{ log.summary || '-' }}</span>
           <el-popconfirm
             v-if="canRollback && log.canRollback && log.rollbackId"
             title="回滚到这次修改之前？将精确还原该 SKU 的整组库存。"
@@ -40,9 +40,8 @@ withDefaults(
       rollbackId?: number
     }>
     canRollback?: boolean
-    showOperatorLabel?: boolean
   }>(),
-  { canRollback: false, showOperatorLabel: false },
+  { canRollback: false },
 )
 
 defineEmits<{
