@@ -55,6 +55,7 @@ export interface SewingListQuery {
   tab?: string;
   orderNo?: string;
   skuCode?: string;
+  supplier?: string;
   completedStart?: string;
   completedEnd?: string;
   page?: number;
@@ -256,7 +257,7 @@ export class ProductionSewingService {
   }
 
   private async buildSewingRows(baseQuery: SewingListQuery): Promise<SewingListItem[]> {
-    const { tab = 'all', orderNo, skuCode, completedStart, completedEnd } = baseQuery;
+    const { tab = 'all', orderNo, skuCode, supplier, completedStart, completedEnd } = baseQuery;
 
     const completedSewing = await this.sewingRepo.find({
       where: { status: 'completed' },
@@ -276,6 +277,9 @@ export class ProductionSewingService {
     }
     if (skuCode?.trim()) {
       qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
+    }
+    if (supplier?.trim()) {
+      qb.andWhere('o.factory_name = :supplier', { supplier: supplier.trim() });
     }
 
     qb.orderBy('o.order_date', 'DESC').addOrderBy('o.id', 'DESC');

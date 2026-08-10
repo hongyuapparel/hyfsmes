@@ -43,6 +43,25 @@
           </span>
         </template>
       </el-input>
+      <el-select
+        v-model="filter.supplier"
+        placeholder="供应商"
+        clearable
+        filterable
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.supplier ? `供应商：${filter.supplier}` : '', '供应商')"
+        @change="onSearch(true)"
+      >
+        <template #prefix>
+          <span v-if="filter.supplier" :style="{ color: ACTIVE_FILTER_COLOR }">供应商：</span>
+        </template>
+        <el-option
+          v-for="supplier in factorySuppliers"
+          :key="supplier.id"
+          :label="supplier.name"
+          :value="supplier.name"
+        />
+      </el-select>
       <div
         class="filter-bar-item filter-date-box"
         :class="{ 'is-active': completedRange }"
@@ -166,6 +185,7 @@ import { computed, reactive, onMounted, ref, watch, watchEffect } from 'vue'
 import { type SewingListItem } from '@/api/production-sewing'
 import {
   ACTIVE_FILTER_COLOR,
+  getAdaptiveSelectStyle,
   getFilterInputStyle,
   getOrderNoFilterStyle,
   getFilterRangeStyle,

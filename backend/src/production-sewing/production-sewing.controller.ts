@@ -16,10 +16,11 @@ export class ProductionSewingController {
   getTabCounts(
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('supplier') supplier?: string,
     @Query('completedStart') completedStart?: string,
     @Query('completedEnd') completedEnd?: string,
   ) {
-    return this.sewingService.getSewingTabCounts({ orderNo, skuCode, completedStart, completedEnd });
+    return this.sewingService.getSewingTabCounts({ orderNo, skuCode, supplier, completedStart, completedEnd });
   }
 
   @Get('items')
@@ -27,6 +28,7 @@ export class ProductionSewingController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('supplier') supplier?: string,
     @Query('completedStart') completedStart?: string,
     @Query('completedEnd') completedEnd?: string,
     @Query('page') page?: string,
@@ -38,6 +40,7 @@ export class ProductionSewingController {
       tab,
       orderNo,
       skuCode,
+      supplier,
       completedStart,
       completedEnd,
       page: page ? parseInt(page, 10) : 1,
@@ -53,6 +56,7 @@ export class ProductionSewingController {
     @Query('tab') tab?: string,
     @Query('orderNo') orderNo?: string,
     @Query('skuCode') skuCode?: string,
+    @Query('supplier') supplier?: string,
     @Query('completedStart') completedStart?: string,
     @Query('completedEnd') completedEnd?: string,
     @Res() res?: Response,
@@ -61,6 +65,7 @@ export class ProductionSewingController {
       tab,
       orderNo,
       skuCode,
+      supplier,
       completedStart,
       completedEnd,
     };
