@@ -15,6 +15,7 @@ import { seedOrderSewingQuantityRow } from './database/seed-order-sewing-quantit
 import { seedInboundPendingBatchColumns } from './database/seed-inbound-pending-batch-columns';
 import { ensureOrderOperationLogTargetColumns } from './database/ensure-order-operation-log-target-columns';
 import { ensureProductionColorRowsColumns } from './database/ensure-production-color-rows-columns';
+import { ensureFabricStockValuationColumns } from './database/ensure-fabric-stock-valuation-columns';
 import { ensureEmployeeRostersTables } from './database/ensure-employee-rosters-tables';
 import { ensureSupplierTypesMaxDepth } from './database/ensure-supplier-types-max-depth';
 import { ensureSupplierTypesDedupe } from './database/ensure-supplier-types-dedupe';
@@ -416,9 +417,11 @@ async function bootstrap() {
   );
 
   const port = process.env.PORT || 3000;
+  const dataSource = app.get(DataSource);
+  // 成本字段是面料库存接口的硬依赖，必须在开始接收流量前补齐。
+  await ensureFabricStockValuationColumns(dataSource);
   await app.listen(port, '0.0.0.0');
 
-  const dataSource = app.get(DataSource);
   try {
     await ensureSupplierMultiScopeColumn(dataSource);
     await ensureSupplierLastActiveColumn(dataSource);

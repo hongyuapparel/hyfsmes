@@ -23,6 +23,8 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { FabricStockService } from './fabric-stock.service';
 import { FabricStockExportService } from './fabric-stock-export.service';
 import { FabricStockExportDto } from './fabric-stock-export.dto';
+import { FabricStockOutboundQueryService } from './fabric-stock-outbound-query.service';
+import { FabricStockValuationService } from './fabric-stock-valuation.service';
 
 @Controller('inventory/fabric')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -31,6 +33,8 @@ export class FabricStockController {
   constructor(
     private readonly service: FabricStockService,
     private readonly exportService: FabricStockExportService,
+    private readonly outboundQueryService: FabricStockOutboundQueryService,
+    private readonly valuationService: FabricStockValuationService,
   ) {}
 
   @Get('supplier-options')
@@ -106,6 +110,8 @@ export class FabricStockController {
     @Body('warehouseId') warehouseId?: unknown,
     @Body('inventoryTypeId') inventoryTypeId?: unknown,
     @Body('storageLocation') storageLocation?: string,
+    @Body('unitPrice') unitPrice?: unknown,
+    @Body('otherCost') otherCost?: unknown,
     @CurrentUser() user?: { username?: string },
   ) {
     return this.service.create({
@@ -119,6 +125,8 @@ export class FabricStockController {
       warehouseId,
       inventoryTypeId,
       storageLocation,
+      unitPrice,
+      otherCost,
       operatorUsername: user?.username ?? '',
     });
   }
@@ -136,6 +144,7 @@ export class FabricStockController {
     @Body('warehouseId') warehouseId?: unknown,
     @Body('inventoryTypeId') inventoryTypeId?: unknown,
     @Body('storageLocation') storageLocation?: string,
+    @Body('unitPrice') unitPrice?: unknown,
     @CurrentUser() user?: { username?: string },
   ) {
     return this.service.update(Number(id), {
@@ -149,6 +158,7 @@ export class FabricStockController {
       warehouseId,
       inventoryTypeId,
       storageLocation,
+      unitPrice,
       operatorUsername: user?.username ?? '',
     });
   }
@@ -156,6 +166,14 @@ export class FabricStockController {
   @Delete('items/:id')
   remove(@Param('id') id: string, @CurrentUser() user?: { username?: string }) {
     return this.service.remove(Number(id), user?.username ?? '');
+  }
+
+  @Post('items/batch-price')
+  batchUpdatePrices(
+    @Body('items') items: Array<{ id: number; unitPrice: unknown }>,
+    @CurrentUser() user?: { username?: string },
+  ) {
+    return this.valuationService.batchUpdatePrices(items, user?.username ?? '');
   }
 
   @Post('outbound')
@@ -192,14 +210,17 @@ export class FabricStockController {
     @Query('customerName') customerName?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
+    @Query('inventoryTypeId') inventoryTypeIdStr?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
-    return this.service.getOutboundRecords({
+    const inventoryTypeId = inventoryTypeIdStr ? Number(inventoryTypeIdStr) : null;
+    return this.outboundQueryService.getOutboundRecords({
       name,
       customerName,
       startDate,
       endDate,
+      inventoryTypeId: Number.isInteger(inventoryTypeId) && (inventoryTypeId ?? 0) > 0 ? inventoryTypeId : null,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });

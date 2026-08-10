@@ -11,6 +11,9 @@ import { SystemOptionsModule } from '../system-options/system-options.module';
 import { FabricStockController } from './fabric-stock.controller';
 import { FabricStockService } from './fabric-stock.service';
 import { FabricStockExportService } from './fabric-stock-export.service';
+import { FabricStockOutboundQueryService } from './fabric-stock-outbound-query.service';
+import { FabricStockValuationService } from './fabric-stock-valuation.service';
+import { FabricStockQueryService } from './fabric-stock-query.service';
 
 @Module({
   imports: [
@@ -26,7 +29,13 @@ import { FabricStockExportService } from './fabric-stock-export.service';
     SystemOptionsModule,
   ],
   controllers: [FabricStockController],
-  providers: [FabricStockService, FabricStockExportService],
+  providers: [
+    FabricStockService,
+    FabricStockExportService,
+    FabricStockOutboundQueryService,
+    FabricStockValuationService,
+    FabricStockQueryService,
+  ],
   exports: [FabricStockService],
 })
 export class FabricStockModule {}

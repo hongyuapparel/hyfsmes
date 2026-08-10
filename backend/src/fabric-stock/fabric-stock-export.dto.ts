@@ -20,8 +20,8 @@ export class FabricStockExportDto extends InventoryStockExportRequestDto {
   inventoryTypeId?: number;
 
   @ValidateIf((dto: FabricStockExportDto) => dto.sortField !== undefined || dto.sortOrder !== undefined)
-  @IsIn(['quantity'])
-  sortField?: 'quantity';
+  @IsIn(['quantity', 'unitPrice', 'amount'])
+  sortField?: 'quantity' | 'unitPrice' | 'amount';
 
   @ValidateIf((dto: FabricStockExportDto) => dto.sortField !== undefined || dto.sortOrder !== undefined)
   @IsIn(['asc', 'desc'])

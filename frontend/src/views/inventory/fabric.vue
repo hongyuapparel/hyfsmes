@@ -1,6 +1,6 @@
 <template>
   <div class="page-card page-card--fill inventory-fabric-page">
-    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs" @tab-change="onPageTabChange">
+    <el-tabs v-model="pageTab" class="inventory-tabs list-page-tabs">
       <el-tab-pane label="库存" name="stock">
         <div class="tab-pane-scroll">
         <el-form class="filter-bar has-filter-collapse" @submit.prevent>
@@ -91,6 +91,7 @@
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
             <el-button @click="onReset">清空</el-button>
             <el-button :loading="exporting" @click="onExport">{{ exportButtonText }}</el-button>
+            <el-button :disabled="!selectedRows.length" @click="batchPricing.open">批量补价</el-button>
             <el-button type="primary" @click="openForm(null)">新增面料</el-button>
             <el-button
               v-if="selectedRows.length"
@@ -144,6 +145,12 @@
             <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }}</template>
           </el-table-column>
           <el-table-column prop="unit" label="单位" width="70" align="center" header-align="center" />
+          <el-table-column prop="unitPrice" label="实际成本单价" width="130" align="right" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ row.unitPrice == null ? '未计价' : formatMoneyAligned(row.unitPrice) }}</template>
+          </el-table-column>
+          <el-table-column prop="amount" label="库存金额" width="130" align="right" header-align="center" sortable="custom">
+            <template #default="{ row }">{{ row.amount == null ? '未计价' : formatMoneyAligned(row.amount) }}</template>
+          </el-table-column>
           <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip align="center" header-align="center" />
           <el-table-column prop="createdAt" label="创建时间" width="160" align="center" header-align="center">
             <template #default="{ row }">{{ formatDate(row.createdAt) }}</template>
@@ -161,7 +168,11 @@
           v-model:page-size="pagination.pageSize"
           :total="pagination.total"
           :total-quantity="stockTotalQuantity"
+          :secondary-quantity="stockUnpricedQuantityDisplay"
+          :secondary-label="`未计价（${stockUnpricedCountDisplay}条）`"
+          :total-amount="stockTotalAmountDisplay"
           summary-label="总数量"
+          total-amount-label="已计价金额"
           @current-change="load"
           @size-change="onPageSizeChange"
         />
@@ -169,105 +180,11 @@
       </el-tab-pane>
 
       <el-tab-pane label="出库记录" name="outbounds">
-        <div class="tab-pane-scroll">
-        <el-form class="filter-bar" @submit.prevent>
-          <el-input
-            v-model="outboundFilter.name"
-            placeholder="面料名称"
-            clearable
-            class="filter-bar-item"
-            :style="getTextFilterStyle('面料名称', outboundFilter.name, false)"
-            :input-style="getFilterInputStyle(outboundFilter.name)"
-            @keyup.enter="onOutboundSearch(true)"
-          />
-          <el-select
-            v-model="outboundFilter.customerName"
-            placeholder="客户"
-            filterable
-            clearable
-            class="filter-bar-item"
-            :style="getAdaptiveSelectStyle(outboundFilter.customerName ? `客户：${outboundFilter.customerName}` : '', '客户', 42)"
-            @change="onOutboundSearch(true)"
-          >
-            <template #label="{ label }">
-              <span v-if="outboundFilter.customerName">客户：{{ label }}</span>
-              <span v-else>{{ label }}</span>
-            </template>
-            <el-option v-for="opt in customerOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
-          </el-select>
-          <div
-            class="filter-bar-item filter-date-box"
-            :class="{ 'is-active': outboundFilter.dateRange && outboundFilter.dateRange.length === 2 }"
-            :style="getFilterRangeStyle(outboundFilter.dateRange as [string, string] | [], '出库时间')"
-          >
-            <span v-if="outboundFilter.dateRange && outboundFilter.dateRange.length === 2" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">出库时间：</span>
-            <el-date-picker
-              v-model="outboundFilter.dateRange"
-              type="daterange"
-              :name="['fabricOutboundDateStart', 'fabricOutboundDateEnd']"
-              :range-separator="outboundFilter.dateRange && outboundFilter.dateRange.length === 2 ? '~' : ''"
-              start-placeholder="出库时间"
-              end-placeholder=""
-              unlink-panels
-              clearable
-              value-format="YYYY-MM-DD"
-              :shortcuts="rangeShortcuts"
-              :class="['filter-range', { 'range-single': !(outboundFilter.dateRange && outboundFilter.dateRange.length === 2) }]"
-              @change="onOutboundSearch(true)"
-            />
-          </div>
-          <div class="filter-bar-actions">
-            <el-button type="primary" @click="onOutboundSearch(true)">搜索</el-button>
-            <el-button @click="onOutboundReset">清空</el-button>
-          </div>
-        </el-form>
-
-        <div ref="fabricOutboundShellRef" class="list-page-table-shell">
-        <el-table
-          ref="fabricOutboundTableRef"
-          v-loading="outboundLoading2"
-          :data="outboundList"
-          border
-          stripe
-          class="fabric-table"
-          :height="fabricOutboundTableHeight"
-          :row-style="compactRowStyle"
-          :cell-style="compactCellStyle"
-          :header-cell-style="compactHeaderCellStyle"
-          @header-dragend="onFabricOutboundHeaderDragEnd"
-        >
-          <el-table-column prop="createdAt" label="时间" width="160" align="center" header-align="center" />
-          <el-table-column prop="name" label="面料名称" min-width="140" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column prop="pickupUserName" label="领取人" min-width="100" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="出库数量" width="110" align="center" header-align="center">
-            <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }} {{ row.unit }}</template>
-          </el-table-column>
-          <el-table-column prop="remark" label="备注" min-width="180" show-overflow-tooltip align="center" header-align="center" />
-          <el-table-column label="照片" :width="compactImageColumnMinWidth" align="center" header-align="center">
-            <template #default="{ row }">
-              <AppImageThumb
-                v-if="row.photoUrl"
-                :raw-url="row.photoUrl"
-                :width="compactImageSize"
-                :height="compactImageSize"
-              />
-              <span v-else>-</span>
-            </template>
-          </el-table-column>
-        </el-table>
-        </div>
-
-        <AppPaginationBar
-          v-model:current-page="outboundPagination.page"
-          v-model:page-size="outboundPagination.pageSize"
-          :total="outboundPagination.total"
-          :total-quantity="outboundTotalQuantity"
-          summary-label="出库数量"
-          @current-change="loadOutbounds"
-          @size-change="onOutboundPageSizeChange"
+        <FabricOutboundTab
+          ref="fabricOutboundTabRef"
+          :customer-options="customerOptions"
+          :inventory-type-options="inventoryTypeOptions"
         />
-        </div>
       </el-tab-pane>
     </el-tabs>
 
@@ -301,10 +218,19 @@
       :outbound-form="outboundForm"
       :outbound-rules="outboundRules"
       :outbound-max-qty="outboundMaxQty"
+      :outbound-unit-price="outboundUnitPrice"
+      :outbound-amount="outboundAmount"
       :fabric-pickup-user-options="fabricPickupUserOptions"
       @update:visible="outboundDialog.visible = $event"
       @confirm="submitOutbound"
       @closed="resetOutboundForm"
+    />
+
+    <FabricBatchPriceDialog
+      v-model:visible="batchPricing.visible.value"
+      :submitting="batchPricing.submitting.value"
+      :rows="batchPricing.rows"
+      @confirm="batchPricing.submit"
     />
   </div>
 </template>
@@ -316,6 +242,7 @@ import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { useFabricInventoryStock } from '@/composables/useFabricInventoryStock'
 import { useFabricFormDialog, type FabricFormDialogExpose } from '@/composables/useFabricFormDialog'
 import { useFabricInventoryOutbound } from '@/composables/useFabricInventoryOutbound'
+import { useFabricBatchPricing } from '@/composables/useFabricBatchPricing'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -325,9 +252,11 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import type { FabricItem } from '@/api/inventory'
 import { formatDateTime as formatDate } from '@/utils/date-format'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import FabricFormDrawer from '@/components/inventory/FabricFormDrawer.vue'
 import FabricOutboundDialog from '@/components/inventory/FabricOutboundDialog.vue'
+import FabricOutboundTab from '@/components/inventory/FabricOutboundTab.vue'
+import FabricBatchPriceDialog from '@/components/inventory/FabricBatchPriceDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
@@ -340,9 +269,12 @@ const {
 } = useCompactTableStyle()
 const pageTab = ref<'stock' | 'outbounds'>('stock')
 const stock = useFabricInventoryStock()
+const fabricOutboundTabRef = ref<InstanceType<typeof FabricOutboundTab>>()
 const outbound = useFabricInventoryOutbound({
   selectedRows: stock.selectedRows,
   reloadStock: stock.load,
+  reloadOutbounds: () => fabricOutboundTabRef.value?.load(),
+  clearSelection: () => stock.fabricStockTableRef.value?.clearSelection(),
 })
 
 const {
@@ -352,6 +284,9 @@ const {
   list,
   loading,
   stockTotalQuantity: stockGrandTotalQuantity,
+  stockTotalAmount: stockGrandTotalAmount,
+  stockUnpricedCount: stockGrandUnpricedCount,
+  stockUnpricedQuantity: stockGrandUnpricedQuantity,
   pagination,
   selectedRows,
   exporting,
@@ -394,29 +329,25 @@ const {
   formatLogAction,
 } = useFabricFormDialog(selectedRows, load, fabricFormDialogRef, loadFabricSupplierOptions)
 
+const batchPricing = useFabricBatchPricing({
+  selectedRows,
+  reload: load,
+  clearSelection: () => fabricStockTableRef.value?.clearSelection(),
+})
+
 function onRowClick(row: FabricItem, column?: { type?: string; label?: string }) {
   if (column?.type === 'selection' || column?.label === '操作') return
   openForm(row, 'view')
 }
 
 const {
-  outboundFilter,
-  outboundList,
-  outboundLoading2,
-  outboundPagination,
-  fabricOutboundTableRef,
-  fabricOutboundShellRef,
-  fabricOutboundTableHeight,
-  onFabricOutboundHeaderDragEnd,
   outboundDialog,
   outboundForm,
   outboundRules,
   outboundMaxQty,
+  outboundUnitPrice,
+  outboundAmount,
   fabricPickupUserOptions,
-  loadOutbounds,
-  onOutboundSearch,
-  onOutboundReset,
-  onOutboundPageSizeChange,
   loadFabricPickupUserOptions,
   openOutboundDialog,
   resetOutboundForm,
@@ -429,6 +360,16 @@ const stockTotalQuantity = computed(() => {
   }
   return stockGrandTotalQuantity.value
 })
+const stockTotalAmountDisplay = computed(() => {
+  if (!selectedRows.value.length) return stockGrandTotalAmount.value
+  return selectedRows.value.reduce((sum, row) => sum + (row.amount == null ? 0 : Number(row.amount) || 0), 0)
+})
+const stockUnpricedCountDisplay = computed(() => selectedRows.value.length
+  ? selectedRows.value.filter((row) => row.unitPrice == null).length
+  : stockGrandUnpricedCount.value)
+const stockUnpricedQuantityDisplay = computed(() => selectedRows.value.length
+  ? selectedRows.value.reduce((sum, row) => sum + (row.unitPrice == null ? Number(row.quantity) || 0 : 0), 0)
+  : stockGrandUnpricedQuantity.value)
 const exportButtonText = computed(() =>
   selectedRows.value.length > 0 ? `导出已选（${selectedRows.value.length}）` : '导出筛选结果',
 )
@@ -437,8 +378,6 @@ const selectedInventoryTypeLabel = computed(() => {
   if (id == null) return ''
   return inventoryTypeOptions.value.find((o) => o.id === id)?.label ?? ''
 })
-const outboundTotalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
-
 const { collapsed, isMobile } = useFilterCollapse('inventory-fabric-stock')
 const activeFilterCount = computed(() => {
   let n = 0
@@ -448,13 +387,6 @@ const activeFilterCount = computed(() => {
   if (inboundDateRange.value) n++
   return n
 })
-
-function onPageTabChange() {
-  if (pageTab.value === 'outbounds') {
-    outboundPagination.page = 1
-    loadOutbounds()
-  }
-}
 
 onMounted(() => {
   loadCustomerOptions()

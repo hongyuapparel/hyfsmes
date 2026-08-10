@@ -7,7 +7,7 @@ import {
 import { assertMaterialStockExportCapacity } from '../common/material-stock-export-capacity';
 import { InventoryStockExportMode } from '../common/inventory-stock-export.dto';
 import { prepareFinishedStockImages } from '../finished-goods-stock/finished-goods-stock-export-image';
-import type { FabricStockListRow } from './fabric-stock.service';
+import type { FabricStockListRow } from './fabric-stock-query.service';
 import { FabricStockService } from './fabric-stock.service';
 
 export type FabricStockExportParams = {
@@ -18,7 +18,7 @@ export type FabricStockExportParams = {
   startDate?: string;
   endDate?: string;
   selectedIds?: number[];
-  sortField?: 'quantity';
+  sortField?: 'quantity' | 'unitPrice' | 'amount';
   sortOrder?: 'asc' | 'desc';
 };
 
@@ -33,6 +33,9 @@ export function buildFabricStockExportLines(items: FabricStockListRow[]): Materi
     sizeName: '-',
     quantity: Number(item.quantity) || 0,
     unit: text(item.unit),
+    pricingStatus: item.unitPrice == null ? '未计价' : '已计价',
+    unitPrice: item.unitPrice == null ? null : Number(item.unitPrice),
+    amount: item.amount == null ? null : Number(item.amount),
     customerName: text(item.customerName),
     salesperson: '-',
     supplierName: text(item.supplierName),

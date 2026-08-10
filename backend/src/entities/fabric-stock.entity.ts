@@ -37,6 +37,10 @@ export class FabricStock {
   @Column({ name: 'quantity', type: 'decimal', precision: 12, scale: 2, default: 0 })
   quantity: string;
 
+  /** 当前库存实际成本单价；null 表示暂未计价，0 表示真实零成本 */
+  @Column({ name: 'unit_price', type: 'decimal', precision: 14, scale: 4, nullable: true })
+  unitPrice: string | null;
+
   @Column({ name: 'unit', length: 32, default: '米' })
   unit: string;
 

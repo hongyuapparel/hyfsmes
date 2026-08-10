@@ -7,6 +7,9 @@ export interface FabricItem {
   name: string
   quantity: string
   unit: string
+  /** null 表示暂未计价，0 表示真实零成本 */
+  unitPrice: string | null
+  amount: string | null
   remark: string
   customerName?: string
   imageUrl?: string
@@ -49,12 +52,21 @@ export function getFabricList(params?: {
   endDate?: string
   inventoryTypeId?: number | null
   skipTotal?: boolean
-  sortField?: 'quantity'
+  sortField?: 'quantity' | 'unitPrice' | 'amount'
   sortOrder?: 'asc' | 'desc'
   page?: number
   pageSize?: number
 }, config?: AxiosRequestConfig) {
-  return request.get<{ list: FabricItem[]; total: number; totalQuantity: number; page: number; pageSize: number }>(
+  return request.get<{
+    list: FabricItem[]
+    total: number
+    totalQuantity: number
+    totalAmount: number
+    unpricedCount: number
+    unpricedQuantity: number
+    page: number
+    pageSize: number
+  }>(
     '/inventory/fabric/items',
     { params, ...(config ?? {}) }
   )
@@ -68,7 +80,7 @@ export type FabricStockExportParams = {
   startDate?: string
   endDate?: string
   selectedIds?: number[]
-  sortField?: 'quantity'
+  sortField?: 'quantity' | 'unitPrice' | 'amount'
   sortOrder?: 'asc' | 'desc'
 }
 
@@ -95,6 +107,8 @@ export function createFabric(body: {
   warehouseId?: number | null
   inventoryTypeId?: number | null
   storageLocation?: string
+  unitPrice?: number | null
+  otherCost?: number
 }) {
   return request.post<FabricItem>('/inventory/fabric/items', body)
 }
@@ -112,9 +126,14 @@ export function updateFabric(
     warehouseId?: number | null
     inventoryTypeId?: number | null
     storageLocation?: string
+    unitPrice?: number | null
   }
 ) {
   return request.put<FabricItem>(`/inventory/fabric/items/${id}`, body)
+}
+
+export function batchUpdateFabricPrices(items: Array<{ id: number; unitPrice: number }>) {
+  return request.post<{ updated: number }>('/inventory/fabric/items/batch-price', { items })
 }
 
 export function deleteFabric(id: number) {
@@ -137,7 +156,11 @@ export interface FabricOutboundRecord {
   name: string
   customerName: string
   unit: string
+  inventoryTypeId: number | null
+  inventoryTypeLabel: string
   quantity: string
+  unitPrice: string | null
+  amount: string | null
   photoUrl: string
   remark: string
   pickupUserId?: number | null
@@ -161,10 +184,20 @@ export function getFabricOutboundRecords(params?: {
   customerName?: string
   startDate?: string
   endDate?: string
+  inventoryTypeId?: number | null
   page?: number
   pageSize?: number
 }) {
-  return request.get<{ list: FabricOutboundRecord[]; total: number; page: number; pageSize: number }>(
+  return request.get<{
+    list: FabricOutboundRecord[]
+    total: number
+    totalQuantity: number
+    totalAmount: number
+    unpricedCount: number
+    unpricedQuantity: number
+    page: number
+    pageSize: number
+  }>(
     '/inventory/fabric/outbounds',
     { params }
   )

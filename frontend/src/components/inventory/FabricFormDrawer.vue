@@ -63,6 +63,33 @@
           <el-form-item label="单位" prop="unit">
             <el-input v-model="form.unit" placeholder="如米、公斤" clearable :disabled="Boolean(quickAddSource)" />
           </el-form-item>
+          <el-form-item label="计价状态">
+            <el-checkbox v-model="form.isUnpriced" @change="onUnpricedChange">暂未计价</el-checkbox>
+          </el-form-item>
+          <el-form-item label="采购单价">
+            <el-input-number
+              v-model="form.unitPrice"
+              :min="0"
+              :precision="4"
+              controls-position="right"
+              placeholder="本批实际采购单价"
+              :disabled="form.isUnpriced"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="其他费用">
+            <el-input-number
+              v-model="form.otherCost"
+              :min="0"
+              :precision="2"
+              controls-position="right"
+              :disabled="form.isUnpriced"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="实际成本">
+            <span>{{ effectiveUnitPriceText }}</span>
+          </el-form-item>
           <el-form-item class="span-2" label="图片" prop="imageUrl">
             <ImageUploadArea v-model="form.imageUrl" />
           </el-form-item>
@@ -108,6 +135,7 @@ import type { FabricFormMode, FabricFormModel } from '@/composables/useFabricFor
 import AppDrawer from '@/components/AppDrawer.vue'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import FabricDetailView from '@/components/inventory/FabricDetailView.vue'
+import { formatMoneyAligned } from '@/utils/display-number'
 
 const props = defineProps<{
   visible: boolean
@@ -141,6 +169,20 @@ const isView = computed(() => props.mode === 'view')
 const isEdit = computed(() => props.mode === 'edit')
 const isCreate = computed(() => props.mode === 'create')
 const titleText = computed(() => (isView.value ? '面料详情' : isEdit.value ? '编辑面料' : '新增面料'))
+const effectiveUnitPriceText = computed(() => {
+  if (props.form.isUnpriced) return '未计价'
+  const quantity = Number(props.form.quantity)
+  const unitPrice = Number(props.form.unitPrice)
+  const otherCost = Number(props.form.otherCost)
+  if (!(quantity > 0) || !Number.isFinite(unitPrice) || !Number.isFinite(otherCost)) return '-'
+  return `${formatMoneyAligned((quantity * unitPrice + otherCost) / quantity)}/${props.form.unit || '单位'}`
+})
+
+function onUnpricedChange(value: boolean | string | number) {
+  if (!value) return
+  props.form.unitPrice = null
+  props.form.otherCost = 0
+}
 
 function onClose() {
   formRef.value?.clearValidate()

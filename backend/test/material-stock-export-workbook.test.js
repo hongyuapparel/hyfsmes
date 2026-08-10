@@ -15,7 +15,7 @@ const {
   buildFabricStockExportLines,
 } = require('../dist/fabric-stock/fabric-stock-export.service');
 const { FabricStockExportDto } = require('../dist/fabric-stock/fabric-stock-export.dto');
-const { FabricStockService } = require('../dist/fabric-stock/fabric-stock.service');
+const { FabricStockQueryService } = require('../dist/fabric-stock/fabric-stock-query.service');
 const { InventoryAccessoriesExportDto } = require('../dist/inventory-accessories/inventory-accessories-export.dto');
 const {
   assertMaterialStockExportCapacity,
@@ -112,6 +112,8 @@ test('面料导出保持系统字段顺序，并生成图片失败清单', async
     customerName: '客户B',
     supplierName: '供应商B',
     inventoryTypeLabel: '大货余料',
+    unitPrice: '12.3456',
+    amount: '154.32',
     warehouseLabel: '面料仓',
     storageLocation: 'B-03',
     remark: '留样',
@@ -129,12 +131,16 @@ test('面料导出保持系统字段顺序，并生成图片失败清单', async
   const detail = workbook.getWorksheet('面料库存明细');
   assert.ok(detail);
   assert.deepEqual(detail.getRow(1).values.slice(1), [
-    '面料名称', '图片', '数量', '单位', '客户', '供应商', '库存类型', '仓库', '存放地址', '备注', '创建时间',
+    '面料名称', '图片', '数量', '单位', '计价状态', '单价', '金额', '客户', '供应商', '库存类型', '仓库', '存放地址', '备注', '创建时间',
   ]);
   assert.equal(detail.getCell('B2').value, '图片加载失败');
   assert.equal(detail.getCell('C2').value, 12.5);
+  assert.equal(detail.getCell('E2').value, '已计价');
+  assert.equal(detail.getCell('F2').value, 12.3456);
+  assert.equal(detail.getCell('G2').value, 154.32);
   assert.equal(detail.getCell('A3').value, '合计');
   assert.equal(detail.getCell('C3').value, 12.5);
+  assert.equal(detail.getCell('G3').value, 154.32);
 
   const failures = workbook.getWorksheet('图片加载失败');
   assert.ok(failures);
@@ -168,11 +174,8 @@ test('面料导出查询继承页面数量排序', async () => {
     addOrderBy(field, direction) { orderCalls.push(['addOrderBy', field, direction]); return this; },
     async getMany() { return []; },
   };
-  const service = new FabricStockService(
+  const service = new FabricStockQueryService(
     { createQueryBuilder: () => queryBuilder },
-    null,
-    null,
-    null,
     null,
     null,
   );

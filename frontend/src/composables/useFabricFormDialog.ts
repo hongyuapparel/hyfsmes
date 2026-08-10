@@ -28,12 +28,16 @@ export interface FabricFormModel {
   storageLocation: string
   imageUrl: string
   remark: string
+  unitPrice: number | null
+  otherCost: number
+  isUnpriced: boolean
 }
 
 function emptyFabricForm(): FabricFormModel {
   return {
     name: '', quantity: 0, unit: '米', customerName: '', supplierId: null,
     warehouseId: null, inventoryTypeId: null, storageLocation: '', imageUrl: '', remark: '',
+    unitPrice: null, otherCost: 0, isUnpriced: false,
   }
 }
 
@@ -66,6 +70,7 @@ export function useFabricFormDialog(
     if (action === 'create') return '新建'
     if (action === 'inbound') return '新增入库'
     if (action === 'update') return '编辑'
+    if (action === 'reprice') return '补价'
     if (action === 'outbound') return '出库'
     if (action === 'delete') return '删除'
     return action || '操作'
@@ -95,6 +100,9 @@ export function useFabricFormDialog(
     form.imageUrl = seed.imageUrl ?? ''
     form.remark = seed.remark ?? ''
     form.quantity = parseFloat(String(seed.quantity)) || 0
+    form.unitPrice = seed.unitPrice == null ? null : Number(seed.unitPrice)
+    form.otherCost = 0
+    form.isUnpriced = seed.unitPrice == null
   }
 
   async function openForm(row: FabricItem | null, mode: FabricFormMode = row ? 'edit' : 'create') {
@@ -111,6 +119,9 @@ export function useFabricFormDialog(
       applyRowToForm(selectedRows.value[0]!)
       quickAddSource.value = selectedRows.value[0]!
       form.quantity = 0
+      form.unitPrice = null
+      form.otherCost = 0
+      form.isUnpriced = false
     } else {
       Object.assign(form, emptyFabricForm())
     }
@@ -146,11 +157,28 @@ export function useFabricFormDialog(
       warehouseId: form.warehouseId,
       inventoryTypeId: form.inventoryTypeId,
       storageLocation: form.storageLocation,
+      unitPrice: form.isUnpriced ? null : form.unitPrice,
     }
   }
 
   async function submitForm() {
-    await dialogRef.value?.validate?.().catch(() => {})
+    try {
+      await dialogRef.value?.validate?.()
+    } catch {
+      return
+    }
+    if (formDialog.mode !== 'edit' && (!Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0)) {
+      ElMessage.warning('请输入大于 0 的新增数量')
+      return
+    }
+    if (!form.isUnpriced && (form.unitPrice == null || !Number.isFinite(Number(form.unitPrice)) || Number(form.unitPrice) < 0)) {
+      ElMessage.warning('请输入大于或等于 0 的实际采购单价，或选择暂未计价')
+      return
+    }
+    if (!form.isUnpriced && (!Number.isFinite(Number(form.otherCost)) || Number(form.otherCost) < 0)) {
+      ElMessage.warning('其他费用不能小于 0')
+      return
+    }
     formDialog.submitting = true
     try {
       if (formDialog.mode === 'edit' && editId.value != null) {
@@ -162,10 +190,10 @@ export function useFabricFormDialog(
           ElMessage.warning('请输入大于 0 的新增数量')
           return
         }
-        await createFabric({ ...buildPayload(), quantity: inputQty })
+        await createFabric({ ...buildPayload(), quantity: inputQty, otherCost: form.isUnpriced ? 0 : form.otherCost })
         ElMessage.success('库存增加成功')
       } else {
-        await createFabric({ ...buildPayload(), quantity: form.quantity })
+        await createFabric({ ...buildPayload(), quantity: form.quantity, otherCost: form.isUnpriced ? 0 : form.otherCost })
         ElMessage.success('新增成功')
       }
       formDialog.visible = false

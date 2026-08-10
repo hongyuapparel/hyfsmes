@@ -15,6 +15,9 @@ export type MaterialStockExportLine = {
   sizeName: string;
   quantity: number;
   unit: string;
+  pricingStatus?: string;
+  unitPrice?: number | null;
+  amount?: number | null;
   customerName: string;
   salesperson: string;
   supplierName: string;
@@ -35,6 +38,8 @@ type WorkbookSpec = {
   worksheetName: string;
   columns: ExportColumn[];
   quantityColumn: number;
+  unitPriceColumn?: number;
+  amountColumn?: number;
   mergeColumns: number[];
 };
 
@@ -70,6 +75,9 @@ const FABRIC_SPEC: WorkbookSpec = {
     { header: '图片', key: 'image', width: 15 },
     { header: '数量', key: 'quantity', width: 12 },
     { header: '单位', key: 'unit', width: 10 },
+    { header: '计价状态', key: 'pricingStatus', width: 12 },
+    { header: '单价', key: 'unitPrice', width: 14 },
+    { header: '金额', key: 'amount', width: 16 },
     { header: '客户', key: 'customerName', width: 20 },
     { header: '供应商', key: 'supplierName', width: 20 },
     { header: '库存类型', key: 'inventoryType', width: 16 },
@@ -79,6 +87,8 @@ const FABRIC_SPEC: WorkbookSpec = {
     { header: '创建时间', key: 'createdAt', width: 20 },
   ],
   quantityColumn: 3,
+  unitPriceColumn: 6,
+  amountColumn: 7,
   mergeColumns: [],
 };
 
@@ -145,7 +155,7 @@ function addLineRows(
   spec: WorkbookSpec,
 ) {
   lines.forEach((line) => {
-    const values: Record<string, string | number> = {};
+    const values: Record<string, string | number | null | undefined> = {};
     spec.columns.forEach((column) => {
       values[column.key] = column.key === 'image' ? '' : line[column.key];
     });
@@ -153,6 +163,8 @@ function addLineRows(
     row.height = 28;
     row.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     row.getCell(spec.quantityColumn).numFmt = '#,##0.##';
+    if (spec.unitPriceColumn) row.getCell(spec.unitPriceColumn).numFmt = '¥#,##0.0000';
+    if (spec.amountColumn) row.getCell(spec.amountColumn).numFmt = '¥#,##0.00';
   });
 }
 
@@ -217,12 +229,14 @@ export async function buildMaterialStockWorkbook(
   worksheet.autoFilter = { from: 'A1', to: `${worksheet.getColumn(spec.columns.length).letter}${lines.length + 1}` };
 
   const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
-  const totalRow = worksheet.addRow({ name: '合计', quantity: totalQuantity });
+  const totalAmount = lines.reduce((sum, line) => sum + (line.amount ?? 0), 0);
+  const totalRow = worksheet.addRow({ name: '合计', quantity: totalQuantity, amount: totalAmount });
   totalRow.height = 28;
   totalRow.font = { bold: true };
   totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF0F8' } };
   totalRow.alignment = { horizontal: 'center', vertical: 'middle' };
   totalRow.getCell(spec.quantityColumn).numFmt = '#,##0.##';
+  if (spec.amountColumn) totalRow.getCell(spec.amountColumn).numFmt = '¥#,##0.00';
   applyBorders(worksheet);
 
   const failedImages = collectFailedImages(lines, prepared);

@@ -29,6 +29,9 @@ export function useFabricInventoryStock() {
   const loading = ref(false)
   /** 当前筛选下全量匹配的总数量（接口返回，跨分页） */
   const stockTotalQuantity = ref(0)
+  const stockTotalAmount = ref(0)
+  const stockUnpricedCount = ref(0)
+  const stockUnpricedQuantity = ref(0)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
   const selectedRows = ref<FabricItem[]>([])
   const customerOptions = ref<{ label: string; value: string }[]>([])
@@ -47,7 +50,9 @@ export function useFabricInventoryStock() {
     buildPayload: (selectedIds, selectedMode) => {
       const [startDate, endDate] = inboundDateRange.value ?? ['', '']
       const sort = sortParams()
-      const sortField = sort.sortField === 'quantity' ? sort.sortField : undefined
+      const sortField = ['quantity', 'unitPrice', 'amount'].includes(sort.sortField ?? '')
+        ? sort.sortField as 'quantity' | 'unitPrice' | 'amount'
+        : undefined
       return {
         mode: selectedMode ? 'selected' : 'filtered',
         name: selectedMode ? undefined : filter.name || undefined,
@@ -77,7 +82,9 @@ export function useFabricInventoryStock() {
       const [startDate, endDate] =
         inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
       const sort = sortParams()
-      const sortField = sort.sortField === 'quantity' ? sort.sortField : undefined
+      const sortField = ['quantity', 'unitPrice', 'amount'].includes(sort.sortField ?? '')
+        ? sort.sortField as 'quantity' | 'unitPrice' | 'amount'
+        : undefined
       const res = await getFabricList({
         name: filter.name || undefined,
         customerName: filter.customerName || undefined,
@@ -94,6 +101,9 @@ export function useFabricInventoryStock() {
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         stockTotalQuantity.value = Number(data.totalQuantity ?? 0) || 0
+        stockTotalAmount.value = Number(data.totalAmount ?? 0) || 0
+        stockUnpricedCount.value = Number(data.unpricedCount ?? 0) || 0
+        stockUnpricedQuantity.value = Number(data.unpricedQuantity ?? 0) || 0
         restoreFabricStockColumnWidths(fabricStockTableRef.value)
       }
     } catch (e: unknown) {
@@ -186,6 +196,9 @@ export function useFabricInventoryStock() {
     list,
     loading,
     stockTotalQuantity,
+    stockTotalAmount,
+    stockUnpricedCount,
+    stockUnpricedQuantity,
     pagination,
     selectedRows,
     exporting,

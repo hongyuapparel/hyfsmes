@@ -63,6 +63,7 @@ function actionLabel(action: string): string {
   if (action === 'inbound') return '入库'
   if (action === 'outbound') return '出库'
   if (action === 'update') return '编辑'
+  if (action === 'reprice') return '补价'
   if (action === 'delete') return '删除'
   return action || '操作'
 }
@@ -73,6 +74,11 @@ function normalizeText(value: unknown): string {
 
 function displayText(value: unknown): string {
   return normalizeText(value) || '-'
+}
+
+function displayCost(value: unknown): string {
+  const number = toFiniteNumber(value)
+  return number == null ? '未计价' : `￥${number.toFixed(2)}`
 }
 
 function valuesEqual(left: unknown, right: unknown): boolean {
@@ -121,6 +127,12 @@ function buildEditChangeSummaries(
   addTextChange('location', '存放地址')
   addTextChange('storageLocation', '存放地址')
   addTextChange('remark', '备注')
+  if (!valuesEqual(before.unitPrice, after.unitPrice)) {
+    changes.push(`实际成本单价「${displayCost(before.unitPrice)}」→「${displayCost(after.unitPrice)}」`)
+  }
+  if (!valuesEqual(before.amount, after.amount)) {
+    changes.push(`库存金额「${displayCost(before.amount)}」→「${displayCost(after.amount)}」`)
+  }
 
   if (!!before.isSized !== !!after.isSized) {
     changes.push(`分码「${before.isSized ? '开启' : '关闭'}」→「${after.isSized ? '开启' : '关闭'}」`)
@@ -168,13 +180,20 @@ export function buildInventoryOperationLogSummary(
       if (directionMatches) {
         const movedQuantity = action === 'outbound' ? -delta : delta
         parts.push(`${label} ${withUnit(movedQuantity, unit)}，库存 ${withUnit(beforeQuantity, unit)} → ${withUnit(afterQuantity, unit)}`)
+        if (action === 'outbound' && before && Object.prototype.hasOwnProperty.call(before, 'unitPrice')) {
+          const outboundUnitPrice = before?.unitPrice
+          const unitPriceNumber = toFiniteNumber(outboundUnitPrice)
+          parts.push(unitPriceNumber == null
+            ? '本次出库未计价'
+            : `实际成本单价 ${displayCost(outboundUnitPrice)}，出库金额 ${displayCost(movedQuantity * unitPriceNumber)}`)
+        }
       } else {
         parts.push(`${label}记录异常，库存实际 ${withUnit(beforeQuantity, unit)} → ${withUnit(afterQuantity, unit)}`)
       }
       const sizeSummary = buildSizeDeltaSummary(before, after, unit)
       if (sizeSummary) parts.push(sizeSummary)
     }
-  } else if (action === 'update' && before && after) {
+  } else if ((action === 'update' || action === 'reprice') && before && after) {
     if (beforeQuantity != null && afterQuantity != null && beforeQuantity !== afterQuantity) {
       parts.push(`库存 ${withUnit(beforeQuantity, normalizeText(before.unit))} → ${withUnit(afterQuantity, normalizeText(after.unit))}`)
     }

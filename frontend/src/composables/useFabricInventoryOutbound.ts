@@ -1,41 +1,21 @@
 import { computed, reactive, ref, type Ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
 import {
   fabricOutbound,
-  getFabricOutboundRecords,
   getFabricPickupUserOptions,
   type FabricItem,
-  type FabricOutboundRecord,
   type FabricPickupUserOption,
 } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
-import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
-import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
-import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 
 interface UseFabricInventoryOutboundOptions {
   selectedRows: Ref<FabricItem[]>
   reloadStock: () => void | Promise<void>
+  reloadOutbounds: () => void | Promise<void>
+  clearSelection: () => void
 }
 
 export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOptions) {
-  const outboundFilter = reactive<{
-    name: string
-    customerName: string
-    dateRange: [string, string] | []
-  }>({ name: '', customerName: '', dateRange: [] })
-  const outboundList = ref<FabricOutboundRecord[]>([])
-  const outboundLoading2 = ref(false)
-  const outboundPagination = reactive({ page: 1, pageSize: 20, total: 0 })
-
-  const fabricOutboundTableRef = ref()
-  const fabricOutboundShellRef = ref<HTMLElement | null>(null)
-  const { tableHeight: fabricOutboundTableHeight } = useFlexShellTableHeight(fabricOutboundShellRef)
-  const {
-    onHeaderDragEnd: onFabricOutboundHeaderDragEnd,
-    restoreColumnWidths: restoreFabricOutboundColumnWidths,
-  } = useTableColumnWidthPersist('inventory-fabric-outbounds')
-
   const outboundDialog = reactive<{
     visible: boolean
     submitting: boolean
@@ -59,58 +39,12 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
     const q = parseFloat(String(row.quantity))
     return Number.isFinite(q) ? q : 0
   })
+  const outboundUnitPrice = computed(() => outboundDialog.row?.unitPrice ?? null)
+  const outboundAmount = computed(() => {
+    if (outboundUnitPrice.value == null) return null
+    return Number(outboundUnitPrice.value) * Number(outboundForm.quantity || 0)
+  })
   const fabricPickupUserOptions = ref<FabricPickupUserOption[]>([])
-
-  function getInventoryOutboundRangeStyle(v: [string, string] | []) {
-    const hasValue = Array.isArray(v) && v.length === 2
-    if (!hasValue) return getFilterRangeStyle(v)
-    const w = '240px'
-    return { ...getFilterRangeStyle(v), width: w, minWidth: w, flex: `0 0 ${w}` }
-  }
-
-  async function loadOutbounds() {
-    outboundLoading2.value = true
-    try {
-      const [startDate, endDate] =
-        Array.isArray(outboundFilter.dateRange) && outboundFilter.dateRange.length === 2
-          ? outboundFilter.dateRange
-          : ['', '']
-      const res = await getFabricOutboundRecords({
-        name: outboundFilter.name || undefined,
-        customerName: outboundFilter.customerName || undefined,
-        startDate: startDate || undefined,
-        endDate: endDate || undefined,
-        page: outboundPagination.page,
-        pageSize: outboundPagination.pageSize,
-      })
-      const data = res.data
-      outboundList.value = data?.list ?? []
-      outboundPagination.total = data?.total ?? 0
-      restoreFabricOutboundColumnWidths(fabricOutboundTableRef.value)
-    } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-    } finally {
-      outboundLoading2.value = false
-    }
-  }
-
-  function onOutboundSearch(_byUser = false) {
-    outboundPagination.page = 1
-    loadOutbounds()
-  }
-
-  function onOutboundReset() {
-    outboundFilter.name = ''
-    outboundFilter.customerName = ''
-    outboundFilter.dateRange = []
-    outboundPagination.page = 1
-    loadOutbounds()
-  }
-
-  function onOutboundPageSizeChange() {
-    outboundPagination.page = 1
-    loadOutbounds()
-  }
 
   async function loadFabricPickupUserOptions() {
     try {
@@ -151,7 +85,22 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
       ElMessage.warning('请选择领取人，并上传出库照片、填写备注（谁领走、用途）')
       return
     }
-    await outboundFormRef.value?.validate().catch(() => {})
+    try {
+      await outboundFormRef.value?.validate()
+    } catch {
+      return
+    }
+    if (outboundDialog.row.unitPrice == null) {
+      try {
+        await ElMessageBox.confirm(
+          '该面料当前暂未计价。本次出库会正常扣减库存，但出库单价和金额将记录为“未计价”，之后补价也不会回改本次记录。是否继续？',
+          '未计价出库确认',
+          { type: 'warning', confirmButtonText: '继续出库', cancelButtonText: '取消' },
+        )
+      } catch {
+        return
+      }
+    }
     outboundDialog.submitting = true
     try {
       await fabricOutbound({
@@ -163,8 +112,9 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
       })
       ElMessage.success('出库成功')
       outboundDialog.visible = false
-      options.selectedRows.value = []
+      options.clearSelection()
       await options.reloadStock()
+      await options.reloadOutbounds()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
@@ -173,25 +123,14 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
   }
 
   return {
-    outboundFilter,
-    outboundList,
-    outboundLoading2,
-    outboundPagination,
-    fabricOutboundTableRef,
-    fabricOutboundShellRef,
-    fabricOutboundTableHeight,
-    onFabricOutboundHeaderDragEnd,
     outboundDialog,
     outboundFormRef,
     outboundForm,
     outboundRules,
     outboundMaxQty,
+    outboundUnitPrice,
+    outboundAmount,
     fabricPickupUserOptions,
-    getInventoryOutboundRangeStyle,
-    loadOutbounds,
-    onOutboundSearch,
-    onOutboundReset,
-    onOutboundPageSizeChange,
     loadFabricPickupUserOptions,
     openOutboundDialog,
     resetOutboundForm,

@@ -69,6 +69,30 @@
         <el-input v-if="isEdit" v-model="form.unit" size="small" placeholder="如米、公斤" clearable />
         <span v-else>{{ form.unit || '-' }}</span>
       </div>
+      <div class="detail-basic-label">计价状态</div>
+      <div class="detail-basic-value">
+        <el-checkbox v-if="isEdit" v-model="form.isUnpriced" @change="onUnpricedChange">暂未计价</el-checkbox>
+        <span v-else>{{ form.isUnpriced ? '未计价' : '已计价' }}</span>
+      </div>
+      <div class="detail-basic-label">实际成本单价</div>
+      <div class="detail-basic-value">
+        <el-input-number
+          v-if="isEdit"
+          v-model="form.unitPrice"
+          :min="0"
+          :precision="4"
+          controls-position="right"
+          :disabled="form.isUnpriced"
+          style="width: 100%"
+        />
+        <span v-else>{{ unitPriceText }}</span>
+      </div>
+      <div class="detail-basic-label">库存金额</div>
+      <div class="detail-basic-value">
+        <span>{{ amountText }}</span>
+      </div>
+      <div class="detail-basic-label"></div>
+      <div class="detail-basic-value"></div>
       <div class="detail-basic-label detail-basic-label-row-start">备注</div>
       <div class="detail-basic-value detail-basic-value-span-3">
         <el-input v-if="isEdit" v-model="form.remark" size="small" type="textarea" :rows="2" placeholder="备注" />
@@ -101,7 +125,7 @@ import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import FinishedBasicInfoGrid from '@/components/inventory/finished-shared/FinishedBasicInfoGrid.vue'
 import { formatDateTime as formatDate } from '@/utils/date-format'
-import { formatDisplayNumber } from '@/utils/display-number'
+import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { buildInventoryOperationLogSummary } from '@/utils/inventoryOperationLogSummary'
 
 const props = defineProps<{
@@ -145,6 +169,15 @@ const warehouseText = computed(() => {
 })
 
 const quantityText = computed(() => `${formatDisplayNumber(props.form.quantity)} ${props.form.unit || ''}`.trim())
+const unitPriceText = computed(() => props.form.isUnpriced ? '未计价' : formatMoneyAligned(props.form.unitPrice))
+const amountText = computed(() => {
+  if (props.form.isUnpriced || props.form.unitPrice == null) return '未计价'
+  return formatMoneyAligned(Number(props.form.quantity) * Number(props.form.unitPrice))
+})
+
+function onUnpricedChange(value: boolean | string | number) {
+  if (value) props.form.unitPrice = null
+}
 
 const formattedLogs = computed(() =>
   props.logs.map((log) => ({

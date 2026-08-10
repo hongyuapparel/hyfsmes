@@ -12,6 +12,13 @@
       :rules="outboundRules"
       label-width="90px"
     >
+      <el-alert
+        :title="outboundUnitPrice == null ? '当前库存暂未计价，本次出库单价和金额会记录为未计价' : `实际成本单价 ${formatMoneyAligned(outboundUnitPrice)}，本次金额 ${formatMoneyAligned(outboundAmount)}`"
+        :type="outboundUnitPrice == null ? 'warning' : 'info'"
+        :closable="false"
+        show-icon
+        class="outbound-cost-alert"
+      />
       <el-form-item label="领取人" prop="pickupUserId">
         <el-select
           v-model="outboundForm.pickupUserId"
@@ -74,6 +81,7 @@ import { computed, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import type { FabricPickupUserOption } from '@/api/inventory'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
+import { formatMoneyAligned } from '@/utils/display-number'
 
 interface OutboundFormModel {
   pickupUserId: number | null
@@ -88,6 +96,8 @@ const props = defineProps<{
   outboundForm: OutboundFormModel
   outboundRules: FormRules
   outboundMaxQty: number
+  outboundUnitPrice: string | null
+  outboundAmount: number | null
   fabricPickupUserOptions: FabricPickupUserOption[]
 }>()
 
@@ -114,3 +124,7 @@ defineExpose({
   clearValidate: () => formRef.value?.clearValidate(),
 })
 </script>
+
+<style scoped>
+.outbound-cost-alert { margin-bottom: 14px; }
+</style>

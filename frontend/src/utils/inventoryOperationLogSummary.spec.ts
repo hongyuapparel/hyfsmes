@@ -110,4 +110,21 @@ describe('buildInventoryOperationLogSummary', () => {
       beforeSnapshot: { name: '吊牌', quantity: 10, unit: '个' },
     })).toBe('删除「吊牌」，删除前库存 10个')
   })
+
+  it('面料出库显示保存时的成本快照', () => {
+    expect(buildInventoryOperationLogSummary({
+      action: 'outbound',
+      beforeSnapshot: { quantity: 10, unit: '米', unitPrice: '8.5000' },
+      afterSnapshot: { quantity: 6, unit: '米', unitPrice: '8.5000' },
+    })).toBe('出库 4米，库存 10米 → 6米；实际成本单价 ￥8.50，出库金额 ￥34.00')
+  })
+
+  it('批量补价显示单价和库存金额变化', () => {
+    expect(buildInventoryOperationLogSummary({
+      action: 'reprice',
+      beforeSnapshot: { quantity: 10, unit: '米', unitPrice: null, amount: null },
+      afterSnapshot: { quantity: 10, unit: '米', unitPrice: '8.5000', amount: '85.00' },
+      remark: '批量补价',
+    })).toBe('补价；实际成本单价「未计价」→「￥8.50」；库存金额「未计价」→「￥85.00」；备注：批量补价')
+  })
 })

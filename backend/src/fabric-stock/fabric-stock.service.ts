@@ -1,27 +1,22 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { FabricStock } from '../entities/fabric-stock.entity';
 import { FabricOutbound } from '../entities/fabric-outbound.entity';
 import { FabricStockOperationLog } from '../entities/fabric-stock-operation-log.entity';
 import { Supplier } from '../entities/supplier.entity';
 import { User, UserStatus } from '../entities/user.entity';
-import { SystemOption } from '../entities/system-option.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
-import { formatDateTimeForResponse } from '../common/date-time.util';
-import { InventoryStockExportMode } from '../common/inventory-stock-export.dto';
 import {
-  applyFabricStockListFilters,
-  type FabricStockListFilters,
-} from './fabric-stock-list-query';
+  calculateFabricAmount,
+  calculateFabricInboundUnitPrice,
+  calculateFabricWeightedUnitPrice,
+  normalizeFabricOtherCost,
+  normalizeFabricUnitPrice,
+} from './fabric-stock-valuation';
+import { FabricStockQueryService, type FabricStockListRow } from './fabric-stock-query.service';
 
 const FABRIC_SUPPLIER_TYPE_VALUE = '面料供应商';
-
-export type FabricStockListRow = FabricStock & {
-  supplierName: string;
-  warehouseLabel: string;
-  inventoryTypeLabel: string;
-};
 
 @Injectable()
 export class FabricStockService {
@@ -30,8 +25,6 @@ export class FabricStockService {
   constructor(
     @InjectRepository(FabricStock)
     private readonly stockRepo: Repository<FabricStock>,
-    @InjectRepository(FabricOutbound)
-    private readonly outboundRepo: Repository<FabricOutbound>,
     @InjectRepository(FabricStockOperationLog)
     private readonly operationLogRepo: Repository<FabricStockOperationLog>,
     @InjectRepository(Supplier)
@@ -39,6 +32,8 @@ export class FabricStockService {
     @InjectRepository(User)
     private readonly userRepo: Repository<User>,
     private readonly systemOptionsService: SystemOptionsService,
+    private readonly queryService: FabricStockQueryService,
+    private readonly dataSource: DataSource,
   ) {}
 
   private toSnapshot(item: FabricStock): Record<string, unknown> {
@@ -46,6 +41,8 @@ export class FabricStockService {
       id: item.id,
       name: item.name,
       quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      amount: calculateFabricAmount(item.quantity, item.unitPrice),
       unit: item.unit,
       customerName: item.customerName,
       supplierId: item.supplierId,
@@ -57,54 +54,6 @@ export class FabricStockService {
     };
   }
 
-  private buildWarehouseIdToLabelMap(options: SystemOption[]): Map<number, string> {
-    const byId = new Map(options.map((o) => [o.id, o]));
-    const map = new Map<number, string>();
-    for (const o of options) {
-      const path: string[] = [];
-      let cur: SystemOption | undefined = o;
-      while (cur) {
-        path.unshift(cur.value);
-        cur = cur.parentId != null ? byId.get(cur.parentId) : undefined;
-      }
-      map.set(o.id, path.join(' > '));
-    }
-    return map;
-  }
-
-  private async decorateFabricStocks(items: FabricStock[]): Promise<FabricStockListRow[]> {
-    if (!items.length) return [];
-    const supplierIds = [
-      ...new Set(
-        items.map((r) => r.supplierId).filter((x): x is number => x != null && x > 0),
-      ),
-    ];
-    const warehouseOpts = await this.systemOptionsService.findAllByType('warehouses');
-    const whMap = this.buildWarehouseIdToLabelMap(warehouseOpts);
-    const whIdSet = new Set(warehouseOpts.map((o) => o.id));
-    const inventoryTypeOpts = await this.systemOptionsService.findAllByType('inventory_types');
-    const invTypeMap = new Map(inventoryTypeOpts.map((o) => [o.id, o.value]));
-    const suppliers =
-      supplierIds.length > 0
-        ? await this.supplierRepo.find({ where: { id: In(supplierIds) } })
-        : [];
-    const supMap = new Map(suppliers.map((s) => [s.id, s.name]));
-    return items.map((item) => ({
-      ...item,
-      supplierName:
-        item.supplierId != null && item.supplierId > 0
-          ? (supMap.get(item.supplierId) ?? '')
-          : '',
-      warehouseLabel:
-        item.warehouseId != null && item.warehouseId > 0 && whIdSet.has(item.warehouseId)
-          ? (whMap.get(item.warehouseId) ?? '')
-          : '',
-      inventoryTypeLabel:
-        item.inventoryTypeId != null && item.inventoryTypeId > 0
-          ? (invTypeMap.get(item.inventoryTypeId) ?? '')
-          : '',
-    }));
-  }
 
   /**
    * system_options 中「面料供应商」根节点 id（与供应商列表按 type 解析一致；value 按 trim 比对以兼容库内首尾空格）
@@ -220,75 +169,16 @@ export class FabricStockService {
     return msg.includes("doesn't exist") && msg.includes(tableName.toLowerCase());
   }
 
-  async getList(params: FabricStockListFilters & {
-    skipTotal?: boolean;
-    sortField?: string;
-    sortOrder?: string;
-    page?: number;
-    pageSize?: number;
-  }): Promise<{ list: FabricStockListRow[]; total: number; totalQuantity: number; page: number; pageSize: number }> {
-    const {
-      skipTotal = false,
-      sortField,
-      sortOrder,
-      page = 1,
-      pageSize = 20,
-    } = params;
-    const qb = applyFabricStockListFilters(this.stockRepo.createQueryBuilder('s'), params);
-    const totalQuantityRow = skipTotal
-      ? null
-      : await qb
-          .clone()
-          .select('COALESCE(SUM(s.quantity), 0)', 'sum')
-          .getRawOne<{ sum: string | number | null }>();
-    const totalQuantity = Number(totalQuantityRow?.sum ?? 0) || 0;
-    if (sortField === 'quantity' && (sortOrder === 'asc' || sortOrder === 'desc')) {
-      qb.orderBy('s.quantity', sortOrder === 'asc' ? 'ASC' : 'DESC')
-        .addOrderBy('s.created_at', 'DESC')
-        .addOrderBy('s.id', 'DESC');
-    } else {
-      qb.orderBy('s.created_at', 'DESC').addOrderBy('s.id', 'DESC');
-    }
-    const total = skipTotal ? 0 : await qb.getCount();
-    const rawList = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getMany();
-    const list = await this.decorateFabricStocks(rawList);
-    return { list, total, totalQuantity, page, pageSize };
+  async getList(params: Parameters<FabricStockQueryService['getList']>[0]) {
+    return this.queryService.getList(params);
   }
 
-  async getRowsForExport(
-    params: FabricStockListFilters & {
-      mode: InventoryStockExportMode;
-      selectedIds?: number[];
-      sortField?: 'quantity';
-      sortOrder?: 'asc' | 'desc';
-    },
-  ): Promise<FabricStockListRow[]> {
-    const selectedIds = Array.from(new Set(params.selectedIds ?? []));
-    const qb = this.stockRepo.createQueryBuilder('s');
-    if (params.mode === InventoryStockExportMode.Selected) {
-      qb.andWhere('s.id IN (:...selectedIds)', { selectedIds });
-    } else {
-      applyFabricStockListFilters(qb, params);
-    }
-    if (params.sortField === 'quantity' && (params.sortOrder === 'asc' || params.sortOrder === 'desc')) {
-      qb.orderBy('s.quantity', params.sortOrder === 'asc' ? 'ASC' : 'DESC')
-        .addOrderBy('s.created_at', 'DESC')
-        .addOrderBy('s.id', 'DESC');
-    } else {
-      qb.orderBy('s.created_at', 'DESC').addOrderBy('s.id', 'DESC');
-    }
-    const items = await qb.getMany();
-    return this.decorateFabricStocks(items);
+  async getRowsForExport(params: Parameters<FabricStockQueryService['getRowsForExport']>[0]): Promise<FabricStockListRow[]> {
+    return this.queryService.getRowsForExport(params);
   }
 
   async getOne(id: number): Promise<FabricStockListRow> {
-    const item = await this.stockRepo.findOne({ where: { id } });
-    if (!item) throw new NotFoundException('面料记录不存在');
-    const [decorated] = await this.decorateFabricStocks([item]);
-    return decorated;
+    return this.queryService.getOne(id);
   }
 
   async create(dto: {
@@ -302,6 +192,8 @@ export class FabricStockService {
     warehouseId?: unknown;
     inventoryTypeId?: unknown;
     storageLocation?: string;
+    unitPrice?: unknown;
+    otherCost?: unknown;
     operatorUsername?: string;
   }): Promise<FabricStockListRow> {
     const name = this.normalizeName(dto.name);
@@ -313,12 +205,21 @@ export class FabricStockService {
     const supplierId = this.normalizeOptionalPositiveInt(dto.supplierId);
     const warehouseId = this.normalizeOptionalPositiveInt(dto.warehouseId);
     const inventoryTypeId = this.normalizeOptionalPositiveInt(dto.inventoryTypeId);
+    const inboundUnitPrice = calculateFabricInboundUnitPrice(qty, dto.unitPrice, dto.otherCost);
+    const otherCost = normalizeFabricOtherCost(dto.otherCost);
     if (supplierId != null) await this.assertFabricSupplierId(supplierId);
     if (warehouseId != null) await this.assertWarehouseId(warehouseId);
     const existing = await this.findByName(name);
     if (existing) {
       const before = this.toSnapshot(existing);
-      existing.quantity = String((Number(existing.quantity) || 0) + qty);
+      const currentQuantity = Number(existing.quantity) || 0;
+      existing.quantity = String(currentQuantity + qty);
+      existing.unitPrice = calculateFabricWeightedUnitPrice(
+        currentQuantity,
+        existing.unitPrice,
+        qty,
+        inboundUnitPrice,
+      );
       if (!existing.unit && dto.unit) existing.unit = dto.unit.trim();
       if (!existing.customerName && dto.customerName) existing.customerName = dto.customerName.trim();
       if (existing.supplierId == null) existing.supplierId = supplierId;
@@ -333,14 +234,20 @@ export class FabricStockService {
         operatorUsername: dto.operatorUsername ?? '',
         beforeSnapshot: before,
         afterSnapshot: this.toSnapshot(savedExisting),
-        remark: dto.remark ?? '',
+        remark: [
+          inboundUnitPrice == null
+            ? '本次暂未计价，合并后整条库存暂不统计金额'
+            : `本批采购单价：${normalizeFabricUnitPrice(dto.unitPrice)}；本批其他费用：${otherCost}；本批实际成本单价：${inboundUnitPrice}`,
+          dto.remark ?? '',
+        ].filter(Boolean).join('；'),
       });
-      const [row] = await this.decorateFabricStocks([savedExisting]);
+      const [row] = await this.queryService.decorate([savedExisting]);
       return row;
     }
     const entity = this.stockRepo.create({
       name,
       quantity: String(qty),
+      unitPrice: inboundUnitPrice,
       unit: dto.unit?.trim() ?? '米',
       customerName: dto.customerName?.trim() ?? '',
       supplierId,
@@ -359,9 +266,14 @@ export class FabricStockService {
       operatorUsername: dto.operatorUsername ?? '',
       beforeSnapshot,
       afterSnapshot: this.toSnapshot(saved),
-      remark: dto.remark ?? '',
+      remark: [
+        inboundUnitPrice == null
+          ? '本次暂未计价'
+          : `本批采购单价：${normalizeFabricUnitPrice(dto.unitPrice)}；本批其他费用：${otherCost}；本批实际成本单价：${inboundUnitPrice}`,
+        dto.remark ?? '',
+      ].filter(Boolean).join('；'),
     });
-    const [row] = await this.decorateFabricStocks([saved]);
+    const [row] = await this.queryService.decorate([saved]);
     return row;
   }
 
@@ -378,6 +290,7 @@ export class FabricStockService {
       warehouseId?: unknown;
       inventoryTypeId?: unknown;
       storageLocation?: string;
+      unitPrice?: unknown;
       operatorUsername?: string;
     },
   ): Promise<FabricStockListRow> {
@@ -411,6 +324,7 @@ export class FabricStockService {
       item.inventoryTypeId = this.normalizeOptionalPositiveInt(dto.inventoryTypeId);
     }
     if (dto.storageLocation !== undefined) item.storageLocation = (dto.storageLocation ?? '').trim();
+    if (dto.unitPrice !== undefined) item.unitPrice = normalizeFabricUnitPrice(dto.unitPrice);
     const saved = await this.stockRepo.save(item);
     await this.addOperationLog({
       fabricStockId: saved.id,
@@ -419,7 +333,7 @@ export class FabricStockService {
       beforeSnapshot: before,
       afterSnapshot: this.toSnapshot(saved),
     });
-    const [row] = await this.decorateFabricStocks([saved]);
+    const [row] = await this.queryService.decorate([saved]);
     return row;
   }
 
@@ -446,15 +360,9 @@ export class FabricStockService {
     operatorUsername = '',
     pickupUserId: number | null = null,
   ): Promise<void> {
-    const stock = await this.stockRepo.findOne({ where: { id } });
-    if (!stock) throw new NotFoundException('面料记录不存在');
     const qty = Number(quantity);
-    const current = parseFloat(stock.quantity);
     if (!Number.isFinite(qty) || qty <= 0) {
-      throw new NotFoundException('出库数量必须大于 0');
-    }
-    if (qty > current) {
-      throw new NotFoundException('出库数量不能大于当前库存');
+      throw new BadRequestException('出库数量必须大于 0');
     }
     let pickupUserName = '';
     if (pickupUserId != null && pickupUserId > 0) {
@@ -464,135 +372,54 @@ export class FabricStockService {
       if (!u) throw new BadRequestException('领取人无效或已停用');
       pickupUserName = String(u.displayName ?? '').trim() || String(u.username ?? '').trim();
     }
-    const before = this.toSnapshot(stock);
-    stock.quantity = String(current - qty);
-    const saved = await this.stockRepo.save(stock);
     const outboundRemark = [
       pickupUserName ? `领取人：${pickupUserName}` : '',
       remark?.trim() ?? '',
     ].filter(Boolean).join('；');
-    const out = this.outboundRepo.create({
-      fabricStockId: id,
-      quantity: String(qty),
-      photoUrl: photoUrl?.trim() ?? '',
-      remark: outboundRemark,
-      pickupUserId: pickupUserId != null && pickupUserId > 0 ? pickupUserId : null,
+    const transactionResult = await this.dataSource.transaction(async (manager) => {
+      const stockRepo = manager.getRepository(FabricStock);
+      const stock = await stockRepo
+        .createQueryBuilder('stock')
+        .setLock('pessimistic_write')
+        .where('stock.id = :id', { id })
+        .getOne();
+      if (!stock) throw new NotFoundException('面料记录不存在');
+      const current = Number(stock.quantity);
+      if (!Number.isFinite(current) || qty > current) {
+        throw new BadRequestException('出库数量不能大于当前库存');
+      }
+      const before = this.toSnapshot(stock);
+      const [decoratedStock] = await this.queryService.decorate([stock]);
+      const outboundAmount = calculateFabricAmount(qty, stock.unitPrice);
+      stock.quantity = String(current - qty);
+      const saved = await stockRepo.save(stock);
+      const inventoryTypeLabel = decoratedStock.inventoryTypeLabel
+        || (stock.inventoryTypeId == null ? '未设置' : '库存类型已失效');
+      const out = manager.getRepository(FabricOutbound).create({
+        fabricStockId: id,
+        nameSnapshot: stock.name,
+        customerNameSnapshot: stock.customerName,
+        unitSnapshot: stock.unit,
+        inventoryTypeId: stock.inventoryTypeId,
+        inventoryTypeLabel,
+        quantity: String(qty),
+        unitPrice: stock.unitPrice,
+        amount: outboundAmount,
+        photoUrl: photoUrl?.trim() ?? '',
+        remark: outboundRemark,
+        pickupUserId: pickupUserId != null && pickupUserId > 0 ? pickupUserId : null,
+      });
+      await manager.getRepository(FabricOutbound).save(out);
+      return { before, saved };
     });
-    await this.outboundRepo.save(out);
     await this.addOperationLog({
       fabricStockId: id,
       action: 'outbound',
       operatorUsername,
-      beforeSnapshot: before,
-      afterSnapshot: this.toSnapshot(saved),
+      beforeSnapshot: transactionResult.before,
+      afterSnapshot: this.toSnapshot(transactionResult.saved),
       remark: outboundRemark,
     });
-  }
-
-  async getOutboundRecords(params: {
-    name?: string;
-    customerName?: string;
-    startDate?: string;
-    endDate?: string;
-    page?: number;
-    pageSize?: number;
-  }): Promise<{
-    list: Array<{
-      id: number;
-      fabricStockId: number;
-      name: string;
-      customerName: string;
-      unit: string;
-      quantity: string;
-      photoUrl: string;
-      remark: string;
-      pickupUserId: number | null;
-      pickupUserName: string;
-      createdAt: string;
-    }>;
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
-    const { name, customerName, startDate, endDate, page = 1, pageSize = 20 } = params;
-    const qb = this.outboundRepo
-      .createQueryBuilder('o')
-      .innerJoin(FabricStock, 's', 's.id = o.fabric_stock_id')
-      .select([
-        'o.id AS id',
-        'o.fabric_stock_id AS fabricStockId',
-        's.name AS name',
-        's.customer_name AS customerName',
-        's.unit AS unit',
-        'o.quantity AS quantity',
-        'o.photo_url AS photoUrl',
-        'o.remark AS remark',
-        'o.pickup_user_id AS pickupUserId',
-        'o.created_at AS createdAt',
-      ]);
-
-    if (name?.trim()) qb.andWhere('s.name LIKE :name', { name: `%${name.trim()}%` });
-    if (customerName?.trim()) qb.andWhere('s.customer_name LIKE :customerName', { customerName: `%${customerName.trim()}%` });
-    if (startDate?.trim()) qb.andWhere('o.created_at >= :start', { start: `${startDate.trim()} 00:00:00` });
-    if (endDate?.trim()) qb.andWhere('o.created_at <= :end', { end: `${endDate.trim()} 23:59:59` });
-
-    qb.orderBy('o.created_at', 'DESC');
-    const total = await qb.getCount();
-    // 原始查询(getRawMany)分页必须用 offset/limit；skip/take 仅对实体查询(getMany)生效，
-    // 用在 getRawMany 上会被忽略导致返回全部行（分页失效）。
-    const rows = await qb
-      .offset((page - 1) * pageSize)
-      .limit(pageSize)
-      .getRawMany<{
-        id: number;
-        fabricStockId: number;
-        name: string;
-        customerName: string;
-        unit: string;
-        quantity: string;
-        photoUrl: string;
-        remark: string;
-        pickupUserId: number | null;
-        createdAt: Date;
-      }>();
-
-    const pickupIds = [
-      ...new Set(
-        rows
-          .map((r) => r.pickupUserId)
-          .filter((x): x is number => x != null && Number(x) > 0)
-          .map((x) => Number(x)),
-      ),
-    ];
-    const pickupUsers =
-      pickupIds.length > 0
-        ? await this.userRepo.find({ where: { id: In(pickupIds) } })
-        : [];
-    const pickupMap = new Map(
-      pickupUsers.map((u) => [
-        u.id,
-        ((u.displayName ?? '').trim() || (u.username ?? '').trim() || '').trim(),
-      ]),
-    );
-
-    const list = rows.map((r) => {
-      const pid =
-        r.pickupUserId != null && Number(r.pickupUserId) > 0 ? Number(r.pickupUserId) : null;
-      return {
-        id: r.id,
-        fabricStockId: r.fabricStockId,
-        name: r.name ?? '',
-        customerName: r.customerName ?? '',
-        unit: r.unit ?? '',
-        quantity: r.quantity ?? '0',
-        photoUrl: r.photoUrl ?? '',
-        remark: r.remark ?? '',
-        pickupUserId: pid,
-        pickupUserName: pid != null ? (pickupMap.get(pid) ?? '') : '',
-        createdAt: formatDateTimeForResponse(r.createdAt),
-      };
-    });
-    return { list, total, page, pageSize };
   }
 
   async getOperationLogs(fabricStockId: number): Promise<FabricStockOperationLog[]> {
