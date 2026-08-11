@@ -165,6 +165,10 @@ export interface FabricOutboundRecord {
   remark: string
   pickupUserId?: number | null
   pickupUserName?: string
+  nameFromCurrentStock: boolean
+  customerNameFromCurrentStock: boolean
+  unitFromCurrentStock: boolean
+  inventoryTypeFromCurrentStock: boolean
   createdAt: string
 }
 
