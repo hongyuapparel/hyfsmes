@@ -7,6 +7,7 @@ import { useOrderCostInitialization } from './useOrderCostInitialization'
 import { useOrderCostQuoteActions } from './useOrderCostQuoteActions'
 import { useOrderCostTemplateActions } from './useOrderCostTemplateActions'
 import { useOrderQuoteQueueNavigation } from './useOrderQuoteQueueNavigation'
+import { useOrderCostRouteIdentity } from './useOrderCostRouteIdentity'
 
 interface OrderCostAuthLike {
   hasPermission: (code: string) => boolean
@@ -18,10 +19,7 @@ interface OrderCostAuthLike {
 
 export function useOrderCostPage(authStore: OrderCostAuthLike) {
   const route = useRoute()
-  const orderId = computed(() => {
-    const num = Number(route.params.id)
-    return Number.isNaN(num) ? 0 : num
-  })
+  const orderId = useOrderCostRouteIdentity(route)
   const {
     order,
     materialRows,
@@ -145,7 +143,7 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
 
   function goBack() { goBackFromCost() }
 
-  useOrderCostInitialization({
+  const { initialLoading, initialLoadFailed } = useOrderCostInitialization({
     orderId,
     order,
     materialRows,
@@ -169,6 +167,8 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
   })
 
   return {
+    initialLoading,
+    initialLoadFailed,
     order,
     materialRowsSorted,
     processItemRows,

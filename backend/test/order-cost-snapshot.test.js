@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const { OrderCostSnapshotService } = require('../dist/orders/order-cost-snapshot.service');
+const { OrderQueryService } = require('../dist/orders/order-query.service');
 const { Order } = require('../dist/entities/order.entity');
 const { OrderCostSnapshot } = require('../dist/entities/order-cost-snapshot.entity');
 const { resolveOrderQuoteStatus } = require('../dist/orders/order-quote-status');
@@ -141,4 +142,39 @@ test('旧订单确认后又保存草稿时在待报价列表标记为待重新�
   assert.equal(resolveOrderQuoteStatus({}, { lastConfirmLogId: 10, lastDraftLogId: 11 }), 'needs_reconfirm');
   assert.equal(resolveOrderQuoteStatus({}, { lastConfirmLogId: 10, lastDraftLogId: 9 }), 'confirmed');
   assert.equal(resolveOrderQuoteStatus({}, { lastConfirmLogId: 0, lastDraftLogId: 11 }), 'unconfirmed');
+});
+
+test('cost snapshot lookup validates the order with an id-only query', async () => {
+  const orderFindCalls = [];
+  const orderRepo = {
+    findOne: async (options) => {
+      orderFindCalls.push(options);
+      return { id: 7 };
+    },
+  };
+  const snapshot = { id: 3, orderId: 7, snapshot: { profitMargin: 0.1 } };
+  const snapshotRepo = {
+    findOne: async () => snapshot,
+    save: async (row) => row,
+  };
+  const service = new OrderQueryService(
+    orderRepo,
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    {},
+    snapshotRepo,
+    {},
+    {},
+  );
+
+  const result = await service.getCostSnapshot(7);
+
+  assert.equal(result, snapshot);
+  assert.equal(orderFindCalls.length, 1);
+  assert.deepEqual(orderFindCalls[0].select, ['id']);
 });

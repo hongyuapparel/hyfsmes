@@ -242,12 +242,13 @@ export class OrderQueryService {
   }
 
   async findOne(id: number): Promise<OrderDetail> {
-    const order = await this.orderRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const [order, ext] = await Promise.all([
+      this.orderRepo.findOne({ where: { id, deletedAt: IsNull() } }),
+      this.orderExtRepo.findOne({ where: { orderId: id } }),
+    ]);
     if (!order) throw new NotFoundException('订单不存在');
 
-    const ext = await this.orderExtRepo.findOne({ where: { orderId: id } });
     const rawMaterials = ext?.materials ?? [];
-    const materials = await this.enrichMaterialsWithOptionLabels(rawMaterials);
     const colorSizeHeaders = ext?.colorSizeHeaders ?? [];
     const colorSizeRows = ext?.colorSizeRows ?? [];
     const sizeInfoMetaHeaders = ext?.sizeInfoMetaHeaders ?? [];
@@ -260,22 +261,28 @@ export class OrderQueryService {
     const packagingMethod = ext?.packagingMethod ?? '';
     const attachments = ext?.attachments ?? [];
     const skuCode = String(order.skuCode ?? '').trim();
+    const [materials, product] = await Promise.all([
+      this.enrichMaterialsWithOptionLabels(rawMaterials),
+      skuCode ? this.productRepo.findOne({ where: { skuCode } }) : Promise.resolve(null),
+    ]);
     let productGroupId: number | null = null;
     let productGroupName = '';
     let applicablePeopleId: number | null = null;
     let applicablePeopleName = '';
-    if (skuCode) {
-      const product = await this.productRepo.findOne({ where: { skuCode } });
-      if (product) {
-        productGroupId = product.productGroupId ?? null;
-        applicablePeopleId = product.applicablePeopleId ?? null;
-        if (productGroupId != null) {
-          productGroupName = await this.systemOptionsService.getProductGroupPathById(productGroupId);
-        }
-        if (applicablePeopleId != null) {
-          const labelMap = await this.systemOptionsService.getOptionLabelsByIds('applicable_people', [applicablePeopleId]);
-          applicablePeopleName = labelMap[applicablePeopleId] ?? '';
-        }
+    if (product) {
+      productGroupId = product.productGroupId ?? null;
+      applicablePeopleId = product.applicablePeopleId ?? null;
+      const [groupName, applicablePeopleLabelMap] = await Promise.all([
+        productGroupId != null
+          ? this.systemOptionsService.getProductGroupPathById(productGroupId)
+          : Promise.resolve(''),
+        applicablePeopleId != null
+          ? this.systemOptionsService.getOptionLabelsByIds('applicable_people', [applicablePeopleId])
+          : Promise.resolve<Record<number, string>>({}),
+      ]);
+      productGroupName = groupName;
+      if (applicablePeopleId != null) {
+        applicablePeopleName = applicablePeopleLabelMap[applicablePeopleId] ?? '';
       }
     }
     return {
@@ -786,8 +793,14 @@ export class OrderQueryService {
   }
 
   async getCostSnapshot(orderId: number): Promise<OrderCostSnapshot | null> {
-    await this.findOne(orderId);
-    const row = await this.orderCostSnapshotRepo.findOne({ where: { orderId } });
+    const [order, row] = await Promise.all([
+      this.orderRepo.findOne({
+        where: { id: orderId, deletedAt: IsNull() },
+        select: ['id'],
+      }),
+      this.orderCostSnapshotRepo.findOne({ where: { orderId } }),
+    ]);
+    if (!order) throw new NotFoundException('订单不存在');
     if (row?.snapshot && typeof row.snapshot === 'object') {
       const snapshot = row.snapshot as Record<string, unknown>;
       const normalized = this.normalizeProfitMargin(snapshot.profitMargin);

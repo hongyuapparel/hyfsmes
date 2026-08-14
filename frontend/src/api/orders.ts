@@ -246,8 +246,8 @@ export interface PackagingCellFormRow {
 }
 
 /** 获取订单详情（编辑回显） */
-export function getOrderDetail(id: number) {
-  return request.get<OrderDetail>(`/orders/${id}`)
+export function getOrderDetail(id: number, config?: AxiosRequestConfig) {
+  return request.get<OrderDetail>(`/orders/${id}`, config)
 }
 
 /** 数量追踪：按颜色分块，每块含订单/裁床/车缝/尾部入库等行 */
@@ -342,8 +342,8 @@ export interface OrderCostSnapshotRes {
 }
 
 /** 获取订单成本快照（成本页回显） */
-export function getOrderCost(id: number) {
-  return request.get<OrderCostSnapshotRes | null>(`/orders/${id}/cost`)
+export function getOrderCost(id: number, config?: AxiosRequestConfig) {
+  return request.get<OrderCostSnapshotRes | null>(`/orders/${id}/cost`, config)
 }
 
 /** 保存订单成本草稿（不同步订单卡片出厂价） */

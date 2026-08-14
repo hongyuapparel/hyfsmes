@@ -1,4 +1,5 @@
 import request from './request'
+import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 export interface ProductionProcessItem {
   id: number
@@ -12,7 +13,10 @@ export interface ProductionProcessItem {
 }
 
 export function getProductionProcesses(params?: { department?: string; jobType?: string }) {
-  return request.get<ProductionProcessItem[]>('/production-processes', { params })
+  const key = buildSharedGetKey('/production-processes', params)
+  return sharedGet(key, () => request.get<ProductionProcessItem[]>('/production-processes', { params }), {
+    ttlMs: 30000,
+  })
 }
 
 export interface ProductionProcessPageRes {
@@ -39,18 +43,27 @@ export function createProductionProcess(body: {
   unitPrice?: string
   sortOrder?: number
 }) {
-  return request.post<ProductionProcessItem>('/production-processes/create', body)
+  return request.post<ProductionProcessItem>('/production-processes/create', body).then((response) => {
+    invalidateSharedGetCache('/production-processes')
+    return response
+  })
 }
 
 export function updateProductionProcess(
   id: number,
   body: { department?: string; jobType?: string; name?: string; unitPrice?: string; sortOrder?: number },
 ) {
-  return request.put<ProductionProcessItem>(`/production-processes/${id}`, body)
+  return request.put<ProductionProcessItem>(`/production-processes/${id}`, body).then((response) => {
+    invalidateSharedGetCache('/production-processes')
+    return response
+  })
 }
 
 export function deleteProductionProcess(id: number) {
-  return request.delete<void>(`/production-processes/${id}`)
+  return request.delete<void>(`/production-processes/${id}`).then((response) => {
+    invalidateSharedGetCache('/production-processes')
+    return response
+  })
 }
 
 export function batchMoveProductionProcesses(body: {
@@ -58,5 +71,8 @@ export function batchMoveProductionProcesses(body: {
   department: string
   jobType: string
 }) {
-  return request.patch<{ moved: number }>('/production-processes/batch/move', body)
+  return request.patch<{ moved: number }>('/production-processes/batch/move', body).then((response) => {
+    invalidateSharedGetCache('/production-processes')
+    return response
+  })
 }

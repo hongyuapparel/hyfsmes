@@ -30,6 +30,15 @@ interface CostSnapshotPayload {
   quoteDraftUpdatedAt?: unknown
 }
 
+export interface OrderCostLoadOptions {
+  silent?: boolean
+}
+
+export interface CostSnapshotLoadResult {
+  requestSucceeded: boolean
+  hasUserSavedSnapshot: boolean
+}
+
 export interface OrderCostLoaderRefs {
   order: ReturnType<typeof ref<OrderDetail | null>>
   materialRows: ReturnType<typeof ref<MaterialRow[]>>
@@ -45,8 +54,8 @@ export interface OrderCostLoaderRefs {
 }
 
 export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCostLoaderRefs & {
-  loadOrder: () => Promise<void>
-  loadCostSnapshot: () => Promise<boolean>
+  loadOrder: (options?: OrderCostLoadOptions) => Promise<boolean>
+  loadCostSnapshot: (options?: OrderCostLoadOptions) => Promise<CostSnapshotLoadResult>
   resetOrderCostState: () => void
   loadMaterialTypes: () => Promise<void>
   loadProcesses: () => Promise<void>
@@ -118,24 +127,26 @@ export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCost
     ensureCostRowsBase()
   }
 
-  async function loadOrder() {
-    const currentOrderId = toValue(orderId)
-    if (!currentOrderId) return
-    try {
-      const res = await getOrderDetail(currentOrderId)
-      if (currentOrderId !== toValue(orderId)) return
-      order.value = res.data
-    } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载订单失败'))
-    }
-  }
-
-  async function loadCostSnapshot(): Promise<boolean> {
+  async function loadOrder(options?: OrderCostLoadOptions): Promise<boolean> {
     const currentOrderId = toValue(orderId)
     if (!currentOrderId) return false
     try {
-      const res = await getOrderCost(currentOrderId)
+      const res = await getOrderDetail(currentOrderId, options?.silent ? { skipGlobalErrorHandler: true } : undefined)
       if (currentOrderId !== toValue(orderId)) return false
+      order.value = res.data
+      return true
+    } catch (e: unknown) {
+      if (!options?.silent && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载订单失败'))
+      return false
+    }
+  }
+
+  async function loadCostSnapshot(options?: OrderCostLoadOptions): Promise<CostSnapshotLoadResult> {
+    const currentOrderId = toValue(orderId)
+    if (!currentOrderId) return { requestSucceeded: false, hasUserSavedSnapshot: false }
+    try {
+      const res = await getOrderCost(currentOrderId, options?.silent ? { skipGlobalErrorHandler: true } : undefined)
+      if (currentOrderId !== toValue(orderId)) return { requestSucceeded: false, hasUserSavedSnapshot: false }
       const snapshot = res.data?.snapshot
       const hasSnapshot = !!snapshot && typeof snapshot === 'object'
       const s = (hasSnapshot ? snapshot : {}) as CostSnapshotPayload
@@ -159,10 +170,10 @@ export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCost
       quoteNeedsReconfirm.value = Boolean(s.quoteNeedsReconfirm)
       const draftUpdatedAt = typeof s.quoteDraftUpdatedAt === 'string' ? s.quoteDraftUpdatedAt : ''
       const isUserSavedSnapshot = hasSnapshot && (!!draftUpdatedAt || !!quoteConfirmedAt.value)
-      return isUserSavedSnapshot
+      return { requestSucceeded: true, hasUserSavedSnapshot: isUserSavedSnapshot }
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
-      return false
+      if (!options?.silent && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载成本快照失败'))
+      return { requestSucceeded: false, hasUserSavedSnapshot: false }
     }
   }
 

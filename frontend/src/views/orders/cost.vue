@@ -7,21 +7,33 @@
         <span v-if="order" class="sub-title">{{ order.orderNo }} · {{ order.skuCode }}</span>
       </div>
       <div class="header-actions">
-        <el-button :loading="savingDraft" :disabled="!canSubmitCost || confirmingQuote" @click="saveDraft">保存草稿</el-button>
+        <el-button :loading="savingDraft" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || confirmingQuote" @click="saveDraft">保存草稿</el-button>
         <template v-if="isQuoteQueue">
-          <el-button :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('return')">
+          <el-button :loading="confirmingQuote" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || savingDraft" @click="confirmQuote('return')">
             确认并返回列表
           </el-button>
-          <el-button type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('next')">
+          <el-button type="primary" :loading="confirmingQuote" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || savingDraft" @click="confirmQuote('next')">
             确认并处理下一条
           </el-button>
         </template>
-        <el-button v-else type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote()">
+        <el-button v-else type="primary" :loading="confirmingQuote" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || savingDraft" @click="confirmQuote()">
           确认报价
         </el-button>
       </div>
     </div>
 
+    <el-card v-if="initialLoading" class="block-card" shadow="never">
+      <el-skeleton :rows="10" animated />
+    </el-card>
+
+    <el-result
+      v-else-if="initialLoadFailed"
+      icon="error"
+      title="订单成本加载失败"
+      sub-title="请检查网络后重新进入页面，当前页面已禁止保存，避免覆盖原有成本数据。"
+    />
+
+    <template v-else>
     <el-card class="block-card summary-card" shadow="never">
       <div class="order-summary">
         <span><strong>客户：</strong>{{ order?.customerName ?? '-' }}</span>
@@ -140,20 +152,21 @@
       </div>
       <div class="result-actions">
         <el-button @click="goBack">取消</el-button>
-        <el-button :loading="savingDraft" :disabled="!canSubmitCost || confirmingQuote" @click="saveDraft">保存草稿</el-button>
+        <el-button :loading="savingDraft" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || confirmingQuote" @click="saveDraft">保存草稿</el-button>
         <template v-if="isQuoteQueue">
-          <el-button :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('return')">
+          <el-button :loading="confirmingQuote" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || savingDraft" @click="confirmQuote('return')">
             确认并返回列表
           </el-button>
-          <el-button type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote('next')">
+          <el-button type="primary" :loading="confirmingQuote" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || savingDraft" @click="confirmQuote('next')">
             确认并处理下一条
           </el-button>
         </template>
-        <el-button v-else type="primary" :loading="confirmingQuote" :disabled="!canSubmitCost || savingDraft" @click="confirmQuote()">
+        <el-button v-else type="primary" :loading="confirmingQuote" :disabled="initialLoading || initialLoadFailed || !canSubmitCost || savingDraft" @click="confirmQuote()">
           确认报价
         </el-button>
       </div>
     </el-card>
+    </template>
   </div>
 </template>
 
@@ -167,6 +180,8 @@ import OrderCostProductionCard from '@/components/orders/cost/OrderCostProductio
 
 const authStore = useAuthStore()
 const {
+  initialLoading,
+  initialLoadFailed,
   order,
   materialRowsSorted,
   processItemRows,
