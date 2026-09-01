@@ -48,6 +48,7 @@ export function getFabricPickupUserOptions() {
 export function getFabricList(params?: {
   name?: string
   customerName?: string
+  supplierId?: number | null
   startDate?: string
   endDate?: string
   inventoryTypeId?: number | null
@@ -76,6 +77,7 @@ export type FabricStockExportParams = {
   mode: 'selected' | 'filtered'
   name?: string
   customerName?: string
+  supplierId?: number
   inventoryTypeId?: number
   startDate?: string
   endDate?: string

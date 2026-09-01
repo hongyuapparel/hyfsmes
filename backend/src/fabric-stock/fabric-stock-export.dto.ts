@@ -17,6 +17,12 @@ export class FabricStockExportDto extends InventoryStockExportRequestDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
+  supplierId?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
   inventoryTypeId?: number;
 
   @ValidateIf((dto: FabricStockExportDto) => dto.sortField !== undefined || dto.sortOrder !== undefined)

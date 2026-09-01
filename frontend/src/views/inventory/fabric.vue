@@ -46,6 +46,27 @@
           <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
           <div class="filter-rest" v-show="!isMobile || !collapsed">
           <el-select
+            v-model="filter.supplierId"
+            placeholder="供应商"
+            filterable
+            clearable
+            class="filter-bar-item"
+            :loading="fabricSupplierOptionsLoading"
+            :style="getAdaptiveSelectStyle(filter.supplierId ? `供应商：${selectedSupplierLabel}` : '', '供应商', 42)"
+            @change="onSearch(true)"
+          >
+            <template #label="{ label }">
+              <span v-if="filter.supplierId">供应商：{{ label }}</span>
+              <span v-else>{{ label }}</span>
+            </template>
+            <el-option
+              v-for="opt in fabricSupplierOptions"
+              :key="opt.id"
+              :label="opt.name"
+              :value="opt.id"
+            />
+          </el-select>
+          <el-select
             v-model="filter.inventoryTypeId"
             placeholder="库存类型"
             filterable
@@ -378,11 +399,17 @@ const selectedInventoryTypeLabel = computed(() => {
   if (id == null) return ''
   return inventoryTypeOptions.value.find((o) => o.id === id)?.label ?? ''
 })
+const selectedSupplierLabel = computed(() => {
+  const id = filter.supplierId
+  if (id == null) return ''
+  return fabricSupplierOptions.value.find((option) => option.id === id)?.name ?? ''
+})
 const { collapsed, isMobile } = useFilterCollapse('inventory-fabric-stock')
 const activeFilterCount = computed(() => {
   let n = 0
   if (filter.name) n++
   if (filter.customerName) n++
+  if (filter.supplierId != null) n++
   if (filter.inventoryTypeId != null) n++
   if (inboundDateRange.value) n++
   return n

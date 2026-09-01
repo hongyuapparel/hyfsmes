@@ -51,6 +51,7 @@ export class FabricStockController {
   getList(
     @Query('name') name?: string,
     @Query('customerName') customerName?: string,
+    @Query('supplierId') supplierIdStr?: string,
     @Query('startDate') startDate?: string,
     @Query('endDate') endDate?: string,
     @Query('inventoryTypeId') inventoryTypeIdStr?: string,
@@ -64,9 +65,11 @@ export class FabricStockController {
       inventoryTypeIdStr != null && inventoryTypeIdStr !== ''
         ? Number(inventoryTypeIdStr)
         : null;
+    const supplierId = supplierIdStr != null && supplierIdStr !== '' ? Number(supplierIdStr) : null;
     return this.service.getList({
       name,
       customerName,
+      supplierId: Number.isInteger(supplierId) && (supplierId ?? 0) > 0 ? supplierId : null,
       startDate,
       endDate,
       inventoryTypeId: Number.isFinite(inventoryTypeId) && (inventoryTypeId ?? 0) > 0 ? inventoryTypeId : null,

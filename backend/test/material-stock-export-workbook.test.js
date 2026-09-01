@@ -189,6 +189,25 @@ test('面料导出查询继承页面数量排序', async () => {
   ]);
 });
 
+test('面料供应商筛选按 supplier_id 精确匹配并传递到筛选导出', async () => {
+  const whereCalls = [];
+  const queryBuilder = {
+    andWhere(condition, params) { whereCalls.push([condition, params]); return this; },
+    orderBy() { return this; },
+    addOrderBy() { return this; },
+    async getMany() { return []; },
+  };
+  const service = new FabricStockQueryService(
+    { createQueryBuilder: () => queryBuilder },
+    null,
+    null,
+  );
+
+  await service.getRowsForExport({ mode: 'filtered', supplierId: 23 });
+
+  assert.deepEqual(whereCalls, [['s.supplier_id = :supplierId', { supplierId: 23 }]]);
+});
+
 test('selected 与 filtered 导出模式执行严格 DTO 校验', () => {
   const validFiltered = plainToInstance(FabricStockExportDto, { mode: 'filtered' });
   assert.equal(validateSync(validFiltered).length, 0);

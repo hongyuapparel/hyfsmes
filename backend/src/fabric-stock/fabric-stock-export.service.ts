@@ -14,6 +14,7 @@ export type FabricStockExportParams = {
   mode: InventoryStockExportMode;
   name?: string;
   customerName?: string;
+  supplierId?: number | null;
   inventoryTypeId?: number | null;
   startDate?: string;
   endDate?: string;

@@ -18,9 +18,10 @@ import { useTableSort } from '@/composables/useTableSort'
 import { useInventoryWorkbookExport } from '@/composables/useInventoryWorkbookExport'
 
 export function useFabricInventoryStock() {
-  const filter = reactive<{ name: string; customerName: string; inventoryTypeId: number | null }>({
+  const filter = reactive<{ name: string; customerName: string; supplierId: number | null; inventoryTypeId: number | null }>({
     name: '',
     customerName: '',
+    supplierId: null,
     inventoryTypeId: null,
   })
   const inboundDateRange = ref<[string, string] | null>(null)
@@ -57,6 +58,7 @@ export function useFabricInventoryStock() {
         mode: selectedMode ? 'selected' : 'filtered',
         name: selectedMode ? undefined : filter.name || undefined,
         customerName: selectedMode ? undefined : filter.customerName || undefined,
+        supplierId: selectedMode ? undefined : filter.supplierId ?? undefined,
         inventoryTypeId: selectedMode ? undefined : filter.inventoryTypeId ?? undefined,
         startDate: selectedMode ? undefined : startDate || undefined,
         endDate: selectedMode ? undefined : endDate || undefined,
@@ -88,6 +90,7 @@ export function useFabricInventoryStock() {
       const res = await getFabricList({
         name: filter.name || undefined,
         customerName: filter.customerName || undefined,
+        supplierId: filter.supplierId ?? undefined,
         inventoryTypeId: filter.inventoryTypeId ?? undefined,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
@@ -132,6 +135,7 @@ export function useFabricInventoryStock() {
     nameLabelVisible.value = false
     filter.name = ''
     filter.customerName = ''
+    filter.supplierId = null
     filter.inventoryTypeId = null
     inboundDateRange.value = null
     pagination.page = 1
