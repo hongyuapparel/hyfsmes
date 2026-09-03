@@ -9,6 +9,7 @@
           :inbound-date-range="inboundDateRange"
           :customer-options="customerOptions"
           :inventory-type-options="inventoryTypeOptions"
+          :department-options="departmentOptions"
           :active-filter-color="ACTIVE_FILTER_COLOR"
           :has-pending-selection="hasPendingSelection"
           :has-stored-selection="hasStoredSelection"
@@ -273,6 +274,7 @@ async function load() {
       skuCode: filter.skuCode || undefined,
       customerName: filter.customerName || undefined,
       inventoryTypeId: filter.inventoryTypeId ?? undefined,
+      department: filter.department || undefined,
       startDate: startDate || undefined,
       endDate: endDate || undefined,
       page: pagination.page,

@@ -8,6 +8,7 @@ type FinishedStockExportOptions = {
     skuCode: string
     customerName: string
     inventoryTypeId: number | null
+    department: string
   }
   inboundDateRange: Ref<[string, string] | null>
   selectedRows: Ref<StockTableLeafRow[]>
@@ -58,6 +59,7 @@ export function useFinishedStockExport(options: FinishedStockExportOptions) {
         skuCode: selectedMode ? undefined : options.filter.skuCode || undefined,
         customerName: selectedMode ? undefined : options.filter.customerName || undefined,
         inventoryTypeId: selectedMode ? undefined : options.filter.inventoryTypeId ?? undefined,
+        department: selectedMode ? undefined : options.filter.department || undefined,
         startDate: selectedMode ? undefined : startDate || undefined,
         endDate: selectedMode ? undefined : endDate || undefined,
         selections,

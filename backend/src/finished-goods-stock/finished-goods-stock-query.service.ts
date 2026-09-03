@@ -30,6 +30,7 @@ type StockListQueryParams = {
   skuCode?: string;
   customerName?: string;
   inventoryTypeId?: number | null;
+  department?: string;
   startDate?: string;
   endDate?: string;
   page?: number;

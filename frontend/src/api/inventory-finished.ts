@@ -40,6 +40,7 @@ export function getFinishedStockList(params?: {
   skuCode?: string
   customerName?: string
   inventoryTypeId?: number | null
+  department?: string
   /** 入库时间：按记录 created_at，YYYY-MM-DD */
   startDate?: string
   endDate?: string
@@ -68,6 +69,7 @@ export function exportFinishedStock(params: {
   skuCode?: string
   customerName?: string
   inventoryTypeId?: number
+  department?: string
   startDate?: string
   endDate?: string
   selections?: FinishedStockExportSelection[]

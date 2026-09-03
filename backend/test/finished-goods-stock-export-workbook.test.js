@@ -12,6 +12,9 @@ const {
 const {
   resolveExportImagePath,
 } = require('../dist/finished-goods-stock/finished-goods-stock-export-image');
+const {
+  FinishedGoodsStockListQueryService,
+} = require('../dist/finished-goods-stock/finished-goods-stock-list-query.service');
 
 const imageUrl = '/uploads/export-test.png';
 const missingImageUrl = '/uploads/export-missing.png';
@@ -166,4 +169,30 @@ test('export image paths allow safe upload subdirectories and reject traversal',
   assert.equal(resolveExportImagePath('/api/uploads/../secrets.txt', root), null);
   assert.equal(resolveExportImagePath('/api/uploads/%2e%2e/secrets.txt', root), null);
   assert.equal(resolveExportImagePath('/api/uploads/C:%5Csecrets.txt', root), null);
+});
+
+test('成品库存部门筛选按库存记录部门精确匹配并传递到筛选导出', async () => {
+  const whereCalls = [];
+  const queryBuilder = {
+    leftJoin() { return this; },
+    select() { return this; },
+    andWhere(condition, params) { whereCalls.push([condition, params]); return this; },
+    orderBy() { return this; },
+    addOrderBy() { return this; },
+    async getRawMany() { return []; },
+  };
+  const service = new FinishedGoodsStockListQueryService(
+    { createQueryBuilder: () => queryBuilder },
+    null,
+    null,
+    null,
+    null,
+  );
+
+  await service.getStoredRowsForExport({ department: ' B2B外贸 ' });
+
+  assert.deepEqual(whereCalls, [
+    ['s.quantity > 0', undefined],
+    ['s.department = :department', { department: 'B2B外贸' }],
+  ]);
 });

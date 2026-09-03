@@ -4,6 +4,7 @@ type FinishedStockFilter = {
   skuCode: string
   customerName: string
   inventoryTypeId: number | null
+  department: string
 }
 
 type FinishedStockPagination = {
@@ -20,6 +21,7 @@ export function useFinishedViewStockFilter(load: LoadHandler, clearSelection: ()
     skuCode: '',
     customerName: '',
     inventoryTypeId: null,
+    department: '',
   })
   const skuCodeLabelVisible = ref(false)
   const inboundDateRange = ref<[string, string] | null>(null)
@@ -47,6 +49,7 @@ export function useFinishedViewStockFilter(load: LoadHandler, clearSelection: ()
     filter.skuCode = ''
     filter.customerName = ''
     filter.inventoryTypeId = null
+    filter.department = ''
     inboundDateRange.value = null
     currentTab.value = 'stored'
     pagination.page = 1

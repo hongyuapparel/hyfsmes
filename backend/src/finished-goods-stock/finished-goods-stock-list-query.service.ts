@@ -52,6 +52,7 @@ export class FinishedGoodsStockListQueryService {
       skuCode?: string;
       customerName?: string;
       inventoryTypeId?: number | null;
+      department?: string;
       startDate?: string;
       endDate?: string;
     },
@@ -71,6 +72,9 @@ export class FinishedGoodsStockListQueryService {
       qb.andWhere('s.inventory_type_id = :inventoryTypeId', {
         inventoryTypeId: filters.inventoryTypeId,
       });
+    }
+    if (filters.department?.trim()) {
+      qb.andWhere('s.department = :department', { department: filters.department.trim() });
     }
     this.applyInboundTimeRange(qb, 's.created_at', filters.startDate, filters.endDate);
   }
@@ -148,6 +152,7 @@ export class FinishedGoodsStockListQueryService {
     skuCode?: string;
     customerName?: string;
     inventoryTypeId?: number | null;
+    department?: string;
     startDate?: string;
     endDate?: string;
   }): Promise<number> {
@@ -155,13 +160,7 @@ export class FinishedGoodsStockListQueryService {
       .createQueryBuilder('s')
       .leftJoin(Order, 'o', 'o.id = s.order_id')
       .select('COALESCE(SUM(s.quantity), 0)', 'qty');
-    if (filters.orderNo?.trim()) qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${filters.orderNo.trim()}%` });
-    if (filters.skuCode?.trim()) qb.andWhere('s.sku_code LIKE :skuCode', { skuCode: `%${filters.skuCode.trim()}%` });
-    if (filters.customerName?.trim()) {
-      qb.andWhere('s.customer_name LIKE :customerName', { customerName: `%${filters.customerName.trim()}%` });
-    }
-    if (filters.inventoryTypeId != null) qb.andWhere('s.inventory_type_id = :inventoryTypeId', { inventoryTypeId: filters.inventoryTypeId });
-    this.applyInboundTimeRange(qb, 's.created_at', filters.startDate, filters.endDate);
+    this.applyStoredListFilters(qb, filters);
     const row = await qb.getRawOne<{ qty: string | number }>();
     return Number(row?.qty ?? 0) || 0;
   }
@@ -171,6 +170,7 @@ export class FinishedGoodsStockListQueryService {
     skuCode?: string;
     customerName?: string;
     inventoryTypeId?: number | null;
+    department?: string;
     startDate?: string;
     endDate?: string;
   }): Promise<number> {
@@ -189,6 +189,7 @@ export class FinishedGoodsStockListQueryService {
     skuCode?: string;
     customerName?: string;
     inventoryTypeId?: number | null;
+    department?: string;
     startDate?: string;
     endDate?: string;
     page?: number;
@@ -209,6 +210,7 @@ export class FinishedGoodsStockListQueryService {
     skuCode?: string;
     customerName?: string;
     inventoryTypeId?: number | null;
+    department?: string;
     startDate?: string;
     endDate?: string;
     selectedIds?: number[];
@@ -228,6 +230,7 @@ export class FinishedGoodsStockListQueryService {
         skuCode: params.skuCode,
         customerName: params.customerName,
         inventoryTypeId: params.inventoryTypeId,
+        department: params.department,
         startDate: params.startDate,
         endDate: params.endDate,
       });
@@ -317,6 +320,7 @@ export class FinishedGoodsStockListQueryService {
     skuCode?: string;
     customerName?: string;
     inventoryTypeId?: number | null;
+    department?: string;
     startDate?: string;
     endDate?: string;
     page?: number;
@@ -336,6 +340,7 @@ export class FinishedGoodsStockListQueryService {
       skuCode,
       customerName,
       inventoryTypeId,
+      department,
       startDate,
       endDate,
       page = 1,
@@ -348,10 +353,10 @@ export class FinishedGoodsStockListQueryService {
         ? this.sumPendingQuantitiesForList({ orderNo, skuCode, customerName, startDate, endDate })
         : Promise.resolve(0),
       tab === 'stored' || tab === 'all'
-        ? this.sumStoredQuantitiesForList({ orderNo, skuCode, customerName, inventoryTypeId, startDate, endDate })
+        ? this.sumStoredQuantitiesForList({ orderNo, skuCode, customerName, inventoryTypeId, department, startDate, endDate })
         : Promise.resolve(0),
       tab === 'stored' || tab === 'all'
-        ? this.sumStoredAmountForList({ orderNo, skuCode, customerName, inventoryTypeId, startDate, endDate })
+        ? this.sumStoredAmountForList({ orderNo, skuCode, customerName, inventoryTypeId, department, startDate, endDate })
         : Promise.resolve(0),
     ]);
     const listTotalQuantity = pendingQtyTotal + storedQtyTotal;
@@ -380,6 +385,7 @@ export class FinishedGoodsStockListQueryService {
         if (skuCode?.trim()) qb.andWhere('s.sku_code LIKE :allSSkuCode', { allSSkuCode: `%${skuCode.trim()}%` });
         if (customerName?.trim()) qb.andWhere('s.customer_name LIKE :allSCustomer', { allSCustomer: `%${customerName.trim()}%` });
         if (inventoryTypeId != null) qb.andWhere('s.inventory_type_id = :allSInvType', { allSInvType: inventoryTypeId });
+        if (department?.trim()) qb.andWhere('s.department = :allSDepartment', { allSDepartment: department.trim() });
         this.applyInboundTimeRange(qb, 's.created_at', startDate, endDate);
         return qb;
       };
@@ -510,6 +516,7 @@ export class FinishedGoodsStockListQueryService {
         skuCode,
         customerName,
         inventoryTypeId,
+        department,
         startDate,
         endDate,
       });
@@ -532,6 +539,7 @@ export class FinishedGoodsStockListQueryService {
           skuCode,
           customerName,
           inventoryTypeId,
+          department,
           startDate,
           endDate,
         });

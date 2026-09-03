@@ -68,6 +68,21 @@
           @change="emit('search', true)"
         />
       </div>
+      <el-select
+        v-model="filter.department"
+        placeholder="部门"
+        filterable
+        clearable
+        class="filter-bar-item"
+        :style="getAdaptiveSelectStyle(filter.department ? '部门：' + filter.department : '', '部门')"
+        @change="emit('search', true)"
+      >
+        <template #label="{ label }">
+          <span v-if="filter.department">部门：{{ label }}</span>
+          <span v-else>{{ label }}</span>
+        </template>
+        <el-option v-for="opt in departmentOptions" :key="opt.value" :label="opt.label" :value="opt.value" />
+      </el-select>
       </div>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="emit('search', true)">搜索</el-button>
@@ -243,6 +258,7 @@ type FinishedStockFilter = {
   skuCode: string
   customerName: string
   inventoryTypeId: number | null
+  department: string
 }
 
 const props = defineProps<{
@@ -251,6 +267,7 @@ const props = defineProps<{
   inboundDateRange: [string, string] | null
   customerOptions: Array<{ label: string; value: string }>
   inventoryTypeOptions: Array<{ id: number; label: string }>
+  departmentOptions: Array<{ label: string; value: string }>
   activeFilterColor: string
   hasPendingSelection: boolean
   hasStoredSelection: boolean
@@ -309,6 +326,7 @@ const activeFilterCount = computed(() => {
   if (props.filter.customerName) n++
   if (props.filter.inventoryTypeId != null) n++
   if (props.inboundDateRange) n++
+  if (props.filter.department) n++
   return n
 })
 

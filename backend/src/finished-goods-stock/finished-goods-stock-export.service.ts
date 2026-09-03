@@ -16,6 +16,7 @@ export type FinishedStockExportParams = {
   skuCode?: string;
   customerName?: string;
   inventoryTypeId?: number | null;
+  department?: string;
   startDate?: string;
   endDate?: string;
   selections?: FinishedStockExportSelection[];
@@ -178,6 +179,7 @@ export class FinishedGoodsStockExportService {
         skuCode: params.skuCode,
         customerName: params.customerName,
         inventoryTypeId: params.inventoryTypeId,
+        department: params.department,
         startDate: params.startDate,
         endDate: params.endDate,
         selectedIds,
