@@ -5,6 +5,7 @@
         <el-button link type="primary" @click="goBack">返回列表</el-button>
         <span class="title">订单编辑</span>
         <span v-if="orderNo" class="sub-title">订单号：{{ orderNo }}</span>
+        <el-tag v-if="hasUnsavedChanges" type="warning" size="small">未保存修改</el-tag>
         <el-tag v-if="orderStatus" size="small" type="info" class="order-status-tag">
           {{ getStatusLabel(orderStatus) }}
         </el-tag>
@@ -281,6 +282,7 @@
     />
 
     <OrderEditSizeInfoCard
+      :history-key="`${orderId}:${pageLoading}`"
       :set-size-info-table-ref="setSizeInfoTableRef"
       :size-info-rows="sizeInfoRows"
       :size-meta-headers="sizeMetaHeaders"
@@ -426,6 +428,7 @@ import { formatDisplayNumber } from '@/utils/display-number'
 import { useOrderEditPage } from '@/composables/useOrderEditPage'
 
 const {
+  hasUnsavedChanges,
   pageLoading,
   goBack,
   orderId,

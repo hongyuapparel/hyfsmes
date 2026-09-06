@@ -11,6 +11,16 @@ export interface RouteCacheDropTarget {
 }
 
 const routeCacheVersions = reactive<Record<string, number>>({})
+const closeGuards = new Map<string, () => Promise<boolean>>()
+
+export function registerTabCloseGuard(key: string, guard: () => Promise<boolean>) {
+  closeGuards.set(key, guard)
+  return () => { if (closeGuards.get(key) === guard) closeGuards.delete(key) }
+}
+
+export async function canCloseTab(key: string) {
+  return await closeGuards.get(key)?.() ?? true
+}
 
 function normalizeKey(value: unknown): string {
   return String(value ?? '').trim()

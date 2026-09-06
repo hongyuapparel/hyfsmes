@@ -1,15 +1,18 @@
 <template>
-  <el-card class="block-card">
+  <el-card class="block-card" @keydown.capture="grid.keydown">
     <template #header>
       <div class="block-header">
         <span class="block-title">D 尺寸信息</span>
         <div class="block-actions">
-          <el-button link type="primary" @click="addSizeMetaColumn">新增部位列</el-button>
-          <el-button link type="primary" @click="addSizeInfoRow">新增行</el-button>
-          <el-button link type="primary" @click="copySizeInfoToClipboard">复制到剪贴板</el-button>
+          <el-button link :disabled="!grid.history.canUndo.value" @click="grid.history.undo">撤销</el-button>
+          <el-button link :disabled="!grid.history.canRedo.value" @click="grid.history.redo">重做</el-button>
+          <el-button link type="primary" @click="grid.action(addSizeMetaColumn)">新增信息列</el-button>
+          <el-button link type="primary" @click="grid.action(addSizeInfoRow)">新增部位行</el-button>
+          <el-button link type="primary" @click="copySizeInfoToClipboard">复制整表（含表头）</el-button>
         </div>
       </div>
     </template>
+    <div class="size-grid-hint">{{ grid.selectionLabel.value }} · Ctrl+Z 撤销 · Ctrl+Y 重做</div>
     <el-table
       :ref="setSizeInfoTableRef"
       :data="sizeInfoRows"
@@ -34,14 +37,15 @@
       >
         <template #header>
           <div class="b-header-cell">
-            <el-input v-model="sizeMetaHeaders[idx]" size="small" class="b-header-input" @click.stop />
+            <el-input v-model="sizeMetaHeaders[idx]" size="small" class="b-header-input" @click.stop
+              @focus="grid.history.begin" @beforeinput="grid.history.begin" @change="grid.history.commit" />
             <el-tooltip v-if="sizeMetaHeaders.length > 1" content="删除此列" placement="top">
               <el-button
                 link
                 type="danger"
                 size="small"
                 class="b-header-remove"
-                @click.stop="removeSizeMetaColumn(idx)"
+                @click.stop="grid.action(() => removeSizeMetaColumn(idx))"
               >
                 <el-icon><CircleClose /></el-icon>
               </el-button>
@@ -51,9 +55,16 @@
         <template #default="{ row, $index }">
           <el-input
             v-model="row.metaValues[idx]"
+            :class="{ 'size-cell-selected': grid.selected($index, idx) }"
+            @mousedown="grid.pick($event, $index, idx)"
+            @mouseenter="grid.extend($event, $index, idx)"
+            @copy="grid.copy($event, $index, idx)"
+            @beforeinput="grid.history.begin"
+            @focus="grid.history.begin"
+            @change="grid.history.commit"
             :ref="(el) => setSizeGridCellRef(el, $index, idx)"
             @keydown.stop="onSizeGridKeydown($event, $index, idx)"
-            @paste.stop.prevent="onSizeGridPaste($event, $index, idx)"
+            @paste.stop.prevent="grid.paste($event, $index, idx)"
           />
         </template>
       </el-table-column>
@@ -71,10 +82,17 @@
         <template #default="{ row, $index }">
           <el-input
             v-model="row.sizeValues[sIndex]"
+            :class="{ 'size-cell-selected': grid.selected($index, sizeMetaHeaders.length + sIndex) }"
+            @mousedown="grid.pick($event, $index, sizeMetaHeaders.length + sIndex)"
+            @mouseenter="grid.extend($event, $index, sizeMetaHeaders.length + sIndex)"
+            @copy="grid.copy($event, $index, sizeMetaHeaders.length + sIndex)"
+            @beforeinput="grid.history.begin"
+            @focus="grid.history.begin"
+            @change="grid.history.commit"
             size="small"
             :ref="(el) => setSizeGridCellRef(el, $index, sizeMetaHeaders.length + sIndex)"
             @keydown.stop="onSizeGridKeydown($event, $index, sizeMetaHeaders.length + sIndex)"
-            @paste.stop.prevent="onSizeGridPaste($event, $index, sizeMetaHeaders.length + sIndex)"
+            @paste.stop.prevent="grid.paste($event, $index, sizeMetaHeaders.length + sIndex)"
           />
         </template>
       </el-table-column>
@@ -87,7 +105,7 @@
               size="small"
               circle
               :aria-label="`Delete size row ${$index + 1}`"
-              @click="removeSizeInfoRow($index)"
+              @click="grid.action(() => removeSizeInfoRow($index))"
             >
               <el-icon><Delete /></el-icon>
             </el-button>
@@ -101,8 +119,10 @@
 <script setup lang="ts">
 import { Delete, CircleClose } from '@element-plus/icons-vue'
 import type { SizeInfoRow } from '@/composables/useOrderSizeInfo'
+import { useSizeGridInteraction } from './useSizeGridInteraction'
 
-defineProps<{
+const props = defineProps<{
+  historyKey?: string
   setSizeInfoTableRef: (el: unknown) => void
   sizeInfoRows: SizeInfoRow[]
   sizeMetaHeaders: string[]
@@ -116,6 +136,7 @@ defineProps<{
   removeSizeInfoRow: (index: number) => void
   copySizeInfoToClipboard: () => void
 }>()
+const grid = useSizeGridInteraction(props)
 </script>
 
 <style scoped src="./order-edit-card.css"></style>

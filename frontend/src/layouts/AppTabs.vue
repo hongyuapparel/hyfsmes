@@ -38,7 +38,7 @@ import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter, type RouteLocationNormalizedLoaded } from 'vue-router'
 import { Close } from '@element-plus/icons-vue'
 import Sortable from 'sortablejs'
-import { getRouteTabKey, markRouteCacheDropped } from '@/composables/useRouteCacheControl'
+import { canCloseTab, getRouteTabKey, markRouteCacheDropped } from '@/composables/useRouteCacheControl'
 
 interface TabItem {
   key: string
@@ -88,7 +88,8 @@ function addTab(r: RouteLocationNormalizedLoaded) {
   activeKey.value = key
 }
 
-function closeByKey(key: string) {
+async function closeByKey(key: string) {
+  if (!await canCloseTab(key)) return
   const index = tabs.value.findIndex((t) => t.key === key)
   if (index === -1) return
 

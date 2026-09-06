@@ -1,7 +1,7 @@
 import { onBeforeUnmount, reactive, ref, watch, computed } from 'vue'
-import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
-import { ElMessageBox } from 'element-plus'
+import { useOrderEditSession } from '@/composables/useOrderEditSession'
 import type { OrderFormPayload } from '@/api/orders'
 import { useAuthStore } from '@/stores/auth'
 import { useOrderAttachments } from '@/composables/useOrderAttachments'
@@ -224,17 +224,17 @@ export function useOrderEditPage() {
     { deep: true },
   )
 
-  onBeforeRouteLeave((_to, _from, next) => {
-    if (!hasUnsavedChanges.value) return next()
-    ElMessageBox.confirm('当前有未保存的内容，离开后将无法恢复，确定要离开吗？', '提示', {
-      confirmButtonText: '确定离开',
-      cancelButtonText: '取消',
-      type: 'warning',
-    }).then(() => next()).catch(() => next(false))
-  })
+  const editSession = useOrderEditSession(form, [
+    colorSizeApi.colorRows, colorSizeApi.sizeHeaders, materialsApi.materials,
+    sizeInfoApi.sizeMetaHeaders, sizeInfoApi.sizeInfoRows, processItemsApi.processItems,
+    revisionNotes, productionRequirement, packagingApi.packagingHeaders,
+    packagingApi.packagingCells, packagingApi.packagingMethod, attachmentsApi.attachments,
+    skuSelectionApi.skuProductGroupName, skuSelectionApi.skuApplicablePeopleName,
+    customerSelectionApi.selectedCustomer,
+  ], hasUnsavedChanges, skipDirtyCheck)
 
   function goBack() {
-    router.push({ name: 'OrdersList' })
+    return editSession.cancel(() => router.push({ name: 'OrdersList' }))
   }
 
   const isSuperAdmin = computed(() => {

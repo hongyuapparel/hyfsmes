@@ -4,7 +4,7 @@ import { useOrderSizeInfo } from './useOrderSizeInfo'
 import Sortable from 'sortablejs'
 
 vi.mock('element-plus', () => ({
-  ElMessage: { success: vi.fn(), error: vi.fn() },
+  ElMessage: { success: vi.fn(), error: vi.fn(), warning: vi.fn() },
 }))
 
 vi.mock('sortablejs', () => ({
@@ -14,6 +14,19 @@ vi.mock('sortablejs', () => ({
 }))
 
 describe('useOrderSizeInfo', () => {
+  it('rejects overflowing paste without partially changing existing cells', () => {
+    const api = useOrderSizeInfo({ sizeHeaders: ref(['S']), parseClipboardText: () => [] })
+    api.addSizeInfoRow()
+    api.sizeInfoRows.value[0].sizeValues[0] = '10'
+    api.onSizeGridPaste({ clipboardData: { getData: () => '20\t30' } } as unknown as ClipboardEvent, 0, 4)
+    expect(api.sizeInfoRows.value[0].sizeValues).toEqual(['10'])
+    expect(api.sizeInfoRows.value).toHaveLength(1)
+  })
+  it('pastes quoted multiline text without shifting later measurement rows', () => {
+    const api = useOrderSizeInfo({ sizeHeaders: ref(['S']), parseClipboardText: () => [] })
+    api.onSizeGridPaste({ clipboardData: { getData: () => '胸围\t"a\nb"\n袖长\t沿袖缝' } } as unknown as ClipboardEvent, 0, 0)
+    expect(api.sizeInfoRows.value.map(row => row.metaValues.slice(0, 2))).toEqual([['胸围', 'a\nb'], ['袖长', '沿袖缝']])
+  })
   beforeEach(() => {
     vi.clearAllMocks()
   })

@@ -30,3 +30,15 @@
   cursor: move;
   user-select: none;
 }
+
+.size-grid-hint {
+  color: var(--el-text-color-secondary);
+  font-size: var(--font-size-caption);
+  margin-bottom: var(--space-xs);
+}
+
+.size-cell-selected {
+  outline: 1px solid var(--el-color-primary);
+  outline-offset: -1px;
+  background: var(--el-color-primary-light-9);
+}

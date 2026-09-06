@@ -3,6 +3,7 @@ import { nextTick, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { nextRowKey, useTableRowDragSort } from '@/composables/useTableRowDragSort'
 import type { SizeHeaderChange } from '@/composables/useOrderColorSizeMatrix'
+import { parseSizeClipboard, serializeSizeClipboard } from '@/utils/size-grid-clipboard'
 
 type InputComponentInstance = HTMLElement | { focus?: () => void } | null
 
@@ -18,7 +19,7 @@ export interface UseOrderSizeInfoOptions {
 }
 
 export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
-  const { sizeHeaders, parseClipboardText } = options
+  const { sizeHeaders } = options
   const defaultSizeMetaHeaders = ['部位cm', '量法', '样衣尺寸', '公差']
   const sizeMetaHeaders = ref<string[]>([...defaultSizeMetaHeaders])
   const sizeInfoRows = ref<SizeInfoRow[]>([])
@@ -61,11 +62,10 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     let targetRow = rowIndex
     let targetCol = colIndex
 
-    if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey)) {
-      e.preventDefault()
-      void copySizeInfoToClipboard()
-      return
-    }
+    const input = e.target as HTMLInputElement | null
+    if (e.isComposing || e.ctrlKey || e.metaKey || e.altKey || e.shiftKey && e.key !== 'Tab') return
+    if (e.key === 'ArrowLeft' && input && input.selectionStart !== 0) return
+    if (e.key === 'ArrowRight' && input && input.selectionEnd !== input.value.length) return
 
     if (e.key === 'ArrowRight' || (e.key === 'Tab' && !e.shiftKey)) {
       targetCol = colIndex + 1
@@ -100,8 +100,15 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
     const text = e.clipboardData?.getData('text/plain') ?? ''
     if (!text) return
 
-    const matrix = parseClipboardText(text)
+    const matrix = parseSizeClipboard(text)
     if (!matrix.length) return
+
+    const width = Math.max(...matrix.map(row => row.length))
+    const columns = sizeMetaHeaders.value.length + sizeHeaders.value.length
+    if (startCol + width > columns || matrix.length * width > 10000) {
+      ElMessage.warning('粘贴范围超出可用列或超过 10000 格，请缩小范围或先增加对应列')
+      return
+    }
 
     const requiredRows = startRow + matrix.length
     while (sizeInfoRows.value.length < requiredRows) {
@@ -210,30 +217,12 @@ export function useOrderSizeInfo(options: UseOrderSizeInfoOptions) {
       const sizes = sizeHeaders.value.map((_, idx) => String(row.sizeValues?.[idx] ?? ''))
       return [...meta, ...sizes]
     })
-    const lines = [headers, ...rows].map((r) => r.join('\t')).join('\n')
+    const lines = serializeSizeClipboard([headers, ...rows])
     try {
-      const nav = navigator as { clipboard?: { writeText?: (text: string) => Promise<void> } }
-      if (nav?.clipboard?.writeText) {
-        await nav.clipboard.writeText(lines)
-        ElMessage.success('已复制到剪贴板，可直接粘贴到 Excel')
-      } else {
-        throw new Error('clipboard not available')
-      }
+      await navigator.clipboard.writeText(lines)
+      ElMessage.success('已复制整表（含表头），可粘贴到 Excel')
     } catch {
-      const textarea = document.createElement('textarea')
-      textarea.value = lines
-      textarea.style.position = 'fixed'
-      textarea.style.opacity = '0'
-      document.body.appendChild(textarea)
-      textarea.select()
-      try {
-        document.execCommand('copy')
-        ElMessage.success('已复制到剪贴板，可直接粘贴到 Excel')
-      } catch {
-        ElMessage.error('复制失败，请手动选择后复制')
-      } finally {
-        document.body.removeChild(textarea)
-      }
+      ElMessage.error('复制失败，请检查剪贴板权限，或选中单元格后按 Ctrl+C')
     }
   }
 
