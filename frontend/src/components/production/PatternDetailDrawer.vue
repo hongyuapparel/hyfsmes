@@ -31,8 +31,11 @@
           <el-descriptions-item label="完成时间">
             {{ formatDateTime(row.completedAt) }}
           </el-descriptions-item>
-          <el-descriptions-item label="时效判定">
+          <el-descriptions-item label="客户交期判定" :span="2">
             <SlaJudgeTag :text="row.timeRating" />
+          </el-descriptions-item>
+          <el-descriptions-item label="判定依据" :span="2">
+            {{ row.timeRatingReason }}
           </el-descriptions-item>
         </el-descriptions>
       </ProductionDetailSection>

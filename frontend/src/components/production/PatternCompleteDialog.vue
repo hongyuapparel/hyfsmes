@@ -3,17 +3,25 @@
     v-model="visible"
     :title="mode === 'edit' ? '编辑已提交纸样' : '确认完成'"
     width="480"
+    :show-close="!submitting && !uploading"
+    :close-on-press-escape="!submitting && !uploading"
     destroy-on-close
     @close="emit('close')"
   >
-    <div v-if="row" class="complete-brief">
+    <div v-if="batch" class="complete-brief">
+      <div>本次完成 {{ rows.length }} 张订单：</div>
+      <div>{{ rows.map((item) => item.orderNo).join('、') }}</div>
+      <div>保留各订单已有的样品图片；如需上传，请逐单完成或完成后编辑。</div>
+    </div>
+    <div v-else-if="row" class="complete-brief">
       <div>订单号：{{ row.orderNo }}</div>
       <div>SKU：{{ row.skuCode }}</div>
     </div>
-    <div class="complete-hint">样品图片可选：不上传也可以完成纸样</div>
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <div v-if="!batch" class="complete-hint">{{ mode === 'edit' ? '修改样品图片，不改变完成时间和订单状态' : '样品图片可选：不上传也可以完成纸样' }}</div>
+    <el-form v-if="!batch" :disabled="submitting || uploading" ref="formRef" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="样品图片" prop="sampleImageUrl">
-        <div class="sample-image-upload" @click="emit('trigger-upload')">
+        <div class="sample-image-upload" @click="!submitting && !uploading && emit('trigger-upload')">
           <div v-if="form.sampleImageUrl" class="image-preview-wrap">
             <el-image
               :src="form.sampleImageUrl"
@@ -39,9 +47,9 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="emit('submit')">
-        {{ mode === 'edit' ? '保存纠错' : '完成纸样' }}
+      <el-button :disabled="submitting || uploading" @click="visible = false">取消</el-button>
+      <el-button type="primary" :loading="submitting" :disabled="uploading" @click="emit('submit')">
+        {{ mode === 'edit' ? '保存纠错' : batch ? `完成这 ${rows.length} 张纸样` : '完成纸样' }}
       </el-button>
     </template>
   </AppDialog>
@@ -59,6 +67,10 @@ const props = withDefaults(
     form: { sampleImageUrl: string }
     rules: FormRules
     submitting: boolean
+    rows: PatternListItem[]
+    batch: boolean
+    error: string
+    uploading: boolean
     mode?: 'complete' | 'edit'
   }>(),
   { mode: 'complete' },

@@ -45,9 +45,11 @@
     <el-table-column prop="completedAt" label="完成时间" width="120" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
     </el-table-column>
-    <el-table-column label="时效判定" width="96" align="center">
+    <el-table-column label="客户交期判定" width="116" align="center">
       <template #default="{ row }">
-        <SlaJudgeTag :text="row.timeRating" />
+        <el-tooltip :content="row.timeRatingReason" placement="top">
+          <span><SlaJudgeTag :text="row.timeRating" /></span>
+        </el-tooltip>
       </template>
     </el-table-column>
     <el-table-column label="订单属性" min-width="108">

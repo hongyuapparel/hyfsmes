@@ -247,6 +247,10 @@
       v-model="completeDialog.visible"
       :mode="completeDialog.mode"
       :row="completeDialog.row"
+      :rows="completeDialog.rows"
+      :batch="completeDialog.batch"
+      :error="completeDialog.error"
+      :uploading="sampleImageUploading"
       :form="completeForm"
       :rules="completeRules"
       :submitting="completeDialog.submitting"
@@ -395,6 +399,7 @@ const {
   completeDialog,
   completeForm,
   completeRules,
+  sampleImageUploading,
   patternBriefFromRow,
   addMaterialRow,
   removeMaterialRow,
@@ -419,7 +424,7 @@ const {
 )
 
 const canEditCompletedPatternSelection = computed(
-  () => selectedRows.value.length > 0 && selectedRows.value.every((r) => r.patternStatus === 'completed'),
+  () => selectedRows.value.length === 1 && selectedRows.value[0].patternStatus === 'completed',
 )
 
 const emptyBrief: ProductionOrderBriefModel = {

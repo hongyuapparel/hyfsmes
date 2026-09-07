@@ -126,6 +126,9 @@ export class ProductionPatternController {
       '车版师',
       '纸样状态',
       '纸样完成时间',
+      '到纸样时间',
+      '客户交期判定',
+      '判定依据',
     ];
     const escape = (v: unknown) => {
       const str = v == null ? '' : String(v);
@@ -146,8 +149,11 @@ export class ProductionPatternController {
           r.orderDate ?? '',
           r.patternMaster,
           r.sampleMaker,
-          r.patternStatus,
+          ({ pending_assign: '待分单', in_progress: '打样中', completed: '样品完成' } as Record<string, string>)[r.patternStatus] ?? r.patternStatus,
           r.completedAt ?? '',
+          r.arrivedAtPattern ?? '',
+          r.timeRating,
+          r.timeRatingReason,
         ].map(escape).join(','),
       );
     }

@@ -5,12 +5,12 @@ import { Order } from '../entities/order.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
-import { OrderStatusConfigService } from '../order-status-config/order-status-config.service';
 import { OrderStatus } from '../entities/order-status.entity';
 import { OrderStatusHistory } from '../entities/order-status-history.entity';
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
+import { judgePatternCustomerDueDate } from './pattern-time-rating';
 import { applyRowSort } from '../common/list-row-sort.util';
 
 export interface PatternListItem {
@@ -37,8 +37,9 @@ export interface PatternListItem {
   patternMaster: string;
   sampleMaker: string;
   sampleImageUrl: string;
-  /** 时效判定（与订单时效配置对比） */
+  /** 按客户交期判断纸样完成是否超期 */
   timeRating: string;
+  timeRatingReason: string;
 }
 
 export interface PatternListQuery {
@@ -92,7 +93,6 @@ export class ProductionPatternService {
     @InjectRepository(OrderOperationLog)
     private readonly orderLogRepo: Repository<OrderOperationLog>,
     private readonly orderWorkflowService: OrderWorkflowService,
-    private readonly orderStatusConfigService: OrderStatusConfigService,
   ) {}
 
   private async hasPatternMaterialsColumns(): Promise<boolean> {
@@ -398,7 +398,7 @@ export class ProductionPatternService {
       this.getEnteredAtMap(orderIds, 'pending_pattern'),
     ]);
     const patternMap = new Map(patterns.map((p) => [p.orderId, p]));
-    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
+    const now = new Date();
 
     const rows: PatternListItem[] = [];
     for (const order of orders) {
@@ -421,20 +421,11 @@ export class ProductionPatternService {
         this.toDateTimeLocalString(order.statusTime) ??
         this.toDateTimeLocalString(pattern?.completedAt ?? null);
 
-      let phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(arrivedAtPatternMap.get(order.id));
-      if (!phaseStart && order.status === 'pending_pattern') {
-        phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(order.statusTime);
-      }
-      const phaseEnd =
-        pStatus === 'completed' && pattern?.completedAt
-          ? this.orderStatusConfigService.parseProductionPhaseInstant(pattern.completedAt)
-          : null;
-      const timeRating = this.orderStatusConfigService.judgeProductionPhaseDuration(
-        'pending_pattern',
-        phaseStart,
-        phaseEnd,
-        order.status ?? '',
-        slaCtx,
+      const { timeRating, timeRatingReason } = judgePatternCustomerDueDate(
+        this.toDateOnlyLocalString(order.customerDueDate),
+        this.toDateTimeLocalString(pattern?.completedAt),
+        pStatus === 'completed',
+        now,
       );
 
       rows.push({
@@ -461,6 +452,7 @@ export class ProductionPatternService {
         sampleMaker: sampleMakerName,
         sampleImageUrl: pattern?.sampleImageUrl ?? '',
         timeRating,
+        timeRatingReason,
       });
     }
 
