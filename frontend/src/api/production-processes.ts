@@ -1,4 +1,5 @@
 import request from './request'
+import type { AxiosRequestConfig } from 'axios'
 import { buildSharedGetKey, invalidateSharedGetCache, sharedGet } from './shared-request-cache'
 
 export interface ProductionProcessItem {
@@ -12,9 +13,9 @@ export interface ProductionProcessItem {
   updatedAt: string
 }
 
-export function getProductionProcesses(params?: { department?: string; jobType?: string }) {
+export function getProductionProcesses(params?: { department?: string; jobType?: string }, config?: AxiosRequestConfig) {
   const key = buildSharedGetKey('/production-processes', params)
-  return sharedGet(key, () => request.get<ProductionProcessItem[]>('/production-processes', { params }), {
+  return sharedGet(key, () => request.get<ProductionProcessItem[]>('/production-processes', { ...config, params }), {
     ttlMs: 30000,
   })
 }

@@ -3,6 +3,20 @@
   font-size: var(--font-size-body);
 }
 
+.order-cost-page .cost-edit-fields {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+.order-cost-page .page-header .left {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+}
+
 .page-header {
   display: flex;
   align-items: center;

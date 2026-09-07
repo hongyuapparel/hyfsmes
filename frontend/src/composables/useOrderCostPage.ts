@@ -1,4 +1,4 @@
-import { computed, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useRoute } from 'vue-router'
 import { formatDisplayNumber } from '@/utils/display-number'
 import { buildSnapshotPayload } from '@/utils/order-cost'
@@ -8,6 +8,8 @@ import { useOrderCostQuoteActions } from './useOrderCostQuoteActions'
 import { useOrderCostTemplateActions } from './useOrderCostTemplateActions'
 import { useOrderQuoteQueueNavigation } from './useOrderQuoteQueueNavigation'
 import { useOrderCostRouteIdentity } from './useOrderCostRouteIdentity'
+import { useOrderCostSession } from './useOrderCostSession'
+import { useOrderCostReview } from './useOrderCostReview'
 
 interface OrderCostAuthLike {
   hasPermission: (code: string) => boolean
@@ -92,7 +94,6 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     resetOrderCostState,
   } = useOrderCostData(orderId)
 
-  const hasLocalDraftChanges = ref(false)
   const suppressDirtyTracking = ref(true)
   const canSubmitCost = computed(() => authStore.hasPermission('orders_cost_submit'))
   const { isQuoteQueue, goAfterQuoteConfirm, goBackFromCost } = useOrderQuoteQueueNavigation(orderId)
@@ -111,10 +112,16 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     })
   }
 
-  function onAnyFieldInput() { if (!suppressDirtyTracking.value) hasLocalDraftChanges.value = true }
-  function onAnyFieldChange() { if (!suppressDirtyTracking.value) hasLocalDraftChanges.value = true }
+  const { hasLocalDraftChanges, markSaved } = useOrderCostSession(buildCurrentSnapshot, (snapshot) => {
+    materialRows.value = snapshot.materialRows
+    processItemRows.value = snapshot.processItemRows
+    productionRows.value = snapshot.productionRows
+    productionCostMultiplier.value = snapshot.productionCostMultiplier
+    profitMargin.value = snapshot.profitMargin
+  }, suppressDirtyTracking, () => blockingSubmission.value)
+  const review = useOrderCostReview(order, materialRows, processItemRows, productionRows, productionCostMultiplier)
 
-  const { savingDraft, confirmingQuote, costNotice, saveDraft, confirmQuote } = useOrderCostQuoteActions({
+  const { savingDraft, confirmingQuote, blockingSubmission, costNotice, saveDraft, confirmQuote } = useOrderCostQuoteActions({
     authStore,
     orderId,
     order,
@@ -126,6 +133,9 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     hasLocalDraftChanges,
     isQuoteQueue,
     buildCurrentSnapshot,
+    markSaved,
+    costIssues: review.costIssues,
+    structureDifferences: review.structureDifferences,
     goAfterQuoteConfirm,
   })
 
@@ -137,19 +147,17 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
   })
 
   async function applyImportOrder() {
-    const imported = await applyImportOrderFromData()
-    if (imported && !suppressDirtyTracking.value) hasLocalDraftChanges.value = true
+    await applyImportOrderFromData()
   }
 
   function goBack() { goBackFromCost() }
 
-  const { initialLoading, initialLoadFailed } = useOrderCostInitialization({
+  const initialization = useOrderCostInitialization({
     orderId,
     order,
     materialRows,
     processItemRows,
     selectedProductionRows,
-    hasLocalDraftChanges,
     suppressDirtyTracking,
     resetOrderCostState,
     loadOrder,
@@ -162,13 +170,10 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     syncMaterialTypeIdsFromLabel,
   })
 
-  watch([materialTotal, processItemTotal, productionProcessTotal, totalCost, computedExFactoryPrice], () => {
-    if (!suppressDirtyTracking.value && !productionPickerVisible.value) hasLocalDraftChanges.value = true
-  })
-
   return {
-    initialLoading,
-    initialLoadFailed,
+    ...initialization,
+    ...review,
+    hasLocalDraftChanges,
     order,
     materialRowsSorted,
     processItemRows,
@@ -222,8 +227,6 @@ export function useOrderCostPage(authStore: OrderCostAuthLike) {
     onProductionProcessChange,
     onProductionDepartmentChange,
     onProductionJobTypeChange,
-    onAnyFieldInput,
-    onAnyFieldChange,
     saveDraft,
     confirmQuote,
     goBack,

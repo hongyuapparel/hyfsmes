@@ -10,7 +10,7 @@ import {
 export function useOrderCostProductionRows(
   productionRows: { value: ProductionRow[] },
   productionProcesses: { value: ProductionProcessItem[] },
-  loadProcesses: () => Promise<void>,
+  loadProcesses: () => Promise<boolean>,
 ) {
   const productionPickerVisible = ref(false)
   const selectedProductionRows = ref<ProductionRow[]>([])

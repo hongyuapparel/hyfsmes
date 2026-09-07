@@ -152,10 +152,10 @@ test('cost snapshot lookup validates the order with an id-only query', async () 
       return { id: 7 };
     },
   };
-  const snapshot = { id: 3, orderId: 7, snapshot: { profitMargin: 0.1 } };
+  const snapshot = { id: 3, orderId: 7, snapshot: { profitMargin: 0.15 } };
   const snapshotRepo = {
     findOne: async () => snapshot,
-    save: async (row) => row,
+    save: async () => { throw new Error('读取成本不得修改数据库'); },
   };
   const service = new OrderQueryService(
     orderRepo,
@@ -175,6 +175,18 @@ test('cost snapshot lookup validates the order with an id-only query', async () 
   const result = await service.getCostSnapshot(7);
 
   assert.equal(result, snapshot);
+  assert.equal(result.snapshot.profitMargin, 0.15);
   assert.equal(orderFindCalls.length, 1);
   assert.deepEqual(orderFindCalls[0].select, ['id']);
+});
+
+test('15% 目标毛利率保持原值并参与报价计算', async () => {
+  const { service, savedOrders } = createService();
+  assert.equal(service.normalizeProfitMargin(0.15), 0.15);
+  assert.equal(service.normalizeProfitMargin(1), 0.1);
+  const result = await service.confirmCostQuote(7, { snapshot: {
+    materialRows: [{ unitPrice: 20, usagePerPiece: 2, lossPercent: 5 }], profitMargin: 0.15,
+  } }, { userId: 1, username: 'quoter' });
+  assert.equal(result.snapshot.profitMargin, 0.15);
+  assert.equal(savedOrders[0].exFactoryPrice, '49.41');
 });

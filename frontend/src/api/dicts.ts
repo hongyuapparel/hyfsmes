@@ -52,7 +52,7 @@ export function getDictItems(type: DictType, config?: AxiosRequestConfig) {
     return request.get<SystemOptionItem[]>('/dicts/list', { params, ...(config ?? {}) })
   }
   const key = buildSharedGetKey('/dicts/list', params)
-  return sharedGet(key, () => request.get<SystemOptionItem[]>('/dicts/list', { params }), {
+  return sharedGet(key, () => request.get<SystemOptionItem[]>('/dicts/list', { ...config, params }), {
     ttlMs: 30000,
   })
 }

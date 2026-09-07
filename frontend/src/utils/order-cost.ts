@@ -86,8 +86,7 @@ export function getMaterialTypeMergeKey(row: MaterialRow): string {
 
 export function normalizeProfitMargin(value: unknown): number {
   const num = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(num) || num < 0) return DEFAULT_PROFIT_MARGIN
-  if (Math.abs(num - 0.15) < 1e-9) return DEFAULT_PROFIT_MARGIN
+  if (!Number.isFinite(num) || num < 0 || num >= 1) return DEFAULT_PROFIT_MARGIN
   return num
 }
 
@@ -211,11 +210,13 @@ export function mergeMaterialRowsFromOrder(
 ): MaterialRow[] {
   const exactBuckets = buildBuckets(pricedRows, materialIdentityKey)
   const nameBuckets = buildBuckets(pricedRows, (row) => String(row.materialName ?? '').trim())
+  const sourceNames = buildBuckets(orderMaterials, (row) => String(row.materialName ?? '').trim())
   const used = new Set<MaterialRow>()
   return orderMaterials.map((src) => {
     const matched =
       pickOnce(exactBuckets, materialIdentityKey(src), used) ??
-      pickOnce(nameBuckets, String(src.materialName ?? '').trim(), used)
+      (sourceNames.get(String(src.materialName ?? '').trim())?.length === 1 && nameBuckets.get(String(src.materialName ?? '').trim())?.length === 1
+        ? pickOnce(nameBuckets, String(src.materialName ?? '').trim(), used) : null)
     return {
       ...src,
       unitPrice: matched ? Number(matched.unitPrice) || 0 : 0,
@@ -233,11 +234,13 @@ export function mergeProcessItemRowsFromOrder(
 ): ProcessItemRow[] {
   const exactBuckets = buildBuckets(pricedRows, processItemIdentityKey)
   const nameBuckets = buildBuckets(pricedRows, (row) => String(row.processName ?? '').trim())
+  const sourceNames = buildBuckets(orderProcessItems, (row) => String(row.processName ?? '').trim())
   const used = new Set<ProcessItemRow>()
   return orderProcessItems.map((src) => {
     const matched =
       pickOnce(exactBuckets, processItemIdentityKey(src), used) ??
-      pickOnce(nameBuckets, String(src.processName ?? '').trim(), used)
+      (sourceNames.get(String(src.processName ?? '').trim())?.length === 1 && nameBuckets.get(String(src.processName ?? '').trim())?.length === 1
+        ? pickOnce(nameBuckets, String(src.processName ?? '').trim(), used) : null)
     const quantity = matched ? Number(matched.quantity) : Number.NaN
     return {
       ...src,

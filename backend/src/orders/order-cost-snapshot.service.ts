@@ -27,8 +27,7 @@ export class OrderCostSnapshotService {
 
   normalizeProfitMargin(v: unknown): number {
     const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n) || n < 0) return 0.1;
-    if (Math.abs(n - 0.15) < 1e-9) return 0.1;
+    if (!Number.isFinite(n) || n < 0 || n >= 1) return 0.1;
     return n;
   }
 

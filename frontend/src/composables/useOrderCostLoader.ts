@@ -57,8 +57,8 @@ export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCost
   loadOrder: (options?: OrderCostLoadOptions) => Promise<boolean>
   loadCostSnapshot: (options?: OrderCostLoadOptions) => Promise<CostSnapshotLoadResult>
   resetOrderCostState: () => void
-  loadMaterialTypes: () => Promise<void>
-  loadProcesses: () => Promise<void>
+  loadMaterialTypes: () => Promise<boolean>
+  loadProcesses: () => Promise<boolean>
   reconcileCostRowsFromOrder: (detail: OrderDetail) => void
   ensureCostRowsBase: () => void
   syncMaterialTypeIdsFromLabel: () => void
@@ -90,10 +90,12 @@ export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCost
 
   async function loadMaterialTypes() {
     try {
-      const res = await getDictItems('material_types')
+      const res = await getDictItems('material_types', { skipGlobalErrorHandler: true })
       materialTypeOptions.value = (res.data ?? []).map((item) => ({ id: item.id, label: item.value }))
+      return true
     } catch (e: unknown) {
       if (!isErrorHandled(e)) console.warn('物料类型加载失败', getErrorMessage(e))
+      return false
     }
   }
 
@@ -179,22 +181,12 @@ export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCost
 
   async function loadProcesses() {
     try {
-      const res = await getProductionProcesses()
+      const res = await getProductionProcesses(undefined, { skipGlobalErrorHandler: true })
       productionProcesses.value = res.data ?? []
-      if (!productionRows.value.length) {
-        const first = productionProcesses.value[0]
-        productionRows.value = [{
-          processId: first?.id ?? null,
-          department: first?.department ?? '',
-          jobType: first?.jobType ?? '',
-          processName: first?.name ?? '',
-          remark: '',
-          unitPrice: first ? Number(first.unitPrice) || 0 : 0,
-          quantity: DEFAULT_PRODUCTION_PROCESS_QTY,
-        }]
-      }
+      return true
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载生产工序失败'))
+      if (!isErrorHandled(e)) console.warn('加载生产工序失败', getErrorMessage(e))
+      return false
     }
   }
 
@@ -209,7 +201,6 @@ export function useOrderCostLoader(orderId: MaybeRefOrGetter<number>): OrderCost
         row.processId = found.id
         row.department = found.department || row.department
         row.jobType = found.jobType || row.jobType
-        row.unitPrice = Number(found.unitPrice) || row.unitPrice
       }
     })
   }

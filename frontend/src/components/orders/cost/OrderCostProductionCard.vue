@@ -151,137 +151,42 @@
       </span>
     </div>
 
-    <AppDialog
-      :model-value="importDialogVisible"
-      title="导入工序模板"
-      width="400px"
-      @close="onImportDialogClose"
-      @update:model-value="(value) => emit('updateImportDialogVisible', value)"
-    >
-      <p class="import-template-hint">选择服装类型模板，将其中工序一键填入下方表格，再按款式做个别增减。</p>
-      <el-select
-        :model-value="importTemplateId"
-        placeholder="选择模板"
-        filterable
-        clearable
-        style="width: 100%"
-        @update:model-value="(value) => emit('updateImportTemplateId', value as number | null)"
-      >
-        <el-option
-          v-for="t in importTemplateOptions"
-          :key="t.id"
-          :label="t.name"
-          :value="t.id"
-        />
-      </el-select>
-      <template #footer>
-        <el-button @click="emit('updateImportDialogVisible', false)">取消</el-button>
-        <el-button type="primary" :disabled="!importTemplateId" @click="$emit('applyImportTemplate')">
-          确定导入
-        </el-button>
-      </template>
-    </AppDialog>
+    <OrderCostImportTemplateDialog
+      :import-template-options="importTemplateOptions"
+      :import-dialog-visible="importDialogVisible"
+      :import-template-id="importTemplateId"
+      @update-import-dialog-visible="(value) => emit('updateImportDialogVisible', value)"
+      @update-import-template-id="(value) => emit('updateImportTemplateId', value)"
+      @apply-import-template="emit('applyImportTemplate')"
+      @import-dialog-close="emit('importDialogClose')"
+    />
 
-    <AppDialog
-      :model-value="importOrderDialogVisible"
-      title="从订单导入生产工序成本"
-      width="760px"
-      @close="$emit('importOrderDialogClose')"
-      @update:model-value="(value) => emit('updateImportOrderDialogVisible', value)"
-    >
-      <div class="import-order-search">
-        <el-input
-          :model-value="importOrderKeyword"
-          placeholder="输入订单号 / SKU 搜索"
-          clearable
-          class="import-order-search-input"
-          @update:model-value="(value) => emit('updateImportOrderKeyword', String(value ?? ''))"
-          @keyup.enter="emit('searchImportOrders')"
-        />
-        <el-button type="primary" :loading="importOrderLoading" @click="emit('searchImportOrders')">
-          搜索
-        </el-button>
-      </div>
-      <el-table
-        :data="importOrderResults"
-        v-loading="importOrderLoading"
-        row-key="id"
-        size="small"
-        class="import-order-table"
-      >
-        <el-table-column label="图片" width="78" align="center">
-          <template #default="{ row }">
-            <AppImageThumb
-              v-if="row.imageUrl"
-              :raw-url="row.imageUrl"
-              :width="48"
-              :height="48"
-              empty-text="-"
-              preview-disabled
-            />
-            <span v-else class="import-order-empty">-</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="orderNo" label="订单号" min-width="130" />
-        <el-table-column prop="skuCode" label="SKU" min-width="130" />
-        <el-table-column label="状态" min-width="110">
-          <template #default="{ row }">
-            <el-tag size="small" effect="light" :type="getImportOrderStatusTagType(row.status)">
-              {{ getImportOrderStatusLabel(row.status) }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="82" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="importOrderSelectedId === row.id" size="small" type="success">已选</el-tag>
-            <el-button v-else link type="primary" size="small" @click="emit('updateImportOrderSelectedId', row.id)">
-              选择
-            </el-button>
-          </template>
-        </el-table-column>
-        <template #empty>
-          <span>{{ importOrderKeyword.trim() ? '未找到匹配订单' : '输入订单号或 SKU 后搜索' }}</span>
-        </template>
-      </el-table>
-      <template #footer>
-        <el-button :disabled="importOrderApplying" @click="emit('updateImportOrderDialogVisible', false)">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="importOrderApplying"
-          :disabled="!importOrderSelectedId"
-          @click="$emit('applyImportOrder')"
-        >
-          确定导入
-        </el-button>
-      </template>
-    </AppDialog>
+    <OrderCostImportOrderDialog
+      :import-order-dialog-visible="importOrderDialogVisible"
+      :import-order-keyword="importOrderKeyword"
+      :import-order-loading="importOrderLoading"
+      :import-order-applying="importOrderApplying"
+      :import-order-results="importOrderResults"
+      :import-order-selected-id="importOrderSelectedId"
+      :get-import-order-status-label="getImportOrderStatusLabel"
+      :get-import-order-status-tag-type="getImportOrderStatusTagType"
+      @update-import-order-dialog-visible="(value) => emit('updateImportOrderDialogVisible', value)"
+      @update-import-order-keyword="(value) => emit('updateImportOrderKeyword', value)"
+      @update-import-order-selected-id="(value) => emit('updateImportOrderSelectedId', value)"
+      @search-import-orders="emit('searchImportOrders')"
+      @apply-import-order="emit('applyImportOrder')"
+      @import-order-dialog-close="emit('importOrderDialogClose')"
+    />
 
-    <AppDialog
-      :model-value="saveDialogVisible"
-      title="保存为工序报价模板"
-      width="420px"
-      @close="$emit('saveDialogClose')"
-      @update:model-value="(value) => emit('updateSaveDialogVisible', value)"
-    >
-      <el-input
-        :model-value="saveDialogName"
-        placeholder="请输入模板名称（如：卫衣-基础版）"
-        maxlength="40"
-        show-word-limit
-        @update:model-value="(value) => emit('updateSaveDialogName', String(value ?? ''))"
-      />
-      <template #footer>
-        <el-button :disabled="saveDialogSubmitting" @click="emit('updateSaveDialogVisible', false)">取消</el-button>
-        <el-button
-          type="primary"
-          :loading="saveDialogSubmitting"
-          :disabled="!saveDialogName.trim()"
-          @click="$emit('saveCurrentTemplate')"
-        >
-          保存
-        </el-button>
-      </template>
-    </AppDialog>
+    <OrderCostSaveTemplateDialog
+      :save-dialog-visible="saveDialogVisible"
+      :save-dialog-name="saveDialogName"
+      :save-dialog-submitting="saveDialogSubmitting"
+      @update-save-dialog-visible="(value) => emit('updateSaveDialogVisible', value)"
+      @update-save-dialog-name="(value) => emit('updateSaveDialogName', value)"
+      @save-current-template="emit('saveCurrentTemplate')"
+      @save-dialog-close="emit('saveDialogClose')"
+    />
 
     <ProductionProcessPickerDialog
       :model-value="productionPickerVisible"
@@ -300,7 +205,9 @@ import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { getJobTypeLabel, type ProductionRow } from '@/utils/order-cost'
 import type { OrderListItem } from '@/api/orders'
 import type { ProductionProcessItem } from '@/api/production-processes'
-import AppImageThumb from '@/components/AppImageThumb.vue'
+import OrderCostImportTemplateDialog from './OrderCostImportTemplateDialog.vue'
+import OrderCostImportOrderDialog from './OrderCostImportOrderDialog.vue'
+import OrderCostSaveTemplateDialog from './OrderCostSaveTemplateDialog.vue'
 import ProductionProcessPickerDialog from '@/views/orders/components/ProductionProcessPickerDialog.vue'
 
 const props = defineProps<{
@@ -370,7 +277,4 @@ const productionCostMultiplierModel = computed({
   set: (value: number) => emit('updateProductionCostMultiplier', value),
 })
 
-function onImportDialogClose() {
-  emit('importDialogClose')
-}
 </script>

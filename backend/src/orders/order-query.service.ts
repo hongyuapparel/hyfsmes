@@ -785,13 +785,6 @@ export class OrderQueryService {
     return this.orderRemarkRepo.find({ where: { orderId }, order: { createdAt: 'DESC' } });
   }
 
-  private normalizeProfitMargin(v: unknown): number {
-    const n = typeof v === 'number' ? v : Number(v);
-    if (!Number.isFinite(n) || n < 0) return 0.1;
-    if (Math.abs(n - 0.15) < 1e-9) return 0.1;
-    return n;
-  }
-
   async getCostSnapshot(orderId: number): Promise<OrderCostSnapshot | null> {
     const [order, row] = await Promise.all([
       this.orderRepo.findOne({
@@ -801,15 +794,6 @@ export class OrderQueryService {
       this.orderCostSnapshotRepo.findOne({ where: { orderId } }),
     ]);
     if (!order) throw new NotFoundException('订单不存在');
-    if (row?.snapshot && typeof row.snapshot === 'object') {
-      const snapshot = row.snapshot as Record<string, unknown>;
-      const normalized = this.normalizeProfitMargin(snapshot.profitMargin);
-      const current = typeof snapshot.profitMargin === 'number' ? snapshot.profitMargin : Number(snapshot.profitMargin);
-      if (!Number.isFinite(current) || Math.abs(current - normalized) > 1e-9) {
-        row.snapshot = { ...snapshot, profitMargin: normalized };
-        await this.orderCostSnapshotRepo.save(row);
-      }
-    }
     return row ?? null;
   }
 }
