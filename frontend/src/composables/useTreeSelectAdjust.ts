@@ -52,7 +52,9 @@ export function useTreeSelectAdjust() {
     state.initialTimer = setTimeout(() => {
       state.initialTimer = null
 
-      const popper = document.querySelector<HTMLElement>(`.${popperClass}.el-popper`)
+      // KeepAlive 会保留同类名的隐藏面板；只能测量正在展开的实例。
+      const popper = [...document.querySelectorAll<HTMLElement>(`.${popperClass}.el-popper`)]
+        .find((element) => element.getClientRects().length > 0)
       if (!popper) {
         stateMap.delete(popperClass)
         return
