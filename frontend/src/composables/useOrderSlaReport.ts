@@ -10,6 +10,7 @@ import {
   type OrderStatusItem,
 } from '@/api/order-status-config'
 import { getDictItems } from '@/api/dicts'
+import { useOrderListOptions } from '@/composables/useOrderListOptions'
 import { formatDateTime } from '@/utils/date-format'
 import { formatDisplayNumber } from '@/utils/display-number'
 
@@ -51,7 +52,7 @@ export function useOrderSlaReport() {
   const profitSummary = ref<OrderProfitReportSummary | null>(null)
   const statusOptions = ref<OrderStatusItem[]>([])
   const collaborationOptions = ref<Array<{ id: number; value: string }>>([])
-  const orderTypeOptions = ref<Array<{ id: number; value: string }>>([])
+  const { orderTypeTreeSelectData, findOrderTypeLabelById, loadOrderTypeTree } = useOrderListOptions()
   const selection = ref<OrderSlaReportRow[]>([])
   const profitSelection = ref<OrderProfitReportRow[]>([])
   const pagination = ref({ page: 1, pageSize: 20 })
@@ -264,10 +265,9 @@ export function useOrderSlaReport() {
 
   async function loadOrderTypeOptions() {
     try {
-      const res = await getDictItems('order_types')
-      orderTypeOptions.value = (res.data ?? []).map((x) => ({ id: x.id, value: x.value }))
+      await loadOrderTypeTree()
     } catch {
-      orderTypeOptions.value = []
+      // 加载失败时保留空树，与其他筛选选项一致。
     }
   }
 
@@ -361,7 +361,8 @@ export function useOrderSlaReport() {
     profitSummary,
     statusOptions,
     collaborationOptions,
-    orderTypeOptions,
+    orderTypeTreeSelectData,
+    findOrderTypeLabelById,
     pagination,
     activeTab,
     filter,

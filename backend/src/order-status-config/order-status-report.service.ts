@@ -136,7 +136,8 @@ export class OrderStatusReportService {
       });
     }
     if (params.orderTypeId != null) {
-      orderQb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: params.orderTypeId });
+      const orderTypeIds = await this.systemOptionsService.getSelfAndDescendantIds('order_types', params.orderTypeId);
+      orderQb.andWhere('o.order_type_id IN (:...orderTypeIds)', { orderTypeIds });
     }
     const orderNoKw = params.orderNo?.trim();
     if (orderNoKw) {
@@ -538,7 +539,10 @@ export class OrderStatusReportService {
     if (params.collaborationTypeId != null) {
       qb.andWhere('o.collaboration_type_id = :collaborationTypeId', { collaborationTypeId: params.collaborationTypeId });
     }
-    if (params.orderTypeId != null) qb.andWhere('o.order_type_id = :orderTypeId', { orderTypeId: params.orderTypeId });
+    if (params.orderTypeId != null) {
+      const orderTypeIds = await this.systemOptionsService.getSelfAndDescendantIds('order_types', params.orderTypeId);
+      qb.andWhere('o.order_type_id IN (:...orderTypeIds)', { orderTypeIds });
+    }
     const orderNoKw = params.orderNo?.trim();
     if (orderNoKw) qb.andWhere('o.order_no LIKE :orderNoKw', { orderNoKw: `%${orderNoKw}%` });
     const skuCodeKw = params.skuCode?.trim();

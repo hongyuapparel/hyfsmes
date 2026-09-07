@@ -120,20 +120,27 @@
         </template>
         <el-option v-for="opt in collaborationOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
       </el-select>
-      <el-select
+      <el-tree-select
         v-model="filter.orderTypeId"
+        :data="orderTypeTreeSelectData"
         placeholder="订单类型"
+        popper-class="report-order-type-tree-popper"
+        filterable
         clearable
+        check-strictly
+        default-expand-all
+        :render-after-expand="false"
+        node-key="value"
+        :props="{ label: 'label', value: 'value', children: 'children', disabled: 'disabled' }"
         class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.orderTypeId != null ? `订单类型：${orderTypeOptions.find(o => o.id === filter.orderTypeId)?.value ?? ''}` : '', '订单类型')"
+        :style="getAdaptiveSelectStyle(filter.orderTypeId && `订单类型：${findOrderTypeLabelById(filter.orderTypeId)}`, '订单类型')"
         @change="onSearch"
+        @visible-change="(v: boolean) => v && adjustTreePopperWidth('report-order-type-tree-popper')"
       >
-        <template #label="{ label }">
-          <span v-if="filter.orderTypeId != null">订单类型：{{ label }}</span>
-          <span v-else>{{ label }}</span>
+        <template #prefix>
+          <span v-if="filter.orderTypeId" :style="{ color: ACTIVE_FILTER_COLOR }">订单类型：</span>
         </template>
-        <el-option v-for="opt in orderTypeOptions" :key="opt.id" :label="opt.value" :value="opt.id" />
-      </el-select>
+      </el-tree-select>
       </div>
 
       <div class="filter-bar-actions">
@@ -347,6 +354,7 @@ import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import { useTreeSelectAdjust } from '@/composables/useTreeSelectAdjust'
 import { useOrderSlaReport } from '@/composables/useOrderSlaReport'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
@@ -383,7 +391,8 @@ const {
   profitSummary,
   statusOptions,
   collaborationOptions,
-  orderTypeOptions,
+  orderTypeTreeSelectData,
+  findOrderTypeLabelById,
   pagination,
   activeTab,
   filter,
@@ -411,6 +420,7 @@ const {
 } = useOrderSlaReport()
 
 const { collapsed, isMobile } = useFilterCollapse('finance-sla-report')
+const { adjustTreePopperWidth } = useTreeSelectAdjust()
 const activeFilterCount = computed(() => {
   const f = filter.value
   let n = 0
