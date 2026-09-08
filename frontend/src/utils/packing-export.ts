@@ -1,11 +1,13 @@
 import * as XLSX from 'xlsx'
 import type { PackingListDetail } from '@/api/packing-lists'
+import { normalizePackingDetail } from '@/composables/packingQuantities'
 
 /**
  * 装箱单中英双语 Excel 导出（贴近公盘模板）。
  * 已知限制：SheetJS 社区版不支持嵌入图片，颜色列导出文字。
  */
-export function exportPackingListExcel(detail: PackingListDetail): void {
+export function exportPackingListExcel(rawDetail: PackingListDetail): void {
+  const detail = normalizePackingDetail(rawDetail)
   const sizeHeaders = detail.sizeHeaders
   const header = [
     '箱号 Carton No.',

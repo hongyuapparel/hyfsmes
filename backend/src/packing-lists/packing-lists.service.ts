@@ -9,6 +9,14 @@ import { User } from '../entities/user.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 import { buildPackingListUpdateSummary } from './packing-list-log-summary';
 import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
+import {
+  findUnexpectedPackingSizeQuantity,
+  formatUnexpectedPackingSizeQuantity,
+  normalizePackingSizeHeaders,
+  normalizePackingSizeQuantities,
+  normalizePackingSizeQuantitiesForHeaders,
+  packingQuantityTotal,
+} from './packing-list-quantities';
 
 export interface PackingListQuery {
   status?: string;
@@ -90,20 +98,6 @@ export interface PackingListDetail {
   operatorUsername: string;
   createdAt: Date;
   boxes: PackingBoxDetail[];
-}
-
-function normalizeSizeQuantities(raw: unknown): Record<string, number> {
-  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const out: Record<string, number> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const num = Number(value);
-    if (key && Number.isFinite(num) && num > 0) out[key] = num;
-  }
-  return out;
-}
-
-function sumSizeQuantities(sizeQuantities: Record<string, number>): number {
-  return Object.values(sizeQuantities).reduce((acc, n) => acc + n, 0);
 }
 
 /** 操作记录条目（前端展示用） */
@@ -295,8 +289,8 @@ export class PackingListsService {
           styleName: item.styleName,
           colorName: item.colorName,
           imageUrl: item.imageUrl,
-          sizeQuantities: normalizeSizeQuantities(item.sizeQuantities),
-          totalQty: item.totalQty,
+          sizeQuantities: normalizePackingSizeQuantities(item.sizeQuantities),
+          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty),
           sourceType: item.sourceType,
           sourceId: item.sourceId,
         })),
@@ -320,6 +314,7 @@ export class PackingListsService {
   }
 
   async create(payload: SavePackingListDto, operatorUsername: string): Promise<{ id: number; code: string }> {
+    this.assertPayloadSizeQuantitiesVisible(payload);
     const now = new Date();
     const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     // 并发下两个请求可能算出同一序号；靠 uniq_packing_lists_code 唯一索引报重复，捕获后重算重试。
@@ -402,8 +397,8 @@ export class PackingListsService {
           styleName: item.styleName,
           colorName: item.colorName,
           imageUrl: item.imageUrl,
-          sizeQuantities: normalizeSizeQuantities(item.sizeQuantities),
-          totalQty: item.totalQty,
+          sizeQuantities: normalizePackingSizeQuantities(item.sizeQuantities),
+          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty),
           sourceType: item.sourceType,
           sourceId: item.sourceId,
         })),
@@ -467,6 +462,7 @@ export class PackingListsService {
   // 已发货单也允许修改：发货后客户常要求改装箱方式（返箱/调箱/补录）。本方法只改单据本身
   // （表头 + 箱 + 明细），不触碰任何库存——库存只在 /ship 时扣减一次，已发货单的二次编辑不影响库存账。
   async update(id: number, payload: SavePackingListDto, operatorUsername = ''): Promise<void> {
+    this.assertPayloadSizeQuantitiesVisible(payload);
     const before = await this.getDetail(id);
     await this.listRepo.manager.transaction(async (manager) => {
       await manager.getRepository(PackingList).update({ id }, this.buildListColumns(payload));
@@ -561,8 +557,7 @@ export class PackingListsService {
     for (const box of boxes) {
       const items = Array.isArray(box.items) ? box.items : [];
       for (const item of items) {
-        const sizeTotal = sumSizeQuantities(normalizeSizeQuantities(item.sizeQuantities));
-        totalQty += sizeTotal > 0 ? sizeTotal : Math.max(0, Number(item.totalQty) || 0);
+        totalQty += packingQuantityTotal(item.sizeQuantities, item.totalQty);
       }
     }
     return { boxCount: boxes.length, totalQty };
@@ -581,7 +576,7 @@ export class PackingListsService {
       packDate: payload.packDate?.trim() || null,
       remark: (payload.remark ?? '').trim(),
       showCompany: payload.showCompany === false ? 0 : 1,
-      sizeHeaders: Array.isArray(payload.sizeHeaders) ? payload.sizeHeaders.map((h) => h.trim()).filter((h) => !!h) : [],
+      sizeHeaders: normalizePackingSizeHeaders(payload.sizeHeaders),
     };
   }
 
@@ -592,6 +587,7 @@ export class PackingListsService {
     payload: SavePackingListDto,
   ): Promise<void> {
     const boxes = Array.isArray(payload.boxes) ? payload.boxes : [];
+    const sizeHeaders = normalizePackingSizeHeaders(payload.sizeHeaders);
     for (let i = 0; i < boxes.length; i++) {
       const boxPayload = boxes[i];
       const box = await boxRepo.save(
@@ -607,8 +603,7 @@ export class PackingListsService {
       if (!items.length) continue;
       await itemRepo.save(
         items.map((item) => {
-          const sizeQuantities = normalizeSizeQuantities(item.sizeQuantities);
-          const sizeTotal = sumSizeQuantities(sizeQuantities);
+          const sizeQuantities = normalizePackingSizeQuantitiesForHeaders(item.sizeQuantities, sizeHeaders);
           return itemRepo.create({
             packingListId,
             boxId: box.id,
@@ -617,12 +612,17 @@ export class PackingListsService {
             colorName: (item.colorName ?? '').trim(),
             imageUrl: (item.imageUrl ?? '').trim(),
             sizeQuantities,
-            totalQty: sizeTotal > 0 ? sizeTotal : Math.max(0, Number(item.totalQty) || 0),
+            totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty),
             sourceType: item.sourceType === 'pending' || item.sourceType === 'finished' ? item.sourceType : 'manual',
             sourceId: item.sourceId != null && Number.isInteger(Number(item.sourceId)) ? Number(item.sourceId) : null,
           });
         }),
       );
     }
+  }
+
+  private assertPayloadSizeQuantitiesVisible(payload: SavePackingListDto): void {
+    const unexpected = findUnexpectedPackingSizeQuantity(payload.sizeHeaders, payload.boxes);
+    if (unexpected) throw new BadRequestException(formatUnexpectedPackingSizeQuantity(unexpected));
   }
 }

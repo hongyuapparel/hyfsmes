@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { usePackingGridRows, type PackingItemDraft } from './usePackingGridRows'
+import {
+  packingItemTotal,
+  reconcilePackingSizeHeaders,
+  setPackingSizeQuantity,
+  usePackingGridRows,
+  type PackingItemDraft,
+} from './usePackingGridRows'
 import type { PickableLine } from '@/api/packing-lists'
 
 function makeItem(overrides: Partial<PackingItemDraft> = {}): PackingItemDraft {
@@ -122,8 +128,7 @@ describe('usePackingGridRows', () => {
     grid.sizeHeaders.value = ['S', 'M']
     grid.addBox()
     grid.boxes.value[0].items[0].sizeQuantities = { S: 5, M: 6 }
-    grid.sizeHeaders.value[1] = 'L'
-    expect(grid.commitSizeHeader(1, 'M')).toBe('ok')
+    expect(grid.commitSizeHeader(1, 'L')).toBe('ok')
     expect(grid.sizeHeaders.value).toEqual(['S', 'L'])
     expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({ S: 5, L: 6 })
   })
@@ -131,8 +136,7 @@ describe('usePackingGridRows', () => {
   it('commitSizeHeader 重名拒绝并撤销回旧名', () => {
     const grid = usePackingGridRows()
     grid.sizeHeaders.value = ['S', 'M']
-    grid.sizeHeaders.value[1] = 'S'
-    expect(grid.commitSizeHeader(1, 'M')).toBe('duplicate')
+    expect(grid.commitSizeHeader(1, 'S')).toBe('duplicate')
     expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
   })
 
@@ -148,8 +152,7 @@ describe('usePackingGridRows', () => {
     grid.sizeHeaders.value = ['S', 'M']
     grid.addBox()
     grid.boxes.value[0].items[0].sizeQuantities = { M: 6 }
-    grid.sizeHeaders.value[1] = ''
-    expect(grid.commitSizeHeader(1, 'M')).toBe('ok')
+    expect(grid.commitSizeHeader(1, '')).toBe('ok')
     expect(grid.sizeHeaders.value).toEqual(['S', 'M'])
   })
 
@@ -176,6 +179,31 @@ describe('usePackingGridRows', () => {
     expect(grid.totals.value.totalQty).toBe(30)
     expect(grid.totals.value.totalWeight).toBeCloseTo(15)
     expect(grid.totals.value.bySize).toEqual({ S: 3, M: 7 })
+  })
+
+  it('只按当前可见尺码计算，隐藏旧键不得造成 5 显示成 10', () => {
+    const item = makeItem({ sizeQuantities: { OSFA: 5, S: 5 }, totalQty: 10 })
+    expect(packingItemTotal(item, ['OSFA'])).toBe(5)
+
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['OSFA']
+    grid.addBox()
+    grid.boxes.value[0].items[0] = item
+    expect(grid.totals.value.totalQty).toBe(5)
+    expect(grid.totals.value.bySize).toEqual({ OSFA: 5 })
+  })
+
+  it('可见尺码清零后为 0，旧 totalQty 和隐藏键都不能复活', () => {
+    const item = makeItem({ sizeQuantities: { OSFA: 5, S: 5 }, totalQty: 10 })
+    setPackingSizeQuantity(item, 'OSFA', 0)
+    expect(item.totalQty).toBe(0)
+    expect(packingItemTotal(item, ['OSFA'])).toBe(0)
+  })
+
+  it('加载历史异常时把表头外的正数尺码追加成可见列', () => {
+    expect(reconcilePackingSizeHeaders(['OSFA'], [
+      { items: [{ sizeQuantities: { OSFA: 5, S: 5, M: 0 } }] },
+    ])).toEqual({ sizeHeaders: ['OSFA', 'S'], appendedHeaders: ['S'] })
   })
 
   it('allocationBySource 同 source 同色跨箱累加', () => {

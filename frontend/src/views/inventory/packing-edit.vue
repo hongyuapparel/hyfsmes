@@ -274,8 +274,8 @@ function onAddSizeAt(index: number) {
   if (!grid.sizeHeaders.value[at]) packingGridRef.value?.focusSizeHeader(at)
 }
 
-function onRenameSize(index: number, oldName: string) {
-  if (grid.commitSizeHeader(index, oldName) === 'duplicate') ElMessage.warning('该尺码列已存在')
+function onRenameSize(index: number, newName: string) {
+  if (grid.commitSizeHeader(index, newName) === 'duplicate') ElMessage.warning('该尺码已存在或有未显示数量，请先核对')
 }
 
 async function onRemoveSizeAt(index: number) {
