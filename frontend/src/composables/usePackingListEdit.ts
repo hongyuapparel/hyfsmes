@@ -13,7 +13,6 @@ import { getAllCustomerCompanyOptions, getSalespeople, type CustomerItem } from 
 import {
   allocationKey,
   createEmptyPackingItem,
-  reconcilePackingSizeHeaders,
   type PackingItemDraft,
   usePackingGridRows,
 } from './usePackingGridRows'
@@ -61,7 +60,6 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
   }
 
   function applyDetail(data: PackingListDetail) {
-    const reconciled = reconcilePackingSizeHeaders(data.sizeHeaders, data.boxes)
     const normalized = normalizePackingDetail(data)
     const normalizedBoxes = normalized.boxes
     detail.value = normalized
@@ -78,9 +76,6 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     form.remark = data.remark
     form.showCompany = data.showCompany
     grid.sizeHeaders.value = [...normalized.sizeHeaders]
-    if (reconciled.appendedHeaders.length) {
-      ElMessage.warning(`检测到历史隐藏尺码数量，已显示对应列：${reconciled.appendedHeaders.join('、')}`)
-    }
     grid.boxes.value = normalizedBoxes.map((box, index) => ({
       key: `loaded-${data.id}-${box.id || index}`,
       weightKg: box.weightKg,

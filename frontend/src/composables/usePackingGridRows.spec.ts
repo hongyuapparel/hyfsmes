@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
   packingItemTotal,
-  reconcilePackingSizeHeaders,
   setPackingSizeQuantity,
   usePackingGridRows,
   type PackingItemDraft,
@@ -200,10 +199,16 @@ describe('usePackingGridRows', () => {
     expect(packingItemTotal(item, ['OSFA'])).toBe(0)
   })
 
-  it('加载历史异常时把表头外的正数尺码追加成可见列', () => {
-    expect(reconcilePackingSizeHeaders(['OSFA'], [
-      { items: [{ sizeQuantities: { OSFA: 5, S: 5, M: 0 } }] },
-    ])).toEqual({ sizeHeaders: ['OSFA', 'S'], appendedHeaders: ['S'] })
+  it('删除最后一个尺码后重新加同名列，不恢复数量或旧合计', () => {
+    const grid = usePackingGridRows()
+    grid.sizeHeaders.value = ['S']
+    grid.addBox()
+    grid.boxes.value[0].items[0] = makeItem({ sizeQuantities: { S: 5 }, totalQty: 10 })
+    grid.removeSizeColumnAt(0)
+    expect(grid.totals.value.totalQty).toBe(0)
+    grid.insertSizeHeader('S')
+    expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({})
+    expect(grid.totals.value.totalQty).toBe(0)
   })
 
   it('allocationBySource 同 source 同色跨箱累加', () => {

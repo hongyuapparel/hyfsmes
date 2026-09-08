@@ -3,7 +3,6 @@ import type { SavePackingListPayload } from '@/api/packing-lists'
 import {
   normalizePackingSizeQuantities,
   packingItemTotal,
-  reconcilePackingSizeHeaders,
   type PackingBoxDraft,
   type PackingItemDraft,
 } from './usePackingGridRows'
@@ -47,10 +46,6 @@ export function isEmptyManualRow(item: PackingItemDraft, sizeHeaders = Object.ke
 /** 把表单 + 网格组装成保存载荷：表头去空格、码列去空、空白手工行过滤、合计按尺码重算 */
 export function buildPayload(form: PackingForm, grid: PackingGridState): SavePackingListPayload {
   const sizeHeaders = Array.from(new Set(grid.sizeHeaders.value.map((h) => h.trim()).filter(Boolean)))
-  const { appendedHeaders } = reconcilePackingSizeHeaders(sizeHeaders, grid.boxes.value)
-  if (appendedHeaders.length) {
-    throw new Error(`存在未显示尺码数量：${appendedHeaders.join('、')}，请先补回对应尺码列并核对后保存`)
-  }
   return {
     customerId: form.customerId,
     customerName: form.customerName.trim(),

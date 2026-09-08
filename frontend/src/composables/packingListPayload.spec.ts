@@ -49,10 +49,12 @@ describe('packingListPayload', () => {
     expect(payload.boxes[0].items[0].totalQty).toBe(5)
   })
 
-  it('隐藏数量必须阻止保存，不能先过滤掉而绕过后端校验', () => {
-    expect(() => buildPayload(form(), {
+  it('表头外数量作为已删除数据清除，不能转成手填合计', () => {
+    const payload = buildPayload(form(), {
       sizeHeaders: ref(['OSFA']),
       boxes: ref([box({ S: 5 }, 10)]),
-    })).toThrow('存在未显示尺码数量：S')
+    })
+    expect(payload.boxes[0].items[0].sizeQuantities).toEqual({})
+    expect(payload.boxes[0].items[0].totalQty).toBe(0)
   })
 })

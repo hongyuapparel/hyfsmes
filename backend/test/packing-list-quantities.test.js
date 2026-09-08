@@ -6,6 +6,7 @@ const {
   formatUnexpectedPackingSizeQuantity,
   normalizePackingSizeQuantitiesForHeaders,
   sumPackingSizeQuantities,
+  packingQuantityTotal,
 } = require('../dist/packing-lists/packing-list-quantities');
 
 function boxes(sizeQuantities) {
@@ -39,8 +40,13 @@ test('零数量旧键不阻断，正数旧键必须阻断', () => {
   assert.equal(findUnexpectedPackingSizeQuantity(['OSFA'], boxes({ OSFA: 5 })), null);
 });
 
-test('无名正数不能静默丢弃，必须作为未命名尺码核对', () => {
-  const unexpected = findUnexpectedPackingSizeQuantity(['OSFA'], boxes({ '': 5, OSFA: 5 }));
-  assert.equal(unexpected.sizeName, '未命名尺码');
-  assert.equal(unexpected.quantity, 5);
+test('无名和已删除尺码不计数，也不能回退到旧合计', () => {
+  assert.deepEqual(normalizePackingSizeQuantitiesForHeaders({ '': 5, S: 4 }, ['OSFA']), {});
+  assert.equal(packingQuantityTotal({ '': 5, S: 4 }, 9, ['OSFA']), 0);
+  assert.equal(packingQuantityTotal({}, 9, ['OSFA']), 9);
+});
+
+test('表头明确保留的 S 和 0 是正常尺码，不得误删', () => {
+  assert.deepEqual(normalizePackingSizeQuantitiesForHeaders({ S: 4, '0': 5 }, ['S', '0']), { S: 4, '0': 5 });
+  assert.equal(packingQuantityTotal({ S: 4, '0': 5 }, 999, ['S', '0']), 9);
 });

@@ -3,7 +3,7 @@ import type { PickableLine } from '@/api/packing-lists'
 import { usePackingSizeHeaders } from './usePackingSizeHeaders'
 import { normalizePackingSizeQuantities, packingItemTotal } from './packingQuantities'
 export { normalizePackingSizeQuantities, packingItemTotal, packingItemHasSizeQuantity,
-  reconcilePackingSizeHeaders, sanitizePackingSizeQuantities, setPackingSizeQuantity } from './packingQuantities'
+  sanitizePackingSizeQuantities, setPackingSizeQuantity } from './packingQuantities'
 
 export interface PackingItemDraft {
   styleNo: string

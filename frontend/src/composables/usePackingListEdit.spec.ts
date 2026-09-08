@@ -21,19 +21,34 @@ function detail(): PackingListDetail {
 beforeEach(() => vi.clearAllMocks())
 
 describe('packing edit load/save boundary', () => {
-  it('load exposes legacy orphan quantities without mutating API response or saved print headers', () => {
+  it('load deletes orphan quantities without adding columns or mutating the API response', () => {
     const raw = detail()
     raw.boxes[0].items[0].sizeQuantities.S = 5
     const grid = usePackingGridRows(), edit = usePackingListEdit(grid)
     edit.applyDetail(raw)
-    expect(grid.sizeHeaders.value).toEqual(['OSFA', 'S'])
-    expect(grid.totals.value.totalQty).toBe(10)
-    expect(api.warning).toHaveBeenCalledOnce()
-    grid.removeSizeHeader('S')
+    expect(grid.sizeHeaders.value).toEqual(['OSFA'])
+    expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({ OSFA: 5 })
+    expect(api.warning).not.toHaveBeenCalled()
     expect(grid.totals.value.totalQty).toBe(5)
-    expect(edit.detail.value?.sizeHeaders).toEqual(['OSFA', 'S'])
+    expect(edit.detail.value?.sizeHeaders).toEqual(['OSFA'])
+    expect(edit.detail.value?.boxes[0].items[0].totalQty).toBe(5)
     expect(raw.sizeHeaders).toEqual(['OSFA'])
     expect(raw.boxes[0].items[0].sizeQuantities).toEqual({ OSFA: 5, S: 5 })
+  })
+
+  it('all removed sizes stay zero on load; legitimate S and 0 headers are retained', () => {
+    const raw = detail()
+    raw.boxes[0].items[0].sizeQuantities = { S: 4, '0': 5 }
+    raw.boxes[0].items[0].totalQty = 9
+    const grid = usePackingGridRows(), edit = usePackingListEdit(grid)
+    edit.applyDetail(raw)
+    expect(grid.sizeHeaders.value).toEqual(['OSFA'])
+    expect(grid.boxes.value[0].items[0].sizeQuantities).toEqual({})
+    expect(grid.totals.value.totalQty).toBe(0)
+    raw.sizeHeaders = ['S', '0']
+    edit.applyDetail(raw)
+    expect(grid.sizeHeaders.value).toEqual(['S', '0'])
+    expect(grid.totals.value.totalQty).toBe(9)
   })
 
   it('save/reload, clear to zero, save/reload, copy, delete column never resurrects old 5', async () => {

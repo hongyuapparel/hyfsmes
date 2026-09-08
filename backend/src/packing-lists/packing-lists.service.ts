@@ -10,10 +10,7 @@ import { resolveOperatorDisplayName } from '../common/operator.util';
 import { buildPackingListUpdateSummary } from './packing-list-log-summary';
 import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
 import {
-  findUnexpectedPackingSizeQuantity,
-  formatUnexpectedPackingSizeQuantity,
   normalizePackingSizeHeaders,
-  normalizePackingSizeQuantities,
   normalizePackingSizeQuantitiesForHeaders,
   packingQuantityTotal,
 } from './packing-list-quantities';
@@ -289,8 +286,8 @@ export class PackingListsService {
           styleName: item.styleName,
           colorName: item.colorName,
           imageUrl: item.imageUrl,
-          sizeQuantities: normalizePackingSizeQuantities(item.sizeQuantities),
-          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty),
+          sizeQuantities: normalizePackingSizeQuantitiesForHeaders(item.sizeQuantities, list.sizeHeaders ?? []),
+          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty, list.sizeHeaders ?? []),
           sourceType: item.sourceType,
           sourceId: item.sourceId,
         })),
@@ -314,7 +311,6 @@ export class PackingListsService {
   }
 
   async create(payload: SavePackingListDto, operatorUsername: string): Promise<{ id: number; code: string }> {
-    this.assertPayloadSizeQuantitiesVisible(payload);
     const now = new Date();
     const ymd = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
     // 并发下两个请求可能算出同一序号；靠 uniq_packing_lists_code 唯一索引报重复，捕获后重算重试。
@@ -397,8 +393,8 @@ export class PackingListsService {
           styleName: item.styleName,
           colorName: item.colorName,
           imageUrl: item.imageUrl,
-          sizeQuantities: normalizePackingSizeQuantities(item.sizeQuantities),
-          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty),
+          sizeQuantities: normalizePackingSizeQuantitiesForHeaders(item.sizeQuantities, list.sizeHeaders ?? []),
+          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty, list.sizeHeaders ?? []),
           sourceType: item.sourceType,
           sourceId: item.sourceId,
         })),
@@ -462,7 +458,6 @@ export class PackingListsService {
   // 已发货单也允许修改：发货后客户常要求改装箱方式（返箱/调箱/补录）。本方法只改单据本身
   // （表头 + 箱 + 明细），不触碰任何库存——库存只在 /ship 时扣减一次，已发货单的二次编辑不影响库存账。
   async update(id: number, payload: SavePackingListDto, operatorUsername = ''): Promise<void> {
-    this.assertPayloadSizeQuantitiesVisible(payload);
     const before = await this.getDetail(id);
     await this.listRepo.manager.transaction(async (manager) => {
       await manager.getRepository(PackingList).update({ id }, this.buildListColumns(payload));
@@ -557,7 +552,7 @@ export class PackingListsService {
     for (const box of boxes) {
       const items = Array.isArray(box.items) ? box.items : [];
       for (const item of items) {
-        totalQty += packingQuantityTotal(item.sizeQuantities, item.totalQty);
+        totalQty += packingQuantityTotal(item.sizeQuantities, item.totalQty, payload.sizeHeaders ?? []);
       }
     }
     return { boxCount: boxes.length, totalQty };
@@ -612,7 +607,7 @@ export class PackingListsService {
             colorName: (item.colorName ?? '').trim(),
             imageUrl: (item.imageUrl ?? '').trim(),
             sizeQuantities,
-            totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty),
+            totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty, sizeHeaders),
             sourceType: item.sourceType === 'pending' || item.sourceType === 'finished' ? item.sourceType : 'manual',
             sourceId: item.sourceId != null && Number.isInteger(Number(item.sourceId)) ? Number(item.sourceId) : null,
           });
@@ -621,8 +616,4 @@ export class PackingListsService {
     }
   }
 
-  private assertPayloadSizeQuantitiesVisible(payload: SavePackingListDto): void {
-    const unexpected = findUnexpectedPackingSizeQuantity(payload.sizeHeaders, payload.boxes);
-    if (unexpected) throw new BadRequestException(formatUnexpectedPackingSizeQuantity(unexpected));
-  }
 }

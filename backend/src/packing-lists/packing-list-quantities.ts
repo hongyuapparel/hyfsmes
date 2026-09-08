@@ -22,14 +22,14 @@ export function normalizePackingSizeHeaders(raw: unknown): string[] {
   return Array.from(new Set(raw.map((header) => String(header ?? '').trim()).filter(Boolean)));
 }
 
-/** 规范尺码数量；无名正数也必须显式核对，不能静默丢件。 */
+/** 规范尺码数量；无名数据不属于任何尺码列。 */
 export function normalizePackingSizeQuantities(raw: unknown): Record<string, number> {
   if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return {};
   const out: Record<string, number> = {};
   for (const [rawSize, rawValue] of Object.entries(raw as Record<string, unknown>)) {
-    const size = rawSize.trim() || '未命名尺码';
+    const size = rawSize.trim();
     const quantity = Number(rawValue);
-    if (!Number.isFinite(quantity) || quantity <= 0) continue;
+    if (!size || !Number.isFinite(quantity) || quantity <= 0) continue;
     out[size] = (out[size] ?? 0) + quantity;
   }
   return out;
@@ -54,15 +54,15 @@ export function sumPackingSizeQuantities(sizeQuantities: Record<string, number>)
 }
 
 /** totalQty 仅在完全无分码时手填；分码合计包括显式全零，不回退历史缓存。 */
-export function packingQuantityTotal(raw: unknown, totalQty: unknown): number {
+export function packingQuantityTotal(raw: unknown, totalQty: unknown, sizeHeaders: readonly string[]): number {
   if (raw && typeof raw === 'object' && !Array.isArray(raw) && Object.keys(raw).length) {
-    return sumPackingSizeQuantities(normalizePackingSizeQuantities(raw));
+    return sumPackingSizeQuantities(normalizePackingSizeQuantitiesForHeaders(raw, sizeHeaders));
   }
   const total = Number(totalQty);
   return Number.isFinite(total) ? Math.max(0, total) : 0;
 }
 
-/** 找到第一条“有数量但不在表头”的明细，供保存和发货入口统一阻断。 */
+/** 发货前检查内部数量一致性；正常读取和保存已清除表头外数据。 */
 export function findUnexpectedPackingSizeQuantity(
   sizeHeaders: unknown,
   boxes: PackingQuantityBoxLike[] | null | undefined,
