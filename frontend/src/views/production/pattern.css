@@ -28,9 +28,13 @@
   line-height: 20px;
 }
 
-.table-selection-count {
-  margin: 8px 0;
-  color: var(--el-text-color-secondary);
+.pattern-batch-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-bottom: var(--space-sm);
   font-size: var(--font-size-body);
 }
 

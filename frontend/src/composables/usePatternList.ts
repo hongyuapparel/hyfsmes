@@ -35,6 +35,7 @@ export function usePatternList() {
   const collaborationOptions = ref<{ id: number; label: string }[]>([])
 
   const filter = reactive({
+    onlyOverdue: false,
     orderNo: '',
     skuCode: '',
     patternMaster: '',
@@ -113,6 +114,7 @@ export function usePatternList() {
   function buildQuery(): PatternListQuery {
     const q: PatternListQuery = {
       tab: currentTab.value,
+      onlyOverdue: filter.onlyOverdue || undefined,
       orderNo: normalizeTextFilter(filter.orderNo),
       skuCode: normalizeTextFilter(filter.skuCode),
       patternMaster: normalizeTextFilter(filter.patternMaster),
@@ -225,6 +227,7 @@ export function usePatternList() {
   function onReset(loadFn: () => void) {
     orderNoLabelVisible.value = false
     skuCodeLabelVisible.value = false
+    filter.onlyOverdue = false
     filter.orderNo = ''
     filter.skuCode = ''
     filter.patternMaster = ''

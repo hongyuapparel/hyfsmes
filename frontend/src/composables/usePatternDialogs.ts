@@ -1,14 +1,15 @@
-import { computed, reactive, ref, type Ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
+import { computed, reactive, ref, watch, type Ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import {
-  assignPattern,
-  getPatternMaterials,
+  getPatternMaterials, getPatternLogs,
   savePatternMaterials,
   type PatternListItem,
   type PatternMaterialRow,
 } from '@/api/production-pattern'
 import { getStaffOptions, type StaffOptionItem } from '@/api/hr'
 import { getDictItems } from '@/api/dicts'
+import { usePatternAssignment } from './usePatternAssignment'
+import { toLogSectionItems } from '@/api/operation-logs'
 import { usePatternCompletion } from './usePatternCompletion'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { useAuthStore } from '@/stores/auth'
@@ -31,24 +32,19 @@ export function usePatternDialogs(
   labelFinders: LabelFinders,
 ) {
   const authStore = useAuthStore()
-  const canEditPatternMaterials = computed(() => authStore.hasPermission('production_pattern_materials'))
+  const canEditPatternMaterials = computed(() => authStore.hasPermission('production_pattern_materials') || authStore.hasPermission('production_admin_edit'))
 
-  const detailDrawer = reactive<{ visible: boolean; loading: boolean; saving: boolean; row: PatternListItem | null }>({
+  const detailDrawer = reactive<{ visible: boolean; loading: boolean; saving: boolean; loaded: boolean; row: PatternListItem | null }>({
     visible: false,
     loading: false,
     saving: false,
+    loaded: false,
     row: null,
   })
   const materialsForm = reactive<{ materials: PatternMaterialRow[]; remark: string }>({ materials: [], remark: '' })
   const materialTypeOptions = ref<{ id: number; label: string }[]>([])
 
-  const assignDialog = reactive<{ visible: boolean; submitting: boolean }>({ visible: false, submitting: false })
-  const assignFormRef = ref<FormInstance>()
-  const assignForm = reactive({ patternMaster: '', sampleMaker: '' })
-  const assignRules: FormRules = {
-    patternMaster: [{ required: true, message: '请选择纸样师', trigger: 'change' }],
-    sampleMaker: [{ required: true, message: '请选择车版师', trigger: 'change' }],
-  }
+  const assignment = usePatternAssignment(selectedRows, loaders)
   const patternMasterOptions = ref<StaffOptionItem[]>([])
   const sampleMakerOptions = ref<StaffOptionItem[]>([])
 
@@ -101,38 +97,91 @@ export function usePatternDialogs(
     materialsForm.materials.splice(index, 1)
   }
 
+  let materialsVersion: string | undefined
+  const patternDrawerLogsError = ref('')
+  let materialsRequest = 0
+  const materialsSnapshot = ref<{ materials: PatternMaterialRow[]; remark: string } | null>(null)
+  const hasUnsavedMaterials = computed(() => materialsSnapshot.value != null && JSON.stringify(materialsSnapshot.value) !== JSON.stringify(materialsForm))
+  function onEnterEdit() {
+    materialsSnapshot.value = JSON.parse(JSON.stringify(materialsForm)) as typeof materialsForm
+  }
+  function onCancelEdit() {
+    if (materialsSnapshot.value) Object.assign(materialsForm, materialsSnapshot.value)
+    materialsSnapshot.value = null
+  }
+  watch(() => detailDrawer.visible, (visible) => {
+    if (!visible) { materialsRequest++; detailDrawer.loaded = false; materialsSnapshot.value = null }
+  })
+  const patternDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
+  let logsRequest = 0
+  async function loadPatternDrawerLogs() {
+    const request = ++logsRequest
+    const row = detailDrawer.row
+    patternDrawerLogs.value = []
+    if (!row || !detailDrawer.visible) return
+    patternDrawerLogsError.value = ''
+    try {
+      const { data: logs } = await getPatternLogs(row.orderId)
+      if (request === logsRequest && detailDrawer.visible && detailDrawer.row?.orderId === row.orderId) patternDrawerLogs.value = toLogSectionItems(logs)
+    } catch {
+      if (request === logsRequest && detailDrawer.visible) patternDrawerLogsError.value = '操作记录加载失败，请关闭详情后重新打开。'
+    }
+  }
+  watch(() => [detailDrawer.row?.orderId, detailDrawer.visible], () => { void loadPatternDrawerLogs() })
+
+  watch(() => assignment.assignDialog.visible || completion.completeDialog.visible, (visible) => {
+    if (!visible && detailDrawer.visible) void loadPatternDrawerLogs()
+  })
+
   function onDetailDrawerClosed() {
+    if (detailDrawer.visible) return
+    materialsRequest++
+    detailDrawer.loaded = false
+    detailDrawer.loading = false
+    materialsSnapshot.value = null
     resetMaterialsForm()
     detailDrawer.row = null
   }
 
   async function openPatternDetailDrawer(row: PatternListItem) {
+    if (detailDrawer.saving) return
+    const request = ++materialsRequest
+    resetMaterialsForm()
+    materialsSnapshot.value = null
+    detailDrawer.loaded = false
     detailDrawer.row = row
     detailDrawer.visible = true
     detailDrawer.loading = true
     try {
       const res = await getPatternMaterials(row.orderId)
+      if (request !== materialsRequest || !detailDrawer.visible) return
       const data = res.data
+      materialsVersion = data?.version
       materialsForm.materials = (data?.materials ?? []).map(normalizePatternMaterialRow)
       materialsForm.remark = data?.remark ?? ''
+      detailDrawer.loaded = true
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载失败'))
+      if (request === materialsRequest && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载失败'))
     } finally {
-      detailDrawer.loading = false
+      if (request === materialsRequest) detailDrawer.loading = false
     }
   }
 
   async function submitMaterials(): Promise<boolean> {
-    if (!detailDrawer.row) return false
+    if (!detailDrawer.row || !detailDrawer.loaded || detailDrawer.loading || detailDrawer.saving) return false
     const payloadMaterials = (materialsForm.materials ?? [])
       .map(normalizePatternMaterialRow)
-      .filter((row) => row.materialTypeId != null || (row.materialName ?? '').trim().length > 0)
+      .filter((row) => row.materialTypeId != null || row.usagePerPiece != null || row.cuttingQuantity != null || [row.materialName, row.fabricWidth, row.remark].some((value) => (value ?? '').trim()))
     detailDrawer.saving = true
     try {
-      await savePatternMaterials(detailDrawer.row.orderId, {
+      const result = await savePatternMaterials(detailDrawer.row.orderId, {
         materials: payloadMaterials,
-        remark: materialsForm.remark ?? '',
+        remark: materialsForm.remark ?? '', expectedVersion: materialsVersion,
       })
+      materialsVersion = result.data?.version
+      materialsForm.materials = payloadMaterials
+      materialsSnapshot.value = JSON.parse(JSON.stringify(materialsForm)) as typeof materialsForm
+      void loadPatternDrawerLogs()
       ElMessage.success('已保存')
       return true
     } catch (e: unknown) {
@@ -140,42 +189,6 @@ export function usePatternDialogs(
       return false
     } finally {
       detailDrawer.saving = false
-    }
-  }
-
-  function openAssignDialog() {
-    if (selectedRows.value.length === 0) return
-    assignForm.patternMaster = selectedRows.value[0].patternMaster ?? ''
-    assignForm.sampleMaker = selectedRows.value[0].sampleMaker ?? ''
-    assignDialog.visible = true
-  }
-
-  function resetAssignForm() {
-    assignForm.patternMaster = ''
-    assignForm.sampleMaker = ''
-    assignFormRef.value?.clearValidate()
-  }
-
-  async function submitAssign() {
-    await assignFormRef.value?.validate().catch(() => {})
-    if (selectedRows.value.length === 0) return
-    assignDialog.submitting = true
-    try {
-      for (const row of selectedRows.value) {
-        await assignPattern({
-          orderId: row.orderId,
-          patternMaster: assignForm.patternMaster,
-          sampleMaker: assignForm.sampleMaker,
-        })
-      }
-      ElMessage.success('分配成功')
-      assignDialog.visible = false
-      await loaders.reloadList()
-      void loaders.reloadTabCounts()
-    } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '分配失败'))
-    } finally {
-      assignDialog.submitting = false
     }
   }
 
@@ -204,15 +217,21 @@ export function usePatternDialogs(
     }
   }
 
+  function completeFromDrawer() {
+    const row = detailDrawer.row
+    if (!row || !detailDrawer.loaded) return
+    if (hasUnsavedMaterials.value) { ElMessage.warning('请先保存用料，再确认完成'); return }
+    completion.openCompleteDialog([row], undefined, () => { detailDrawer.visible = false })
+  }
+
   return {
+    completeFromDrawer,
     canEditPatternMaterials,
+    hasUnsavedMaterials, onEnterEdit, onCancelEdit, patternDrawerLogs, patternDrawerLogsError,
     detailDrawer,
     materialsForm,
     materialTypeOptions,
-    assignDialog,
-    assignFormRef,
-    assignForm,
-    assignRules,
+    ...assignment,
     patternMasterOptions,
     sampleMakerOptions,
     ...completion,
@@ -222,9 +241,6 @@ export function usePatternDialogs(
     onDetailDrawerClosed,
     openPatternDetailDrawer,
     submitMaterials,
-    openAssignDialog,
-    resetAssignForm,
-    submitAssign,
     loadPatternStaffOptions,
     loadMaterialTypes,
   }

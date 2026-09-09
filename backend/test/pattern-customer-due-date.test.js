@@ -72,3 +72,36 @@ test('CSV 导出包含到纸样时间、交期判定、依据，且状态显示�
   assert.match(csv, /未超期/);
   assert.match(csv, /样品完成/);
 });
+
+
+test('超期天数按自然日计算，跨月与跨年正确，缺日期返回空', () => {
+  assert.equal(judge('2026-09-01', '2026-09-03 01:00:00', true).overdueDays, 2);
+  assert.equal(judge('2026-09-03', '2026-09-03 23:59:59', true).overdueDays, 0);
+  assert.equal(judge('2026-08-31', '2026-09-02', true).overdueDays, 2);
+  assert.equal(judge('2026-12-31', null, false, new Date('2027-01-02T00:00:00+08:00')).overdueDays, 2);
+  assert.equal(judge(null, null, false).overdueDays, null);
+});
+
+test('仅看超期对列表、统计与导出一致，清空恢复，已完成不可分配', async () => {
+  const service = createService();
+  const result = await service.getPatternList({ onlyOverdue: true });
+  assert.equal(result.total, 1);
+  assert.equal(result.totalQuantity, 2);
+  assert.equal(result.list[0].orderNo, 'LATE');
+  assert.equal(result.list[0].overdueDays, 1);
+  assert.equal(result.list[0].canAssign, false);
+  assert.equal((await service.getPatternTabCounts({ onlyOverdue: true })).all, 1);
+  assert.equal((await service.getPatternExportRows({ onlyOverdue: true })).length, 1);
+  assert.equal((await service.getPatternList({ onlyOverdue: false })).total, 2);
+});
+
+test('超期排序按数字而非文字，空值最后，先排序后分页，导出顺序一致', async () => {
+  const service = createService();
+  service.buildPatternRows = async () => [2, 10, null, 0, 1].map((overdueDays, index) => ({ orderId: index, overdueDays, quantity: 1 }));
+  const asc = await service.getPatternList({ sortField: 'overdueDays', sortOrder: 'asc', pageSize: 100 });
+  assert.deepEqual(asc.list.map(r => r.overdueDays), [0, 1, 2, 10, null]);
+  const desc = await service.getPatternList({ sortField: 'overdueDays', sortOrder: 'desc', page: 2, pageSize: 2 });
+  assert.deepEqual(desc.list.map(r => r.overdueDays), [1, 0]);
+  const exported = await service.getPatternExportRows({ sortField: 'overdueDays', sortOrder: 'desc' });
+  assert.deepEqual(exported.map(r => r.overdueDays), [10, 2, 1, 0, null]);
+});

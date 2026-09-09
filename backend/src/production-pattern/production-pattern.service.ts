@@ -1,7 +1,9 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { validatePatternMaterials, patternMaterialsVersion } from './pattern-material-validation';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Brackets, In, IsNull, Repository } from 'typeorm';
+import { Brackets, EntityManager, In, IsNull, Repository } from 'typeorm';
 import { Order } from '../entities/order.entity';
+import { SystemOption } from '../entities/system-option.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderWorkflowService } from '../order-workflow/order-workflow.service';
@@ -40,9 +42,12 @@ export interface PatternListItem {
   /** 按客户交期判断纸样完成是否超期 */
   timeRating: string;
   timeRatingReason: string;
+  overdueDays: number | null;
+  canAssign: boolean;
 }
 
 export interface PatternListQuery {
+  onlyOverdue?: boolean;
   tab?: string;
   orderNo?: string;
   skuCode?: string;
@@ -119,13 +124,15 @@ export class ProductionPatternService {
   }
 
   /** 状态变更时写入流转历史，供各模块读取进入时间 */
-  private async appendStatusHistory(orderId: number, statusCode: string): Promise<void> {
+  private async appendStatusHistory(orderId: number, statusCode: string, manager?: EntityManager): Promise<void> {
     const code = (statusCode ?? '').trim();
     if (!code) return;
-    const status = await this.orderStatusRepo.findOne({ where: { code } });
+    const statusRepo = manager?.getRepository(OrderStatus) ?? this.orderStatusRepo;
+    const historyRepo = manager?.getRepository(OrderStatusHistory) ?? this.orderStatusHistoryRepo;
+    const status = await statusRepo.findOne({ where: { code } });
     if (!status) return;
-    await this.orderStatusHistoryRepo.save(
-      this.orderStatusHistoryRepo.create({ orderId, statusId: status.id }),
+    await historyRepo.save(
+      historyRepo.create({ orderId, statusId: status.id }),
     );
   }
 
@@ -251,14 +258,14 @@ export class ProductionPatternService {
     }));
   }
 
-  async getPatternMaterials(orderId: number): Promise<{ materials: PatternMaterialRow[]; remark: string | null }> {
+  async getPatternMaterials(orderId: number): Promise<{ materials: PatternMaterialRow[]; remark: string | null; version: string }> {
     const order = await this.orderRepo.findOne({ where: { id: orderId } });
     if (!order) throw new NotFoundException('订单不存在');
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
     const colsReady = await this.hasPatternMaterialsColumns();
     if (!colsReady) {
       const materials = this.mapOrderMaterialsToPatternMaterials(ext?.materials ?? null);
-      return { materials, remark: null };
+      return { materials, remark: null, version: patternMaterialsVersion(null, null) };
     }
     const pattern = await this.patternRepo
       .createQueryBuilder('p')
@@ -268,7 +275,7 @@ export class ProductionPatternService {
     const saved = pattern?.materialsJson;
     const materials = Array.isArray(saved) ? (saved as PatternMaterialRow[]) : this.mapOrderMaterialsToPatternMaterials(ext?.materials ?? null);
     const remark = pattern?.materialsRemark ?? null;
-    return { materials, remark };
+    return { materials, remark, version: patternMaterialsVersion(saved, remark) };
   }
 
   async savePatternMaterials(
@@ -276,34 +283,40 @@ export class ProductionPatternService {
     materials: PatternMaterialRow[],
     remark?: string | null,
     actor?: { userId?: number; username?: string },
-  ): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('订单不存在');
-    const colsReady = await this.hasPatternMaterialsColumns();
-    if (!colsReady) {
-      throw new BadRequestException('数据库缺少纸样物料字段，请先执行脚本：backend/scripts/add-order-pattern-materials-json.sql');
-    }
-    let pattern = await this.patternRepo.findOne({ where: { orderId } });
-    const materialsBeforeSave = pattern?.materialsJson;
-    const remarkBeforeSave = pattern?.materialsRemark ?? null;
-    const hadUsageBefore =
-      Array.isArray(materialsBeforeSave) &&
-      (materialsBeforeSave as PatternMaterialRow[]).some((m) => {
-        const u = m.usagePerPiece;
-        return u != null && Number.isFinite(Number(u));
-      });
-    if (!pattern) {
-      pattern = this.patternRepo.create({ orderId, status: 'pending_assign' });
-    }
-    pattern.materialsJson = Array.isArray(materials) ? (materials as unknown as typeof pattern.materialsJson) : [];
-    pattern.materialsRemark = remark?.trim() || null;
-    await this.patternRepo.save(pattern);
+    expectedVersion?: string,
+  ): Promise<{ version: string }> {
+    return this.orderRepo.manager.transaction(async manager => {
+      const orderRepo = manager.getRepository(Order);
+      const patternRepo = manager.getRepository(OrderPattern);
+      const orderLogRepo = manager.getRepository(OrderOperationLog);
+      const order = await orderRepo.findOne({ where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!order) throw new NotFoundException('订单不存在');
+      const colsReady = await this.hasPatternMaterialsColumns();
+      if (!colsReady) {
+        throw new BadRequestException('数据库缺少纸样物料字段，请先执行脚本：backend/scripts/add-order-pattern-materials-json.sql');
+      }
+      let pattern = await patternRepo.createQueryBuilder('p')
+        .addSelect(['p.materialsJson', 'p.materialsRemark'])
+        .where('p.orderId = :orderId', { orderId }).getOne();
+      if (expectedVersion != null && expectedVersion !== patternMaterialsVersion(pattern?.materialsJson, pattern?.materialsRemark)) {
+        throw new ConflictException('这张订单的用料已被其他人修改。当前输入已保留，请先核对最新资料后再保存。');
+      }
+      if (pattern?.status === 'completed') validatePatternMaterials(materials);
+      const materialsBeforeSave = pattern?.materialsJson;
+      const remarkBeforeSave = pattern?.materialsRemark ?? null;
+      if (!pattern) {
+        pattern = patternRepo.create({ orderId, status: 'pending_assign' });
+      }
+      pattern.materialsJson = Array.isArray(materials) ? (materials as unknown as typeof pattern.materialsJson) : [];
+      pattern.materialsRemark = remark?.trim() || null;
+      await patternRepo.save(pattern);
 
-    const isFirstSave = !hadUsageBefore;
-    try {
+      const isFirstSave = !Array.isArray(materialsBeforeSave);
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
+      const materialTypes = await manager.getRepository(SystemOption).find({ where: { optionType: 'material_types' } });
+      const typeName = (id: number) => materialTypes.find(type => type.id === id)?.value ?? `已停用类型(${id})`;
       const formatMaterials = (rows: PatternMaterialRow[]) => rows
-        .map((m) => `${m.materialName ?? '-'} ${m.usagePerPiece ?? '-'}${m.fabricWidth ? `（门幅${m.fabricWidth}）` : ''}`)
+        .map((m) => `${m.materialName ?? '-'} ${m.usagePerPiece ?? '-'}${m.materialTypeId != null ? `，类型${typeName(m.materialTypeId)}` : ''}${m.fabricWidth ? `（门幅${m.fabricWidth}）` : ''}${m.cuttingQuantity != null ? `，裁片${m.cuttingQuantity}` : ''}${m.remark ? `，备注${m.remark}` : ''}`)
         .join(' / ') || '无';
       const beforeSummary = formatMaterials(Array.isArray(materialsBeforeSave) ? materialsBeforeSave as PatternMaterialRow[] : []);
       const summary = formatMaterials(materials);
@@ -312,8 +325,8 @@ export class ProductionPatternService {
       const detail = isFirstSave
         ? `${verbCN}纸样用量：${summary}；备注：${remark?.trim() || '-'}`
         : `${verbCN}纸样用量：${beforeSummary}→${summary}；备注：${remarkBeforeSave || '-'}→${remark?.trim() || '-'}`;
-      await this.orderLogRepo.save(
-        this.orderLogRepo.create({
+      await orderLogRepo.save(
+        orderLogRepo.create({
           orderId,
           orderNo: order.orderNo,
           operatorUsername: operator,
@@ -323,9 +336,8 @@ export class ProductionPatternService {
           targetRef: null,
         }),
       );
-    } catch (err) {
-      console.warn('[pattern] write operation log failed:', err);
-    }
+      return { version: patternMaterialsVersion(pattern.materialsJson, pattern.materialsRemark) };
+    });
   }
 
   private async buildPatternRows(baseQuery: PatternListQuery): Promise<PatternListItem[]> {
@@ -421,12 +433,14 @@ export class ProductionPatternService {
         this.toDateTimeLocalString(order.statusTime) ??
         this.toDateTimeLocalString(pattern?.completedAt ?? null);
 
-      const { timeRating, timeRatingReason } = judgePatternCustomerDueDate(
+      const { timeRating, timeRatingReason, overdueDays } = judgePatternCustomerDueDate(
         this.toDateOnlyLocalString(order.customerDueDate),
         this.toDateTimeLocalString(pattern?.completedAt),
         pStatus === 'completed',
         now,
       );
+
+      if (baseQuery.onlyOverdue && !(overdueDays != null && overdueDays > 0)) continue;
 
       rows.push({
         orderId: order.id,
@@ -453,10 +467,25 @@ export class ProductionPatternService {
         sampleImageUrl: pattern?.sampleImageUrl ?? '',
         timeRating,
         timeRatingReason,
+        overdueDays,
+        canAssign: order.status === 'pending_pattern' && pStatus !== 'completed',
       });
     }
 
     return rows;
+  }
+
+  private sortPatternRows(rows: PatternListItem[], query: PatternListQuery): PatternListItem[] {
+    if (query.sortField === 'overdueDays' && (query.sortOrder === 'asc' || query.sortOrder === 'desc')) {
+      const direction = query.sortOrder === 'asc' ? 1 : -1;
+      return [...rows].sort((a, b) => {
+        if (a.overdueDays === b.overdueDays) return 0;
+        if (a.overdueDays == null) return 1;
+        if (b.overdueDays == null) return -1;
+        return (a.overdueDays - b.overdueDays) * direction;
+      });
+    }
+    return applyRowSort(rows, query.sortField, query.sortOrder, ['orderDate', 'arrivedAtPattern', 'completedAt']);
   }
 
   async getPatternList(query: PatternListQuery, actorUserId?: number): Promise<{
@@ -469,7 +498,7 @@ export class ProductionPatternService {
     this.schedulePatternReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
     const allRows = await this.buildPatternRows(query);
-    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['orderDate', 'arrivedAtPattern', 'completedAt']);
+    const rows = this.sortPatternRows(allRows, query);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
@@ -488,7 +517,7 @@ export class ProductionPatternService {
 
   async getPatternExportRows(query: PatternListQuery, actorUserId?: number): Promise<PatternListItem[]> {
     this.schedulePatternReconcile(actorUserId);
-    return this.buildPatternRows(query);
+    return this.sortPatternRows(await this.buildPatternRows(query), query);
   }
 
   async assignPattern(
@@ -497,37 +526,42 @@ export class ProductionPatternService {
     sampleMaker: string,
     actor?: { userId?: number; username?: string },
   ): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) {
-      throw new NotFoundException('订单不存在');
-    }
-    if (order.status !== 'pending_pattern') {
-      throw new NotFoundException('仅待纸样订单可分配');
-    }
+    return this.orderRepo.manager.transaction(async manager => {
+      const orderRepo = manager.getRepository(Order);
+      const patternRepo = manager.getRepository(OrderPattern);
+      const orderLogRepo = manager.getRepository(OrderOperationLog);
+      const order = await orderRepo.findOne({ where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!order) {
+        throw new NotFoundException('订单不存在');
+      }
+      if (order.status !== 'pending_pattern') {
+        throw new NotFoundException('仅待纸样订单可分配');
+      }
 
-    let pattern = await this.patternRepo.findOne({ where: { orderId } });
-    const beforePatternMaster = pattern?.patternMaster ?? '';
-    const beforeSampleMaker = pattern?.sampleMaker ?? '';
-    if (!pattern) {
-      pattern = this.patternRepo.create({
-        orderId,
-        patternMaster: patternMaster.trim(),
-        sampleMaker: sampleMaker.trim(),
-        status: 'in_progress',
-      });
-    } else {
-      pattern.patternMaster = patternMaster.trim();
-      pattern.sampleMaker = sampleMaker.trim();
-      pattern.status = 'in_progress';
-    }
-    await this.patternRepo.save(pattern);
-    try {
+      let pattern = await patternRepo.findOne({ where: { orderId } });
+      if (pattern?.status === 'completed') throw new BadRequestException('纸样已完成，请刷新后查看');
+      if (!patternMaster?.trim() || !sampleMaker?.trim()) throw new BadRequestException('请选择纸样师和车版师');
+      const beforePatternMaster = pattern?.patternMaster ?? '';
+      const beforeSampleMaker = pattern?.sampleMaker ?? '';
+      if (!pattern) {
+        pattern = patternRepo.create({
+          orderId,
+          patternMaster: patternMaster.trim(),
+          sampleMaker: sampleMaker.trim(),
+          status: 'in_progress',
+        });
+      } else {
+        pattern.patternMaster = patternMaster.trim();
+        pattern.sampleMaker = sampleMaker.trim();
+        pattern.status = 'in_progress';
+      }
+      await patternRepo.save(pattern);
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
       const isEdit = !!beforePatternMaster || !!beforeSampleMaker;
       const detail = isEdit
-        ? `修改纸样分配：纸样师 ${beforePatternMaster || '-'}→${pattern.patternMaster || '-'}；样衣工 ${beforeSampleMaker || '-'}→${pattern.sampleMaker || '-'}`
-        : `纸样分配：纸样师 ${pattern.patternMaster || '-'}；样衣工 ${pattern.sampleMaker || '-'}`;
-      await this.orderLogRepo.save(this.orderLogRepo.create({
+        ? `修改纸样分配：纸样师 ${beforePatternMaster || '-'}→${pattern.patternMaster || '-'}；车版师 ${beforeSampleMaker || '-'}→${pattern.sampleMaker || '-'}`
+        : `纸样分配：纸样师 ${pattern.patternMaster || '-'}；车版师 ${pattern.sampleMaker || '-'}`;
+      await orderLogRepo.save(orderLogRepo.create({
         orderId,
         orderNo: order.orderNo,
         operatorUsername: operator,
@@ -536,9 +570,43 @@ export class ProductionPatternService {
         targetType: 'order',
         targetRef: null,
       }));
-    } catch (err) {
-      console.warn('[pattern assign] write operation log failed:', err);
+    });
+  }
+
+  async getPatternLogs(orderId: number) {
+    return this.orderLogRepo.createQueryBuilder('log')
+      .where('log.orderId = :orderId', { orderId })
+      .andWhere('log.action IN (:...actions)', { actions: ['production_pattern_save', 'production_pattern_update', 'production_pattern_assign', 'production_pattern_complete', 'production_pattern_admin_edit'] })
+      .orderBy('log.createdAt', 'DESC').addOrderBy('log.id', 'DESC').limit(200).getMany();
+  }
+
+  async checkCompletion(orderIds: number[]) {
+    if (!Array.isArray(orderIds) || !orderIds.length || orderIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+      throw new BadRequestException('请选择有效的订单');
     }
+    const ids = [...new Set(orderIds)];
+    const orders = await this.orderRepo.find({ where: { id: In(ids) } });
+    const patterns = await this.patternRepo.createQueryBuilder('p').addSelect('p.materialsJson')
+      .where('p.orderId IN (:...ids)', { ids }).getMany();
+    const issues: Array<{ orderId: number; message: string }> = [];
+    for (const orderId of ids) {
+      const order = orders.find(item => item.id === orderId);
+      const pattern = patterns.find(item => item.orderId === orderId);
+      if (!order || order.status !== 'pending_pattern' || pattern?.status === 'completed') {
+        issues.push({ orderId, message: '订单状态已变化，请重新搜索后操作' });
+        continue;
+      }
+      try {
+        validatePatternMaterials(pattern?.materialsJson as PatternMaterialRow[] | null);
+        const next = await this.orderWorkflowService.resolveNextStatus({ order, triggerCode: 'pattern_completed', actorUserId: 0 });
+        if (!next) throw new BadRequestException('未匹配到纸样完成流程，请联系负责人检查订单流程设置');
+      }
+      catch (error) {
+        if (!(error instanceof BadRequestException)) throw error;
+        issues.push({ orderId, message: error.message });
+      }
+    }
+    return { issues };
   }
 
   async completePattern(
@@ -546,50 +614,58 @@ export class ProductionPatternService {
     sampleImageUrl: string,
     actor?: { userId?: number; username?: string },
   ): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) {
-      throw new NotFoundException('订单不存在');
-    }
-    if (order.status !== 'pending_pattern') {
-      throw new NotFoundException('仅待纸样订单可确认完成');
-    }
+    return this.orderRepo.manager.transaction(async manager => {
+      const orderRepo = manager.getRepository(Order);
+      const patternRepo = manager.getRepository(OrderPattern);
+      const orderLogRepo = manager.getRepository(OrderOperationLog);
+      const order = await orderRepo.findOne({ where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!order) {
+        throw new NotFoundException('订单不存在');
+      }
+      if (order.status !== 'pending_pattern') {
+        throw new NotFoundException('仅待纸样订单可确认完成');
+      }
 
-    const next = await this.orderWorkflowService.resolveNextStatus({
-      order,
-      triggerCode: 'pattern_completed',
-      actorUserId: actor?.userId ?? 0,
-    });
-    if (!next) {
-      throw new BadRequestException('未匹配到“纸样完成”流转规则，请先在订单设置中检查流程链路配置');
-    }
+      const savedMaterials = await patternRepo.createQueryBuilder('p')
+        .addSelect('p.materialsJson').where('p.orderId = :orderId', { orderId }).getOne();
+      if (savedMaterials?.status === 'completed') throw new BadRequestException('纸样已完成，请勿重复操作');
+      validatePatternMaterials(savedMaterials?.materialsJson as PatternMaterialRow[] | null);
 
-    let pattern = await this.patternRepo.findOne({ where: { orderId } });
-    if (!pattern) {
-      pattern = this.patternRepo.create({
-        orderId,
-        patternMaster: '',
-        sampleMaker: '',
-        status: 'completed',
-        completedAt: new Date(),
-        sampleImageUrl: (sampleImageUrl ?? '').trim(),
+      const next = await this.orderWorkflowService.resolveNextStatus({
+        order,
+        triggerCode: 'pattern_completed',
+        actorUserId: actor?.userId ?? 0,
       });
-    } else {
-      pattern.status = 'completed';
-      pattern.completedAt = new Date();
-      pattern.sampleImageUrl = (sampleImageUrl ?? '').trim();
-    }
-    await this.patternRepo.save(pattern);
+      if (!next) {
+        throw new BadRequestException('未匹配到“纸样完成”流转规则，请先在订单设置中检查流程链路配置');
+      }
 
-    const beforeStatus = order.status;
-    if (next && next !== order.status) {
-      order.status = next;
-      order.statusTime = new Date();
-      await this.orderRepo.save(order);
-      await this.appendStatusHistory(order.id, next);
-    }
-    try {
+      let pattern = await patternRepo.findOne({ where: { orderId } });
+      if (!pattern) {
+        pattern = patternRepo.create({
+          orderId,
+          patternMaster: '',
+          sampleMaker: '',
+          status: 'completed',
+          completedAt: new Date(),
+          sampleImageUrl: (sampleImageUrl ?? '').trim(),
+        });
+      } else {
+        pattern.status = 'completed';
+        pattern.completedAt = new Date();
+        pattern.sampleImageUrl = (sampleImageUrl ?? '').trim();
+      }
+      await patternRepo.save(pattern);
+
+      const beforeStatus = order.status;
+      if (next && next !== order.status) {
+        order.status = next;
+        order.statusTime = new Date();
+        await orderRepo.save(order);
+        await this.appendStatusHistory(order.id, next, manager);
+      }
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
-      await this.orderLogRepo.save(this.orderLogRepo.create({
+      await orderLogRepo.save(orderLogRepo.create({
         orderId,
         orderNo: order.orderNo,
         operatorUsername: operator,
@@ -598,9 +674,7 @@ export class ProductionPatternService {
         targetType: 'order',
         targetRef: null,
       }));
-    } catch (err) {
-      console.warn('[pattern complete] write operation log failed:', err);
-    }
+    });
   }
 
   /** 纠错：编辑已完成纸样的样衣图等字段，不推进主状态 */
@@ -609,20 +683,23 @@ export class ProductionPatternService {
     sampleImageUrl: string,
     actor?: { userId?: number; username?: string },
   ): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) throw new NotFoundException('订单不存在');
-    const pattern = await this.patternRepo.findOne({ where: { orderId } });
-    if (!pattern || String(pattern.status ?? '').toLowerCase() !== 'completed') {
-      throw new NotFoundException('仅已完成纸样的订单可纠错编辑');
-    }
-    const before = pattern.sampleImageUrl ?? '';
-    pattern.sampleImageUrl = (sampleImageUrl ?? '').trim();
-    await this.patternRepo.save(pattern);
+    return this.orderRepo.manager.transaction(async manager => {
+      const orderRepo = manager.getRepository(Order);
+      const patternRepo = manager.getRepository(OrderPattern);
+      const orderLogRepo = manager.getRepository(OrderOperationLog);
+      const order = await orderRepo.findOne({ where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
+      if (!order) throw new NotFoundException('订单不存在');
+      const pattern = await patternRepo.findOne({ where: { orderId } });
+      if (!pattern || String(pattern.status ?? '').toLowerCase() !== 'completed') {
+        throw new NotFoundException('仅已完成纸样的订单可纠错编辑');
+      }
+      const before = pattern.sampleImageUrl ?? '';
+      pattern.sampleImageUrl = (sampleImageUrl ?? '').trim();
+      await patternRepo.save(pattern);
 
-    try {
       const operator = await resolveOperatorDisplayName(this.userRepo, actor ?? {});
-      await this.orderLogRepo.save(
-        this.orderLogRepo.create({
+      await orderLogRepo.save(
+        orderLogRepo.create({
           orderId,
           orderNo: order.orderNo,
           operatorUsername: operator,
@@ -632,8 +709,6 @@ export class ProductionPatternService {
           targetRef: null,
         }),
       );
-    } catch (err) {
-      console.warn('[pattern edit] write operation log failed:', err);
-    }
+    });
   }
 }

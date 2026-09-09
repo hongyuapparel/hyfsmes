@@ -1,6 +1,6 @@
 import { reactive, ref, type Ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { completePattern, editCompletedPattern, type PatternListItem } from '@/api/production-pattern'
+import { checkPatternCompletion, completePattern, editCompletedPattern, type PatternListItem } from '@/api/production-pattern'
 import { uploadImage } from '@/api/uploads'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
@@ -18,18 +18,23 @@ export function usePatternCompletion(
   const sampleImageFileInputRef = ref<HTMLInputElement | null>(null)
   const sampleImageUploading = ref(false)
 
-  function openCompleteDialog() {
-    const rows = selectedRows.value
+  let beforeComplete: (() => Promise<boolean>) | undefined
+  let afterComplete: (() => void) | undefined
+  function openCompleteDialog(rows = selectedRows.value, before?: () => Promise<boolean>, after?: () => void) {
     if (!rows.length || rows.some((row) => row.patternStatus === 'completed')) return
+    beforeComplete = before
+    afterComplete = after
     Object.assign(completeDialog, {
       mode: 'complete', row: rows[0], rows: [...rows], batch: rows.length > 1, error: '', visible: true,
     })
     completeForm.sampleImageUrl = rows[0].sampleImageUrl ?? ''
   }
 
-  function openEditCompletedDialog() {
-    if (selectedRows.value.length !== 1 || selectedRows.value[0].patternStatus !== 'completed') return
-    const row = selectedRows.value[0]
+  function openEditCompletedDialog(rows = selectedRows.value) {
+    beforeComplete = undefined
+    afterComplete = undefined
+    if (rows.length !== 1 || rows[0].patternStatus !== 'completed') return
+    const row = rows[0]
     Object.assign(completeDialog, { mode: 'edit', row, rows: [row], batch: false, error: '', visible: true })
     completeForm.sampleImageUrl = row.sampleImageUrl ?? ''
   }
@@ -71,6 +76,17 @@ export function usePatternCompletion(
     const editing = completeDialog.mode === 'edit'
     let succeeded = 0
     try {
+      if (!editing && beforeComplete && !await beforeComplete()) return
+      if (!editing) {
+        const { data } = await checkPatternCompletion(completeDialog.rows.map(row => row.orderId))
+        if (data.issues.length) {
+          completeDialog.error = '尚未完成任何订单，请先补齐以下问题：\n' + data.issues.map(issue => {
+            const row = completeDialog.rows.find(item => item.orderId === issue.orderId)
+            return `订单 ${row?.orderNo ?? issue.orderId}：${issue.message}`
+          }).join('\n')
+          return
+        }
+      }
       // 成功后移出待处理快照；失败重试不会重复提交前面已成功的订单。
       while (completeDialog.rows.length) {
         const row = completeDialog.rows[0]
@@ -80,11 +96,13 @@ export function usePatternCompletion(
         }
         if (editing) await editCompletedPattern(payload)
         else await completePattern(payload)
+        row.sampleImageUrl = payload.sampleImageUrl
         completeDialog.rows.shift()
         succeeded++
         selectedRows.value = selectedRows.value.filter((selected) => selected.orderId !== row.orderId)
       }
       completeDialog.visible = false
+      afterComplete?.()
       ElMessage.success(editing ? '已保存纸样纠错（主状态未改）' : `已完成 ${succeeded} 张订单的纸样`)
     } catch (error) {
       completeDialog.error = `本次成功 ${succeeded} 张；订单 ${completeDialog.rows[0]?.orderNo ?? ''} 处理失败，剩余 ${completeDialog.rows.length} 张未确认成功。${getErrorMessage(error, '操作失败')}。可重试剩余订单。`
