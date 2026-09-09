@@ -63,13 +63,13 @@
             </el-tooltip>
             <el-input
               :ref="(el) => setSizeHeaderRef(el, sIndex)"
-              v-model="sizeHeaders[sIndex]"
+              :model-value="headerDrafts[sIndex] ?? size"
               size="small"
               placeholder="码"
               class="size-header-input"
               :input-style="{ textAlign: 'center' }"
-              @focus="onSizeHeaderFocus(sIndex)"
-              @change="onSizeHeaderChange(sIndex)"
+              @update:model-value="headerDrafts[sIndex] = $event"
+              @change="onSizeHeaderChange(sIndex, $event)"
               @keydown.enter.stop="blurEvent"
               @click.stop
             />
@@ -87,7 +87,7 @@
           :model-value="row.item.sizeQuantities[size] ?? undefined"
           :min="0"
           :controls="false"
-          :disabled="disabled"
+          :disabled="disabled || !size.trim()"
           class="qty-input"
           placeholder=""
           @update:model-value="setSizeQty(row.item, size, $event)"
@@ -96,7 +96,7 @@
     </el-table-column>
     <el-table-column width="92" label="合计" align="center" header-align="center">
       <template #default="{ row }">
-        <span v-if="hasSizeQty(row.item)">{{ formatDisplayNumber(packingItemTotal(row.item)) }}</span>
+        <span v-if="hasSizeQty(row.item)">{{ formatDisplayNumber(packingItemTotal(row.item, sizeHeaders)) }}</span>
         <el-input-number
           v-else
           v-model="row.item.totalQty"
@@ -166,13 +166,18 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, ref } from 'vue'
+import { nextTick, reactive, ref } from 'vue'
 import { CircleClose, CopyDocument, Delete, Plus, ShoppingCart } from '@element-plus/icons-vue'
 import type { InputInstance } from 'element-plus'
 import ImageUploadArea from '@/components/ImageUploadArea.vue'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
-import { packingItemTotal, type PackingFlatRow, type PackingItemDraft } from '@/composables/usePackingGridRows'
+import {
+  packingItemHasSizeQuantity as hasSizeQty,
+  packingItemTotal,
+  setPackingSizeQuantity as setSizeQty,
+  type PackingFlatRow,
+} from '@/composables/usePackingGridRows'
 import { useGridKeyboardNav } from '@/composables/useGridKeyboardNav'
 import { usePackingGridLayout } from '@/composables/usePackingGridLayout'
 
@@ -194,7 +199,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   'add-size-at': [index: number]
-  'rename-size': [index: number, oldName: string]
+  'rename-size': [index: number, newName: string]
   'remove-size-at': [index: number]
   'copy-box': [boxIndex: number]
   'remove-box': [boxIndex: number]
@@ -204,19 +209,18 @@ const emit = defineEmits<{
 }>()
 
 const sizeHeaderRefs = new Map<number, InputInstance>()
-let editingOldName = ''
+const headerDrafts = reactive<Record<number, string>>({})
 
 function setSizeHeaderRef(el: unknown, index: number): void {
   if (el) sizeHeaderRefs.set(index, el as InputInstance)
   else sizeHeaderRefs.delete(index)
 }
 
-function onSizeHeaderFocus(index: number): void {
-  editingOldName = props.sizeHeaders[index] ?? ''
-}
-
-function onSizeHeaderChange(index: number): void {
-  emit('rename-size', index, editingOldName)
+async function onSizeHeaderChange(index: number, newName: string): Promise<void> {
+  emit('rename-size', index, newName)
+  // 等本次输入值渲染后再恢复为已提交的表头，重复/空名称被拒绝时输入框也能正确回退。
+  await nextTick()
+  delete headerDrafts[index]
 }
 
 function blurEvent(e: Event): void {
@@ -229,15 +233,6 @@ async function focusSizeHeader(index: number): Promise<void> {
 }
 
 defineExpose({ focusSizeHeader })
-
-function hasSizeQty(item: PackingItemDraft): boolean {
-  return Object.values(item.sizeQuantities).some((n) => (Number(n) || 0) > 0)
-}
-
-function setSizeQty(item: PackingItemDraft, size: string, value: number | undefined | null): void {
-  if (value == null || value <= 0) delete item.sizeQuantities[size]
-  else item.sizeQuantities[size] = value
-}
 
 const { spanMethod, summaryMethod } = usePackingGridLayout(
   () => props.sizeHeaders,

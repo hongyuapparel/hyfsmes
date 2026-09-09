@@ -11,6 +11,7 @@ import { FinishedGoodsStockInboundQueryService } from '../finished-goods-stock/f
 import { getSizeHeaderKey } from '../common/size-headers.util';
 import { PackingListsService, PackingListDetail } from './packing-lists.service';
 import { buildPackingListShipSummary } from './packing-list-log-summary';
+import { findUnexpectedPackingSizeQuantity, formatUnexpectedPackingSizeQuantity } from './packing-list-quantities';
 
 interface ColorSizeSnapshot {
   headers: string[];
@@ -50,6 +51,8 @@ export class PackingListsShipService {
     if (!hasAnyItem) {
       throw new BadRequestException('装箱单没有任何明细行，无法发货');
     }
+    const unexpected = findUnexpectedPackingSizeQuantity(detail.sizeHeaders, detail.boxes);
+    if (unexpected) throw new BadRequestException(formatUnexpectedPackingSizeQuantity(unexpected));
 
     const pendingGroups = this.groupBySource(detail, 'pending');
     const finishedGroups = this.groupBySource(detail, 'finished');

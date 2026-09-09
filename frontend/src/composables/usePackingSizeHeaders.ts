@@ -16,13 +16,7 @@ export function usePackingSizeHeaders(sizeHeaders: Ref<string[]>, boxes: Ref<Pac
 
   function removeSizeHeader(name: string): void {
     const at = sizeHeaders.value.indexOf(name)
-    if (at < 0) return
-    sizeHeaders.value.splice(at, 1)
-    for (const box of boxes.value) {
-      for (const item of box.items) {
-        if (name in item.sizeQuantities) delete item.sizeQuantities[name]
-      }
-    }
+    removeSizeColumnAt(at)
   }
 
   /**
@@ -50,20 +44,23 @@ export function usePackingSizeHeaders(sizeHeaders: Ref<string[]>, boxes: Ref<Pac
     if (name) {
       for (const box of boxes.value) {
         for (const item of box.items) {
-          if (name in item.sizeQuantities) delete item.sizeQuantities[name]
+          if (name in item.sizeQuantities) {
+            item.totalQty = 0
+            delete item.sizeQuantities[name]
+          }
         }
       }
     }
   }
 
   /**
-   * 提交列头改名（列头 v-model 已把 headers[index] 改为新值后调用）。
-   * oldName 为进入编辑前的列名。返回提交结果，供前端提示。
+   * 校验完成后，同步提交表头和数量键；输入中的临时名称不能进入业务数据。
    */
-  function commitSizeHeader(index: number, oldName: string): 'ok' | 'duplicate' | 'removed' {
+  function commitSizeHeader(index: number, proposedName: string): 'ok' | 'duplicate' | 'removed' {
     const headers = sizeHeaders.value
     if (index < 0 || index >= headers.length) return 'ok'
-    const newName = (headers[index] ?? '').trim()
+    const oldName = headers[index] ?? ''
+    const newName = proposedName.trim()
     if (!newName) {
       // 空名：旧列有数据则撤销回旧名，否则删除该空列
       if (oldName && columnHasData(oldName)) {
@@ -73,7 +70,8 @@ export function usePackingSizeHeaders(sizeHeaders: Ref<string[]>, boxes: Ref<Pac
       removeSizeColumnAt(index)
       return 'removed'
     }
-    if (headers.some((h, i) => i !== index && h.trim() === newName)) {
+    if (headers.some((h, i) => i !== index && h.trim() === newName) ||
+        (oldName !== newName && columnHasData(newName))) {
       headers[index] = oldName
       return 'duplicate'
     }
@@ -82,6 +80,7 @@ export function usePackingSizeHeaders(sizeHeaders: Ref<string[]>, boxes: Ref<Pac
       for (const box of boxes.value) {
         for (const item of box.items) {
           if (oldName in item.sizeQuantities) {
+            item.totalQty = 0
             const v = item.sizeQuantities[oldName]
             delete item.sizeQuantities[oldName]
             item.sizeQuantities[newName] = v

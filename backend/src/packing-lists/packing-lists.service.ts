@@ -9,6 +9,11 @@ import { User } from '../entities/user.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 import { buildPackingListUpdateSummary } from './packing-list-log-summary';
 import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
+import {
+  normalizePackingSizeHeaders,
+  normalizePackingSizeQuantitiesForHeaders,
+  packingQuantityTotal,
+} from './packing-list-quantities';
 
 export interface PackingListQuery {
   status?: string;
@@ -90,20 +95,6 @@ export interface PackingListDetail {
   operatorUsername: string;
   createdAt: Date;
   boxes: PackingBoxDetail[];
-}
-
-function normalizeSizeQuantities(raw: unknown): Record<string, number> {
-  if (raw == null || typeof raw !== 'object' || Array.isArray(raw)) return {};
-  const out: Record<string, number> = {};
-  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-    const num = Number(value);
-    if (key && Number.isFinite(num) && num > 0) out[key] = num;
-  }
-  return out;
-}
-
-function sumSizeQuantities(sizeQuantities: Record<string, number>): number {
-  return Object.values(sizeQuantities).reduce((acc, n) => acc + n, 0);
 }
 
 /** 操作记录条目（前端展示用） */
@@ -295,8 +286,8 @@ export class PackingListsService {
           styleName: item.styleName,
           colorName: item.colorName,
           imageUrl: item.imageUrl,
-          sizeQuantities: normalizeSizeQuantities(item.sizeQuantities),
-          totalQty: item.totalQty,
+          sizeQuantities: normalizePackingSizeQuantitiesForHeaders(item.sizeQuantities, list.sizeHeaders ?? []),
+          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty, list.sizeHeaders ?? []),
           sourceType: item.sourceType,
           sourceId: item.sourceId,
         })),
@@ -402,8 +393,8 @@ export class PackingListsService {
           styleName: item.styleName,
           colorName: item.colorName,
           imageUrl: item.imageUrl,
-          sizeQuantities: normalizeSizeQuantities(item.sizeQuantities),
-          totalQty: item.totalQty,
+          sizeQuantities: normalizePackingSizeQuantitiesForHeaders(item.sizeQuantities, list.sizeHeaders ?? []),
+          totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty, list.sizeHeaders ?? []),
           sourceType: item.sourceType,
           sourceId: item.sourceId,
         })),
@@ -561,8 +552,7 @@ export class PackingListsService {
     for (const box of boxes) {
       const items = Array.isArray(box.items) ? box.items : [];
       for (const item of items) {
-        const sizeTotal = sumSizeQuantities(normalizeSizeQuantities(item.sizeQuantities));
-        totalQty += sizeTotal > 0 ? sizeTotal : Math.max(0, Number(item.totalQty) || 0);
+        totalQty += packingQuantityTotal(item.sizeQuantities, item.totalQty, payload.sizeHeaders ?? []);
       }
     }
     return { boxCount: boxes.length, totalQty };
@@ -581,7 +571,7 @@ export class PackingListsService {
       packDate: payload.packDate?.trim() || null,
       remark: (payload.remark ?? '').trim(),
       showCompany: payload.showCompany === false ? 0 : 1,
-      sizeHeaders: Array.isArray(payload.sizeHeaders) ? payload.sizeHeaders.map((h) => h.trim()).filter((h) => !!h) : [],
+      sizeHeaders: normalizePackingSizeHeaders(payload.sizeHeaders),
     };
   }
 
@@ -592,6 +582,7 @@ export class PackingListsService {
     payload: SavePackingListDto,
   ): Promise<void> {
     const boxes = Array.isArray(payload.boxes) ? payload.boxes : [];
+    const sizeHeaders = normalizePackingSizeHeaders(payload.sizeHeaders);
     for (let i = 0; i < boxes.length; i++) {
       const boxPayload = boxes[i];
       const box = await boxRepo.save(
@@ -607,8 +598,7 @@ export class PackingListsService {
       if (!items.length) continue;
       await itemRepo.save(
         items.map((item) => {
-          const sizeQuantities = normalizeSizeQuantities(item.sizeQuantities);
-          const sizeTotal = sumSizeQuantities(sizeQuantities);
+          const sizeQuantities = normalizePackingSizeQuantitiesForHeaders(item.sizeQuantities, sizeHeaders);
           return itemRepo.create({
             packingListId,
             boxId: box.id,
@@ -617,7 +607,7 @@ export class PackingListsService {
             colorName: (item.colorName ?? '').trim(),
             imageUrl: (item.imageUrl ?? '').trim(),
             sizeQuantities,
-            totalQty: sizeTotal > 0 ? sizeTotal : Math.max(0, Number(item.totalQty) || 0),
+            totalQty: packingQuantityTotal(item.sizeQuantities, item.totalQty, sizeHeaders),
             sourceType: item.sourceType === 'pending' || item.sourceType === 'finished' ? item.sourceType : 'manual',
             sourceId: item.sourceId != null && Number.isInteger(Number(item.sourceId)) ? Number(item.sourceId) : null,
           });
@@ -625,4 +615,5 @@ export class PackingListsService {
       );
     }
   }
+
 }

@@ -1,6 +1,9 @@
 import { computed, ref } from 'vue'
 import type { PickableLine } from '@/api/packing-lists'
 import { usePackingSizeHeaders } from './usePackingSizeHeaders'
+import { normalizePackingSizeQuantities, packingItemTotal } from './packingQuantities'
+export { normalizePackingSizeQuantities, packingItemTotal, packingItemHasSizeQuantity,
+  sanitizePackingSizeQuantities, setPackingSizeQuantity } from './packingQuantities'
 
 export interface PackingItemDraft {
   styleNo: string
@@ -57,11 +60,6 @@ function nextKey(): string {
 
 export function createEmptyPackingItem(): PackingItemDraft {
   return { styleNo: '', styleName: '', colorName: '', imageUrl: '', sizeQuantities: {}, totalQty: 0, sourceType: 'manual', sourceId: null }
-}
-
-export function packingItemTotal(item: PackingItemDraft): number {
-  const sizeTotal = Object.values(item.sizeQuantities).reduce((sum, n) => sum + (Number(n) || 0), 0)
-  return sizeTotal > 0 ? sizeTotal : Math.max(0, Number(item.totalQty) || 0)
 }
 
 export function allocationKey(sourceType: string, sourceId: number, colorName: string): string {
@@ -128,10 +126,10 @@ export function usePackingGridRows() {
     for (const box of boxes.value) {
       totalWeight += Number(box.weightKg) || 0
       for (const item of box.items) {
-        totalQty += packingItemTotal(item)
-        for (const [size, qty] of Object.entries(item.sizeQuantities)) {
-          const n = Number(qty) || 0
-          if (n > 0) bySize[size] = (bySize[size] ?? 0) + n
+        const visibleQuantities = normalizePackingSizeQuantities(sizeHeaders.value, item.sizeQuantities)
+        totalQty += packingItemTotal(item, sizeHeaders.value)
+        for (const [size, qty] of Object.entries(visibleQuantities)) {
+          bySize[size] = (bySize[size] ?? 0) + qty
         }
       }
     }
@@ -145,10 +143,10 @@ export function usePackingGridRows() {
         if (item.sourceType === 'manual' || item.sourceId == null) continue
         const key = allocationKey(item.sourceType, item.sourceId, item.colorName)
         const entry = map.get(key) ?? { totalQty: 0, sizeQuantities: {}, styleNo: item.styleNo }
-        entry.totalQty += packingItemTotal(item)
-        for (const [size, qty] of Object.entries(item.sizeQuantities)) {
-          const n = Number(qty) || 0
-          if (n > 0) entry.sizeQuantities[size] = (entry.sizeQuantities[size] ?? 0) + n
+        const visibleQuantities = normalizePackingSizeQuantities(sizeHeaders.value, item.sizeQuantities)
+        entry.totalQty += packingItemTotal(item, sizeHeaders.value)
+        for (const [size, qty] of Object.entries(visibleQuantities)) {
+          entry.sizeQuantities[size] = (entry.sizeQuantities[size] ?? 0) + qty
         }
         map.set(key, entry)
       }

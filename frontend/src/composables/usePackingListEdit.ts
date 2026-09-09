@@ -17,6 +17,7 @@ import {
   usePackingGridRows,
 } from './usePackingGridRows'
 import { buildPayload, isEmptyManualRow, today } from './packingListPayload'
+import { normalizePackingDetail } from './packingQuantities'
 
 export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) {
   const route = useRoute()
@@ -59,7 +60,9 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
   }
 
   function applyDetail(data: PackingListDetail) {
-    detail.value = data
+    const normalized = normalizePackingDetail(data)
+    const normalizedBoxes = normalized.boxes
+    detail.value = normalized
     listId.value = data.id
     form.customerId = data.customerId
     form.customerName = data.customerName
@@ -72,8 +75,8 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     form.packDate = data.packDate
     form.remark = data.remark
     form.showCompany = data.showCompany
-    grid.sizeHeaders.value = [...data.sizeHeaders]
-    grid.boxes.value = data.boxes.map((box, index) => ({
+    grid.sizeHeaders.value = [...normalized.sizeHeaders]
+    grid.boxes.value = normalizedBoxes.map((box, index) => ({
       key: `loaded-${data.id}-${box.id || index}`,
       weightKg: box.weightKg,
       cartonSize: box.cartonSize,
@@ -85,7 +88,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
             colorName: item.colorName,
             imageUrl: item.imageUrl,
             sizeQuantities: { ...item.sizeQuantities },
-            totalQty: item.totalQty,
+            totalQty: Object.keys(item.sizeQuantities).length ? 0 : item.totalQty,
             sourceType: item.sourceType === 'pending' || item.sourceType === 'finished' ? item.sourceType : 'manual',
             sourceId: item.sourceId,
           }))
@@ -205,7 +208,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
       }
       const box = grid.boxes.value[boxIndex]
       if (!box) continue
-      const emptyIndex = box.items.findIndex(isEmptyManualRow)
+      const emptyIndex = box.items.findIndex((candidate) => isEmptyManualRow(candidate))
       if (emptyIndex >= 0) box.items.splice(emptyIndex, 1, item)
       else box.items.push(item)
       pickedLines.value = [...pickedLines.value.filter((p) => allocationKey(p.sourceType, p.sourceId, p.colorName) !== key), line]
