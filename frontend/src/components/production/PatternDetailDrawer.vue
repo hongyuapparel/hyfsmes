@@ -6,7 +6,7 @@
       </ProductionDetailSection>
       <ProductionDetailSection title="打样安排">
         <template #actions>
-          <el-button v-if="canAssign && row.canAssign" size="small" :disabled="busy || saving" @click="emit('assign')">分配师傅</el-button>
+          <el-button v-if="canAssign && row.canAssign" type="primary" size="small" :disabled="busy || saving" @click="emit('assign')">分配师傅</el-button>
         </template>
         <el-descriptions :column="3" border size="small">
           <el-descriptions-item label="当前进度">{{ patternStatusLabel(row.patternStatus) }}</el-descriptions-item>
@@ -20,7 +20,7 @@
       <ProductionDetailSection title="实际用料">
         <template #actions>
           <el-text v-if="editMode" type="info" size="small" role="status">{{ hasUnsavedChanges ? '有修改尚未保存' : '正在编辑用料' }}</el-text>
-          <el-button v-if="!editMode && canEdit" size="small" :disabled="loading || busy || saving" @click="enterEdit">修改用料</el-button>
+          <el-button v-if="!editMode && canEdit" type="primary" size="small" :disabled="loading || busy || saving" @click="enterEdit">修改用料</el-button>
           <el-button v-if="editMode" size="small" :disabled="saving || busy" @click="cancelEdit">取消</el-button>
           <el-button v-if="editMode && canEdit" size="small" type="primary" :disabled="loading || busy" :loading="saving" @click="handleSave">保存用料</el-button>
           <el-button v-if="showComplete && !editMode" size="small" type="primary" :disabled="loading || saving || busy" @click="emit('complete')">确认完成</el-button>

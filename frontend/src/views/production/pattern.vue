@@ -165,11 +165,11 @@
     <div v-if="hasSelection" class="pattern-batch-bar" role="region" aria-label="所选订单操作">
       <span>已选 {{ selectedRows.length }} 张订单</span>
       <el-space wrap>
-        <el-button v-if="selectedRows.length > 1 && canAssignSelection && canAssignPattern" @click="openAssignDialog()">
+        <el-button v-if="canAssignSelection && canAssignPattern" type="primary" @click="openAssignDialog()">
           分配师傅
         </el-button>
         <el-button
-          v-if="selectedRows.length > 1 && canCompleteSelection && canCompletePattern"
+          v-if="canCompleteSelection && canCompletePattern"
           type="primary"
           @click="openCompleteDialog()"
         >
