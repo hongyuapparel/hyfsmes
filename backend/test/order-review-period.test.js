@@ -23,8 +23,9 @@ async function report(events, status, overrides = {}, logs = []) {
 
 test('旧轮次超期，退回等六天，新轮次一小时通过：只计一小时', async () => {
   const row = await report([['pending_review', 1], ['draft', 3], ['pending_review', 9], ['pending_purchase', 9, 1]], 'pending_purchase', { orderDate: date(9) });
-  assert.equal(row.reviewAt, date(9).toISOString());
+  assert.equal(row.reviewAt, date(9, 1).toISOString());
   assert.equal(row.orderDate, date(9).toISOString());
+  assert.equal((Date.parse(row.reviewAt) - Date.parse(row.orderDate)) / 3600000, row.reviewDurationHours);
   assert.equal(row.reviewDurationHours, 1);
   assert.equal(row.reviewJudge, '未超期');
 });
@@ -35,7 +36,7 @@ test('旧轮次一小时，新轮次48小时：不能漏掉新轮次超期', asy
 });
 test('重新提交尚未审单：旧退回记录不能当本次通过', async () => {
   const row = await report([['pending_review', 1], ['draft', 3], ['pending_review', 9]], 'pending_review');
-  assert.equal(row.reviewAt, date(9).toISOString());
+  assert.equal(row.reviewAt, null);
   assert.equal(row.reviewDurationHours, null);
   assert.equal(row.reviewJudge, '进行中');
 });
@@ -57,6 +58,7 @@ test('历史缺失时根据本次提交与明确通过日志恢复，不用旧�
     { id: 3, orderId: 1, action: 'review', detail: '审核订单：pending_review -> pending_purchase', createdAt: date(9, 2) },
   ]);
   assert.equal(row.reviewDurationHours, 2);
+  assert.equal(row.reviewAt, date(9, 2).toISOString());
   assert.equal(row.reviewJudge, '未超期');
 });
 test('草稿再次提交更新下单时间，同时保留建单时间并追加历史', async () => {
