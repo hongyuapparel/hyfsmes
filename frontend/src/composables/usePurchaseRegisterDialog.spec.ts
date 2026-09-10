@@ -41,4 +41,19 @@ describe('采购登记交互',()=>{
     f.openRegisterDialog();f.registerDialog.submitting=true
     await f.submitRegister();expect(mocks.register).not.toHaveBeenCalled()
   })
+  it('清空数量不能作为零保存，明确填写零仍可保存', async () => {
+    const f = setup()
+    f.openRegisterDialog()
+    for (const empty of [null, undefined]) {
+      f.registerDialog.rows[0].actualPurchaseQuantity = empty
+      await f.submitRegister()
+      expect(mocks.register).not.toHaveBeenCalled()
+      expect(f.registerDialog.visible).toBe(true)
+    }
+    f.registerDialog.rows[0].actualPurchaseQuantity = 0
+    await f.submitRegister()
+    expect(mocks.register).toHaveBeenCalledWith({
+      items: [expect.objectContaining({ actualPurchaseQuantity: 0 })],
+    })
+  })
 })

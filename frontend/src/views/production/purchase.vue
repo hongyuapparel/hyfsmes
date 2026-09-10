@@ -190,129 +190,14 @@
       @size-change="onPageSizeChange"
     />
 
-    <ProductionDetailDrawerShell
+    <PurchaseBriefDrawer
       v-model="purchaseBriefDrawer.visible"
-      title="订单与物料概要"
-      :size="760"
-      :resizable="true"
+      :row="purchaseBriefDrawer.row"
+      :brief="purchaseBriefDrawer.row ? purchaseBriefFromRow(purchaseBriefDrawer.row) : null"
+      :order-type-label="purchaseBriefDrawer.row ? orderTypeDisplay(purchaseBriefDrawer.row) : ''"
+      :logs="purchaseDrawerLogs"
       @closed="purchaseBriefDrawer.row = null"
-    >
-      <template v-if="purchaseBriefDrawer.row">
-        <ProductionDetailSection>
-          <ProductionOrderBriefPanel :brief="purchaseBriefFromRow(purchaseBriefDrawer.row)" />
-        </ProductionDetailSection>
-        <ProductionDetailSection title="本行物料">
-          <el-descriptions :column="2" border size="small" class="purchase-brief-material">
-            <el-descriptions-item label="物料序号">
-              {{ purchaseBriefDrawer.row.materialIndex + 1 }}
-            </el-descriptions-item>
-            <el-descriptions-item label="处理路线">
-              {{ purchaseBriefDrawer.row.processRoute === 'picking' ? '领料' : '采购' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="订单类型">
-              {{ orderTypeDisplay(purchaseBriefDrawer.row) || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="物料类型">
-              {{ (purchaseBriefDrawer.row.materialType ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="物料名称">
-              {{ (purchaseBriefDrawer.row.materialName ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="颜色">
-              {{ (purchaseBriefDrawer.row.color ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="成分">
-              {{ (purchaseBriefDrawer.row.composition ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="克重">
-              {{ (purchaseBriefDrawer.row.weight ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="物料图">
-              <AppImageThumb
-                v-if="purchaseBriefDrawer.row.referenceImageUrl"
-                :raw-url="purchaseBriefDrawer.row.referenceImageUrl"
-                variant="compact"
-              />
-              <span v-else>—</span>
-            </el-descriptions-item>
-            <el-descriptions-item label="供应商">
-              {{ (purchaseBriefDrawer.row.supplierName ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="物料来源">
-              {{ (purchaseBriefDrawer.row.materialSource ?? '').trim() || '—' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="计划用量">
-              {{ formatMaterialQuantity(purchaseBriefDrawer.row.planQuantity, purchaseBriefDrawer.row) }}
-            </el-descriptions-item>
-          </el-descriptions>
-        </ProductionDetailSection>
-        <ProductionDetailSection title="采购登记信息">
-          <el-descriptions :column="2" border size="small" class="purchase-brief-material">
-            <el-descriptions-item label="实际采购数量">
-              {{
-                purchaseBriefDrawer.row.actualPurchaseQuantity != null
-                  ? formatDisplayNumber(purchaseBriefDrawer.row.actualPurchaseQuantity)
-                  : '—'
-              }}
-            </el-descriptions-item>
-            <el-descriptions-item label="单价(元)">
-              {{
-                purchaseBriefDrawer.row.purchaseUnitPrice != null && purchaseBriefDrawer.row.purchaseUnitPrice !== ''
-                  ? formatDisplayNumber(purchaseBriefDrawer.row.purchaseUnitPrice)
-                  : '—'
-              }}
-            </el-descriptions-item>
-            <el-descriptions-item label="其他费用(元)">
-              {{
-                purchaseBriefDrawer.row.purchaseOtherCost != null && purchaseBriefDrawer.row.purchaseOtherCost !== ''
-                  ? formatDisplayNumber(purchaseBriefDrawer.row.purchaseOtherCost)
-                  : '—'
-              }}
-            </el-descriptions-item>
-            <el-descriptions-item label="采购总金额(元)">
-              {{
-                purchaseBriefDrawer.row.purchaseAmount != null && purchaseBriefDrawer.row.purchaseAmount !== ''
-                  ? formatDisplayNumber(purchaseBriefDrawer.row.purchaseAmount)
-                  : '—'
-              }}
-            </el-descriptions-item>
-            <el-descriptions-item label="采购凭证">
-              <AppImageThumb
-                v-if="purchaseBriefDrawer.row.purchaseImageUrl"
-                :raw-url="purchaseBriefDrawer.row.purchaseImageUrl"
-                variant="compact"
-              />
-              <span v-else>—</span>
-            </el-descriptions-item>
-            <el-descriptions-item label="采购备注">
-              {{ (purchaseBriefDrawer.row.purchaseRemark ?? '').trim() || '—' }}
-            </el-descriptions-item>
-          </el-descriptions>
-        </ProductionDetailSection>
-        <ProductionDetailSection title="时效与节点">
-          <el-descriptions :column="2" border size="small" class="purchase-brief-material">
-            <el-descriptions-item label="到采购时间">
-              {{ formatDateTime(purchaseBriefDrawer.row.pendingPurchaseAt) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="完成时间">
-              {{
-                formatDateTime(
-                  purchaseBriefDrawer.row.processRoute === 'picking'
-                    ? purchaseBriefDrawer.row.pickCompletedAt
-                    : purchaseBriefDrawer.row.purchaseCompletedAt,
-                )
-              }}
-            </el-descriptions-item>
-            <el-descriptions-item label="时效判定">
-              <SlaJudgeTag :text="purchaseBriefDrawer.row.timeRating" />
-            </el-descriptions-item>
-          </el-descriptions>
-        </ProductionDetailSection>
-        <ProductionDetailSection>
-          <OperationLogsSection :logs="purchaseDrawerLogs" />
-        </ProductionDetailSection>
-      </template>
-    </ProductionDetailDrawerShell>
+    />
 
     <PurchaseRegisterDialog
       v-model="registerDialog.visible"
@@ -347,8 +232,6 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDateTime } from '@/utils/date-format'
-import { formatDisplayNumber } from '@/utils/display-number'
-import { formatMaterialQuantity } from '@/utils/material-quantity-unit'
 import {
   ACTIVE_FILTER_COLOR,
   getFilterInputStyle,
@@ -366,18 +249,13 @@ const { collapsed, isMobile } = useFilterCollapse('production-purchase')
 import { PURCHASE_TABS, usePurchaseList } from '@/composables/usePurchaseList'
 import { usePurchaseDialogs } from '@/composables/usePurchaseDialogs'
 import type { PurchaseItemRow } from '@/api/production-purchase'
-import OperationLogsSection from '@/components/common/OperationLogsSection.vue'
 import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
-import SlaJudgeTag from '@/components/sla/SlaJudgeTag.vue'
+import PurchaseBriefDrawer from '@/components/production/PurchaseBriefDrawer.vue'
 import PurchaseTable from '@/components/production/PurchaseTable.vue'
 import PurchaseRegisterDialog from '@/components/production/PurchaseRegisterDialog.vue'
 import PurchasePickDialog from '@/components/production/PurchasePickDialog.vue'
-import ProductionOrderBriefPanel from '@/components/production/ProductionOrderBriefPanel.vue'
-import ProductionDetailDrawerShell from '@/components/production/ProductionDetailDrawerShell.vue'
-import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 import { useAuthStore } from '@/stores/auth'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
-import AppImageThumb from '@/components/AppImageThumb.vue'
 
 const authStore = useAuthStore()
 const canRegisterPurchase = computed(() => authStore.hasPermission('production_purchase_register'))
@@ -493,7 +371,9 @@ async function loadPurchaseDrawerLogs(row: PurchaseItemRow | null) {
     targetType: 'purchase_item',
     targetRef: `${row.orderId}_${row.materialIndex}`,
   })
-  purchaseDrawerLogs.value = toLogSectionItems(logs)
+  purchaseDrawerLogs.value = toLogSectionItems(logs).map((log) => ({
+    ...log, createdAt: formatDateTime(log.createdAt),
+  }))
 }
 
 watch(

@@ -20,7 +20,7 @@ export interface PurchaseRegisterDraftRow {
   color?: string | null
   supplierName: string
   planQuantity: number | null
-  actualPurchaseQuantity: number
+  actualPurchaseQuantity: number | null | undefined
   unitPrice: string
   otherCost: string
   remark: string
@@ -166,7 +166,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
     }
     const invalidQuantity = registerDialog.rows.find((row) => {
       const quantity = Number(row.actualPurchaseQuantity)
-      return !Number.isFinite(quantity) || quantity < 0
+      return row.actualPurchaseQuantity == null || !Number.isFinite(quantity) || quantity < 0
     })
     if (invalidQuantity) {
       ElMessage.warning(`实际采购数量无效：${invalidQuantity.orderNo} / ${invalidQuantity.materialName}`)
@@ -178,7 +178,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
         orderId: row.orderId,
         materialIndex: row.materialIndex,
         supplierName: normalizeText(row.supplierName),
-        actualPurchaseQuantity: Number(row.actualPurchaseQuantity) || 0,
+        actualPurchaseQuantity: Number(row.actualPurchaseQuantity),
         unitPrice: row.unitPrice.trim() || '0',
         otherCost: row.otherCost.trim() || '0',
         remark: row.remark.trim() || undefined,
