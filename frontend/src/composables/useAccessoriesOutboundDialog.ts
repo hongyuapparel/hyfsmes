@@ -36,6 +36,7 @@ export function useAccessoriesOutboundDialog(
     isSized: boolean
     sizeHeaders: string[]
     sizeQuantities: number[]
+    availableSizeQuantities: number[]
     remark: string
   }>({
     accessoryId: null,
@@ -46,6 +47,7 @@ export function useAccessoriesOutboundDialog(
     isSized: false,
     sizeHeaders: [],
     sizeQuantities: [],
+    availableSizeQuantities: [],
     remark: '',
   })
   const outboundRules: FormRules = {
@@ -63,7 +65,10 @@ export function useAccessoriesOutboundDialog(
     }
   }
 
+  let session = 0
   async function openOutboundDialog() {
+    if (outboundDialog.submitting) return
+    const version = ++session
     if (selectedRows.value.length !== 1) {
       ElMessage.warning('请先选中 1 条辅料记录')
       return
@@ -77,19 +82,24 @@ export function useAccessoriesOutboundDialog(
     const sizedHeaders = row.isSized && Array.isArray(row.sizeHeaders) ? row.sizeHeaders : []
     outboundForm.sizeHeaders = [...sizedHeaders]
     outboundForm.sizeQuantities = sizedHeaders.map(() => 0)
+    outboundForm.availableSizeQuantities = sizedHeaders.map((_, i) => Math.max(0, Number(row.sizeQuantities?.[i]) || 0))
     outboundForm.pickupUserId = null
     outboundForm.remark = ''
     await ensureOutboundUserOptionsLoaded()
+    if (version !== session) return
     outboundDialog.visible = true
   }
 
   function resetOutboundDialog() {
+    session++
     dialogRef.value?.clearValidate()
   }
 
   async function submitOutbound() {
-    if (!outboundForm.accessoryId) return
-    await dialogRef.value?.validate?.().catch(() => {})
+    if (!outboundForm.accessoryId || !outboundDialog.visible || outboundDialog.submitting) return
+    const version = session
+    try { if (await dialogRef.value?.validate?.() === false) return } catch { return }
+    if (outboundDialog.submitting || version !== session || !outboundDialog.visible) return
     if (!outboundForm.pickupUserId) return
     const pickupUser = outboundUserOptions.value.find((u) => u.id === outboundForm.pickupUserId)
     const pickupUserLabel = pickupUser ? (pickupUser.displayName || pickupUser.username) : ''
@@ -97,17 +107,28 @@ export function useAccessoriesOutboundDialog(
       ElMessage.warning('领取人无效，请重新选择')
       return
     }
+    if (outboundForm.isSized && outboundForm.sizeQuantities.some(q => !Number.isInteger(q) || q < 0)) {
+      ElMessage.warning('各码出库数量必须是大于或等于 0 的整数')
+      return
+    }
     const matrix = outboundForm.isSized
       ? cleanAccessoryMatrix(outboundForm.sizeHeaders, outboundForm.sizeQuantities)
       : null
     const qty = matrix ? sumDetailRowQty(matrix.quantities) : Number(outboundForm.quantity) || 0
-    if (qty <= 0) {
+    if (!Number.isInteger(qty) || qty <= 0 || outboundForm.sizeQuantities.some(q => !Number.isInteger(q) || q < 0)) {
       ElMessage.warning(outboundForm.isSized ? '请填写本次各码出库数量' : '出库数量不合法')
       return
     }
-    if (!outboundForm.isSized && qty > (Number(outboundForm.maxQuantity) || 0)) {
+    if (qty > (Number(outboundForm.maxQuantity) || 0)) {
       ElMessage.warning('出库数量不能大于当前库存')
       return
+    }
+    if (outboundForm.isSized) {
+      const exceeded = outboundForm.sizeQuantities.findIndex((q, i) => q > outboundForm.availableSizeQuantities[i])
+      if (exceeded >= 0) {
+        ElMessage.warning(`尺码 ${outboundForm.sizeHeaders[exceeded]} 最多可出 ${outboundForm.availableSizeQuantities[exceeded]}，本次填写 ${outboundForm.sizeQuantities[exceeded]}`)
+        return
+      }
     }
     outboundDialog.submitting = true
     try {

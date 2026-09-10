@@ -23,11 +23,17 @@ export function buildOutboundDialogItem(
   const target = Number(row.quantity) || 0
   const snap = row.colorSizeSnapshot
   if (snap?.headers?.length && snap.rows?.length) {
-    const headers = snap.headers.filter((h) => h !== '合计')
+    const columns = snap.headers.map((header, index) => ({ header, index })).filter(c => c.header !== '合计')
+    const headers = columns.map(c => c.header)
     const dialogRows = snap.rows.map((r) => ({
       colorName: r.colorName || '',
-      quantities: headers.map((_, i) => Math.max(0, Math.trunc(Number(r.quantities?.[i]) || 0))),
+      quantities: columns.map(c => r.quantities[c.index]),
+      availableQuantities: columns.map(c => r.quantities[c.index]),
     }))
+    if (!headers.length || new Set(headers).size !== headers.length || headers.some(h => !h.trim()) ||
+      dialogRows.some(r => r.quantities.some(q => !Number.isInteger(q) || q < 0))) {
+      return { item: { row, headers: [], rows: [] }, warning: `订单 ${row.orderNo} / ${row.skuCode} 本批尺码或数量明细无效，请先核对原始登记` }
+    }
     const snapTotal = dialogRows.reduce(
       (sum, r) => sum + r.quantities.reduce((a, b) => a + b, 0),
       0,
@@ -53,7 +59,8 @@ export function buildInboundPreviewItem(
 ): InboundPreviewItem {
   const snap = row.colorSizeSnapshot
   if (snap?.headers?.length && snap.rows?.length) {
-    const headers = snap.headers.filter((h) => h !== '合计')
+    const columns = snap.headers.map((header, index) => ({ header, index })).filter(c => c.header !== '合计')
+    const headers = columns.map(c => c.header)
     return {
       id: row.id,
       orderId: row.orderId,
@@ -63,7 +70,7 @@ export function buildInboundPreviewItem(
       headers,
       rows: snap.rows.map((r) => ({
         colorName: r.colorName || '',
-        values: headers.map((_, i) => Math.max(0, Math.trunc(Number(r.quantities?.[i]) || 0))),
+        values: columns.map(c => r.quantities[c.index]),
       })),
     }
   }
@@ -76,6 +83,23 @@ export function buildInboundPreviewItem(
     headers: [],
     rows: [],
   }
+}
+
+export function getOutboundValidationMessage(item: PendingOutboundDialogItem): string {
+  const label = `订单 ${item.row.orderNo} / ${item.row.skuCode}`
+  if (!item.headers.length || !item.rows.length) return `${label} 暂无颜色尺码明细，无法发货`
+  for (const row of item.rows) {
+    for (let index = 0; index < item.headers.length; index++) {
+      const quantity = row.quantities[index]
+      const available = row.availableQuantities[index]
+      if (!Number.isInteger(quantity) || quantity < 0) return `${label} ${row.colorName} / ${item.headers[index]} 请填写非负整数`
+      if (quantity > available) return `${label} ${row.colorName} / ${item.headers[index]} 最多可发 ${available} 件，当前填写 ${quantity} 件`
+    }
+  }
+  const total = getOutboundItemTotal(item)
+  if (total <= 0) return `${label} 请填写发货数量`
+  if (total > item.row.quantity) return `${label} 发货数量不能大于当前待处理数量`
+  return ''
 }
 
 export function getOutboundTableSummaries(

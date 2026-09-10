@@ -48,7 +48,8 @@
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
         <el-button @click="onReset">清空</el-button>
         <el-button
-          v-if="pageTab === 'pending' && hasSelection"
+          v-if="pageTab === 'pending'"
+          :disabled="!hasSelection || loading"
           type="primary"
           :loading="inboundLoading"
           @click="openInboundDialog"
@@ -56,7 +57,8 @@
           入库
         </el-button>
         <el-button
-          v-if="pageTab === 'pending' && canOutboundSelection"
+          v-if="pageTab === 'pending'"
+          :disabled="!canOutboundSelection || loading"
           type="warning"
           :loading="outboundDialog.submitting"
           @click="openOutboundDialog"
@@ -66,13 +68,14 @@
       </div>
     </el-form>
 
-    <div v-if="pageTab === 'pending' && hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+    <div v-if="pageTab === 'pending' && hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项，共 {{ formatDisplayNumber(selectedQuantity) }} 件<span v-if="!canOutboundSelection">；次品仅支持入库，不支持直接发货</span></div>
 
     <div ref="tableShellRef" class="list-page-table-shell">
     <el-table
       ref="pendingTableRef"
       v-loading="loading"
       :data="list"
+      row-key="id"
       border
       stripe
       class="pending-table"
@@ -100,71 +103,7 @@
       </el-table-column>
       <el-table-column :label="pageTab === 'pending' ? '待处理数量' : '已发货数量'" width="140" align="right">
         <template #default="{ row }">
-          <el-tooltip
-            v-if="pageTab === 'pending'"
-            placement="top"
-            effect="light"
-            :show-after="250"
-            :hide-after="0"
-            popper-class="pending-qty-popper"
-          >
-            <template #content>
-              <div class="qty-tooltip">
-                <template v-if="row.colorSizeSnapshot && row.colorSizeSnapshot.headers.length && row.colorSizeSnapshot.rows.length">
-                  <div class="qty-tooltip-title">
-                    {{ row.sourceType === 'defect' ? '本批次品明细' : '本批入库明细' }}
-                  </div>
-                  <div class="qty-tooltip-grid">
-                    <div class="qty-tooltip-row qty-tooltip-head">
-                      <div class="qty-tooltip-cell qty-tooltip-color">颜色</div>
-                      <div
-                        v-for="(h, idx) in row.colorSizeSnapshot.headers"
-                        :key="idx"
-                        class="qty-tooltip-cell"
-                      >
-                        {{ h }}
-                      </div>
-                      <div class="qty-tooltip-cell">合计</div>
-                    </div>
-                    <div
-                      v-for="(r, rIdx) in row.colorSizeSnapshot.rows"
-                      :key="rIdx"
-                      class="qty-tooltip-row"
-                    >
-                      <div class="qty-tooltip-cell qty-tooltip-color">{{ r.colorName || '-' }}</div>
-                      <div
-                        v-for="(v, vIdx) in r.quantities"
-                        :key="vIdx"
-                        class="qty-tooltip-cell qty-tooltip-num"
-                      >
-                        {{ formatDisplayNumber(v) }}
-                      </div>
-                      <div class="qty-tooltip-cell qty-tooltip-num">
-                        <strong>{{ formatDisplayNumber(sumSnapshotRow(r.quantities)) }}</strong>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-                <template v-else>
-                  <div class="qty-tooltip-empty">
-                    {{ row.sourceType === 'defect' ? `本批次品 ${formatDisplayNumber(row.quantity)} 件` : `本批入库 ${formatDisplayNumber(row.quantity)} 件` }}
-                    <br />
-                    <span class="qty-tooltip-empty-sub">（颜色×尺码明细未留存；不会按订单计划推算）</span>
-                  </div>
-                </template>
-              </div>
-            </template>
-            <span class="qty-inline">
-              <span class="qty-hover">{{ formatDisplayNumber(row.quantity) }}</span>
-              <el-tag v-if="row.sourceType === 'defect'" type="danger" size="small" effect="light" class="defect-tag">
-                次品
-              </el-tag>
-              <el-tag v-if="row.detailStatus === 'missing'" type="warning" size="small" effect="light" class="defect-tag">
-                明细待补
-              </el-tag>
-            </span>
-          </el-tooltip>
-          <span v-else>{{ formatDisplayNumber(row.quantity) }}</span>
+          <PendingQuantityCell :row="row" :shipped="pageTab === 'shipped'" />
         </template>
       </el-table-column>
       <el-table-column :label="pageTab === 'pending' ? '完成时间' : '发货时间'" prop="createdAt" width="160" align="center" />
@@ -180,7 +119,7 @@
       :total="pagination.total"
       :total-quantity="totalPageQuantity"
       unit="件"
-      summary-label="总件数"
+      summary-label="本页件数"
       @current-change="load"
       @size-change="onPageSizeChange"
     />
@@ -221,7 +160,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getPendingList,
@@ -238,6 +177,7 @@ import {
   getSkuCodeFilterStyle,
 } from '@/composables/useFilterBarHelpers'
 import { formatDisplayNumber } from '@/utils/display-number'
+import PendingQuantityCell from '@/components/inventory/pending/PendingQuantityCell.vue'
 import PendingInboundDialog from '@/components/inventory/pending/PendingInboundDialog.vue'
 import PendingOutboundDialog from '@/components/inventory/pending/PendingOutboundDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
@@ -263,6 +203,7 @@ const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PendingListItem[]>([])
 const hasSelection = computed(() => selectedRows.value.length > 0)
+const selectedQuantity = computed(() => selectedRows.value.reduce((sum, row) => sum + Number(row.quantity), 0))
 const totalPageQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 const canOutboundSelection = computed(
   () => pageTab.value === 'pending' && selectedRows.value.length > 0 && selectedRows.value.every((r) => r.sourceType !== 'defect'),
@@ -306,12 +247,11 @@ const {
   load,
 })
 
-function sumSnapshotRow(values: number[] | undefined): number {
-  if (!Array.isArray(values)) return 0
-  return values.reduce((s, n) => s + (Number(n) || 0), 0)
-}
-
+let loadVersion = 0
 async function load() {
+  const version = ++loadVersion
+  selectedRows.value = []
+  pendingTableRef.value?.clearSelection()
   loading.value = true
   try {
     const res = await getPendingList({
@@ -321,6 +261,7 @@ async function load() {
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
+    if (version !== loadVersion) return
     const data = res.data
     if (data) {
       list.value = data.list ?? []
@@ -328,13 +269,18 @@ async function load() {
       restorePendingColumnWidths(pendingTableRef.value)
     }
   } catch (e: unknown) {
+    if (version !== loadVersion) return
+    list.value = []
+    pagination.total = 0
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (version === loadVersion) loading.value = false
   }
 }
 
 function onSearch(byUser = false) {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = null
   if (byUser) {
     if (filter.orderNo && String(filter.orderNo).trim()) orderNoLabelVisible.value = true
     if (filter.skuCode && String(filter.skuCode).trim()) skuCodeLabelVisible.value = true
@@ -353,6 +299,8 @@ function debouncedSearch() {
 }
 
 function onReset() {
+  if (searchTimer) clearTimeout(searchTimer)
+  searchTimer = null
   orderNoLabelVisible.value = false
   skuCodeLabelVisible.value = false
   filter.orderNo = ''
@@ -378,152 +326,15 @@ function onPageTabChange() {
   load()
 }
 
-onMounted(async () => {
-  await loadDialogOptions()
-  await load()
+onMounted(() => {
+  void loadDialogOptions()
+  void load()
+})
+onBeforeUnmount(() => {
+  if (searchTimer) clearTimeout(searchTimer)
+  loadVersion++
 })
 </script>
-
-<style scoped>
-.qty-hover {
-  cursor: help;
-  text-decoration: underline;
-  text-decoration-style: dotted;
-  text-underline-offset: 3px;
-}
-
-.qty-inline {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.defect-tag {
-  transform: scale(0.92);
-  transform-origin: right center;
-}
-
-.qty-tooltip {
-  max-width: 520px;
-}
-
-.qty-tooltip-loading,
-.qty-tooltip-error,
-.qty-tooltip-empty {
-  padding: 6px 8px;
-  font-size: var(--font-size-caption);
-  line-height: 1.4;
-}
-
-.qty-tooltip-empty-sub {
-  color: var(--el-text-color-secondary);
-  font-size: var(--font-size-caption);
-}
-
-.qty-tooltip-title {
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--el-color-primary);
-}
-
-.qty-tooltip-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.qty-tooltip-row {
-  display: grid;
-  grid-auto-flow: column;
-  grid-auto-columns: minmax(44px, auto);
-  align-items: center;
-  gap: 2px;
-}
-
-.qty-tooltip-cell {
-  padding: 4px 6px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.12);
-  font-size: var(--font-size-caption);
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.qty-tooltip-head .qty-tooltip-cell {
-  background: rgba(255, 255, 255, 0.18);
-  font-weight: 600;
-}
-
-.qty-tooltip-color {
-  min-width: 72px;
-  text-align: center;
-}
-
-.qty-tooltip-num {
-  text-align: center;
-}
-
-</style>
-
-<style>
-/* tooltip 弹层在 body 下，需用全局样式；通过 popper-class 精确作用范围 */
-.pending-qty-popper {
-  padding: 0;
-}
-
-.pending-qty-popper .el-popper__arrow::before {
-  border: 1px solid var(--el-border-color-lighter);
-}
-
-.pending-qty-popper .qty-tooltip {
-  padding: 10px 12px;
-}
-
-.pending-qty-popper .qty-tooltip-cell {
-  background: #f5f6f8;
-  color: var(--el-text-color-regular);
-  border: 1px solid var(--el-border-color-lighter);
-  text-align: center;
-}
-
-.pending-qty-popper .qty-tooltip-head .qty-tooltip-cell {
-  background: #eef1f6;
-  font-weight: 600;
-}
-
-/* 按颜色分组的尺码追踪表（跟尾部 hover 同款） */
-.pending-qty-popper .qty-tooltip-color-block + .qty-tooltip-color-block {
-  margin-top: 8px;
-}
-.pending-qty-popper .qty-tooltip-color-name {
-  font-weight: 600;
-  margin-bottom: 4px;
-  color: var(--el-text-color-primary);
-  font-size: var(--font-size-body);
-}
-.pending-qty-popper .qty-tooltip-color-table {
-  border-collapse: collapse;
-  font-size: var(--font-size-caption);
-}
-.pending-qty-popper .qty-tooltip-color-table th,
-.pending-qty-popper .qty-tooltip-color-table td {
-  border: 1px solid var(--el-border-color-lighter);
-  padding: 3px 8px;
-  text-align: center;
-  white-space: nowrap;
-  background: #fff;
-}
-.pending-qty-popper .qty-tooltip-color-table thead th {
-  background: #eef1f6;
-  font-weight: 500;
-}
-.pending-qty-popper .qty-tooltip-color-table .qty-tooltip-label {
-  text-align: left;
-  color: var(--el-text-color-secondary);
-}
-
-</style>
 
 <style scoped>
 .inventory-pending-page {

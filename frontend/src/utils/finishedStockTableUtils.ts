@@ -91,11 +91,6 @@ export function remapValuesByHeaders(sourceHeaders: string[], values: unknown[],
   })
 }
 
-export function sameSnapshotValues(a: number[], b: number[]): boolean {
-  if (a.length !== b.length) return false
-  return a.every((value, index) => value === b[index])
-}
-
 export function snapshotRowTotal(values: unknown[]): number {
   return values.reduce<number>((sum, value) => sum + Math.max(0, Math.trunc(Number(value) || 0)), 0)
 }
@@ -104,7 +99,7 @@ export function normalizeStoredBreakdownSnapshot(
   snapshot: NonNullable<FinishedStockRow['sizeBreakdown']> | null | undefined,
 ): NormalizedStoredBreakdownSnapshot | null {
   if (!snapshot?.headers?.length || !snapshot.rows?.length) return null
-  const normalizedHeaders = normalizeBreakdownHeaders(snapshot.headers)
+  const normalizedHeaders = snapshot.headers.map(normalizeSizeHeader)
   const visibleHeaderIndexes = normalizedHeaders
     .map((header, index) => ({ header: String(header ?? '').trim(), index }))
     .filter((item) => item.header && !isInternalUnassignedSizeHeader(item.header))
@@ -127,21 +122,17 @@ export function normalizeStoredBreakdownSnapshot(
   snapshot.rows.forEach((item) => {
     const sourceValues = Array.isArray(item.values) ? item.values : []
     if (isInternalUnassignedColorName(item.colorName)) {
-      blankRows.push(remapValuesByHeaders(sourceHeaders, sourceValues, headers))
+      blankRows.push(remapValuesByHeaders(sourceHeaders, visibleHeaderIndexes.map(({ index }) => sourceValues[index]), headers))
       return
     }
-    const values = remapValuesByHeaders(sourceHeaders, sourceValues, headers)
+    const values = remapValuesByHeaders(sourceHeaders, visibleHeaderIndexes.map(({ index }) => sourceValues[index]), headers)
     if (snapshotRowTotal(values) <= 0) return
     const colorName = normalizeColorName(item.colorName)
     if (!colorName) blankRows.push(values)
     else addRow(colorName, values)
   })
   blankRows.forEach((values) => {
-    if (snapshotRowTotal(values) <= 0) return
-    const exactMatches = rowOrder.filter((colorName) => sameSnapshotValues(rowMap.get(colorName) ?? [], values))
-    if (exactMatches.length === 1) addRow(exactMatches[0], values)
-    else if (rowOrder.length === 1) addRow(rowOrder[0], values)
-    else addRow('', values)
+    if (snapshotRowTotal(values) > 0) addRow('', values)
   })
   const rows = rowOrder
     .map((colorName) => ({ colorName, values: [...(rowMap.get(colorName) ?? [])] }))

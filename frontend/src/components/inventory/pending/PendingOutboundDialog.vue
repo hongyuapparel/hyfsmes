@@ -5,6 +5,8 @@
     width="860"
     class="outbound-dialog-centered"
     destroy-on-close
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
     @update:model-value="onVisibleChange"
     @close="onClose"
   >
@@ -44,6 +46,7 @@
           </div>
           <div v-if="item.headers.length" class="outbound-size-wrap">
             <el-table
+              class="editable-grid"
               :data="item.rows"
               border
               size="small"
@@ -66,6 +69,8 @@
                   <el-input-number
                     v-model="row.quantities[hIdx]"
                     :min="0"
+                    :max="row.availableQuantities[hIdx]"
+                    :aria-label="`${row.colorName} ${h} 发货数量，最多 ${row.availableQuantities[hIdx]} 件`"
                     :precision="0"
                     controls-position="right"
                     size="small"
@@ -84,13 +89,14 @@
                 formatDisplayNumber(getOutboundItemTotal(item))
               }}
             </div>
+            <div class="detail-muted">各颜色尺码不能超过本批可用数量；实际库存以提交时校验为准。</div>
           </div>
           <div v-else class="detail-muted">该记录暂无颜色尺码明细，无法发货。</div>
         </div>
       </div>
     </el-form>
     <template #footer>
-      <el-button @click="onCancel">取消</el-button>
+      <el-button :disabled="submitting" @click="onCancel">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="onSubmit">
         确定发货
       </el-button>
@@ -111,7 +117,7 @@ type PendingOutboundDialogItem = {
     quantity: number
   }
   headers: string[]
-  rows: Array<{ colorName: string; quantities: number[] }>
+  rows: Array<{ colorName: string; quantities: number[]; availableQuantities: number[] }>
 }
 
 type PickupUserOption = {

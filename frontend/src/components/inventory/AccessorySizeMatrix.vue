@@ -42,7 +42,7 @@
             <el-input-number
               v-if="!readonly"
               :model-value="numQty(idx)"
-              :min="0"
+              :min="allowNegative ? undefined : 0"
               :precision="0"
               :controls="false"
               size="small"
@@ -68,9 +68,10 @@ import { Close } from '@element-plus/icons-vue'
 import { sumDetailRowQty } from '@/utils/finishedStockTableUtils'
 import { nextAccessorySizeLabel } from '@/utils/accessorySizeMatrix'
 
-withDefaults(defineProps<{ readonly?: boolean; headersReadonly?: boolean }>(), {
+withDefaults(defineProps<{ readonly?: boolean; headersReadonly?: boolean; allowNegative?: boolean }>(), {
   readonly: false,
   headersReadonly: false,
+  allowNegative: false,
 })
 
 const sizeHeaders = defineModel<string[]>('sizeHeaders', { required: true })

@@ -11,6 +11,26 @@ const {
   parseStoredColorSizeSnapshot,
 } = require('../dist/finished-goods-stock/finished-goods-stock-query.utils');
 const { assertColorRowsShape } = require('../dist/common/color-size-row.util');
+const { InventoryPendingService } = require('../dist/inventory-pending/inventory-pending.service');
+
+test('shipped listing preserves factual size breakdown and local clock time', async () => {
+  const saved = { headers: ['S', 'M'], rows: [{ colorName: '杏色', quantities: [2, 3] }] };
+  let selected = [];
+  const qb = new Proxy({}, { get: (_, name) => {
+    if (name === 'then') return undefined;
+    if (name === 'getCount') return async () => 1;
+    if (name === 'getRawMany') return async () => [{ id: 1, orderId: 2, quantity: 5, colorSizeSnapshot: JSON.stringify(saved), createdAt: new Date(2026, 8, 7, 10, 30, 0), operatorUsername: '管理员' }];
+    return (...args) => { if (name === 'select') selected = args[0]; return qb; };
+  } });
+  const service = new InventoryPendingService({ manager: { createQueryBuilder: () => qb } });
+  const result = await service.getList({ tab: 'shipped' });
+  assert.deepEqual(result.list[0].colorSizeSnapshot, saved);
+  assert.equal(result.list[0].createdAt, '2026-09-07 10:30:00');
+  assert.equal(result.list[0].detailStatus, 'recorded');
+  assert.equal(result.list[0].operatorUsername, '管理员');
+  assert.ok(selected.includes('fo.size_breakdown AS colorSizeSnapshot'));
+  assert.ok(selected.some(column => column.includes('actor.display_name')));
+});
 
 test('entity queries hydrate select:false pending color-size snapshots through property paths', () => {
   const pendingServiceSource = fs.readFileSync(
@@ -29,6 +49,20 @@ test('entity queries hydrate select:false pending color-size snapshots through p
   assert.doesNotMatch(pendingServiceSource, /\.addSelect\('p\.color_size_snapshot'\)/);
   assert.match(finishingServiceSource, /\.addSelect\('pending\.colorSizeSnapshot'\)/);
   assert.doesNotMatch(finishingServiceSource, /\.addSelect\('pending\.color_size_snapshot'\)/);
+});
+
+test('历史发货没有快照时原因未知，不猜测缺失或不分尺码', async () => {
+  const qb = new Proxy({}, { get: (_, name) => {
+    if (name === 'then') return undefined;
+    if (name === 'getCount') return async () => 1;
+    if (name === 'getRawMany') return async () => [{ id: 1, orderId: 2, quantity: 5, colorSizeSnapshot: null, createdAt: null }];
+    return () => qb;
+  } });
+  const service = new InventoryPendingService({ manager: { createQueryBuilder: () => qb } });
+  const result = await service.getList({ tab: 'shipped' });
+  assert.equal(result.list[0].detailStatus, 'unknown');
+  assert.equal(result.list[0].colorSizeSnapshot, null);
+  assert.equal(result.list[0].quantity, 5);
 });
 
 function snapshot(quantities) {

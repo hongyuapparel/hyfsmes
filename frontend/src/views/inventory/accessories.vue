@@ -90,7 +90,7 @@
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
             <el-button @click="onReset">清空</el-button>
-            <el-button :loading="exporting" @click="onExport">{{ exportButtonText }}</el-button>
+            <el-button :loading="exporting" :disabled="loading" @click="onExport">{{ exportButtonText }}</el-button>
             <el-button type="primary" @click="openForm(null)">新增辅料</el-button>
             <el-button
               v-if="selectedRows.length"
@@ -167,7 +167,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="出库记录" name="outbounds" lazy>
-        <AccessoriesOutboundTab />
+        <AccessoriesOutboundTab :active="pageTab === 'outbounds'" />
       </el-tab-pane>
     </el-tabs>
 
@@ -206,7 +206,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, onScopeDispose, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   exportAccessoriesStock,
@@ -319,7 +319,13 @@ function stockSizeDetail(row: AccessoryItem): { headers: string[]; quantities: n
   return null
 }
 
+let requestVersion = 0
+onScopeDispose(() => { requestVersion++; if (searchTimer) clearTimeout(searchTimer) })
 async function load() {
+  const version = ++requestVersion
+  if (searchTimer) { clearTimeout(searchTimer); searchTimer = null }
+  selectedRows.value = []
+  accessoriesStockTableRef.value?.clearSelection()
   loading.value = true
   try {
     const [startDate, endDate] =
@@ -335,6 +341,7 @@ async function load() {
       pageSize: pagination.pageSize,
     })
     const data = res.data
+    if (version !== requestVersion) return
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
@@ -342,9 +349,9 @@ async function load() {
       restoreAccessoriesStockColumnWidths(accessoriesStockTableRef.value)
     }
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 

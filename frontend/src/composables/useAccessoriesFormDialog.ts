@@ -9,6 +9,7 @@ import {
 } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { cleanAccessoryMatrix } from '@/utils/accessorySizeMatrix'
+import { buildAccessoryEditSizePayload } from './accessoryEditPayload'
 import { sumDetailRowQty } from '@/utils/finishedStockTableUtils'
 
 export interface AccessoriesFormDialogExpose {
@@ -75,16 +76,20 @@ export function useAccessoriesFormDialog(
     return action || '操作'
   }
 
+  let session = 0
   async function fetchLogs(id: number): Promise<void> {
+    const version = session
     formDialog.logsLoading = true
     try {
       const res = await getAccessoryOperationLogs(id)
+      if (version !== session) return
       logs.value = res.data ?? []
     } catch (e: unknown) {
+      if (version !== session) return
       logs.value = []
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      formDialog.logsLoading = false
+      if (version === session) formDialog.logsLoading = false
     }
   }
 
@@ -110,9 +115,11 @@ export function useAccessoriesFormDialog(
   }
 
   function openForm(row: AccessoryItem | null, mode: AccessoriesFormMode = row ? 'edit' : 'create') {
+    if (formDialog.submitting) return
+    session++
     formDialog.mode = mode
     quickAddSource.value = null
-    logs.value = []
+    logs.value = []; formDialog.logsLoading = false
     editId.value = row ? row.id : null
     const isRowMode = mode === 'edit' || mode === 'view'
     detailRow.value = isRowMode ? row : null
@@ -140,12 +147,15 @@ export function useAccessoriesFormDialog(
 
   /** 编辑中点「取消」：还原表单到原始值并回到详情态 */
   function exitEdit() {
-    if (detailRow.value) applyRowToForm(detailRow.value)
+    if (formDialog.submitting) return
+    session++
+    if (detailRow.value) { applyRowToForm(detailRow.value); void fetchLogs(detailRow.value.id) }
     dialogRef.value?.clearValidate()
     formDialog.mode = 'view'
   }
 
   function resetForm() {
+    session++
     dialogRef.value?.clearValidate()
   }
 
@@ -158,31 +168,23 @@ export function useAccessoriesFormDialog(
   }
 
   async function submitForm() {
-    await dialogRef.value?.validate?.().catch(() => {})
+    if (formDialog.submitting || !formDialog.visible || formDialog.mode === 'view') return
+    const version = session
+    try { if (await dialogRef.value?.validate?.() === false) return } catch { return }
+    if (formDialog.submitting || version !== session || !formDialog.visible) return
     formDialog.submitting = true
     try {
       const imagePayload = getImagePayload()
       if (formDialog.mode === 'edit' && editId.value != null) {
-        const editMatrix = form.isSized ? cleanAccessoryMatrix(form.sizeHeaders, form.sizeQuantities) : null
-        if (form.isSized && (!editMatrix || editMatrix.headers.length === 0)) {
-          ElMessage.warning('请填写分码尺码')
-          return
-        }
-        if (form.isSized && editMatrix && sumDetailRowQty(editMatrix.quantities) <= 0) {
-          ElMessage.warning('分码数量合计必须大于 0')
-          return
-        }
-        const editSizePayload = editMatrix
-          ? { isSized: true, sizeHeaders: editMatrix.headers, sizeQuantities: editMatrix.quantities }
-          : { isSized: false }
+        const editSizePayload = buildAccessoryEditSizePayload(form, detailRow.value)
         await updateAccessory(editId.value, {
           name: form.name,
-          category: form.category,
+          category: form.category ?? '',
           ...editSizePayload,
           unit: form.unit,
           warehouseId: form.warehouseId ?? null,
-          location: form.location || undefined,
-          customerName: form.customerName || undefined,
+          location: form.location,
+          customerName: form.customerName ?? '',
           salesperson: form.salesperson,
           ...imagePayload,
           remark: form.remark,

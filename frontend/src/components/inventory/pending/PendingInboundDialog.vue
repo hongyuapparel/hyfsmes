@@ -2,8 +2,10 @@
   <AppDialog
     :model-value="visible"
     title="入库"
-    width="440"
+    width="680"
     destroy-on-close
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
     @update:model-value="onVisibleChange"
     @close="onClose"
   >
@@ -105,7 +107,7 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="onCancel">取消</el-button>
+      <el-button :disabled="submitting" @click="onCancel">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="onSubmit">
         确定入库
       </el-button>

@@ -1,4 +1,5 @@
 import { computed, reactive, ref } from 'vue'
+import { buildFinishedDetailColorImageMap } from './finishedStockGroupDetail'
 import { ElMessage } from 'element-plus'
 import { type FinishedStockDetailRes, getFinishedStockDetail, repartitionFinishedStockDetail, rollbackFinishedStockChange, upsertFinishedStockColorImage } from '@/api/inventory'
 import type { FinishedDetailColorMeta } from '@/composables/useFinishedDetailMatrixEdit'
@@ -26,7 +27,7 @@ type UseFinishedDetailDataOptions = {
   buildColorMetaHeaders?: () => string[]
   onColorImagesSynced: (stockId: number, colorImages: unknown[]) => void
   onColorImageSaved: (payload: { stockId: number; colorName: string; imageUrl: string }) => void
-  onMetaSaved: () => void
+  onMetaSaved: (refreshDetail: boolean) => Promise<void>
 }
 
 type OpenDetailPayload = {
@@ -50,6 +51,7 @@ type StockMeta = Partial<Record<'skuCode' | 'department' | 'location' | 'imageUr
 export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   const { reset: resetColorImageLoad } = useUploadListImage()
   const loading = ref(false)
+  let loadVersion = 0
   const saving = ref(false)
   const data = ref<FinishedDetailData | null>(null)
   const colorImageMap = ref<Record<string, string>>({})
@@ -132,12 +134,13 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   }
 
   async function loadDetail(stockId: number) {
+    const version = ++loadVersion
     loading.value = true
-    saving.value = false
     data.value = null
     colorImageMap.value = {}
     try {
       const detail = (await getFinishedStockDetail(stockId)).data as FinishedDetailData
+      if (version !== loadVersion) return
       data.value = detail
       internalGroupSizeHeaders.value = mergeSizeHeaders(
         internalGroupSizeHeaders.value,
@@ -145,31 +148,16 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
         Array.isArray(detail?.colorSize?.headers) ? detail.colorSize.headers : [],
       )
       const records = Array.isArray(detail?.colorImages) ? detail.colorImages : []
-      const nextColorImageMap: Record<string, string> = {}
-      internalGroupColorSizeSnapshot.value?.rows.forEach((entry) => {
-        const colorName = String(entry?.colorName ?? '').trim(), imageUrl = String(entry?.imageUrl ?? '').trim()
-        if (colorName && imageUrl && !nextColorImageMap[colorName]) nextColorImageMap[colorName] = imageUrl
-      })
-      // 先用整组聚合的图片填充（覆盖整个 SKU 组所有颜色）
-      internalGroupColorImages.value.forEach((entry) => {
-        const colorName = String(entry?.colorName ?? '').trim()
-        const imageUrl = String(entry?.imageUrl ?? '').trim()
-        if (colorName && imageUrl) nextColorImageMap[colorName] = imageUrl
-      })
-      // 再用当前 stock 的图片覆盖（最准确）
-      records.forEach((record) => {
-        const colorName = String(record?.colorName ?? '').trim()
-        const imageUrl = String(record?.imageUrl ?? '').trim()
-        if (colorName && imageUrl) nextColorImageMap[colorName] = imageUrl
-      })
-      colorImageMap.value = nextColorImageMap
+      colorImageMap.value = buildFinishedDetailColorImageMap(
+        internalGroupColorSizeSnapshot.value?.rows ?? [], internalGroupColorImages.value, records,
+      )
       fillEditFormFromStock()
       metaEditing.value = false
       options.onColorImagesSynced(stockId, records)
     } catch (error: unknown) {
-      if (!isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
+      if (version === loadVersion && !isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
     } finally {
-      loading.value = false
+      if (version === loadVersion) loading.value = false
     }
   }
 
@@ -179,6 +167,8 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   }
 
   async function saveMeta(stockId: number) {
+    if (saving.value) return
+    const version = loadVersion
     saving.value = true
     try {
       await repartitionFinishedStockDetail(stockId, {
@@ -189,9 +179,8 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
         colorMeta: options.buildColorMeta?.() ?? [],
       })
       ElMessage.success('保存成功')
-      await loadDetail(stockId)
-      options.onMetaSaved()
-      metaEditing.value = false
+      await options.onMetaSaved(version === loadVersion)
+      if (version === loadVersion) metaEditing.value = false
     } catch (error: unknown) {
       if (!isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
     } finally {
@@ -220,12 +209,13 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   }
 
   async function rollbackLog(stockId: number, logId: number) {
+    if (saving.value) return
+    const version = loadVersion
     saving.value = true
     try {
       await rollbackFinishedStockChange(logId)
       ElMessage.success('已回滚到该次修改前')
-      await loadDetail(stockId)
-      options.onMetaSaved()
+      await options.onMetaSaved(version === loadVersion)
     } catch (error: unknown) {
       if (!isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
     } finally {
@@ -246,25 +236,10 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   }
 
   return {
-    loading,
-    saving,
-    data,
-    editForm,
-    metaEditing,
-    colorImageMap,
-    adjustLogs,
-    displayProductImage,
-    displaySizeHeaders,
-    displayColorSizeRows,
-    tableUnitPrice,
-    rowTotalPrice,
-    getColorSizeSummary,
-    findInventoryTypeLabel,
-    findWarehouseLabel,
-    toggleEditMode,
-    saveMeta,
-    saveColorImage,
-    rollbackLog,
-    openDetail,
+    loading, saving, data, editForm, metaEditing,
+    colorImageMap, adjustLogs, displayProductImage,
+    displaySizeHeaders, displayColorSizeRows, tableUnitPrice, rowTotalPrice, getColorSizeSummary,
+    findInventoryTypeLabel, findWarehouseLabel,
+    toggleEditMode, saveMeta, saveColorImage, rollbackLog, openDetail,
   }
 }

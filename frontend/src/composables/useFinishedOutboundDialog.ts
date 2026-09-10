@@ -116,16 +116,18 @@ export function useFinishedOutboundDialog(emitSubmitted: () => void, closeDialog
     }
   }
 
+  let session = 0
   function resetOutboundForm() {
+    session++
     outboundForm.pickupUserId = null
     outboundItems.value = []
     outboundFormRef.value?.clearValidate()
   }
 
-  async function buildDialogItem(stock: FinishedOutboundStockInfo): Promise<FinishedOutboundDialogItem> {
+  function buildDialogItem(stock: FinishedOutboundStockInfo): FinishedOutboundDialogItem {
     const snapshot = stock.sizeBreakdown
     if (snapshot?.headers?.length && snapshot.rows?.length) {
-      const sourceHeaders = snapshot.headers.map(normalizeSizeHeader).filter(Boolean)
+      const sourceHeaders = snapshot.headers.map(normalizeSizeHeader)
       const headers = toHeaders(snapshot.headers)
       return { stock, headers, rows: toSnapshotRows(stock, sourceHeaders, headers, snapshot.rows) }
     }
@@ -133,11 +135,12 @@ export function useFinishedOutboundDialog(emitSubmitted: () => void, closeDialog
   }
 
   async function initOutboundSizeList(stockItems: FinishedOutboundStockInfo[]) {
+    if (submitting.value) return
     resetOutboundForm()
     if (!stockItems.length) return
     outboundLoading.value = true
     try {
-      outboundItems.value = await Promise.all(stockItems.map((item) => buildDialogItem(item)))
+      outboundItems.value = stockItems.map(buildDialogItem)
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
       outboundItems.value = []
@@ -187,8 +190,14 @@ export function useFinishedOutboundDialog(emitSubmitted: () => void, closeDialog
   }
 
   async function submitOutbound() {
-    const valid = await outboundFormRef.value?.validate().then(() => true).catch(() => false)
-    if (!valid) return
+    if (submitting.value) return
+    const version = session
+    const valid = await outboundFormRef.value?.validate().catch(() => false)
+    if (!valid || submitting.value || version !== session) return
+    if (outboundItems.value.some(item => item.rows.some(row => row.quantities.some(qty => !Number.isInteger(qty) || qty < 0)))) {
+      ElMessage.warning('各尺码出库数量必须是大于或等于 0 的整数')
+      return
+    }
     if (!outboundItems.value.length) {
       ElMessage.warning('未选择可出库记录')
       return

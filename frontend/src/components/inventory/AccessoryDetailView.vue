@@ -8,7 +8,7 @@
         </el-button>
         <template v-else>
           <el-button type="primary" size="small" class="detail-head-btn" :loading="submitting" @click="emit('confirm')">保存</el-button>
-          <el-button size="small" class="detail-head-btn" @click="emit('exitEdit')">取消</el-button>
+          <el-button size="small" class="detail-head-btn" :disabled="submitting" @click="emit('exitEdit')">取消</el-button>
         </template>
       </template>
 
@@ -81,7 +81,7 @@
 
     <div v-if="form.isSized" class="acc-section">
       <div class="acc-section-title">分码明细</div>
-      <AccessorySizeMatrix v-model:size-headers="form.sizeHeaders" v-model:size-quantities="form.sizeQuantities" :readonly="isView" />
+      <AccessorySizeMatrix v-model:size-headers="form.sizeHeaders" v-model:size-quantities="form.sizeQuantities" :readonly="isView" allow-negative />
     </div>
 
     <div class="acc-section">
@@ -200,4 +200,9 @@ defineOptions({ name: 'AccessoryDetailView' })
 .multi-image-upload :deep(.image-upload-area) { min-height: 110px; height: 110px; }
 .multi-image-upload :deep(.preview-img) { aspect-ratio: 1 / 1; max-width: 100px; }
 .image-tip { font-size: var(--font-size-caption); color: var(--color-text-muted); }
+@media (max-width: 600px) {
+  .acc-detail-wrap :deep(.detail-basic-grid) { grid-template-columns: 90px minmax(0, 1fr); }
+  .acc-detail-wrap .detail-basic-value-span-3 { grid-column: 2 / 3; }
+  .acc-detail-wrap .detail-basic-value { overflow-wrap: anywhere; }
+}
 </style>

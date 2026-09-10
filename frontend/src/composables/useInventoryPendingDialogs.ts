@@ -3,12 +3,9 @@ import { ElMessage, type FormRules } from 'element-plus'
 import {
   doPendingInbound,
   doPendingOutbound,
-  getPendingPickupUserOptions,
-  type FinishedPickupUserOption,
   type PendingListItem,
 } from '@/api/inventory'
-import { getDictItems } from '@/api/dicts'
-import type { SystemOptionItem } from '@/api/system-options'
+import { useInventoryPendingOptions } from '@/composables/useInventoryPendingOptions'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import {
   buildInboundPreviewItem,
@@ -17,6 +14,7 @@ import {
   getOutboundItemTotal,
   getOutboundRowTotal,
   getOutboundTableSummaries,
+  getOutboundValidationMessage,
   toInboundPreviewTableRows,
 } from '@/composables/inventoryPendingDialogHelpers'
 
@@ -25,7 +23,7 @@ type PendingPageTab = 'pending' | 'shipped'
 export type PendingOutboundDialogItem = {
   row: PendingListItem
   headers: string[]
-  rows: Array<{ colorName: string; quantities: number[] }>
+  rows: Array<{ colorName: string; quantities: number[]; availableQuantities: number[] }>
 }
 
 export type InboundPreviewItem = {
@@ -65,9 +63,7 @@ export function useInventoryPendingDialogs({
     location: [{ required: true, message: '请输入存放地址', trigger: 'blur' }],
   }
 
-  const warehouseOptions = ref<{ id: number; label: string }[]>([])
-  const inventoryTypeOptions = ref<{ id: number; label: string }[]>([])
-  const departmentOptions = ref<{ value: string; label: string }[]>([])
+  const { warehouseOptions, inventoryTypeOptions, departmentOptions, pickupUserOptions, loadDialogOptions } = useInventoryPendingOptions()
 
   const outboundDialog = reactive<{
     visible: boolean
@@ -80,7 +76,6 @@ export function useInventoryPendingDialogs({
   const outboundRules: FormRules = {
     pickupUserId: [{ required: true, message: '请选择领取人', trigger: 'change' }],
   }
-  const pickupUserOptions = ref<FinishedPickupUserOption[]>([])
 
   const outboundSelectedCustomer = computed(() => {
     const first = outboundDialog.items[0]?.row?.customerName?.trim()
@@ -89,9 +84,7 @@ export function useInventoryPendingDialogs({
   const outboundGrandTotal = computed(() =>
     outboundDialog.items.reduce((sum, item) => sum + getOutboundItemTotal(item), 0),
   )
-  const inboundPreviewItems = computed<InboundPreviewItem[]>(() =>
-    selectedRows.value.map((row) => buildInboundPreviewItem(row)),
-  )
+  const inboundPreviewItems = ref<InboundPreviewItem[]>([])
 
   async function openInboundDialog() {
     if (!selectedRows.value.length) return
@@ -100,6 +93,7 @@ export function useInventoryPendingDialogs({
       ElMessage.warning(`订单 ${missing.orderNo} / ${missing.skuCode} 未留存本批颜色尺码明细，请先在尾部纠错中按实际数据补录`)
       return
     }
+    inboundPreviewItems.value = selectedRows.value.map(buildInboundPreviewItem)
     inboundDialog.visible = true
   }
 
@@ -111,7 +105,8 @@ export function useInventoryPendingDialogs({
   }
 
   async function submitInbound() {
-    const ids = selectedRows.value.map((r) => r.id)
+    if (inboundDialog.submitting) return
+    const ids = inboundPreviewItems.value.map((r) => r.id)
     if (!ids.length) return
     inboundDialog.submitting = true
     try {
@@ -131,54 +126,6 @@ export function useInventoryPendingDialogs({
     } finally {
       inboundDialog.submitting = false
     }
-  }
-
-  async function loadWarehouseOptions() {
-    try {
-      const res = await getDictItems('warehouses')
-      const list = (res.data ?? []) as SystemOptionItem[]
-      warehouseOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
-    } catch {
-      warehouseOptions.value = []
-    }
-  }
-
-  async function loadDepartmentOptions() {
-    try {
-      const res = await getDictItems('org_departments')
-      const list = (res.data ?? []) as SystemOptionItem[]
-      departmentOptions.value = list.map((o) => ({ value: o.value, label: o.value }))
-    } catch {
-      departmentOptions.value = []
-    }
-  }
-
-  async function loadInventoryTypeOptions() {
-    try {
-      const res = await getDictItems('inventory_types')
-      const list = (res.data ?? []) as SystemOptionItem[]
-      inventoryTypeOptions.value = list.map((o) => ({ id: o.id, label: o.value }))
-    } catch {
-      inventoryTypeOptions.value = []
-    }
-  }
-
-  async function loadPickupUserOptions() {
-    try {
-      const res = await getPendingPickupUserOptions()
-      pickupUserOptions.value = res.data ?? []
-    } catch {
-      pickupUserOptions.value = []
-    }
-  }
-
-  async function loadDialogOptions() {
-    await Promise.all([
-      loadWarehouseOptions(),
-      loadInventoryTypeOptions(),
-      loadDepartmentOptions(),
-      loadPickupUserOptions(),
-    ])
   }
 
   async function openOutboundDialog() {
@@ -225,24 +172,15 @@ export function useInventoryPendingDialogs({
   }
 
   async function submitOutbound() {
+    if (outboundDialog.submitting) return
     if (!outboundDialog.items.length) return
     if (outboundForm.pickupUserId == null) {
       ElMessage.warning('请选择领取人')
       return
     }
-    const invalidItem = outboundDialog.items.find((item) => {
-      const qty = getOutboundItemTotal(item)
-      return item.headers.length === 0 || qty <= 0 || qty > item.row.quantity
-    })
-    if (invalidItem) {
-      const qty = getOutboundItemTotal(invalidItem)
-      if (invalidItem.headers.length === 0) {
-        ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 暂无颜色尺码明细，无法发货`)
-      } else if (qty <= 0) {
-        ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 请填写发货数量`)
-      } else {
-        ElMessage.warning(`订单 ${invalidItem.row.orderNo} / ${invalidItem.row.skuCode} 的发货数量不能大于当前待处理数量`)
-      }
+    const warning = outboundDialog.items.map(getOutboundValidationMessage).find(Boolean)
+    if (warning) {
+      ElMessage.warning(warning)
       return
     }
     outboundDialog.submitting = true

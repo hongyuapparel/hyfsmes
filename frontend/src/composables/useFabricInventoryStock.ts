@@ -1,4 +1,4 @@
-import { reactive, ref } from 'vue'
+import { onScopeDispose, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getAllCustomerCompanyOptions } from '@/api/customers'
 import {
@@ -78,8 +78,19 @@ export function useFabricInventoryStock() {
     onHeaderDragEnd: onFabricStockHeaderDragEnd,
     restoreColumnWidths: restoreFabricStockColumnWidths,
   } = useTableColumnWidthPersist('inventory-fabric-stock')
+  let requestVersion = 0
+  let searchTimer: ReturnType<typeof setTimeout> | null = null
+  function cancelSearch() {
+    if (searchTimer) clearTimeout(searchTimer)
+    searchTimer = null
+  }
+  onScopeDispose(() => { cancelSearch(); requestVersion++ })
   async function load() {
+    cancelSearch()
+    const version = ++requestVersion
     loading.value = true
+    selectedRows.value = []
+    fabricStockTableRef.value?.clearSelection()
     try {
       const [startDate, endDate] =
         inboundDateRange.value && inboundDateRange.value.length === 2 ? inboundDateRange.value : ['', '']
@@ -99,6 +110,7 @@ export function useFabricInventoryStock() {
         sortField,
         sortOrder: sortField ? sort.sortOrder : undefined,
       })
+      if (version !== requestVersion) return
       const data = res.data
       if (data) {
         list.value = data.list ?? []
@@ -110,9 +122,9 @@ export function useFabricInventoryStock() {
         restoreFabricStockColumnWidths(fabricStockTableRef.value)
       }
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+      if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      loading.value = false
+      if (version === requestVersion) loading.value = false
     }
   }
 
@@ -122,7 +134,6 @@ export function useFabricInventoryStock() {
     load()
   }
 
-  let searchTimer: ReturnType<typeof setTimeout> | null = null
   function debouncedSearch() {
     if (searchTimer) clearTimeout(searchTimer)
     searchTimer = setTimeout(() => {
@@ -148,7 +159,7 @@ export function useFabricInventoryStock() {
   }
 
   function onSelectionChange(rows: FabricItem[]) {
-    selectedRows.value = rows ?? []
+    selectedRows.value = loading.value ? [] : rows ?? []
   }
 
   async function loadCustomerOptions() {

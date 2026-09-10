@@ -7,12 +7,14 @@
     :max-size="1120"
     :resizable="true"
     class="accessories-form-drawer"
-    @update:model-value="emit('update:visible', $event)"
+    :show-close="!submitting"
+    :close-on-press-escape="!submitting"
+    @update:model-value="!submitting && emit('update:visible', $event)"
     @closed="onClose"
   >
     <div class="accessories-form-scroll">
       <!-- 新增辅料：录入表单 -->
-      <el-form v-if="isCreate" ref="formRef" :model="form" :rules="formRules" label-width="80px">
+      <el-form v-if="isCreate" ref="formRef" :model="form" :rules="formRules" :disabled="submitting" label-width="80px">
         <div class="form-grid">
           <el-alert
             v-if="quickAddSource"
@@ -117,7 +119,7 @@
       />
     </div>
     <template #footer>
-      <el-button @click="emit('update:visible', false)">{{ isCreate ? '取消' : '关闭' }}</el-button>
+      <el-button :disabled="submitting" @click="emit('update:visible', false)">{{ isCreate ? '取消' : '关闭' }}</el-button>
       <el-button v-if="isCreate" type="primary" :loading="submitting" @click="emit('confirm')">确定</el-button>
     </template>
   </AppDrawer>

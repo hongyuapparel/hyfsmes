@@ -42,6 +42,7 @@ type OutboundDialogState = {
 
 type StockInteractionsOptions = {
   list: Ref<FinishedStockRow[]>
+  stockTableData: Ref<StockTableRow[]>
   getSharedProductImageUrl: (row: StockTableRow) => string
   getGroupLeafRows: (row: StockTableRow) => StockTableLeafRow[]
   getGroupSizeHeaders: (row: StockTableRow) => string[]
@@ -81,6 +82,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
 
   const createDrawerVisible = ref(false)
   const createSeed = ref<FinishedCreateQuickAddSource | null>(null)
+  let detailSession = 0
 
   function onSelectionChange(rows: StockTableRow[]) {
     selectedRows.value = resolveFinishedStockLeafSelection(rows, selectedRows.value)
@@ -89,6 +91,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   function openDetail(row: StockTableRow) {
     const detailRow = isStockTableParentRow(row) ? row._children[0] : row
     if (!isStockTableLeafRow(detailRow)) return
+    detailSession++
     detailDrawer.groupProductImage = getSharedProductImageUrl(row)
     detailDrawer.groupSizeHeaders = getGroupSizeHeaders(row)
     detailDrawer.groupColorSizeSnapshot = buildFinishedGroupColorSizeSnapshot(row, getGroupLeafRows, getGroupSizeHeaders)
@@ -196,8 +199,22 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
     syncStockColorImage(payload.stockId, payload.colorName, payload.imageUrl)
   }
 
-  async function onMetaSaved() {
+  async function onMetaSaved(refreshDetail = true) {
+    const session = detailSession
+    const currentSku = list.value.find(row => row.id === detailDrawer.stockId)?.skuCode
+    const colorName = detailDrawer.selectedColorName
+    const previousId = detailDrawer.stockId
     await load()
+    if (!refreshDetail || !detailDrawer.visible || session !== detailSession) return
+    const group = options.stockTableData.value.find(row => row.type === 'stored' && row.skuCode === currentSku)
+    if (!group) {
+      detailDrawer.visible = false
+      return
+    }
+    const leaf = colorName === null ? null : getGroupLeafRows(group).find(row =>
+      row.id === previousId && normalizeColorName(row._selectedColorName || row._displayColor) === colorName,
+    )
+    openDetail(leaf ?? group)
   }
 
   function clearSelection() {

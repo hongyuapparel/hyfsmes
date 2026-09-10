@@ -59,6 +59,7 @@ export function useFabricFormDialog(
   const editId = ref<number | null>(null)
   const detailRow = ref<FabricItem | null>(null)
   const logs = ref<FabricOperationLog[]>([])
+  let formVersion = 0
   /** 每次打开表单递增，重置供应商下拉内部筛选关键字 */
   const fabricSupplierSelectKey = ref(0)
   const form = reactive<FabricFormModel>(emptyFabricForm())
@@ -77,15 +78,19 @@ export function useFabricFormDialog(
   }
 
   async function fetchLogs(id: number): Promise<void> {
+    const version = formVersion
+    const isCurrent = () => version === formVersion && formDialog.visible
     formDialog.logsLoading = true
     try {
       const res = await getFabricOperationLogs(id)
+      if (!isCurrent()) return
       logs.value = res.data ?? []
     } catch (e: unknown) {
+      if (!isCurrent()) return
       logs.value = []
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      formDialog.logsLoading = false
+      if (isCurrent()) formDialog.logsLoading = false
     }
   }
 
@@ -106,6 +111,9 @@ export function useFabricFormDialog(
   }
 
   async function openForm(row: FabricItem | null, mode: FabricFormMode = row ? 'edit' : 'create') {
+    if (formDialog.submitting) return
+    formVersion += 1
+    formDialog.logsLoading = false
     formDialog.mode = mode
     quickAddSource.value = null
     logs.value = []
@@ -133,16 +141,21 @@ export function useFabricFormDialog(
   }
 
   function enterEdit() {
+    if (formDialog.submitting) return
     formDialog.mode = 'edit'
   }
 
   function exitEdit() {
+    if (formDialog.submitting) return
     if (detailRow.value) applyRowToForm(detailRow.value)
     dialogRef.value?.clearValidate()
     formDialog.mode = 'view'
   }
 
   function resetForm() {
+    if (formDialog.visible) return
+    formVersion += 1
+    formDialog.logsLoading = false
     dialogRef.value?.clearValidate()
   }
 
@@ -150,21 +163,29 @@ export function useFabricFormDialog(
     return {
       name: form.name,
       unit: form.unit,
-      customerName: form.customerName || undefined,
-      imageUrl: form.imageUrl || undefined,
+      customerName: form.customerName ?? '',
+      imageUrl: form.imageUrl,
       remark: form.remark,
-      supplierId: form.supplierId,
-      warehouseId: form.warehouseId,
-      inventoryTypeId: form.inventoryTypeId,
+      supplierId: form.supplierId ?? null,
+      warehouseId: form.warehouseId ?? null,
+      inventoryTypeId: form.inventoryTypeId ?? null,
       storageLocation: form.storageLocation,
       unitPrice: form.isUnpriced ? null : form.unitPrice,
     }
   }
 
   async function submitForm() {
+    if (formDialog.submitting || !formDialog.visible || formDialog.mode === 'view') return
+    const version = formVersion
+    const mode = formDialog.mode
     try {
       await dialogRef.value?.validate?.()
     } catch {
+      return
+    }
+    if (formDialog.submitting || !formDialog.visible || version !== formVersion || mode !== formDialog.mode) return
+    if (!form.name.trim()) {
+      ElMessage.warning('请输入面料名称')
       return
     }
     if (formDialog.mode !== 'edit' && (!Number.isFinite(Number(form.quantity)) || Number(form.quantity) <= 0)) {
@@ -182,7 +203,7 @@ export function useFabricFormDialog(
     formDialog.submitting = true
     try {
       if (formDialog.mode === 'edit' && editId.value != null) {
-        await updateFabric(editId.value, { ...buildPayload(), quantity: form.quantity })
+        await updateFabric(editId.value, buildPayload())
         ElMessage.success('保存成功')
       } else if (quickAddSource.value) {
         const inputQty = Number(form.quantity) || 0

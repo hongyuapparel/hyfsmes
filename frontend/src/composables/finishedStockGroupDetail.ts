@@ -20,6 +20,24 @@ function getLeafImageUrl(leaf: StockTableLeafRow, colorName: string): string {
   )
 }
 
+export function buildFinishedDetailColorImageMap(
+  snapshotRows: Array<{ colorName?: string; imageUrl?: string }>,
+  groupImages: Array<{ colorName?: string; imageUrl?: string }>,
+  stockImages: Array<{ colorName?: string; imageUrl?: string }>,
+): Record<string, string> {
+  const result: Record<string, string> = {}
+  snapshotRows.forEach(entry => {
+    const color = normalizeColorName(entry.colorName), url = String(entry.imageUrl ?? '').trim()
+    if (color && url && !result[color]) result[color] = url
+  })
+  // 当前库存的图片优先于聚合图片，沿用已有显示顺序。
+  for (const entry of [...groupImages, ...stockImages]) {
+    const color = normalizeColorName(entry.colorName), url = String(entry.imageUrl ?? '').trim()
+    if (color && url) result[color] = url
+  }
+  return result
+}
+
 export function buildFinishedGroupColorSizeSnapshot(
   row: StockTableRow,
   getGroupLeafRows: (row: StockTableRow) => StockTableLeafRow[],

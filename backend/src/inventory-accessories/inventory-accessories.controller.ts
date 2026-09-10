@@ -161,6 +161,8 @@ export class InventoryAccessoriesController {
     @Query('accessoryId') accessoryId?: string,
     @Query('orderNo') orderNo?: string,
     @Query('outboundType') outboundType?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -168,6 +170,8 @@ export class InventoryAccessoriesController {
       accessoryId: accessoryId ? Number(accessoryId) : undefined,
       orderNo,
       outboundType,
+      startDate,
+      endDate,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -193,6 +197,7 @@ export class InventoryAccessoriesController {
         quantity: Number(quantity),
         sizeOutbound,
         outboundType: 'manual',
+        enforceAvailableStock: true,
         operatorUsername,
         remark,
         orderId: null,

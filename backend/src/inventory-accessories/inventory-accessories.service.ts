@@ -10,10 +10,9 @@ import { InventoryStockExportMode } from '../common/inventory-stock-export.dto';
 import {
   applySizedOutbound,
   distributeProportional,
-  mapOutboundRawRow,
+  assertManualAccessoryOutbound,
   toAccessorySnapshot,
   type AccessoryOutboundNegative,
-  type AccessoryOutboundRawRow,
   type InventoryAccessoryOutboundParams,
   type InventoryAccessoryOutboundResult,
 } from './inventory-accessory.helpers';
@@ -21,6 +20,7 @@ import {
   applyInventoryAccessoryListFilters,
   type InventoryAccessoryListFilters,
 } from './inventory-accessories-list-query';
+import { getAccessoryOutboundRecords } from './inventory-accessories-outbound-query';
 
 @Injectable()
 export class InventoryAccessoriesService {
@@ -169,6 +169,10 @@ export class InventoryAccessoriesService {
     const mainImageUrl = imageUrls[0] ?? this.normalizeName(dto.imageUrl);
     const existing = await this.findByName(name);
     if (existing) {
+      const incomingUnit = dto.unit === undefined ? this.normalizeName(existing.unit) : this.normalizeName(dto.unit);
+      if (incomingUnit !== this.normalizeName(existing.unit)) {
+        throw new BadRequestException(`同名辅料单位不一致（库存：${existing.unit || '未记录'}，本次：${incomingUnit || '未填写'}），不能合并入库，请核对单位`);
+      }
       const before = toAccessorySnapshot(existing);
       if (existing.isSized) {
         if (!matrix) {
@@ -382,11 +386,12 @@ export class InventoryAccessoriesService {
       .getOne();
 
     if (!accessory) throw new NotFoundException('辅料记录不存在');
+    if (params.enforceAvailableStock) assertManualAccessoryOutbound(accessory, params);
 
     const before = Number(accessory.quantity) || 0;
     const beforeSnapshot = toAccessorySnapshot(accessory);
 
-    // 允许负库存：库存不足不再报错，扣成负数作为「待订购」信号，入库后自然抵消。
+    // 订单自动扣料及采购领料保留原规则；库存页手动出库已在行锁内逐码校验。
     const negatives: AccessoryOutboundNegative[] = [];
     let recordSizeOutbound: { headers: string[]; quantities: number[] } | null = null;
     let recordQty = qty;
@@ -457,58 +462,8 @@ export class InventoryAccessoriesService {
     return { accessory: savedAccessory, record: savedRecord, negatives };
   }
 
-  async getOutboundRecords(params: {
-    accessoryId?: number;
-    orderNo?: string;
-    outboundType?: string;
-    page?: number;
-    pageSize?: number;
-  }): Promise<{
-    list: Array<
-      Omit<InventoryAccessoryOutbound, 'createdAt'> & {
-        createdAt: string;
-        imageUrl?: string;
-        customerName?: string;
-        category?: string;
-      }
-    >;
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
-    const { accessoryId, orderNo, outboundType, page = 1, pageSize = 20 } = params;
-    const qb = this.outboundRepo
-      .createQueryBuilder('r')
-      .leftJoin(InventoryAccessory, 'a', 'a.id = r.accessory_id')
-      .select([
-        'r.id AS id',
-        'r.accessory_id AS accessoryId',
-        'r.order_id AS orderId',
-        'r.order_no AS orderNo',
-        'r.outbound_type AS outboundType',
-        'r.quantity AS quantity',
-        'r.before_quantity AS beforeQuantity',
-        'r.after_quantity AS afterQuantity',
-        'r.operator_username AS operatorUsername',
-        'r.remark AS remark',
-        'r.created_at AS createdAt',
-        'r.size_outbound AS sizeOutbound',
-        "COALESCE(a.image_url, '') AS imageUrl",
-        "COALESCE(a.customer_name, '') AS customerName",
-        "COALESCE(a.category, '') AS category",
-      ]);
-    if (accessoryId) qb.andWhere('r.accessory_id = :accessoryId', { accessoryId });
-    if (orderNo?.trim()) qb.andWhere('r.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
-    if (outboundType?.trim()) qb.andWhere('r.outbound_type = :outboundType', { outboundType: outboundType.trim() });
-    qb.orderBy('r.created_at', 'DESC');
-
-    const total = await qb.getCount();
-    const list = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getRawMany<AccessoryOutboundRawRow>();
-    const rows = list.map(mapOutboundRawRow);
-    return { list: rows, total, page, pageSize };
+  async getOutboundRecords(params: Parameters<typeof getAccessoryOutboundRecords>[1]) {
+    return getAccessoryOutboundRecords(this.outboundRepo, params);
   }
 
   async getOperationLogs(accessoryId: number): Promise<InventoryAccessoryOperationLog[]> {

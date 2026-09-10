@@ -1,6 +1,5 @@
 import { computed, type Ref } from 'vue'
 import {
-  allocateByWeight,
   formatPrice,
   formatTotalPrice,
   mergeSizeHeaders,
@@ -93,45 +92,8 @@ export function useFinishedDetailDisplayData(params: {
       return displayRows.length ? { headers: displayHeaders, rows: displayRows } : { headers: [], rows: [] }
     }
 
-    const filteredRows = hasSelectedColor ? rows.filter((row) => normalizeColorName(row.colorName) === selectedName) : rows
-    if (!filteredRows.length) return { headers: [], rows: [] }
-    const stockQuantity = Math.max(0, Math.trunc(Number(params.selectedQuantity.value ?? detail?.stock?.quantity) || 0))
-    const orderTotal = filteredRows.reduce((sum, row) => sum + sumRowQty(row.quantities ?? []), 0)
-    if (orderTotal === stockQuantity) {
-      return {
-        headers: [...targetHeaders],
-        rows: filteredRows
-          .map<DisplayColorSizeRow>((row) => ({
-            colorName: String(row.colorName ?? ''),
-            imageUrl: row.imageUrl,
-            stockId: detail?.stock?.id,
-          unitPrice: detail?.stock?.unitPrice != null ? String(detail.stock.unitPrice) : '',
-            quantities: remapValuesByHeaders(headers, row.quantities ?? [], targetHeaders),
-          }))
-          .filter((row) => snapshotRowTotal(row.quantities) > 0),
-      }
-    }
+    return { headers: [], rows: [] }
 
-    const weights = filteredRows.flatMap((row) => headers.map((_, index) => Math.max(0, Number(row.quantities?.[index]) || 0)))
-    const allocated = allocateByWeight(weights, stockQuantity)
-    let cursor = 0
-    return {
-      headers: [...targetHeaders],
-      rows: filteredRows
-        .map<DisplayColorSizeRow>((row) => ({
-          colorName: String(row.colorName ?? ''),
-          imageUrl: row.imageUrl,
-          quantities: headers.map(() => allocated[cursor++] ?? 0),
-        }))
-        .map<DisplayColorSizeRow>((row) => ({
-          colorName: row.colorName,
-          imageUrl: row.imageUrl,
-          stockId: detail?.stock?.id,
-          unitPrice: detail?.stock?.unitPrice != null ? String(detail.stock.unitPrice) : '',
-          quantities: remapValuesByHeaders(headers, row.quantities, targetHeaders),
-        }))
-        .filter((row) => snapshotRowTotal(row.quantities) > 0),
-    }
   })
 
   const displaySizeHeaders = computed(() => displayColorSizeData.value.headers)

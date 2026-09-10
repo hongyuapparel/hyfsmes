@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { buildOutboundDialogItem } from '@/composables/inventoryPendingDialogHelpers'
+import { buildOutboundDialogItem, buildInboundPreviewItem, getOutboundValidationMessage } from '@/composables/inventoryPendingDialogHelpers'
 import type { PendingListItem } from '@/api/inventory'
 
 function baseRow(overrides: Partial<PendingListItem> = {}): PendingListItem {
@@ -22,6 +22,32 @@ function baseRow(overrides: Partial<PendingListItem> = {}): PendingListItem {
 }
 
 describe('buildOutboundDialogItem', () => {
+  it('keeps quantities aligned when a total column is not the last column', () => {
+    const row = baseRow({ quantity: 5, colorSizeSnapshot: { headers: ['合计', 'S', 'M'], rows: [{ colorName: '杏色', quantities: [5, 2, 3] }] } })
+    expect(buildOutboundDialogItem(row).item.rows[0].quantities).toEqual([2, 3])
+    expect(buildInboundPreviewItem(row).rows[0].values).toEqual([2, 3])
+  })
+
+  it.each([-1, 1.5, Number.NaN])('rejects invalid stored quantity %s without clamping facts', (value) => {
+    const row = baseRow({ quantity: 2, colorSizeSnapshot: { headers: ['S'], rows: [{ colorName: '杏色', quantities: [value] }] } })
+    expect(buildOutboundDialogItem(row).warning).toMatch(/明细无效/)
+  })
+
+  it('rejects color-size over-allocation even when the grand total is unchanged', () => {
+    const { item } = buildOutboundDialogItem(baseRow())
+    item.rows[0].quantities[0] = 51
+    item.rows[0].quantities[1] = 48
+    expect(getOutboundValidationMessage(item)).toMatch(/S 最多可发 50 件/)
+    expect(item.row.colorSizeSnapshot?.rows[0].quantities[0]).toBe(50)
+  })
+
+  it('accepts a factual partial shipment and rejects zero shipment', () => {
+    const { item } = buildOutboundDialogItem(baseRow())
+    item.rows[0].quantities = [1, 0, 0, 0, 0]
+    expect(getOutboundValidationMessage(item)).toBe('')
+    item.rows[0].quantities = [0, 0, 0, 0, 0]
+    expect(getOutboundValidationMessage(item)).toMatch(/请填写发货数量/)
+  })
   it('uses finishing snapshot as-is when totals match', () => {
     const { item, warning } = buildOutboundDialogItem(baseRow())
     expect(warning).toBeUndefined()

@@ -21,6 +21,7 @@ export function useFabricBatchPricing(options: {
   const rows = reactive<FabricBatchPriceRow[]>([])
 
   function open() {
+    if (submitting.value) return
     if (!options.selectedRows.value.length) {
       ElMessage.warning('请先选择需要补价的面料')
       return
@@ -36,6 +37,7 @@ export function useFabricBatchPricing(options: {
   }
 
   async function submit() {
+    if (submitting.value || !visible.value || !rows.length) return
     if (rows.some((row) => row.unitPrice == null || !Number.isFinite(Number(row.unitPrice)) || Number(row.unitPrice) < 0)) {
       ElMessage.warning('请为每一行填写大于或等于 0 的实际成本单价')
       return

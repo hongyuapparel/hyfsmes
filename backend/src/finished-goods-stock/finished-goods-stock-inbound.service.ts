@@ -394,6 +394,7 @@ export class FinishedGoodsStockInboundService {
   }
 
   async upsertColorImage(id: number, dto: { colorName: string; imageUrl: string }, operatorUsername = ''): Promise<void> {
+    // 图片操作只更新图片和日志，不能触发库存合并、加权计价或更换库存 ID。
     const stock = await this.stockRepo.findOne({ where: { id } });
     if (!stock) throw new NotFoundException('库存记录不存在');
     const colorName = (dto.colorName ?? '').trim();
@@ -410,7 +411,6 @@ export class FinishedGoodsStockInboundService {
             action: 'image',
           });
         }
-        await this.consolidateDuplicateFinishedStocks(stock);
         return;
       }
       if (existing) {
@@ -422,7 +422,6 @@ export class FinishedGoodsStockInboundService {
             action: 'image',
           });
         }
-        await this.consolidateDuplicateFinishedStocks(stock);
         return;
       }
       await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: id, colorName, imageUrl }));
@@ -430,7 +429,6 @@ export class FinishedGoodsStockInboundService {
       await this.appendFinishedStockAdjustLog(id, operatorUsername, before, after, `更新颜色图片：${colorName}`, {
         action: 'image',
       });
-      await this.consolidateDuplicateFinishedStocks(stock);
     } catch (e) {
       if (this.isTableMissingError(e, 'finished_goods_stock_color_images')) {
         throw new InternalServerErrorException(

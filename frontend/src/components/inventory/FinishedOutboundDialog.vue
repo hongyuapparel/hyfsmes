@@ -4,10 +4,12 @@
     title="出库"
     width="920"
     destroy-on-close
+    :show-close="!submitting"
+    :close-on-press-escape="!submitting"
     @update:model-value="onDialogVisibleChange"
     @close="resetOutboundForm"
   >
-    <el-form ref="outboundFormRef" :model="outboundForm" :rules="outboundRules" label-width="80px">
+    <el-form ref="outboundFormRef" :model="outboundForm" :rules="outboundRules" :disabled="submitting" label-width="80px">
       <el-form-item label="领取人" prop="pickupUserId">
         <el-select
           v-model="outboundForm.pickupUserId"
@@ -44,7 +46,7 @@
             :data="group.rows"
             border
             size="small"
-            class="outbound-size-table"
+            class="outbound-size-table editable-grid"
           >
             <el-table-column label="颜色" min-width="100" align="center" header-align="center">
               <template #default="{ row }">
@@ -91,7 +93,7 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="closeDialog">取消</el-button>
+      <el-button :disabled="submitting" @click="closeDialog">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="submitOutbound">确定出库</el-button>
     </template>
   </AppDialog>
@@ -207,6 +209,7 @@ function getGroupTotal(group: OutboundSkuGroup): number {
 }
 
 function onDialogVisibleChange(value: boolean) {
+  if (submitting.value) return
   emit('update:modelValue', value)
 }
 

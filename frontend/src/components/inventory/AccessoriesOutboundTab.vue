@@ -73,6 +73,9 @@
           <template #default="{ row }">{{ row.createdAt }}</template>
         </el-table-column>
         <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column prop="accessoryName" label="辅料名称" min-width="180" show-overflow-tooltip align="center" header-align="center">
+          <template #default="{ row }">{{ row.accessoryName || '名称不可用' }}</template>
+        </el-table-column>
         <el-table-column label="图片" :width="compactImageColumnMinWidth" align="center">
           <template #default="{ row }">
             <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" :width="compactImageSize" :height="compactImageSize" />
@@ -101,7 +104,7 @@
       v-model:page-size="pagination.pageSize"
       :total="pagination.total"
       :total-quantity="totalQuantity"
-      summary-label="出库数量"
+      summary-label="本页出库数量"
       @current-change="load"
       @size-change="onPageSizeChange"
     />
@@ -109,7 +112,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onScopeDispose, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getAccessoryOutboundRecords, type AccessoryOutboundRecord } from '@/api/inventory'
@@ -128,6 +131,7 @@ import AppImageThumb from '@/components/AppImageThumb.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import AccessoryQtyCell from '@/components/inventory/AccessoryQtyCell.vue'
 
+const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true })
 const outboundFilter = reactive<{ orderNo: string; outboundType: string; dateRange: [string, string] | [] }>({
   orderNo: '',
   outboundType: '',
@@ -145,23 +149,29 @@ const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('inv
 
 const totalQuantity = computed(() => outboundList.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
 
+let requestVersion = 0
+onScopeDispose(() => { requestVersion++ })
 async function load() {
+  const version = ++requestVersion
   loading.value = true
   try {
     const res = await getAccessoryOutboundRecords({
       orderNo: outboundFilter.orderNo || undefined,
       outboundType: outboundFilter.outboundType || undefined,
+      startDate: outboundFilter.dateRange?.[0] || undefined,
+      endDate: outboundFilter.dateRange?.[1] || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
     const data = res.data
+    if (version !== requestVersion) return
     outboundList.value = data?.list ?? []
     pagination.total = data?.total ?? 0
     restoreColumnWidths(tableRef.value)
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 
@@ -183,5 +193,5 @@ function onPageSizeChange() {
   load()
 }
 
-onMounted(load)
+watch(() => props.active, active => { if (active) void load() }, { immediate: true })
 </script>

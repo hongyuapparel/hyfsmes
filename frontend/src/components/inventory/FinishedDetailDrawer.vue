@@ -89,6 +89,7 @@ const props = withDefaults(
     inventoryTypeOptions: { id: number; label: string }[]
     warehouseOptions: { id: number; label: string }[]
     departmentOptions: { value: string; label: string }[]
+    reloadAfterSave: (refreshDetail?: boolean) => Promise<void>
   }>(),
   {
     initialColorName: null,
@@ -103,7 +104,6 @@ const emit = defineEmits<{
   (e: 'update:modelValue', value: boolean): void
   (e: 'colorImagesSynced', stockId: number, colorImages: unknown[]): void
   (e: 'colorImageSaved', payload: { stockId: number; colorName: string; imageUrl: string }): void
-  (e: 'metaSaved'): void
 }>()
 
 const activeDetailTab = ref('size')
@@ -154,7 +154,7 @@ const {
   buildColorMetaHeaders: () => buildColorMetaHeaders(),
   onColorImagesSynced: (stockId, colorImages) => emit('colorImagesSynced', stockId, colorImages),
   onColorImageSaved: (payload) => emit('colorImageSaved', payload),
-  onMetaSaved: () => emit('metaSaved'),
+  onMetaSaved: (refreshDetail) => props.reloadAfterSave(refreshDetail),
 })
 
 const stockInfo = computed(
@@ -218,7 +218,7 @@ function onDetailRowMetaChange(
 }
 
 watch(
-  () => [props.modelValue, props.stockId] as const,
+  () => [props.modelValue, props.stockId, props.groupColorSizeSnapshot] as const,
   ([visible, stockId]) => {
     if (visible && stockId) {
       openDetail({

@@ -49,7 +49,7 @@
           出库时间：
         </span>
         <el-date-picker
-          v-model="filter.dateRange"
+          v-model="dateRangeModel"
           type="daterange"
           :name="['fabricOutboundDateStart', 'fabricOutboundDateEnd']"
           :range-separator="filter.dateRange.length === 2 ? '~' : ''"
@@ -156,7 +156,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onScopeDispose, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getFabricOutboundRecords, type FabricOutboundRecord } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -183,6 +183,10 @@ const props = defineProps<{
 const filter = reactive<{ name: string; customerName: string; inventoryTypeId: number | null; dateRange: [string, string] | [] }>({
   name: '', customerName: '', inventoryTypeId: null, dateRange: [],
 })
+const dateRangeModel = computed({
+  get: () => filter.dateRange,
+  set: (value: [string, string] | [] | null) => { filter.dateRange = value ?? [] },
+})
 const selectedInventoryTypeLabel = computed(() => {
   if (filter.inventoryTypeId == null) return ''
   const label = props.inventoryTypeOptions.find((option) => option.id === filter.inventoryTypeId)?.label
@@ -202,7 +206,10 @@ const { tableHeight } = useFlexShellTableHeight(shellRef)
 const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('inventory-fabric-outbounds')
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
 
+let requestVersion = 0
+onScopeDispose(() => { requestVersion++ })
 async function load() {
+  const version = ++requestVersion
   loading.value = true
   try {
     const [startDate, endDate] = filter.dateRange.length === 2 ? filter.dateRange : ['', '']
@@ -215,6 +222,7 @@ async function load() {
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
+    if (version !== requestVersion) return
     list.value = data?.list ?? []
     pagination.total = data?.total ?? 0
     totalQuantity.value = data?.totalQuantity ?? 0
@@ -223,9 +231,9 @@ async function load() {
     unpricedQuantity.value = data?.unpricedQuantity ?? 0
     restoreColumnWidths(tableRef.value)
   } catch (error: unknown) {
-    if (!isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
+    if (version === requestVersion && !isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 

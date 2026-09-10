@@ -8,7 +8,7 @@
         </el-button>
         <template v-else>
           <el-button type="primary" size="small" class="detail-head-btn" :loading="submitting" @click="emit('confirm')">保存</el-button>
-          <el-button size="small" class="detail-head-btn" @click="emit('exitEdit')">取消</el-button>
+          <el-button size="small" class="detail-head-btn" :disabled="submitting" @click="emit('exitEdit')">取消</el-button>
         </template>
       </template>
 
@@ -209,4 +209,9 @@ defineOptions({ name: 'FabricDetailView' })
 .fabric-section-title { font-weight: 600; font-size: var(--font-size-body); color: var(--el-text-color-primary); margin-bottom: 8px; }
 .fabric-muted { font-size: var(--font-size-caption); color: var(--el-text-color-secondary); }
 .qty-readonly { color: var(--el-text-color-regular); }
+@media (max-width: 600px) {
+  .fabric-detail-wrap :deep(.detail-basic-grid) { grid-template-columns: 90px minmax(0, 1fr); }
+  .fabric-detail-wrap .detail-basic-value-span-3 { grid-column: 2 / 3; }
+  .fabric-detail-wrap .detail-basic-value { overflow-wrap: anywhere; }
+}
 </style>
