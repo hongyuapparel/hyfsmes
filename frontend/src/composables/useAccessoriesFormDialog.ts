@@ -2,6 +2,7 @@ import { reactive, ref, type Ref } from 'vue'
 import { ElMessage, type FormRules } from 'element-plus'
 import {
   createAccessory,
+  restockAccessory,
   updateAccessory,
   getAccessoryOperationLogs,
   type AccessoryItem,
@@ -46,7 +47,6 @@ function emptyAccessoryForm(): AccessoriesFormModel {
 type LoadHandler = () => Promise<void> | void
 
 export function useAccessoriesFormDialog(
-  selectedRows: Ref<AccessoryItem[]>,
   reloadList: LoadHandler,
   dialogRef: Ref<AccessoriesFormDialogExpose | undefined>,
 ) {
@@ -58,7 +58,6 @@ export function useAccessoriesFormDialog(
   })
   const quickAddSource = ref<AccessoryItem | null>(null)
   const editId = ref<number | null>(null)
-  /** 当前查看/编辑的行，用于编辑中「取消」时还原表单 */
   const detailRow = ref<AccessoryItem | null>(null)
   const logs = ref<AccessoryOperationLog[]>([])
   const form = reactive<AccessoriesFormModel>(emptyAccessoryForm())
@@ -125,11 +124,11 @@ export function useAccessoriesFormDialog(
     detailRow.value = isRowMode ? row : null
     if (isRowMode && row) {
       applyRowToForm(row)
-    } else if (mode === 'create' && selectedRows.value.length === 1) {
-      // 增量入库：沿用源记录的字段，数量从 0 开始、各码清零
-      const seed = selectedRows.value[0]!
+    } else if (mode === 'create' && row) {
+      const seed = row
       applyRowToForm(seed)
       quickAddSource.value = seed
+      form.remark = ''
       form.quantity = 0
       const sizedHeaders = seed.isSized && Array.isArray(seed.sizeHeaders) ? seed.sizeHeaders : []
       form.sizeHeaders = [...sizedHeaders]
@@ -145,7 +144,6 @@ export function useAccessoriesFormDialog(
     formDialog.mode = 'edit'
   }
 
-  /** 编辑中点「取消」：还原表单到原始值并回到详情态 */
   function exitEdit() {
     if (formDialog.submitting) return
     session++
@@ -211,7 +209,9 @@ export function useAccessoriesFormDialog(
         const sizePayload = matrix
           ? { isSized: true, sizeHeaders: matrix.headers, sizeQuantities: matrix.quantities }
           : { quantity: Number(form.quantity) || 0 }
-        await createAccessory({
+        if (quickAddSource.value) {
+          await restockAccessory(quickAddSource.value.id, { ...sizePayload, unit: form.unit, remark: form.remark })
+        } else await createAccessory({
           name: form.name,
           category: form.category,
           ...sizePayload,

@@ -92,6 +92,7 @@
             <el-button @click="onReset">清空</el-button>
             <el-button :loading="exporting" :disabled="loading" @click="onExport">{{ exportButtonText }}</el-button>
             <el-button type="primary" @click="openForm(null)">新增辅料</el-button>
+            <el-button v-if="selectedRows.length" :disabled="selectedRows.length !== 1" @click="openForm(selectedRows[0], 'create')">补货入库</el-button>
             <el-button
               v-if="selectedRows.length"
               type="warning"
@@ -296,7 +297,7 @@ const {
   loadCategoryOptions, loadWarehouseOptions, formatWarehouseLabel, getMainImageUrl,
 } = useAccessoryInventoryOptions()
 const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, exitEdit, resetForm, submitForm, formatLogAction } =
-  useAccessoriesFormDialog(selectedRows, load, accessoriesFormDialogRef)
+  useAccessoriesFormDialog(load, accessoriesFormDialogRef)
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
 

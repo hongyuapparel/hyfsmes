@@ -104,6 +104,23 @@ export class InventoryAccessoriesController {
     return this.service.create({ name, category, quantity, isSized, sizeHeaders, sizeQuantities, unit, warehouseId, location, remark, imageUrl, imageUrls, customerName, salesperson, operatorUsername: user?.username ?? '' });
   }
 
+  /** 仅给明确选中的记录增量入库，不按名称查找或创建其他记录。 */
+  @Post('items/:id/inbounds')
+  restock(
+    @Param('id') id: string,
+    @Body('quantity') quantity: number | undefined,
+    @Body('isSized') isSized: boolean | undefined,
+    @Body('sizeHeaders') sizeHeaders: string[] | undefined,
+    @Body('sizeQuantities') sizeQuantities: number[] | undefined,
+    @Body('unit') unit: string | undefined,
+    @Body('remark') remark: string | undefined,
+    @CurrentUser() user: { username?: string },
+  ) {
+    return this.service.restock(Number(id), {
+      quantity, isSized, sizeHeaders, sizeQuantities, unit, remark, operatorUsername: user?.username ?? '',
+    });
+  }
+
   @Put('items/:id')
   update(
     @Param('id') id: string,

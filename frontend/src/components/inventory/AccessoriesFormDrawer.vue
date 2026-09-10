@@ -14,7 +14,7 @@
   >
     <div class="accessories-form-scroll">
       <!-- 新增辅料：录入表单 -->
-      <el-form v-if="isCreate" ref="formRef" :model="form" :rules="formRules" :disabled="submitting" label-width="80px">
+      <el-form v-if="isCreate" ref="formRef" :model="form" :rules="quickAddSource ? {} : formRules" :disabled="submitting" label-width="80px">
         <div class="form-grid">
           <el-alert
             v-if="quickAddSource"
@@ -22,7 +22,7 @@
             type="info"
             :closable="false"
             show-icon
-            :title="`已按「${quickAddSource.name || '-'}」回填，提交后会把本次数量增量到该记录`"
+            :title="`向「${quickAddSource.name || '-'}」补货；只增加本次数量，原有资料不变`"
           />
           <el-form-item label="名称" prop="name">
             <el-input v-model="form.name" placeholder="请输入名称" clearable :disabled="Boolean(quickAddSource)" />
@@ -53,18 +53,18 @@
             </el-select>
           </el-form-item>
           <el-form-item label="仓库" prop="warehouseId">
-            <el-select v-model="form.warehouseId" placeholder="请选择仓库" filterable clearable style="width: 100%">
+            <el-select v-model="form.warehouseId" placeholder="请选择仓库" filterable clearable style="width: 100%" :disabled="Boolean(quickAddSource)">
               <el-option v-for="opt in warehouseOptions" :key="opt.id" :label="opt.label" :value="opt.id" />
             </el-select>
           </el-form-item>
           <el-form-item label="存放地址" prop="location">
-            <el-input v-model="form.location" placeholder="请输入存放地址" clearable />
+            <el-input v-model="form.location" placeholder="请输入存放地址" clearable :disabled="Boolean(quickAddSource)" />
           </el-form-item>
           <el-form-item class="span-2" label="分码" prop="isSized">
             <el-switch v-model="form.isSized" :disabled="Boolean(quickAddSource)" @change="onSizedChange" />
             <span class="sized-tip">商标/吊牌等按尺码记库存时开启；编辑里可把已有辅料转为分码</span>
           </el-form-item>
-          <el-form-item v-if="!form.isSized" label="数量" prop="quantity">
+          <el-form-item v-if="!form.isSized" :label="quickAddSource ? '本次入库' : '数量'" prop="quantity">
             <div class="qty-unit-row">
               <el-input-number v-model="form.quantity" :min="0" :precision="0" controls-position="right" class="qty-input" />
               <el-input v-model="form.unit" placeholder="单位（如个、卷）" clearable class="unit-input" :disabled="Boolean(quickAddSource)" />
@@ -78,7 +78,7 @@
               <AccessorySizeMatrix v-model:size-headers="form.sizeHeaders" v-model:size-quantities="form.sizeQuantities" />
             </el-form-item>
           </template>
-          <el-form-item class="span-2" label="图片" prop="imageUrls">
+          <el-form-item v-if="!quickAddSource" class="span-2" label="图片" prop="imageUrls">
             <div class="multi-image-wrap">
               <div class="multi-image-row">
                 <div v-for="(_url, idx) in form.imageUrls" :key="`c-img-${idx}`" class="multi-image-item">
@@ -165,7 +165,7 @@ const formRef = ref<FormInstance>()
 const isView = computed(() => props.mode === 'view')
 const isEdit = computed(() => props.mode === 'edit')
 const isCreate = computed(() => props.mode === 'create')
-const titleText = computed(() => (isView.value ? '辅料详情' : isEdit.value ? '编辑辅料' : '新增辅料'))
+const titleText = computed(() => (isView.value ? '辅料详情' : isEdit.value ? '编辑辅料' : props.quickAddSource ? '补货入库' : '新增辅料'))
 
 function onClose() {
   emit('close')
@@ -194,7 +194,7 @@ function removeImage(index: number) {
 watch(
   () => props.form.customerName,
   (customerName) => {
-    if (isView.value) return
+    if (isView.value || props.quickAddSource) return
     const name = String(customerName ?? '').trim()
     if (!name) return
     const matched = props.customerOptions.find((opt) => opt.value === name)

@@ -182,3 +182,13 @@ export function getAccessoryOutboundRecords(params?: {
 export function getAccessoryOperationLogs(id: number) {
   return request.get<AccessoryOperationLog[]>(`/inventory/accessories/items/${id}/logs`)
 }
+export function restockAccessory(id: number, body: {
+  quantity?: number
+  isSized?: boolean
+  sizeHeaders?: string[]
+  sizeQuantities?: number[]
+  unit?: string
+  remark?: string
+}) {
+  return request.post<AccessoryItem>(`/inventory/accessories/items/${id}/inbounds`, body)
+}

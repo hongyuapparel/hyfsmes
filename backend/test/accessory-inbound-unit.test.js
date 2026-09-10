@@ -1,16 +1,23 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
 const { InventoryAccessoriesService } = require('../dist/inventory-accessories/inventory-accessories.service');
+const { InventoryAccessory } = require('../dist/entities/inventory-accessory.entity');
 
 function fixture(overrides = {}, newItem = false) {
   const stock = { id: 1, name: 'QA单位', unit: '个', quantity: 10, isSized: false, ...overrides };
   const writes = [], logs = [];
   const repo = { create: row => row, save: async row => { writes.push(structuredClone(row)); return row; } };
-  const service = new InventoryAccessoriesService(repo, {}, {
+  const logRepo = {
     create: row => row, save: async row => { logs.push(row); return row; },
-  }, {});
-  service.findByName = async () => newItem ? null : stock;
-  return { stock, writes, logs, run: dto => service.create({ name: 'QA单位', quantity: 1, salesperson: 'Andy', ...dto }) };
+  };
+  const qb = { setLock() { return this; }, where() { return this; }, orderBy() { return this; },
+    getOne: async () => newItem ? null : stock };
+  repo.createQueryBuilder = () => qb;
+  repo.manager = { transaction: (_isolation, run) => run({ getRepository: entity => entity === InventoryAccessory ? repo : logRepo }) };
+  const service = new InventoryAccessoriesService(repo, {}, logRepo, {});
+  return { stock, writes, logs, run: dto => newItem
+    ? service.create({ name: 'QA单位', quantity: 1, salesperson: 'Andy', ...dto })
+    : service.restock(1, { quantity: 1, ...dto }) };
 }
 
 test('同名不同单位入库拒绝，库存和日志均不改变', async () => {
