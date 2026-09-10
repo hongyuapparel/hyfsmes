@@ -80,12 +80,6 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
 
   const receiveTailReceivedTotal = computed(() => sumColorRowsTotal(receiveDialog.tailReceivedQuantitiesByColor))
 
-  /** 每格上限：等于该颜色对应尺码的车缝数（收货数不能超过车缝数） */
-  function receiveCellMax(rowIdx: number, colIdx: number): number | undefined {
-    const v = receiveDialog.sewingColorRows[rowIdx]?.quantities?.[colIdx]
-    return v != null && Number.isFinite(Number(v)) ? Number(v) : undefined
-  }
-
   function resetReceiveForm() {
     receiveDialog.row = null
     receiveDialog.headers = []
@@ -164,7 +158,6 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
     receiveDialog,
     receiveSizeTableRows,
     receiveTailReceivedTotal,
-    receiveCellMax,
     resetReceiveForm,
     openReceiveDialog,
     submitReceive,

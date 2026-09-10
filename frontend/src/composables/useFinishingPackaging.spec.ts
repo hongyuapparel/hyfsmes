@@ -216,7 +216,6 @@ describe('useFinishingPackaging — byColor', () => {
 
     expect(c.inboundCellMax(item, 0, 0)).toBeUndefined()
     expect(c.defectCellMax(item, 0, 0)).toBeUndefined()
-    expect(c.receivedCellMax(item, 0, 0)).toBeUndefined()
 
     // 模拟用户先改入库、再改收货：动态 max 不再把前一个值夹回 0。
     item.tailReceivedColorRows[0].quantities[0] = 0
@@ -226,7 +225,7 @@ describe('useFinishingPackaging — byColor', () => {
     expect(item.inboundQuantitiesByColor[0].quantities[0]).toBe(55)
   })
 
-  it('纠错保存同时提交新的尾部收货、入库和次品明细', async () => {
+  it('纠错允许收货超过车缝，保存实际收货、入库和次品明细', async () => {
     vi.mocked(getFinishingRegisterFormData).mockResolvedValueOnce({
       data: {
         headers: ['S', 'M', '合计'],
@@ -253,17 +252,17 @@ describe('useFinishingPackaging — byColor', () => {
 
     await c.openPackagingAmendDialog()
     const item = c.packagingCompleteDialog.items[0]
-    item.tailReceivedColorRows = [{ colorName: 'red', quantities: [55, 35] }]
-    item.inboundQuantitiesByColor = [{ colorName: 'red', quantities: [50, 30] }]
+    item.tailReceivedColorRows = [{ colorName: 'red', quantities: [65, 45] }]
+    item.inboundQuantitiesByColor = [{ colorName: 'red', quantities: [60, 40] }]
     item.defectQuantitiesByColor = [{ colorName: 'red', quantities: [5, 5] }]
     await c.submitPackagingComplete('full')
 
     expect(amendFinishingPackaging).toHaveBeenCalledWith(expect.objectContaining({
       orderId: 1,
-      tailReceivedQty: 90,
-      tailInboundQty: 80,
+      tailReceivedQty: 110,
+      tailInboundQty: 100,
       defectQuantity: 10,
-      tailReceivedQuantitiesByColor: [{ colorName: 'red', quantities: [55, 35] }],
+      tailReceivedQuantitiesByColor: [{ colorName: 'red', quantities: [65, 45] }],
     }))
   })
 })

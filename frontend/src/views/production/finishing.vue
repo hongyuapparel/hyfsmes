@@ -147,7 +147,6 @@
       :dialog="receiveDialog"
       :size-table-rows="receiveSizeTableRows"
       :tail-total="receiveTailReceivedTotal"
-      :get-cell-max="receiveCellMax"
       @close="resetReceiveForm"
       @submit="submitReceive"
     />
@@ -161,7 +160,6 @@
       :received-total="receivedTotal"
       :already-inbound-qty="alreadyInboundQty"
       :remaining-qty="remainingQty"
-      :received-cell-max="receivedCellMax"
       :inbound-cell-max="inboundCellMax"
       :defect-cell-max="defectCellMax"
       :packaging-set-inbound-to-received="packagingSetInboundToReceived"
@@ -323,7 +321,6 @@ const {
   receiveDialog,
   receiveSizeTableRows,
   receiveTailReceivedTotal,
-  receiveCellMax,
   resetReceiveForm,
   openReceiveDialog,
   submitReceive,
@@ -340,7 +337,6 @@ const {
   defectTotal,
   inboundTotal,
   receivedTotal,
-  receivedCellMax,
   inboundCellMax,
   defectCellMax,
   packagingSetInboundToReceived,

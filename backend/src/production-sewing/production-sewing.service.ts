@@ -145,9 +145,9 @@ export class ProductionSewingService {
     cutRow: (number | null)[];
     /** 不含合计列的纯尺码 headers，用于二维矩阵 */
     sizeHeaders: string[];
-    /** 订单计划按颜色×尺码（参考与上限基础） */
+    /** 订单计划按颜色×尺码（参考） */
     orderColorRows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>;
-    /** 裁床实际按颜色×尺码（车缝/入库的每格上限） */
+    /** 裁床实际按颜色×尺码（工序数量参考） */
     cutColorRows: Array<{ colorName: string; quantities: number[] }>;
     /** 已完成车缝时带回当前登记，供纠错编辑预填 */
     sewingCompleted?: boolean;
@@ -599,7 +599,6 @@ export class ProductionSewingService {
     }
 
     const ext = await this.orderExtRepo.findOne({ where: { orderId } });
-    const cutting = await this.cuttingRepo.findOne({ where: { orderId } });
     const headers = Array.isArray(ext?.colorSizeHeaders) ? ext.colorSizeHeaders : [];
     const sizeLen = headers.length;
     const planColors = (Array.isArray(ext?.colorSizeRows) ? ext.colorSizeRows : []).map((r) =>
@@ -619,10 +618,6 @@ export class ProductionSewingService {
       ? sumColorRows(byColor)
       : sewingQuantity;
     if (totalQty <= 0) throw new BadRequestException('车缝数量必须大于 0');
-
-    if (byColor && sizeLen > 0) {
-      this.assertSewingNotExceedCut(byColor, cutting?.actualCutRows ?? null, sizeLen);
-    }
 
     const sewingQuantityRow = byColor
       ? sumColorRowsBySize(byColor, sizeLen)
@@ -691,40 +686,4 @@ export class ProductionSewingService {
     });
   }
 
-  /**
-   * 已过裁床（矩阵有非 0）时，纠错车缝数不得大于对应色×码裁床数。
-   * 未过裁床（全 0）跳过，与前端登记上限一致。
-   */
-  private assertSewingNotExceedCut(
-    byColor: ColorSizeQuantityRow[],
-    actualCutRows: ActualCutRow[] | null,
-    sizeLen: number,
-  ): void {
-    const rows = Array.isArray(actualCutRows) ? actualCutRows : [];
-    const cutByName = new Map<string, number[]>();
-    let anyCut = false;
-    for (const r of rows) {
-      const name = String(r?.colorName ?? '').trim();
-      const q = Array.isArray(r?.quantities) ? r.quantities : [];
-      const filled = Array.from({ length: sizeLen }, (_, i) => Math.max(0, Math.trunc(Number(q[i]) || 0)));
-      if (filled.some((n) => n > 0)) anyCut = true;
-      if (name) cutByName.set(name, filled);
-    }
-    if (!anyCut) return;
-
-    for (const sew of byColor) {
-      const colorName = String(sew.colorName ?? '').trim();
-      const sewQ = Array.isArray(sew.quantities) ? sew.quantities : [];
-      const cutQ = cutByName.get(colorName) ?? Array.from({ length: sizeLen }, () => 0);
-      for (let i = 0; i < sizeLen; i++) {
-        const s = Math.max(0, Math.trunc(Number(sewQ[i]) || 0));
-        const c = Math.max(0, Math.trunc(Number(cutQ[i]) || 0));
-        if (s > c) {
-          throw new BadRequestException(
-            `颜色「${colorName || '-'}」第 ${i + 1} 码车缝数 ${s} 超过裁床数 ${c}`,
-          );
-        }
-      }
-    }
-  }
 }

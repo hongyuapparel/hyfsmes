@@ -103,18 +103,6 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
       return qs.every((q) => !(Number(q) > 0))
     })
   })
-  /**
-   * 每个颜色×尺码的车缝上限：
-   * - 已过裁床（矩阵有非 0）→ 严格用对应裁床数（含 0：该色该码确实没裁，不让超）
-   * - 未登记裁床二维明细 → 不设置上限，实际车缝数由用户填写，不能用订单计划代替事实
-   */
-  function registerSewingCellMax(rowIdx: number, colIdx: number): number | undefined {
-    if (registerCutSkipped.value) {
-      return undefined
-    }
-    const cut = registerForm.cutColorRows?.[rowIdx]?.quantities?.[colIdx]
-    return cut != null && Number.isFinite(Number(cut)) ? Number(cut) : undefined
-  }
   const registerRules: FormRules = {
     defectQuantity: [],
     defectReason: [],
@@ -393,7 +381,6 @@ export function useSewingDialogs(selectedRows: Ref<SewingListItem[]>, refreshAft
     registerForm,
     registerSizeTableRows,
     registerSewingTotal,
-    registerSewingCellMax,
     registerCutSkipped,
     registerRules,
     loadFactorySuppliers,

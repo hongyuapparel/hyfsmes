@@ -38,7 +38,7 @@
 
         <template v-if="item.sizeHeaders?.length">
           <div class="register-qty-toolbar">
-            <p v-if="dialog.mode === 'amend'" class="register-qty-tip">可修正尾部收货、入库与次品；收货不可超过车缝，入库与次品之和须等于收货。</p>
+            <p v-if="dialog.mode === 'amend'" class="register-qty-tip">可修正尾部收货、入库与次品；入库与次品之和须等于实际收货。</p>
             <p v-else class="register-qty-tip">按颜色分别填写本次入库与本次次品；每格不可超过该颜色"尾部收货 − 已入库 − 已次品"剩余。</p>
             <div class="register-qty-actions">
               <el-button v-if="dialog.mode === 'register'" size="small" link @click="packagingSetInboundToReceived(item)">
@@ -93,7 +93,6 @@
                     <el-input-number
                       v-model="item.tailReceivedColorRows[ri].quantities[ci]"
                       :min="0"
-                      :max="receivedCellMax(item, ri, ci)"
                       :precision="0"
                       :controls="false"
                       size="small"
@@ -214,7 +213,6 @@ const props = defineProps<{
   receivedTotal: (item: PackagingCompleteItem) => number
   alreadyInboundQty: (item: PackagingCompleteItem) => number
   remainingQty: (item: PackagingCompleteItem) => number
-  receivedCellMax: (item: PackagingCompleteItem, ri: number, ci: number) => number | undefined
   inboundCellMax: (item: PackagingCompleteItem, ri: number, ci: number) => number | undefined
   defectCellMax: (item: PackagingCompleteItem, ri: number, ci: number) => number | undefined
   packagingSetInboundToReceived: (item: PackagingCompleteItem) => void
