@@ -16,9 +16,11 @@ export interface ProductionOrderBriefModel {
   collaborationLabel?: string
 }
 
-defineProps<{
+withDefaults(defineProps<{
   brief: ProductionOrderBriefModel | null
-}>()
+  imageWidth?: number
+  imageHeight?: number
+}>(), { imageWidth: 64, imageHeight: 64 })
 
 function dash(v: string | null | undefined) {
   const s = (v ?? '').trim()
@@ -52,7 +54,7 @@ function dateOnly(v: string | null | undefined) {
         </el-descriptions-item>
       </el-descriptions>
       <div class="production-order-brief-panel__image">
-        <AppImageThumb v-if="brief.imageUrl" :raw-url="brief.imageUrl" variant="dialog" />
+        <AppImageThumb v-if="brief.imageUrl" :raw-url="brief.imageUrl" variant="dialog" :width="imageWidth" :height="imageHeight" />
         <span v-else class="production-order-brief-panel__image-placeholder">—</span>
       </div>
     </div>

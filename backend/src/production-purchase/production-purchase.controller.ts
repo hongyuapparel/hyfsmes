@@ -139,7 +139,7 @@ export class ProductionPurchaseController {
             : '待领料'
           : r.purchaseStatus === 'completed'
             ? '采购完成'
-            : '等待采购';
+            : r.purchaseStatus === 'purchasing' ? '采购中' : '等待采购';
       lines.push(
         [
           r.orderNo,
@@ -184,6 +184,7 @@ export class ProductionPurchaseController {
     @Body('otherCost') otherCost: string,
     @Body('remark') remark: string | null,
     @Body('imageUrl') imageUrl: string | null,
+    @Body('purchaseStatus') purchaseStatus?: 'purchasing' | 'completed',
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     return this.purchaseService.registerPurchase(
@@ -195,6 +196,7 @@ export class ProductionPurchaseController {
       remark,
       imageUrl,
       user?.userId,
+      purchaseStatus,
     );
   }
 
@@ -210,11 +212,13 @@ export class ProductionPurchaseController {
       otherCost: string;
       remark?: string | null;
       imageUrl?: string | null;
+      purchaseStatus?: 'purchasing' | 'completed';
     }> | undefined,
     @CurrentUser() user?: { userId: number; username: string },
   ) {
     const normalizedItems = Array.isArray(items)
       ? items.map((item) => ({
+          purchaseStatus: item.purchaseStatus,
           orderId: Number(item.orderId),
           materialIndex: Number(item.materialIndex),
           supplierName: item.supplierName == null ? '' : String(item.supplierName),
@@ -227,6 +231,19 @@ export class ProductionPurchaseController {
       : [];
     return this.purchaseService.registerPurchaseBatch({
       items: normalizedItems,
+      actorUserId: user?.userId,
+    });
+  }
+
+  @Post('items/complete/batch')
+  @RequirePermission('production_purchase_register')
+  completeBatch(
+    @Body('items') items: Array<{ orderId: number; materialIndex: number }> | undefined,
+    @CurrentUser() user?: { userId: number; username: string },
+  ) {
+    return this.purchaseService.registerPurchaseBatch({
+      items: Array.isArray(items) ? items.map(item => ({ orderId: Number(item.orderId), materialIndex: Number(item.materialIndex) })) : [],
+      completeOnly: true,
       actorUserId: user?.userId,
     });
   }

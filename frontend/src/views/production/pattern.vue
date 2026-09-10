@@ -154,31 +154,30 @@
         />
       </div>
       </div>
+      <el-checkbox v-model="filter.onlyOverdue" @change="onSearch()">仅看超期</el-checkbox>
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
         <el-button @click="onReset">清空</el-button>
         <el-button :loading="exporting" @click="onExport">导出表格</el-button>
-        <el-button v-if="hasSelection && canAssignPattern" type="primary" @click="openAssignDialog">
-          分配纸样师和车版师
-        </el-button>
-        <el-button
-          v-if="hasSelection && canCompleteSelection && canCompletePattern"
-          type="primary"
-          @click="openCompleteDialog"
-        >
-          确认完成
-        </el-button>
-        <el-button
-          v-if="hasSelection && canEditCompletedPatternSelection && canAdminEditSubmitted"
-          type="primary"
-          @click="openEditCompletedDialog"
-        >
-          编辑
-        </el-button>
       </div>
     </div>
 
-    <div v-if="hasSelection" class="table-selection-count">已选 {{ selectedRows.length }} 项</div>
+    <div v-if="hasSelection" class="pattern-batch-bar" role="region" aria-label="所选订单操作">
+      <span>已选 {{ selectedRows.length }} 张订单</span>
+      <el-space wrap>
+        <el-button v-if="canAssignSelection && canAssignPattern" type="primary" @click="openAssignDialog()">
+          分配师傅
+        </el-button>
+        <el-button
+          v-if="canCompleteSelection && canCompletePattern"
+          type="primary"
+          @click="openCompleteDialog()"
+        >
+          确认完成
+        </el-button>
+        <el-button @click="patternTableRef?.clearSelection()">取消选择</el-button>
+      </el-space>
+    </div>
 
     <div ref="tableShellRef" class="list-page-table-shell">
       <PatternTable
@@ -219,10 +218,19 @@
       :brief="detailDrawer.row ? patternBriefFromRow(detailDrawer.row) : emptyBrief"
       :loading="detailDrawer.loading"
       :saving="detailDrawer.saving"
-      :can-edit="canEditPatternMaterials"
+      :busy="assignDialog.visible || completeDialog.visible"
+      :can-assign="canAssignPattern"
+      :can-complete="canCompletePattern && detailDrawer.loaded"
+      :can-edit-image="canAdminEditSubmitted"
+      @assign="detailDrawer.row && openAssignDialog([detailDrawer.row])"
+      @complete="completeFromDrawer"
+      @edit-image="detailDrawer.row && openEditCompletedDialog([detailDrawer.row])"
+      :can-edit="canEditPatternMaterials && detailDrawer.loaded"
+      :has-unsaved-changes="hasUnsavedMaterials"
       :materials-form="materialsForm"
       :material-type-options="materialTypeOptions"
       :logs="patternDrawerLogs"
+      :logs-error="patternDrawerLogsError"
       @closed="onDetailDrawerClosed"
       @enter-edit="onEnterEdit"
       @cancel-edit="onCancelEdit"
@@ -238,6 +246,8 @@
       :pattern-master-options="patternMasterOptions"
       :sample-maker-options="sampleMakerOptions"
       :submitting="assignDialog.submitting"
+      :rows="assignDialog.rows"
+      :error="assignDialog.error"
       @close="resetAssignForm"
       @submit="submitAssign"
     />
@@ -264,7 +274,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import {
   ACTIVE_FILTER_COLOR,
@@ -282,12 +292,10 @@ import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import { PATTERN_TABS, usePatternList } from '@/composables/usePatternList'
 import { usePatternDialogs } from '@/composables/usePatternDialogs'
-import type { PatternListItem, PatternMaterialRow } from '@/api/production-pattern'
 import PatternTable from '@/components/production/PatternTable.vue'
 import PatternDetailDrawer from '@/components/production/PatternDetailDrawer.vue'
 import PatternAssignDialog from '@/components/production/PatternAssignDialog.vue'
 import PatternCompleteDialog from '@/components/production/PatternCompleteDialog.vue'
-import { fetchOrderOperationLogs, toLogSectionItems } from '@/api/operation-logs'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useAuthStore } from '@/stores/auth'
 import type { ProductionOrderBriefModel } from '@/components/production/ProductionOrderBriefPanel.vue'
@@ -300,7 +308,7 @@ const canAdminEditSubmitted = computed(() => authStore.hasPermission('production
 const { adjustTreePopperWidth } = useTreeSelectAdjust()
 const { collapsed, isMobile } = useFilterCollapse('production-pattern')
 
-const patternTableRef = ref<{ getTableRef?: () => unknown } | null>(null)
+const patternTableRef = ref<{ getTableRef?: () => unknown; clearSelection: () => void } | null>(null)
 const tableShellRef = ref<HTMLElement | null>(null)
 const { tableHeight } = useFlexShellTableHeight(tableShellRef)
 const {
@@ -355,6 +363,7 @@ const activeFilterCount = computed(() => {
   if (filter.collaborationTypeId != null) n++
   if (orderDateRange.value) n++
   if (completedRange.value) n++
+  if (filter.onlyOverdue) n++
   return n
 })
 
@@ -387,7 +396,9 @@ function onSelectionChange(rows: typeof selectedRows.value) {
 }
 
 const {
-  canEditPatternMaterials,
+  canEditPatternMaterials, completeFromDrawer,
+  hasUnsavedMaterials, onEnterEdit, onCancelEdit, patternDrawerLogs, patternDrawerLogsError,
+  canAssignSelection,
   detailDrawer,
   materialsForm,
   materialTypeOptions,
@@ -423,10 +434,6 @@ const {
   { findOrderTypeLabelById, findCollaborationLabelById },
 )
 
-const canEditCompletedPatternSelection = computed(
-  () => selectedRows.value.length === 1 && selectedRows.value[0].patternStatus === 'completed',
-)
-
 const emptyBrief: ProductionOrderBriefModel = {
   orderNo: '',
   skuCode: '',
@@ -438,58 +445,13 @@ const emptyBrief: ProductionOrderBriefModel = {
 }
 
 const detailDrawerRef = ref<{ onSaveSuccess: () => void } | null>(null)
-let materialsSnapshot: { materials: PatternMaterialRow[]; remark: string } | null = null
-
-function onEnterEdit() {
-  materialsSnapshot = {
-    materials: JSON.parse(JSON.stringify(materialsForm.materials)) as PatternMaterialRow[],
-    remark: materialsForm.remark,
-  }
-  if (!materialsForm.materials.length) {
-    addMaterialRow()
-  }
-}
-
-function onCancelEdit() {
-  if (materialsSnapshot) {
-    materialsForm.materials = materialsSnapshot.materials
-    materialsForm.remark = materialsSnapshot.remark
-  }
-  materialsSnapshot = null
-}
-
 async function onSaveMaterials() {
   if (detailDrawer.saving) return
   const ok = await submitMaterials()
   if (ok) {
-    materialsSnapshot = null
     detailDrawerRef.value?.onSaveSuccess()
-    await loadPatternDrawerLogs(detailDrawer.row)
   }
 }
-
-watch(
-  () => detailDrawer.visible,
-  (visible) => {
-    if (!visible) materialsSnapshot = null
-  },
-)
-
-const patternDrawerLogs = ref<ReturnType<typeof toLogSectionItems>>([])
-
-async function loadPatternDrawerLogs(row: PatternListItem | null) {
-  if (!row) {
-    patternDrawerLogs.value = []
-    return
-  }
-  const logs = await fetchOrderOperationLogs(row.orderId, { module: 'production_pattern' })
-  patternDrawerLogs.value = toLogSectionItems(logs)
-}
-
-watch(
-  () => detailDrawer.row,
-  (row) => { void loadPatternDrawerLogs(row) },
-)
 
 const completeDialogRef = ref<{ fileInputRef: HTMLInputElement | null } | null>(null)
 

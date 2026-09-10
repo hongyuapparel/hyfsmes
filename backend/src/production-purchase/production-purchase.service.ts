@@ -24,7 +24,10 @@ interface RegisterPurchaseBatchItem {
   otherCost: string;
   remark?: string | null;
   imageUrl?: string | null;
+  purchaseStatus?: 'purchasing' | 'completed';
 }
+
+type PurchaseMaterialRef = Pick<RegisterPurchaseBatchItem, 'orderId' | 'materialIndex'>;
 
 @Injectable()
 export class ProductionPurchaseService {
@@ -127,108 +130,19 @@ export class ProductionPurchaseService {
     remark: string | null | undefined,
     imageUrl: string | null | undefined,
     actorUserId?: number,
+    purchaseStatus?: 'purchasing' | 'completed',
   ): Promise<void> {
-    const order = await this.orderRepo.findOne({ where: { id: orderId } });
-    if (!order) {
-      throw new NotFoundException('订单不存在');
-    }
-    let ext = await this.orderExtRepo.findOne({ where: { orderId } });
-    if (!ext || !Array.isArray(ext.materials)) {
-      throw new NotFoundException('该订单无物料数据');
-    }
-    if (materialIndex < 0 || materialIndex >= ext.materials.length) {
-      throw new NotFoundException('物料索引无效');
-    }
-
-    const materials = [...ext.materials];
-    const row = materials[materialIndex] as OrderMaterialRow;
-    await this.ensureMaterialSourceOptionCache();
-    const sourceLabel = this.getMaterialSourceLabelById(row.materialSourceId ?? null);
-    if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'purchase') {
-      throw new NotFoundException('该物料来源不在等待采购流程，请使用领料处理');
-    }
-    if ((row.purchaseStatus ?? 'pending').toLowerCase() === 'completed') {
-      throw new BadRequestException('已采购完成，请使用纠错编辑；勿重复登记');
-    }
-
-    const normalizedQty = Number.isFinite(actualPurchaseQuantity) ? actualPurchaseQuantity : 0;
-    const normalizedUnit = Number(this.normalizeDecimalInput(unitPrice)) || 0;
-    const normalizedOther = Number(this.normalizeDecimalInput(otherCost)) || 0;
-    const total = normalizedQty * normalizedUnit + normalizedOther;
-    const totalStr = Number.isFinite(total) ? total.toFixed(2) : '0';
-
-    materials[materialIndex] = {
-      ...row,
-      purchaseStatus: 'completed',
-      actualPurchaseQuantity: normalizedQty,
-      purchaseUnitPrice: this.normalizeDecimalInput(unitPrice),
-      purchaseOtherCost: this.normalizeDecimalInput(otherCost),
-      purchaseAmount: totalStr,
-      purchaseCompletedAt: this.toDateTimeLocalString(new Date()),
-      purchaseRemark: (remark ?? '').trim() || null,
-      purchaseImageUrl: (imageUrl ?? '').trim() || null,
-    };
-
-    let nextStatus: string | null = null;
-    if (order.status === 'pending_purchase') {
-      const allCompleted = materials.length > 0 && materials.every((m) => this.isMaterialFlowCompleted(m));
-      if (allCompleted) {
-        nextStatus = await this.orderWorkflowService.resolveNextStatus({
-          order,
-          triggerCode: 'purchase_all_completed',
-          actorUserId: actorUserId ?? 0,
-        });
-        if (!nextStatus) {
-          throw new BadRequestException('未匹配到“采购完成”流转规则，请先在订单设置中检查流程链路配置');
-        }
-      }
-    }
-
-    ext.materials = materials;
-    await this.orderExtRepo.save(ext);
-    await this.suppliersService.touchLastActiveByNames([row?.supplierName ?? '']);
-
-    // 若该订单全部物料采购完成，则按配置规则流转
-    if (nextStatus && nextStatus !== order.status) {
-      order.status = nextStatus;
-      order.statusTime = new Date();
-      await this.orderRepo.save(order);
-      await this.appendStatusHistory(order.id, nextStatus);
-    }
-
-    try {
-      const operator = await resolveOperatorDisplayName(this.userRepo, {
-        userId: actorUserId,
-        username: '',
-      });
-      const detail = [
-        `采购登记：物料 ${row.materialName ?? '-'}${row.color ? `/${row.color}` : ''}`,
-        `供应商 ${row.supplierName || '-'}`,
-        `数量 ${normalizedQty}`,
-        `单价 ${normalizedUnit}`,
-        `其他费用 ${normalizedOther}`,
-        `金额 ${totalStr}`,
-        `备注 ${(remark ?? '').trim() || '-'}`,
-        `图片 ${(imageUrl ?? '').trim() ? '已上传' : '未上传'}`,
-      ].join('；');
-      await this.orderLogRepo.save(
-        this.orderLogRepo.create({
-          orderId: order.id,
-          orderNo: order.orderNo,
-          operatorUsername: operator,
-          action: 'production_purchase_register',
-          detail,
-          targetType: 'purchase_item',
-          targetRef: `${order.id}_${materialIndex}`,
-        }),
-      );
-    } catch (err) {
-      console.warn('[purchase] write operation log failed:', err);
-    }
+    const ext = await this.orderExtRepo.findOne({ where: { orderId } });
+    return this.registerPurchaseBatch({
+      items: [{ orderId, materialIndex, actualPurchaseQuantity, unitPrice, otherCost,
+        remark, imageUrl, purchaseStatus, supplierName: ext?.materials?.[materialIndex]?.supplierName ?? '' }],
+      actorUserId,
+    });
   }
 
   async registerPurchaseBatch(params: {
-    items: RegisterPurchaseBatchItem[];
+    items: Array<RegisterPurchaseBatchItem | PurchaseMaterialRef>;
+    completeOnly?: boolean;
     remark?: string | null;
     imageUrl?: string | null;
     actorUserId?: number;
@@ -257,13 +171,14 @@ export class ProductionPurchaseService {
       amount: string;
       remark: string;
       hasImage: boolean;
+      purchaseStatus: string;
     }> = [];
 
     await this.orderRepo.manager.transaction(async (manager) => {
       const orderRepo = manager.getRepository(Order);
       const orderExtRepo = manager.getRepository(OrderExt);
       const statusHistoryRepo = manager.getRepository(OrderStatusHistory);
-      const itemsByOrderId = new Map<number, RegisterPurchaseBatchItem[]>();
+      const itemsByOrderId = new Map<number, Array<RegisterPurchaseBatchItem | PurchaseMaterialRef>>();
       const seenMaterialKeys = new Set<string>();
 
       for (const item of items) {
@@ -279,10 +194,13 @@ export class ProductionPurchaseService {
         itemsByOrderId.set(orderId, group);
       }
 
-      for (const [orderId, orderItems] of itemsByOrderId.entries()) {
-        const order = await orderRepo.findOne({ where: { id: orderId } });
+      for (const [orderId, orderItems] of [...itemsByOrderId.entries()].sort(([a], [b]) => a - b)) {
+        const order = await orderRepo.findOne({ where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
         if (!order) throw new NotFoundException('订单不存在');
-        const ext = await orderExtRepo.findOne({ where: { orderId } });
+        if (order.deletedAt || ['draft', 'pending_review', 'completed'].includes(order.status)) {
+          throw new BadRequestException('该订单当前不可处理采购');
+        }
+        const ext = await orderExtRepo.findOne({ where: { orderId }, lock: { mode: 'pessimistic_write' } });
         if (!ext || !Array.isArray(ext.materials)) throw new NotFoundException('该订单无物料数据');
 
         const materials = [...ext.materials];
@@ -299,29 +217,55 @@ export class ProductionPurchaseService {
             throw new BadRequestException('已采购完成的物料不能重复登记');
           }
 
-          const supplierName = (item.supplierName ?? '').trim();
+          const currentStatus = (row.purchaseStatus ?? 'pending').toLowerCase();
+          if (params.completeOnly ? currentStatus !== 'purchasing' : currentStatus !== 'pending') {
+            throw new BadRequestException(params.completeOnly ? '仅采购中的物料可确认到货完成，请刷新列表' : '仅等待采购的物料可登记，请刷新列表');
+          }
+          let registration: RegisterPurchaseBatchItem;
+          if (params.completeOnly) {
+            registration = {
+              orderId, materialIndex: item.materialIndex, supplierName: row.supplierName ?? '',
+              actualPurchaseQuantity: row.actualPurchaseQuantity ?? 0, unitPrice: row.purchaseUnitPrice ?? '0',
+              otherCost: row.purchaseOtherCost ?? '0', remark: row.purchaseRemark, imageUrl: row.purchaseImageUrl,
+              purchaseStatus: 'completed',
+            };
+          } else if ('supplierName' in item) {
+            registration = item;
+          } else {
+            throw new BadRequestException('采购登记内容不完整');
+          }
+          const purchaseStatus = registration.purchaseStatus ?? 'purchasing';
+          if (!['purchasing', 'completed'].includes(purchaseStatus)) throw new BadRequestException('采购状态无效');
+          if (!Number.isFinite(registration.actualPurchaseQuantity) || registration.actualPurchaseQuantity < 0) {
+            throw new BadRequestException('实际采购数量无效');
+          }
+          const supplierName = (registration.supplierName ?? '').trim();
           if (!supplierName || supplierName === '-') {
             throw new BadRequestException('请为所有采购物料填写供应商');
           }
-          const normalizedQty = this.normalizeNonNegativeNumber(item.actualPurchaseQuantity);
-          const unitPrice = this.normalizeDecimalInput(item.unitPrice);
-          const otherCost = this.normalizeDecimalInput(item.otherCost);
+          const normalizedQty = this.normalizeNonNegativeNumber(registration.actualPurchaseQuantity);
+          const unitPrice = this.normalizeDecimalInput(registration.unitPrice);
+          const otherCost = this.normalizeDecimalInput(registration.otherCost);
           const normalizedUnit = Number(unitPrice) || 0;
           const normalizedOther = Number(otherCost) || 0;
           const total = normalizedQty * normalizedUnit + normalizedOther;
           const totalStr = Number.isFinite(total) ? total.toFixed(2) : '0';
 
-          const itemRemark = (item.remark ?? '').trim() || null;
-          const itemImageUrl = (item.imageUrl ?? '').trim() || null;
-          materials[item.materialIndex] = {
+          const itemRemark = (registration.remark ?? '').trim() || null;
+          const itemImageUrl = (registration.imageUrl ?? '').trim() || null;
+          materials[item.materialIndex] = params.completeOnly ? {
+            ...row,
+            purchaseStatus: 'completed',
+            purchaseCompletedAt: completedAt,
+          } : {
             ...row,
             supplierName,
-            purchaseStatus: 'completed',
+            purchaseStatus,
             actualPurchaseQuantity: normalizedQty,
             purchaseUnitPrice: unitPrice,
             purchaseOtherCost: otherCost,
             purchaseAmount: totalStr,
-            purchaseCompletedAt: completedAt,
+            purchaseCompletedAt: purchaseStatus === 'completed' ? completedAt : null,
             purchaseRemark: itemRemark,
             purchaseImageUrl: itemImageUrl,
           };
@@ -336,9 +280,10 @@ export class ProductionPurchaseService {
             qty: normalizedQty,
             unitPrice,
             otherCost,
-            amount: totalStr,
+            amount: params.completeOnly ? row.purchaseAmount ?? totalStr : totalStr,
             remark: itemRemark ?? '',
             hasImage: !!itemImageUrl,
+            purchaseStatus,
           });
         }
 
@@ -380,7 +325,8 @@ export class ProductionPurchaseService {
         });
         const colorPart = entry.color ? ` ${entry.color}` : '';
         const detail = [
-          `采购登记（批量）：物料 ${entry.materialName}${colorPart}`,
+          `${params.completeOnly ? '到货完成' : '采购登记'}：物料 ${entry.materialName}${colorPart}`,
+          `状态 ${entry.purchaseStatus === 'purchasing' ? '采购中（待到货）' : '采购完成（已到货交接）'}`,
           `供应商 ${entry.supplierName}`,
           `数量 ${entry.qty}`,
           `单价 ${entry.unitPrice}`,
@@ -458,10 +404,10 @@ export class ProductionPurchaseService {
         itemsByOrderId.set(orderId, group);
       }
 
-      for (const [orderId, orderItems] of itemsByOrderId.entries()) {
-        const order = await orderRepo.findOne({ where: { id: orderId } });
+      for (const [orderId, orderItems] of [...itemsByOrderId.entries()].sort(([a], [b]) => a - b)) {
+        const order = await orderRepo.findOne({ where: { id: orderId }, lock: { mode: 'pessimistic_write' } });
         if (!order) throw new NotFoundException('订单不存在');
-        const ext = await orderExtRepo.findOne({ where: { orderId } });
+        const ext = await orderExtRepo.findOne({ where: { orderId }, lock: { mode: 'pessimistic_write' } });
         if (!ext || !Array.isArray(ext.materials)) throw new NotFoundException('该订单无物料数据');
 
         const materials = [...ext.materials];
@@ -474,8 +420,8 @@ export class ProductionPurchaseService {
           if (this.resolveMaterialRouteBySourceLabel(sourceLabel) !== 'purchase') {
             throw new NotFoundException('该物料来源不在采购流程');
           }
-          if ((row.purchaseStatus ?? 'pending').toLowerCase() !== 'completed') {
-            throw new BadRequestException('仅已采购完成的物料可纠错编辑');
+          if (!['purchasing', 'completed'].includes((row.purchaseStatus ?? 'pending').toLowerCase())) {
+            throw new BadRequestException('仅已登记采购的物料可纠错编辑');
           }
 
           const supplierName = (item.supplierName ?? '').trim();
@@ -493,12 +439,11 @@ export class ProductionPurchaseService {
           materials[item.materialIndex] = {
             ...row,
             supplierName,
-            purchaseStatus: 'completed',
             actualPurchaseQuantity: normalizedQty,
             purchaseUnitPrice: unitPrice,
             purchaseOtherCost: otherCost,
             purchaseAmount: totalStr,
-            purchaseCompletedAt: row.purchaseCompletedAt ?? this.toDateTimeLocalString(new Date()),
+            purchaseCompletedAt: row.purchaseCompletedAt ?? null,
             purchaseRemark: (item.remark ?? '').trim() || null,
             purchaseImageUrl: (item.imageUrl ?? '').trim() || null,
           };

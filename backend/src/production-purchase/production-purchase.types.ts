@@ -60,7 +60,7 @@ export interface PurchaseItemRow {
 }
 
 export interface PurchaseListQuery {
-  /** tab: all | pending | picking | completed */
+  /** tab: all | pending | purchasing | picking | completed */
   tab?: string;
   orderNo?: string;
   skuCode?: string;

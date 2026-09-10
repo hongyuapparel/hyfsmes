@@ -20,11 +20,12 @@ export interface PurchaseRegisterDraftRow {
   color?: string | null
   supplierName: string
   planQuantity: number | null
-  actualPurchaseQuantity: number
+  actualPurchaseQuantity: number | null | undefined
   unitPrice: string
   otherCost: string
   remark: string
   imageUrl: string
+  purchaseStatus: 'purchasing' | 'completed'
 }
 
 export interface PurchaseRegisterDialogState {
@@ -66,11 +67,11 @@ export function calcPurchaseRegisterRowAmount(
 }
 
 export function isRegisterablePurchaseRow(row: PurchaseItemRow): boolean {
-  return row.processRoute === 'purchase' && row.purchaseStatus !== 'completed'
+  return row.processRoute === 'purchase' && row.purchaseStatus === 'pending'
 }
 
 export function isEditableCompletedPurchaseRow(row: PurchaseItemRow): boolean {
-  return row.processRoute === 'purchase' && row.purchaseStatus === 'completed'
+  return row.processRoute === 'purchase' && ['purchasing', 'completed'].includes(row.purchaseStatus)
 }
 
 function toRegisterDraftRow(row: PurchaseItemRow): PurchaseRegisterDraftRow {
@@ -90,6 +91,7 @@ function toRegisterDraftRow(row: PurchaseItemRow): PurchaseRegisterDraftRow {
     otherCost: row.purchaseOtherCost ?? '',
     remark: normalizeText(row.purchaseRemark),
     imageUrl: normalizeText(row.purchaseImageUrl),
+    purchaseStatus: row.purchaseStatus === 'completed' ? 'completed' : 'purchasing',
   }
 }
 
@@ -142,7 +144,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
   function openEditCompletedDialog() {
     const rows = options.selectedRows.value.filter(isEditableCompletedPurchaseRow)
     if (!rows.length) {
-      ElMessage.warning('请选择已采购完成的物料')
+      ElMessage.warning('请选择已登记采购的物料')
       return
     }
     registerDialog.mode = 'edit'
@@ -156,7 +158,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
   }
 
   async function submitRegister() {
-    if (!registerDialog.rows.length) return
+    if (registerDialog.submitting || !registerDialog.rows.length) return
     const missingSupplier = registerDialog.rows.find((row) => !normalizeText(row.supplierName))
     if (missingSupplier) {
       ElMessage.warning(`请补充供应商：${missingSupplier.orderNo} / ${missingSupplier.materialName}`)
@@ -164,7 +166,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
     }
     const invalidQuantity = registerDialog.rows.find((row) => {
       const quantity = Number(row.actualPurchaseQuantity)
-      return !Number.isFinite(quantity) || quantity < 0
+      return row.actualPurchaseQuantity == null || !Number.isFinite(quantity) || quantity < 0
     })
     if (invalidQuantity) {
       ElMessage.warning(`实际采购数量无效：${invalidQuantity.orderNo} / ${invalidQuantity.materialName}`)
@@ -176,11 +178,12 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
         orderId: row.orderId,
         materialIndex: row.materialIndex,
         supplierName: normalizeText(row.supplierName),
-        actualPurchaseQuantity: Number(row.actualPurchaseQuantity) || 0,
+        actualPurchaseQuantity: Number(row.actualPurchaseQuantity),
         unitPrice: row.unitPrice.trim() || '0',
         otherCost: row.otherCost.trim() || '0',
         remark: row.remark.trim() || undefined,
         imageUrl: row.imageUrl.trim() || undefined,
+        purchaseStatus: row.purchaseStatus,
       }))
       if (registerDialog.mode === 'edit') {
         await editCompletedPurchaseBatch({ items })

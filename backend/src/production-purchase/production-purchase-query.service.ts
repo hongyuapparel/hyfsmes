@@ -159,13 +159,14 @@ export class ProductionPurchaseQueryService {
           processRoute === 'purchase'
             ? purchaseStatus === 'completed'
               ? 'completed'
-              : 'pending'
+              : purchaseStatus === 'purchasing' ? 'purchasing' : 'pending'
             : pickStatus === 'completed'
               ? 'completed'
               : 'pending';
         // 已完成订单后续补充的物料/辅料只是资料完善，不再进入采购待办。
-        if (order.status === 'completed' && routeStatus === 'pending') continue;
+        if (order.status === 'completed' && routeStatus !== 'completed') continue;
         if (tab === 'pending' && !(processRoute === 'purchase' && routeStatus === 'pending')) continue;
+        if (tab === 'purchasing' && !(processRoute === 'purchase' && routeStatus === 'purchasing')) continue;
         if (tab === 'picking' && !(processRoute === 'picking' && routeStatus === 'pending')) continue;
         if (tab === 'completed' && routeStatus !== 'completed') continue;
 
@@ -204,7 +205,7 @@ export class ProductionPurchaseQueryService {
           planQuantity: m.purchaseQuantity ?? m.orderPieces ?? null,
           actualPurchaseQuantity: m.actualPurchaseQuantity ?? null,
           purchaseAmount: m.purchaseAmount ?? null,
-          purchaseStatus: purchaseStatus === 'completed' ? 'completed' : 'pending',
+          purchaseStatus: ['completed', 'purchasing'].includes(purchaseStatus) ? purchaseStatus : 'pending',
           pickStatus: pickStatus === 'completed' ? 'completed' : 'pending',
           purchaseCompletedAt: m.purchaseCompletedAt ?? null,
           pickCompletedAt: m.pickCompletedAt ?? null,
@@ -236,7 +237,7 @@ export class ProductionPurchaseQueryService {
 
   async getPurchaseTabCounts(query: PurchaseListQuery): Promise<Record<string, number>> {
     const allRows = await this.getPurchaseExportRows({ ...query, tab: 'all' });
-    const counts: Record<string, number> = { all: allRows.length, pending: 0, picking: 0, completed: 0 };
+    const counts: Record<string, number> = { all: allRows.length, pending: 0, purchasing: 0, picking: 0, completed: 0 };
     for (const row of allRows) {
       const routeCompleted =
         (row.processRoute === 'purchase' && row.purchaseStatus === 'completed') ||
@@ -244,7 +245,7 @@ export class ProductionPurchaseQueryService {
       if (routeCompleted) {
         counts.completed++;
       } else if (row.processRoute === 'purchase') {
-        counts.pending++;
+        counts[row.purchaseStatus === 'purchasing' ? 'purchasing' : 'pending']++;
       } else {
         counts.picking++;
       }

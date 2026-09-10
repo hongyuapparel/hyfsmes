@@ -21,6 +21,7 @@
             v-if="row.imageUrl"
             :raw-url="row.imageUrl"
             variant="dialog"
+            :lazy="true"
             :width="isMobile ? 48 : undefined"
             :height="isMobile ? 48 : undefined"
           />

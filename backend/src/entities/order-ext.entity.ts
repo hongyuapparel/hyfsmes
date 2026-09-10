@@ -104,13 +104,13 @@ export interface OrderMaterialRow {
   purchaseQuantity?: number | null;
   cuttingQuantity?: number | null;
   remark?: string;
-  /** 采购状态：pending | completed */
+  /** 采购状态：pending（等待采购）| purchasing（已采购待到货）| completed（到货交接完成） */
   purchaseStatus?: string;
   /** 实际采购数量（登记后写入） */
   actualPurchaseQuantity?: number | null;
   /** 采购金额（登记后写入） */
   purchaseAmount?: string | null;
-  /** 采购完成时间（登记后写入） */
+  /** 采购完成时间（确认到货交接后写入） */
   purchaseCompletedAt?: string | null;
   /** 单价（登记后写入） */
   purchaseUnitPrice?: string | null;
