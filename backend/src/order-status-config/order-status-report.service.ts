@@ -15,6 +15,7 @@ import { OrderPattern } from '../entities/order-pattern.entity';
 import { OrderExt, type OrderMaterialRow } from '../entities/order-ext.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { SystemOptionsService } from '../system-options/system-options.service';
+import { resolveOrderReviewPeriod } from './order-review-period';
 
 export type ProductionSlaJudgeContext = {
   slaMap: Map<number, number>;
@@ -151,7 +152,7 @@ export class OrderStatusReportService {
     const orderIds = filteredOrders.map((o) => o.id);
 
     // ===== 数据加载：与各生产页面保持同源 =====
-    // - 审单：order_operation_logs（action='submit'/'review'） + orders.createdAt 兜底
+    // - 审单：最近一轮提交后的状态历史/操作日志，不计旧轮次及草稿等待时间
     // - 采购：order_status_history (pending_purchase) + orders.statusTime 兜底（同 production-purchase-query.service.ts:94-117）
     //   + order_ext.materials[].purchaseCompletedAt 取 max（同生产采购页第 170 行）
     // - 纸样/裁床/工艺/车缝/尾部：直接读 order_pattern / order_cutting / order_craft / order_sewing / order_finishing 实体表
@@ -224,14 +225,11 @@ export class OrderStatusReportService {
     const extByOrder: EntityMap<OrderExt> = emptyMap();
     for (const r of exts) extByOrder.set(r.orderId, r);
 
-    const submitFirstByOrder = new Map<number, Date>();
-    const reviewLastByOrder = new Map<number, Date>();
+    const reviewLogsByOrder = new Map<number, OrderOperationLog[]>();
     for (const log of opLogs) {
-      if (log.action === 'submit' && !submitFirstByOrder.has(log.orderId)) {
-        submitFirstByOrder.set(log.orderId, log.createdAt);
-      } else if (log.action === 'review') {
-        reviewLastByOrder.set(log.orderId, log.createdAt); // 顺序按 createdAt ASC，覆盖式保留最后一条
-      }
+      const logs = reviewLogsByOrder.get(log.orderId) ?? [];
+      logs.push(log);
+      reviewLogsByOrder.set(log.orderId, logs);
     }
 
     // 工艺阶段状态码集合：标准 pending_craft + 工作流链路里所有 trigger='craft_completed' 的 fromStatus
@@ -353,14 +351,9 @@ export class OrderStatusReportService {
       }
 
       // —— 审单 ——
-      const reviewStart =
-        findFirstHistoryEnteredAt(order.id, 'pending_review') ??
-        submitFirstByOrder.get(order.id) ??
-        order.createdAt ?? null;
-      const reviewEnd =
-        findEnteredAtAfterPhase(order.id, 'pending_review') ??
-        reviewLastByOrder.get(order.id) ??
-        null;
+      const { start: reviewStart, end: reviewEnd } = resolveOrderReviewPeriod(
+        order, historyByOrder.get(order.id) ?? [], reviewLogsByOrder.get(order.id) ?? [],
+      );
       const reviewDurationHours =
         reviewStart && reviewEnd
           ? Math.round(((reviewEnd.getTime() - reviewStart.getTime()) / (1000 * 60 * 60)) * 100) / 100
