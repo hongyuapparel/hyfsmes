@@ -1,3 +1,4 @@
+import { summarizeProductionTab } from '../common/production-list-summary.util';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
@@ -279,16 +280,18 @@ export class ProductionCuttingListService {
     totalQuantity: number;
     page: number;
     pageSize: number;
+    tabCounts: Record<string, number>;
   }> {
     this.scheduleCuttingReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
-    const allRows = await this.buildCuttingRows(query);
-    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['arrivedAt', 'completedAt']);
+    const allRows = await this.buildCuttingRows({ ...query, tab: 'all' });
+    const { rows: tabRows, tabCounts } = summarizeProductionTab(allRows, query.tab, ['pending', 'completed'], (row) => row.cuttingStatus);
+    const rows = applyRowSort(tabRows, query.sortField, query.sortOrder, ['arrivedAt', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, totalQuantity, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize, tabCounts };
   }
 
   async getCuttingTabCounts(query: CuttingListQuery): Promise<Record<string, number>> {

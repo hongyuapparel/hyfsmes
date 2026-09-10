@@ -15,7 +15,6 @@ type UsePurchaseDialogsOptions = {
   selectedRows: Ref<PurchaseItemRow[]>
   canAdminEditSubmitted: Ref<boolean>
   reload: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
   clearSelection: () => void
 }
 
@@ -40,7 +39,6 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
       ElMessage.success(`已完成 ${items.length} 条采购`)
       options.clearSelection()
       await options.reload()
-      await options.reloadTabCounts()
     } catch (e: unknown) {
       if (e !== 'cancel' && e !== 'close' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '到货完成失败'))
     } finally {
@@ -50,13 +48,11 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
   const register = usePurchaseRegisterDialog({
     selectedRows: options.selectedRows,
     reload: options.reload,
-    reloadTabCounts: options.reloadTabCounts,
     clearSelection: options.clearSelection,
   })
   const pick = usePurchasePickDialog({
     selectedRows: options.selectedRows,
     reload: options.reload,
-    reloadTabCounts: options.reloadTabCounts,
     clearSelection: options.clearSelection,
   })
 

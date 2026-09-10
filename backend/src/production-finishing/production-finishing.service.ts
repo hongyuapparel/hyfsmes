@@ -18,6 +18,7 @@ export class ProductionFinishingService {
     totalQuantity: number;
     page: number;
     pageSize: number;
+    tabCounts: Record<string, number>;
   }> {
     return this.queryService.getFinishingList(query);
   }

@@ -33,6 +33,7 @@ export interface PatternListItem {
 }
 
 export interface PatternListRes {
+  tabCounts: Record<string, number>
   list: PatternListItem[]
   total: number
   totalQuantity: number

@@ -47,7 +47,6 @@ export interface PackagingCompleteItem {
 interface UseFinishingPackagingParams {
   selectedRows: Ref<FinishingListItem[]>
   reloadList: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
 }
 
 function emptyColorRows(planColors: string[], sizeLen: number): ColorRow[] {
@@ -76,7 +75,7 @@ function sumColorRowsBySize(rows: ColorRow[], sizeLen: number): number[] {
 }
 
 export function useFinishingPackaging(params: UseFinishingPackagingParams) {
-  const { selectedRows, reloadList, reloadTabCounts } = params
+  const { selectedRows, reloadList } = params
 
   const packagingCompleteDialog = reactive<{
     visible: boolean
@@ -167,15 +166,6 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     return false
   }
 
-  /** 尾部收货每格上限：对应颜色尺码的车缝完成数。 */
-  function receivedCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
-    // 纠错时允许按任意顺序修改收货、入库和次品。动态 max 会让
-    // el-input-number 在失焦时擅自截断用户刚输入的值，统一改为提交时校验。
-    if (packagingCompleteDialog.mode === 'amend') return undefined
-    const value = item.sewingColorRows[ri]?.quantities?.[ci]
-    return value != null && Number.isFinite(Number(value)) ? Number(value) : undefined
-  }
-
   /** 入库每格上限：颜色 ri 尺码 ci 剩余 = 尾部收货[ri][ci] − 已入库[ri][ci] − 已次品[ri][ci] − 本次次品[ri][ci]
    *  老订单缺 byColor 真值时返回 undefined（不设 cell 上限），避免输入值被 el-input-number 自动 reset 到 0。 */
   function inboundCellMax(item: PackagingCompleteItem, ri: number, ci: number): number | undefined {
@@ -210,10 +200,6 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
       for (let ri = 0; ri < rows.length; ri++) {
         for (let ci = 0; ci < sizeLen; ci++) {
           const r = Number(rows[ri]?.quantities?.[ci] ?? 0)
-          const sewingRaw = item.sewingColorRows[ri]?.quantities?.[ci]
-          if (sewingRaw != null && Number.isFinite(Number(sewingRaw)) && r > Number(sewingRaw)) {
-            return `订单 ${item.row.orderNo}：${rows[ri].colorName}/${item.sizeHeaders[ci]} 尾部收货(${r})不能超过车缝数(${Number(sewingRaw)})`
-          }
           const ti = Number(item.inboundQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
           const td = Number(item.defectQuantitiesByColor[ri]?.quantities?.[ci] ?? 0)
           if (ti + td !== r) {
@@ -423,7 +409,6 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
       packagingCompleteDialog.visible = false
       resetPackagingCompleteDialog()
       await reloadList()
-      await reloadTabCounts()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记包装完成失败'))
     } finally {
@@ -443,7 +428,6 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
     remainingQty,
     packagingSetZero,
     packagingSetInboundToReceived,
-    receivedCellMax,
     inboundCellMax,
     defectCellMax,
     openPackagingCompleteDialog,

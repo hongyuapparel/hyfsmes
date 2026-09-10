@@ -2,7 +2,6 @@ import { ref, reactive, computed, onBeforeUnmount, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   getSewingItems,
-  getSewingTabCounts,
   exportSewingItems,
   type SewingListItem,
   type SewingListQuery,
@@ -36,7 +35,7 @@ export function useSewingList() {
 
   const currentTab = ref<string>('all')
   const tabCounts = ref<Record<string, number>>({})
-  const tabTotal = ref(0)
+  const tabTotal = ref<number | null>(null)
   const list = ref<SewingListItem[]>([])
   const loading = ref(false)
   const exporting = ref(false)
@@ -87,7 +86,7 @@ export function useSewingList() {
 
   function getTabLabel(tab: SewingTabConfig): string {
     const counts = tabCounts.value
-    const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+    const count = tab.value === 'all' ? tabTotal.value ?? '—' : counts[tab.value] ?? '—'
     return `${tab.label}(${count})`
   }
 
@@ -113,38 +112,32 @@ export function useSewingList() {
     return q
   }
 
-  async function loadTabCounts() {
-    try {
-      const res = await getSewingTabCounts(buildQuery())
-      const counts = res.data ?? {}
-      tabCounts.value = counts
-      tabTotal.value = counts.all ?? 0
-    } catch {
-      // keep existing counts on error
-    }
-  }
+  let listRequestId = 0
 
   async function load() {
+    const requestId = ++listRequestId
     loading.value = true
     try {
       const res = await getSewingItems(buildQuery())
+      if (requestId !== listRequestId) return
       const data = res.data
       if (data) {
+        tabCounts.value = data.tabCounts ?? {}
+        tabTotal.value = data.tabCounts?.all ?? null
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
         restoreColumnWidths(sewingTableRef.value?.getTableRef?.())
       }
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+      if (requestId === listRequestId && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      loading.value = false
+      if (requestId === listRequestId) loading.value = false
     }
   }
 
   async function refreshAfterMutation() {
     await load()
-    void loadTabCounts()
   }
 
   async function onExport() {
@@ -190,7 +183,6 @@ export function useSewingList() {
     }
     pagination.page = 1
     void load()
-    void loadTabCounts()
   }
 
   function debouncedSearch() {
@@ -212,14 +204,12 @@ export function useSewingList() {
     pagination.page = 1
     selectedRows.value = []
     void load()
-    void loadTabCounts()
   }
 
   function onTabChange() {
     pagination.page = 1
     selectedRows.value = []
     void load()
-    void loadTabCounts()
   }
 
   function onPageSizeChange() {
@@ -267,7 +257,6 @@ export function useSewingList() {
     qtyPopoverWidth,
     getTabLabel,
     load,
-    loadTabCounts,
     refreshAfterMutation,
     onExport,
     onShowQtyPopover,

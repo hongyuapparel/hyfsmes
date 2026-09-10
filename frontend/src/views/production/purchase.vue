@@ -281,7 +281,6 @@ const {
   getTabLabel,
   findOrderTypeLabelById,
   load,
-  loadTabCounts,
   onExport,
   onSearch,
   debouncedSearch,
@@ -341,7 +340,6 @@ const {
   selectedRows,
   canAdminEditSubmitted,
   reload: load,
-  reloadTabCounts: loadTabCounts,
   clearSelection: () => {
     selectedRows.value = []
   },
@@ -385,10 +383,7 @@ watch(
 
 onMounted(() => {
   void loadOptions()
-  void (async () => {
-    await load()
-    await loadTabCounts()
-  })()
+  void load()
 })
 </script>
 

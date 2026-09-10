@@ -16,7 +16,6 @@ interface ColorRow {
 interface UseFinishingReceiveParams {
   selectedRows: Ref<FinishingListItem[]>
   reloadList: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
 }
 
 function emptyColorRows(planColors: string[], sizeLen: number): ColorRow[] {
@@ -36,7 +35,7 @@ function sumColorRowsTotal(rows: ColorRow[]): number {
 }
 
 export function useFinishingReceive(params: UseFinishingReceiveParams) {
-  const { selectedRows, reloadList, reloadTabCounts } = params
+  const { selectedRows, reloadList } = params
 
   const receiveDialog = reactive<{
     visible: boolean
@@ -79,12 +78,6 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
   })
 
   const receiveTailReceivedTotal = computed(() => sumColorRowsTotal(receiveDialog.tailReceivedQuantitiesByColor))
-
-  /** 每格上限：等于该颜色对应尺码的车缝数（收货数不能超过车缝数） */
-  function receiveCellMax(rowIdx: number, colIdx: number): number | undefined {
-    const v = receiveDialog.sewingColorRows[rowIdx]?.quantities?.[colIdx]
-    return v != null && Number.isFinite(Number(v)) ? Number(v) : undefined
-  }
 
   function resetReceiveForm() {
     receiveDialog.row = null
@@ -152,7 +145,6 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
       ElMessage.success('登记收货成功，订单已进入「尾部中」')
       receiveDialog.visible = false
       await reloadList()
-      await reloadTabCounts()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记收货失败'))
     } finally {
@@ -164,7 +156,6 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
     receiveDialog,
     receiveSizeTableRows,
     receiveTailReceivedTotal,
-    receiveCellMax,
     resetReceiveForm,
     openReceiveDialog,
     submitReceive,

@@ -442,7 +442,7 @@ export class OrderStatusReportService {
         customerName: order.customerName ?? '',
         orderDate: order.orderDate ? order.orderDate.toISOString() : null,
         customerDueDate: order.customerDueDate ? order.customerDueDate.toISOString() : null,
-        reviewAt: toIso(reviewStart),
+        reviewAt: toIso(reviewEnd),
         reviewDurationHours,
         reviewJudge: judge(limitByPhaseCode('pending_review'), reviewStart, reviewEnd, orderStatusCode === 'pending_review'),
         purchaseArrivedAt: toIso(purchaseStart),

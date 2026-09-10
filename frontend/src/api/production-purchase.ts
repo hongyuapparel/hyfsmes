@@ -48,6 +48,7 @@ export interface PurchaseItemRow {
 }
 
 export interface PurchaseListRes {
+  tabCounts: Record<string, number>
   list: PurchaseItemRow[]
   total: number
   page: number

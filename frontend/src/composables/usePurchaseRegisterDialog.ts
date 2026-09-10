@@ -43,7 +43,6 @@ export interface PurchaseSupplierOption {
 type UsePurchaseRegisterDialogOptions = {
   selectedRows: Ref<PurchaseItemRow[]>
   reload: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
   clearSelection: () => void
 }
 
@@ -194,7 +193,6 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
       }
       registerDialog.visible = false
       await options.reload()
-      await options.reloadTabCounts()
       options.clearSelection()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, registerDialog.mode === 'edit' ? '纠错保存失败' : '登记失败'))

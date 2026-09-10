@@ -600,31 +600,6 @@ export class ProductionFinishingMutationService {
           `按颜色×尺码合计(收货 ${sumReceived} / 入库 ${sumIn} / 次品 ${sumDef})与目标累计(收货 ${received} / 入库 ${inbound} / 次品 ${defect})不一致`,
         );
       }
-      const sewingRowsRaw = await this.sewingRepo.manager.query(
-        'SELECT sewing_quantities_by_color FROM order_sewing WHERE order_id = ? LIMIT 1',
-        [orderId],
-      ) as Array<{ sewing_quantities_by_color?: unknown }>;
-      let sewingRowsParsed: unknown = sewingRowsRaw[0]?.sewing_quantities_by_color;
-      if (typeof sewingRowsParsed === 'string') {
-        try { sewingRowsParsed = JSON.parse(sewingRowsParsed); } catch { sewingRowsParsed = null; }
-      }
-      if (Array.isArray(sewingRowsParsed)) {
-        const sewingByColor = normalizeColorRows(sewingRowsParsed as ColorSizeQuantityRow[], sizeHeaders.length);
-        if (planColors.length > 0) assertColorRowsShape(sewingByColor, planColors, sizeHeaders.length);
-        for (let rowIndex = 0; rowIndex < amendReceivedByColor.length; rowIndex++) {
-          for (let sizeIndex = 0; sizeIndex < sizeHeaders.length; sizeIndex++) {
-            const receivedCell = amendReceivedByColor[rowIndex].quantities[sizeIndex] ?? 0;
-            const sewingCell = sewingByColor[rowIndex]?.quantities?.[sizeIndex] ?? 0;
-            if (receivedCell > sewingCell) {
-              throw new BadRequestException(
-                `${amendReceivedByColor[rowIndex].colorName}/${sizeHeaders[sizeIndex]} 尾部收货数(${receivedCell})不能超过车缝数(${sewingCell})`,
-              );
-            }
-          }
-        }
-      } else if (received > (Number(sewing.sewingQuantity) || 0)) {
-        throw new BadRequestException(`尾部收货数(${received})不能超过车缝数(${Number(sewing.sewingQuantity) || 0})`);
-      }
       (finishing as { tailReceivedQuantitiesByColor?: ColorSizeQuantityRow[] | null }).tailReceivedQuantitiesByColor = amendReceivedByColor;
       (finishing as { tailInboundQuantitiesByColor?: ColorSizeQuantityRow[] | null }).tailInboundQuantitiesByColor = amendInboundByColor;
       (finishing as { defectQuantitiesByColor?: ColorSizeQuantityRow[] | null }).defectQuantitiesByColor = amendDefectByColor;
@@ -645,9 +620,6 @@ export class ProductionFinishingMutationService {
         amendDefectQuantityRowOut = defRowFinal;
       }
     } else {
-      if (received > (Number(sewing.sewingQuantity) || 0)) {
-        throw new BadRequestException(`尾部收货数(${received})不能超过车缝数(${Number(sewing.sewingQuantity) || 0})`);
-      }
       amendTailReceivedQtyRowOut = [received];
     }
 

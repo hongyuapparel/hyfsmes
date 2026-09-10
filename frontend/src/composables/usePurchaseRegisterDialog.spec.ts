@@ -12,8 +12,8 @@ vi.mock('element-plus', () => ({ElMessage:{warning:mocks.warning,error:mocks.err
 function setup() {
   const row = {orderId:1,materialIndex:0,orderNo:'TEST',skuCode:'TEST',materialName:'布',
     supplierName:'供应商',planQuantity:10,processRoute:'purchase',purchaseStatus:'pending'} as PurchaseItemRow
-  const reload=vi.fn(async()=>{}), reloadTabCounts=vi.fn(async()=>{}), clearSelection=vi.fn()
-  return { ...usePurchaseRegisterDialog({selectedRows:ref([row]),reload,reloadTabCounts,clearSelection}),row,reload,reloadTabCounts }
+  const reload=vi.fn(async()=>{}), clearSelection=vi.fn()
+  return { ...usePurchaseRegisterDialog({selectedRows:ref([row]),reload,clearSelection}),row,reload }
 }
 describe('采购登记交互',()=>{
   beforeEach(()=>vi.clearAllMocks())
@@ -27,7 +27,7 @@ describe('采购登记交互',()=>{
     await f.submitRegister()
     expect(mocks.register).toHaveBeenCalledWith({items:[expect.objectContaining({purchaseStatus:'completed',actualPurchaseQuantity:10})]})
     expect(f.registerDialog.visible).toBe(false)
-    expect(f.reloadTabCounts).toHaveBeenCalledOnce()
+    expect(f.reload).toHaveBeenCalledOnce()
   })
   it('缺少供应商不能保存，失败不关闭表单',async()=>{
     const f=setup();f.openRegisterDialog();f.registerDialog.rows[0].supplierName=''
