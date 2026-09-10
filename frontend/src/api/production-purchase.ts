@@ -99,6 +99,7 @@ export function registerPurchase(payload: {
   otherCost: string
   remark: string
   imageUrl: string
+  purchaseStatus?: 'purchasing' | 'completed'
 }) {
   return request.post<void>('/production/purchase/items/register', payload)
 }
@@ -112,6 +113,11 @@ export interface RegisterPurchaseBatchItem {
   otherCost: string
   remark?: string
   imageUrl?: string
+  purchaseStatus?: 'purchasing' | 'completed'
+}
+
+export function completePurchaseBatch(items: Array<Pick<PurchaseItemRow, 'orderId' | 'materialIndex'>>) {
+  return request.post<void>('/production/purchase/items/complete/batch', { items })
 }
 
 export function registerPurchaseBatch(payload: {

@@ -25,6 +25,7 @@ export interface PurchaseRegisterDraftRow {
   otherCost: string
   remark: string
   imageUrl: string
+  purchaseStatus: 'purchasing' | 'completed'
 }
 
 export interface PurchaseRegisterDialogState {
@@ -66,11 +67,11 @@ export function calcPurchaseRegisterRowAmount(
 }
 
 export function isRegisterablePurchaseRow(row: PurchaseItemRow): boolean {
-  return row.processRoute === 'purchase' && row.purchaseStatus !== 'completed'
+  return row.processRoute === 'purchase' && row.purchaseStatus === 'pending'
 }
 
 export function isEditableCompletedPurchaseRow(row: PurchaseItemRow): boolean {
-  return row.processRoute === 'purchase' && row.purchaseStatus === 'completed'
+  return row.processRoute === 'purchase' && ['purchasing', 'completed'].includes(row.purchaseStatus)
 }
 
 function toRegisterDraftRow(row: PurchaseItemRow): PurchaseRegisterDraftRow {
@@ -90,6 +91,7 @@ function toRegisterDraftRow(row: PurchaseItemRow): PurchaseRegisterDraftRow {
     otherCost: row.purchaseOtherCost ?? '',
     remark: normalizeText(row.purchaseRemark),
     imageUrl: normalizeText(row.purchaseImageUrl),
+    purchaseStatus: row.purchaseStatus === 'completed' ? 'completed' : 'purchasing',
   }
 }
 
@@ -142,7 +144,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
   function openEditCompletedDialog() {
     const rows = options.selectedRows.value.filter(isEditableCompletedPurchaseRow)
     if (!rows.length) {
-      ElMessage.warning('请选择已采购完成的物料')
+      ElMessage.warning('请选择已登记采购的物料')
       return
     }
     registerDialog.mode = 'edit'
@@ -156,7 +158,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
   }
 
   async function submitRegister() {
-    if (!registerDialog.rows.length) return
+    if (registerDialog.submitting || !registerDialog.rows.length) return
     const missingSupplier = registerDialog.rows.find((row) => !normalizeText(row.supplierName))
     if (missingSupplier) {
       ElMessage.warning(`请补充供应商：${missingSupplier.orderNo} / ${missingSupplier.materialName}`)
@@ -181,6 +183,7 @@ export function usePurchaseRegisterDialog(options: UsePurchaseRegisterDialogOpti
         otherCost: row.otherCost.trim() || '0',
         remark: row.remark.trim() || undefined,
         imageUrl: row.imageUrl.trim() || undefined,
+        purchaseStatus: row.purchaseStatus,
       }))
       if (registerDialog.mode === 'edit') {
         await editCompletedPurchaseBatch({ items })

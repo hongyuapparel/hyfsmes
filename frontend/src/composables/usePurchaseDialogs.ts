@@ -1,5 +1,7 @@
-import { computed, type Ref } from 'vue'
-import type { PurchaseItemRow } from '@/api/production-purchase'
+import { computed, ref, type Ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { completePurchaseBatch, type PurchaseItemRow } from '@/api/production-purchase'
+import { getErrorMessage, isErrorHandled } from '@/api/request'
 import {
   isEditableCompletedPurchaseRow,
   isRegisterablePurchaseRow,
@@ -18,6 +20,33 @@ type UsePurchaseDialogsOptions = {
 }
 
 export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
+  const completing = ref(false)
+  const canCompleteSelection = computed(() => options.selectedRows.value.length > 0
+    && options.selectedRows.value.every(row => row.processRoute === 'purchase' && row.purchaseStatus === 'purchasing'))
+  const canHandleSelection = computed(() => options.selectedRows.value.length > 0
+    && options.selectedRows.value.every(row => options.currentTab.value === 'picking'
+      ? row.processRoute === 'picking' && row.pickStatus !== 'completed'
+      : isRegisterablePurchaseRow(row)))
+
+  async function completeSelection() {
+    if (completing.value || !canCompleteSelection.value) return
+    const items = options.selectedRows.value.map(({ orderId, materialIndex }) => ({ orderId, materialIndex }))
+    completing.value = true
+    try {
+      await ElMessageBox.confirm(`确认这 ${items.length} 条物料已到货并交接？完成后，物料齐备的订单将进入下一环节。`, '到货完成', {
+        confirmButtonText: '确认完成', cancelButtonText: '取消', type: 'warning',
+      })
+      await completePurchaseBatch(items)
+      ElMessage.success(`已完成 ${items.length} 条采购`)
+      options.clearSelection()
+      await options.reload()
+      await options.reloadTabCounts()
+    } catch (e: unknown) {
+      if (e !== 'cancel' && e !== 'close' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '到货完成失败'))
+    } finally {
+      completing.value = false
+    }
+  }
   const register = usePurchaseRegisterDialog({
     selectedRows: options.selectedRows,
     reload: options.reload,
@@ -36,7 +65,7 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
       if (row.pickStatus !== 'completed') return true
       return options.canAdminEditSubmitted.value
     }
-    if (isRegisterablePurchaseRow(row)) return true
+    if (isRegisterablePurchaseRow(row) || row.purchaseStatus === 'purchasing') return true
     return options.canAdminEditSubmitted.value && isEditableCompletedPurchaseRow(row)
   }
 
@@ -56,6 +85,10 @@ export function usePurchaseDialogs(options: UsePurchaseDialogsOptions) {
   return {
     ...register,
     ...pick,
+    completing,
+    canCompleteSelection,
+    canHandleSelection,
+    completeSelection,
     batchButtonLabel,
     isPurchaseRowSelectable,
     onBatchHandle,

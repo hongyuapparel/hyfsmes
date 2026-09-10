@@ -138,12 +138,18 @@
         <el-button @click="onReset">清空</el-button>
         <el-button :loading="exporting" @click="onExport">导出表格</el-button>
         <el-button
-          v-if="hasSelection && canRegisterPurchase"
+          v-if="canHandleSelection && canRegisterPurchase"
           type="primary"
           @click="onBatchHandle"
         >
           {{ batchButtonLabel }}
         </el-button>
+        <el-button
+          v-if="canCompleteSelection && canRegisterPurchase"
+          type="primary"
+          :loading="completing"
+          @click="completeSelection"
+        >到货完成</el-button>
         <el-button
           v-if="hasSelection && canEditCompletedPurchaseSelection && canAdminEditSubmitted"
           type="primary"
@@ -427,6 +433,10 @@ const activeFilterCount = computed(() => {
 
 const {
   registerDialog,
+  completing,
+  canCompleteSelection,
+  canHandleSelection,
+  completeSelection,
   registerSupplierOptions,
   registerSupplierLoading,
   pickDialog,
@@ -462,7 +472,7 @@ const {
 const canEditCompletedPurchaseSelection = computed(
   () =>
     selectedRows.value.length > 0
-    && selectedRows.value.every((r) => r.processRoute === 'purchase' && r.purchaseStatus === 'completed'),
+    && selectedRows.value.every((r) => r.processRoute === 'purchase' && ['purchasing', 'completed'].includes(r.purchaseStatus)),
 )
 
 const canEditCompletedPickSelection = computed(

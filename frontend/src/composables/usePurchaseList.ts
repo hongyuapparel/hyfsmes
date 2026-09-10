@@ -12,6 +12,7 @@ import type { ProductionOrderBriefModel } from '@/components/production/Producti
 export const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
   { label: '等待采购', value: 'pending' },
+  { label: '采购中', value: 'purchasing' },
   { label: '待领料', value: 'picking' },
   { label: '采购完成', value: 'completed' },
 ] as const
@@ -123,6 +124,12 @@ export function usePurchaseList() {
       const res = await getPurchaseItems(buildQuery())
       const data = res.data
       if (data) {
+        const lastPage = Math.max(1, Math.ceil(data.total / pagination.pageSize))
+        if (pagination.page > lastPage) {
+          pagination.page = lastPage
+          await load()
+          return
+        }
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         restoreColumnWidths(purchaseTableHostRef.value?.purchaseTableRef as Parameters<typeof restoreColumnWidths>[0])
