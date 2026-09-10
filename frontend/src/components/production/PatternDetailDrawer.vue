@@ -2,7 +2,7 @@
   <AppDrawer v-model="visible" title="纸样工作区" :size="1060" :min-size="760" :max-size="1400" resizable :before-close="beforeClose" @closed="onClosed">
     <div v-if="row" class="pattern-workspace">
       <ProductionDetailSection>
-        <ProductionOrderBriefPanel :brief="brief" />
+        <ProductionOrderBriefPanel :brief="brief" :image-width="96" :image-height="160" />
       </ProductionDetailSection>
       <ProductionDetailSection title="打样安排">
         <template #actions>
@@ -171,4 +171,6 @@ defineExpose({ onSaveSuccess })
 
 <style scoped>
 .pattern-workspace, .pattern-workspace-materials { display: flex; flex-direction: column; gap: var(--space-sm); }
+.pattern-workspace { flex: 1; min-height: 0; overflow-y: auto; }
+.pattern-workspace > * { flex-shrink: 0; }
 </style>
