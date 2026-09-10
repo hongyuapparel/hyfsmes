@@ -1,3 +1,4 @@
+import { summarizeProductionTab } from '../common/production-list-summary.util';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -365,15 +366,17 @@ export class ProductionSewingService {
     totalQuantity: number;
     page: number;
     pageSize: number;
+    tabCounts: Record<string, number>;
   }> {
     const { page = 1, pageSize = 20 } = query;
-    const allRows = await this.buildSewingRows(query);
-    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['arrivedAt', 'distributedAt', 'completedAt']);
+    const allRows = await this.buildSewingRows({ ...query, tab: 'all' });
+    const { rows: tabRows, tabCounts } = summarizeProductionTab(allRows, query.tab, ['pending', 'completed'], (row) => row.sewingStatus);
+    const rows = applyRowSort(tabRows, query.sortField, query.sortOrder, ['arrivedAt', 'distributedAt', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, totalQuantity, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize, tabCounts };
   }
 
   async getSewingTabCounts(query: SewingListQuery): Promise<Record<string, number>> {

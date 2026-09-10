@@ -1,6 +1,6 @@
 import { computed, reactive, ref, type Ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getPatternItems, getPatternTabCounts, exportPatternItems, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
+import { getPatternItems, exportPatternItems, type PatternListItem, type PatternListQuery } from '@/api/production-pattern'
 import { getDictTree, getDictItems } from '@/api/dicts'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -49,7 +49,7 @@ export function usePatternList() {
   const skuCodeLabelVisible = ref(false)
   const currentTab = ref<string>('all')
   const tabCounts = ref<Record<string, number>>({})
-  const tabTotal = ref(0)
+  const tabTotal = ref<number | null>(null)
   const list = ref<PatternListItem[]>([])
   const loading = ref(false)
   const exporting = ref(false)
@@ -63,7 +63,6 @@ export function usePatternList() {
 
   const orderTypeTreeSelectData = computed(() => toOrderTypeTreeSelect(orderTypeTree.value))
 
-  let tabCountsReqId = 0
   let listAbortController: AbortController | null = null
   let patternListReqId = 0
   let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -102,7 +101,7 @@ export function usePatternList() {
 
   function getTabLabel(tab: PatternTabConfig): string {
     const counts = tabCounts.value
-    const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+    const count = tab.value === 'all' ? tabTotal.value ?? '—' : counts[tab.value] ?? '—'
     return `${tab.label}(${count})`
   }
 
@@ -141,20 +140,6 @@ export function usePatternList() {
     return e?.code === 'ERR_CANCELED' || e?.name === 'CanceledError'
   }
 
-  async function loadTabCounts() {
-    tabCountsReqId++
-    const reqId = tabCountsReqId
-    try {
-      const res = await getPatternTabCounts(buildQuery())
-      if (reqId !== tabCountsReqId) return
-      const counts = res.data ?? {}
-      tabCounts.value = counts
-      tabTotal.value = counts.all ?? 0
-    } catch {
-      // keep existing counts on error
-    }
-  }
-
   async function load(getTableRef?: () => unknown) {
     patternListReqId++
     const reqId = patternListReqId
@@ -167,6 +152,8 @@ export function usePatternList() {
       if (reqId !== patternListReqId) return
       const data = res.data
       if (data) {
+        tabCounts.value = data.tabCounts ?? {}
+        tabTotal.value = data.tabCounts?.all ?? null
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
@@ -213,7 +200,6 @@ export function usePatternList() {
     }
     pagination.page = 1
     loadFn()
-    void loadTabCounts()
   }
 
   function debouncedSearch(loadFn: () => void) {
@@ -240,14 +226,12 @@ export function usePatternList() {
     pagination.page = 1
     selectedRows.value = []
     loadFn()
-    void loadTabCounts()
   }
 
   function onTabChange(loadFn: () => void) {
     pagination.page = 1
     selectedRows.value = []
     loadFn()
-    void loadTabCounts()
   }
 
   function onPageSizeChange(loadFn: () => void) {
@@ -297,7 +281,6 @@ export function usePatternList() {
     findCollaborationLabelById,
     getTabLabel,
     load,
-    loadTabCounts,
     loadOptions,
     onExport,
     onSearch,

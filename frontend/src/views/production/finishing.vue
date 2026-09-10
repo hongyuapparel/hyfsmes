@@ -290,7 +290,6 @@ const {
   exporting,
   pagination,
   totalQuantity,
-  loadTabCounts,
   load,
   onExport,
   onSearch,
@@ -300,7 +299,6 @@ const {
   onPageSizeChange,
   onSortChange,
 } = useFinishingListData({
-  tabs: FINISHING_TABS,
   clearSelection,
 })
 const {
@@ -313,7 +311,7 @@ const {
 
 function getTabLabel(tab: FinishingTabConfig): string {
   const counts = tabCounts.value
-  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  const count = tab.value === 'all' ? tabTotal.value ?? '—' : counts[tab.value] ?? '—'
   return `${tab.label}(${count})`
 }
 
@@ -327,7 +325,6 @@ const {
 } = useFinishingReceive({
   selectedRows,
   reloadList: load,
-  reloadTabCounts: loadTabCounts,
 })
 
 const {
@@ -350,7 +347,6 @@ const {
 } = useFinishingPackaging({
   selectedRows,
   reloadList: load,
-  reloadTabCounts: loadTabCounts,
 })
 
 const finishingDrawerReloadToken = ref(0)
@@ -371,10 +367,7 @@ watch(
 )
 
 onMounted(() => {
-  void (async () => {
-    await load()
-    await loadTabCounts()
-  })()
+  void load()
 })
 </script>
 

@@ -16,7 +16,6 @@ interface ColorRow {
 interface UseFinishingReceiveParams {
   selectedRows: Ref<FinishingListItem[]>
   reloadList: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
 }
 
 function emptyColorRows(planColors: string[], sizeLen: number): ColorRow[] {
@@ -36,7 +35,7 @@ function sumColorRowsTotal(rows: ColorRow[]): number {
 }
 
 export function useFinishingReceive(params: UseFinishingReceiveParams) {
-  const { selectedRows, reloadList, reloadTabCounts } = params
+  const { selectedRows, reloadList } = params
 
   const receiveDialog = reactive<{
     visible: boolean
@@ -146,7 +145,6 @@ export function useFinishingReceive(params: UseFinishingReceiveParams) {
       ElMessage.success('登记收货成功，订单已进入「尾部中」')
       receiveDialog.visible = false
       await reloadList()
-      await reloadTabCounts()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记收货失败'))
     } finally {

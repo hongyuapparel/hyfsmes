@@ -14,11 +14,10 @@ import { useCuttingFormState, SELF_DEPARTMENT_LABEL } from '@/composables/useCut
 interface UseCuttingRegisterParams {
   selectedRows: Ref<CuttingListItem[]>
   reloadList: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
 }
 
 export function useCuttingRegister(params: UseCuttingRegisterParams) {
-  const { selectedRows, reloadList, reloadTabCounts } = params
+  const { selectedRows, reloadList } = params
 
   const fs = useCuttingFormState()
 
@@ -89,7 +88,6 @@ export function useCuttingRegister(params: UseCuttingRegisterParams) {
       ElMessage.success('裁床登记完成，订单已进入待车缝')
       registerDialog.visible = false
       await reloadList()
-      await reloadTabCounts()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
     } finally {

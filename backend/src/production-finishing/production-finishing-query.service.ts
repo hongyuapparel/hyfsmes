@@ -1,3 +1,4 @@
+import { summarizeProductionTab } from '../common/production-list-summary.util';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
@@ -286,15 +287,17 @@ export class ProductionFinishingQueryService {
     totalQuantity: number;
     page: number;
     pageSize: number;
+    tabCounts: Record<string, number>;
   }> {
     const { page = 1, pageSize = 20 } = query;
-    const allRows = await this.buildFinishingRows(query);
-    const rows = applyRowSort(allRows, query.sortField, query.sortOrder, ['arrivedAt', 'completedAt']);
+    const allRows = await this.buildFinishingRows({ ...query, tab: 'all' });
+    const { rows: tabRows, tabCounts } = summarizeProductionTab(allRows, query.tab, ['pending_receive', 'pending_assign', 'inbound'], (row) => row.finishingStatus);
+    const rows = applyRowSort(tabRows, query.sortField, query.sortOrder, ['arrivedAt', 'completedAt']);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, totalQuantity, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize, tabCounts };
   }
 
   async getFinishingTabCounts(query: FinishingListQuery): Promise<Record<string, number>> {

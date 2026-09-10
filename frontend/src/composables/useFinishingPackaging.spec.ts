@@ -83,7 +83,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows,
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openPackagingCompleteDialog()
     const item = c.packagingCompleteDialog.items[0]
@@ -105,7 +104,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows,
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openPackagingCompleteDialog()
     const item = c.packagingCompleteDialog.items[0]
@@ -121,7 +119,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows,
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openPackagingCompleteDialog()
     const item = c.packagingCompleteDialog.items[0]
@@ -135,7 +132,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows,
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openPackagingCompleteDialog()
     const item = c.packagingCompleteDialog.items[0]
@@ -149,7 +145,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows,
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openPackagingCompleteDialog()
     const item = c.packagingCompleteDialog.items[0]
@@ -179,7 +174,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows: ref([makeRow()]),
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openPackagingCompleteDialog()
     expect(c.packagingCompleteDialog.visible).toBe(false)
@@ -208,7 +202,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows: ref([makeRow({ finishingStatus: 'inbound', tailInboundQty: 100 })]),
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
 
     await c.openPackagingAmendDialog()
@@ -247,7 +240,6 @@ describe('useFinishingPackaging — byColor', () => {
     const c = useFinishingPackaging({
       selectedRows: ref([makeRow({ finishingStatus: 'inbound', tailInboundQty: 100 })]),
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
 
     await c.openPackagingAmendDialog()

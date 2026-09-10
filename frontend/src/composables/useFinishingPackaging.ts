@@ -47,7 +47,6 @@ export interface PackagingCompleteItem {
 interface UseFinishingPackagingParams {
   selectedRows: Ref<FinishingListItem[]>
   reloadList: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
 }
 
 function emptyColorRows(planColors: string[], sizeLen: number): ColorRow[] {
@@ -76,7 +75,7 @@ function sumColorRowsBySize(rows: ColorRow[], sizeLen: number): number[] {
 }
 
 export function useFinishingPackaging(params: UseFinishingPackagingParams) {
-  const { selectedRows, reloadList, reloadTabCounts } = params
+  const { selectedRows, reloadList } = params
 
   const packagingCompleteDialog = reactive<{
     visible: boolean
@@ -410,7 +409,6 @@ export function useFinishingPackaging(params: UseFinishingPackagingParams) {
       packagingCompleteDialog.visible = false
       resetPackagingCompleteDialog()
       await reloadList()
-      await reloadTabCounts()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '登记包装完成失败'))
     } finally {

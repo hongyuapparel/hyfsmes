@@ -6,7 +6,7 @@ import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 export function usePatternCompletion(
   selectedRows: Ref<PatternListItem[]>,
-  loaders: { reloadList: () => Promise<void> | void; reloadTabCounts: () => Promise<void> | void },
+  loaders: { reloadList: () => Promise<void> | void },
 ) {
   const completeDialog = reactive<{
     visible: boolean; submitting: boolean; mode: 'complete' | 'edit'
@@ -111,7 +111,6 @@ export function usePatternCompletion(
       if (succeeded) {
         const results = await Promise.allSettled([
           Promise.resolve().then(() => loaders.reloadList()),
-          Promise.resolve().then(() => loaders.reloadTabCounts()),
         ])
         if (results.some((result) => result.status === 'rejected')) ElMessage.warning('操作已成功，但列表更新失败，请重新搜索查看')
       }

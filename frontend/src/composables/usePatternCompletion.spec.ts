@@ -20,7 +20,7 @@ function row(id: number): PatternListItem {
 }
 function setup(count = 3) {
   const selected = ref(Array.from({ length: count }, (_, i) => row(i + 1)))
-  const loaders = { reloadList: vi.fn(), reloadTabCounts: vi.fn() }
+  const loaders = { reloadList: vi.fn() }
   const state = usePatternCompletion(selected, loaders)
   return { selected, loaders, ...state }
 }
@@ -35,7 +35,6 @@ describe('纸样完成', () => {
     expect(api.complete.mock.calls.map(([payload]) => payload)).toEqual([1, 2, 3].map((id) => ({ orderId: id, sampleImageUrl: `image-${id}` })))
     expect(state.completeDialog.visible).toBe(false)
     expect(state.loaders.reloadList).toHaveBeenCalledOnce()
-    expect(state.loaders.reloadTabCounts).toHaveBeenCalledOnce()
   })
   it('部分失败显示订单及剩余数量，重试不重复提交已成功订单', async () => {
     const state = setup()

@@ -32,7 +32,6 @@ export interface PurchasePickInventoryOption {
 type UsePurchasePickDialogOptions = {
   selectedRows: { value: PurchaseItemRow[] }
   reload: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
   clearSelection: () => void
 }
 
@@ -331,7 +330,6 @@ export function usePurchasePickDialog(options: UsePurchasePickDialogOptions) {
       }
       pickDialog.visible = false
       await options.reload()
-      await options.reloadTabCounts()
       options.clearSelection()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) {

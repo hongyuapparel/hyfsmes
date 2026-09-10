@@ -1,21 +1,16 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportCuttingItems, getCuttingItems, getCuttingTabCounts, type CuttingListItem, type CuttingListQuery } from '@/api/production-cutting'
+import { exportCuttingItems, getCuttingItems, type CuttingListItem, type CuttingListQuery } from '@/api/production-cutting'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
 import { useTableSort } from '@/composables/useTableSort'
 
-interface CuttingTabLike {
-  value: string
-}
-
 interface UseCuttingListDataParams {
-  tabs: readonly CuttingTabLike[]
   clearSelection?: () => void
 }
 
 export function useCuttingListData(params: UseCuttingListDataParams) {
-  const { tabs, clearSelection } = params
+  const { clearSelection } = params
 
   const filter = reactive({ orderNo: '', skuCode: '' })
   const completedRange = ref<[string, string] | null>(null)
@@ -24,7 +19,7 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
 
   const currentTab = ref<string>('all')
   const tabCounts = ref<Record<string, number>>({})
-  const tabTotal = ref(0)
+  const tabTotal = ref<number | null>(null)
   const list = ref<CuttingListItem[]>([])
   const loading = ref(false)
   const exporting = ref(false)
@@ -54,31 +49,26 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     return q
   }
 
-  async function loadTabCounts() {
-    try {
-      const res = await getCuttingTabCounts(buildQuery())
-      const counts = res.data ?? {}
-      tabCounts.value = counts
-      tabTotal.value = counts.all ?? 0
-    } catch {
-      // keep existing counts on error
-    }
-  }
+  let listRequestId = 0
 
   async function load() {
+    const requestId = ++listRequestId
     loading.value = true
     try {
       const res = await getCuttingItems(buildQuery())
+      if (requestId !== listRequestId) return
       const data = res.data
       if (data) {
+        tabCounts.value = data.tabCounts ?? {}
+        tabTotal.value = data.tabCounts?.all ?? null
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
       }
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+      if (requestId === listRequestId && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      loading.value = false
+      if (requestId === listRequestId) loading.value = false
     }
   }
 
@@ -113,7 +103,6 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     }
     pagination.page = 1
     void load()
-    void loadTabCounts()
   }
 
   function debouncedSearch() {
@@ -134,14 +123,12 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     pagination.page = 1
     clearSelection?.()
     void load()
-    void loadTabCounts()
   }
 
   function onTabChange() {
     pagination.page = 1
     clearSelection?.()
     void load()
-    void loadTabCounts()
   }
 
   function onPageSizeChange() {
@@ -163,7 +150,6 @@ export function useCuttingListData(params: UseCuttingListDataParams) {
     pagination,
     totalQuantity,
     load,
-    loadTabCounts,
     onExport,
     onSearch,
     debouncedSearch,

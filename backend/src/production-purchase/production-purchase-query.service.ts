@@ -1,3 +1,4 @@
+import { summarizeProductionTab } from '../common/production-list-summary.util';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository } from 'typeorm';
@@ -45,6 +46,7 @@ export class ProductionPurchaseQueryService {
     total: number;
     page: number;
     pageSize: number;
+    tabCounts: Record<string, number>;
   }> {
     const {
       tab = 'all',
@@ -60,8 +62,7 @@ export class ProductionPurchaseQueryService {
       pageSize = 20,
     } = query;
     this.schedulePurchaseReconcile(actorUserId);
-    await this.ensureMaterialSourceOptionCache();
-    await this.ensureMaterialTypeOptionCache();
+    await Promise.all([this.ensureMaterialSourceOptionCache(), this.ensureMaterialTypeOptionCache()]);
 
     const qb = this.orderRepo
       .createQueryBuilder('o')
@@ -89,43 +90,15 @@ export class ProductionPurchaseQueryService {
     const orders = await qb.getMany();
     const orderIds = orders.map((o) => o.id);
     if (orderIds.length === 0) {
-      return { list: [], total: 0, page, pageSize };
+      return { list: [], total: 0, page, pageSize, tabCounts: { all: 0, pending: 0, purchasing: 0, picking: 0, completed: 0 } };
     }
 
-    // 到采购时间：从状态历史表中取进入 pending_purchase 的时间（取最新一次进入时间）
-    let pendingPurchaseEnteredAtMap = new Map<number, string>();
-    try {
-      const pendingStatus = await this.orderStatusRepo.findOne({ where: { code: 'pending_purchase' } });
-      const statusId = pendingStatus?.id;
-      if (statusId) {
-        const historyRows = await this.orderStatusHistoryRepo
-          .createQueryBuilder('h')
-          .select('h.order_id', 'orderId')
-          .addSelect('MAX(h.entered_at)', 'enteredAt')
-          .where('h.status_id = :statusId', { statusId })
-          .andWhere('h.order_id IN (:...orderIds)', { orderIds })
-          .groupBy('h.order_id')
-          .getRawMany<{ orderId: number; enteredAt: string }>();
-        const map = new Map<number, string>();
-        for (const r of historyRows) {
-          const orderId = Number(r.orderId);
-          const enteredAt = r.enteredAt;
-          if (!Number.isFinite(orderId) || !enteredAt) continue;
-          const formatted = this.toDateTimeLocalString(enteredAt);
-          if (!formatted) continue;
-          map.set(orderId, formatted);
-        }
-        pendingPurchaseEnteredAtMap = map;
-      }
-    } catch {
-      pendingPurchaseEnteredAtMap = new Map<number, string>();
-    }
-
-    const extList = await this.orderExtRepo.find({
-      where: orderIds.map((id) => ({ orderId: id })),
-    });
+    const [pendingPurchaseEnteredAtMap, extList, slaCtx] = await Promise.all([
+      this.getPendingPurchaseEnteredAtMap(orderIds),
+      this.orderExtRepo.find({ where: { orderId: In(orderIds) }, select: ['orderId', 'materials'] }),
+      this.orderStatusConfigService.loadProductionSlaJudgeContext(),
+    ]);
     const extMap = new Map(extList.map((e) => [e.orderId, e]));
-    const slaCtx = await this.orderStatusConfigService.loadProductionSlaJudgeContext();
 
     const rows: PurchaseItemRow[] = [];
     for (const order of orders) {
@@ -165,10 +138,6 @@ export class ProductionPurchaseQueryService {
               : 'pending';
         // 已完成订单后续补充的物料/辅料只是资料完善，不再进入采购待办。
         if (order.status === 'completed' && routeStatus !== 'completed') continue;
-        if (tab === 'pending' && !(processRoute === 'purchase' && routeStatus === 'pending')) continue;
-        if (tab === 'purchasing' && !(processRoute === 'purchase' && routeStatus === 'purchasing')) continue;
-        if (tab === 'picking' && !(processRoute === 'picking' && routeStatus === 'pending')) continue;
-        if (tab === 'completed' && routeStatus !== 'completed') continue;
 
         const phaseStart = this.orderStatusConfigService.parseProductionPhaseInstant(pendingPurchaseAt);
         const materialDone = routeStatus === 'completed';
@@ -227,12 +196,49 @@ export class ProductionPurchaseQueryService {
       }
     }
 
-    const sortedRows = applyRowSort(rows, query.sortField, query.sortOrder, ['orderDate', 'pendingPurchaseAt', 'completedAt']);
+    const { rows: tabRows, tabCounts } = summarizeProductionTab(rows, tab,
+      ['pending', 'purchasing', 'picking', 'completed'], (row) => {
+        if (row.processRoute === 'picking') return row.pickStatus === 'completed' ? 'completed' : 'picking';
+        return row.purchaseStatus;
+      });
+    const sortedRows = applyRowSort(tabRows, query.sortField, query.sortOrder, ['orderDate', 'pendingPurchaseAt', 'completedAt']);
     const total = sortedRows.length;
     const start = (page - 1) * pageSize;
     const list = sortedRows.slice(start, start + pageSize);
 
-    return { list, total, page, pageSize };
+    return { list, total, page, pageSize, tabCounts };
+  }
+
+  private async getPendingPurchaseEnteredAtMap(orderIds: number[]): Promise<Map<number, string>> {
+    let pendingPurchaseEnteredAtMap = new Map<number, string>();
+    try {
+      const pendingStatus = await this.orderStatusRepo.findOne({ where: { code: 'pending_purchase' } });
+      const statusId = pendingStatus?.id;
+      if (statusId) {
+        const historyRows = await this.orderStatusHistoryRepo
+          .createQueryBuilder('h')
+          .select('h.order_id', 'orderId')
+          .addSelect('MAX(h.entered_at)', 'enteredAt')
+          .where('h.status_id = :statusId', { statusId })
+          .andWhere('h.order_id IN (:...orderIds)', { orderIds })
+          .groupBy('h.order_id')
+          .getRawMany<{ orderId: number; enteredAt: string }>();
+        const map = new Map<number, string>();
+        for (const r of historyRows) {
+          const orderId = Number(r.orderId);
+          const enteredAt = r.enteredAt;
+          if (!Number.isFinite(orderId) || !enteredAt) continue;
+          const formatted = this.toDateTimeLocalString(enteredAt);
+          if (!formatted) continue;
+          map.set(orderId, formatted);
+        }
+        pendingPurchaseEnteredAtMap = map;
+      }
+    } catch {
+      pendingPurchaseEnteredAtMap = new Map<number, string>();
+    }
+
+    return pendingPurchaseEnteredAtMap;
   }
 
   async getPurchaseTabCounts(query: PurchaseListQuery): Promise<Record<string, number>> {

@@ -64,7 +64,7 @@ describe('useFinishingReceive — 真实收货录入', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('收货超过车缝时按实际数量提交，零数量仍被拦截', async () => {
-    const c = useFinishingReceive({ selectedRows: ref([row]), reloadList: async () => {}, reloadTabCounts: async () => {} })
+    const c = useFinishingReceive({ selectedRows: ref([row]), reloadList: async () => {} })
     await c.openReceiveDialog()
     await c.submitReceive()
     expect(registerFinishingReceive).not.toHaveBeenCalled()
@@ -81,7 +81,6 @@ describe('useFinishingReceive — 真实收货录入', () => {
     const c = useFinishingReceive({
       selectedRows: ref([row]),
       reloadList: async () => {},
-      reloadTabCounts: async () => {},
     })
     await c.openReceiveDialog()
     expect(c.receiveDialog.tailReceivedQuantitiesByColor).toEqual([

@@ -239,7 +239,6 @@ const {
   qtyPopoverWidth,
   getTabLabel,
   load,
-  loadTabCounts,
   refreshAfterMutation,
   onExport,
   onShowQtyPopover,
@@ -354,10 +353,7 @@ function sewingBriefFromRow(row: SewingListItem): ProductionOrderBriefModel {
 
 onMounted(() => {
   void loadFactorySuppliers()
-  void (async () => {
-    await load()
-    await loadTabCounts()
-  })()
+  void load()
 })
 </script>
 

@@ -28,7 +28,7 @@ function row(orderId: number): PatternListItem {
 }
 function setup() {
   const selected = ref([1, 2, 3].map(row))
-  const loaders = { reloadList: vi.fn(), reloadTabCounts: vi.fn() }
+  const loaders = { reloadList: vi.fn() }
   return { selected, loaders, ...usePatternDialogs(selected, loaders, { findOrderTypeLabelById: () => '', findCollaborationLabelById: () => '' }) }
 }
 
@@ -78,7 +78,6 @@ describe('纸样交互安全', () => {
     expect(state.assignDialog.rows.map(r => r.orderId)).toEqual([2, 3])
     expect(state.assignDialog.error).toContain('TEST-2')
     expect(state.loaders.reloadList).toHaveBeenCalledOnce()
-    expect(state.loaders.reloadTabCounts).toHaveBeenCalledOnce()
     await state.submitAssign()
     expect(api.assign.mock.calls.map(([payload]) => payload.orderId)).toEqual([1, 2, 2, 3])
     expect(state.assignDialog.succeeded).toBe(3)
@@ -99,12 +98,13 @@ describe('纸样交互安全', () => {
     finish?.(); await submit; expect(api.assign).toHaveBeenCalledTimes(3)
   })
   it('仅看超期联动列表、数量及排序参数，清空筛选恢复全部', async () => {
-    api.items.mockResolvedValue({ data: { list: [], total: 0, totalQuantity: 0 } })
+    api.items.mockResolvedValue({ data: { list: [], total: 0, totalQuantity: 0, tabCounts: { all: 7, pending_assign: 3 } } })
     api.counts.mockResolvedValue({ data: { all: 0 } })
     const state = usePatternList(); state.filter.onlyOverdue = true
-    state.onSortChange({ prop: 'overdueDays', order: 'descending' }); await state.loadTabCounts()
+    state.onSortChange({ prop: 'overdueDays', order: 'descending' }); await nextTick()
     expect(api.items.mock.calls[0][0]).toMatchObject({ onlyOverdue: true, sortField: 'overdueDays', sortOrder: 'desc', page: 1 })
-    expect(api.counts.mock.calls[0][0]).toMatchObject({ onlyOverdue: true })
+    expect(api.counts).not.toHaveBeenCalled()
+    expect(state.tabTotal.value).toBe(7)
     state.onReset(() => { void state.load() }); await nextTick()
     expect(api.items.mock.calls[api.items.mock.calls.length - 1]?.[0].onlyOverdue).toBeUndefined()
     expect(state.currentTab.value).toBe('all')
