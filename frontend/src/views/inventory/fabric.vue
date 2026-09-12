@@ -111,7 +111,7 @@
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
             <el-button @click="onReset">清空</el-button>
-            <el-button :loading="exporting" @click="onExport">{{ exportButtonText }}</el-button>
+            <el-button :loading="exporting" :disabled="loading" @click="onExport">{{ exportButtonText }}</el-button>
             <el-button :disabled="!selectedRows.length" @click="batchPricing.open">批量补价</el-button>
             <el-button type="primary" @click="openForm(null)">新增面料</el-button>
             <el-button
@@ -234,6 +234,7 @@
     />
 
     <FabricOutboundDialog
+      ref="outboundFormRef"
       :visible="outboundDialog.visible"
       :submitting="outboundDialog.submitting"
       :outbound-form="outboundForm"
@@ -363,6 +364,7 @@ function onRowClick(row: FabricItem, column?: { type?: string; label?: string })
 
 const {
   outboundDialog,
+  outboundFormRef,
   outboundForm,
   outboundRules,
   outboundMaxQty,
@@ -462,4 +464,17 @@ onMounted(() => {
 }
 
 
+@media (max-width: 768px) {
+  .inventory-fabric-page :deep(.pagination-summary) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-xs) var(--space-sm);
+    width: 100%;
+    white-space: normal;
+  }
+  .inventory-fabric-page :deep(.pagination-summary > span) {
+    margin-left: 0;
+    white-space: nowrap;
+  }
+}
 </style>

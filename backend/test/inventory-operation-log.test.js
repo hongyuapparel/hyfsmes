@@ -1,5 +1,6 @@
 const assert = require('node:assert/strict');
 const test = require('node:test');
+const { FinishedGoodsStockInboundService } = require('../dist/finished-goods-stock/finished-goods-stock-inbound.service');
 
 const {
   buildFinishedInboundLogDetails,
@@ -84,3 +85,29 @@ test('成品出库日志同时留存领取人和备注', () => {
     '成品出库；领取人：齐雅芳；备注：样衣使用',
   );
 });
+
+for (const action of ['新增', '替换', '清除']) {
+  test(`成品${action}颜色图片不合并库存、不改数量价格和库存ID`, async () => {
+    const stocks = [{ id: 1, quantity: 4, unitPrice: '11.00' }, { id: 2, quantity: 2, unitPrice: '10.00' }];
+    const before = structuredClone(stocks);
+    let image = action === '新增' ? null : { finishedStockId: 1, colorName: '蓝', imageUrl: '/old.png' };
+    const logs = [];
+    const service = Object.create(FinishedGoodsStockInboundService.prototype);
+    service.stockRepo = { findOne: async () => stocks[0] };
+    service.colorImageRepo = {
+      findOne: async () => image,
+      create: row => row,
+      save: async row => { image = { ...row }; return image; },
+      remove: async () => { image = null; },
+    };
+    service.getColorImagesSnapshot = async () => image ? [{ ...image }] : [];
+    service.appendFinishedStockAdjustLog = async (...args) => logs.push(args);
+    service.consolidateDuplicateFinishedStocks = async () => { assert.fail('图片更新不能触发库存合并'); };
+    await service.upsertColorImage(1, { colorName: '蓝', imageUrl: action === '清除' ? '' : '/new.png' }, 'QA');
+    assert.deepEqual(stocks, before);
+    assert.equal(image?.imageUrl ?? '', action === '清除' ? '' : '/new.png');
+    assert.equal(logs.length, 1);
+    assert.equal(logs[0][1], 'QA');
+    assert.equal(logs[0][5].action, 'image');
+  });
+}

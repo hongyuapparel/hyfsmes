@@ -5,15 +5,13 @@ import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
 import { InventoryAccessoryOperationLog } from '../entities/inventory-accessory-operation-log.entity';
 import { User, UserStatus } from '../entities/user.entity';
-import { normalizeSizeMatrix } from '../common/size-headers.util';
 import { InventoryStockExportMode } from '../common/inventory-stock-export.dto';
 import {
   applySizedOutbound,
   distributeProportional,
-  mapOutboundRawRow,
+  assertManualAccessoryOutbound,
   toAccessorySnapshot,
   type AccessoryOutboundNegative,
-  type AccessoryOutboundRawRow,
   type InventoryAccessoryOutboundParams,
   type InventoryAccessoryOutboundResult,
 } from './inventory-accessory.helpers';
@@ -21,6 +19,8 @@ import {
   applyInventoryAccessoryListFilters,
   type InventoryAccessoryListFilters,
 } from './inventory-accessories-list-query';
+import { getAccessoryOutboundRecords } from './inventory-accessories-outbound-query';
+import { AccessoryStockWriter, runAccessoryWrite } from './inventory-accessory-write';
 
 @Injectable()
 export class InventoryAccessoriesService {
@@ -41,54 +41,6 @@ export class InventoryAccessoriesService {
     const e = error as { code?: string; errno?: number; message?: string } | undefined;
     const msg = String(e?.message ?? '').toLowerCase();
     return e?.code === 'ER_NO_SUCH_TABLE' || e?.errno === 1146 || msg.includes("doesn't exist");
-  }
-
-  private normalizeName(value: unknown): string {
-    return String(value ?? '').trim();
-  }
-
-  private normalizeImageUrls(value: unknown): string[] {
-    if (!Array.isArray(value)) return [];
-    return value
-      .map((url) => String(url ?? '').trim())
-      .filter((url) => !!url);
-  }
-
-  private async findByName(name: string): Promise<InventoryAccessory | null> {
-    const normalized = this.normalizeName(name);
-    if (!normalized) return null;
-    return this.repo
-      .createQueryBuilder('a')
-      .where('a.name = :name', { name: normalized })
-      .orderBy('a.id', 'ASC')
-      .getOne();
-  }
-
-  private async addOperationLog(params: {
-    accessoryId: number;
-    action: string;
-    operatorUsername: string;
-    beforeSnapshot?: Record<string, unknown> | null;
-    afterSnapshot?: Record<string, unknown> | null;
-    remark?: string;
-  }) {
-    try {
-      const row = this.operationLogRepo.create({
-        accessoryId: params.accessoryId,
-        action: params.action,
-        operatorUsername: (params.operatorUsername ?? '').trim(),
-        beforeSnapshot: params.beforeSnapshot ?? null,
-        afterSnapshot: params.afterSnapshot ?? null,
-        remark: (params.remark ?? '').trim(),
-      });
-      await this.operationLogRepo.save(row);
-    } catch (error) {
-      if (this.isMissingTableError(error)) {
-        this.logger.warn('操作记录表不存在，已跳过本次辅料操作日志写入');
-        return;
-      }
-      throw error;
-    }
   }
 
   async getList(params: InventoryAccessoryListFilters & {
@@ -135,203 +87,20 @@ export class InventoryAccessoriesService {
     return item;
   }
 
-  async create(dto: {
-    name: string;
-    category?: string;
-    quantity?: number;
-    isSized?: boolean;
-    sizeHeaders?: string[];
-    sizeQuantities?: number[];
-    unit?: string;
-    warehouseId?: number | null;
-    location?: string;
-    remark?: string;
-    imageUrl?: string;
-    imageUrls?: string[];
-    customerName?: string;
-    salesperson?: string;
-    operatorUsername?: string;
-  }): Promise<InventoryAccessory> {
-    const name = this.normalizeName(dto.name);
-    if (!name) throw new BadRequestException('辅料名称不能为空');
-    const isSized = !!dto.isSized;
-    const matrix = isSized ? normalizeSizeMatrix(dto.sizeHeaders, dto.sizeQuantities) : null;
-    if (isSized && (!matrix || !matrix.headers.length)) {
-      throw new BadRequestException('请填写分码尺码明细');
-    }
-    const qty = isSized ? matrix!.total : Number(dto.quantity ?? 0);
-    if (!Number.isFinite(qty) || qty <= 0) {
-      throw new BadRequestException(isSized ? '分码新增数量合计必须大于 0' : '新增数量必须大于 0');
-    }
-    const salesperson = (dto.salesperson ?? '').trim();
-    if (!salesperson) throw new BadRequestException('业务员不能为空');
-    const imageUrls = this.normalizeImageUrls(dto.imageUrls);
-    const mainImageUrl = imageUrls[0] ?? this.normalizeName(dto.imageUrl);
-    const existing = await this.findByName(name);
-    if (existing) {
-      const before = toAccessorySnapshot(existing);
-      if (existing.isSized) {
-        if (!matrix) {
-          throw new BadRequestException('该辅料为分码辅料，请按尺码录入入库数量');
-        }
-        const merged = normalizeSizeMatrix(
-          [...(existing.sizeHeaders ?? []), ...matrix.headers],
-          [...(existing.sizeQuantities ?? []), ...matrix.quantities],
-        );
-        existing.sizeHeaders = merged.headers;
-        existing.sizeQuantities = merged.quantities;
-        existing.quantity = merged.total;
-      } else {
-        if (isSized) {
-          throw new BadRequestException(
-            '已存在同名「非分码」辅料，无法按分码新增；请在该辅料「编辑」里开启分码，或换一个名称',
-          );
-        }
-        existing.quantity = (Number(existing.quantity) || 0) + qty;
-      }
-      if (!existing.category && dto.category) existing.category = dto.category.trim();
-      if (!existing.unit && dto.unit) existing.unit = dto.unit.trim();
-      if (existing.warehouseId == null && dto.warehouseId != null) existing.warehouseId = dto.warehouseId;
-      if (!existing.location && dto.location) existing.location = dto.location.trim();
-      if (!existing.customerName && dto.customerName) existing.customerName = dto.customerName.trim();
-      if (!existing.salesperson && salesperson) existing.salesperson = salesperson;
-      if (!existing.imageUrl && mainImageUrl) existing.imageUrl = mainImageUrl;
-      if ((!existing.imageUrls || !existing.imageUrls.length) && imageUrls.length) existing.imageUrls = imageUrls;
-      const savedExisting = await this.repo.save(existing);
-      await this.addOperationLog({
-        accessoryId: savedExisting.id,
-        action: 'inbound',
-        operatorUsername: dto.operatorUsername ?? '',
-        beforeSnapshot: before,
-        afterSnapshot: toAccessorySnapshot(savedExisting),
-        remark: dto.remark ?? '',
-      });
-      return savedExisting;
-    }
-    const entity = this.repo.create({
-      name,
-      category: dto.category?.trim() ?? '',
-      quantity: qty,
-      isSized,
-      sizeHeaders: isSized ? matrix!.headers : null,
-      sizeQuantities: isSized ? matrix!.quantities : null,
-      unit: dto.unit?.trim() ?? '个',
-      warehouseId: dto.warehouseId ?? null,
-      location: dto.location?.trim() ?? '',
-      remark: dto.remark?.trim() ?? '',
-      imageUrl: mainImageUrl || '',
-      imageUrls: imageUrls.length ? imageUrls : null,
-      customerName: dto.customerName?.trim() ?? '',
-      salesperson,
-    });
-    const saved = await this.repo.save(entity);
-    const beforeSnapshot = toAccessorySnapshot(saved);
-    beforeSnapshot.quantity = 0;
-    if (saved.isSized) {
-      beforeSnapshot.sizeQuantities = (saved.sizeQuantities ?? []).map(() => 0);
-    }
-    await this.addOperationLog({
-      accessoryId: saved.id,
-      action: 'create',
-      operatorUsername: dto.operatorUsername ?? '',
-      beforeSnapshot,
-      afterSnapshot: toAccessorySnapshot(saved),
-      remark: dto.remark ?? '',
-    });
-    return saved;
+  async create(dto: Parameters<AccessoryStockWriter['create']>[0]): Promise<InventoryAccessory> {
+    return runAccessoryWrite(this.repo.manager, (writer) => writer.create(dto));
   }
 
-  async update(
-    id: number,
-    dto: {
-      name?: string;
-      category?: string;
-      quantity?: number;
-      isSized?: boolean;
-      sizeHeaders?: string[];
-      sizeQuantities?: number[];
-      unit?: string;
-      warehouseId?: number | null;
-      location?: string;
-      remark?: string;
-      imageUrl?: string;
-      imageUrls?: string[];
-      customerName?: string;
-      salesperson?: string;
-      operatorUsername?: string;
-    },
-  ): Promise<InventoryAccessory> {
-    const item = await this.repo.findOne({ where: { id } });
-    if (!item) throw new NotFoundException('辅料记录不存在');
-    const before = toAccessorySnapshot(item);
-    if (dto.isSized !== undefined) {
-      if (dto.isSized) {
-        const matrix = normalizeSizeMatrix(dto.sizeHeaders, dto.sizeQuantities);
-        if (!matrix || !matrix.headers.length) {
-          throw new BadRequestException('请填写分码尺码明细');
-        }
-        item.isSized = true;
-        item.sizeHeaders = matrix.headers;
-        item.sizeQuantities = matrix.quantities;
-        item.quantity = matrix.total;
-      } else {
-        item.isSized = false;
-        item.sizeHeaders = null;
-        item.sizeQuantities = null;
-      }
-    }
-    if (dto.name !== undefined) {
-      const nextName = this.normalizeName(dto.name);
-      if (!nextName) throw new BadRequestException('辅料名称不能为空');
-      const existing = await this.findByName(nextName);
-      if (existing && existing.id !== id) {
-        throw new BadRequestException('辅料名称已存在，不能改成重复名称');
-      }
-      item.name = nextName;
-    }
-    if (dto.category !== undefined) item.category = dto.category?.trim() ?? '';
-    if (dto.unit !== undefined) item.unit = dto.unit?.trim() ?? '个';
-    if (dto.warehouseId !== undefined) item.warehouseId = dto.warehouseId ?? null;
-    if (dto.location !== undefined) item.location = dto.location?.trim() ?? '';
-    if (dto.remark !== undefined) item.remark = dto.remark?.trim() ?? '';
-    if (dto.imageUrls !== undefined) {
-      const imageUrls = this.normalizeImageUrls(dto.imageUrls);
-      item.imageUrls = imageUrls.length ? imageUrls : null;
-      item.imageUrl = imageUrls[0] ?? '';
-    } else if (dto.imageUrl !== undefined) {
-      const imageUrl = dto.imageUrl?.trim() ?? '';
-      item.imageUrl = imageUrl;
-      item.imageUrls = imageUrl ? [imageUrl] : null;
-    }
-    if (dto.customerName !== undefined) item.customerName = dto.customerName?.trim() ?? '';
-    if (dto.salesperson !== undefined) {
-      const salesperson = dto.salesperson?.trim() ?? '';
-      if (!salesperson) throw new BadRequestException('业务员不能为空');
-      item.salesperson = salesperson;
-    }
-    const saved = await this.repo.save(item);
-    await this.addOperationLog({
-      accessoryId: saved.id,
-      action: 'update',
-      operatorUsername: dto.operatorUsername ?? '',
-      beforeSnapshot: before,
-      afterSnapshot: toAccessorySnapshot(saved),
-    });
-    return saved;
+  async restock(id: number, dto: Parameters<AccessoryStockWriter['restock']>[1]): Promise<InventoryAccessory> {
+    return runAccessoryWrite(this.repo.manager, (writer) => writer.restock(id, dto));
+  }
+
+  async update(id: number, dto: Parameters<AccessoryStockWriter['update']>[1]): Promise<InventoryAccessory> {
+    return runAccessoryWrite(this.repo.manager, (writer) => writer.update(id, dto));
   }
 
   async remove(id: number, operatorUsername = ''): Promise<void> {
-    const item = await this.repo.findOne({ where: { id } });
-    if (!item) throw new NotFoundException('辅料记录不存在');
-    const before = toAccessorySnapshot(item);
-    await this.repo.remove(item);
-    await this.addOperationLog({
-      accessoryId: id,
-      action: 'delete',
-      operatorUsername,
-      beforeSnapshot: before,
-      afterSnapshot: null,
-    });
+    return runAccessoryWrite(this.repo.manager, (writer) => writer.remove(id, operatorUsername));
   }
 
   /** 出库弹窗「领取人」下拉：返回全公司可用用户 */
@@ -382,11 +151,12 @@ export class InventoryAccessoriesService {
       .getOne();
 
     if (!accessory) throw new NotFoundException('辅料记录不存在');
+    if (params.enforceAvailableStock) assertManualAccessoryOutbound(accessory, params);
 
     const before = Number(accessory.quantity) || 0;
     const beforeSnapshot = toAccessorySnapshot(accessory);
 
-    // 允许负库存：库存不足不再报错，扣成负数作为「待订购」信号，入库后自然抵消。
+    // 订单自动扣料及采购领料保留原规则；库存页手动出库已在行锁内逐码校验。
     const negatives: AccessoryOutboundNegative[] = [];
     let recordSizeOutbound: { headers: string[]; quantities: number[] } | null = null;
     let recordQty = qty;
@@ -438,77 +208,22 @@ export class InventoryAccessoriesService {
       remark: (params.remark ?? '').trim(),
     });
     const savedRecord = await recordRepo.save(record);
-    try {
-      await operationLogRepo.save(
-        operationLogRepo.create({
-          accessoryId: params.accessoryId,
-          action: 'outbound',
-          operatorUsername: (params.operatorUsername ?? '').trim(),
-          beforeSnapshot,
-          afterSnapshot: toAccessorySnapshot(savedAccessory),
-          remark: (params.remark ?? '').trim(),
-        }),
-      );
-    } catch (error) {
-      if (!this.isMissingTableError(error)) throw error;
-      this.logger.warn('操作记录表不存在，已跳过本次辅料出库日志写入');
-    }
+    await operationLogRepo.save(
+      operationLogRepo.create({
+        accessoryId: params.accessoryId,
+        action: 'outbound',
+        operatorUsername: (params.operatorUsername ?? '').trim(),
+        beforeSnapshot,
+        afterSnapshot: toAccessorySnapshot(savedAccessory),
+        remark: (params.remark ?? '').trim(),
+      }),
+    );
 
     return { accessory: savedAccessory, record: savedRecord, negatives };
   }
 
-  async getOutboundRecords(params: {
-    accessoryId?: number;
-    orderNo?: string;
-    outboundType?: string;
-    page?: number;
-    pageSize?: number;
-  }): Promise<{
-    list: Array<
-      Omit<InventoryAccessoryOutbound, 'createdAt'> & {
-        createdAt: string;
-        imageUrl?: string;
-        customerName?: string;
-        category?: string;
-      }
-    >;
-    total: number;
-    page: number;
-    pageSize: number;
-  }> {
-    const { accessoryId, orderNo, outboundType, page = 1, pageSize = 20 } = params;
-    const qb = this.outboundRepo
-      .createQueryBuilder('r')
-      .leftJoin(InventoryAccessory, 'a', 'a.id = r.accessory_id')
-      .select([
-        'r.id AS id',
-        'r.accessory_id AS accessoryId',
-        'r.order_id AS orderId',
-        'r.order_no AS orderNo',
-        'r.outbound_type AS outboundType',
-        'r.quantity AS quantity',
-        'r.before_quantity AS beforeQuantity',
-        'r.after_quantity AS afterQuantity',
-        'r.operator_username AS operatorUsername',
-        'r.remark AS remark',
-        'r.created_at AS createdAt',
-        'r.size_outbound AS sizeOutbound',
-        "COALESCE(a.image_url, '') AS imageUrl",
-        "COALESCE(a.customer_name, '') AS customerName",
-        "COALESCE(a.category, '') AS category",
-      ]);
-    if (accessoryId) qb.andWhere('r.accessory_id = :accessoryId', { accessoryId });
-    if (orderNo?.trim()) qb.andWhere('r.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
-    if (outboundType?.trim()) qb.andWhere('r.outbound_type = :outboundType', { outboundType: outboundType.trim() });
-    qb.orderBy('r.created_at', 'DESC');
-
-    const total = await qb.getCount();
-    const list = await qb
-      .skip((page - 1) * pageSize)
-      .take(pageSize)
-      .getRawMany<AccessoryOutboundRawRow>();
-    const rows = list.map(mapOutboundRawRow);
-    return { list: rows, total, page, pageSize };
+  async getOutboundRecords(params: Parameters<typeof getAccessoryOutboundRecords>[1]) {
+    return getAccessoryOutboundRecords(this.outboundRepo, params);
   }
 
   async getOperationLogs(accessoryId: number): Promise<InventoryAccessoryOperationLog[]> {

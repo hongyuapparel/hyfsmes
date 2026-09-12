@@ -1,3 +1,4 @@
+import { summarizeProductionTab } from '../common/production-list-summary.util';
 import { validatePatternMaterials, patternMaterialsVersion } from './pattern-material-validation';
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -494,16 +495,18 @@ export class ProductionPatternService {
     totalQuantity: number;
     page: number;
     pageSize: number;
+    tabCounts: Record<string, number>;
   }> {
     this.schedulePatternReconcile(actorUserId);
     const { page = 1, pageSize = 20 } = query;
-    const allRows = await this.buildPatternRows(query);
-    const rows = this.sortPatternRows(allRows, query);
+    const allRows = await this.buildPatternRows({ ...query, tab: 'all' });
+    const { rows: tabRows, tabCounts } = summarizeProductionTab(allRows, query.tab, ['pending_assign', 'in_progress', 'completed'], (row) => row.patternStatus);
+    const rows = this.sortPatternRows(tabRows, query);
     const total = rows.length;
     const totalQuantity = rows.reduce((sum, row) => sum + (Number(row.quantity) || 0), 0);
     const start = (page - 1) * pageSize;
     const list = rows.slice(start, start + pageSize);
-    return { list, total, totalQuantity, page, pageSize };
+    return { list, total, totalQuantity, page, pageSize, tabCounts };
   }
 
   async getPatternTabCounts(query: PatternListQuery): Promise<Record<string, number>> {

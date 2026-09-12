@@ -136,6 +136,8 @@ export function manualAccessoryOutbound(body: {
 export interface AccessoryOutboundRecord {
   id: number
   accessoryId: number
+  /** 当前关联辅料保存的名称，改名后随查询更新。 */
+  accessoryName?: string | null
   orderId: number | null
   orderNo: string
   imageUrl?: string
@@ -166,6 +168,8 @@ export function getAccessoryOutboundRecords(params?: {
   accessoryId?: number
   orderNo?: string
   outboundType?: string
+  startDate?: string
+  endDate?: string
   page?: number
   pageSize?: number
 }) {
@@ -177,4 +181,14 @@ export function getAccessoryOutboundRecords(params?: {
 
 export function getAccessoryOperationLogs(id: number) {
   return request.get<AccessoryOperationLog[]>(`/inventory/accessories/items/${id}/logs`)
+}
+export function restockAccessory(id: number, body: {
+  quantity?: number
+  isSized?: boolean
+  sizeHeaders?: string[]
+  sizeQuantities?: number[]
+  unit?: string
+  remark?: string
+}) {
+  return request.post<AccessoryItem>(`/inventory/accessories/items/${id}/inbounds`, body)
 }

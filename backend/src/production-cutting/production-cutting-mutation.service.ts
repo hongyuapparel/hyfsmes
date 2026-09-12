@@ -13,7 +13,7 @@ import { SystemOptionsService } from '../system-options/system-options.service';
 import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
-import { getSewnDetail, findCutBelowSewn } from './production-cutting-downstream.util';
+import { detectSewingStarted } from './production-cutting-downstream.util';
 import { buildCuttingLogDetail, buildCuttingEditLogDetail } from './production-cutting-log.util';
 import { CUTTING_ABNORMAL_REASONS } from './production-cutting.types';
 
@@ -320,15 +320,8 @@ export class ProductionCuttingMutationService {
     // 编辑模式：下游车缝冲突判定
     let editOldMeta = { unitPrice: null as string | null, department: null as string | null, cutter: null as string | null };
     if (isEdit) {
-      const sewn = await getSewnDetail(this.sewingRepo, orderId);
-      const violation = findCutBelowSewn(ext?.colorSizeHeaders ?? [], rowsIn, sewn);
-      if (violation) {
-        const where = violation.colorName ? `「${violation.colorName}」${violation.sizeLabel}` : '该订单';
-        throw new BadRequestException(
-          `${where}已车缝 ${violation.sewnQty} 件，裁床数量不能少于已车缝数（当前填 ${violation.cutQty}）。请先回退车缝再修改。`,
-        );
-      }
-      if (sewn.started && !options?.confirmDownstream) {
+      const sewn = await detectSewingStarted(this.sewingRepo, orderId);
+      if (sewn.sewingStarted && !options?.confirmDownstream) {
         throw new BadRequestException(
           `车缝已登记 ${sewn.sewingQuantity} 件，修改裁床数据可能导致下游数据不一致，请确认后再提交`,
         );

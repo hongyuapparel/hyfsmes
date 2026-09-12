@@ -1,6 +1,6 @@
 import { computed, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportPurchaseItems, getPurchaseItems, getPurchaseTabCounts, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
+import { exportPurchaseItems, getPurchaseItems, type PurchaseItemRow, type PurchaseListQuery } from '@/api/production-purchase'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getDictTree } from '@/api/dicts'
 import type { SystemOptionTreeNode } from '@/api/system-options'
@@ -12,6 +12,7 @@ import type { ProductionOrderBriefModel } from '@/components/production/Producti
 export const PURCHASE_TABS = [
   { label: '全部', value: 'all' },
   { label: '等待采购', value: 'pending' },
+  { label: '采购中', value: 'purchasing' },
   { label: '待领料', value: 'picking' },
   { label: '采购完成', value: 'completed' },
 ] as const
@@ -63,7 +64,7 @@ export function usePurchaseList() {
     currentTab.value === 'picking' ? '领料状态' : '采购状态',
   )
   const tabCounts = ref<Record<string, number>>({})
-  const tabTotal = ref(0)
+  const tabTotal = ref<number | null>(null)
   const list = ref<PurchaseItemRow[]>([])
   const loading = ref(false)
   const exporting = ref(false)
@@ -75,7 +76,7 @@ export function usePurchaseList() {
 
   function getTabLabel(tab: PurchaseTabConfig): string {
     const counts = tabCounts.value
-    const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+    const count = tab.value === 'all' ? tabTotal.value ?? '—' : counts[tab.value] ?? '—'
     return `${tab.label}(${count})`
   }
 
@@ -106,31 +107,32 @@ export function usePurchaseList() {
     return q
   }
 
-  async function loadTabCounts() {
-    try {
-      const res = await getPurchaseTabCounts(buildQuery())
-      const counts = res.data ?? {}
-      tabCounts.value = counts
-      tabTotal.value = counts.all ?? 0
-    } catch {
-      // keep existing counts on error
-    }
-  }
+  let listRequestId = 0
 
   async function load() {
+    const requestId = ++listRequestId
     loading.value = true
     try {
       const res = await getPurchaseItems(buildQuery())
+      if (requestId !== listRequestId) return
       const data = res.data
       if (data) {
+        tabCounts.value = data.tabCounts ?? {}
+        tabTotal.value = data.tabCounts?.all ?? null
+        const lastPage = Math.max(1, Math.ceil(data.total / pagination.pageSize))
+        if (pagination.page > lastPage) {
+          pagination.page = lastPage
+          await load()
+          return
+        }
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         restoreColumnWidths(purchaseTableHostRef.value?.purchaseTableRef as Parameters<typeof restoreColumnWidths>[0])
       }
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+      if (requestId === listRequestId && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      loading.value = false
+      if (requestId === listRequestId) loading.value = false
     }
   }
 
@@ -165,7 +167,6 @@ export function usePurchaseList() {
     }
     pagination.page = 1
     void load()
-    void loadTabCounts()
   }
 
   let searchTimer: ReturnType<typeof setTimeout> | null = null
@@ -190,14 +191,12 @@ export function usePurchaseList() {
     pagination.page = 1
     selectedRows.value = []
     void load()
-    void loadTabCounts()
   }
 
   function onTabChange() {
     pagination.page = 1
     selectedRows.value = []
     void load()
-    void loadTabCounts()
   }
 
   function onPageSizeChange() {
@@ -276,7 +275,6 @@ export function usePurchaseList() {
     getTabLabel,
     findOrderTypeLabelById,
     load,
-    loadTabCounts,
     onExport,
     onSearch,
     debouncedSearch,

@@ -14,7 +14,7 @@
       </div>
       <div v-if="dialog.formLoading" class="register-loading">加载尺寸细数...</div>
       <template v-else-if="dialog.sizeHeaders?.length">
-        <p class="register-qty-tip">按颜色分别登记尾部收货数；每格不可超过对应颜色的车缝数。</p>
+        <p class="register-qty-tip">按颜色分别登记尾部收货数；按实际收货数填写，允许超过车缝数。</p>
         <div
           v-for="(plan, ri) in dialog.planColorRows"
           :key="plan.colorName + ri"
@@ -52,7 +52,6 @@
                   <el-input-number
                     v-model="dialog.tailReceivedQuantitiesByColor[ri].quantities[ci]"
                     :min="0"
-                    :max="getCellMax(ri, ci)"
                     :precision="0"
                     :controls="false"
                     size="small"
@@ -119,7 +118,6 @@ const props = defineProps<{
   dialog: ReceiveDialogState
   sizeTableRows: SizeTableRow[]
   tailTotal: number | string
-  getCellMax: (rowIdx: number, colIdx: number) => number | undefined
 }>()
 
 const emit = defineEmits<{

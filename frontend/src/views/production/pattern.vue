@@ -341,7 +341,6 @@ const {
   findCollaborationLabelById,
   getTabLabel,
   load: loadList,
-  loadTabCounts,
   loadOptions,
   onExport,
   onSearch: searchList,
@@ -430,7 +429,7 @@ const {
   loadMaterialTypes,
 } = usePatternDialogs(
   selectedRows,
-  { reloadList: load, reloadTabCounts: loadTabCounts },
+  { reloadList: load },
   { findOrderTypeLabelById, findCollaborationLabelById },
 )
 
@@ -463,10 +462,7 @@ onMounted(() => {
   void loadOptions()
   void loadMaterialTypes()
   void loadPatternStaffOptions()
-  void (async () => {
-    await load()
-    await loadTabCounts()
-  })()
+  void load()
 })
 </script>
 

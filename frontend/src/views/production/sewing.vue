@@ -159,7 +159,6 @@
       :complete-loading="registerFormCompleteLoading"
       :size-table-rows="registerSizeTableRows"
       :sewing-total="registerSewingTotal"
-      :get-cell-max="registerSewingCellMax"
       :cut-skipped="registerCutSkipped"
       :factory-suppliers="factorySuppliers"
       @update:dialog="registerDialog.visible = $event.visible"
@@ -240,7 +239,6 @@ const {
   qtyPopoverWidth,
   getTabLabel,
   load,
-  loadTabCounts,
   refreshAfterMutation,
   onExport,
   onShowQtyPopover,
@@ -269,7 +267,6 @@ const {
   registerForm,
   registerSizeTableRows,
   registerSewingTotal,
-  registerSewingCellMax,
   registerCutSkipped,
   registerRules,
   loadFactorySuppliers,
@@ -356,10 +353,7 @@ function sewingBriefFromRow(row: SewingListItem): ProductionOrderBriefModel {
 
 onMounted(() => {
   void loadFactorySuppliers()
-  void (async () => {
-    await load()
-    await loadTabCounts()
-  })()
+  void load()
 })
 </script>
 

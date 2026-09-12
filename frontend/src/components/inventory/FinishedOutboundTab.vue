@@ -155,7 +155,7 @@
       :page-size="outboundPagination.pageSize"
       :total="outboundPagination.total"
       :total-quantity="outboundPageTotalQuantity"
-      summary-label="出库数量"
+      summary-label="本页出库数量"
       unit="件"
       @current-change="emit('current-change', $event)"
       @size-change="emit('page-size-change', $event)"

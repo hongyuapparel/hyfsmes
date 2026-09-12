@@ -1,5 +1,6 @@
 <template>
-  <AppDialog v-model="dialogVisible" title="批量补价" width="760" destroy-on-close>
+  <AppDialog v-model="dialogVisible" title="批量补价" width="760" destroy-on-close
+    :close-on-press-escape="!submitting" :show-close="!submitting">
     <el-alert
       title="每条面料单独填写当前实际成本单价；保存后只重估当前库存，不改历史出库金额。"
       type="info"
@@ -7,7 +8,7 @@
       show-icon
       class="batch-price-tip"
     />
-    <el-table :data="rows" border max-height="460">
+    <el-table :data="rows" border max-height="460" class="editable-grid">
       <el-table-column prop="name" label="面料名称" min-width="220" show-overflow-tooltip />
       <el-table-column label="库存数量" width="130" align="center">
         <template #default="{ row }">{{ formatDisplayNumber(row.quantity) }} {{ row.unit }}</template>
@@ -18,6 +19,7 @@
             v-model="row.unitPrice"
             :min="0"
             :precision="4"
+            :disabled="submitting"
             controls-position="right"
             style="width: 100%"
           />
@@ -30,7 +32,7 @@
       </el-table-column>
     </el-table>
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
+      <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="emit('confirm')">保存价格</el-button>
     </template>
   </AppDialog>
@@ -54,7 +56,7 @@ const emit = defineEmits<{
 
 const dialogVisible = computed({
   get: () => props.visible,
-  set: (value: boolean) => emit('update:visible', value),
+  set: (value: boolean) => { if (!props.submitting) emit('update:visible', value) },
 })
 </script>
 

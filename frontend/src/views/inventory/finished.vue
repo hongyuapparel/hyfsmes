@@ -102,7 +102,7 @@
       :department-options="departmentOptions"
       @color-images-synced="onColorImagesSynced"
       @color-image-saved="onColorImageSaved"
-      @meta-saved="onMetaSaved"
+      :reload-after-save="onMetaSaved"
     />
   </div>
 </template>
@@ -188,6 +188,7 @@ const {
   clearSelection,
 } = useFinishedViewStockInteractions({
   list,
+  stockTableData,
   getSharedProductImageUrl,
   getGroupLeafRows,
   getGroupSizeHeaders,

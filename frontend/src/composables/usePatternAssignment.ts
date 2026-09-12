@@ -5,7 +5,7 @@ import { getErrorMessage } from '@/api/request'
 
 export function usePatternAssignment(
   selectedRows: Ref<PatternListItem[]>,
-  loaders: { reloadList: () => Promise<void> | void; reloadTabCounts: () => Promise<void> | void },
+  loaders: { reloadList: () => Promise<void> | void },
 ) {
   const canAssignSelection = computed(() => selectedRows.value.length > 0 && selectedRows.value.every((row) => row.canAssign))
   const assignDialog = reactive({ visible: false, submitting: false, rows: [] as PatternListItem[], error: '', succeeded: 0 })
@@ -59,7 +59,6 @@ export function usePatternAssignment(
       if (succeeded) {
         const results = await Promise.allSettled([
           Promise.resolve().then(() => loaders.reloadList()),
-          Promise.resolve().then(() => loaders.reloadTabCounts()),
         ])
         if (results.some((result) => result.status === 'rejected')) ElMessage.warning('分配已成功，但列表更新失败，请重新搜索查看')
       }

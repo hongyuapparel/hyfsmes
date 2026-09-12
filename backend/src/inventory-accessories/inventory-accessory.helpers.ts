@@ -1,3 +1,4 @@
+import { BadRequestException } from '@nestjs/common';
 import { InventoryAccessory } from '../entities/inventory-accessory.entity';
 import { InventoryAccessoryOutbound } from '../entities/inventory-accessory-outbound.entity';
 import { getSizeHeaderKey, normalizeSizeHeader, normalizeSizeMatrix } from '../common/size-headers.util';
@@ -8,6 +9,7 @@ export type AccessorySizeBreakdown = { headers: string[]; quantities: number[] }
 export type AccessoryOutboundRawRow = {
   id: number | string;
   accessoryId: number | string;
+  accessoryName: string | null;
   orderId: number | string | null;
   orderNo: string | null;
   outboundType: 'manual' | 'order_auto' | null;
@@ -26,6 +28,8 @@ export type AccessoryOutboundRawRow = {
 export type AccessoryOutboundNegative = { size: string | null; after: number };
 
 export type InventoryAccessoryOutboundParams = {
+  /** 仅由库存手动出库接口在服务端开启，不接收请求体中的开关。 */
+  enforceAvailableStock?: boolean;
   accessoryId: number;
   quantity: number;
   outboundType: 'order_auto' | 'manual';
@@ -43,6 +47,28 @@ export type InventoryAccessoryOutboundResult = {
   /** 本次出库后被扣成负数的项（待订购信号） */
   negatives: AccessoryOutboundNegative[];
 };
+
+/** 只供手动实物出库使用，必须在行锁取得的库存上校验，不影响自动扣料。 */
+export function assertManualAccessoryOutbound(item: InventoryAccessory, params: InventoryAccessoryOutboundParams): void {
+  const qty = Number(params.quantity);
+  if (!Number.isInteger(qty) || qty <= 0) throw new BadRequestException('手动出库数量必须是正整数');
+  if (qty > Number(item.quantity)) throw new BadRequestException(`出库数量不能大于当前库存（可用 ${Math.max(0, Number(item.quantity))}，本次 ${qty}）`);
+  if (!item.isSized) return;
+  const detail = params.sizeOutbound;
+  if (!detail || !Array.isArray(detail.headers) || !Array.isArray(detail.quantities) || !detail.headers.length || detail.headers.length !== detail.quantities.length) {
+    throw new BadRequestException('分码辅料必须填写本次各尺码出库明细');
+  }
+  const keys = detail.headers.map(getSizeHeaderKey);
+  if (keys.some(key => !key) || new Set(keys).size !== keys.length || detail.quantities.some(q => !Number.isInteger(q) || q < 0)) {
+    throw new BadRequestException('出库尺码不能重复或为空，数量必须是非负整数');
+  }
+  if (detail.quantities.reduce((sum, q) => sum + q, 0) !== qty) throw new BadRequestException('各尺码出库合计必须等于出库数量');
+  const available = new Map((item.sizeHeaders ?? []).map((h, i) => [getSizeHeaderKey(h), Number(item.sizeQuantities?.[i]) || 0]));
+  keys.forEach((key, i) => {
+    const max = Math.max(0, available.get(key) ?? 0);
+    if (detail.quantities[i] > max) throw new BadRequestException(`尺码 ${detail.headers[i]} 库存不足（可用 ${max}，本次 ${detail.quantities[i]}）`);
+  });
+}
 
 export function parseSizeBreakdown(value: unknown): AccessorySizeBreakdown | null {
   let raw: unknown = value;
@@ -165,6 +191,7 @@ export function mapOutboundRawRow(r: AccessoryOutboundRawRow) {
   return {
     id: Number(r.id),
     accessoryId: Number(r.accessoryId),
+    accessoryName: r.accessoryName ?? null,
     orderId: r.orderId != null ? Number(r.orderId) : null,
     orderNo: r.orderNo ?? '',
     outboundType: r.outboundType ?? 'manual',

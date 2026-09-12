@@ -1,4 +1,4 @@
-import { ref, reactive } from 'vue'
+import { ref, reactive, onScopeDispose } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getFinishedOutboundRecords, type FinishedOutboundRecord } from '@/api/inventory'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
@@ -18,7 +18,10 @@ export function useFinishedOutboundRecords() {
   const { restoreColumnWidths: restoreFinishedOutboundColumnWidths } =
     useTableColumnWidthPersist('inventory-finished-outbounds')
 
+  let requestVersion = 0
+  onScopeDispose(() => { requestVersion++ })
   async function loadOutbounds() {
+    const version = ++requestVersion
     outboundLoading2.value = true
     try {
       const [startDate, endDate] =
@@ -35,13 +38,14 @@ export function useFinishedOutboundRecords() {
         pageSize: outboundPagination.pageSize,
       })
       const data = res.data
+      if (version !== requestVersion) return
       outboundList.value = data?.list ?? []
       outboundPagination.total = data?.total ?? 0
       restoreFinishedOutboundColumnWidths(finishedOutboundTableRef.value)
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+      if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      outboundLoading2.value = false
+      if (version === requestVersion) outboundLoading2.value = false
     }
   }
 

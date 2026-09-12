@@ -23,7 +23,6 @@ type LabelFinders = {
 
 type LoadFunctions = {
   reloadList: () => Promise<void> | void
-  reloadTabCounts: () => Promise<void> | void
 }
 
 export function usePatternDialogs(

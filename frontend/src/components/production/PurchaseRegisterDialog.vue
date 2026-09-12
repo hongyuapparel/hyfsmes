@@ -3,12 +3,13 @@
     v-model="dialogVisible"
     :title="mode === 'edit' ? '编辑已提交采购' : '登记实际采购'"
     width="1300"
+    top="5vh"
     destroy-on-close
     @close="emit('closed')"
   >
     <template v-if="rows.length">
       <div class="register-batch-summary">已选 {{ rows.length }} 条采购物料</div>
-      <el-table :data="rows" border size="small" max-height="420" class="register-batch-table">
+      <el-table :data="rows" border size="small" max-height="min(420px, calc(90vh - 180px))" class="register-batch-table editable-grid">
         <el-table-column prop="orderNo" label="订单号" width="110" show-overflow-tooltip />
         <el-table-column prop="skuCode" label="SKU" width="100" show-overflow-tooltip />
         <el-table-column label="采购物料" min-width="150" show-overflow-tooltip>
@@ -19,6 +20,14 @@
                 {{ [row.materialType, row.color].filter(Boolean).join(' - ') || '-' }}
               </div>
             </div>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="mode === 'register'" label="采购状态" width="190">
+          <template #default="{ row }">
+            <el-select v-model="row.purchaseStatus" aria-label="采购状态">
+              <el-option label="采购中（待到货）" value="purchasing" />
+              <el-option label="采购完成（已到货）" value="completed" />
+            </el-select>
           </template>
         </el-table-column>
         <el-table-column label="供应商" min-width="190">
@@ -90,7 +99,7 @@
     </template>
     <template #footer>
       <el-button @click="dialogVisible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="emit('submit')">确定</el-button>
+      <el-button type="primary" :loading="submitting" @click="emit('submit')">保存</el-button>
     </template>
   </AppDialog>
 </template>

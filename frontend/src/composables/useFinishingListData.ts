@@ -1,22 +1,17 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { exportFinishingItems, getFinishingItems, getFinishingTabCounts, type FinishingListItem, type FinishingListQuery } from '@/api/production-finishing'
+import { exportFinishingItems, getFinishingItems, type FinishingListItem, type FinishingListQuery } from '@/api/production-finishing'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { normalizeTextFilter } from '@/composables/useFilterBarHelpers'
 import { useTableSort } from '@/composables/useTableSort'
 
-interface FinishingTabLike {
-  value: string
-}
-
 interface UseFinishingListDataParams {
-  tabs: readonly FinishingTabLike[]
   clearSelection?: () => void
   onAfterLoad?: () => void
 }
 
 export function useFinishingListData(params: UseFinishingListDataParams) {
-  const { tabs, clearSelection, onAfterLoad } = params
+  const { clearSelection, onAfterLoad } = params
 
   const filter = reactive({ orderNo: '', skuCode: '' })
   const completedRange = ref<[string, string] | null>(null)
@@ -25,7 +20,7 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
   const currentTab = ref<string>('all')
 
   const tabCounts = ref<Record<string, number>>({})
-  const tabTotal = ref(0)
+  const tabTotal = ref<number | null>(null)
   const list = ref<FinishingListItem[]>([])
   const loading = ref(false)
   const exporting = ref(false)
@@ -55,32 +50,27 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
     return q
   }
 
-  async function loadTabCounts() {
-    try {
-      const res = await getFinishingTabCounts(buildQuery())
-      const counts = res.data ?? {}
-      tabCounts.value = counts
-      tabTotal.value = counts.all ?? 0
-    } catch {
-      // keep existing counts on error
-    }
-  }
+  let listRequestId = 0
 
   async function load() {
+    const requestId = ++listRequestId
     loading.value = true
     try {
       const res = await getFinishingItems(buildQuery())
+      if (requestId !== listRequestId) return
       const data = res.data
       if (data) {
+        tabCounts.value = data.tabCounts ?? {}
+        tabTotal.value = data.tabCounts?.all ?? null
         list.value = data.list ?? []
         pagination.total = data.total ?? 0
         totalQuantity.value = Number(data.totalQuantity ?? 0) || 0
         onAfterLoad?.()
       }
     } catch (e: unknown) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+      if (requestId === listRequestId && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
-      loading.value = false
+      if (requestId === listRequestId) loading.value = false
     }
   }
 
@@ -115,7 +105,6 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
     }
     pagination.page = 1
     void load()
-    void loadTabCounts()
   }
 
   function debouncedSearch() {
@@ -136,14 +125,12 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
     pagination.page = 1
     clearSelection?.()
     void load()
-    void loadTabCounts()
   }
 
   function onTabChange() {
     pagination.page = 1
     clearSelection?.()
     void load()
-    void loadTabCounts()
   }
 
   function onPageSizeChange() {
@@ -164,7 +151,6 @@ export function useFinishingListData(params: UseFinishingListDataParams) {
     exporting,
     pagination,
     totalQuantity,
-    loadTabCounts,
     load,
     onExport,
     onSearch,

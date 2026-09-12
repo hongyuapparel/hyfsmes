@@ -23,6 +23,7 @@ export interface SewingListItem {
 }
 
 export interface SewingListRes {
+  tabCounts: Record<string, number>
   list: SewingListItem[]
   total: number
   totalQuantity: number

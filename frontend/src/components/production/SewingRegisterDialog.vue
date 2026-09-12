@@ -74,7 +74,7 @@
           <p class="register-qty-tip">
             <template v-if="dialog.mode === 'edit'">按颜色修改车缝数量，与上方分单信息一并保存。</template>
             <template v-else-if="cutSkipped">未登记裁床颜色尺码明细，请按实际车缝数量填写；系统不会按订单计划推算。</template>
-            <template v-else>按颜色分别登记车缝数量；每格不可超过对应颜色的裁床数。</template>
+            <template v-else>按颜色分别登记车缝数量；按实际完成数填写，允许超过裁床数。</template>
           </p>
           <div
             v-for="(plan, ri) in form.orderColorRows"
@@ -113,7 +113,6 @@
                     <el-input-number
                       v-model="form.sewingQuantitiesByColor[ri].quantities[ci]"
                       :min="0"
-                      :max="getCellMax(ri, ci)"
                       :precision="0"
                       :controls="false"
                       size="small"
@@ -218,7 +217,6 @@ const props = defineProps<{
   completeLoading: boolean
   sizeTableRows: SizeTableRow[]
   sewingTotal: number
-  getCellMax: (rowIdx: number, colIdx: number) => number | undefined
   cutSkipped?: boolean
   factorySuppliers?: SupplierItem[]
 }>()

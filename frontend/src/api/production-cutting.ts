@@ -24,6 +24,7 @@ export interface CuttingListItem {
 }
 
 export interface CuttingListRes {
+  tabCounts: Record<string, number>
   list: CuttingListItem[]
   total: number
   totalQuantity: number
