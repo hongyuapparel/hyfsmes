@@ -14,7 +14,8 @@ export class FinanceDashboardController {
   getSummary(
     @Query('dateFrom') dateFrom?: string,
     @Query('dateTo') dateTo?: string,
+    @Query('cashKind') cashKind?: string,
   ) {
-    return this.svc.getSummary({ dateFrom, dateTo });
+    return this.svc.getSummary({ dateFrom, dateTo, cashKind });
   }
 }

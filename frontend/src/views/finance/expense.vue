@@ -1,107 +1,24 @@
 ﻿<template>
   <div class="page-card finance-page">
-    <div class="filter-bar has-filter-collapse">
-      <div
-        class="filter-bar-item filter-date-box"
-        :class="{ 'is-active': hasDateRangeValue(filter.occurDateRange) }"
-        :style="getFilterRangeStyle(filter.occurDateRange, '支出日期')"
-      >
-        <span v-if="hasDateRangeValue(filter.occurDateRange)" class="filter-date-label-text" :style="{ color: ACTIVE_FILTER_COLOR }">支出日期：</span>
-        <el-date-picker
-          v-model="filter.occurDateRange"
-          type="daterange"
-          :name="['financeExpenseStartDate', 'financeExpenseEndDate']"
-          :range-separator="hasDateRangeValue(filter.occurDateRange) ? '~' : ''"
-          start-placeholder="支出日期"
-          end-placeholder=""
-          value-format="YYYY-MM-DD"
-          :shortcuts="rangeShortcuts"
-          unlink-panels
-          clearable
-          :class="['filter-range', { 'range-single': !hasDateRangeValue(filter.occurDateRange) }]"
-          @change="onSearch"
-          @clear="onDateRangeClear"
-        />
-      </div>
-      <el-select
-        v-model="filter.expenseTypeId"
-        placeholder="支出类型"
-        clearable
-        filterable
-        class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.expenseTypeId != null ? `支出类型：${options.expenseTypes.find(t => t.id === filter.expenseTypeId)?.name ?? ''}` : '', '支出类型')"
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.expenseTypeId != null">支出类型：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
-      </el-select>
-      <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />
-      <div class="filter-rest" v-show="!isMobile || !collapsed">
-      <el-select
-        v-model="filter.fundAccountId"
-        placeholder="支出账户"
-        clearable
-        filterable
-        class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.fundAccountId != null ? `支出账户：${options.fundAccounts.find(a => a.id === filter.fundAccountId)?.name ?? ''}` : '', '支出账户')"
-        @change="onSearch"
-      >
-        <template #label="{ label }">
-          <span v-if="filter.fundAccountId != null">支出账户：{{ label }}</span>
-          <span v-else>{{ label }}</span>
-        </template>
-        <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
-      </el-select>
-      <el-input
-        v-model="filter.payeeKeyword"
-        placeholder="收款方"
-        clearable
-        class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.payeeKeyword ? `收款方：${filter.payeeKeyword}` : '', '收款方')"
-        :input-style="getFilterInputStyle(filter.payeeKeyword)"
-        @clear="onSearch"
-        @keyup.enter="onSearch"
-      >
-        <template #prefix>
-          <span v-if="filter.payeeKeyword" :style="{ color: ACTIVE_FILTER_COLOR }">收款方：</span>
-        </template>
-      </el-input>
-      <el-input
-        v-model="filter.orderNo"
-        placeholder="订单号"
-        clearable
-        class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(filter.orderNo ? `订单号：${filter.orderNo}` : '', '订单号')"
-        :input-style="getFilterInputStyle(filter.orderNo)"
-        @clear="onSearch"
-        @keyup.enter="onSearch"
-      >
-        <template #prefix>
-          <span v-if="filter.orderNo" :style="{ color: ACTIVE_FILTER_COLOR }">订单号：</span>
-        </template>
-      </el-input>
-      </div>
-      <div class="filter-bar-actions">
-        <el-button type="primary" @click="onSearch">查询</el-button>
-        <el-button @click="onReset">清空</el-button>
-        <el-button type="primary" @click="openForm(null)">登记支出</el-button>
-      </div>
+    <div class="finance-heading"><div><h2>支出流水</h2></div><router-link to="/finance/dashboard">返回财务看板 →</router-link><el-button v-if="auth.hasPermission('finance_expense_create')" type="primary" @click="openForm(null)">登记支出</el-button></div>
+    <FinanceFlowFilters :income="false" :filter="filter" :types="options.expenseTypes" :accounts="options.fundAccounts" :departments="options.departments" @search="onSearch" @reset="onReset" />
+
+    <div class="selection-bar"><el-switch v-model="filter.deleted" active-text="回收站" @change="onSearch" /><span v-if="filter.deleted" class="text-muted">已删除记录不参与收支统计，可核实后恢复。</span></div>
+    <div v-if="selected.length" class="selection-bar">
+      <span>已选 {{ selected.length }} 条，金额 {{ formatMoneyAligned(selectedAmount) }}</span>
+      <el-button v-if="!filter.deleted && auth.hasPermission('finance_expense_delete')" type="danger" plain :loading="deleting" @click="onBatchDelete">批量删除</el-button>
+      <el-button :disabled="deleting" @click="tableRef?.clearSelection()">取消选择</el-button>
     </div>
 
-    <div v-if="summary.totalAmount" class="summary-bar">
-      当前筛选共 <b>{{ pagination.total }}</b> 条，合计支出：<b class="expense-highlight">￥{{ summary.totalAmount }}</b>
-    </div>
-
-    <el-table v-loading="loading" :data="list" border stripe class="data-table">
+    <el-table ref="tableRef" v-loading="loading || deleting" :data="list" row-key="id" border stripe class="data-table" @selection-change="selected = $event">
+      <el-table-column v-if="!filter.deleted && auth.hasPermission('finance_expense_delete')" type="selection" width="48" align="center" />
       <el-table-column prop="occurDate" label="支出日期" width="110" />
       <el-table-column label="支出金额（元）" width="130" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           <span class="expense-amount">{{ formatMoneyAligned(row.amount) }}</span>
         </template>
       </el-table-column>
+      <el-table-column label="性质" width="110" show-overflow-tooltip><template #default="{ row }">{{ cashKindLabel(row.cashKind) }}</template></el-table-column>
       <el-table-column prop="expenseTypeName" label="支出类型" width="110" show-overflow-tooltip />
       <el-table-column prop="fundAccountName" label="支出账户" width="110" show-overflow-tooltip />
       <el-table-column label="对象类型" width="90">
@@ -111,7 +28,7 @@
       <el-table-column prop="orderNo" label="关联订单" width="120" show-overflow-tooltip>
         <template #default="{ row }">{{ row.orderNo || '—' }}</template>
       </el-table-column>
-      <el-table-column prop="departmentName" label="部门" width="90" show-overflow-tooltip />
+      <el-table-column prop="departmentName" label="归属部门" width="110" show-overflow-tooltip><template #default="{ row }">{{ row.departmentName || '待归属' }}</template></el-table-column>
       <el-table-column prop="operator" label="经办人" width="80" show-overflow-tooltip />
       <el-table-column prop="remark" label="备注" min-width="100" show-overflow-tooltip />
       <el-table-column label="附件" width="70" align="center">
@@ -128,118 +45,37 @@
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" :width="isMobile ? 56 : 120" align="center" fixed="right">
+      <el-table-column label="操作" :width="isMobile ? 56 : 110" align="center" fixed="right">
         <template #default="{ row }">
           <TableRowActions
             :actions="[
-              { key: 'edit', label: '编辑', onClick: () => openForm(row), type: 'primary' },
-              { key: 'delete', label: '删除', onClick: () => onDelete(row), type: 'danger' },
+              { key: 'edit', label: '编辑', onClick: () => openForm(row), type: 'primary', show: !filter.deleted && auth.hasPermission('finance_expense_edit') },
+              { key: 'history', label: '记录', onClick: () => openHistory(row.id) },
+              { key: 'restore', label: '恢复', onClick: () => restoreRow(row), show: filter.deleted && auth.hasPermission('finance_expense_delete') },
             ]"
           />
         </template>
       </el-table-column>
     </el-table>
 
-    <div class="pagination-wrap">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.pageSize"
-        :total="pagination.total"
-        :page-sizes="[20, 50, 100]"
-        layout="total, sizes, prev, pager, next"
-        @current-change="load"
-        @size-change="onPageSizeChange"
-      />
-    </div>
+    <AppPaginationBar v-model:current-page="pagination.page" v-model:page-size="pagination.pageSize" :total="pagination.total" :page-sizes="[20, 50, 100]" :total-quantity="pagination.total" summary-label="筛选记录" unit="条" :total-amount="rawTotalAmount" total-amount-label="筛选合计" @current-change="load" @size-change="onPageSizeChange" />
 
-    <AppDialog
+    <AppDialog top="2vh"
       v-model="dialog.visible"
       :title="dialog.isEdit ? '编辑支出' : '登记支出'"
-      width="580"
+      width="760"
       destroy-on-close
       @close="formRef?.resetFields()"
     >
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
-        <el-form-item label="支出日期" prop="occurDate">
-          <el-date-picker
-            v-model="form.occurDate"
-            type="date"
-            value-format="YYYY-MM-DD"
-            placeholder="选择日期"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="支出金额" prop="amount">
-          <el-input-number v-model="form.amount" :min="0" :precision="2" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="支出类型" prop="expenseTypeId">
-          <el-select v-model="form.expenseTypeId" placeholder="选择支出类型" clearable filterable style="width: 100%">
-            <el-option v-for="t in options.expenseTypes" :key="t.id" :label="t.name" :value="t.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="支出账户">
-          <el-select v-model="form.fundAccountId" placeholder="选择支出账户" clearable filterable style="width: 100%">
-            <el-option v-for="a in options.fundAccounts" :key="a.id" :label="a.name" :value="a.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="对象类型">
-          <el-select v-model="form.objectType" placeholder="选择对象类型" clearable style="width: 100%">
-            <el-option v-for="o in OBJECT_TYPE_OPTIONS" :key="o.value" :label="o.label" :value="o.value" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="收款方名称">
-          <el-input v-model="form.payeeName" placeholder="如：供应商、员工、平台名称" clearable />
-        </el-form-item>
-        <el-form-item label="关联订单号">
-          <el-input v-model="form.orderNo" placeholder="选填，可输入系统外订单号" clearable />
-        </el-form-item>
-        <el-form-item label="部门">
-          <el-select v-model="form.departmentId" placeholder="选填" clearable filterable style="width: 100%">
-            <el-option v-for="d in options.departments" :key="d.id" :label="d.value" :value="d.id" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="经办人">
-          <el-input v-model="form.operator" placeholder="选填" clearable />
-        </el-form-item>
-        <el-form-item label="备注">
-          <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="选填" clearable />
-        </el-form-item>
-        <el-form-item label="附件凭证">
-          <div class="attachment-area">
-            <div v-if="form.attachments.length" class="attachment-list">
-              <div v-for="(url, idx) in form.attachments" :key="idx" class="attachment-item">
-                <AppImageThumb
-                  :raw-url="url"
-                  :width="72"
-                  :height="72"
-                  :preview-gallery="form.attachments"
-                  :preview-gallery-index="idx"
-                />
-                <el-button link type="danger" size="small" class="attachment-del" @click="removeAttachment(idx)">
-                  删除
-                </el-button>
-              </div>
-            </div>
-            <el-upload
-              :show-file-list="false"
-              :before-upload="(f: File) => handleUpload(f)"
-              accept="image/*"
-              :disabled="uploading"
-            >
-              <el-button size="small" :loading="uploading">
-                {{ uploading ? '上传中...' : '上传图片' }}
-              </el-button>
-            </el-upload>
-          </div>
-        </el-form-item>
-      </el-form>
+      <ExpenseEntryFields ref="formRef" :form="form" :options="options" :uploading="uploading" :show-duplicate-reason="showDuplicateReason" @upload="handleUpload" @remove="removeAttachment" />
       <template #footer>
         <el-button @click="dialog.visible = false">取消</el-button>
         <el-button type="primary" :loading="dialog.submitting" @click="submitForm">确定</el-button>
       </template>
     </AppDialog>
 
-    <AppDialog v-model="previewDialog.visible" title="附件预览" width="700">
+    <AppDialog top="2vh" v-model="history.visible" title="操作记录" width="700"><FinanceAuditTable :logs="history.logs" /></AppDialog>
+    <AppDialog top="2vh" v-model="previewDialog.visible" title="附件预览" width="700">
       <div class="preview-grid">
         <el-image
           v-for="(url, i) in previewDialog.urls"
@@ -256,9 +92,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
-import { appConfirm } from '@/utils/message-box'
+import FinanceRecordMeta from './components/FinanceRecordMeta.vue'
+import FinanceAuditTable from './components/FinanceAuditTable.vue'
+import { cashKindLabel, getFinanceHistory, restoreFinanceRecord, type FinanceAudit } from '@/api/finance-control'
+import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import { useFinanceSelection } from '@/composables/useFinanceSelection'
+import FinanceFlowFilters from './components/FinanceFlowFilters.vue'
+import { onMounted, onActivated, reactive, ref, watch } from 'vue'
+import ExpenseEntryFields from './components/ExpenseEntryFields.vue'
+import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { appPrompt } from '@/utils/message-box'
 import {
   OBJECT_TYPE_OPTIONS,
   createExpense,
@@ -273,14 +117,12 @@ import {
 } from '@/api/finance'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { uploadFinanceImage } from '@/api/uploads'
-import { ACTIVE_FILTER_COLOR, getFilterRangeStyle, getAdaptiveSelectStyle, getFilterInputStyle } from '@/composables/useFilterBarHelpers'
-import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
+import { formatMoneyAligned } from '@/utils/display-number'
 import TableRowActions from '@/components/common/TableRowActions.vue'
-import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
+import { useAuthStore } from '@/stores/auth'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
 
-const { collapsed, isMobile } = useFilterCollapse('finance-expense')
+const { isMobile } = useFilterCollapse('finance-expense')
 
 const options = reactive<{
   expenseTypes: FinanceExpenseType[]
@@ -292,61 +134,49 @@ const options = reactive<{
   departments: [],
 })
 
+const auth = useAuthStore()
+const history = reactive({ visible: false, logs: [] as FinanceAudit[] })
+const showDuplicateReason = ref(false)
+const route = useRoute()
 type DateRangeValue = [string, string] | null
 
 const filter = reactive({
   occurDateRange: null as DateRangeValue,
-  expenseTypeId: null as number | null,
+  typeId: null as number | null,
   fundAccountId: null as number | null,
-  payeeKeyword: '',
+  departmentId: null as number | null,
+  cashKind: '',
+  deleted: false,
+  keyword: '',
   orderNo: '',
-})
-const activeFilterCount = computed(() => {
-  let n = 0
-  if (hasDateRangeValue(filter.occurDateRange)) n++
-  if (filter.expenseTypeId != null) n++
-  if (filter.fundAccountId != null) n++
-  if (filter.payeeKeyword) n++
-  if (filter.orderNo) n++
-  return n
 })
 const list = ref<ExpenseRecordItem[]>([])
 const loading = ref(false)
+const tableRef = ref<{ clearSelection(): void }>()
+const { selected, selectedAmount, deleting, removeRecords } = useFinanceSelection()
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const rawTotalAmount = ref(0)
-const summary = computed(() => ({
-  totalAmount: rawTotalAmount.value > 0 ? formatDisplayNumber(rawTotalAmount.value) : '',
-}))
-
 const dialog = reactive({ visible: false, isEdit: false, submitting: false })
 const editId = ref<number | null>(null)
-const formRef = ref<FormInstance>()
+const formRef = ref<InstanceType<typeof ExpenseEntryFields>>()
 const uploading = ref(false)
 const form = reactive({
+  cashKind: 'unclassified', bankReference: '', duplicateReason: '', version: 1,
   occurDate: '',
   amount: 0,
   expenseTypeId: null as number | null,
   fundAccountId: null as number | null,
+  departmentId: null as number | null,
   objectType: '',
   payeeName: '',
   orderNo: '',
-  departmentId: null as number | null,
   operator: '',
   remark: '',
   attachments: [] as string[],
 })
-const rules: FormRules = {
-  occurDate: [{ required: true, message: '请选择支出日期', trigger: 'change' }],
-  amount: [{ required: true, message: '请输入金额', trigger: 'blur' }],
-  expenseTypeId: [{ required: true, message: '请选择支出类型', trigger: 'change' }],
-}
+
 
 const previewDialog = reactive({ visible: false, urls: [] as string[] })
-
-function fmtAmt(v: string | number) {
-  const n = Number(v)
-  return Number.isNaN(n) ? '-' : formatDisplayNumber(n)
-}
 
 function objectTypeLabel(v: string) {
   return OBJECT_TYPE_OPTIONS.find((o) => o.value === v)?.label ?? (v || '—')
@@ -356,30 +186,40 @@ function hasDateRangeValue(v: DateRangeValue | undefined) {
   return Array.isArray(v) && v.length === 2
 }
 
+let loadGeneration=0
 async function load() {
+  const generation=++loadGeneration
+  tableRef.value?.clearSelection()
+  selected.value = []
   loading.value = true
   try {
     const [dateFrom, dateTo] = hasDateRangeValue(filter.occurDateRange) ? filter.occurDateRange : []
     const res = await getExpenseList({
+      cashKind: filter.cashKind || undefined, deleted: filter.deleted,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
-      expenseTypeId: filter.expenseTypeId ?? undefined,
+      expenseTypeId: filter.typeId ?? undefined,
       fundAccountId: filter.fundAccountId ?? undefined,
-      payeeKeyword: filter.payeeKeyword || undefined,
+      departmentId: filter.departmentId ?? undefined,
+      payeeKeyword: filter.keyword || undefined,
       orderNo: filter.orderNo || undefined,
       page: pagination.page,
       pageSize: pagination.pageSize,
     })
+    if (generation!==loadGeneration) return
     const data = res.data
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
-      rawTotalAmount.value = list.value.reduce((sum, row) => sum + Number(row.amount || 0), 0)
+      const lastPage = Math.max(1, Math.ceil(pagination.total / pagination.pageSize))
+      if (pagination.page > lastPage) { pagination.page = lastPage; await load(); return }
+      rawTotalAmount.value = Number(data.totalAmount ?? 0)
     }
   } catch (e: unknown) {
+    if (getErrorMessage(e).includes('疑似重复')) showDuplicateReason.value = true
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (generation===loadGeneration) loading.value = false
   }
 }
 
@@ -388,16 +228,15 @@ function onSearch() {
   load()
 }
 
-function onDateRangeClear() {
-  filter.occurDateRange = null
-  onSearch()
-}
 
 function onReset() {
+  filter.cashKind = ''
+  filter.deleted = false
   filter.occurDateRange = null
-  filter.expenseTypeId = null
+  filter.typeId = null
   filter.fundAccountId = null
-  filter.payeeKeyword = ''
+  filter.departmentId = null
+  filter.keyword = ''
   filter.orderNo = ''
   pagination.page = 1
   load()
@@ -409,6 +248,11 @@ function onPageSizeChange() {
 }
 
 function openForm(row: ExpenseRecordItem | null) {
+  showDuplicateReason.value = false
+  form.duplicateReason = ''
+  form.cashKind = row?.cashKind || 'unclassified'
+  form.bankReference = row?.bankReference || ''
+  form.version = row?.version || 1
   dialog.isEdit = !!row
   editId.value = row?.id ?? null
   if (row) {
@@ -424,7 +268,7 @@ function openForm(row: ExpenseRecordItem | null) {
     form.remark = row.remark ?? ''
     form.attachments = [...(row.attachments ?? [])]
   } else {
-    form.occurDate = ''
+    form.occurDate = new Date().toLocaleDateString('sv-SE')
     form.amount = 0
     form.expenseTypeId = null
     form.fundAccountId = null
@@ -432,7 +276,7 @@ function openForm(row: ExpenseRecordItem | null) {
     form.payeeName = ''
     form.orderNo = ''
     form.departmentId = null
-    form.operator = ''
+    form.operator = useAuthStore().user?.displayName || useAuthStore().user?.username || ''
     form.remark = ''
     form.attachments = []
   }
@@ -467,6 +311,7 @@ async function submitForm() {
   dialog.submitting = true
   try {
     const payload = {
+      cashKind: form.cashKind, bankReference: form.bankReference, duplicateReason: form.duplicateReason, version: form.version,
       occurDate: form.occurDate,
       amount: form.amount,
       expenseTypeId: form.expenseTypeId,
@@ -489,24 +334,49 @@ async function submitForm() {
     dialog.visible = false
     load()
   } catch (e: unknown) {
+    if (getErrorMessage(e).includes('疑似重复')) showDuplicateReason.value = true
     if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
     dialog.submitting = false
   }
 }
 
-async function onDelete(row: ExpenseRecordItem) {
+async function openHistory(id: number) {
+  history.logs = []; history.visible = true
+  try { history.logs = (await getFinanceHistory('expense', id)).data || [] } catch (e) { ElMessage.error(getErrorMessage(e)) }
+}
+async function restoreRow(row: ExpenseRecordItem) {
   try {
-    await appConfirm('确定删除这条支出记录吗？', '提示', { type: 'warning' })
-    await deleteExpense(row.id)
-    ElMessage.success('已删除')
-    load()
-  } catch (e: unknown) {
-    if (e !== 'cancel' && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
-  }
+    const { value } = await appPrompt('核实后填写恢复原因，恢复后该笔重新计入收支。', '恢复记录', { inputValidator: value => !!value?.trim() || '请填写原因' })
+    await restoreFinanceRecord('expense', row.id, row.version, value); await load(); ElMessage.success('已恢复')
+  } catch (e) { if (e !== 'cancel' && e !== 'close') ElMessage.error(getErrorMessage(e)) }
+}
+async function onBatchDelete() {
+  const rows = list.value.filter(row => selected.value.some(item => item.id === row.id))
+  if (!rows.length || deleting.value) return
+  try {
+    const { value } = await appPrompt('将删除选中的 ' + rows.length + ' 条支出，不再参与统计，可从回收站恢复。请填写原因。', '批量删除', { inputValidator: value => !!value?.trim() || '请填写原因' })
+    const result = await removeRecords(rows.map(row=>row.id), id => deleteExpense(id, rows.find(row=>row.id===id)!.version, value))
+    if (!result) return
+    if (result.failedIds.length) ElMessage.error('已删除 ' + result.deletedCount + ' 条；失败记录编号：' + result.failedIds.join('、'))
+    else ElMessage.success('已删除 ' + result.deletedCount + ' 条，可从回收站恢复')
+    await load()
+  } catch (e) { if (e !== 'cancel' && e !== 'close') ElMessage.error(getErrorMessage(e)) }
 }
 
+function applyPeriodQuery() {
+  const { dateFrom, dateTo, departmentId, cashKind } = route.query
+  filter.departmentId = typeof departmentId === 'string' && /^\d+$/.test(departmentId) ? Number(departmentId) : null
+  filter.cashKind = typeof cashKind === 'string' ? cashKind : ''
+  filter.deleted = false
+  filter.occurDateRange = typeof dateFrom === 'string' && typeof dateTo === 'string' ? [dateFrom, dateTo] : null
+}
+watch(() => route.query, () => { if (route.path === '/finance/expense') { applyPeriodQuery(); onSearch() } })
+let mounted=false
+onActivated(()=>{if(mounted)load()})
 onMounted(async () => {
+  applyPeriodQuery()
+  await auth.fetchUser()
   try {
     const res = await getFinanceDropdownOptions()
     if (res.data) {
@@ -518,25 +388,20 @@ onMounted(async () => {
     // ignore dropdown loading failure
   }
   await load()
+  mounted=true
 })
 </script>
 
 <style scoped>
+.selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); font-size: var(--font-size-body); }
+.finance-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); }
+.finance-heading h2 { margin: 0; font-size: var(--font-size-body); }
+.finance-heading a { color: var(--color-primary); white-space: nowrap; font-size: var(--font-size-body); }
+@media (max-width: 650px) { .finance-heading { align-items: flex-start; } }
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
-.summary-bar { padding: 6px 12px; background: #fff7ed; border: 1px solid #fed7aa; border-radius: 6px; font-size: var(--font-size-body); color: #c2410c; margin-bottom: var(--space-sm); }
-.expense-highlight { color: #dc2626; font-size: var(--font-size-subtitle); }
-.expense-amount { color: #dc2626; font-weight: 600; }
+.expense-amount { color: var(--el-text-color-primary); font-weight: 600; }
 .text-muted { color: var(--color-text-muted); }
 .data-table { margin-bottom: var(--space-md); }
-.pagination-wrap { display: flex; justify-content: flex-end; }
-.attachment-area { display: flex; flex-direction: column; gap: 8px; }
-.attachment-list { display: flex; flex-wrap: wrap; gap: 8px; }
-.attachment-item { position: relative; }
-.attachment-del { position: absolute; top: 2px; right: 2px; padding: 0 4px; background: rgba(0, 0, 0, 0.45); color: #fff; border-radius: 2px; }
 .preview-grid { display: flex; flex-wrap: wrap; gap: 12px; }
 .preview-img { width: 180px; height: 180px; border-radius: 6px; border: 1px solid var(--color-border); cursor: zoom-in; }
-.range-single.el-date-editor--daterange :deep(.el-range-separator) { display: none; }
-.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) { display: none; }
-.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) { width: 100%; }
-.range-single.el-date-editor--daterange :deep(.el-range__close-icon) { margin-left: 0; }
 </style>

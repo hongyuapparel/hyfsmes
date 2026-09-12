@@ -23,7 +23,7 @@ export class FinanceSettingsController {
 
   // ── 下拉选项（供收入/支出流水页使用，权限复用 finance/income） ──
   @Get('options')
-  @RequirePermission('/finance/income')
+  @RequirePermission(['/finance/income', '/finance/expense', '/finance/dashboard'])
   getOptions() {
     return this.svc.getDropdownOptions();
   }

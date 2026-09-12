@@ -1,290 +1,67 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, type ObjectLiteral, type SelectQueryBuilder } from 'typeorm';
-import { IncomeRecord } from '../entities/income-record.entity';
-import { ExpenseRecord } from '../entities/expense-record.entity';
-import { FinanceFundAccount } from '../entities/finance-fund-account.entity';
-import { FinanceIncomeType } from '../entities/finance-income-type.entity';
-import { FinanceExpenseType } from '../entities/finance-expense-type.entity';
-import { SystemOptionsService } from '../system-options/system-options.service';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { DataSource } from 'typeorm';
+import { CASH_KINDS, financeDate, financeToday } from '../common/finance-value.util';
+import { FinanceControlService } from './finance-control.service';
+
+const FLOWS = `(SELECT id,occur_date,amount,department_id,fund_account_id,cash_kind,'income' direction FROM finance_income_records WHERE deleted_at IS NULL
+ UNION ALL SELECT id,occur_date,amount,department_id,fund_account_id,cash_kind,'expense' direction FROM finance_expense_records WHERE deleted_at IS NULL)`;
+const SUMS = `COALESCE(SUM(IF(direction='income',amount,0)),0) totalIncome,
+ COALESCE(SUM(IF(direction='expense',amount,0)),0) totalExpense,
+ COALESCE(SUM(IF(direction='income',amount,-amount)),0) netCashFlow`;
+export interface Totals { totalIncome: string; totalExpense: string; netCashFlow: string }
+export interface Dept extends Totals { departmentId: number | null; departmentName: string }
 
 @Injectable()
 export class FinanceDashboardService {
-  constructor(
-    @InjectRepository(IncomeRecord)
-    private incomeRepo: Repository<IncomeRecord>,
-    @InjectRepository(ExpenseRecord)
-    private expenseRepo: Repository<ExpenseRecord>,
-    @InjectRepository(FinanceFundAccount)
-    private fundAccountRepo: Repository<FinanceFundAccount>,
-    @InjectRepository(FinanceIncomeType)
-    private incomeTypeRepo: Repository<FinanceIncomeType>,
-    @InjectRepository(FinanceExpenseType)
-    private expenseTypeRepo: Repository<FinanceExpenseType>,
-    private readonly systemOptionsService: SystemOptionsService,
-  ) {}
-
-  private formatDate(date: Date) {
-    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  }
-
-  private getDefaultRange() {
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), 1);
-    const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-    return {
-      dateFrom: this.formatDate(start),
-      dateTo: this.formatDate(end),
-    };
-  }
-
-  private normalizeDateRange(dateFrom?: string, dateTo?: string) {
-    const fallback = this.getDefaultRange();
-    const from = (dateFrom || dateTo || fallback.dateFrom).trim();
-    const to = (dateTo || dateFrom || fallback.dateTo).trim();
-    return from <= to
-      ? { dateFrom: from, dateTo: to }
-      : { dateFrom: to, dateTo: from };
-  }
-
-  private applyOccurDateRange<T extends ObjectLiteral>(
-    qb: SelectQueryBuilder<T>,
-    alias: string,
-    range: { dateFrom: string; dateTo: string },
-  ) {
-    return qb.where(`${alias}.occur_date >= :dateFrom AND ${alias}.occur_date <= :dateTo`, range);
-  }
-
-  async getSummary(params?: { dateFrom?: string; dateTo?: string }) {
-    const range = this.normalizeDateRange(params?.dateFrom, params?.dateTo);
-
-    // 区间收入汇总
-    const incomeSumRaw = await this.applyOccurDateRange(
-      this.incomeRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('SUM(r.amount)', 'total')
-      .getRawOne<{ total: string | null }>();
-
-    // 区间支出汇总
-    const expenseSumRaw = await this.applyOccurDateRange(
-      this.expenseRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('SUM(r.amount)', 'total')
-      .getRawOne<{ total: string | null }>();
-
-    // 区间订单相关支出（order_no 不为空）
-    const orderExpenseRaw = await this.applyOccurDateRange(
-      this.expenseRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('SUM(r.amount)', 'total')
-      .andWhere("r.order_no != ''")
-      .getRawOne<{ total: string | null }>();
-
-    // 区间公司费用（order_no 为空）
-    const companyExpenseRaw = await this.applyOccurDateRange(
-      this.expenseRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('SUM(r.amount)', 'total')
-      .andWhere("(r.order_no IS NULL OR r.order_no = '')")
-      .getRawOne<{ total: string | null }>();
-
-    // 区间关联订单的收入
-    const orderIncomeRaw = await this.applyOccurDateRange(
-      this.incomeRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('SUM(r.amount)', 'total')
-      .andWhere("r.order_no != ''")
-      .getRawOne<{ total: string | null }>();
-
-    const toNum = (v: string | null | undefined) => parseFloat(v ?? '0') || 0;
-    const orderProfit = toNum(orderIncomeRaw?.total) - toNum(orderExpenseRaw?.total);
-
-    // 各账户余额
-    const accounts = await this.fundAccountRepo.find({ order: { sortOrder: 'ASC', id: 'ASC' } });
-    const [incomeByAccount, expenseByAccount] = await Promise.all([
-      this.incomeRepo
-        .createQueryBuilder('r')
-        .select('r.fund_account_id', 'fundAccountId')
-        .addSelect('SUM(r.amount)', 'total')
-        .groupBy('r.fund_account_id')
-        .getRawMany<{ fundAccountId: number; total: string | null }>(),
-      this.expenseRepo
-        .createQueryBuilder('r')
-        .select('r.fund_account_id', 'fundAccountId')
-        .addSelect('SUM(r.amount)', 'total')
-        .groupBy('r.fund_account_id')
-        .getRawMany<{ fundAccountId: number; total: string | null }>(),
-    ]);
-    const incomeMap = new Map(incomeByAccount.map((r) => [Number(r.fundAccountId), r.total]));
-    const expenseMap = new Map(expenseByAccount.map((r) => [Number(r.fundAccountId), r.total]));
-    const accountBalances = accounts.map((a) => {
-      const balance = toNum(incomeMap.get(a.id)) - toNum(expenseMap.get(a.id));
-      return { fundAccountId: a.id, fundAccountName: a.name, balance: balance.toFixed(2) };
+  constructor(private readonly db: DataSource, private readonly control: FinanceControlService) {}
+  async getSummary(params?: { dateFrom?: string; dateTo?: string; cashKind?: string }) {
+    const today = financeToday();
+    const dateFrom = financeDate(params?.dateFrom || today.slice(0,4) + '-01-01');
+    const requestedTo = financeDate(params?.dateTo || today);
+    const dateTo = requestedTo > today ? today : requestedTo;
+    if (dateFrom > dateTo) throw new BadRequestException('开始日期不能晚于结束日期或今天');
+    if ((Date.parse(dateTo)-Date.parse(dateFrom))/86400000 > 3660) throw new BadRequestException('单次统计区间不能超过十年');
+    const cashKind = params?.cashKind || '';
+    if (cashKind && !CASH_KINDS.includes(cashKind as typeof CASH_KINDS[number])) throw new BadRequestException('收支性质无效');
+    const clause = `occur_date BETWEEN ? AND ?${cashKind ? ' AND cash_kind=?' : ''}`;
+    const args = [dateFrom, dateTo, ...(cashKind ? [cashKind] : [])];
+    const duration = Date.parse(dateTo)-Date.parse(dateFrom)+86400000;
+    const previousTo = new Date(Date.parse(dateFrom)-86400000).toISOString().slice(0,10);
+    const previousFrom = new Date(Date.parse(dateFrom)-duration).toISOString().slice(0,10);
+    const result = await this.db.transaction('REPEATABLE READ', async manager => {
+      const totals: Totals[] = await manager.query(`SELECT ${SUMS} FROM ${FLOWS} f WHERE ${clause}`,args);
+      const previous: Totals[] = await manager.query(`SELECT ${SUMS} FROM ${FLOWS} f WHERE ${clause}`,[previousFrom,previousTo,...(cashKind ? [cashKind] : [])]);
+      const departments: Dept[] = await manager.query(`SELECT department_id departmentId,
+        CASE WHEN department_id IS NULL THEN '待归属' ELSE COALESCE(d.value,CONCAT('未知部门 #',department_id)) END departmentName, ${SUMS}
+        FROM ${FLOWS} f LEFT JOIN system_options d ON d.id=f.department_id AND d.option_type='org_departments'
+        WHERE ${clause} GROUP BY department_id,d.value ORDER BY totalExpense DESC,totalIncome DESC`,args);
+      const previousDepartments: Dept[] = await manager.query(`SELECT department_id departmentId,${SUMS} FROM ${FLOWS} f WHERE ${clause} GROUP BY department_id`,[previousFrom,previousTo,...(cashKind ? [cashKind] : [])]);
+      const trend: (Totals & { month: string })[] = await manager.query(`SELECT DATE_FORMAT(occur_date,'%Y-%m') month,${SUMS} FROM ${FLOWS} f WHERE ${clause} GROUP BY month ORDER BY month`,args);
+      const nature: (Totals & { cashKind: string })[] = await manager.query(`SELECT cash_kind cashKind,${SUMS} FROM ${FLOWS} f WHERE occur_date BETWEEN ? AND ? GROUP BY cash_kind`,[dateFrom,dateTo]);
+      const quality: { incomeCount: string; expenseCount: string; unclassified: string; missingAccount: string; missingDepartment: string; unknownDepartment: string; latest: string | null }[] = await manager.query(`SELECT
+        COUNT(IF(direction='income',1,NULL)) incomeCount,COUNT(IF(direction='expense',1,NULL)) expenseCount,
+        COUNT(IF(cash_kind='unclassified',1,NULL)) unclassified,
+        COUNT(IF(a.id IS NULL,1,NULL)) missingAccount,
+        COUNT(IF(department_id IS NULL,1,NULL)) missingDepartment,
+        COUNT(IF(department_id IS NOT NULL AND d.id IS NULL,1,NULL)) unknownDepartment,
+        DATE_FORMAT(MAX(occur_date),'%Y-%m-%d') latest
+        FROM ${FLOWS} f LEFT JOIN finance_fund_accounts a ON a.id=f.fund_account_id
+        LEFT JOIN system_options d ON d.id=f.department_id AND d.option_type='org_departments'
+        WHERE occur_date BETWEEN ? AND ?`,[dateFrom,dateTo]);
+      const monthMap = new Map(trend.map(row => [row.month,row]));
+      const months: (Totals & { month: string })[] = [];
+      for (let date=new Date(dateFrom.slice(0,7)+'-01'); date.toISOString().slice(0,7)<=dateTo.slice(0,7); date.setUTCMonth(date.getUTCMonth()+1)) {
+        const month=date.toISOString().slice(0,7);
+        months.push(monthMap.get(month) || {month,totalIncome:'0.00',totalExpense:'0.00',netCashFlow:'0.00'});
+      }
+      const accounts = await this.control.accounts(today, manager);
+      const [unassigned]: {total:string}[] = await manager.query(`SELECT COUNT(*) total FROM ${FLOWS} f LEFT JOIN finance_fund_accounts a ON a.id=f.fund_account_id WHERE a.id IS NULL AND occur_date<=?`,[today]);
+      const complete = Number(unassigned.total)===0 && accounts.length>0 && accounts.every(a=>a.bookBalance!==null);
+      const currentBookBalance = complete ? (accounts.reduce((sum,a)=>sum+Math.round(Number(a.bookBalance)*100),0)/100).toFixed(2) : null;
+      return { accounts, currentBookBalance, period:{dateFrom,dateTo}, cashKind, periodSummary:totals[0], previous:{period:{dateFrom:previousFrom,dateTo:previousTo},...previous[0]},
+        departments:departments.map(row=>({...row,previous:previousDepartments.find(p=>p.departmentId===row.departmentId) || {totalIncome:'0.00',totalExpense:'0.00',netCashFlow:'0.00'}})),
+        trend:months, nature, quality:quality[0] };
     });
-
-    // 区间最近流水
-    const recentIncome = await this.applyOccurDateRange(
-      this.incomeRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .orderBy('r.occur_date', 'DESC')
-      .addOrderBy('r.id', 'DESC')
-      .limit(8)
-      .getMany();
-    const recentExpense = await this.applyOccurDateRange(
-      this.expenseRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .orderBy('r.occur_date', 'DESC')
-      .addOrderBy('r.id', 'DESC')
-      .limit(8)
-      .getMany();
-
-    // 区间支出类型TOP5
-    const expenseTypeTop5Raw = await this.applyOccurDateRange(
-      this.expenseRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('r.expense_type_id', 'expenseTypeId')
-      .addSelect('SUM(r.amount)', 'total')
-      .andWhere('r.expense_type_id IS NOT NULL')
-      .groupBy('r.expense_type_id')
-      .orderBy('total', 'DESC')
-      .limit(5)
-      .getRawMany<{ expenseTypeId: string; total: string }>();
-
-    const expenseTypeIds = expenseTypeTop5Raw.map((r) => Number(r.expenseTypeId));
-    const expenseTypes = expenseTypeIds.length
-      ? await this.expenseTypeRepo.findByIds(expenseTypeIds)
-      : [];
-    const etMap = Object.fromEntries(expenseTypes.map((t) => [t.id, t.name]));
-    const expenseTypeTop5 = expenseTypeTop5Raw.map((r) => ({
-      expenseTypeName: etMap[Number(r.expenseTypeId)] ?? '未知类型',
-      totalAmount: parseFloat(r.total).toFixed(2),
-    }));
-
-    // 区间部门支出TOP5
-    const deptTop5Raw = await this.applyOccurDateRange(
-      this.expenseRepo.createQueryBuilder('r'),
-      'r',
-      range,
-    )
-      .select('r.department_id', 'departmentId')
-      .addSelect('SUM(r.amount)', 'total')
-      .andWhere('r.department_id IS NOT NULL')
-      .groupBy('r.department_id')
-      .orderBy('total', 'DESC')
-      .limit(5)
-      .getRawMany<{ departmentId: string; total: string }>();
-
-    const deptIds = deptTop5Raw.map((r) => Number(r.departmentId));
-    const deptLabels = deptIds.length
-      ? await this.systemOptionsService.getOptionLabelsByIds('org_departments', deptIds)
-      : ({} as Record<number, string>);
-    const deptTop5 = deptTop5Raw.map((r) => ({
-      departmentName: deptLabels[Number(r.departmentId)] ?? '未知部门',
-      totalAmount: parseFloat(r.total).toFixed(2),
-    }));
-
-    // 区间部门利润率
-    const [incomeDeptRaw, expenseDeptRaw] = await Promise.all([
-      this.applyOccurDateRange(
-        this.incomeRepo.createQueryBuilder('r'),
-        'r',
-        range,
-      )
-        .select('r.department_id', 'departmentId')
-        .addSelect('SUM(r.amount)', 'total')
-        .andWhere('r.department_id IS NOT NULL')
-        .groupBy('r.department_id')
-        .getRawMany<{ departmentId: string; total: string }>(),
-      this.applyOccurDateRange(
-        this.expenseRepo.createQueryBuilder('r'),
-        'r',
-        range,
-      )
-        .select('r.department_id', 'departmentId')
-        .addSelect('SUM(r.amount)', 'total')
-        .andWhere('r.department_id IS NOT NULL')
-        .groupBy('r.department_id')
-        .getRawMany<{ departmentId: string; total: string }>(),
-    ]);
-    const profitabilityDeptIds = [
-      ...new Set(
-        [...incomeDeptRaw, ...expenseDeptRaw]
-          .map((r) => Number(r.departmentId))
-          .filter((id) => Number.isFinite(id)),
-      ),
-    ];
-    const profitabilityLabels = profitabilityDeptIds.length
-      ? await this.systemOptionsService.getOptionLabelsByIds('org_departments', profitabilityDeptIds)
-      : ({} as Record<number, string>);
-    const incomeDeptMap = Object.fromEntries(incomeDeptRaw.map((r) => [Number(r.departmentId), toNum(r.total)]));
-    const expenseDeptMap = Object.fromEntries(expenseDeptRaw.map((r) => [Number(r.departmentId), toNum(r.total)]));
-    const departmentProfitability = profitabilityDeptIds
-      .map((departmentId) => {
-        const totalIncome = incomeDeptMap[departmentId] ?? 0;
-        const totalExpense = expenseDeptMap[departmentId] ?? 0;
-        const profit = totalIncome - totalExpense;
-        return {
-          departmentId,
-          departmentName: profitabilityLabels[departmentId] ?? '未知部门',
-          totalIncome: totalIncome.toFixed(2),
-          totalExpense: totalExpense.toFixed(2),
-          profit: profit.toFixed(2),
-          profitRate: totalIncome > 0 ? ((profit / totalIncome) * 100).toFixed(2) : '',
-        };
-      })
-      .sort((a, b) => Number(b.totalIncome) - Number(a.totalIncome) || Number(b.profit) - Number(a.profit));
-
-    // 解析收入/支出类型名称供最近流水用
-    const inTypeIds = [...new Set(recentIncome.map((r) => r.incomeTypeId).filter((v) => v != null) as number[])];
-    const inTypes = inTypeIds.length ? await this.incomeTypeRepo.findByIds(inTypeIds) : [];
-    const inTypeMap = Object.fromEntries(inTypes.map((t) => [t.id, t.name]));
-    const inDeptIds = [...new Set(recentIncome.map((r) => r.departmentId).filter((v) => v != null) as number[])];
-    const inDeptLabels = inDeptIds.length
-      ? await this.systemOptionsService.getOptionLabelsByIds('org_departments', inDeptIds)
-      : ({} as Record<number, string>);
-
-    const exTypeIds = [...new Set(recentExpense.map((r) => r.expenseTypeId).filter((v) => v != null) as number[])];
-    const exTypes = exTypeIds.length ? await this.expenseTypeRepo.findByIds(exTypeIds) : [];
-    const exTypeMap = Object.fromEntries(exTypes.map((t) => [t.id, t.name]));
-
-    return {
-      period: range,
-      periodSummary: {
-        totalIncome: toNum(incomeSumRaw?.total).toFixed(2),
-        totalExpense: toNum(expenseSumRaw?.total).toFixed(2),
-        orderExpense: toNum(orderExpenseRaw?.total).toFixed(2),
-        companyExpense: toNum(companyExpenseRaw?.total).toFixed(2),
-        orderProfit: orderProfit.toFixed(2),
-      },
-      accountBalances,
-      recentIncome: recentIncome.map((r) => ({
-        ...r,
-        incomeTypeName: r.incomeTypeId != null ? (inTypeMap[r.incomeTypeId] ?? '') : '',
-        departmentName: r.departmentId != null ? (inDeptLabels[r.departmentId] ?? '') : '',
-      })),
-      recentExpense: recentExpense.map((r) => ({
-        ...r,
-        expenseTypeName: r.expenseTypeId != null ? (exTypeMap[r.expenseTypeId] ?? '') : '',
-      })),
-      expenseTypeTop5,
-      departmentExpenseTop5: deptTop5,
-      departmentProfitability,
-    };
+    return {...result, generatedAt:new Date().toISOString()};
   }
 }
