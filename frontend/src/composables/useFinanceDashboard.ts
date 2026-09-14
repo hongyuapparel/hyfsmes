@@ -26,22 +26,18 @@ export function useFinanceDashboard() {
     filter.range = [start.toISOString().slice(0,10), kind === 'lastMonth' ? new Date(Date.UTC(year,month,0)).toISOString().slice(0,10) : today()]
     return load()
   }
-  const warnings = computed(() => {
-    if (!data.value) return []
-    const { quality:q, accounts, period } = data.value
-    const messages: string[] = []
-    const pending = accounts.filter(a => !a.reconciled_through || a.reconciled_through < period.dateTo || !a.opening_date || a.opening_date > period.dateFrom)
-    if (!accounts.length) messages.push('尚未配置资金账户')
-    if (pending.length) messages.push(`${pending.length} 个账户尚未覆盖本期完整核对，当前数字仅代表已登记流水`)
-    if (!Number(q.expenseCount)) messages.push('本期没有已登记支出，不代表公司没有支出')
-    if (!Number(q.incomeCount)) messages.push('本期没有已登记收款，不代表公司没有回款')
-    if (Number(q.unclassified)) messages.push(`${q.unclassified} 笔收支性质待分类，经营收付可能尚未统计完整`)
-    if (Number(q.missingAccount)) messages.push(`${q.missingAccount} 笔流水未关联有效资金账户`)
-    if (Number(q.unknownDepartment) || Number(q.missingDepartment)) messages.push(`${q.unknownDepartment} 笔部门失效，${q.missingDepartment} 笔待归属`)
-    return messages
+  const pendingAccounts = computed(() => {
+    if (!data.value) return 0
+    const { accounts, period } = data.value
+    return accounts.filter(a => !a.reconciled_through || a.reconciled_through < period.dateTo || !a.opening_date || a.opening_date > period.dateFrom).length
+  })
+  const needsReview = computed(() => {
+    if (!data.value) return false
+    const { quality, accounts } = data.value
+    return !accounts.length || pendingAccounts.value > 0 || [quality.unclassified, quality.missingAccount, quality.unknownDepartment, quality.missingDepartment].some(value => Number(value) > 0)
   })
   function flowLink(kind: 'income'|'expense', departmentId?: number | null, cashKind = filter.cashKind) {
     return { path: `/finance/${kind}`, query: { ...data.value?.period, ...(departmentId !== undefined ? {departmentId:String(departmentId ?? 0)} : {}), ...(cashKind ? {cashKind} : {}) } }
   }
-  return { data, loading, error, filter, load, preset, warnings, flowLink }
+  return { data, loading, error, filter, load, preset, pendingAccounts, needsReview, flowLink }
 }

@@ -9,15 +9,12 @@
     <el-alert v-if="error" :title="error" type="error" :closable="false" />
     <template v-if="data">
       <div class="period">{{ data.period.dateFrom }} 至 {{ data.period.dateTo }} · {{ filter.cashKind ? cashKindLabel(filter.cashKind) : '全部对外收付' }} · 按实际收付日期，单位：人民币元</div>
-      <el-alert :type="warnings.length ? 'warning' : 'info'" :closable="false" :title="warnings.length ? '数据尚未核对完整，请勿据此判断部门盈亏' : '已覆盖所选期间的账户核对；收支结余仍不等同于利润'">
-        <ul v-if="warnings.length" class="warnings"><li v-for="warning in warnings" :key="warning">{{ warning }}</li></ul>
-        <span>所选期间最后一笔收付：{{ data.quality.latest || '暂无记录' }}。该日期不代表已完成对账。</span>
-      </el-alert>
+      <div class="period">最近登记至 {{ data.quality.latest || '暂无记录' }}<span v-if="needsReview"> · 数据待核对</span></div>
       <div class="stat-cards">
-        <div class="stat-card"><div>今日账面资金</div><strong>{{ financeAmount(data.currentBookBalance) }}</strong><small>含已设置期初与内部转账；不代表实时银行余额</small></div>
+        <div class="stat-card"><div>今日账面资金</div><strong>{{ financeAmount(data.currentBookBalance) }}</strong><small>含已设置期初与内部转账；不代表实时银行余额</small><div class="account-review"><span>{{ data.accounts.length ? (pendingAccounts ? pendingAccounts + ' 个账户待核对' : '本期账户已核对') : '尚未配置账户' }}</span><el-button link type="primary" @click="run(controls.open)">去核对</el-button></div></div>
         <div class="stat-card"><div>本期收款</div><router-link :to="flowLink('income')"><strong>{{ financeAmount(data.periodSummary.totalIncome) }}</strong></router-link><small>点击查看同口径收入流水</small></div>
         <div class="stat-card"><div>本期支出净额</div><router-link :to="flowLink('expense')"><strong>{{ financeAmount(data.periodSummary.totalExpense) }}</strong></router-link><small>含退款及扣款冲减；点击查看支出流水</small></div>
-        <div class="stat-card"><div>本期收支结余</div><strong>{{ financeAmount(data.periodSummary.netCashFlow) }}</strong><small>收款减付款；内部转账不计入</small></div>
+        <div class="stat-card"><div class="stat-label">本期收支结余<el-tooltip content="收款减付款，内部转账不计入；未进行库存成本结转和公共费用分摊，不能作为部门利润。" placement="top" trigger="click"><el-button link aria-label="收支结余说明"><el-icon><QuestionFilled /></el-icon></el-button></el-tooltip></div><strong>{{ financeAmount(data.periodSummary.netCashFlow) }}</strong><small>收款减付款；内部转账不计入</small></div>
       </div>
       <section class="section">
         <div class="section-heading"><h3>部门投入与回收</h3><span>公共费用分摊前 · 点击金额查明细</span></div>
@@ -59,6 +56,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onActivated, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import { CASH_KIND_OPTIONS, cashKindLabel } from '@/api/finance-control'
 import { getErrorMessage } from '@/api/request'
 import { useFinanceDashboard, financeAmount } from '@/composables/useFinanceDashboard'
@@ -68,7 +66,7 @@ import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 import FinanceControls from './components/FinanceControls.vue'
 import FinanceAuditTable from './components/FinanceAuditTable.vue'
-const { data, loading, error, filter, load, preset, warnings, flowLink } = useFinanceDashboard()
+const { data, loading, error, filter, load, preset, pendingAccounts, needsReview, flowLink } = useFinanceDashboard()
 const controls = useFinanceControls(); const auth=useAuthStore(); const controlPanel=ref<InstanceType<typeof FinanceControls>>()
 const comparisonRows=computed(()=>data.value ? ([['totalIncome','收款'],['totalExpense','付款'],['netCashFlow','结余']] as const).map(([key,name])=>({name,current:data.value!.periodSummary[key],previous:data.value!.previous[key],delta:(Math.round(Number(data.value!.periodSummary[key])*100)-Math.round(Number(data.value!.previous[key])*100))/100})) : [])
 function departmentSummary(){return ['合计',financeAmount(data.value?.periodSummary.totalIncome),financeAmount(data.value?.periodSummary.totalExpense),financeAmount(data.value?.periodSummary.netCashFlow)]}
@@ -87,11 +85,13 @@ onActivated(()=>{if(mounted)load()})
 </script>
 <style scoped>
 .dashboard-page{padding:var(--space-md);min-width:0}
+.stat-label,.account-review{display:flex;align-items:center;gap:var(--space-sm)}
+.account-review{font-size:var(--font-size-caption);flex-wrap:wrap;color:var(--color-text-muted)}
 .heading,.actions,.section-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-sm)}
 .heading{margin-bottom:var(--space-md)}
 h2,h3{margin:0;font-size:var(--font-size-body)}
 .period,.note,.section-heading span{font-size:var(--font-size-caption);color:var(--color-text-muted);line-height:1.7}
-.period{margin:var(--space-sm) 0}.warnings{margin:var(--space-xs) 0;padding-left:var(--space-md)}
+.period{margin:var(--space-sm) 0}
 .stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-md);margin:var(--space-md) 0}
 .stat-card,.section{border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-md);background:var(--color-card);min-width:0}
 .stat-card{display:flex;flex-direction:column;gap:var(--space-sm);font-size:var(--font-size-body)}

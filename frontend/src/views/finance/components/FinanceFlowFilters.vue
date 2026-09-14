@@ -11,7 +11,7 @@
         <template #label="{ label }">{{ '资金账户' }}：{{ label }}</template>
         <el-option v-for="item in accounts" :key="item.id" :label="item.name" :value="item.id" />
       </el-select>
-      <el-select v-model="filter.departmentId" :placeholder="'归属部门'" clearable filterable class="filter-bar-item" :style="getAdaptiveSelectStyle(filter.departmentId != null ? '归属部门' + '：' + (departments.find(item => item.id === filter.departmentId)?.value ?? '') : '', '归属部门')" @change="emit('search')">
+      <el-select v-model="filter.departmentId" :placeholder="'归属部门'" clearable filterable class="filter-bar-item" :style="getAdaptiveSelectStyle(filter.departmentId != null ? '归属部门' + '：' + (filter.departmentId === 0 ? '待归属' : departments.find(item => item.id === filter.departmentId)?.value ?? '') : '', '归属部门')" @change="emit('search')">
         <template #label="{ label }">{{ '归属部门' }}：{{ label }}</template>
         <el-option :value="0" label="待归属" /><el-option v-if="filter.departmentId && !departments.some(item=>item.id===filter.departmentId)" :value="filter.departmentId" :label="'未知部门 #' + filter.departmentId" />
         <el-option v-for="item in departments" :key="item.id" :label="item.value" :value="item.id" />
@@ -23,7 +23,10 @@
       <el-select v-model="filter.cashKind" placeholder="收支性质" clearable class="filter-bar-item" style="width:140px" @change="emit('search')"><el-option v-for="item in CASH_KIND_OPTIONS" :key="item.value" :value="item.value" :label="item.label" /></el-select>
       <el-input v-model="filter.orderNo" placeholder="订单号" clearable class="filter-bar-item" :style="getAdaptiveSelectStyle(filter.orderNo, '订单号')" @keyup.enter="emit('search')" @clear="emit('search')" />
     </div>
-    <div class="filter-bar-actions"><el-button type="primary" @click="emit('search')">查询</el-button><el-button @click="emit('reset')">清空</el-button></div>
+    <div class="filter-bar-actions">
+      <el-button @click="emit('search')">查询</el-button><el-button @click="emit('reset')">清空</el-button>
+      <slot name="actions" />
+    </div>
   </div>
 </template>
 <script setup lang="ts">

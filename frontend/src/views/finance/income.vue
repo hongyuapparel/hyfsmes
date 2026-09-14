@@ -1,9 +1,13 @@
-﻿<template>
+<template>
   <div class="page-card finance-page">
-    <div class="finance-heading"><div><h2>收入流水</h2></div><router-link to="/finance/dashboard">返回财务看板 →</router-link><el-button v-if="auth.hasPermission('finance_income_create')" type="primary" @click="openForm(null)">登记收入</el-button></div>
-    <FinanceFlowFilters :income="true" :filter="filter" :types="options.incomeTypes" :accounts="options.fundAccounts" :departments="options.departments" @search="onSearch" @reset="onReset" />
+    <FinanceFlowFilters :income="true" :filter="filter" :types="options.incomeTypes" :accounts="options.fundAccounts" :departments="options.departments" @search="onSearch" @reset="onReset">
+      <template #actions>
+        <el-switch v-model="filter.deleted" active-text="回收站" @change="onSearch" />
+        <el-button v-if="auth.hasPermission('finance_income_create')" type="primary" @click="openForm(null)">登记收入</el-button>
+      </template>
+    </FinanceFlowFilters>
 
-    <div class="selection-bar"><el-switch v-model="filter.deleted" active-text="回收站" @change="onSearch" /><span v-if="filter.deleted" class="text-muted">已删除记录不参与收支统计，可核实后恢复。</span></div>
+    <div v-if="filter.deleted" class="selection-bar text-muted">已删除记录不参与收支统计，可核实后恢复。</div>
     <div v-if="selected.length" class="selection-bar">
       <span>已选 {{ selected.length }} 条，金额 {{ formatMoneyAligned(selectedAmount) }}</span>
       <el-button v-if="!filter.deleted && auth.hasPermission('finance_income_delete')" type="danger" plain :loading="deleting" @click="onBatchDelete">批量删除</el-button>
@@ -12,7 +16,9 @@
 
     <el-table ref="tableRef" v-loading="loading || deleting" :data="list" row-key="id" border stripe class="data-table" @selection-change="selected = $event">
       <el-table-column v-if="!filter.deleted && auth.hasPermission('finance_income_delete')" type="selection" width="48" align="center" />
-      <el-table-column prop="occurDate" label="收款日期" width="110" />
+      <el-table-column prop="occurDate" label="收款日期" width="110">
+        <template #default="{ row }"><el-button link type="primary" size="small" class="finance-date" :aria-label="'查看收入详情 ' + row.occurDate" @click="openDetail(row)">{{ row.occurDate }}</el-button></template>
+      </el-table-column>
       <el-table-column label="收入金额（元）" width="130" align="right" class-name="col-num-right" label-class-name="col-num-right">
         <template #default="{ row }">
           <span class="income-amount">{{ formatMoneyAligned(row.amount) }}</span>
@@ -41,12 +47,11 @@
           <span v-else class="text-muted">—</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" :width="isMobile ? 56 : 110" align="center" fixed="right">
+      <el-table-column v-if="filter.deleted ? auth.hasPermission('finance_income_delete') : auth.hasPermission('finance_income_edit')" label="操作" width="72" align="center" fixed="right">
         <template #default="{ row }">
           <TableRowActions
             :actions="[
               { key: 'edit', label: '编辑', onClick: () => openForm(row), type: 'primary', show: !filter.deleted && auth.hasPermission('finance_income_edit') },
-              { key: 'history', label: '记录', onClick: () => openHistory(row.id) },
               { key: 'restore', label: '恢复', onClick: () => restoreRow(row), show: filter.deleted && auth.hasPermission('finance_income_delete') },
             ]"
           />
@@ -109,7 +114,7 @@
       </template>
     </AppDialog>
 
-    <AppDialog top="2vh" v-model="history.visible" title="操作记录" width="700"><FinanceAuditTable :logs="history.logs" /></AppDialog>
+    <FinanceRecordDrawer v-model:visible="detailVisible" kind="income" :record="detailRecord" />
     <AppDialog top="2vh" v-model="previewDialog.visible" title="附件预览" width="700">
       <div class="preview-grid">
         <el-image
@@ -128,8 +133,8 @@
 
 <script setup lang="ts">
 import FinanceRecordMeta from './components/FinanceRecordMeta.vue'
-import FinanceAuditTable from './components/FinanceAuditTable.vue'
-import { cashKindLabel, getFinanceHistory, restoreFinanceRecord, type FinanceAudit } from '@/api/finance-control'
+import FinanceRecordDrawer from './components/FinanceRecordDrawer.vue'
+import { cashKindLabel, restoreFinanceRecord } from '@/api/finance-control'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFinanceSelection } from '@/composables/useFinanceSelection'
 import FinanceFlowFilters from './components/FinanceFlowFilters.vue'
@@ -154,9 +159,7 @@ import { uploadFinanceImage } from '@/api/uploads'
 import { formatMoneyAligned } from '@/utils/display-number'
 import TableRowActions from '@/components/common/TableRowActions.vue'
 import { useAuthStore } from '@/stores/auth'
-import { useFilterCollapse } from '@/composables/useFilterCollapse'
 
-const { isMobile } = useFilterCollapse('finance-income')
 
 const options = reactive<{
   incomeTypes: FinanceIncomeType[]
@@ -169,7 +172,8 @@ const options = reactive<{
 })
 
 const auth = useAuthStore()
-const history = reactive({ visible: false, logs: [] as FinanceAudit[] })
+const detailVisible = ref(false)
+const detailRecord = ref<IncomeRecordItem | null>(null)
 const showDuplicateReason = ref(false)
 const route = useRoute()
 type DateRangeValue = [string, string] | null
@@ -373,9 +377,9 @@ async function submitForm() {
   }
 }
 
-async function openHistory(id: number) {
-  history.logs = []; history.visible = true
-  try { history.logs = (await getFinanceHistory('income', id)).data || [] } catch (e) { ElMessage.error(getErrorMessage(e)) }
+function openDetail(row: IncomeRecordItem) {
+  detailRecord.value = row
+  detailVisible.value = true
 }
 async function restoreRow(row: IncomeRecordItem) {
   try {
@@ -425,13 +429,11 @@ onMounted(async () => {
 </script>
 
 <style scoped>
+.finance-date { font-size: var(--font-size-caption); font-weight: 400; }
 .selection-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); font-size: var(--font-size-body); }
-.finance-heading { display: flex; justify-content: space-between; align-items: center; gap: var(--space-md); margin-bottom: var(--space-md); }
-.finance-heading h2 { margin: 0; font-size: var(--font-size-body); }
-.finance-heading a { color: var(--color-primary); white-space: nowrap; font-size: var(--font-size-body); }
 .finance-entry-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: var(--space-md); }
 .entry-wide { grid-column: 1 / -1; }
-@media (max-width: 650px) { .finance-entry-form { grid-template-columns: minmax(0, 1fr); } .finance-heading { align-items: flex-start; } }
+@media (max-width: 650px) { .finance-entry-form { grid-template-columns: minmax(0, 1fr); } }
 .finance-page { background: var(--color-card); padding: var(--space-md); border-radius: var(--radius-xl); border: 1px solid var(--color-border); }
 .income-amount { color: var(--el-text-color-primary); font-weight: 600; }
 .text-muted { color: var(--color-text-muted); }
