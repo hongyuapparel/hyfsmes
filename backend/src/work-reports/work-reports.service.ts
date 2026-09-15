@@ -107,10 +107,10 @@ export class WorkReportsService {
    }
    if(codes.includes('purchase')) {
      // No actor is passed: the shared query cannot trigger purchase workflow reconciliation.
-     const pending=date===today?await this.purchase.getPurchaseExportRows({tab:'pending',sortField:'orderDate',sortOrder:'asc'}):[];
+     const pending=date===today?(await this.purchase.getPurchaseExportRows({tab:'all',sortField:'orderDate',sortOrder:'asc'})).filter(r=>r.processRoute==='purchase'&&r.purchaseStatus!=='completed'):[];
      const completed=(await this.purchase.getPurchaseExportRows({tab:'completed',completedStart:date,completedEnd:date,sortField:'completedAt',sortOrder:'desc'})).filter(r=>r.processRoute==='purchase');
-     const map=(r:typeof pending[number]):AutoRow=>({orderId:r.orderId,orderNo:r.orderNo,sku:r.skuCode,imageUrl:r.imageUrl,title:[r.materialName,r.color].filter(Boolean).join(' · '),time:r.purchaseStatus==='completed'?r.purchaseCompletedAt||'':r.pendingPurchaseAt||'',quantity:r.purchaseStatus==='completed'?r.actualPurchaseQuantity:r.planQuantity,factory:r.supplierName,remark:r.purchaseRemark||'',status:r.purchaseStatus==='completed'?'采购完成':'等待采购',customer:r.customerName,materialIndex:r.materialIndex});
-     automatic.push({title:'当前待采购（部门）',note:date===today?'与采购页等待采购清单一致，按物料项展示；不包含领料。系统目前没有独立的采购中状态。':'历史日期不展示当前待采购清单，系统尚无待采购历史快照。',rows:pending.map(map)});
+     const map=(r:typeof pending[number]):AutoRow=>({orderId:r.orderId,orderNo:r.orderNo,sku:r.skuCode,imageUrl:r.imageUrl,title:[r.materialName,r.color].filter(Boolean).join(' · '),time:r.purchaseStatus==='completed'?r.purchaseCompletedAt||'':r.pendingPurchaseAt||'',quantity:r.purchaseStatus==='completed'?r.actualPurchaseQuantity:r.planQuantity,factory:r.supplierName,remark:r.purchaseRemark||'',status:r.purchaseStatus==='completed'?'采购完成':r.purchaseStatus==='purchasing'?'采购中':'等待采购',customer:r.customerName,materialIndex:r.materialIndex});
+     automatic.push({title:'当前待采购（部门）',note:date===today?'与采购页等待采购、采购中清单一致，按物料项展示；不包含领料。':'历史日期不展示当前待采购清单，系统尚无待采购历史快照。',rows:pending.map(map)});
      automatic.push({title:'当天采购完成（部门）',note:'与采购页完成记录一致，按所选日期和物料项统计；登记完成不等于仓库到货，不同物料数量不合计。',rows:completed.map(map)});
    }
    if(codes.includes('finishing')||codes.includes('warehouse')||template.id==='merchandiser') {

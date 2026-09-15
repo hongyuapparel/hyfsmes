@@ -1,7 +1,7 @@
 import type {AutomaticRow,LiveReport} from '@/api/work-reports'
 export function reportQueues(report:LiveReport) {
  return report.automatic.filter(g=>g.title.startsWith('当前')).flatMap(group=>{
-  const split=group.title.includes('尾部')||group.title.includes('纸样')||group.title.includes('车缝')
+  const split=group.title.includes('尾部')||group.title.includes('纸样')||group.title.includes('车缝')||group.title.includes('采购')
   if(!split||!group.rows.length)return [group]
   return [...new Set(group.rows.map(r=>r.status||r.title))].map(status=>({...group,title:group.title+' · '+status,rows:group.rows.filter(r=>(r.status||r.title)===status)}))
  })
