@@ -6,6 +6,9 @@
     :min-size="600"
     :max-size="1120"
     :resizable="true"
+    :close-on-click-modal="!submitting"
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
     class="fabric-form-drawer"
     @update:model-value="emit('update:visible', $event)"
     @closed="onClose"
@@ -121,7 +124,7 @@
       />
     </div>
     <template #footer>
-      <el-button @click="emit('update:visible', false)">{{ isCreate ? '取消' : '关闭' }}</el-button>
+      <el-button :disabled="submitting" @click="emit('update:visible', false)">{{ isCreate ? '取消' : '关闭' }}</el-button>
       <el-button v-if="isCreate" type="primary" :loading="submitting" @click="emit('confirm')">确定</el-button>
     </template>
   </AppDrawer>
@@ -171,6 +174,7 @@ const isCreate = computed(() => props.mode === 'create')
 const titleText = computed(() => (isView.value ? '面料详情' : isEdit.value ? '编辑面料' : '新增面料'))
 const effectiveUnitPriceText = computed(() => {
   if (props.form.isUnpriced) return '未计价'
+  if (props.form.unitPrice == null) return '-'
   const quantity = Number(props.form.quantity)
   const unitPrice = Number(props.form.unitPrice)
   const otherCost = Number(props.form.otherCost)

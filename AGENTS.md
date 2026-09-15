@@ -30,14 +30,15 @@
 
 | 场景 | 读取 |
 |------|------|
-| 每次任务 | 本文件 |
+| 每次任务 | 本文件和 [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md)；按任务触发其中的验收项 |
 | 业务背景、模块总览 | [`docs/PROJECT_CONTEXT.md`](docs/PROJECT_CONTEXT.md) |
 | 协作边界、验证、设置页 | [`docs/AGENT_WORKFLOW.md`](docs/AGENT_WORKFLOW.md) |
 | 类型、分层、复用、build | [`docs/CODE_STANDARDS.md`](docs/CODE_STANDARDS.md) |
-| 前端 UI、组件、样式 | [`docs/FRONTEND_UI.md`](docs/FRONTEND_UI.md) |
+| 前端 UI、组件、样式（修改前必读） | [`docs/FRONTEND_UI.md`](docs/FRONTEND_UI.md) 和 [`docs/AGENT_WORKFLOW.md` 第 3 节验收要求](docs/AGENT_WORKFLOW.md#3-验证与回复) |
 | 字段配置、列设置 | [`docs/FIELD_CONFIG_DESIGN.md`](docs/FIELD_CONFIG_DESIGN.md) |
 | 订单状态、生产流程 | [`docs/ORDER_STATUS_FLOW_DESIGN.md`](docs/ORDER_STATUS_FLOW_DESIGN.md) |
 | 部署、上线 | [`docs/DEPLOY_GUIDE.md`](docs/DEPLOY_GUIDE.md) |
+| 回顾历史错误、补充防复发规则 | [`docs/AGENT_LESSONS.md`](docs/AGENT_LESSONS.md)；执行要求以对应规范为准 |
 | 用户 @ 指定文档 | 优先于本文件 |
 
 ---

@@ -24,10 +24,12 @@ export class ProductionPatternController {
     @Query('orderDateEnd') orderDateEnd?: string,
     @Query('completedStart') completedStart?: string,
     @Query('completedEnd') completedEnd?: string,
+    @Query('onlyOverdue') onlyOverdue?: string,
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: PatternListQuery = {
+      onlyOverdue: onlyOverdue === 'true',
       orderNo, skuCode, patternMaster, sampleMaker,
       orderTypeId: Number.isNaN(orderTypeId as number) ? undefined : (orderTypeId as number),
       collaborationTypeId: Number.isNaN(collaborationTypeId as number) ? undefined : (collaborationTypeId as number),
@@ -54,10 +56,12 @@ export class ProductionPatternController {
     @Query('sortField') sortField?: string,
     @Query('sortOrder') sortOrder?: string,
     @CurrentUser() user?: { userId: number; username: string },
+    @Query('onlyOverdue') onlyOverdue?: string,
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: PatternListQuery = {
+      onlyOverdue: onlyOverdue === 'true',
       tab,
       orderNo,
       skuCode,
@@ -94,10 +98,14 @@ export class ProductionPatternController {
     @Query('completedEnd') completedEnd?: string,
     @CurrentUser() user?: { userId: number; username: string },
     @Res() res?: Response,
+    @Query('onlyOverdue') onlyOverdue?: string,
+    @Query('sortField') sortField?: string,
+    @Query('sortOrder') sortOrder?: string,
   ) {
     const orderTypeId = orderTypeIdStr ? parseInt(orderTypeIdStr, 10) : undefined;
     const collaborationTypeId = collaborationTypeIdStr ? parseInt(collaborationTypeIdStr, 10) : undefined;
     const query: PatternListQuery = {
+      onlyOverdue: onlyOverdue === 'true',
       tab,
       orderNo,
       skuCode,
@@ -111,6 +119,8 @@ export class ProductionPatternController {
       orderDateEnd,
       completedStart,
       completedEnd,
+      sortField,
+      sortOrder: sortOrder === 'asc' || sortOrder === 'desc' ? sortOrder : undefined,
     };
     const rows = await this.patternService.getPatternExportRows(query, user?.userId);
     const header = [
@@ -129,6 +139,7 @@ export class ProductionPatternController {
       '到纸样时间',
       '客户交期判定',
       '判定依据',
+      '超期天数',
     ];
     const escape = (v: unknown) => {
       const str = v == null ? '' : String(v);
@@ -154,6 +165,7 @@ export class ProductionPatternController {
           r.arrivedAtPattern ?? '',
           r.timeRating,
           r.timeRatingReason,
+          r.overdueDays ?? '',
         ].map(escape).join(','),
       );
     }
@@ -178,6 +190,12 @@ export class ProductionPatternController {
       sampleMaker ?? '',
       { userId: user.userId, username: user.username },
     );
+  }
+
+  @Post('items/check-completion')
+  @RequirePermission('production_pattern_complete')
+  checkCompletion(@Body('orderIds') orderIds: number[]) {
+    return this.patternService.checkCompletion(orderIds);
   }
 
   @Post('items/complete')
@@ -206,6 +224,11 @@ export class ProductionPatternController {
     });
   }
 
+  @Get('items/:orderId/logs')
+  getPatternLogs(@Param('orderId', ParseIntPipe) orderId: number) {
+    return this.patternService.getPatternLogs(orderId);
+  }
+
   @Get('items/:orderId/materials')
   getMaterials(@Param('orderId', ParseIntPipe) orderId: number) {
     return this.patternService.getPatternMaterials(orderId);
@@ -218,12 +241,14 @@ export class ProductionPatternController {
     @CurrentUser() user: { userId: number; username: string },
     @Body('materials') materials: unknown[],
     @Body('remark') remark?: string,
+    @Body('expectedVersion') expectedVersion?: string,
   ) {
     return this.patternService.savePatternMaterials(
       orderId,
       Array.isArray(materials) ? (materials as PatternMaterialRow[]) : [],
       remark ?? null,
       { userId: user.userId, username: user.username },
+      expectedVersion,
     );
   }
 }

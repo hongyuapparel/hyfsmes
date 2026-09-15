@@ -109,6 +109,7 @@
 </template>
 
 <script setup lang="ts">
+import { displayStatus, displayStatusLabel } from '@/utils/purchase-status'
 import { ref } from 'vue'
 import type { PurchaseItemRow } from '@/api/production-purchase'
 import { formatDateTime } from '@/utils/date-format'
@@ -142,18 +143,6 @@ const {
   compactImageSize,
   compactImageColumnMinWidth,
 } = useCompactTableStyle()
-
-function displayStatus(row: PurchaseItemRow): 'pending' | 'completed' {
-  if (row.processRoute === 'picking') {
-    return row.pickStatus === 'completed' ? 'completed' : 'pending'
-  }
-  return row.purchaseStatus === 'completed' ? 'completed' : 'pending'
-}
-
-function displayStatusLabel(row: PurchaseItemRow): string {
-  if (row.processRoute === 'picking') return displayStatus(row) === 'completed' ? '领料完成' : '待领料'
-  return displayStatus(row) === 'completed' ? '采购完成' : '等待采购'
-}
 
 function normalizeCellText(value: string | null | undefined): string {
   const text = (value ?? '').trim()

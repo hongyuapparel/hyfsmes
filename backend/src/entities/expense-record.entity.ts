@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, DeleteDateColumn } from 'typeorm';
 
 export type ObjectType = 'supplier' | 'employee' | 'platform' | 'customer' | 'other';
 
@@ -55,6 +55,15 @@ export class ExpenseRecord {
 
   @Column({ name: 'attachments', type: 'json', nullable: true })
   attachments: string[] | null;
+
+  @Column({ name: 'cash_kind', length: 20, default: 'unclassified' })
+  cashKind: string;
+  @Column({ name: 'bank_reference', length: 100, default: '' })
+  bankReference: string;
+  @Column({ default: 1 })
+  version: number;
+  @DeleteDateColumn({ name: 'deleted_at', type: 'datetime', nullable: true })
+  deletedAt: Date | null;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

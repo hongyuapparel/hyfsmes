@@ -1,29 +1,18 @@
+import { FinanceLedgerService, LedgerBody } from '../finance-dashboard/finance-ledger.service';
+import { FinanceControlService, FinanceActor } from '../finance-dashboard/finance-control.service';
 import {
-  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards,
+  Body, Controller, Delete, Get, Param, ParseIntPipe, Patch, Post, Query, UseGuards, Req,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { FinanceIncomeService } from './finance-income.service';
 
-interface FinanceIncomeBody {
-  occurDate: string;
-  amount: number | string;
-  incomeTypeId?: number | string | null;
-  fundAccountId?: number | string | null;
-  departmentId?: number | string | null;
-  sourceName?: string;
-  orderNo?: string;
-  operator?: string;
-  remark?: string;
-  attachments?: string[] | null;
-}
-
 @Controller('finance/income')
 @UseGuards(JwtAuthGuard, PermissionGuard)
 @RequirePermission('/finance/income')
 export class FinanceIncomeController {
-  constructor(private readonly service: FinanceIncomeService) {}
+  constructor(private readonly service: FinanceIncomeService, private readonly ledger: FinanceLedgerService, private readonly control: FinanceControlService) {}
 
   @Get()
   getList(
@@ -34,6 +23,8 @@ export class FinanceIncomeController {
     @Query('departmentId') departmentIdStr?: string,
     @Query('sourceNameKeyword') sourceNameKeyword?: string,
     @Query('orderNo') orderNo?: string,
+    @Query('cashKind') cashKind?: string,
+    @Query('deleted') deleted?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -41,6 +32,7 @@ export class FinanceIncomeController {
     const fundAccountId = fundAccountIdStr ? parseInt(fundAccountIdStr, 10) : undefined;
     const departmentId = departmentIdStr ? parseInt(departmentIdStr, 10) : undefined;
     return this.service.getList({
+      cashKind, deleted: deleted === 'true',
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
       incomeTypeId: Number.isNaN(incomeTypeId!) ? undefined : incomeTypeId,
@@ -58,40 +50,26 @@ export class FinanceIncomeController {
     return this.service.getOne(id);
   }
 
+  @Get(':id/history')
+  history(@Param('id', ParseIntPipe) id: number) { return this.control.history('income', id); }
   @Post()
-  create(@Body() body: FinanceIncomeBody) {
-    return this.service.create({
-      occurDate: body.occurDate,
-      amount: body.amount,
-      incomeTypeId: body.incomeTypeId != null ? Number(body.incomeTypeId) : null,
-      fundAccountId: body.fundAccountId != null ? Number(body.fundAccountId) : null,
-      departmentId: body.departmentId != null ? Number(body.departmentId) : null,
-      sourceName: body.sourceName,
-      orderNo: body.orderNo,
-      operator: body.operator,
-      remark: body.remark,
-      attachments: body.attachments,
-    });
+  @RequirePermission('finance_income_create')
+  create(@Body() body: LedgerBody, @Req() req: { user: FinanceActor }) {
+    return this.ledger.save('income', null, body, req.user);
   }
-
   @Patch(':id')
-  update(@Param('id', ParseIntPipe) id: number, @Body() body: Partial<FinanceIncomeBody>) {
-    return this.service.update(id, {
-      occurDate: body.occurDate,
-      amount: body.amount,
-      incomeTypeId: body.incomeTypeId !== undefined ? (body.incomeTypeId != null ? Number(body.incomeTypeId) : null) : undefined,
-      fundAccountId: body.fundAccountId !== undefined ? (body.fundAccountId != null ? Number(body.fundAccountId) : null) : undefined,
-      departmentId: body.departmentId !== undefined ? (body.departmentId != null ? Number(body.departmentId) : null) : undefined,
-      sourceName: body.sourceName,
-      orderNo: body.orderNo,
-      operator: body.operator,
-      remark: body.remark,
-      attachments: body.attachments,
-    });
+  @RequirePermission('finance_income_edit')
+  update(@Param('id', ParseIntPipe) id: number, @Body() body: LedgerBody, @Req() req: { user: FinanceActor }) {
+    return this.ledger.save('income', id, body, req.user);
   }
-
   @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    await this.service.remove(id);
+  @RequirePermission('finance_income_delete')
+  remove(@Param('id', ParseIntPipe) id: number, @Body() body: { version?: number; reason?: string }, @Req() req: { user: FinanceActor }) {
+    return this.ledger.remove('income', id, body.version, body.reason, req.user);
+  }
+  @Post(':id/restore')
+  @RequirePermission('finance_income_delete')
+  restore(@Param('id', ParseIntPipe) id: number, @Body() body: { version?: number; reason?: string }, @Req() req: { user: FinanceActor }) {
+    return this.ledger.remove('income', id, body.version, body.reason, req.user, true);
   }
 }

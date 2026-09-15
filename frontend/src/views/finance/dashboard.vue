@@ -1,378 +1,103 @@
 <template>
-  <div v-loading="loading" class="dashboard-page">
+  <div class="dashboard-page" v-loading="loading">
+    <div class="heading"><h2>财务看板</h2><div class="actions"><el-button @click="run(controls.open)">资金核对与内部转账</el-button><el-button @click="load">刷新</el-button></div></div>
     <div class="filter-bar">
-      <div class="preset-group">
-        <el-button
-          v-for="item in rangePresetOptions"
-          :key="item.value"
-          :type="filter.preset === item.value ? 'primary' : 'default'"
-          @click="selectPreset(item.value)"
-        >
-          {{ item.label }}
-        </el-button>
-      </div>
-      <el-date-picker
-        v-model="filter.occurDateRange"
-        type="daterange"
-        :name="['financeDashboardStartDate', 'financeDashboardEndDate']"
-        range-separator=""
-        start-placeholder="统计区间"
-        end-placeholder=""
-        value-format="YYYY-MM-DD"
-        :shortcuts="rangeShortcuts"
-        unlink-panels
-        clearable
-        class="filter-range"
-        :class="{ 'range-single': !hasDateRangeValue(filter.occurDateRange) }"
-        :style="getFilterRangeStyle(filter.occurDateRange)"
-        @change="onRangeChange"
-        @clear="onRangeClear"
-      />
+      <el-button @click="preset('month')">本月</el-button><el-button @click="preset('lastMonth')">上月</el-button><el-button @click="preset('quarter')">本季度</el-button><el-button @click="preset('year')">本年</el-button>
+      <el-date-picker v-model="filter.range" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" value-format="YYYY-MM-DD" :shortcuts="rangeShortcuts" :style="getFilterRangeStyle(filter.range)" unlink-panels @change="load" />
+      <el-select v-model="filter.cashKind" placeholder="全部收支性质" clearable style="width:190px" @change="load"><el-option v-for="item in CASH_KIND_OPTIONS" :key="item.value" :label="item.label" :value="item.value" /></el-select>
     </div>
-
-    <div v-if="summaryPeriod" class="summary-bar">
-      统计区间：<b>{{ summaryPeriod.dateFrom }}</b> 至 <b>{{ summaryPeriod.dateTo }}</b>
-    </div>
-
-    <div class="stat-cards">
-      <div class="stat-card income">
-        <div class="stat-label">{{ titlePrefix }}总收入</div>
-        <div class="stat-value income-color">￥{{ fmtAmt(periodSummaryData.totalIncome) }}</div>
+    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <template v-if="data">
+      <div class="period">{{ data.period.dateFrom }} 至 {{ data.period.dateTo }} · {{ filter.cashKind ? cashKindLabel(filter.cashKind) : '全部对外收付' }} · 按实际收付日期，单位：人民币元</div>
+      <div class="period">最近登记至 {{ data.quality.latest || '暂无记录' }}<span v-if="needsReview"> · 数据待核对</span></div>
+      <div class="stat-cards">
+        <div class="stat-card"><div>今日账面资金</div><strong>{{ financeAmount(data.currentBookBalance) }}</strong><small>含已设置期初与内部转账；不代表实时银行余额</small><div class="account-review"><span>{{ data.accounts.length ? (pendingAccounts ? pendingAccounts + ' 个账户待核对' : '本期账户已核对') : '尚未配置账户' }}</span><el-button link type="primary" @click="run(controls.open)">去核对</el-button></div></div>
+        <div class="stat-card"><div>本期收款</div><router-link :to="flowLink('income')"><strong>{{ financeAmount(data.periodSummary.totalIncome) }}</strong></router-link><small>点击查看同口径收入流水</small></div>
+        <div class="stat-card"><div>本期支出净额</div><router-link :to="flowLink('expense')"><strong>{{ financeAmount(data.periodSummary.totalExpense) }}</strong></router-link><small>含退款及扣款冲减；点击查看支出流水</small></div>
+        <div class="stat-card"><div class="stat-label">本期收支结余<el-tooltip content="收款减付款，内部转账不计入；未进行库存成本结转和公共费用分摊，不能作为部门利润。" placement="top" trigger="click"><el-button link aria-label="收支结余说明"><el-icon><QuestionFilled /></el-icon></el-button></el-tooltip></div><strong>{{ financeAmount(data.periodSummary.netCashFlow) }}</strong><small>收款减付款；内部转账不计入</small></div>
       </div>
-      <div class="stat-card expense">
-        <div class="stat-label">{{ titlePrefix }}总支出</div>
-        <div class="stat-value expense-color">￥{{ fmtAmt(periodSummaryData.totalExpense) }}</div>
-      </div>
-      <div class="stat-card order-expense">
-        <div class="stat-label">{{ titlePrefix }}订单相关支出</div>
-        <div class="stat-value expense-color">￥{{ fmtAmt(periodSummaryData.orderExpense) }}</div>
-      </div>
-      <div class="stat-card company-expense">
-        <div class="stat-label">{{ titlePrefix }}公司费用</div>
-        <div class="stat-value neutral-color">￥{{ fmtAmt(periodSummaryData.companyExpense) }}</div>
-      </div>
-    </div>
-
-    <div v-if="summary?.accountBalances?.length" class="section">
-      <div class="section-title">当前各账户余额</div>
-      <div class="account-balance-row">
-        <div v-for="ab in summary.accountBalances" :key="ab.fundAccountId" class="account-card">
-          <div class="account-name">{{ ab.fundAccountName }}</div>
-          <div class="account-balance" :class="Number(ab.balance) >= 0 ? 'income-color' : 'expense-color'">
-            ￥{{ fmtAmt(ab.balance) }}
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="content-grid">
-      <div class="section half">
-        <div class="section-title">{{ titlePrefix }}收入流水</div>
-        <el-table :data="summary?.recentIncome ?? []" size="small" class="mini-table">
-          <el-table-column prop="occurDate" label="日期" width="100" />
-          <el-table-column prop="incomeTypeName" label="类型" width="110" show-overflow-tooltip />
-          <el-table-column label="部门" min-width="90" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.departmentName || '—' }}</template>
-          </el-table-column>
-          <el-table-column label="金额" width="100" align="right" class-name="col-num-right" label-class-name="col-num-right">
-            <template #default="{ row }">
-              <span class="income-color">{{ formatMoneyAligned(row.amount) }}</span>
-            </template>
-          </el-table-column>
+      <section class="section">
+        <div class="section-heading"><h3>部门投入与回收</h3><span>公共费用分摊前 · 点击金额查明细</span></div>
+        <el-table :data="data.departments" border stripe show-summary :summary-method="departmentSummary">
+          <el-table-column prop="departmentName" label="归属部门" min-width="155" show-overflow-tooltip />
+          <el-table-column prop="totalIncome" label="收款" min-width="150" align="right"><template #default="{row}"><router-link :to="flowLink('income',row.departmentId)">{{ financeAmount(row.totalIncome) }}</router-link></template></el-table-column>
+          <el-table-column prop="totalExpense" label="支出净额" min-width="150" align="right"><template #default="{row}"><router-link :to="flowLink('expense',row.departmentId)">{{ financeAmount(row.totalExpense) }}</router-link></template></el-table-column>
+          <el-table-column prop="netCashFlow" label="收支结余" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.netCashFlow) }}</template></el-table-column>
         </el-table>
-        <div class="section-more">
-          <router-link to="/finance/income" class="more-link">查看全部收入 →</router-link>
-        </div>
-      </div>
-
-      <div class="section half">
-        <div class="section-title">{{ titlePrefix }}支出流水</div>
-        <el-table :data="summary?.recentExpense ?? []" size="small" class="mini-table">
-          <el-table-column prop="occurDate" label="日期" width="100" />
-          <el-table-column prop="expenseTypeName" label="类型" width="110" show-overflow-tooltip />
-          <el-table-column prop="payeeName" label="收款方" min-width="90" show-overflow-tooltip />
-          <el-table-column label="金额" width="100" align="right" class-name="col-num-right" label-class-name="col-num-right">
-            <template #default="{ row }">
-              <span class="expense-color">{{ formatMoneyAligned(row.amount) }}</span>
-            </template>
-          </el-table-column>
+        <p class="note">工厂为业务采购、生产的对外付款只登记一次，归入受益业务；工厂自身管理费用单列。部门名称失效的历史记录保留编号，便于核实归属。</p>
+      </section>
+      <section class="section">
+        <div class="section-heading"><h3>月度收支变化</h3><span>首尾月份可能不足整月；空白月份显示 0，仅代表未登记</span></div>
+        <el-table :data="data.trend" border stripe>
+          <el-table-column prop="month" label="月份" min-width="120" />
+          <el-table-column label="收款" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.totalIncome) }}</template></el-table-column>
+          <el-table-column label="支出净额" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.totalExpense) }}</template></el-table-column>
+          <el-table-column label="收支结余" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.netCashFlow) }}</template></el-table-column>
         </el-table>
-        <div class="section-more">
-          <router-link to="/finance/expense" class="more-link">查看全部支出 →</router-link>
-        </div>
-      </div>
-
-      <div class="section half">
-        <div class="section-title">{{ titlePrefix }}支出分类 TOP5</div>
-        <div v-if="!summary?.expenseTypeTop5?.length" class="empty-tip">暂无数据</div>
-        <div v-else class="top5-list">
-          <div v-for="(item, i) in summary.expenseTypeTop5" :key="i" class="top5-row">
-            <span class="top5-rank">{{ i + 1 }}</span>
-            <span class="top5-name">{{ item.expenseTypeName }}</span>
-            <div class="top5-bar-wrap">
-              <div class="top5-bar" :style="{ width: `${barWidth(item.totalAmount, maxExpenseType)}%` }" />
-            </div>
-            <span class="top5-amount expense-color">￥{{ fmtAmt(item.totalAmount) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="section half">
-        <div class="section-title">{{ titlePrefix }}部门支出 TOP5</div>
-        <div v-if="!summary?.departmentExpenseTop5?.length" class="empty-tip">暂无数据（需在支出流水中填写部门）</div>
-        <div v-else class="top5-list">
-          <div v-for="(item, i) in summary.departmentExpenseTop5" :key="i" class="top5-row">
-            <span class="top5-rank">{{ i + 1 }}</span>
-            <span class="top5-name">{{ item.departmentName }}</span>
-            <div class="top5-bar-wrap">
-              <div class="top5-bar" :style="{ width: `${barWidth(item.totalAmount, maxDeptExpense)}%` }" />
-            </div>
-            <span class="top5-amount expense-color">￥{{ fmtAmt(item.totalAmount) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="section full">
-        <div class="section-title">{{ titlePrefix }}部门利润率</div>
-        <div class="section-desc">按部门收入与支出统计，利润率 = (收入 - 支出) / 收入</div>
-        <div v-if="!summary?.departmentProfitability?.length" class="empty-tip">
-          暂无数据（需在收入流水、支出流水中填写部门）
-        </div>
-        <el-table v-else :data="summary?.departmentProfitability ?? []" size="small" class="mini-table">
-          <el-table-column label="部门" min-width="120" show-overflow-tooltip>
-            <template #default="{ row }">{{ row?.departmentName || '—' }}</template>
-          </el-table-column>
-          <el-table-column label="收入" min-width="120" class-name="col-num-right" label-class-name="col-num-right">
-            <template #default="{ row }">
-              <span class="income-color">{{ formatMoneyAligned(row?.totalIncome ?? 0) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="支出" min-width="120" class-name="col-num-right" label-class-name="col-num-right">
-            <template #default="{ row }">
-              <span class="expense-color">{{ formatMoneyAligned(row?.totalExpense ?? 0) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="利润" min-width="120" class-name="col-num-right" label-class-name="col-num-right">
-            <template #default="{ row }">
-              <span :class="profitClass(row?.profit ?? 0)">{{ formatMoneyAligned(row?.profit ?? 0) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column label="利润率" min-width="110" align="right">
-            <template #default="{ row }">{{ profitRateLabel(row?.profitRate) }}</template>
-          </el-table-column>
-        </el-table>
-      </div>
-    </div>
+        <el-collapse><el-collapse-item title="查看前一等长期间对照（非同比、非利润增长率）" name="comparison">
+          <p class="note">对照期间：{{ data.previous.period.dateFrom }} 至 {{ data.previous.period.dateTo }}。两个期间均需完整对账后才有比较意义。</p>
+          <el-table :data="comparisonRows" border><el-table-column prop="name" label="指标" min-width="100" /><el-table-column label="本期" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.current) }}</template></el-table-column><el-table-column label="前期" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.previous) }}</template></el-table-column><el-table-column label="增减额" min-width="150" align="right"><template #default="{row}">{{ financeAmount(row.delta) }}</template></el-table-column></el-table>
+        </el-collapse-item></el-collapse>
+      </section>
+      <section class="section">
+        <div class="section-heading"><h3>收支性质核对</h3><span>此表始终展示所选期间全部性质，避免漏看待分类金额</span></div>
+        <el-table :data="data.nature" border stripe><el-table-column label="性质" min-width="170"><template #default="{row}">{{ cashKindLabel(row.cashKind) }}</template></el-table-column><el-table-column label="收款" min-width="150" align="right"><template #default="{row}"><router-link :to="flowLink('income',undefined,row.cashKind)">{{ financeAmount(row.totalIncome) }}</router-link></template></el-table-column><el-table-column label="付款" min-width="150" align="right"><template #default="{row}"><router-link :to="flowLink('expense',undefined,row.cashKind)">{{ financeAmount(row.totalExpense) }}</router-link></template></el-table-column></el-table>
+      </section>
+      <el-collapse class="section"><el-collapse-item title="尚未纳入的经营信息与使用边界" name="pending">
+        <p>公共费用分摊：比例尚未确认，不自动分摊。能直接归属的费用先归属业务，剩余公共费用再分摊，不能重复增加公司支出。</p>
+        <p>库存占用、待收及待付款：尚未接入可核对数据。采购已经计入付款，不能再将库存金额扣一次。季度集中备货可能使收支结余下降，不能据此认定亏损或停掉业务。</p>
+        <p>历史内部转账：系统不会按往来方名称自动猜测。若以前分别记过收款和付款，需核实并删除原两笔，再用内部转账登记一次。</p>
+      </el-collapse-item></el-collapse>
+    </template>
+    <FinanceControls ref="controlPanel" :visible="controls.visible.value" :busy="controls.loading.value" :accounts="controls.accounts.value" :transfers="controls.transfers.value" :transfer-query="controls.transferQuery" :transfer-total="controls.transferTotal.value" :transfer-loading="controls.transferLoading.value" @query="patch=>run(()=>controls.loadTransfers(patch))" :can-manage="auth.hasPermission('finance_accounts_manage')" :can-transfer="auth.hasPermission('finance_transfer_create')" :can-void="auth.hasPermission('finance_transfer_void')" @close="controls.visible.value=$event" @history="(kind,id)=>run(()=>controls.history(kind,id))" @save="saveControl" />
+    <AppDialog top="2vh" v-model="controls.audit.visible" title="财务操作记录" width="760"><FinanceAuditTable :logs="controls.audit.logs" /></AppDialog>
   </div>
 </template>
-
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onActivated, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getDashboardSummary, type DashboardSummary } from '@/api/finance'
+import { QuestionFilled } from '@element-plus/icons-vue'
+import { CASH_KIND_OPTIONS, cashKindLabel } from '@/api/finance-control'
 import { getErrorMessage } from '@/api/request'
-import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
+import { useFinanceDashboard, financeAmount } from '@/composables/useFinanceDashboard'
+import { useFinanceControls } from '@/composables/useFinanceControls'
+import { useAuthStore } from '@/stores/auth'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
-import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
-
-const summary = ref<DashboardSummary | null>(null)
-const loading = ref(false)
-
-type DashboardRangePreset = 'currentMonth' | 'lastMonth' | 'currentQuarter' | 'currentYear' | 'custom'
-type DateRangeValue = [string, string] | null
-
-const rangePresetOptions: Array<{ value: Exclude<DashboardRangePreset, 'custom'>; label: string }> = [
-  { value: 'currentMonth', label: '本月' },
-  { value: 'lastMonth', label: '上月' },
-  { value: 'currentQuarter', label: '本季度' },
-  { value: 'currentYear', label: '本年' },
-]
-
-const presetLabelMap: Record<DashboardRangePreset, string> = {
-  currentMonth: '本月',
-  lastMonth: '上月',
-  currentQuarter: '本季度',
-  currentYear: '本年',
-  custom: '所选区间',
-}
-
-const emptyPeriodSummary = {
-  totalIncome: '0.00',
-  totalExpense: '0.00',
-  orderExpense: '0.00',
-  companyExpense: '0.00',
-  orderProfit: '0.00',
-}
-
-const filter = reactive({
-  preset: 'currentMonth' as DashboardRangePreset,
-  occurDateRange: getPresetRange('currentMonth') as DateRangeValue,
-})
-
-function fmtAmt(v: string | number | undefined | null) {
-  if (v == null) return formatDisplayNumber(0)
-  const n = Number(v)
-  return Number.isNaN(n) ? formatDisplayNumber(0) : formatDisplayNumber(n)
-}
-
-function profitClass(v: string | number | undefined | null) {
-  const value = Number(v ?? 0)
-  if (value > 0) return 'income-color'
-  if (value < 0) return 'expense-color'
-  return 'neutral-color'
-}
-
-function profitRateLabel(v: string | undefined) {
-  return v ? `${v}%` : '—'
-}
-
-const titlePrefix = computed(() => presetLabelMap[filter.preset] ?? '所选区间')
-const periodSummaryData = computed(() => summary.value?.periodSummary ?? summary.value?.currentMonth ?? emptyPeriodSummary)
-const summaryPeriod = computed(() => {
-  if (summary.value?.period) return summary.value.period
-  if (hasDateRangeValue(filter.occurDateRange)) {
-    return { dateFrom: filter.occurDateRange[0], dateTo: filter.occurDateRange[1] }
-  }
-  return null
-})
-
-const maxExpenseType = computed(() => {
-  const list = summary.value?.expenseTypeTop5 ?? []
-  return list.length ? Math.max(...list.map((item) => Number(item.totalAmount))) : 0
-})
-
-const maxDeptExpense = computed(() => {
-  const list = summary.value?.departmentExpenseTop5 ?? []
-  return list.length ? Math.max(...list.map((item) => Number(item.totalAmount))) : 0
-})
-
-function barWidth(amount: string, max: number) {
-  if (!max) return 0
-  return Math.round((Number(amount) / max) * 100)
-}
-
-function formatDateValue(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-}
-
-function getPresetRange(preset: Exclude<DashboardRangePreset, 'custom'>): [string, string] {
-  const now = new Date()
-  let start: Date
-  let end: Date
-  if (preset === 'lastMonth') {
-    start = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-    end = new Date(now.getFullYear(), now.getMonth(), 0)
-  } else if (preset === 'currentQuarter') {
-    const quarterStartMonth = Math.floor(now.getMonth() / 3) * 3
-    start = new Date(now.getFullYear(), quarterStartMonth, 1)
-    end = new Date(now.getFullYear(), quarterStartMonth + 3, 0)
-  } else if (preset === 'currentYear') {
-    start = new Date(now.getFullYear(), 0, 1)
-    end = new Date(now.getFullYear(), 12, 0)
-  } else {
-    start = new Date(now.getFullYear(), now.getMonth(), 1)
-    end = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-  }
-  return [formatDateValue(start), formatDateValue(end)]
-}
-
-function hasDateRangeValue(v: DateRangeValue | undefined) {
-  return Array.isArray(v) && v.length === 2
-}
-
-function resolvePreset(range: [string, string]): DashboardRangePreset {
-  const matched = rangePresetOptions.find((item) => {
-    const [start, end] = getPresetRange(item.value)
-    return start === range[0] && end === range[1]
+import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
+import FinanceControls from './components/FinanceControls.vue'
+import FinanceAuditTable from './components/FinanceAuditTable.vue'
+const { data, loading, error, filter, load, preset, pendingAccounts, needsReview, flowLink } = useFinanceDashboard()
+const controls = useFinanceControls(); const auth=useAuthStore(); const controlPanel=ref<InstanceType<typeof FinanceControls>>()
+const comparisonRows=computed(()=>data.value ? ([['totalIncome','收款'],['totalExpense','付款'],['netCashFlow','结余']] as const).map(([key,name])=>({name,current:data.value!.periodSummary[key],previous:data.value!.previous[key],delta:(Math.round(Number(data.value!.periodSummary[key])*100)-Math.round(Number(data.value!.previous[key])*100))/100})) : [])
+function departmentSummary(){return ['合计',financeAmount(data.value?.periodSummary.totalIncome),financeAmount(data.value?.periodSummary.totalExpense),financeAmount(data.value?.periodSummary.netCashFlow)]}
+async function run(action:()=>Promise<unknown>){try{await action()}catch(e){ElMessage.error(getErrorMessage(e))}}
+async function saveControl(id:number,mode:string,body:{date:string;amount:number;reason:string;fromId:number|null;toId:number|null;reference:string}){
+  await run(async()=>{
+    if(mode==='transfer')await controls.transfer({...body,remark:body.reason})
+    else if(mode==='void')await controls.cancelTransfer(id,body.reason)
+    else await controls.saveAccount(id,mode,body)
+    controlPanel.value?.closeEditor();ElMessage.success('已保存并更新');await load()
   })
-  return matched?.value ?? 'custom'
 }
-
-function selectPreset(preset: Exclude<DashboardRangePreset, 'custom'>) {
-  filter.preset = preset
-  filter.occurDateRange = getPresetRange(preset)
-  load()
-}
-
-function onRangeChange(value: DateRangeValue) {
-  if (!hasDateRangeValue(value)) return
-  filter.occurDateRange = value
-  filter.preset = resolvePreset(value)
-  load()
-}
-
-function onRangeClear() {
-  selectPreset('currentMonth')
-}
-
-async function load() {
-  loading.value = true
-  try {
-    const [dateFrom, dateTo] = hasDateRangeValue(filter.occurDateRange)
-      ? filter.occurDateRange
-      : getPresetRange('currentMonth')
-    const res = await getDashboardSummary({ dateFrom, dateTo })
-    summary.value = res.data ?? null
-  } catch (e: unknown) {
-    ElMessage.error(getErrorMessage(e))
-  } finally {
-    loading.value = false
-  }
-}
-
-onMounted(load)
+let mounted=false
+onMounted(async()=>{await auth.fetchUser();await load();mounted=true})
+onActivated(()=>{if(mounted)load()})
 </script>
-
 <style scoped>
-.dashboard-page { padding: var(--space-md); }
-.filter-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); margin-bottom: var(--space-sm); padding: var(--space-sm); background: var(--color-bg-subtle, #f5f6f8); border-radius: var(--radius-lg); }
-.preset-group { display: flex; flex-wrap: wrap; gap: var(--space-xs, 8px); }
-.filter-range { min-width: 170px; margin-left: auto; }
-.summary-bar { padding: 6px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 6px; font-size: var(--font-size-body); color: #475569; margin-bottom: var(--space-md); }
-.range-single.el-date-editor--daterange :deep(.el-range-separator) { display: none; }
-.range-single.el-date-editor--daterange :deep(.el-range-input:last-child) { display: none; }
-.range-single.el-date-editor--daterange :deep(.el-range-input:first-child) { width: 100%; }
-.range-single.el-date-editor--daterange :deep(.el-range__close-icon) { margin-left: 0; }
-
-.stat-cards { display: flex; flex-wrap: wrap; gap: var(--space-md); margin-bottom: var(--space-lg); }
-.stat-card { flex: 1 1 180px; background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-md) var(--space-lg); min-width: 160px; }
-.stat-label { font-size: var(--font-size-body); color: var(--color-text-muted); margin-bottom: 6px; }
-.stat-value { font-size: var(--font-size-title); font-weight: 700; }
-
-.account-balance-row { display: flex; flex-wrap: wrap; gap: var(--space-sm); }
-.account-card { background: var(--color-bg-subtle, #f5f6f8); border: 1px solid var(--color-border); border-radius: var(--radius-lg); padding: 10px 16px; min-width: 130px; }
-.account-name { font-size: var(--font-size-caption); color: var(--color-text-muted); }
-.account-balance { font-size: var(--font-size-subtitle); font-weight: 600; margin-top: 2px; }
-
-.content-grid { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-md); }
-.section { background: var(--color-card); border: 1px solid var(--color-border); border-radius: var(--radius-xl); padding: var(--space-md); }
-.full { grid-column: 1 / -1; }
-.section-title { font-size: var(--font-size-body); font-weight: 600; color: var(--color-text-primary); margin-bottom: var(--space-sm); }
-.section-desc { font-size: var(--font-size-caption); color: var(--color-text-muted); margin-bottom: var(--space-sm); }
-.section-more { margin-top: var(--space-sm); text-align: right; }
-.more-link { font-size: var(--font-size-caption); color: var(--color-primary); text-decoration: none; }
-.more-link:hover { text-decoration: underline; }
-.mini-table { font-size: var(--font-size-body); }
-
-.empty-tip { font-size: var(--font-size-body); color: var(--color-text-muted); padding: var(--space-md) 0; text-align: center; }
-.top5-list { display: flex; flex-direction: column; gap: 10px; }
-.top5-row { display: flex; align-items: center; gap: 8px; font-size: var(--font-size-body); }
-.top5-rank { width: 20px; height: 20px; border-radius: 50%; background: #e2e8f0; color: #64748b; display: flex; align-items: center; justify-content: center; font-size: var(--font-size-caption); font-weight: 600; flex-shrink: 0; }
-.top5-name { width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex-shrink: 0; }
-.top5-bar-wrap { flex: 1; height: 8px; background: #f1f5f9; border-radius: 4px; overflow: hidden; }
-.top5-bar { height: 100%; background: #f97316; border-radius: 4px; transition: width 0.3s; }
-.top5-amount { width: 90px; text-align: right; flex-shrink: 0; font-weight: 600; }
-
-.income-color { color: #16a34a; }
-.expense-color { color: #dc2626; }
-.neutral-color { color: var(--color-text-primary); }
-
-@media (max-width: 900px) {
-  .content-grid { grid-template-columns: 1fr; }
-  .filter-range { margin-left: 0; width: 100%; }
-  .full { grid-column: auto; }
-  /* 防止区块内 el-table 的列最小宽把 grid 轨道撑破（grid blowout），
-     min-width:0 让区块可收窄、表格在区块内横向滚动。 */
-  .section { min-width: 0; }
-}
+.dashboard-page{padding:var(--space-md);min-width:0}
+.stat-label,.account-review{display:flex;align-items:center;gap:var(--space-sm)}
+.account-review{font-size:var(--font-size-caption);flex-wrap:wrap;color:var(--color-text-muted)}
+.heading,.actions,.section-heading{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--space-sm)}
+.heading{margin-bottom:var(--space-md)}
+h2,h3{margin:0;font-size:var(--font-size-body)}
+.period,.note,.section-heading span{font-size:var(--font-size-caption);color:var(--color-text-muted);line-height:1.7}
+.period{margin:var(--space-sm) 0}
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:var(--space-md);margin:var(--space-md) 0}
+.stat-card,.section{border:1px solid var(--color-border);border-radius:var(--radius-lg);padding:var(--space-md);background:var(--color-card);min-width:0}
+.stat-card{display:flex;flex-direction:column;gap:var(--space-sm);font-size:var(--font-size-body)}
+.stat-card strong{font-size:var(--font-size-title);font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--el-text-color-primary)}
+.stat-card small{font-size:var(--font-size-caption);color:var(--color-text-muted);line-height:1.6}
+.section{margin-bottom:var(--space-md)}.section-heading{margin-bottom:var(--space-sm)}
+a{color:var(--color-primary);text-decoration:none}.note{margin-bottom:0}
+@media(max-width:600px){.dashboard-page{padding:var(--space-sm)}.stat-cards{grid-template-columns:minmax(0,1fr)}}
 </style>

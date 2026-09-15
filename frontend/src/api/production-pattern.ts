@@ -1,3 +1,4 @@
+import type { OperationLogItem } from './operation-logs'
 import request from './request'
 import type { AxiosRequestConfig } from 'axios'
 
@@ -27,9 +28,12 @@ export interface PatternListItem {
   /** 按客户交期判断 */
   timeRating: string
   timeRatingReason: string
+  overdueDays: number | null
+  canAssign: boolean
 }
 
 export interface PatternListRes {
+  tabCounts: Record<string, number>
   list: PatternListItem[]
   total: number
   totalQuantity: number
@@ -38,6 +42,7 @@ export interface PatternListRes {
 }
 
 export interface PatternListQuery {
+  onlyOverdue?: boolean
   tab?: string
   orderNo?: string
   skuCode?: string
@@ -94,6 +99,10 @@ export function editCompletedPattern(payload: { orderId: number; sampleImageUrl:
   })
 }
 
+export function checkPatternCompletion(orderIds: number[]) {
+  return request.post<{ issues: Array<{ orderId: number; message: string }> }>('/production/pattern/items/check-completion', { orderIds })
+}
+
 export function completePattern(payload: { orderId: number; sampleImageUrl: string }) {
   return request.post<void>('/production/pattern/items/complete', payload)
 }
@@ -107,7 +116,12 @@ export interface PatternMaterialRow {
   remark?: string
 }
 
+export function getPatternLogs(orderId: number) {
+  return request.get<OperationLogItem[]>(`/production/pattern/items/${orderId}/logs`)
+}
+
 export interface PatternMaterialsRes {
+  version: string
   materials: PatternMaterialRow[]
   remark: string | null
 }
@@ -116,6 +130,6 @@ export function getPatternMaterials(orderId: number) {
   return request.get<PatternMaterialsRes>(`/production/pattern/items/${orderId}/materials`)
 }
 
-export function savePatternMaterials(orderId: number, payload: { materials: PatternMaterialRow[]; remark?: string | null }) {
-  return request.post<void>(`/production/pattern/items/${orderId}/materials`, payload)
+export function savePatternMaterials(orderId: number, payload: { materials: PatternMaterialRow[]; remark?: string | null; expectedVersion?: string }) {
+  return request.post<{ version: string }>(`/production/pattern/items/${orderId}/materials`, payload)
 }

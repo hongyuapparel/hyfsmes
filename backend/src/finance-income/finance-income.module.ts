@@ -1,3 +1,4 @@
+import { FinanceControlModule } from '../finance-dashboard/finance-control.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IncomeRecord } from '../entities/income-record.entity';
@@ -12,6 +13,7 @@ import { FinanceIncomeService } from './finance-income.service';
 
 @Module({
   imports: [
+    FinanceControlModule,
     TypeOrmModule.forFeature([IncomeRecord, FinanceIncomeType, FinanceFundAccount, User, RolePermission]),
     AuthModule,
     SystemOptionsModule,

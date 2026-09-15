@@ -27,6 +27,7 @@ export interface FinishingListItem {
 }
 
 export interface FinishingListRes {
+  tabCounts: Record<string, number>
   list: FinishingListItem[]
   total: number
   totalQuantity: number

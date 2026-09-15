@@ -211,6 +211,10 @@ export class FabricStockService {
     if (warehouseId != null) await this.assertWarehouseId(warehouseId);
     const existing = await this.findByName(name);
     if (existing) {
+      const incomingUnit = dto.unit === undefined ? String(existing.unit ?? '').trim() : dto.unit.trim();
+      if (incomingUnit !== String(existing.unit ?? '').trim()) {
+        throw new BadRequestException(`同名面料单位不一致（库存：${existing.unit || '未记录'}，本次：${incomingUnit || '未填写'}），不能合并入库，请核对单位`);
+      }
       const before = this.toSnapshot(existing);
       const currentQuantity = Number(existing.quantity) || 0;
       existing.quantity = String(currentQuantity + qty);

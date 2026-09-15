@@ -4,12 +4,15 @@
     title="面料出库"
     width="500"
     destroy-on-close
+    :close-on-press-escape="!submitting"
+    :show-close="!submitting"
     @closed="onClosed"
   >
     <el-form
       ref="formRef"
       :model="outboundForm"
       :rules="outboundRules"
+      :disabled="submitting"
       label-width="90px"
     >
       <el-alert
@@ -59,7 +62,7 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
+      <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
       <el-button
         type="primary"
         :loading="submitting"
@@ -111,7 +114,7 @@ const formRef = ref<FormInstance>()
 
 const dialogVisible = computed({
   get: () => props.visible,
-  set: (v: boolean) => emit('update:visible', v),
+  set: (v: boolean) => { if (!props.submitting) emit('update:visible', v) },
 })
 
 function onClosed() {

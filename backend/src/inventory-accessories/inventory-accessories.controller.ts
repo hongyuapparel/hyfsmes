@@ -104,6 +104,23 @@ export class InventoryAccessoriesController {
     return this.service.create({ name, category, quantity, isSized, sizeHeaders, sizeQuantities, unit, warehouseId, location, remark, imageUrl, imageUrls, customerName, salesperson, operatorUsername: user?.username ?? '' });
   }
 
+  /** 仅给明确选中的记录增量入库，不按名称查找或创建其他记录。 */
+  @Post('items/:id/inbounds')
+  restock(
+    @Param('id') id: string,
+    @Body('quantity') quantity: number | undefined,
+    @Body('isSized') isSized: boolean | undefined,
+    @Body('sizeHeaders') sizeHeaders: string[] | undefined,
+    @Body('sizeQuantities') sizeQuantities: number[] | undefined,
+    @Body('unit') unit: string | undefined,
+    @Body('remark') remark: string | undefined,
+    @CurrentUser() user: { username?: string },
+  ) {
+    return this.service.restock(Number(id), {
+      quantity, isSized, sizeHeaders, sizeQuantities, unit, remark, operatorUsername: user?.username ?? '',
+    });
+  }
+
   @Put('items/:id')
   update(
     @Param('id') id: string,
@@ -161,6 +178,8 @@ export class InventoryAccessoriesController {
     @Query('accessoryId') accessoryId?: string,
     @Query('orderNo') orderNo?: string,
     @Query('outboundType') outboundType?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
     @Query('page') page?: string,
     @Query('pageSize') pageSize?: string,
   ) {
@@ -168,6 +187,8 @@ export class InventoryAccessoriesController {
       accessoryId: accessoryId ? Number(accessoryId) : undefined,
       orderNo,
       outboundType,
+      startDate,
+      endDate,
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
@@ -193,6 +214,7 @@ export class InventoryAccessoriesController {
         quantity: Number(quantity),
         sizeOutbound,
         outboundType: 'manual',
+        enforceAvailableStock: true,
         operatorUsername,
         remark,
         orderId: null,

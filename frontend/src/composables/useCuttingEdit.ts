@@ -10,11 +10,10 @@ import { useCuttingFormState } from '@/composables/useCuttingFormState'
 
 interface UseCuttingEditParams {
   reloadList: () => Promise<void>
-  reloadTabCounts: () => Promise<void>
 }
 
 export function useCuttingEdit(params: UseCuttingEditParams) {
-  const { reloadList, reloadTabCounts } = params
+  const { reloadList } = params
 
   const fs = useCuttingFormState()
 
@@ -79,7 +78,6 @@ export function useCuttingEdit(params: UseCuttingEditParams) {
       ElMessage.success('裁床数据已更新')
       editDialog.visible = false
       await reloadList()
-      await reloadTabCounts()
     } catch (e: unknown) {
       if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '操作失败'))
     } finally {

@@ -202,11 +202,7 @@ export class SuppliersService {
     if (changed.length) {
       await this.orderExtRepo.save(changed);
     }
-    // 财务支出：对象类型为 supplier 时，收款方名称同步改名
-    await this.dataSource.query(
-      "UPDATE finance_expense_records SET payee_name = ? WHERE object_type = 'supplier' AND payee_name = ?",
-      [newName, oldName],
-    );
+    // 财务流水保留付款当时的收款方名称；更正须走财务版本校验和操作留痕。
   }
 
   /** 最近合作记录：按订单引用该供应商名称的记录倒序返回 */

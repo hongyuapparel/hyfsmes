@@ -1,5 +1,5 @@
 ﻿<template>
-  <AppDialog v-model="dialogVisible" title="辅料出库" width="480" destroy-on-close @close="onClose">
+  <AppDialog v-model="dialogVisible" title="辅料出库" width="480" destroy-on-close :close-on-press-escape="!submitting" :show-close="!submitting" @close="onClose">
     <el-form ref="formRef" :model="form" :rules="outboundRules" label-width="90px">
       <el-form-item label="辅料" prop="accessoryName">
         <el-input v-model="form.accessoryName" disabled />
@@ -17,8 +17,8 @@
       <el-form-item v-if="!form.isSized" label="出库数量" prop="quantity">
         <el-input-number
           v-model="form.quantity"
-          :min="1"
-          :max="form.maxQuantity"
+          :min="0"
+          :max="Math.max(0, form.maxQuantity)"
           :precision="0"
           controls-position="right"
           style="width: 100%"
@@ -32,13 +32,14 @@
           headers-readonly
         />
         <div class="outbound-qty-tip">按尺码填本次出库数量，合计 {{ outboundTotal }}（当前库存 {{ form.maxQuantity }}）</div>
+        <div class="outbound-qty-tip">各码可用：{{ form.sizeHeaders.map((h, i) => `${h} ${form.availableSizeQuantities[i]}`).join(' / ') }}。不可跨尺码抵扣，提交时会再次核对库存。</div>
       </el-form-item>
       <el-form-item label="备注" prop="remark">
         <el-input v-model="form.remark" type="textarea" :rows="2" placeholder="备注（可选）" clearable />
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="dialogVisible = false">取消</el-button>
+      <el-button :disabled="submitting" @click="dialogVisible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" @click="emit('confirm')">确定出库</el-button>
     </template>
   </AppDialog>
@@ -60,6 +61,7 @@ interface AccessoriesOutboundFormModel {
   isSized: boolean
   sizeHeaders: string[]
   sizeQuantities: number[]
+  availableSizeQuantities: number[]
   remark: string
 }
 

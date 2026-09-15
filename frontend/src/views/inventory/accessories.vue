@@ -90,8 +90,9 @@
           <div class="filter-bar-actions">
             <el-button type="primary" @click="onSearch(true)">搜索</el-button>
             <el-button @click="onReset">清空</el-button>
-            <el-button :loading="exporting" @click="onExport">{{ exportButtonText }}</el-button>
+            <el-button :loading="exporting" :disabled="loading" @click="onExport">{{ exportButtonText }}</el-button>
             <el-button type="primary" @click="openForm(null)">新增辅料</el-button>
+            <el-button v-if="selectedRows.length" :disabled="selectedRows.length !== 1" @click="openForm(selectedRows[0], 'create')">补货入库</el-button>
             <el-button
               v-if="selectedRows.length"
               type="warning"
@@ -167,7 +168,7 @@
       </el-tab-pane>
 
       <el-tab-pane label="出库记录" name="outbounds" lazy>
-        <AccessoriesOutboundTab />
+        <AccessoriesOutboundTab :active="pageTab === 'outbounds'" />
       </el-tab-pane>
     </el-tabs>
 
@@ -206,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, computed } from 'vue'
+import { onMounted, onScopeDispose, reactive, ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   exportAccessoriesStock,
@@ -296,7 +297,7 @@ const {
   loadCategoryOptions, loadWarehouseOptions, formatWarehouseLabel, getMainImageUrl,
 } = useAccessoryInventoryOptions()
 const { formDialog, quickAddSource, form, formRules, logs, openForm, enterEdit, exitEdit, resetForm, submitForm, formatLogAction } =
-  useAccessoriesFormDialog(selectedRows, load, accessoriesFormDialogRef)
+  useAccessoriesFormDialog(load, accessoriesFormDialogRef)
 const { outboundDialog, outboundUserOptions, outboundForm, outboundRules, openOutboundDialog, resetOutboundDialog, submitOutbound } =
   useAccessoriesOutboundDialog(selectedRows, load, accessoriesOutboundDialogRef)
 
@@ -319,7 +320,13 @@ function stockSizeDetail(row: AccessoryItem): { headers: string[]; quantities: n
   return null
 }
 
+let requestVersion = 0
+onScopeDispose(() => { requestVersion++; if (searchTimer) clearTimeout(searchTimer) })
 async function load() {
+  const version = ++requestVersion
+  if (searchTimer) { clearTimeout(searchTimer); searchTimer = null }
+  selectedRows.value = []
+  accessoriesStockTableRef.value?.clearSelection()
   loading.value = true
   try {
     const [startDate, endDate] =
@@ -335,6 +342,7 @@ async function load() {
       pageSize: pagination.pageSize,
     })
     const data = res.data
+    if (version !== requestVersion) return
     if (data) {
       list.value = data.list ?? []
       pagination.total = data.total ?? 0
@@ -342,9 +350,9 @@ async function load() {
       restoreAccessoriesStockColumnWidths(accessoriesStockTableRef.value)
     }
   } catch (e: unknown) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
+    if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
-    loading.value = false
+    if (version === requestVersion) loading.value = false
   }
 }
 

@@ -1,7 +1,7 @@
 import { formatDisplayNumber } from '@/utils/display-number'
 import { getSizeHeaderKey, normalizeSizeHeader, sortSizeHeaders } from '@/utils/sizeHeaders'
 
-type SnapshotRow = { colorName: string; values: number[] }
+export { normalizeStoredBreakdownSnapshot as normalizeStoredSnapshot } from '@/utils/finishedStockTableUtils'
 type AdjustSnapshotRow = { colorName: string; values: number[] }
 
 export type AdjustLogSummaryInput = {
@@ -59,98 +59,6 @@ export function snapshotRowTotal(values: unknown[]): number {
 
 export function sumRowQty(quantities: unknown[]): number {
   return snapshotRowTotal(Array.isArray(quantities) ? quantities : [])
-}
-
-export function allocateByWeight(weights: number[], total: number): number[] {
-  const safeTotal = Math.max(0, Math.trunc(Number(total) || 0))
-  if (!weights.length) return []
-  const safeWeightSum = weights.reduce((sum, weight) => sum + Math.max(0, Number(weight) || 0), 0)
-  if (safeTotal <= 0) return weights.map(() => 0)
-  if (safeWeightSum <= 0) {
-    const allocated = weights.map(() => 0)
-    allocated[0] = safeTotal
-    return allocated
-  }
-
-  const exactAllocation = weights.map(
-    (weight) => (Math.max(0, Number(weight) || 0) * safeTotal) / safeWeightSum,
-  )
-  const floorAllocation = exactAllocation.map((value) => Math.floor(value))
-  let remaining = safeTotal - floorAllocation.reduce((sum, value) => sum + value, 0)
-  const fractionOrder = exactAllocation
-    .map((value, index) => ({ index, fraction: value - Math.floor(value) }))
-    .sort((a, b) => b.fraction - a.fraction)
-
-  let orderIndex = 0
-  while (remaining > 0 && fractionOrder.length > 0) {
-    floorAllocation[fractionOrder[orderIndex % fractionOrder.length].index] += 1
-    remaining -= 1
-    orderIndex += 1
-  }
-  return floorAllocation
-}
-
-export function normalizeStoredSnapshot(
-  snapshot: unknown,
-): { headers: string[]; rows: SnapshotRow[] } | null {
-  if (!snapshot || typeof snapshot !== 'object') return null
-  const source = snapshot as { headers?: unknown[]; rows?: Array<{ colorName?: unknown; values?: unknown[] }> }
-  if (!Array.isArray(source.headers) || !Array.isArray(source.rows)) return null
-  if (!source.headers.length || !source.rows.length) return null
-
-  const normalizedHeaders = normalizeBreakdownHeaders(source.headers.map((header) => String(header ?? '')))
-  const visibleIndexes = normalizedHeaders
-    .map((header, index) => ({ header: String(header ?? '').trim(), index }))
-    .filter((item) => item.header && item.header !== '__UNASSIGNED__')
-  const sourceHeaders = visibleIndexes.map((item) => item.header)
-  const headers = sortSizeHeaders(sourceHeaders)
-
-  const rowOrder: string[] = []
-  const rowMap = new Map<string, number[]>()
-  const blankRows: number[][] = []
-
-  const addRow = (colorName: string, values: number[]) => {
-    let existing = rowMap.get(colorName)
-    if (!existing) {
-      existing = Array(headers.length).fill(0)
-      rowMap.set(colorName, existing)
-      rowOrder.push(colorName)
-    }
-    values.forEach((value, index) => {
-      existing![index] += value
-    })
-  }
-
-  source.rows.forEach((row) => {
-    const sourceValues = Array.isArray(row.values) ? row.values : []
-    const values = remapValuesByHeaders(sourceHeaders, sourceValues, headers)
-    if (String(row.colorName ?? '').trim() === '__UNASSIGNED__') {
-      blankRows.push(values)
-      return
-    }
-    const colorName = normalizeColorName(row.colorName)
-    if (!colorName) {
-      blankRows.push(values)
-    } else {
-      addRow(colorName, values)
-    }
-  })
-
-  blankRows.forEach((values) => {
-    if (snapshotRowTotal(values) <= 0) return
-    const matchedNames = rowOrder.filter((colorName) => {
-      const existing = rowMap.get(colorName) ?? []
-      return existing.length === values.length && existing.every((value, index) => value === values[index])
-    })
-    if (matchedNames.length === 1) addRow(matchedNames[0], values)
-    else if (rowOrder.length === 1) addRow(rowOrder[0], values)
-    else addRow('', values)
-  })
-
-  const rows = rowOrder
-    .map((colorName) => ({ colorName, values: [...(rowMap.get(colorName) ?? [])] }))
-    .filter((row) => snapshotRowTotal(row.values) > 0)
-  return headers.length && rows.length ? { headers, rows } : null
 }
 
 export function formatPrice(unitPrice: string | undefined): string {

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FinanceFundAccount } from '../entities/finance-fund-account.entity';
@@ -38,6 +38,12 @@ export class FinanceSettingsService {
   async removeFundAccount(id: number) {
     const e = await this.fundAccountRepo.findOne({ where: { id } });
     if (!e) throw new NotFoundException('资金账户不存在');
+    const [refs]: { total: string }[] = await this.fundAccountRepo.query(`SELECT
+      (SELECT COUNT(*) FROM finance_income_records WHERE fund_account_id=?) +
+      (SELECT COUNT(*) FROM finance_expense_records WHERE fund_account_id=?) +
+      (SELECT COUNT(*) FROM finance_transfers WHERE from_account_id=? OR to_account_id=?) +
+      (SELECT COUNT(*) FROM finance_fund_accounts WHERE id=? AND opening_date IS NOT NULL) total`,[id,id,id,id,id]);
+    if (Number(refs.total)) throw new ConflictException('账户已有流水或期初，请停用而不是删除，以保留历史账务');
     await this.fundAccountRepo.remove(e);
   }
 
@@ -61,6 +67,8 @@ export class FinanceSettingsService {
   async removeIncomeType(id: number) {
     const e = await this.incomeTypeRepo.findOne({ where: { id } });
     if (!e) throw new NotFoundException('收入类型不存在');
+    const [refs]: { total: string }[] = await this.incomeTypeRepo.query('SELECT COUNT(*) total FROM finance_income_records WHERE income_type_id=?',[id]);
+    if (Number(refs.total)) throw new ConflictException('分类已有流水，请停用而不是删除');
     await this.incomeTypeRepo.remove(e);
   }
 
@@ -84,6 +92,8 @@ export class FinanceSettingsService {
   async removeExpenseType(id: number) {
     const e = await this.expenseTypeRepo.findOne({ where: { id } });
     if (!e) throw new NotFoundException('支出类型不存在');
+    const [refs]: { total: string }[] = await this.expenseTypeRepo.query('SELECT COUNT(*) total FROM finance_expense_records WHERE expense_type_id=?',[id]);
+    if (Number(refs.total)) throw new ConflictException('分类已有流水，请停用而不是删除');
     await this.expenseTypeRepo.remove(e);
   }
 

@@ -55,6 +55,10 @@ export interface IncomeRecordItem {
   incomeTypeName: string
   fundAccountName: string
   departmentName: string
+  cashKind: string
+  bankReference: string
+  version: number
+  deletedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -67,10 +71,12 @@ export function getIncomeList(params?: {
   departmentId?: number | null
   sourceNameKeyword?: string
   orderNo?: string
+  cashKind?: string
+  deleted?: boolean
   page?: number
   pageSize?: number
 }) {
-  return request.get<{ list: IncomeRecordItem[]; total: number; page: number; pageSize: number }>(
+  return request.get<{ list: IncomeRecordItem[]; total: number; totalAmount: string; page: number; pageSize: number }>(
     '/finance/income',
     { params },
   )
@@ -81,6 +87,10 @@ export function getIncomeOne(id: number) {
 }
 
 export function createIncome(body: {
+  cashKind?: string
+  bankReference?: string
+  duplicateReason?: string
+  version?: number
   occurDate: string
   amount: number | string
   incomeTypeId?: number | null
@@ -99,8 +109,8 @@ export function updateIncome(id: number, body: Partial<Parameters<typeof createI
   return request.patch<IncomeRecordItem>(`/finance/income/${id}`, body)
 }
 
-export function deleteIncome(id: number) {
-  return request.delete(`/finance/income/${id}`)
+export function deleteIncome(id: number, version: number, reason: string) {
+  return request.delete(`/finance/income/${id}`, { data: { version, reason } })
 }
 
 export const OBJECT_TYPE_OPTIONS = [
@@ -129,21 +139,28 @@ export interface ExpenseRecordItem {
   expenseTypeName: string
   fundAccountName: string
   departmentName: string
+  cashKind: string
+  bankReference: string
+  version: number
+  deletedAt: string | null
   createdAt: string
   updatedAt: string
 }
 
 export function getExpenseList(params?: {
+  departmentId?: number | null
   dateFrom?: string
   dateTo?: string
   expenseTypeId?: number | null
   fundAccountId?: number | null
   payeeKeyword?: string
   orderNo?: string
+  cashKind?: string
+  deleted?: boolean
   page?: number
   pageSize?: number
 }) {
-  return request.get<{ list: ExpenseRecordItem[]; total: number; page: number; pageSize: number }>(
+  return request.get<{ list: ExpenseRecordItem[]; total: number; totalAmount: string; page: number; pageSize: number }>(
     '/finance/expense',
     { params },
   )
@@ -154,6 +171,10 @@ export function getExpenseOne(id: number) {
 }
 
 export function createExpense(body: {
+  cashKind?: string
+  bankReference?: string
+  duplicateReason?: string
+  version?: number
   occurDate: string
   amount: number | string
   expenseTypeId?: number | null
@@ -173,47 +194,8 @@ export function updateExpense(id: number, body: Partial<Parameters<typeof create
   return request.patch<ExpenseRecordItem>(`/finance/expense/${id}`, body)
 }
 
-export function deleteExpense(id: number) {
-  return request.delete(`/finance/expense/${id}`)
-}
-
-export interface DashboardPeriodSummary {
-  totalIncome: string
-  totalExpense: string
-  orderExpense: string
-  companyExpense: string
-  orderProfit: string
-}
-
-export interface DashboardDepartmentProfitabilityItem {
-  departmentId: number
-  departmentName: string
-  totalIncome: string
-  totalExpense: string
-  profit: string
-  profitRate: string
-}
-
-export interface DashboardSummary {
-  period?: {
-    dateFrom: string
-    dateTo: string
-  }
-  periodSummary?: DashboardPeriodSummary
-  currentMonth?: DashboardPeriodSummary
-  accountBalances: Array<{ fundAccountId: number; fundAccountName: string; balance: string }>
-  recentIncome: (IncomeRecordItem & { incomeTypeName: string })[]
-  recentExpense: (ExpenseRecordItem & { expenseTypeName: string })[]
-  expenseTypeTop5: Array<{ expenseTypeName: string; totalAmount: string }>
-  departmentExpenseTop5: Array<{ departmentName: string; totalAmount: string }>
-  departmentProfitability?: DashboardDepartmentProfitabilityItem[]
-}
-
-export function getDashboardSummary(params?: {
-  dateFrom?: string
-  dateTo?: string
-}) {
-  return request.get<DashboardSummary>('/finance/dashboard', { params })
+export function deleteExpense(id: number, version: number, reason: string) {
+  return request.delete(`/finance/expense/${id}`, { data: { version, reason } })
 }
 
 export function getFundAccounts() {

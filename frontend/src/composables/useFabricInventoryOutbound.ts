@@ -21,7 +21,7 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
     submitting: boolean
     row: FabricItem | null
   }>({ visible: false, submitting: false, row: null })
-  const outboundFormRef = ref<FormInstance>()
+  const outboundFormRef = ref<{ validate: () => ReturnType<FormInstance['validate']> | undefined; clearValidate: () => void }>()
   const outboundForm = reactive({
     pickupUserId: null as number | null,
     quantity: 0,
@@ -56,6 +56,7 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
   }
 
   function openOutboundDialog(row?: FabricItem) {
+    if (outboundDialog.submitting) return
     const target = row ?? options.selectedRows.value[0]
     if (!target) {
       ElMessage.warning('请先选中 1 条面料记录')
@@ -71,6 +72,7 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
   }
 
   function resetOutboundForm() {
+    if (outboundDialog.submitting) return
     outboundDialog.row = null
     outboundForm.pickupUserId = null
     outboundForm.quantity = 0
@@ -80,19 +82,24 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
   }
 
   async function submitOutbound() {
-    if (!outboundDialog.row) return
+    if (!outboundDialog.visible || !outboundDialog.row || outboundDialog.submitting) return
     if (!outboundForm.pickupUserId || !outboundForm.photoUrl || !outboundForm.remark?.trim()) {
       ElMessage.warning('请选择领取人，并上传出库照片、填写备注（谁领走、用途）')
       return
     }
-    try {
-      await outboundFormRef.value?.validate()
-    } catch {
+    const quantity = Number(outboundForm.quantity)
+    if (!Number.isFinite(quantity) || quantity <= 0 || quantity > outboundMaxQty.value) {
+      ElMessage.warning('出库数量必须大于 0，且不能超过当前库存')
       return
     }
-    if (outboundDialog.row.unitPrice == null) {
+    const unpriced = outboundDialog.row.unitPrice == null
+    const payload = { id: outboundDialog.row.id, ...outboundForm, quantity, pickupUserId: outboundForm.pickupUserId }
+    outboundDialog.submitting = true
+    try {
       try {
-        await ElMessageBox.confirm(
+        const valid = await outboundFormRef.value?.validate()
+        if (valid === false) return
+        if (unpriced) await ElMessageBox.confirm(
           '该面料当前暂未计价。本次出库会正常扣减库存，但出库单价和金额将记录为“未计价”，之后补价也不会回改本次记录。是否继续？',
           '未计价出库确认',
           { type: 'warning', confirmButtonText: '继续出库', cancelButtonText: '取消' },
@@ -100,16 +107,7 @@ export function useFabricInventoryOutbound(options: UseFabricInventoryOutboundOp
       } catch {
         return
       }
-    }
-    outboundDialog.submitting = true
-    try {
-      await fabricOutbound({
-        id: outboundDialog.row.id,
-        quantity: outboundForm.quantity,
-        photoUrl: outboundForm.photoUrl,
-        remark: outboundForm.remark,
-        pickupUserId: outboundForm.pickupUserId,
-      })
+      await fabricOutbound(payload)
       ElMessage.success('出库成功')
       outboundDialog.visible = false
       options.clearSelection()

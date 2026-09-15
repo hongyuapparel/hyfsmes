@@ -1,12 +1,16 @@
 <template>
   <AppDialog
     v-model="visible"
-    title="分配纸样师和车版师"
+    title="分配师傅"
     width="420"
+    :show-close="!submitting"
+    :close-on-press-escape="!submitting"
     destroy-on-close
     @close="emit('close')"
   >
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <div>待分配 {{ rows.length }} 张：{{ rows.map((row) => row.orderNo).join('、') }}</div>
+    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <el-form :disabled="submitting" ref="formRef" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="纸样师" prop="patternMaster">
         <el-select
           v-model="form.patternMaster"
@@ -31,8 +35,8 @@
       </el-form-item>
     </el-form>
     <template #footer>
-      <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" @click="handleConfirm">确定</el-button>
+      <el-button :disabled="submitting" @click="visible = false">取消</el-button>
+      <el-button type="primary" :loading="submitting" @click="handleConfirm">确认分配</el-button>
     </template>
   </AppDialog>
 </template>
@@ -40,6 +44,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import type { PatternListItem } from '@/api/production-pattern'
 import type { StaffOptionItem } from '@/api/hr'
 
 const props = defineProps<{
@@ -49,6 +54,8 @@ const props = defineProps<{
   patternMasterOptions: StaffOptionItem[]
   sampleMakerOptions: StaffOptionItem[]
   submitting: boolean
+  rows: PatternListItem[]
+  error: string
 }>()
 
 const emit = defineEmits<{
@@ -64,6 +71,7 @@ watch(visible, (v) => emit('update:modelValue', v))
 const formRef = ref<FormInstance>()
 
 async function handleConfirm() {
+  if (props.submitting) return
   try {
     await formRef.value?.validate()
   } catch {

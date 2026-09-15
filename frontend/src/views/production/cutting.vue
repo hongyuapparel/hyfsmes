@@ -251,7 +251,6 @@ const {
   pagination,
   totalQuantity,
   load,
-  loadTabCounts,
   onExport,
   onSearch,
   debouncedSearch,
@@ -260,7 +259,6 @@ const {
   onPageSizeChange,
   onSortChange,
 } = useCuttingListData({
-  tabs: CUTTING_TABS,
   clearSelection,
 })
 const {
@@ -302,7 +300,6 @@ const {
 } = useCuttingRegister({
   selectedRows,
   reloadList: load,
-  reloadTabCounts: loadTabCounts,
 })
 const {
   editDialog,
@@ -319,7 +316,6 @@ const {
   submitEdit,
 } = useCuttingEdit({
   reloadList: load,
-  reloadTabCounts: loadTabCounts,
 })
 
 async function onEditFromDrawer() {
@@ -361,17 +357,14 @@ watch(
 
 function getTabLabel(tab: CuttingTabConfig): string {
   const counts = tabCounts.value
-  const count = tab.value === 'all' ? tabTotal.value : counts[tab.value] ?? 0
+  const count = tab.value === 'all' ? tabTotal.value ?? '—' : counts[tab.value] ?? '—'
   return `${tab.label}(${count})`
 }
 
 onMounted(() => {
   void loadCuttingDepartments()
   void loadCutterOptions()
-  void (async () => {
-    await load()
-    await loadTabCounts()
-  })()
+  void load()
 })
 </script>
 

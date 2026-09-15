@@ -45,10 +45,10 @@
     <el-table-column prop="completedAt" label="完成时间" width="120" align="center" sortable="custom">
       <template #default="{ row }">{{ formatDateTime(row.completedAt) }}</template>
     </el-table-column>
-    <el-table-column label="客户交期判定" width="116" align="center">
+    <el-table-column prop="overdueDays" label="客户交期判定" width="148" sortable="custom" align="center">
       <template #default="{ row }">
         <el-tooltip :content="row.timeRatingReason" placement="top">
-          <span><SlaJudgeTag :text="row.timeRating" /></span>
+          <span><SlaJudgeTag :text="row.timeRating" /><span v-if="row.overdueDays > 0"> {{ row.overdueDays }} 天</span></span>
         </el-tooltip>
       </template>
     </el-table-column>
@@ -111,5 +111,5 @@ function getTableRef() {
   return tableRef.value
 }
 
-defineExpose({ getTableRef })
+defineExpose({ clearSelection: () => tableRef.value?.clearSelection(), getTableRef })
 </script>

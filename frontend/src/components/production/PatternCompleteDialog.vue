@@ -1,7 +1,7 @@
 <template>
   <AppDialog
     v-model="visible"
-    :title="mode === 'edit' ? '编辑已提交纸样' : '确认完成'"
+    :title="mode === 'edit' ? '修改样品图片' : '确认完成'"
     width="480"
     :show-close="!submitting && !uploading"
     :close-on-press-escape="!submitting && !uploading"
@@ -9,7 +9,7 @@
     @close="emit('close')"
   >
     <div v-if="batch" class="complete-brief">
-      <div>本次完成 {{ rows.length }} 张订单：</div>
+      <div>将完成所选的 {{ rows.length }} 张订单：</div>
       <div>{{ rows.map((item) => item.orderNo).join('、') }}</div>
       <div>保留各订单已有的样品图片；如需上传，请逐单完成或完成后编辑。</div>
     </div>
@@ -17,7 +17,8 @@
       <div>订单号：{{ row.orderNo }}</div>
       <div>SKU：{{ row.skuCode }}</div>
     </div>
-    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <el-alert v-if="mode === 'complete'" title="完成前会检查已保存的物料名称和单件用量，缺项的订单不能完成。" type="info" :closable="false" />
+    <el-alert v-if="error" type="error" :closable="false"><div role="alert" style="white-space: pre-line; max-height: 240px; overflow: auto">{{ error }}</div></el-alert>
     <div v-if="!batch" class="complete-hint">{{ mode === 'edit' ? '修改样品图片，不改变完成时间和订单状态' : '样品图片可选：不上传也可以完成纸样' }}</div>
     <el-form v-if="!batch" :disabled="submitting || uploading" ref="formRef" :model="form" :rules="rules" label-width="100px">
       <el-form-item label="样品图片" prop="sampleImageUrl">
@@ -49,7 +50,7 @@
     <template #footer>
       <el-button :disabled="submitting || uploading" @click="visible = false">取消</el-button>
       <el-button type="primary" :loading="submitting" :disabled="uploading" @click="emit('submit')">
-        {{ mode === 'edit' ? '保存纠错' : batch ? `完成这 ${rows.length} 张纸样` : '完成纸样' }}
+        {{ mode === 'edit' ? '保存图片' : '确认完成' }}
       </el-button>
     </template>
   </AppDialog>

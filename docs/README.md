@@ -7,6 +7,7 @@
 | 文档 | 何时读 |
 |------|--------|
 | [`AGENT_WORKFLOW.md`](AGENT_WORKFLOW.md) | 执行边界、验证回复、设置页即时生效、优先级 |
+| [`AGENT_LESSONS.md`](AGENT_LESSONS.md) | 历史错误、用户纠正与现行规则的对应依据；非另一套执行规范 |
 | [`CODE_STANDARDS.md`](CODE_STANDARDS.md) | 类型、分层、复用、行数、build、字段编码 |
 | [`FRONTEND_UI.md`](FRONTEND_UI.md) | 组件、抽屉弹窗、字号、editable-grid |
 | [`FIELD_CONFIG_DESIGN.md`](FIELD_CONFIG_DESIGN.md) | 字段配置业务设计与列设置 |

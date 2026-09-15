@@ -22,13 +22,15 @@ export function judgePatternCustomerDueDate(
   completedAt: Date | string | null | undefined,
   completed: boolean,
   now = new Date(),
-): { timeRating: string; timeRatingReason: string } {
+): { timeRating: string; timeRatingReason: string; overdueDays: number | null } {
   const due = businessDate(dueDate);
-  if (!due) return { timeRating: '未填写交期', timeRatingReason: '客户交期为空或无效，无法判断是否超期。' };
+  if (!due) return { overdueDays: null, timeRating: '未填写交期', timeRatingReason: '客户交期为空或无效，无法判断是否超期。' };
   const end = businessDate(completed ? completedAt : now);
-  if (!end) return { timeRating: '无法判定', timeRatingReason: '纸样已完成但完成时间缺失或无效，请核对完成记录。' };
-  const late = end > due;
+  if (!end) return { overdueDays: null, timeRating: '无法判定', timeRatingReason: '纸样已完成但完成时间缺失或无效，请核对完成记录。' };
+  const overdueDays = Math.max(0, Math.round((Date.parse(`${end}T00:00:00Z`) - Date.parse(`${due}T00:00:00Z`)) / 86400000));
+  const late = overdueDays > 0;
   return {
+    overdueDays,
     timeRating: completed ? (late ? '超期' : '未超期') : (late ? '已超期' : '进行中'),
     timeRatingReason: `客户交期 ${due}；${completed ? '纸样完成日期' : '今天'} ${end}。按北京时间判断，交期当天完成不算超期。`,
   };

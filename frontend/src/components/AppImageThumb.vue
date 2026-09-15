@@ -27,7 +27,7 @@
           <el-image
             :src="thumbDisplaySrc"
             fit="contain"
-            :lazy="lazy"
+            :lazy="shouldLazyLoad"
             class="app-image-thumb-el"
             @error="onThumbError"
           >
@@ -67,7 +67,7 @@
       <el-image
         :src="thumbDisplaySrc"
         fit="contain"
-        :lazy="lazy"
+        :lazy="shouldLazyLoad"
         class="app-image-thumb-el"
         @error="onThumbError"
       >
@@ -149,7 +149,7 @@ const props = withDefaults(
   }>(),
   {
     variant: 'table',
-    lazy: true,
+    lazy: undefined,
     emptyText: '—',
     teleported: true,
     previewDisabled: false,
@@ -159,6 +159,8 @@ const props = withDefaults(
 )
 
 const { src: resolveUploadSrc, onError: onUploadListError } = useUploadListImage()
+// 抽屉入场时位于屏幕外，延迟加载可能未及时检测到可见；详情小图直接加载。
+const shouldLazyLoad = computed(() => props.lazy ?? props.variant !== 'dialog')
 const { isCoarseOrNoHover } = useCoarsePointerOrNoHover()
 
 const instanceId = nextImageThumbPreviewInstanceId()
