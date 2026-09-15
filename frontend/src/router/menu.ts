@@ -9,6 +9,7 @@ export interface MenuItem {
 
 export const menuConfig: MenuItem[] = [
   { path: '/', title: '主页', icon: 'HomeFilled' },
+  { path: '/work-reports', title: '工作报告', icon: 'Briefcase' },
   { path: '/customers', title: '客户管理', icon: 'UserFilled' },
   {
     path: '/orders',
@@ -69,6 +70,7 @@ export const menuConfig: MenuItem[] = [
       { path: '/settings/suppliers', title: '供应商设置' },
       { path: '/settings/inventory', title: '库存设置' },
       { path: '/settings/hr', title: '组织与人事' },
+      { path: '/settings/work-reports', title: '工作报告设置', adminOnly: true },
       { path: '/settings/finance', title: '财务设置' },
       { path: '/settings/image-cleanup', title: '图片清理', adminOnly: true },
     ],

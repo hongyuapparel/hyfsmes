@@ -34,6 +34,7 @@ import { ProductionFinishingMutationService } from './production-finishing-mutat
     OrderWorkflowModule,
     OrderStatusConfigModule,
   ],
+  exports: [ProductionFinishingQueryService],
   controllers: [ProductionFinishingController],
   providers: [
     ProductionFinishingService,
