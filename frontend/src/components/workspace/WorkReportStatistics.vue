@@ -1,6 +1,6 @@
 <template>
  <section class="statistics"><h2>工作数据</h2><p class="muted">按所选日期统计，点击数字所在条目查看订单明细。</p>
-  <el-collapse>
+  <el-collapse style="--el-collapse-header-font-size:var(--font-size-body);--el-collapse-content-font-size:var(--font-size-body)">
    <el-collapse-item v-for="group in groups" :key="group.title" :name="group.title">
     <template #title><span class="stat-title">{{ group.title }}</span><strong v-if="historical && group.title.startsWith('当前')">未保存历史快照</strong><strong v-else>{{ count(group).orders }} 单<span v-if="group.title.includes('采购')"> · {{ count(group).items }} 项物料</span><span v-if="count(group).quantity!==null"> · {{ count(group).quantity }} 件</span><span v-if="count(group).unlinked"> · {{ count(group).unlinked }} 条未关联订单</span></strong></template>
     <p class="muted">{{ group.note }}</p>

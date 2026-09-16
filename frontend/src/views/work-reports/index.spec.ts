@@ -19,19 +19,19 @@ it('采购自动清单正常显示，无需先填计划；补充说明选填且�
  const w=await open();try{
   expect(w.text()).toContain('TEST-12');expect(w.findAll('article .toolbar section')).toHaveLength(0);expect(api.saveReportPlans).not.toHaveBeenCalled()
   expect(w.text()).not.toContain('样品 · 工作安排');expect(w.text()).not.toContain('大货 · 工作安排')
-  await w.findAll('button').find(b=>b.text()==='编辑全部安排')!.trigger('click');await flushPromises()
-  await w.get('textarea').setValue('TEST-12 · 面料：等待供应商回复');await w.findAll('button').find(b=>b.text()==='保存全部')!.trigger('click');await flushPromises()
+  await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises()
+  await w.get('textarea').setValue('TEST-12 · 面料：等待供应商回复');await w.findAll('button').find(b=>b.text()==='保存')!.trigger('click');await flushPromises()
   expect(api.saveReportPlans.mock.calls[0][2][0].title).toBe('TEST-12 · 面料：等待供应商回复');expect(api.saveReportPlans.mock.calls[0][2][0].date).toBe('');expect(api.saveReportPlans.mock.calls[0][1]).toEqual([])
  }finally{w.unmount()}
 })
 it('尾部模板在查看和编辑时都没有样品板块',async()=>{
  api.getLiveReport.mockResolvedValue({data:{...report(),automatic:[],template:{id:'finishing',name:'尾部模板',manualSections:['bulk','other'],automaticSources:[]}}})
- const w=await open();try{expect(w.text()).not.toContain('样品');expect(w.text()).toContain('大货');await w.findAll('button').find(b=>b.text()==='编辑全部安排')!.trigger('click');await flushPromises();expect(w.text()).not.toContain('样品');expect(w.text()).toContain('大货')}finally{w.unmount()}
+ const w=await open();try{expect(w.text()).not.toContain('样品');expect(w.text()).toContain('大货');await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises();expect(w.text()).not.toContain('样品');expect(w.text()).toContain('大货')}finally{w.unmount()}
 })
 
 it('管理员可编辑他人报告，保存后可以再次编辑',async()=>{
  auth.user.roleCode='admin';const other={...person,id:2,rule:{...person.rule,ownerId:2}};api.getReportDirectory.mockResolvedValue({data:{configured:true,people:[other]}});api.getLiveReport.mockResolvedValue({data:{...report(),person:other}})
- const w=await open();try{await w.findAll('button').find(b=>b.text()==='编辑全部安排')!.trigger('click');await flushPromises();await w.get('textarea').setValue('管理员代填');await w.findAll('button').find(b=>b.text()==='保存全部')!.trigger('click');await flushPromises();expect(api.saveReportPlans.mock.calls[0][3]).toBe(2);await w.findAll('button').find(b=>b.text()==='编辑全部安排')!.trigger('click');await flushPromises();expect(w.findAll('button').some(b=>b.text()==='保存全部')).toBe(true)}finally{w.unmount()}
+ const w=await open();try{await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises();await w.get('textarea').setValue('管理员代填');await w.findAll('button').find(b=>b.text()==='保存')!.trigger('click');await flushPromises();expect(api.saveReportPlans.mock.calls[0][3]).toBe(2);await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises();expect(w.findAll('button').some(b=>b.text()==='保存')).toBe(true)}finally{w.unmount()}
 })
 
 it('四千订单、112行跟单安排编辑时不会逐行渲染全部订单选项，仍可保存填写的行',async()=>{
@@ -40,14 +40,14 @@ it('四千订单、112行跟单安排编辑时不会逐行渲染全部订单选�
  api.getReportOrders.mockResolvedValue({data:catalog})
  api.getLiveReport.mockResolvedValue({data:{...report(),automatic:[],pendingOrders,template:{id:'merchandiser',name:'跟单模板',manualSections:['sample','bulk','other'],automaticSources:[]}}})
  const w=await open();try{
-  await w.findAll('button').find(b=>b.text()==='编辑全部安排')!.trigger('click');await flushPromises()
+  await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises()
   expect(w.findAll('textarea')).toHaveLength(112)
   expect(document.querySelectorAll('[role="option"]').length).toBe(0)
   await w.findAll('textarea')[0].setValue('确认尺寸并交纸样')
   const dateInput=w.get('input[aria-label="sample第2行预计日期"]')
   await dateInput.setValue(today);await dateInput.trigger('change')
   await flushPromises()
-  await w.findAll('button').find(b=>b.text()==='保存全部')!.trigger('click');await flushPromises()
+  await w.findAll('button').find(b=>b.text()==='保存')!.trigger('click');await flushPromises()
   expect(api.saveReportPlans.mock.calls[0][1]).toHaveLength(2)
   expect(api.saveReportPlans.mock.calls[0][1][0].order).toBe('ORDER-0')
   expect(api.saveReportPlans.mock.calls[0][1][0].date).toBe('')
