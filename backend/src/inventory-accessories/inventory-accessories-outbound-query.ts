@@ -16,6 +16,7 @@ function validateDates(start?: string, end?: string): void {
 }
 
 export async function getAccessoryOutboundRecords(repo: Repository<InventoryAccessoryOutbound>, params: {
+    ids?: number[];
     accessoryId?: number;
     orderNo?: string;
     outboundType?: string;
@@ -61,6 +62,7 @@ export async function getAccessoryOutboundRecords(repo: Repository<InventoryAcce
         "COALESCE(a.category, '') AS category",
       ]);
     if (accessoryId) qb.andWhere('r.accessory_id = :accessoryId', { accessoryId });
+    if (params.ids?.length) qb.andWhere('r.id IN (:...exportIds)', { exportIds: params.ids });
     if (orderNo?.trim()) qb.andWhere('r.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
     if (outboundType?.trim()) qb.andWhere('r.outbound_type = :outboundType', { outboundType: outboundType.trim() });
     if (startDate) qb.andWhere('r.created_at >= :outboundStart', { outboundStart: `${startDate} 00:00:00` });

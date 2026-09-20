@@ -66,6 +66,7 @@
       <div class="filter-bar-actions">
         <el-button type="primary" @click="search">搜索</el-button>
         <el-button @click="reset">清空</el-button>
+        <el-button :loading="outboundExport.exporting.value" :disabled="outboundExport.disabled.value" @click="outboundExport.onExport">{{ outboundExport.buttonText.value }}</el-button>
       </div>
     </el-form>
 
@@ -74,6 +75,8 @@
         ref="tableRef"
         v-loading="loading"
         :data="list"
+        row-key="id"
+        @selection-change="outboundExport.onSelectionChange"
         border
         stripe
         class="fabric-table"
@@ -83,6 +86,7 @@
         :header-cell-style="compactHeaderCellStyle"
         @header-dragend="onHeaderDragEnd"
       >
+        <el-table-column type="selection" width="48" align="center" />
         <el-table-column prop="createdAt" label="时间" width="160" align="center" />
         <el-table-column prop="name" label="面料名称" min-width="150" show-overflow-tooltip align="center">
           <template #default="{ row }">
@@ -174,6 +178,7 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
+import { useOutboundRecordExport } from '@/composables/useOutboundRecordExport'
 
 const props = defineProps<{
   customerOptions: Array<{ label: string; value: string }>
@@ -202,6 +207,11 @@ const unpricedCount = ref(0)
 const unpricedQuantity = ref(0)
 const tableRef = ref()
 const shellRef = ref<HTMLElement | null>(null)
+const outboundExport = useOutboundRecordExport<FabricOutboundRecord>({
+  kind: 'fabric', filename: '面料出库记录', loading: () => loading.value, total: () => pagination.total, table: tableRef,
+  filters: () => ({ name: filter.name || undefined, customerName: filter.customerName || undefined,
+    inventoryTypeId: filter.inventoryTypeId ?? undefined, startDate: filter.dateRange[0], endDate: filter.dateRange[1] }),
+})
 const { tableHeight } = useFlexShellTableHeight(shellRef)
 const { onHeaderDragEnd, restoreColumnWidths } = useTableColumnWidthPersist('inventory-fabric-outbounds')
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
@@ -231,6 +241,14 @@ async function load() {
     unpricedQuantity.value = data?.unpricedQuantity ?? 0
     restoreColumnWidths(tableRef.value)
   } catch (error: unknown) {
+    if (version === requestVersion) {
+      list.value = []
+      pagination.total = 0
+      totalQuantity.value = 0
+      totalAmount.value = 0
+      unpricedCount.value = 0
+      unpricedQuantity.value = 0
+    }
     if (version === requestVersion && !isErrorHandled(error)) ElMessage.error(getErrorMessage(error))
   } finally {
     if (version === requestVersion) loading.value = false

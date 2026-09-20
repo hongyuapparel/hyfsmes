@@ -1,4 +1,7 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query, Res, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query, Res, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { OutboundExportDto } from '../common/outbound-export.dto';
+import { collectOutboundExportRows, buildOutboundWorkbook, sendOutboundWorkbook } from '../common/outbound-export-workbook';
+import { finishedOutboundLine, outboundColumns } from '../common/outbound-export-rows';
 import type { Response } from 'express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
@@ -243,5 +246,14 @@ export class FinishedGoodsStockController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
+  }
+
+  @Post('outbounds/export')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+  async exportOutbounds(@Body() dto: OutboundExportDto, @Res() res: Response) {
+    const rows = await collectOutboundExportRows(dto, query => this.reportService.getOutboundRecords({ ...query, exportRowLimit: query.pageSize - 1 }));
+    const labels = await this.reportService.getOutboundExportLabels();
+    sendOutboundWorkbook(res, await buildOutboundWorkbook('成品出库记录', outboundColumns.finished, rows.map(row => finishedOutboundLine(row, labels))));
   }
 }

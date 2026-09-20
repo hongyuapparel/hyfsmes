@@ -9,6 +9,7 @@ type InventoryWorkbookExportOptions<Row, Payload> = {
   buildPayload: (selectedIds: number[], selectedMode: boolean) => Payload
   request: (payload: Payload) => Promise<AxiosResponse<Blob>>
   filenamePrefix: string
+  dataLabel?: string
 }
 
 function buildTimestamp(date: Date): string {
@@ -39,7 +40,7 @@ export function useInventoryWorkbookExport<Row, Payload>(
   async function onExport() {
     if (exporting.value) return
     if (options.selectedRows.value.length === 0 && options.total() <= 0) {
-      ElMessage.warning('当前没有可导出的库存数据')
+      ElMessage.warning(`当前没有可导出的${options.dataLabel ?? '库存数据'}`)
       return
     }
     const selectedMode = options.selectedRows.value.length > 0
@@ -47,7 +48,7 @@ export function useInventoryWorkbookExport<Row, Payload>(
       ? options.selectedRows.value.map(options.getRowId).filter((id) => Number.isInteger(id) && id > 0)
       : []
     if (selectedMode && selectedIds.length !== options.selectedRows.value.length) {
-      ElMessage.error('选中的库存数据无效，请刷新页面后重试')
+      ElMessage.error(`选中的${options.dataLabel ?? '库存数据'}无效，请刷新页面后重试`)
       return
     }
     exporting.value = true
@@ -70,7 +71,7 @@ export function useInventoryWorkbookExport<Row, Payload>(
       if (failedImageCount > 0) {
         ElMessage.warning(`已导出 ${rowCount} 条明细，其中 ${failedImageCount} 张图片加载失败；请查看“图片加载失败”工作表`)
       } else {
-        ElMessage.success(`已导出 ${rowCount} 条库存明细`)
+        ElMessage.success(`已导出 ${rowCount} 条${options.dataLabel ?? '库存明细'}`)
       }
     } catch (error: unknown) {
       ElMessage.error(await readBlobError(error))

@@ -195,6 +195,7 @@ export function rollbackFinishedStockChange(logId: number) {
 }
 
 export interface FinishedOutboundRecord {
+  exportKey?: string
   id: number
   finishedStockId: number
   orderId: number | null

@@ -25,6 +25,9 @@ import { FabricStockExportService } from './fabric-stock-export.service';
 import { FabricStockExportDto } from './fabric-stock-export.dto';
 import { FabricStockOutboundQueryService } from './fabric-stock-outbound-query.service';
 import { FabricStockValuationService } from './fabric-stock-valuation.service';
+import { OutboundExportDto } from '../common/outbound-export.dto';
+import { collectOutboundExportRows, buildOutboundWorkbook, sendOutboundWorkbook } from '../common/outbound-export-workbook';
+import { fabricOutboundLine, outboundColumns } from '../common/outbound-export-rows';
 
 @Controller('inventory/fabric')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -227,5 +230,13 @@ export class FabricStockController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
+  }
+
+  @Post('outbounds/export')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+  async exportOutbounds(@Body() dto: OutboundExportDto, @Res() res: Response) {
+    const rows = await collectOutboundExportRows(dto, query => this.outboundQueryService.getOutboundRecords(query));
+    sendOutboundWorkbook(res, await buildOutboundWorkbook('面料出库记录', outboundColumns.fabric, rows.map(fabricOutboundLine)));
   }
 }

@@ -1,4 +1,8 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards, Res, HttpCode, HttpStatus, UsePipes, ValidationPipe } from '@nestjs/common';
+import type { Response } from 'express';
+import { OutboundExportDto } from '../common/outbound-export.dto';
+import { collectOutboundExportRows, buildOutboundWorkbook, sendOutboundWorkbook } from '../common/outbound-export-workbook';
+import { pendingOutboundLine, outboundColumns } from '../common/outbound-export-rows';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
@@ -47,6 +51,14 @@ export class InventoryPendingController {
       imageUrl,
       user?.username ?? '',
     );
+  }
+
+  @Post('outbounds/export')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+  async exportOutbounds(@Body() dto: OutboundExportDto, @Res() res: Response) {
+    const rows = await collectOutboundExportRows(dto, query => this.service.getList({ ...query, tab: 'shipped' }));
+    sendOutboundWorkbook(res, await buildOutboundWorkbook('待仓已发货记录', outboundColumns.pending, rows.map(pendingOutboundLine)));
   }
 
   @Get('pickup-users')

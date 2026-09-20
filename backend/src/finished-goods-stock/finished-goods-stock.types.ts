@@ -35,6 +35,7 @@ export type ColorSizeSnapshot = {
 };
 
 export type FinishedGoodsOutboundRecord = {
+  exportKey?: string;
   id: number;
   finishedStockId: number;
   orderId: number | null;

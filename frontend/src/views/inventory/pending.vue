@@ -47,6 +47,7 @@
       <div class="filter-bar-actions">
         <el-button type="primary" @click="onSearch(true)">搜索</el-button>
         <el-button @click="onReset">清空</el-button>
+        <el-button v-if="pageTab === 'shipped'" :loading="shippedExport.exporting.value" :disabled="shippedExport.disabled.value" @click="shippedExport.onExport">{{ shippedExport.buttonText.value }}</el-button>
         <el-button
           v-if="pageTab === 'pending'"
           :disabled="!hasSelection || loading"
@@ -86,7 +87,7 @@
       @header-dragend="onPendingHeaderDragEnd"
       @selection-change="onSelectionChange"
     >
-      <el-table-column v-if="pageTab === 'pending'" type="selection" width="48" align="center" />
+      <el-table-column type="selection" width="48" align="center" />
       <el-table-column prop="orderNo" label="订单号" min-width="120" show-overflow-tooltip />
       <el-table-column prop="customerName" label="客户" min-width="140" show-overflow-tooltip />
       <el-table-column prop="skuCode" label="SKU" min-width="100" show-overflow-tooltip />
@@ -182,6 +183,7 @@ import PendingInboundDialog from '@/components/inventory/pending/PendingInboundD
 import PendingOutboundDialog from '@/components/inventory/pending/PendingOutboundDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useInventoryPendingDialogs } from '@/composables/useInventoryPendingDialogs'
+import { useOutboundRecordExport } from '@/composables/useOutboundRecordExport'
 
 const filter = reactive({ orderNo: '', skuCode: '' })
 const pageTab = ref<'pending' | 'shipped'>('pending')
@@ -202,6 +204,11 @@ const loading = ref(false)
 const inboundLoading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const selectedRows = ref<PendingListItem[]>([])
+const shippedExport = useOutboundRecordExport<PendingListItem>({
+  kind: 'pending', filename: '待仓已发货记录', selectedRows, table: pendingTableRef,
+  loading: () => loading.value, total: () => pageTab.value === 'shipped' ? pagination.total : 0,
+  filters: () => ({ orderNo: filter.orderNo || undefined, skuCode: filter.skuCode || undefined }),
+})
 const hasSelection = computed(() => selectedRows.value.length > 0)
 const selectedQuantity = computed(() => selectedRows.value.reduce((sum, row) => sum + Number(row.quantity), 0))
 const totalPageQuantity = computed(() => list.value.reduce((sum, r) => sum + (Number(r.quantity) || 0), 0))
@@ -316,7 +323,7 @@ function onPageSizeChange() {
 }
 
 function onSelectionChange(rows: PendingListItem[]) {
-  if (pageTab.value !== 'pending') return
+  if (loading.value) return
   selectedRows.value = rows
 }
 

@@ -43,6 +43,7 @@ export function useFinishedOutboundRecords() {
       outboundPagination.total = data?.total ?? 0
       restoreFinishedOutboundColumnWidths(finishedOutboundTableRef.value)
     } catch (e: unknown) {
+      if (version === requestVersion) { outboundList.value = []; outboundPagination.total = 0 }
       if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
     } finally {
       if (version === requestVersion) outboundLoading2.value = false

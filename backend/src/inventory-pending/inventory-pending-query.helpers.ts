@@ -41,7 +41,7 @@ type PendingShippedRawRow = {
   createdAt: Date | string | null;
 };
 
-export type PendingListQuery = { tab?: string; orderNo?: string; skuCode?: string; page?: number; pageSize?: number };
+export type PendingListQuery = { tab?: string; orderNo?: string; skuCode?: string; page?: number; pageSize?: number; ids?: number[] };
 
 export async function getPendingInventoryList(
   pendingRepo: Repository<InboundPending>,
@@ -73,7 +73,8 @@ export async function getPendingInventoryList(
         ]);
       if (orderNo?.trim()) qb.andWhere('COALESCE(o.order_no, fo.order_no, \'\') LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
       if (skuCode?.trim()) qb.andWhere('fo.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
-      qb.orderBy('fo.created_at', 'DESC');
+      if (params.ids?.length) qb.andWhere('fo.id IN (:...exportIds)', { exportIds: params.ids });
+      qb.orderBy('fo.created_at', 'DESC').addOrderBy('fo.id', 'DESC');
 
       const countQb = pendingRepo.manager
         .createQueryBuilder()
@@ -82,6 +83,7 @@ export async function getPendingInventoryList(
         .where('fo.remark = :remark', { remark: '待仓直发' });
       if (orderNo?.trim()) countQb.andWhere('COALESCE(o.order_no, fo.order_no, \'\') LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
       if (skuCode?.trim()) countQb.andWhere('fo.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
+      if (params.ids?.length) countQb.andWhere('fo.id IN (:...exportIds)', { exportIds: params.ids });
       const total = await countQb.getCount();
 
       const rows = await qb

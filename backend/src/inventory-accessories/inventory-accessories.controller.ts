@@ -22,6 +22,9 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { InventoryAccessoriesService } from './inventory-accessories.service';
 import { InventoryAccessoriesExportService } from './inventory-accessories-export.service';
 import { InventoryAccessoriesExportDto } from './inventory-accessories-export.dto';
+import { OutboundExportDto } from '../common/outbound-export.dto';
+import { collectOutboundExportRows, buildOutboundWorkbook, sendOutboundWorkbook } from '../common/outbound-export-workbook';
+import { accessoryOutboundLine, outboundColumns } from '../common/outbound-export-rows';
 
 @Controller('inventory/accessories')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -192,6 +195,14 @@ export class InventoryAccessoriesController {
       page: page ? parseInt(page, 10) : 1,
       pageSize: pageSize ? parseInt(pageSize, 10) : 20,
     });
+  }
+
+  @Post('outbounds/export')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ValidationPipe({ transform: true, whitelist: true, forbidNonWhitelisted: true }))
+  async exportOutbounds(@Body() dto: OutboundExportDto, @Res() res: Response) {
+    const rows = await collectOutboundExportRows(dto, query => this.service.getOutboundRecords(query));
+    sendOutboundWorkbook(res, await buildOutboundWorkbook('辅料出库记录', outboundColumns.accessories, rows.map(accessoryOutboundLine)));
   }
 
   /**

@@ -8,6 +8,7 @@ import { SystemOption } from '../entities/system-option.entity';
 import { User } from '../entities/user.entity';
 
 export type FabricOutboundFilters = {
+  ids?: number[];
   name?: string;
   customerName?: string;
   inventoryTypeId?: number | null;
@@ -43,6 +44,7 @@ function applyFilters(
   qb: SelectQueryBuilder<FabricOutbound>,
   params: FabricOutboundFilters,
 ): SelectQueryBuilder<FabricOutbound> {
+  if (params.ids?.length) qb.andWhere('o.id IN (:...exportIds)', { exportIds: params.ids });
   if (params.name?.trim()) {
     qb.andWhere("COALESCE(NULLIF(o.name_snapshot, ''), NULLIF(s.name, ''), '') LIKE :name", {
       name: `%${params.name.trim()}%`,
@@ -129,6 +131,7 @@ export class FabricStockOutboundQueryService {
         'o.created_at AS createdAt',
       ])
       .orderBy('o.created_at', 'DESC')
+      .addOrderBy('o.id', 'DESC')
       .offset((page - 1) * pageSize)
       .limit(pageSize)
       .getRawMany<Omit<FabricOutboundListRow, 'pickupUserName' | 'createdAt'> & { createdAt: Date }>();

@@ -52,6 +52,7 @@
       <div class="filter-bar-actions">
         <el-button type="primary" size="large" @click="onSearch">搜索</el-button>
         <el-button size="large" @click="onReset">清空</el-button>
+        <el-button size="large" :loading="outboundExport.exporting.value" :disabled="outboundExport.disabled.value" @click="outboundExport.onExport">{{ outboundExport.buttonText.value }}</el-button>
       </div>
     </el-form>
 
@@ -60,6 +61,8 @@
         ref="tableRef"
         v-loading="loading"
         :data="outboundList"
+        row-key="id"
+        @selection-change="outboundExport.onSelectionChange"
         border
         stripe
         class="accessories-table"
@@ -69,6 +72,7 @@
         :header-cell-style="compactHeaderCellStyle"
         @header-dragend="onHeaderDragEnd"
       >
+        <el-table-column type="selection" width="48" align="center" />
         <el-table-column prop="createdAt" label="时间" width="160" align="center">
           <template #default="{ row }">{{ row.createdAt }}</template>
         </el-table-column>
@@ -130,6 +134,7 @@ import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import AppImageThumb from '@/components/AppImageThumb.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import AccessoryQtyCell from '@/components/inventory/AccessoryQtyCell.vue'
+import { useOutboundRecordExport } from '@/composables/useOutboundRecordExport'
 
 const props = withDefaults(defineProps<{ active?: boolean }>(), { active: true })
 const outboundFilter = reactive<{ orderNo: string; outboundType: string; dateRange: [string, string] | [] }>({
@@ -142,6 +147,11 @@ const loading = ref(false)
 const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
 const tableRef = ref()
 const shellRef = ref<HTMLElement | null>(null)
+const outboundExport = useOutboundRecordExport<AccessoryOutboundRecord>({
+  kind: 'accessories', filename: '辅料出库记录', loading: () => loading.value, total: () => pagination.total, table: tableRef,
+  filters: () => ({ orderNo: outboundFilter.orderNo || undefined, outboundType: outboundFilter.outboundType || undefined,
+    startDate: outboundFilter.dateRange?.[0], endDate: outboundFilter.dateRange?.[1] }),
+})
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle, compactImageSize, compactImageColumnMinWidth } = useCompactTableStyle()
 const { tableHeight } = useFlexShellTableHeight(shellRef)
@@ -169,6 +179,7 @@ async function load() {
     pagination.total = data?.total ?? 0
     restoreColumnWidths(tableRef.value)
   } catch (e: unknown) {
+    if (version === requestVersion) { outboundList.value = []; pagination.total = 0 }
     if (version === requestVersion && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e))
   } finally {
     if (version === requestVersion) loading.value = false

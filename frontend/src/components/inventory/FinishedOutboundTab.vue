@@ -69,6 +69,7 @@
       <div class="filter-bar-actions">
         <el-button type="primary" @click="emit('search', true)">搜索</el-button>
         <el-button @click="emit('reset')">清空</el-button>
+        <el-button :loading="outboundExport.exporting.value" :disabled="outboundExport.disabled.value" @click="outboundExport.onExport">{{ outboundExport.buttonText.value }}</el-button>
       </div>
     </div>
 
@@ -76,6 +77,8 @@
     <el-table
       v-loading="loading"
       :data="outboundList"
+      :row-key="outboundExportRowKey"
+      @selection-change="outboundExport.onSelectionChange"
       border
       stripe
       class="finished-table"
@@ -86,6 +89,7 @@
       :header-cell-style="compactHeaderCellStyle"
       @header-dragend="handleHeaderDragEnd"
     >
+      <el-table-column type="selection" width="48" align="center" />
       <el-table-column
         v-for="column in outboundPrimaryColumns"
         :key="column.prop"
@@ -178,6 +182,7 @@ import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import { useFlexShellTableHeight } from '@/composables/useFlexShellTableHeight'
 import FilterCollapseToggle from '@/components/common/FilterCollapseToggle.vue'
 import { useFilterCollapse } from '@/composables/useFilterCollapse'
+import { useOutboundRecordExport, outboundExportRowKey } from '@/composables/useOutboundRecordExport'
 
 type OutboundFilter = {
   orderNo: string
@@ -212,6 +217,11 @@ const emit = defineEmits<{
 }>()
 
 const tableRef = ref<unknown | null>(null)
+const outboundExport = useOutboundRecordExport<FinishedOutboundRecord>({
+  kind: 'finished', filename: '成品出库记录', loading: () => props.loading, total: () => props.outboundPagination.total, table: tableRef,
+  filters: () => ({ orderNo: props.outboundFilter.orderNo || undefined, skuCode: props.outboundFilter.skuCode || undefined,
+    customerName: props.outboundFilter.customerName || undefined, startDate: props.outboundFilter.dateRange?.[0], endDate: props.outboundFilter.dateRange?.[1] }),
+})
 const outboundShellRef = ref<HTMLElement | null>(null)
 const { tableHeight: outboundTableHeight } = useFlexShellTableHeight(outboundShellRef)
 

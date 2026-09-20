@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { FinishedGoodsOutbound } from '../entities/finished-goods-outbound.entity';
 import { Product } from '../entities/product.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
 import { User } from '../entities/user.entity';
+import { SystemOption } from '../entities/system-option.entity';
 import type { ColorSizeSnapshot, FinishedGoodsOutboundListResult } from './finished-goods-stock.types';
 
 type OutboundRawRow = {
@@ -195,6 +196,8 @@ export class FinishedGoodsStockReportService {
   }
 
   async getOutboundRecords(params: {
+    ids?: number[];
+    exportRowLimit?: number;
     orderNo?: string;
     skuCode?: string;
     customerName?: string;
@@ -237,7 +240,9 @@ export class FinishedGoodsStockReportService {
       }
       if (startDate?.trim()) qb.andWhere('o.created_at >= :start', { start: `${startDate.trim()} 00:00:00` });
       if (endDate?.trim()) qb.andWhere('o.created_at <= :end', { end: `${endDate.trim()} 23:59:59` });
-      qb.orderBy('o.created_at', 'DESC');
+      if (params.ids?.length) qb.andWhere('o.id IN (:...exportIds)', { exportIds: params.ids });
+      qb.orderBy('o.created_at', 'DESC').addOrderBy('o.id', 'DESC');
+      if (params.exportRowLimit) qb.limit(params.exportRowLimit + 1);
       return qb;
     };
     let list: OutboundRawRow[] = [];
@@ -251,6 +256,9 @@ export class FinishedGoodsStockReportService {
       list = await qb.getRawMany<OutboundRawRow>();
     }
 
+    if (params.exportRowLimit && list.length > params.exportRowLimit) {
+      throw new BadRequestException(`出库记录超过${params.exportRowLimit}行，请缩小筛选范围`);
+    }
     const operatorDisplayNameMap = await this.getOperatorDisplayNameMap(
       list.map((row) => String(row.operatorUsername ?? '')),
     );
@@ -284,7 +292,8 @@ export class FinishedGoodsStockReportService {
     const colorImageMaps = rowsNeedingColorImages.length
       ? await this.getColorImageMapsForStocks(rowsNeedingColorImages.map((row) => row.finishedStockId))
       : new Map<number, Map<string, string>>();
-    const expandedRows = rows.flatMap((row) => this.splitOutboundRowByColor(row, colorImageMaps.get(row.finishedStockId)));
+    const expandedRows = rows.flatMap((row) => this.splitOutboundRowByColor(row, colorImageMaps.get(row.finishedStockId))
+      .map((item, index) => ({ ...item, exportKey: `${row.id}:${index}` })));
     expandedRows.forEach((row) => {
       if (!String(row.imageUrl ?? '').trim()) row.imageUrl = row.productImageUrl || '';
       delete row.productImageUrl;
@@ -298,5 +307,12 @@ export class FinishedGoodsStockReportService {
       page: safePage,
       pageSize: safePageSize,
     };
+  }
+
+  async getOutboundExportLabels(): Promise<Map<number, string>> {
+    const options = await this.outboundRepo.manager.getRepository(SystemOption).find({
+      where: [{ optionType: 'warehouses' }, { optionType: 'inventory_types' }],
+    });
+    return new Map(options.map(option => [option.id, option.value]));
   }
 }
