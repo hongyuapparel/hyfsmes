@@ -23,6 +23,7 @@ const routes: RouteRecordRaw[] = [
     redirect: '/',
     meta: { requiresAuth: true },
     children: [
+      { path: 'work-reports', name: 'WorkReports', component: () => import('@/views/work-reports/index.vue'), meta: { title: '工作报告', permissionPath: '/work-reports' } },
       {
         path: '',
         name: 'Home',
@@ -267,6 +268,12 @@ const routes: RouteRecordRaw[] = [
             name: 'SettingsFinance',
             component: () => import('@/views/settings/finance-settings.vue'),
             meta: { title: '财务设置', permissionPath: '/settings/finance' },
+          },
+          {
+            path: 'work-reports',
+            name: 'SettingsWorkReports',
+            component: () => import('@/views/settings/work-report-settings.vue'),
+            meta: { title: '工作报告设置', adminOnly: true },
           },
           {
             path: 'image-cleanup',

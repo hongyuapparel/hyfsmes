@@ -20,6 +20,7 @@ import { ProductionSewingService } from './production-sewing.service';
     OrderWorkflowModule,
     OrderStatusConfigModule,
   ],
+  exports: [ProductionSewingService],
   controllers: [ProductionSewingController],
   providers: [ProductionSewingService],
 })

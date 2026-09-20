@@ -244,7 +244,10 @@ a:hover {
 }
 
 .el-table,
-.el-table .el-table__cell,
+.el-table .el-table__cell {
+  font-size: var(--table-font-size, var(--font-size-caption));
+}
+
 .el-pagination,
 .el-form-item__error,
 .el-form-item__extra {
@@ -663,7 +666,7 @@ a:hover {
 .editable-grid .el-textarea__inner,
 .editable-grid .el-select__selected-item,
 .editable-grid .el-select__placeholder {
-  font-size: var(--font-size-caption);
+  font-size: var(--table-font-size, var(--font-size-caption));
   text-align: center;
 }
 .editable-grid .el-select__wrapper {

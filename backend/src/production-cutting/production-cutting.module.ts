@@ -37,6 +37,7 @@ import { ProductionCuttingMutationService } from './production-cutting-mutation.
     SystemOptionsModule,
     OrderStatusConfigModule,
   ],
+  exports: [ProductionCuttingListService],
   controllers: [ProductionCuttingController],
   providers: [
     ProductionCuttingService,

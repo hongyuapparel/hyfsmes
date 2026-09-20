@@ -31,6 +31,7 @@ import { ProductionPurchaseQueryService } from './production-purchase-query.serv
     FinishedGoodsStockModule,
     OrderStatusConfigModule,
   ],
+  exports: [ProductionPurchaseQueryService],
   controllers: [ProductionPurchaseController],
   providers: [ProductionPurchaseService, ProductionPurchaseQueryService],
 })

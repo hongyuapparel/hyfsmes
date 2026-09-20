@@ -1,3 +1,4 @@
+import { WorkReportsModule } from './work-reports/work-reports.module';
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule } from '@nestjs/config';
@@ -106,6 +107,7 @@ import { FinanceDashboardModule } from './finance-dashboard/finance-dashboard.mo
       synchronize: false,
       charset: 'utf8mb4',
     }),
+    WorkReportsModule,
     HealthModule,
     AuthModule,
     UsersModule,
