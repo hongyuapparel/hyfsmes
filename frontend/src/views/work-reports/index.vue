@@ -12,7 +12,7 @@
     <div class="person-list"><section v-for="day in days" :key="day"><h2 class="muted">{{ day }}</h2><button v-for="p in peopleOn(day)" :key="p.id" class="person" :title="`${p.name} · ${p.role}`" :class="{selected:p.id===owner&&day===date}" @click="navigate({owner:p.id,date:day})"><strong>{{ p.name }}</strong><span class="muted">{{ p.role }} · 报告</span></button><p v-if="!peopleOn(day).length" class="muted">当天无报告安排</p></section><el-empty v-if="!filteredPeople.length && !busy" description="暂无可查看人员" :image-size="60" /></div>
    </aside>
    <article ref="reportArticle" v-loading="busy">
-    <template v-if="report && !busy">
+    <div v-if="report && !busy" class="report-sheet">
      <div class="toolbar report-toolbar"><div class="report-identity"><h2>{{ report.person.name }} · {{ report.person.role }}</h2><span class="muted">{{ date }}</span></div><div><el-button v-if="mine&&!editing&&(sections.length||report.automatic.some(g=>g.rows.some(r=>r.planKey)))" type="primary" size="small" class="report-action" @click="edit">编辑</el-button><template v-if="editing"><el-button size="small" class="report-action" :disabled="saving" @click="navigate({cancel:true})">取消</el-button><el-button type="primary" size="small" class="report-action" :loading="saving" @click="save">保存</el-button></template></div></div>
      <p class="muted plan-hint">订单自动带入；动作和日期沿用上次保存内容，可修改或留空。</p>
      <el-alert v-if="report.historicalMissing && !editing" title="该日期之前尚无保存的工作安排，不用当前计划冒充历史日报。" type="info" :closable="false" />
@@ -24,7 +24,7 @@
      </template>
      <WorkReportStatistics :groups="statistics" :historical="date!==today" />
      <template v-if="!editing"><el-collapse v-if="completed.length || adjustments.length" style="--el-collapse-header-font-size:var(--font-size-body);--el-collapse-content-font-size:var(--font-size-body)"><el-collapse-item v-if="completed.length" :title="'当天完成的工作事项 · '+completed.length+' 项'" name="completed"><WorkReportTaskTable :tasks="completed" :catalog="catalog" :editable="false" :reference-date="date" /></el-collapse-item><el-collapse-item v-if="adjustments.length" :title="'当天安排调整 · '+adjustments.length+' 项'" name="adjustments"><WorkReportTaskTable :tasks="adjustments" :catalog="catalog" :editable="false" :reference-date="date" /></el-collapse-item></el-collapse></template>
-    </template>
+    </div>
     <el-empty v-if="!report && !busy && !error" description="当天暂无报告安排，可选择其他日期或进入报告设置" />
    </article>
   </div>
@@ -75,21 +75,23 @@ onMounted(()=>{window.addEventListener('beforeunload',unload);window.addEventLis
 onBeforeUnmount(()=>{window.removeEventListener('beforeunload',unload);window.removeEventListener('focus',focus)})
 </script>
 <style scoped>
-.live-reports {--table-font-size:var(--font-size-body);font-size:var(--font-size-body);line-height:1.5;height:calc(100vh - 125px);display:flex;flex-direction:column}
+.live-reports {font-size:var(--font-size-body);line-height:1.5;height:calc(100vh - 125px);display:flex;flex-direction:column}
 .toolbar {display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);flex-wrap:wrap;padding-bottom:var(--space-sm)}
 h1 {font-size:var(--font-size-subtitle);margin:0} h2 {font-size:var(--font-size-subtitle);margin:0}
 .muted {font-size:var(--font-size-caption);color:var(--color-text-muted);line-height:1.6}
-.columns {display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;min-height:0;border-top:1px solid var(--color-border)}
+.columns {display:grid;grid-template-columns:220px minmax(0,1fr);flex:1;min-height:0;border:1px solid var(--color-border);border-radius:var(--radius-md);overflow:hidden;background:var(--color-card)}
 aside {min-width:0;display:flex;flex-direction:column;gap:var(--space-sm);padding:var(--space-sm);border-right:1px solid var(--color-border);min-height:0}
 .person-list {overflow:auto;min-height:0}.person-list h2 {margin:var(--space-sm) 0;font-size:var(--font-size-caption);font-weight:500;line-height:1.5}
 .person {height:32px;min-height:32px;box-sizing:border-box;display:flex;align-items:center;gap:var(--space-sm);width:100%;padding:var(--space-xs) var(--space-sm);margin-bottom:var(--space-xs);border:1px solid transparent;border-radius:var(--el-border-radius-base);background:var(--el-fill-color-light);color:var(--color-text-primary);text-align:left;cursor:pointer;font-family:var(--font-family-ui);font-size:var(--font-size-body);line-height:1.5}
 .person strong,.person span {font-size:inherit;line-height:inherit}.person strong {flex-shrink:0;font-weight:600}.person span {overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.person.selected {border-color:var(--color-primary);background:var(--el-color-primary-light-9)}
-article {overflow:auto;min-width:0;padding:var(--space-md) var(--space-lg)}
+article {overflow:auto;min-width:0;padding:var(--space-md);background:var(--color-card)}
+aside {background:var(--color-card)}
+.report-sheet {width:100%;max-width:1180px;min-width:0}
 .report-date-filter {width:100%;min-width:0;box-sizing:border-box}
 .page-toolbar {justify-content:flex-start}.page-toolbar > .muted {margin-right:auto}
 .report-action {font-size:var(--font-size-body)}
-.report-toolbar {padding-bottom:var(--space-xs)}.report-identity {display:flex;align-items:baseline;gap:var(--space-sm);flex-wrap:wrap}
+.report-toolbar {padding-bottom:var(--space-sm);margin-bottom:var(--space-sm);border-bottom:1px solid var(--color-border)}.report-identity {display:flex;align-items:baseline;gap:var(--space-sm);flex-wrap:wrap}
 .plan-hint {margin:0 0 var(--space-sm)}
-.section {margin:var(--space-md) 0}.section h2 {margin-bottom:var(--space-sm)}
+.section {margin:var(--space-lg) 0}.section h2 {margin-bottom:var(--space-sm)}
 @media(max-width:760px){.columns {grid-template-columns:170px minmax(0,1fr)}article {padding:var(--space-sm)}}
 </style>

@@ -2,9 +2,9 @@
  <div class="plan-table" :class="{'plan-table-editing':editable,'plan-table-other':section==='other'&&!queue}">
   <div v-if="editable && !queue && section !== 'other'" class="merge-toolbar"><el-button :disabled="selected.length < 2" @click="emit('merge',selected.map(r=>r.id));selected=[]">合并安排（{{ selected.length }}）</el-button><span class="order-meta">共同事项可合并填写；部分完成前先拆开订单。</span></div>
   <el-alert v-if="error" :title="error" type="error" :closable="false" />
-  <el-table :data="drafts" row-key="id" :class="{'editable-grid':editable}" :max-height="editable?undefined:420" empty-text="暂无待办" @selection-change="selected=$event">
+  <el-table :data="drafts" row-key="id" :class="{'editable-grid':editable}" empty-text="暂无待办" @selection-change="selected=$event">
    <el-table-column v-if="editable && !queue && section!=='other'" type="selection" width="42" />
-   <el-table-column v-if="queue || section!=='other'" label="订单 / 款式" min-width="200">
+   <el-table-column v-if="queue || section!=='other'" label="订单 / 款式" min-width="260">
     <template #default="{row,$index}">
      <template v-if="editable && !queue && !row.sourceIds?.length">
       <el-select-v2 v-if="editingOrderId===row.id" :model-value="taskOrders(row)" :options="orderOptions" multiple filterable :aria-label="section+'第'+($index+1)+'行订单'" @update:model-value="patch(row.id,{orders:$event,order:$event[0]||''})" />
@@ -16,7 +16,7 @@
    </el-table-column>
    <el-table-column v-if="queue || section!=='other'" label="当前状态 / 事项" min-width="140"><template #default="{row}"><template v-if="queue"><div>{{ queueInfo(row)?.status || queueInfo(row)?.title }}</div><div v-if="queueInfo(row)?.status" class="order-meta">{{ queueInfo(row)?.title }}</div><div class="order-meta">{{ queueInfo(row)?.factory }}</div><div v-if="queueInfo(row)?.quantity!=null" class="order-meta">数量 {{ queueInfo(row)?.quantity }}</div><div class="order-meta">{{ queueInfo(row)?.remark }}</div></template><template v-else>{{ [...new Set(taskOrders(row).map(no=>info(row,no)?.status).filter(Boolean))].join('、') }}</template></template></el-table-column>
    <el-table-column :label="section==='other'&&!queue?'任务 / 协助反馈':'下一步动作（选填）'" min-width="180"><template #default="{row,$index}"><el-input v-if="editable" :model-value="row.title" :disabled="!!row.end" type="textarea" :autosize="{minRows:1,maxRows:4}" maxlength="200" placeholder="填写下一步动作或需要协助的事项" :aria-label="section+'第'+($index+1)+'行工作安排'" @update:model-value="patch(row.id,{title:$event})" /><span v-else>{{ row.title || '—' }}</span></template></el-table-column>
-   <el-table-column label="执行日期（选填）" width="145"><template #default="{row,$index}"><el-date-picker v-if="editable" :model-value="row.date" :disabled="!!row.end" type="date" value-format="YYYY-MM-DD" clearable :aria-label="section+'第'+($index+1)+'行预计日期'" @update:model-value="patch(row.id,{date:$event||''})" /><span v-else>{{ row.date || '未安排' }}</span></template></el-table-column>
+   <el-table-column label="执行日期（选填）" width="165"><template #default="{row,$index}"><el-date-picker style="width:100%" v-if="editable" :model-value="row.date" :disabled="!!row.end" type="date" value-format="YYYY-MM-DD" clearable :aria-label="section+'第'+($index+1)+'行预计日期'" @update:model-value="patch(row.id,{date:$event||''})" /><span v-else>{{ row.date || '未安排' }}</span></template></el-table-column>
    <el-table-column v-if="!queue" label="紧急" width="65"><template #default="{row}"><el-checkbox v-if="editable" :model-value="!!row.urgent" aria-label="紧急" @update:model-value="patch(row.id,{urgent:!!$event})" /><el-tag v-else-if="row.urgent" type="danger" size="small">紧急</el-tag></template></el-table-column>
    <el-table-column v-if="!queue && section==='other'" label="需要协助" width="95"><template #default="{row}"><el-checkbox v-if="editable" :model-value="!!row.needsHelp" aria-label="需要协助" @update:model-value="patch(row.id,{needsHelp:!!$event})" /><span v-else>{{ row.needsHelp?'需要协助':'—' }}</span></template></el-table-column>
    <el-table-column v-if="editable && !queue" :label="section==='other'?'完成':'上一步完成'" width="105"><template #default="{row}"><el-checkbox :model-value="row.done" :disabled="!row.sourceIds?.length" :aria-label="row.order+'上一步完成'" @update:model-value="patch(row.id,{done:!!$event})" /></template></el-table-column>
@@ -41,9 +41,7 @@ const queueInfo=(row:DraftRow)=>queuesByKey.value.get(row.id)
 const info=(row:DraftRow,no:string)=>props.queue?{...ordersByNo.value.get(no),...queueInfo(row)}:ordersByNo.value.get(no)
 </script>
 <style scoped>
-.plan-table {width:100%;max-width:980px;min-width:0}
-.plan-table-editing {max-width:1180px}
-.plan-table-other {max-width:760px}
+.plan-table {width:100%;min-width:0}
 .order-thumb {flex-shrink:0}
 .order-copy {min-width:0;flex:1;text-align:left}
 .order-customer {overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
