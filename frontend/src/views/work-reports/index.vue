@@ -38,7 +38,7 @@ import AppDialog from '@/components/AppDialog.vue'
 import WorkReportStatistics from '@/components/workspace/WorkReportStatistics.vue'
 import WorkReportTaskEditor from '@/components/workspace/WorkReportTaskEditor.vue'
 import WorkReportTaskTable from '@/components/workspace/WorkReportTaskTable.vue'
-import {reportQueues} from '@/composables/workReportPresentation'
+import {reportQueues,compareReportPlans} from '@/composables/workReportPresentation'
 import {isReportScheduled} from '@/composables/workReportSchedule'
 import {useLiveWorkReport} from '@/composables/useLiveWorkReport'
 import type {DraftRow,WorkTask} from '@/composables/workReportDemo'
@@ -57,7 +57,7 @@ const adjustments=computed(()=>tasks.value.filter(t=>t.status==='deferred'&&t.re
 const queues=computed(()=>report.value?reportQueues(report.value):[])
 const statistics=computed(()=>[...queues.value,...(report.value?.automatic.filter(g=>!g.title.startsWith('当前'))||[]),...sections.value.filter(g=>g.type!=='other').map(g=>({title:'当前'+g.label,note:'负责跟进的订单，按订单去重；不代表当日产量。',rows:g.rows.flatMap(t=>(t.orders?.length?t.orders:[t.order]).map(no=>({orderId:catalog.value.find(o=>o.no===no)?.id||0,orderNo:no,sku:catalog.value.find(o=>o.no===no)?.sku||'',title:t.title,time:'',quantity:null,factory:'',imageUrl:''})))}))])
 const viewDrafts=(rows:WorkTask[]):DraftRow[]=>rows.map(t=>({...t,title:t.id.startsWith('auto-')?'':t.title,sourceIds:[t.id],done:false}))
-const queueDrafts=(rows:AutomaticRow[]):DraftRow[]=>rows.map(r=>({id:r.planKey!,order:r.orderNo,orders:[r.orderNo],section:'bulk',title:automaticPlan(r.planKey!)?.title||'',date:automaticPlan(r.planKey!)?.date||'',sourceIds:[],done:false}))
+const queueDrafts=(rows:AutomaticRow[]):DraftRow[]=>rows.map<DraftRow>(r=>({id:r.planKey!,order:r.orderNo,orders:[r.orderNo],section:'bulk',title:automaticPlan(r.planKey!)?.title||'',date:automaticPlan(r.planKey!)?.date||'',sourceIds:[],done:false})).sort((a,b)=>compareReportPlans(editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===a.id)?.date||''}:a,editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===b.id)?.date||''}:b))
 function updateQueue(id:string,patch:Partial<DraftRow>){const plan=automaticPlan(id);if(plan){if(patch.title!==undefined)plan.title=patch.title;if(patch.date!==undefined)plan.date=patch.date}}
 function updateRow(id:string,patch:Partial<DraftRow>){const row=drafts.value.find(r=>r.id===id);if(row)Object.assign(row,patch)}
 function remove(id:string){if(!drafts.value.find(r=>r.id===id)?.sourceIds?.length)drafts.value=drafts.value.filter(r=>r.id!==id)}

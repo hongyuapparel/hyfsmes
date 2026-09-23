@@ -69,3 +69,24 @@ it('隔夜返回今天，历史待办不显示为零，且可以回到今天',as
   expect(api.getLiveReport.mock.lastCall?.[1]).toBe('2026-09-15')
  }finally{w.unmount();vi.useRealTimers()}
 })
+
+it('自动待办按执行日期排序，编辑日期不跳行，保存后重排',async()=>{
+ const rows=[1,2,3].map(n=>({...row,orderId:n,orderNo:'SORT-'+n,planKey:'sort:'+n}))
+ const tasks=[{id:'t1',automaticKey:'sort:1',date:'2099-01-02',title:''},{id:'t2',automaticKey:'sort:2',date:'2099-01-01',title:''}]
+ api.getLiveReport.mockResolvedValue({data:{...report(),tasks,automatic:[{title:'当前待采购（部门）',note:'',rows}]}})
+ const w=await open();try{
+ const order=()=>w.findAll('article .el-table__body-wrapper tbody tr').slice(0,3).map(r=>r.text().match(/SORT-\d/)?.[0])
+ expect(order()).toEqual(['SORT-2','SORT-1','SORT-3'])
+ await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises()
+ const dateInput=w.get('input[aria-label="bulk第1行预计日期"]');await dateInput.setValue('2099-01-03');await dateInput.trigger('change');await flushPromises()
+ expect(order()).toEqual(['SORT-2','SORT-1','SORT-3'])
+ api.saveReportPlans.mockResolvedValue({data:{version:1,tasks:[tasks[0],{...tasks[1],date:'2099-01-03'}]}})
+ await w.findAll('button').find(b=>b.text()==='保存')!.trigger('click');await flushPromises()
+ expect(order()).toEqual(['SORT-1','SORT-2','SORT-3'])
+ }finally{w.unmount()}
+})
+it('普通账号可查看他人报告，但没有编辑及报告设置入口',async()=>{
+ const other={...person,id:2,name:'其他部门'}
+ api.getReportDirectory.mockResolvedValue({data:{configured:true,people:[other]}});api.getLiveReport.mockResolvedValue({data:{...report(),person:other}})
+ const w=await open();try{expect(w.text()).toContain('其他部门');expect(w.text()).toContain('TEST-12');expect(w.findAll('button').some(b=>['编辑','报告设置'].includes(b.text()))).toBe(false)}finally{w.unmount()}
+})

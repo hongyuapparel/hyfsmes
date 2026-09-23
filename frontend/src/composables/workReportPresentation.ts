@@ -12,3 +12,7 @@ export function reportCount(rows:AutomaticRow[],title:string) {
  const quantity=rows.length>0&&!title.includes('采购')&&rows.every(r=>r.quantity!=null&&Number.isFinite(Number(r.quantity)))?rows.reduce((n,r)=>n+Number(r.quantity),0):null
  return {orders,quantity,items:rows.length,unlinked}
 }
+
+export function compareReportPlans(a:{date:string;urgent?:boolean},b:{date:string;urgent?:boolean}) {
+ return (a.date||'9999-12-31').localeCompare(b.date||'9999-12-31') || Number(!!b.urgent)-Number(!!a.urgent)
+}

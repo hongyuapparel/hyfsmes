@@ -25,15 +25,14 @@ export class WorkReportsService {
      WHERE p.code='work_reports_all' AND rp.role_id IN (SELECT role_id FROM users WHERE id=? UNION SELECT role_id FROM user_roles WHERE user_id=?) LIMIT 1`, [id,id]);
    return rows.length > 0;
  }
- async people(actor: number): Promise<Person[]> {
-   const all = await this.canReadAll(actor);
+ async people(_actor: number): Promise<Person[]> {
    return this.db.query(`SELECT u.id, COALESCE(NULLIF(u.display_name,''),u.username) name,u.username,
      GROUP_CONCAT(DISTINCT r.code) codes,GROUP_CONCAT(DISTINCT r.name SEPARATOR ' / ') role
      FROM users u JOIN roles r ON r.id=u.role_id OR r.id IN (SELECT role_id FROM user_roles WHERE user_id=u.id)
-     WHERE u.status='active' AND (?=1 OR u.id=?) GROUP BY u.id ORDER BY u.id`, [all?1:0,actor]);
+     WHERE u.status='active' GROUP BY u.id ORDER BY u.id`);
  }
- async orders(actor: number): Promise<CatalogOrder[]> {
-   const all = await this.canReadAll(actor);
+ async orders(actor: number, forEditing=false): Promise<CatalogOrder[]> {
+   const all = !forEditing || await this.canReadAll(actor);
    const [self]: Person[] = await this.db.query("SELECT id,username,COALESCE(NULLIF(display_name,''),username) name FROM users WHERE id=?", [actor]);
    const rows:CatalogOrder[]=await this.db.query(`SELECT o.id,o.order_no no,o.sku_code sku,o.customer_name customer,o.salesperson,o.merchandiser,
      COALESCE(s.label,o.status) status,o.image_url imageUrl, IF(COALESCE(s.is_final,0)=0 AND o.status NOT IN ('draft','pending_review'),1,0) active,
@@ -143,7 +142,7 @@ export class WorkReportsService {
        || !['orders','sourceIds'].every(k=>Array.isArray(r[k]) && (r[k] as unknown[]).length<=1000 && (r[k] as unknown[]).every(v=>typeof v==='string'))
        || ['urgent','needsHelp','end'].some(k=>r[k]!==undefined && typeof r[k]!=='boolean')) throw new BadRequestException('行字段无效');
    }
-   const orders=await this.orders(actor),today=reportToday();
+   const orders=await this.orders(actor,true),today=reportToday();
    const plans=b.automaticPlans as {key:string;title:string;date:string}[]|undefined;
    if(plans!==undefined){
     if(!Array.isArray(plans)||plans.length>5000)throw new BadRequestException('自动待办安排格式无效');

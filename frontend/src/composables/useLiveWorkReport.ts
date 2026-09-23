@@ -2,7 +2,8 @@ import { isReportScheduled } from './workReportSchedule'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getReportDirectory,getReportOrders,getLiveReport,saveReportPlans,type ReportDirectoryPerson,type ReportOrder,type LiveReport,type AutomaticRow,type AutomaticPlan } from '@/api/work-reports'
-import { compareTasks, taskOrders, type DraftRow, type WorkTask } from './workReportDemo'
+import { compareReportPlans } from './workReportPresentation'
+import { taskOrders, type DraftRow, type WorkTask } from './workReportDemo'
 import { getErrorMessage } from '@/api/request'
 export function useLiveWorkReport() {
  const auth=useAuthStore(),people=ref<ReportDirectoryPerson[]>([]),catalog=ref<ReportOrder[]>([]),report=ref<LiveReport|null>(null)
@@ -18,7 +19,7 @@ export function useLiveWorkReport() {
  const unplanned=computed(()=>(report.value?.pendingOrders||[]).filter(o=>report.value?.template.manualSections.includes(o.orderType)&&!tasks.value.some(t=>t.status==='todo'&&taskOrders(t).includes(o.no))))
  const autoTasks=computed<WorkTask[]>(()=>unplanned.value.map(o=>({id:'auto-'+o.id,owner:String(owner.value),order:o.no,orders:[o.no],section:o.orderType,title:'可补充下一步安排',date:'',status:'todo',completedDate:'',history:[]})))
  const sections=computed(()=>(report.value?.template.manualSections||[]).map(type=>({type,label:type==='sample'?'样品订单':type==='bulk'?'大货订单':'其他事项 / 特殊说明（选填）',
-   rows:[...tasks.value.filter(t=>t.status==='todo'&&t.section===type).sort((a,b)=>compareTasks(a,b,today.value)),...autoTasks.value.filter(t=>t.section===type)],drafts:drafts.value.filter(t=>t.section===type)})))
+   rows:[...tasks.value.filter(t=>t.status==='todo'&&t.section===type),...autoTasks.value.filter(t=>t.section===type)].sort(compareReportPlans),drafts:drafts.value.filter(t=>t.section===type)})))
  const legacyTasks=computed(()=>tasks.value.filter(t=>t.status==='todo'&&!sections.value.some(s=>s.type===t.section)))
  let requestId=0
  async function load() {
@@ -40,7 +41,7 @@ export function useLiveWorkReport() {
    await load()
   }catch(e){error.value=getErrorMessage(e,'更新报告范围失败')}
  }
- function edit() {message.value='';drafts.value=tasks.value.filter(t=>t.status==='todo').map(t=>({id:t.id,order:t.order,orders:[...taskOrders(t)],sourceIds:[t.id],section:t.section,title:t.title,date:t.date,urgent:t.urgent,needsHelp:t.needsHelp,done:false,end:false}));for(const o of unplanned.value){add(o.orderType,o.no);drafts.value[drafts.value.length-1].id="auto-"+o.id;drafts.value[drafts.value.length-1].date="";}automaticDrafts.value=(report.value?.automatic||[]).flatMap(g=>g.rows.filter(r=>r.planKey).map(r=>{const saved=report.value?.tasks.find(t=>t.automaticKey===r.planKey);return {key:r.planKey!,title:saved?.title||'',date:saved?.date||''}}));baseline.value=draftState();editing.value=true}
+ function edit() {message.value='';drafts.value=tasks.value.filter(t=>t.status==='todo').map(t=>({id:t.id,order:t.order,orders:[...taskOrders(t)],sourceIds:[t.id],section:t.section,title:t.title,date:t.date,urgent:t.urgent,needsHelp:t.needsHelp,done:false,end:false}));for(const o of unplanned.value){add(o.orderType,o.no);drafts.value[drafts.value.length-1].id="auto-"+o.id;drafts.value[drafts.value.length-1].date="";}drafts.value.sort(compareReportPlans);automaticDrafts.value=(report.value?.automatic||[]).flatMap(g=>g.rows.filter(r=>r.planKey).map(r=>{const saved=report.value?.tasks.find(t=>t.automaticKey===r.planKey);return {key:r.planKey!,title:saved?.title||'',date:saved?.date||''}}));baseline.value=draftState();editing.value=true}
  function add(section:'sample'|'bulk'|'other',no='') {drafts.value.push({id:'new-'+crypto.randomUUID(),section,order:no,orders:no?[no]:[],sourceIds:[],title:'',date:today.value,done:false,end:false})}
  function annotate(row:AutomaticRow){if(!sections.value.some(s=>s.type==='other'))return;if(!editing.value)edit();add('other');drafts.value[drafts.value.length-1].title=row.orderNo+' · '+row.title+'：'}
  function merge(ids:string[]) {
