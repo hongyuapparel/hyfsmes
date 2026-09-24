@@ -3,7 +3,7 @@
     <el-table-column v-if="!other" label="关联订单 / 款式" min-width="240">
       <template #default="{ row }">
         <el-tag v-if="row.urgent" type="danger" size="small">紧急</el-tag>
-        <span v-if="row.section === 'other'">其他事项</span>
+        <span v-if="row.section === 'other' && !taskOrders(row).length">其他事项</span>
         <div v-for="no in taskOrders(row)" :key="no" class="order-line"><AppImageThumb :src="getOrder(no)?.imageUrl" variant="compact" empty-text="暂无图片" /><div><strong>{{ no }} · {{ getOrder(no)?.sku }}</strong><div class="order-meta">{{ getOrder(no)?.status }} · {{ getOrder(no)?.salesperson }} · {{ getOrder(no)?.customer }}</div></div></div>
       </template>
     </el-table-column>

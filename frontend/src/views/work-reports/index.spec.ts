@@ -90,3 +90,10 @@ it('普通账号可查看他人报告，但没有编辑及报告设置入口',as
  api.getReportDirectory.mockResolvedValue({data:{configured:true,people:[other]}});api.getLiveReport.mockResolvedValue({data:{...report(),person:other}})
  const w=await open();try{expect(w.text()).toContain('其他部门');expect(w.text()).toContain('TEST-12');expect(w.findAll('button').some(b=>['编辑','报告设置'].includes(b.text()))).toBe(false)}finally{w.unmount()}
 })
+
+it('过期计划有提醒和筛选，已结束订单单独提示并保持完成操作',async()=>{
+ const yesterday=new Date(Date.parse(today+'T00:00:00Z')-86400000).toISOString().slice(0,10);
+ const tasks=[{id:'old',order:'OLD',orders:['OLD'],owner:'1',section:'sample',title:'跟进',date:yesterday,status:'todo',history:[]},{id:'now',order:'NOW',orders:['NOW'],owner:'1',section:'sample',title:'今天',date:today,status:'todo',history:[]}];
+ api.getReportOrders.mockResolvedValue({data:[{no:'OLD',sku:'A',finished:1,orderType:'sample'},{no:'NOW',sku:'B',finished:0,orderType:'sample'}]});api.getLiveReport.mockResolvedValue({data:{...report(),tasks,automatic:[],template:{id:'merchandiser',manualSections:['sample'],automaticSources:[]}}});
+ const w=await open();try{expect(w.text()).toContain('逾期 1 天');expect(w.text()).toContain('订单已结束，请确认安排是否结束');await w.findAll('button').find(b=>b.text()==='逾期待处理 1 项')!.trigger('click');expect(w.get('.plan-table').text()).not.toContain('NOW · B');await w.findAll('button').find(b=>b.text()==='编辑')!.trigger('click');await flushPromises();expect(w.text()).toContain('NOW · B');expect(w.text()).toContain('结束跟进');expect(w.text()).toContain('需要协助')}finally{w.unmount()}
+})

@@ -13,13 +13,14 @@
    </aside>
    <article ref="reportArticle" v-loading="busy">
     <div v-if="report && !busy" class="report-sheet">
-     <div class="toolbar report-toolbar"><div class="report-identity"><h2>{{ report.person.name }} · {{ report.person.role }}</h2><span class="muted">{{ date }}</span></div><div><el-button v-if="mine&&!editing&&(sections.length||report.automatic.some(g=>g.rows.some(r=>r.planKey)))" type="primary" size="small" class="report-action" @click="edit">编辑</el-button><template v-if="editing"><el-button size="small" class="report-action" :disabled="saving" @click="navigate({cancel:true})">取消</el-button><el-button type="primary" size="small" class="report-action" :loading="saving" @click="save">保存</el-button></template></div></div>
+     <div class="toolbar report-toolbar"><div class="report-identity"><h2>{{ report.person.name }} · {{ report.person.role }}</h2><span class="muted">{{ date }}</span></div><div><el-button v-if="mine&&!editing&&(sections.length||report.automatic.some(g=>g.rows.some(r=>r.planKey)))" type="primary" size="small" class="report-action" @click="startEdit">编辑</el-button><template v-if="editing"><el-button size="small" class="report-action" :disabled="saving" @click="navigate({cancel:true})">取消</el-button><el-button type="primary" size="small" class="report-action" :loading="saving" @click="save">保存</el-button></template></div></div>
      <p class="muted plan-hint">订单自动带入；动作和日期沿用上次保存内容，可修改或留空。</p>
+     <div v-if="attention.overdue || attention.finished" class="attention-bar"><el-button size="small" :type="attentionFilter==='overdue'?'danger':'default'" :disabled="editing" @click="attentionFilter=attentionFilter==='overdue'?'all':'overdue'">逾期待处理 {{ attention.overdue }} 项</el-button><el-button v-if="attention.finished" size="small" :type="attentionFilter==='finished'?'warning':'default'" :disabled="editing" @click="attentionFilter=attentionFilter==='finished'?'all':'finished'">订单已结束待确认 {{ attention.finished }} 项</el-button><el-button v-if="attentionFilter!=='all'" link @click="attentionFilter='all'">显示全部</el-button><span class="muted">保留原日期；请确认完成、改期或标记需要协助。</span></div>
      <el-alert v-if="report.historicalMissing && !editing" title="该日期之前尚无保存的工作安排，不用当前计划冒充历史日报。" type="info" :closable="false" />
-     <section v-for="group in queues" :key="group.title" class="section"><h2>{{ group.title }} · {{ date!==today ? '未保存历史快照' : group.rows.length+' 条' }}</h2><p v-if="date!==today" class="muted">历史日期未保存待办快照。</p><WorkReportTaskEditor :editable="editing && mine" queue section="bulk" :drafts="queueDrafts(group.rows)" :queue-rows="group.rows" :catalog="catalog" :originals="[]" error="" @update="updateQueue" /></section>
-     <template v-if="editing"><p class="muted">跟单换下一步时可勾选上一步完成；部分订单完成请先拆开。其他事项做完直接勾选完成。</p><section v-for="group in sections" :key="group.type" class="section"><h2>{{ group.label }} {{ group.drafts.length }} 项</h2><WorkReportTaskEditor :section="group.type" :drafts="group.drafts" :originals="tasks" :catalog="catalog" error="" @add="add(group.type)" @update="updateRow" @merge="merge" @split="split" @remove="remove" /></section></template>
+     <section v-for="group in queues" :key="group.title" class="section"><h2>{{ group.title }} · {{ date!==today ? '未保存历史快照' : (attentionFilter==='all'?group.rows.length:visiblePlans(queueDrafts(group.rows)).length+' / '+group.rows.length)+' 条' }}</h2><p v-if="date!==today" class="muted">历史日期未保存待办快照。</p><WorkReportTaskEditor :editable="editing && mine" queue section="bulk" :drafts="visiblePlans(queueDrafts(group.rows))" :reference-date="date" :queue-rows="group.rows" :catalog="catalog" :originals="report.tasks" error="" @update="updateQueue" /></section>
+     <template v-if="editing"><p class="muted">跟单：换下一步勾选上一步完成；结束时勾选结束跟进，已做完可同时勾选完成。部分订单完成请先拆开。岗位清单：动作完成只结束手写安排，不改变生产进度。改期会保留原安排记录。</p><section v-for="group in sections" :key="group.type" class="section"><h2>{{ group.label }} {{ group.drafts.length }} 项</h2><WorkReportTaskEditor :section="group.type" :drafts="group.drafts" :reference-date="date" :check-finished="date===today" :originals="tasks" :catalog="catalog" error="" @add="add(group.type)" @update="updateRow" @merge="merge" @split="split" @remove="remove" /></section></template>
      <template v-else>
-      <section v-for="group in sections" :key="group.type" class="section"><h2>{{ group.label }} · 工作安排 {{ group.rows.length }} 项</h2><WorkReportTaskEditor :editable="false" :section="group.type" :drafts="viewDrafts(group.rows)" :catalog="catalog" :originals="[]" error="" /></section>
+      <section v-for="group in sections" :key="group.type" class="section"><h2>{{ group.label }} · 工作安排 {{ attentionFilter==='all'?group.rows.length:visiblePlans(viewDrafts(group.rows)).length+' / '+group.rows.length }} 项</h2><WorkReportTaskEditor :editable="false" :section="group.type" :drafts="visiblePlans(viewDrafts(group.rows))" :reference-date="date" :check-finished="date===today" :catalog="catalog" :originals="[]" error="" /></section>
       <section v-if="legacyTasks.length" class="section"><h2>已有补充安排</h2><WorkReportTaskTable :tasks="legacyTasks" :catalog="catalog" :editable="false" :reference-date="date" /></section>
      </template>
      <WorkReportStatistics :groups="statistics" :historical="date!==today" />
@@ -32,13 +33,13 @@
  </div>
 </template>
 <script setup lang="ts">
-import {computed,onMounted,onActivated,onBeforeUnmount,ref} from 'vue'
+import {computed,onMounted,onActivated,onBeforeUnmount,ref,watch} from 'vue'
 import {useRouter,onBeforeRouteLeave} from 'vue-router'
 import AppDialog from '@/components/AppDialog.vue'
 import WorkReportStatistics from '@/components/workspace/WorkReportStatistics.vue'
 import WorkReportTaskEditor from '@/components/workspace/WorkReportTaskEditor.vue'
 import WorkReportTaskTable from '@/components/workspace/WorkReportTaskTable.vue'
-import {reportQueues,compareReportPlans} from '@/composables/workReportPresentation'
+import {reportQueues,compareReportPlans,planOverdueDays} from '@/composables/workReportPresentation'
 import {isReportScheduled} from '@/composables/workReportSchedule'
 import {useLiveWorkReport} from '@/composables/useLiveWorkReport'
 import type {DraftRow,WorkTask} from '@/composables/workReportDemo'
@@ -57,8 +58,15 @@ const adjustments=computed(()=>tasks.value.filter(t=>t.status==='deferred'&&t.re
 const queues=computed(()=>report.value?reportQueues(report.value):[])
 const statistics=computed(()=>[...queues.value,...(report.value?.automatic.filter(g=>!g.title.startsWith('当前'))||[]),...sections.value.filter(g=>g.type!=='other').map(g=>({title:'当前'+g.label,note:'负责跟进的订单，按订单去重；不代表当日产量。',rows:g.rows.flatMap(t=>(t.orders?.length?t.orders:[t.order]).map(no=>({orderId:catalog.value.find(o=>o.no===no)?.id||0,orderNo:no,sku:catalog.value.find(o=>o.no===no)?.sku||'',title:t.title,time:'',quantity:null,factory:'',imageUrl:''})))}))])
 const viewDrafts=(rows:WorkTask[]):DraftRow[]=>rows.map(t=>({...t,title:t.id.startsWith('auto-')?'':t.title,sourceIds:[t.id],done:false}))
-const queueDrafts=(rows:AutomaticRow[]):DraftRow[]=>rows.map<DraftRow>(r=>({id:r.planKey!,order:r.orderNo,orders:[r.orderNo],section:'bulk',title:automaticPlan(r.planKey!)?.title||'',date:automaticPlan(r.planKey!)?.date||'',sourceIds:[],done:false})).sort((a,b)=>compareReportPlans(editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===a.id)?.date||''}:a,editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===b.id)?.date||''}:b))
-function updateQueue(id:string,patch:Partial<DraftRow>){const plan=automaticPlan(id);if(plan){if(patch.title!==undefined)plan.title=patch.title;if(patch.date!==undefined)plan.date=patch.date}}
+const queueDrafts=(rows:AutomaticRow[]):DraftRow[]=>rows.map<DraftRow>(r=>({id:r.planKey!,order:r.orderNo,orders:[r.orderNo],section:'bulk',title:automaticPlan(r.planKey!)?.title||'',date:automaticPlan(r.planKey!)?.date||'',needsHelp:!!automaticPlan(r.planKey!)?.needsHelp,sourceIds:[],done:!!(automaticPlan(r.planKey!) as {done?:boolean})?.done})).sort((a,b)=>compareReportPlans(editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===a.id)?.date||''}:a,editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===b.id)?.date||''}:b))
+const attentionFilter=ref<'all'|'overdue'|'finished'>('all')
+watch([owner,date],()=>{attentionFilter.value='all'})
+const finishedNos=computed(()=>new Set(date.value===today.value?catalog.value.filter(o=>o.finished===1).map(o=>o.no):[]))
+const hasFinished=(row:DraftRow)=>(row.orders||[row.order]).some(no=>finishedNos.value.has(no))
+const attention=computed(()=>{const manual=sections.value.flatMap(g=>viewDrafts(g.rows)),all=[...manual,...queues.value.flatMap(g=>queueDrafts(g.rows))];return {overdue:all.filter(r=>planOverdueDays(r.date,date.value)>0).length,finished:manual.filter(hasFinished).length}})
+const visiblePlans=(rows:DraftRow[])=>editing.value||attentionFilter.value==='all'?rows:rows.filter(r=>attentionFilter.value==='overdue'?planOverdueDays(r.date,date.value)>0:hasFinished(r))
+function startEdit(){attentionFilter.value='all';edit()}
+function updateQueue(id:string,patch:Partial<DraftRow>){const plan=automaticPlan(id);if(plan){if(patch.title!==undefined)plan.title=patch.title;if(patch.date!==undefined)plan.date=patch.date;if(patch.needsHelp!==undefined)plan.needsHelp=patch.needsHelp;if(patch.done!==undefined)(plan as {done?:boolean}).done=patch.done}}
 function updateRow(id:string,patch:Partial<DraftRow>){const row=drafts.value.find(r=>r.id===id);if(row)Object.assign(row,patch)}
 function remove(id:string){if(!drafts.value.find(r=>r.id===id)?.sourceIds?.length)drafts.value=drafts.value.filter(r=>r.id!==id)}
 function navigate(next:Target){if(saving.value)return;target.value=next;if(dirty.value)leaveVisible.value=true;else void leave(false)}
@@ -91,6 +99,7 @@ aside {background:var(--color-card)}
 .page-toolbar {justify-content:flex-start}.page-toolbar > .muted {margin-right:auto}
 .report-action {font-size:var(--font-size-body)}
 .report-toolbar {padding-bottom:var(--space-sm);margin-bottom:var(--space-sm);border-bottom:1px solid var(--color-border)}.report-identity {display:flex;align-items:baseline;gap:var(--space-sm);flex-wrap:wrap}
+.attention-bar {display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-xs);margin-bottom:var(--space-sm)}
 .plan-hint {margin:0 0 var(--space-sm)}
 .section {margin:var(--space-lg) 0}.section h2 {margin-bottom:var(--space-sm)}
 @media(max-width:760px){.columns {grid-template-columns:170px minmax(0,1fr)}article {padding:var(--space-sm)}}

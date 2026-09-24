@@ -16,3 +16,9 @@ export function reportCount(rows:AutomaticRow[],title:string) {
 export function compareReportPlans(a:{date:string;urgent?:boolean},b:{date:string;urgent?:boolean}) {
  return (a.date||'9999-12-31').localeCompare(b.date||'9999-12-31') || Number(!!b.urgent)-Number(!!a.urgent)
 }
+
+export function planOverdueDays(date:string, referenceDate:string) {
+ if(!date || date>=referenceDate)return 0;
+ const days=(Date.parse(referenceDate+'T00:00:00Z')-Date.parse(date+'T00:00:00Z'))/86400000;
+ return Number.isFinite(days)?Math.max(0,days):0;
+}

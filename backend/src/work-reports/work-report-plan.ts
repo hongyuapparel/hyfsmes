@@ -76,3 +76,17 @@ export function applyReportBatch(current: WorkTask[], drafts: DraftRow[], newId:
 export function validReportDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + 'T12:00:00Z')) && new Date(value + 'T12:00:00Z').toISOString().slice(0, 10) === value;
 }
+
+export interface AutomaticPlanInput { key:string; title:string; date:string; needsHelp?:boolean; done?:boolean }
+export function applyAutomaticPlans(previous:WorkTask[], plans:AutomaticPlanInput[], newId:()=>string, owner:string, today:string, rows:{planKey?:string;orderNo:string}[]):WorkTask[] {
+ const next=previous.filter(t=>!plans.some(p=>p.key===t.automaticKey));
+ for(const p of plans){
+  const old=previous.find(t=>t.automaticKey===p.key), title=p.title.trim();
+  if(old && !p.done && old.title===title && old.date===p.date && !!old.needsHelp===!!p.needsHelp){next.push(old);continue}
+  if(old){const order=rows.find(r=>r.planKey===p.key)?.orderNo||'';
+   next.push({...old,id:newId(),automaticKey:undefined,order,orders:order?[order]:[],status:p.done?'done':'deferred',completedDate:p.done?today:'',recordedDate:today,revision:p.done?'手写动作已完成，生产进度以岗位工作页为准':('调整为：'+(title||'未填写')+'（'+(p.date||'未安排')+'）'+(p.needsHelp?' · 需要协助':'')),history:[...old.history]});
+  }
+  if(!p.done&&(title||p.date||p.needsHelp))next.push({id:old?.id||newId(),automaticKey:p.key,owner,order:'',orders:[],section:'other',title,date:p.date,needsHelp:!!p.needsHelp,status:'todo',completedDate:'',recordedDate:today,history:[...(old?.history||[]),today+'｜保存工作安排']});
+ }
+ return next;
+}
