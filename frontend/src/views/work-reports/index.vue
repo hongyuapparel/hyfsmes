@@ -12,8 +12,8 @@
     <div class="person-list"><section v-for="day in days" :key="day"><h2 class="muted">{{ day }}</h2><button v-for="p in peopleOn(day)" :key="p.id" class="person" :title="`${p.name} · ${p.role}`" :class="{selected:p.id===owner&&day===date}" @click="navigate({owner:p.id,date:day})"><strong>{{ p.name }}</strong><span class="muted">{{ p.role }} · 报告</span></button><p v-if="!peopleOn(day).length" class="muted">当天无报告安排</p></section><el-empty v-if="!filteredPeople.length && !busy" description="暂无可查看人员" :image-size="60" /></div>
    </aside>
    <article ref="reportArticle" v-loading="busy">
-    <div v-if="report && !busy" class="report-sheet">
-     <div class="toolbar report-toolbar"><div class="report-identity"><h2>{{ report.person.name }} · {{ report.person.role }}</h2><span class="muted">{{ date }}</span></div><div><el-button v-if="mine&&!editing&&(sections.length||report.automatic.some(g=>g.rows.some(r=>r.planKey)))" type="primary" size="small" class="report-action" @click="startEdit">编辑</el-button><template v-if="editing"><el-button size="small" class="report-action" :disabled="saving" @click="navigate({cancel:true})">取消</el-button><el-button type="primary" size="small" class="report-action" :loading="saving" @click="save">保存</el-button></template></div></div>
+    <div v-if="report && !busy" class="report-sheet" :class="{'report-sheet-editing':editing}">
+     <div class="toolbar report-toolbar"><div class="report-identity"><h2>{{ report.person.name }} · {{ report.person.role }}</h2><span class="muted">{{ date }}</span><el-tag v-if="editing" type="primary" size="small">编辑中</el-tag></div><div><el-button v-if="mine&&!editing&&(sections.length||report.automatic.some(g=>g.rows.some(r=>r.planKey)))" type="primary" size="small" class="report-action" @click="startEdit">编辑</el-button><template v-if="editing"><el-button size="small" class="report-action" :disabled="saving" @click="navigate({cancel:true})">取消</el-button><el-button type="primary" size="small" class="report-action" :loading="saving" @click="save">保存</el-button></template></div></div>
      <p class="muted plan-hint">订单自动带入；动作和日期沿用上次保存内容，可修改或留空。</p>
      <div v-if="attention.overdue || attention.finished" class="attention-bar"><el-button size="small" :type="attentionFilter==='overdue'?'danger':'default'" :disabled="editing" @click="attentionFilter=attentionFilter==='overdue'?'all':'overdue'">逾期待处理 {{ attention.overdue }} 项</el-button><el-button v-if="attention.finished" size="small" :type="attentionFilter==='finished'?'warning':'default'" :disabled="editing" @click="attentionFilter=attentionFilter==='finished'?'all':'finished'">订单已结束待确认 {{ attention.finished }} 项</el-button><el-button v-if="attentionFilter!=='all'" link @click="attentionFilter='all'">显示全部</el-button><span class="muted">保留原日期；请确认完成、改期或标记需要协助。</span></div>
      <el-alert v-if="report.historicalMissing && !editing" title="该日期之前尚无保存的工作安排，不用当前计划冒充历史日报。" type="info" :closable="false" />
@@ -94,7 +94,8 @@ aside {min-width:0;display:flex;flex-direction:column;gap:var(--space-sm);paddin
 .person strong,.person span {font-size:inherit;line-height:inherit}.person strong {flex-shrink:0;font-weight:600}.person span {overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.person.selected {border-color:var(--color-primary);background:var(--el-color-primary-light-9)}
 article {overflow:auto;min-width:0;padding:var(--space-md);background:var(--color-card)}
 aside {background:var(--color-card)}
-.report-sheet {width:100%;max-width:1180px;min-width:0}
+.report-sheet {width:100%;min-width:0}
+.report-sheet-editing .report-toolbar {position:sticky;top:0;z-index:3;background:var(--el-color-primary-light-9);border:1px solid var(--el-color-primary-light-8);border-radius:var(--radius-md);padding:var(--space-sm)}
 .report-date-filter {width:100%;min-width:0;box-sizing:border-box}
 .page-toolbar {justify-content:flex-start}.page-toolbar > .muted {margin-right:auto}
 .report-action {font-size:var(--font-size-body)}
