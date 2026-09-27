@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { Order } from '../entities/order.entity';
+import { Customer } from '../entities/customer.entity';
 import {
   OrderExt,
   type OrderMaterialRow,
@@ -166,7 +167,10 @@ export class OrderQueryService {
 
     if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
     if (skuCode?.trim()) qb.andWhere('o.sku_code LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
-    if (customer?.trim()) qb.andWhere('o.customer_name LIKE :customer', { customer: `%${customer.trim()}%` });
+    if (customer?.trim()) qb.andWhere(
+      `COALESCE((SELECT c.company_name FROM customers c WHERE c.id = o.customer_id), o.customer_name) LIKE :customer`,
+      { customer: `%${customer.trim()}%` },
+    );
     if (typeof query.orderTypeId === 'number') {
       const orderTypeIds = await this.resolveOrderTypeFilterIds(query.orderTypeId);
       qb.andWhere('o.order_type_id IN (:...orderTypeIds)', { orderTypeIds });
@@ -241,12 +245,26 @@ export class OrderQueryService {
     }
   }
 
+  /** 关联档案的订单使用当前名称；未关联或档案已删除的手填记录保留原值。 */
+  async resolveCustomerNames(orders: Order[]): Promise<void> {
+    const ids = [...new Set(orders.map((order) => order.customerId).filter((id): id is number => id != null))];
+    if (!ids.length) return;
+    const customers = await this.orderRepo.manager.find(Customer, {
+      where: { id: In(ids) }, select: ['id', 'companyName'],
+    });
+    const names = new Map(customers.map((customer) => [customer.id, customer.companyName]));
+    for (const order of orders) {
+      if (order.customerId != null && names.has(order.customerId)) order.customerName = names.get(order.customerId)!;
+    }
+  }
+
   async findOne(id: number): Promise<OrderDetail> {
     const [order, ext] = await Promise.all([
       this.orderRepo.findOne({ where: { id, deletedAt: IsNull() } }),
       this.orderExtRepo.findOne({ where: { orderId: id } }),
     ]);
     if (!order) throw new NotFoundException('订单不存在');
+    await this.resolveCustomerNames([order]);
 
     const rawMaterials = ext?.materials ?? [];
     const colorSizeHeaders = ext?.colorSizeHeaders ?? [];
@@ -339,6 +357,7 @@ export class OrderQueryService {
       .getRawOne<{ totalQuantity?: string | number }>();
     const totalQuantity = Number(totalQuantityRaw?.totalQuantity ?? 0) || 0;
     const list = await qb.skip((page - 1) * pageSize).take(pageSize).getMany();
+    await this.resolveCustomerNames(list);
 
     const ids = list.map((o) => o.id);
     const remarkCountMap: Record<number, number> = {};
