@@ -204,7 +204,17 @@ export class CustomersService {
     }
     if (dto.cooperation_date !== undefined) customer.cooperationDate = dto.cooperation_date ? new Date(dto.cooperation_date) : null;
 
-    const saved = await this.customerRepo.save(customer);
+    const saved = await this.customerRepo.manager.transaction(async (manager) => {
+      const savedCustomer = await manager.save(Customer, customer);
+      // 同一客户的所有订单（含已完成、回收站）一起更新，不能按旧名称匹配。
+      // 改客户资料不算订单活动，保留订单更新时间和生产状态。
+      await manager.createQueryBuilder().update(Order)
+        .set({ customerName: savedCustomer.companyName, updatedAt: () => 'updated_at' })
+        .where('customer_id = :id', { id })
+        .andWhere('BINARY customer_name <> BINARY :name', { name: savedCustomer.companyName })
+        .execute();
+      return savedCustomer;
+    });
     const productGroup =
       saved.productGroupId != null
         ? await this.systemOptionsService.getProductGroupPathById(saved.productGroupId)
