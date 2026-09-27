@@ -151,7 +151,6 @@ export class WorkReportsService {
     automaticRows=own.automatic.flatMap(g=>g.rows);
     for(const p of plans){if(!p||typeof p.key!=='string'||!allowed.has(p.key)||seen.has(p.key)||typeof p.title!=='string'||p.title.length>200||typeof p.date!=='string'||p.date!==''&&!validReportDate(p.date)||(['done','needsHelp'] as const).some(k=>p[k]!==undefined&&typeof p[k]!=='boolean'))throw new BadRequestException('待办已更新或安排格式无效，请刷新后再试');seen.add(p.key);}
    }
-   for(const row of b.drafts as DraftRow[]) if(row.section!=='other' && row.orders?.some(no=>orders.find(o=>o.no===no)?.orderType!==row.section)) throw new BadRequestException('订单类型与板块不一致，或订单不可访问');
    return this.db.transaction(async em=>{
      await em.query("INSERT IGNORE INTO work_report_plans(owner_id,version,tasks) VALUES (?,0,'[]')",[owner]);
      const [state]:PlanState[]=await em.query('SELECT version,tasks FROM work_report_plans WHERE owner_id=? FOR UPDATE',[owner]);

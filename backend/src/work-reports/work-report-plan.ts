@@ -13,7 +13,6 @@ export function applyReportBatch(current: WorkTask[], drafts: DraftRow[], newId:
   const SELF_ID = context.owner, DEMO_DATE = context.today;
   const getOrder = (no: string) => context.orders.find(o => o.no === no);
   const validateInput = (input: TaskInput) => {
-    if (input.section !== 'other' && !getOrder(input.order)) return '请选择一个订单';
     if ((input.section === 'other' && !input.title.trim()) || input.title.length > 200) return '请填写200字以内的工作安排';
     if (input.date && !validReportDate(input.date)) return '请选择有效的预计执行日期';
     return '';
@@ -22,10 +21,16 @@ export function applyReportBatch(current: WorkTask[], drafts: DraftRow[], newId:
   if (new Set(drafts.map(r => r.id)).size !== drafts.length) throw new Error('存在重复行')
   const originals = current.filter(t => t.owner === SELF_ID && t.status === 'todo')
   const sources = (r: DraftRow) => r.sourceIds || (current.some(t => t.id === r.id) ? [r.id] : [])
+  // Existing plans belong to their report owner even after an order is reassigned,
+  // reclassified or removed. Trust only persisted sources, never client ownership.
+  const isExistingOrder = (r: DraftRow, no: string) => originals.some(t =>
+    sources(r).includes(t.id) && t.section === r.section && taskOrders(t).includes(no))
   drafts.forEach((r, i) => {
     const orders = taskOrders(r)
-    if (r.section === 'other' ? orders.length > 0 : !orders.length || orders.some(o => !getOrder(o))) throw new Error(`第 ${i + 1} 行：请检查关联订单`)
-    if (r.section !== 'other' && new Set(orders.map(o => getOrder(o)?.orderType)).size !== 1) throw new Error('样品和大货请分别安排')
+    if (r.section === 'other' ? orders.length > 0 : !orders.length) throw new Error(`第 ${i + 1} 行：请检查关联订单`)
+    if (r.section !== 'other') for (const no of orders) {
+      if (!isExistingOrder(r, no) && getOrder(no)?.orderType !== r.section) throw new Error(`第 ${i + 1} 行，订单 ${no}：订单类型与板块不一致，或订单不可访问`)
+    }
     const error = validateInput({ ...r, order: orders[0] })
     if (error) throw new Error(`第 ${i + 1} 行：${error}`)
     for (const id of sources(r)) {
