@@ -8,6 +8,8 @@ const { Order } = require('../dist/entities/order.entity');
 const { CustomersService } = require('../dist/customers/customers.service');
 const { OrderQueryService } = require('../dist/orders/order-query.service');
 const { OrderMutationService } = require('../dist/orders/order-mutation.service');
+const { CustomerXiaomanSyncService } = require('../dist/customers/customer-xiaoman-sync.service');
+const { XiaomanSyncState } = require('../dist/entities/xiaoman-sync-state.entity');
 
 // 仅允许本机 MySQL；连接级临时表遮蔽真实表，所有写入仅在临时表内。
 test('客户改名：真实 MySQL 事务、历史订单、搜索统计及旧表单保存', {
@@ -18,7 +20,7 @@ test('客户改名：真实 MySQL 事务、历史订单、搜索统计及旧表�
   const db = new DataSource({
     type: 'mysql', host: env.MYSQL_HOST, port: Number(env.MYSQL_PORT || 3306),
     username: env.MYSQL_USER, password: env.MYSQL_PASSWORD, database: env.MYSQL_DATABASE,
-    entities: [Customer, Order], synchronize: false, logging: false,
+    entities: [Customer, Order, XiaomanSyncState], synchronize: false, logging: false,
   });
   await db.initialize();
   const runner = db.createQueryRunner();
@@ -28,6 +30,9 @@ test('客户改名：真实 MySQL 事务、历史订单、搜索统计及旧表�
       const [schema] = await runner.query(`SHOW CREATE TABLE \`${table}\``);
       await runner.query(schema['Create Table'].replace(/^CREATE TABLE /, 'CREATE TEMPORARY TABLE '));
     }
+    const columns = await runner.query("SHOW COLUMNS FROM customers LIKE 'xiaoman_company_id'");
+    const syncMigration = readFileSync(require('node:path').join(__dirname, '../scripts/add-xiaoman-customer-sync.sql'), 'utf8');
+    if (!columns.length) await runner.query(syncMigration.match(/ALTER TABLE customers[\s\S]*?;/)[0]);
     const customerRepo = runner.manager.getRepository(Customer);
     const orderRepo = runner.manager.getRepository(Order);
     const customer = await customerRepo.save(customerRepo.create({ customerId: 'SYNC-1', companyName: '旧名' }));
@@ -118,6 +123,35 @@ test('客户改名：真实 MySQL 事务、历史订单、搜索统计及旧表�
     for (const sql of migration.split(';').map((part) => part.trim()).filter(Boolean)) await runner.query(sql);
     assert.equal((await orderRepo.findOneByOrFail({ id: orders[1].id })).customerName, 'LATER SKATER');
     assert.equal((await orderRepo.findOneByOrFail({ id: orders[3].id })).customerName, '旧名');
+
+    // 使用同一组临时表验收：小满更新 -> ERP 客户 -> 关联订单 -> 联系人搜索。
+    await runner.query(syncMigration.match(/CREATE TABLE IF NOT EXISTS xiaoman_sync_state[\s\S]*?;/)[0]
+      .replace('CREATE TABLE IF NOT EXISTS', 'CREATE TEMPORARY TABLE IF NOT EXISTS'));
+    const stateRepo = runner.manager.getRepository(XiaomanSyncState);
+    const remoteItem = { company_id: 777, serial_id: 'SYNC-1', name: 'Synced Company', update_time: '2026-09-28' };
+    const remoteDetail = { ...remoteItem, customers: [{ name: 'Elysha Newitt', main_customer_flag: 1 }], tel: ['123'], country: 'AU' };
+    const sync = new CustomerXiaomanSyncService(stateRepo, customerRepo, {
+      getCompanyList: async () => ({ list: [remoteItem], total: 1 }),
+      getCompanyDetail: async () => remoteDetail,
+    }, customers);
+    await sync.sync();
+    const syncState = await sync.getStatus();
+    assert.equal(syncState.lastError, null);
+    assert.equal(syncState.ready, true);
+    assert.equal(syncState.totalCustomers, 1);
+    assert.equal((await customerRepo.findOneByOrFail({ id: customer.id })).xiaomanCompanyId, '777');
+    assert.equal((await orderRepo.findOneByOrFail({ id: orders[1].id })).customerName, 'Synced Company');
+    assert.equal((await sync.getList(1, 20, 'elysha')).total, 1);
+    // 模拟 1771 条索引的数据库读取 + 搜索耗时，实际 SQL 查询而非纯内存计时。
+    const savedState = await stateRepo.findOneByOrFail({ id: 1 });
+    await stateRepo.update(1, { snapshot: Array.from({ length: 1771 }, (_, i) => ({ ...savedState.snapshot[0], company_id: i + 1 })) });
+    const timings = [];
+    for (let i = 0; i < 10; i++) {
+      const started = performance.now();
+      assert.equal((await sync.getList(1, 20, 'Elysha')).total, 1771);
+      timings.push(Math.round(performance.now() - started));
+    }
+    console.log('本机 MySQL 1771 条索引搜索耗时(ms):', timings.join(', '));
   } finally {
     // 关闭连接后临时表自动消失，不执行任何真实表删除。
     await runner.release();

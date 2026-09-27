@@ -17,6 +17,7 @@ import { PermissionGuard } from '../auth/permission.guard';
 import { RequirePermission } from '../auth/require-permission.decorator';
 import { CustomersService } from './customers.service';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { CustomerXiaomanSyncService } from './customer-xiaoman-sync.service';
 
 @Controller('customers')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -24,7 +25,10 @@ import { CurrentUser } from '../auth/current-user.decorator';
 export class CustomersController {
   private readonly logger = new Logger(CustomersController.name);
 
-  constructor(private customersService: CustomersService) {}
+  constructor(private customersService: CustomersService, private readonly xiaomanSync: CustomerXiaomanSyncService) {}
+
+  @Get('xiaoman/status')
+  getXiaomanSyncStatus() { return this.xiaomanSync.getStatus(); }
 
   @Get()
   @RequirePermission([
@@ -86,7 +90,7 @@ export class CustomersController {
     @Query('keyword') keyword?: string,
   ) {
     try {
-      return await this.customersService.getXiaomanList(
+      return await this.xiaomanSync.getList(
         page ? parseInt(page, 10) : 1,
         pageSize ? parseInt(pageSize, 10) : 20,
         keyword?.trim() || undefined,

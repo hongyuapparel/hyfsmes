@@ -13,6 +13,10 @@ export class Customer {
   @Column({ name: 'customer_id', length: 64, unique: true })
   customerId: string;
 
+  /** 小满固定公司 ID；客户改名、改编号后仍关联同一档案。 */
+  @Column({ name: 'xiaoman_company_id', type: 'varchar', length: 32, nullable: true, unique: true })
+  xiaomanCompanyId: string | null;
+
   @Column({ name: 'country', length: 64, default: '' })
   country: string;
 
