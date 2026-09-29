@@ -27,7 +27,8 @@ function createHoldFixture() {
       where: (sql, params) => { state.filters = [{ sql, params }]; return qb; },
       andWhere: (sql, params) => { state.filters.push({ sql, params }); return qb; },
       orderBy: (field, direction) => { state.order = field.includes('pack_date') ? 'packDate' : 'id'; state.direction = direction; return qb; },
-      addOrderBy: () => qb, select: () => qb, addSelect: () => qb, groupBy: () => qb,
+      addOrderBy: () => qb, select: () => qb, addSelect: () => qb,
+      groupBy: (field) => { state.group = field; return qb; },
       setLock: (lock) => { queries.push({ lock }); return qb; },
       skip: (offset) => { state.offset = offset; return qb; }, take: (limit) => { state.limit = limit; return qb; },
       clone: () => builder(name, structuredClone(state)),
@@ -41,6 +42,10 @@ function createHoldFixture() {
       },
       getRawMany: async () => {
         const groups = new Map();
+        if (state.group === 'pl.status') {
+          for (const row of filtered()) groups.set(row.status, (groups.get(row.status) ?? 0) + 1);
+          return [...groups].map(([status, count]) => ({ status, count: String(count) }));
+        }
         for (const row of filtered()) {
           const value = groups.get(row.packingListId) ?? { listId: row.packingListId, boxCount: 0, totalWeight: 0, totalQty: 0, styles: new Set() };
           value.boxCount++;

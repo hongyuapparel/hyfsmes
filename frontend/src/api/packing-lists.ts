@@ -21,9 +21,12 @@ export interface PackingListRow {
   styleNos: string[]
 }
 
+export type PackingListTabCounts = Record<'all' | 'draft' | 'held' | 'shipped', number>
+
 export interface PackingListListRes {
   list: PackingListRow[]
   total: number
+  tabCounts: PackingListTabCounts
   summary: {
     boxCount: number
     totalQty: number

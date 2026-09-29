@@ -1,7 +1,7 @@
 <template>
   <div class="page-card page-card--fill inventory-packing-page">
     <el-tabs v-model="statusTab" class="inventory-tabs packing-status-tabs" @tab-change="onStatusTabChange">
-      <el-tab-pane v-for="tab in STATUS_TABS" :key="tab.name" :label="tab.label" :name="tab.name" />
+      <el-tab-pane v-for="tab in STATUS_TABS" :key="tab.name" :label="getTabLabel(tab)" :name="tab.name" />
     </el-tabs>
 
     <el-form class="filter-bar has-filter-collapse" @submit.prevent>
@@ -287,7 +287,7 @@ const activeFilterCount = computed(() => {
   if (dateRange.value) n++
   return n
 })
-const { list, loading, pagination, filterSummary, load } = usePackingListData(buildListQuery, () => {
+const { list, loading, pagination, filterSummary, getTabLabel, load } = usePackingListData(buildListQuery, () => {
   clearSelection()
   restorePackingColumnWidths(tableRef.value)
 })

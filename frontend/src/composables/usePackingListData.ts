@@ -1,6 +1,6 @@
 import { reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getPackingLists, type PackingListQuery, type PackingListRow, type PackingListListRes } from '@/api/packing-lists'
+import { getPackingLists, type PackingListQuery, type PackingListRow, type PackingListListRes, type PackingListTabCounts } from '@/api/packing-lists'
 import { getErrorMessage, isErrorHandled } from '@/api/request'
 
 type Summary = PackingListListRes['summary']
@@ -34,6 +34,7 @@ async function resolveFilterSummary(params: PackingListQuery, response: PackingL
 export function usePackingListData(query: () => PackingListQuery, afterLoad: () => void) {
   const list = ref<PackingListRow[]>([])
   const loading = ref(false)
+  const tabCounts = ref<PackingListTabCounts | null>(null)
   const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
   const filterSummary = reactive<Summary>({ boxCount: 0, totalQty: 0 })
   let loadSeq = 0
@@ -51,13 +52,17 @@ export function usePackingListData(query: () => PackingListQuery, afterLoad: () 
       if (seq !== loadSeq) return
       list.value = res.data.list
       pagination.total = res.data.total
+      tabCounts.value = res.data.tabCounts ?? null
       Object.assign(filterSummary, summary)
       afterLoad()
     } catch (e) {
-      if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载装箱单失败'))
+      if (seq === loadSeq && !isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载装箱单失败'))
     } finally {
       if (seq === loadSeq) loading.value = false
     }
   }
-  return { list, loading, pagination, filterSummary, load }
+  function getTabLabel(tab: { label: string; name: keyof PackingListTabCounts }): string {
+    return `${tab.label}（${tabCounts.value?.[tab.name] ?? '—'}）`
+  }
+  return { list, loading, pagination, filterSummary, tabCounts, getTabLabel, load }
 }

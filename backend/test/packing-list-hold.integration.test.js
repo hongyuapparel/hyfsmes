@@ -86,6 +86,47 @@ test('滞留分类：真实 MySQL 迁移、筛选、事务回滚和发货竞争'
       const logs = await lists.getLogs(b.id);
       assert.equal(logs[0].action, detail.status === 'held' ? 'hold' : 'ship');
     });
+    await t.test('页签按单去重计数：跨页、全部筛选、零结果和状态变更一致', async () => {
+      const ids = [];
+      for (let i = 1; i <= 25; i++) {
+        const body = { ...payload(5, `COUNT-${i % 2 ? '甲' : '乙'}`),
+          serviceManager: i % 2 ? 'COUNT-甲' : 'COUNT-乙',
+          xiaomanOrderNo: i <= 20 ? 'COUNT-A' : 'COUNT-B', packDate: i <= 20 ? '2026-09-01' : '2026-09-02',
+          boxes: [1, 2].map(() => ({ items: [5, 7].map((qty) => ({ styleNo: 'COUNT-SKU', sizeQuantities: { OSFA: qty }, totalQty: qty })) })),
+        };
+        const { id } = await lists.create(body, '测试员'); ids.push(id);
+        if (i > 23) await ship.ship(id, '测试员');
+        else if (i > 20) await hold.setHold({ ids: [id], status: 'held' }, '测试员');
+      }
+      const expected = { all: 25, draft: 20, held: 3, shipped: 2 };
+      for (const [status, total] of [['', 25], ['draft', 20], ['held', 3], ['shipped', 2]]) {
+        const res = await lists.getList({ customerName: 'COUNT-', status, page: 2, pageSize: 1 });
+        assert.deepEqual(res.tabCounts, expected);
+        assert.equal(res.total, total);
+        assert.equal(res.list.length, 1);
+        assert.deepEqual(res.summary, { boxCount: total * 2, totalQty: total * 24 });
+      }
+      for (const filter of [{ customerName: 'COUNT-甲' }, { serviceManager: 'COUNT-甲' }]) {
+        const res = await lists.getList({ customerName: 'COUNT-', status: 'held', ...filter });
+        assert.deepEqual(res.tabCounts, { all: 13, draft: 10, held: 2, shipped: 1 });
+      }
+      assert.deepEqual((await lists.getList({ keyword: 'COUNT-SKU' })).tabCounts, expected);
+      for (const filter of [{ xiaomanOrderNo: 'COUNT-B' }, { dateFrom: '2026-09-02', dateTo: '2026-09-02' }]) {
+        assert.deepEqual((await lists.getList({ customerName: 'COUNT-', ...filter })).tabCounts,
+          { all: 5, draft: 0, held: 3, shipped: 2 });
+      }
+      const empty = await lists.getList({ customerName: 'COUNT-', keyword: '不存在' });
+      assert.deepEqual(empty.tabCounts, { all: 0, draft: 0, held: 0, shipped: 0 });
+      assert.equal(empty.total, 0);
+      assert.deepEqual(empty.summary, { boxCount: 0, totalQty: 0 });
+      await hold.setHold({ ids: ids.slice(0, 2), status: 'held' }, '测试员');
+      assert.deepEqual((await lists.getList({ customerName: 'COUNT-' })).tabCounts, { all: 25, draft: 18, held: 5, shipped: 2 });
+      await hold.setHold({ ids: ids.slice(0, 2), status: 'draft' }, '测试员');
+      await ship.ship(ids[0], '测试员');
+      assert.deepEqual((await lists.getList({ customerName: 'COUNT-' })).tabCounts, { all: 25, draft: 19, held: 3, shipped: 3 });
+      await lists.remove(ids[1], '测试员');
+      assert.deepEqual((await lists.getList({ customerName: 'COUNT-' })).tabCounts, { all: 24, draft: 18, held: 3, shipped: 3 });
+    });
   } finally {
     if (ds?.isInitialized) await ds.destroy();
     // 仅清理本次成功创建且名称验证过的测试库；绝不读取 MYSQL_DATABASE 作为删除目标。
