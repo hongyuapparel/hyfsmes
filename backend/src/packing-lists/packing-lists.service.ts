@@ -43,6 +43,7 @@ export interface PackingListRow {
   xiaomanOrderId: string;
   packDate: string | null;
   status: string;
+  holdReason: string;
   shippedAt: Date | null;
   createdAt: Date;
   boxCount: number;
@@ -91,6 +92,7 @@ export interface PackingListDetail {
   showCompany: boolean;
   sizeHeaders: string[];
   status: string;
+  holdReason: string;
   shippedAt: Date | null;
   operatorUsername: string;
   createdAt: Date;
@@ -185,6 +187,7 @@ export class PackingListsService {
       xiaomanOrderId: l.xiaomanOrderId,
       packDate: l.packDate,
       status: l.status,
+      holdReason: l.holdReason ?? '',
       shippedAt: l.shippedAt,
       createdAt: l.createdAt,
       boxCount: boxAgg.get(l.id)?.boxCount ?? 0,
@@ -271,6 +274,7 @@ export class PackingListsService {
       showCompany: !!list.showCompany,
       sizeHeaders: Array.isArray(list.sizeHeaders) ? list.sizeHeaders : [],
       status: list.status,
+      holdReason: list.holdReason ?? '',
       shippedAt: list.shippedAt,
       operatorUsername: operatorName,
       createdAt: list.createdAt,
@@ -471,7 +475,7 @@ export class PackingListsService {
   async remove(id: number, operatorUsername = ''): Promise<void> {
     const list = await this.listRepo.findOne({ where: { id } });
     if (!list) throw new NotFoundException('装箱单不存在');
-    if (list.status !== 'draft') throw new BadRequestException('已发货的装箱单不可删除');
+    if (list.status !== 'draft') throw new BadRequestException('仅草稿装箱单可删除，滞留单请先移回草稿');
     await this.listRepo.manager.transaction(async (manager) => {
       await manager.getRepository(PackingListItem).delete({ packingListId: id });
       await manager.getRepository(PackingListBox).delete({ packingListId: id });

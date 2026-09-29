@@ -10,10 +10,10 @@ function item(styleNo: string, sizeQuantities: Record<string, number>, totalQty:
 }
 
 describe('packing Excel quantity consistency', () => {
-  it('exports only retained sizes with 128/61/99 and total 288, without restoring deleted columns', () => {
+  it.each(['draft', 'held'])('exports %s with retained sizes and total 288, without deleted columns or internal hold reason', (status) => {
     const raw: PackingListDetail = { id: 1, code: 'TEST', customerId: null, customerName: '', serviceManager: '', poNo: '', remark: '',
       country: '', postalCode: '', xiaomanOrderNo: '', xiaomanOrderId: '', packDate: null, showCompany: true,
-      status: 'draft', shippedAt: null, operatorUsername: '', createdAt: '',
+      status, holdReason: status === 'held' ? '内部原因：等待尾款' : '', shippedAt: null, operatorUsername: '', createdAt: '',
       sizeHeaders: ['70', '80', '100', '120'], boxes: [
         item('KR157', { 80: 44, 100: 42, 120: 42, S: 4 }, 999),
         item('KR157', { 80: 13, 100: 24, 120: 24 }, 61),
@@ -29,5 +29,6 @@ describe('packing Excel quantity consistency', () => {
     expect(rows.slice(3, 6).map(r => r[7])).toEqual([128, 61, 99])
     expect(rows[6].slice(3, 8)).toEqual([51, 105, 66, 66, 288])
     expect(raw.sizeHeaders).toEqual(['70', '80', '100', '120'])
+    expect(JSON.stringify(rows)).not.toContain('内部原因')
   })
 })

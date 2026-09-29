@@ -55,10 +55,14 @@ export class PackingList {
   @Column({ name: 'size_headers', type: 'json', nullable: true })
   sizeHeaders: string[] | null;
 
-  /** draft | shipped */
+  /** draft | held（滞留待发） | shipped */
   @Index()
   @Column({ name: 'status', length: 16, default: 'draft' })
   status: string;
+
+  /** 内部滞留原因，不进入客户单、箱贴或库存备注。 */
+  @Column({ name: 'hold_reason', length: 500, default: '' })
+  holdReason: string;
 
   @Column({ name: 'shipped_at', type: 'datetime', nullable: true })
   shippedAt: Date | null;
