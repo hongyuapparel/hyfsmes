@@ -20,6 +20,7 @@ export class WorkReportsController {
   const settings=await this.settings.read(),people=await this.service.people(user.userId);
   return {configured:settings.configured,people:people.map(p=>({...p,rule:settings.rules.find(r=>r.ownerId===p.id)||{ownerId:p.id,enabled:!settings.configured,templateId:defaultReportTemplateId(p.codes)}})).filter(p=>p.rule.enabled)};
  }
+ @Get('submissions') submissions(@Query('start') start:string,@Query('end') end:string) {return this.service.submissions(start,end);}
  @Get('people') people(@CurrentUser() user: { userId: number }) { return this.service.people(user.userId); }
  @Get('orders') orders(@CurrentUser() user: { userId: number }) { return this.service.orders(user.userId); }
  @Get(':ownerId') report(@Param('ownerId', ParseIntPipe) owner: number, @Query('date') date: string, @CurrentUser() user: { userId: number }) { return this.service.report(user.userId, owner, date); }

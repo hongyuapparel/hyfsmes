@@ -1,14 +1,20 @@
 import { isReportScheduled } from './workReportSchedule'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { getReportDirectory,getReportOrders,getLiveReport,saveReportPlans,type ReportDirectoryPerson,type ReportOrder,type LiveReport,type AutomaticRow,type AutomaticPlan } from '@/api/work-reports'
+import { getReportSubmissions,type ReportSubmission,getReportDirectory,getReportOrders,getLiveReport,saveReportPlans,type ReportDirectoryPerson,type ReportOrder,type LiveReport,type AutomaticRow,type AutomaticPlan } from '@/api/work-reports'
 import { compareReportPlans } from './workReportPresentation'
 import { taskOrders, type DraftRow, type WorkTask } from './workReportDemo'
 import { getErrorMessage } from '@/api/request'
 export function useLiveWorkReport() {
  const auth=useAuthStore(),people=ref<ReportDirectoryPerson[]>([]),catalog=ref<ReportOrder[]>([]),report=ref<LiveReport|null>(null)
  const date=ref(new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date())),owner=ref(auth.user?.id||0)
- const configured=ref(false),message=ref('')
+ const configured=ref(false),message=ref(''),submissions=ref<ReportSubmission[]>([]),listDate=ref(date.value)
+ const days=computed(()=>Array.from({length:3},(_,i)=>{const d=new Date(listDate.value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-i);return d.toISOString().slice(0,10)}))
+ const submittedPeople=(day:string)=>people.value.filter(p=>isReportScheduled(p.rule)&&submissions.value.some(s=>s.ownerId===p.id&&s.reportDate===day))
+ const submittedCount=computed(()=>submittedPeople(listDate.value).length)
+ const missingPeople=computed(()=>people.value.filter(p=>isReportScheduled(p.rule)&&!submissions.value.some(s=>s.ownerId===p.id&&s.reportDate===listDate.value)))
+ let directoryRequest=0
+ async function refreshSubmissions(){const id=++directoryRequest;const r=await getReportSubmissions(days.value[2],days.value[0]);if(id===directoryRequest)submissions.value=r.data}
  const busy=ref(false),error=ref(''),editing=ref(false),drafts=ref<DraftRow[]>([]),baseline=ref(''),saving=ref(false)
  const automaticDrafts=ref<AutomaticPlan[]>([])
  const draftState=()=>JSON.stringify([drafts.value,automaticDrafts.value])
@@ -32,13 +38,13 @@ export function useLiveWorkReport() {
  }
  async function init() {
   busy.value=true
-  try {const [p,o]=await Promise.all([getReportDirectory(),getReportOrders()]);people.value=p.data.people;configured.value=p.data.configured;catalog.value=o.data;const scheduled=people.value.filter(p=>isReportScheduled(p.rule));owner.value=scheduled.find(p=>p.id===auth.user?.id)?.id||scheduled[0]?.id||0;await load()}
+  try {const [p,o]=await Promise.all([getReportDirectory(),getReportOrders()]);people.value=p.data.people;configured.value=p.data.configured;catalog.value=o.data;const scheduled=people.value.filter(p=>isReportScheduled(p.rule));owner.value=scheduled.find(p=>p.id===auth.user?.id)?.id||scheduled[0]?.id||0;await refreshSubmissions();await load()}
   catch(e){error.value=getErrorMessage(e,'读取失败')}finally{busy.value=false}
  }
  async function refreshDirectory() {
   try {const {data}=await getReportDirectory();people.value=data.people;configured.value=data.configured;
    if(!people.value.some(p=>p.id===owner.value&&isReportScheduled(p.rule))){owner.value=people.value.find(p=>isReportScheduled(p.rule))?.id||0}
-   await load()
+   await refreshSubmissions();await load()
   }catch(e){error.value=getErrorMessage(e,'更新报告范围失败')}
  }
  function edit() {message.value='';drafts.value=tasks.value.filter(t=>t.status==='todo').map(t=>({id:t.id,order:t.order,orders:[...taskOrders(t)],sourceIds:[t.id],section:t.section,title:t.title,date:t.date,urgent:t.urgent,needsHelp:t.needsHelp,done:false,end:false}));for(const o of unplanned.value){add(o.orderType,o.no);drafts.value[drafts.value.length-1].id="auto-"+o.id;drafts.value[drafts.value.length-1].date="";}drafts.value.sort(compareReportPlans);automaticDrafts.value=(report.value?.automatic||[]).flatMap(g=>g.rows.filter(r=>r.planKey).map(r=>{const saved=report.value?.tasks.find(t=>t.automaticKey===r.planKey);return {key:r.planKey!,title:saved?.title||'',date:saved?.date||'',needsHelp:!!saved?.needsHelp,done:false}}));baseline.value=draftState();editing.value=true}
@@ -58,9 +64,9 @@ export function useLiveWorkReport() {
  }
  async function save() {
   if(!report.value||saving.value)return false;saving.value=true;error.value=''
-  try {const r=await saveReportPlans(report.value.version,drafts.value.filter(r=>!r.id.startsWith("auto-")||r.sourceIds?.length||r.title.trim()||r.date||r.done||r.end||r.urgent||r.needsHelp),automaticDrafts.value,owner.value);report.value={...report.value,...r.data};editing.value=false;message.value='全部安排已保存';return true}
+  try {const r=await saveReportPlans(report.value.version,drafts.value.filter(r=>!r.id.startsWith("auto-")||r.sourceIds?.length||r.title.trim()||r.date||r.done||r.end||r.urgent||r.needsHelp),automaticDrafts.value,owner.value,date.value);report.value={...report.value,...r.data};editing.value=false;if(!submissions.value.some(s=>s.ownerId===owner.value&&s.reportDate===date.value))submissions.value.push({ownerId:owner.value,reportDate:date.value});message.value='报告已提交，之后仍可编辑';return true}
   catch(e){error.value=getErrorMessage(e,'保存失败，草稿已保留');return false}finally{saving.value=false}
  }
  function automaticPlan(key:string){return editing.value?automaticDrafts.value.find(p=>p.key===key):report.value?.tasks.find(t=>t.automaticKey===key)}
- return {message,automaticPlan,automaticDrafts,auth,configured,people,catalog,report,date,owner,busy,error,editing,drafts,dirty,saving,today,mine,tasks,sections,legacyTasks,unplanned,annotate,init,refreshDirectory,load,edit,add,merge,split,save}
+ return {submissions,submittedPeople,submittedCount,missingPeople,listDate,days,refreshSubmissions,message,automaticPlan,automaticDrafts,auth,configured,people,catalog,report,date,owner,busy,error,editing,drafts,dirty,saving,today,mine,tasks,sections,legacyTasks,unplanned,annotate,init,refreshDirectory,load,edit,add,merge,split,save}
 }

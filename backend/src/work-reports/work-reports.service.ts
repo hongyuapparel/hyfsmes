@@ -43,13 +43,18 @@ export class WorkReportsService {
    return rows.map(o=>({...o,active:Number(o.active),finished:Number(o.finished)}));
  }
  private checkDate(date: string) { if (!date || !validReportDate(date)) throw new BadRequestException('报告日期无效'); }
+ async submissions(start: string, end: string): Promise<{ownerId:number;reportDate:string}[]> {
+   this.checkDate(start);this.checkDate(end);
+   if(start>end || (Date.parse(end)-Date.parse(start))/86400000>30) throw new BadRequestException('查询日期范围不得超过31天');
+   return this.db.query("SELECT owner_id ownerId,DATE_FORMAT(report_date,'%Y-%m-%d') reportDate FROM work_report_snapshots WHERE report_date BETWEEN ? AND ? ORDER BY report_date DESC,owner_id",[start,end]);
+ }
  async report(actor: number, owner: number, date: string) {
    this.checkDate(date);
    const person = (await this.people(actor)).find(p=>p.id===owner);
    if (!person) throw new ForbiddenException('无权查看此人的报告');
    const today=reportToday();
    const [state]: PlanState[] = await this.db.query('SELECT version,tasks FROM work_report_plans WHERE owner_id=?',[owner]);
-   const [snapshot]: { tasks: WorkTask[] | string }[] = date < today ? await this.db.query('SELECT tasks FROM work_report_snapshots WHERE owner_id=? AND report_date<=? ORDER BY report_date DESC LIMIT 1',[owner,date]) : [];
+   const [snapshot]: { tasks: WorkTask[] | string }[] = await this.db.query('SELECT tasks FROM work_report_snapshots WHERE owner_id=? AND report_date=?',[owner,date]);
    const tasks=date<today ? (snapshot?parseTasks(snapshot.tasks):[]) : state?parseTasks(state.tasks):[];
    const settings=await this.settings.read(),rule=settings.rules.find(r=>r.ownerId===owner);
    const template=settings.templates.find(t=>t.id===(rule?.templateId||defaultReportTemplateId(person.codes)))!;
@@ -127,12 +132,12 @@ export class WorkReportsService {
    }
    for(const group of automatic) if(group.title.startsWith('当前')) for(const row of group.rows) row.planKey=group.title+':'+row.orderId+':'+(row.materialIndex??row.entryId??'');
    const pendingOrders=date===today&&(template.manualSections.includes('sample')||template.manualSections.includes('bulk'))?(await this.orders(actor)).filter(o=>!!o.active&&[person.name,person.username].includes(o.merchandiser)):[];
-   return { today,person,template,pendingOrders,version:state?.version||0,tasks,automatic,historicalMissing:date<today&&!snapshot };
+   return { today,person,template,pendingOrders,version:state?.version||0,tasks,automatic,submitted:!!snapshot,historicalMissing:date<today&&!snapshot };
  }
  async save(actor: number, body: unknown, owner=actor) {
    if(owner!==actor){await this.settings.assertAdmin(actor);if(!(await this.people(actor)).some(p=>p.id===owner))throw new NotFoundException('报告人员不存在');}
    if(!body || typeof body!=='object') throw new BadRequestException('无效请求');
-   const b=body as {version?:unknown; drafts?:unknown; automaticPlans?:unknown};
+   const b=body as {version?:unknown; drafts?:unknown; automaticPlans?:unknown; reportDate?:unknown};
    if(!Number.isInteger(b.version) || !Array.isArray(b.drafts) || b.drafts.length>1000) throw new BadRequestException('安排格式无效');
    for(const row of b.drafts) {
      if(!row || typeof row!=='object') throw new BadRequestException('行格式无效');
@@ -143,6 +148,7 @@ export class WorkReportsService {
        || ['urgent','needsHelp','end'].some(k=>r[k]!==undefined && typeof r[k]!=='boolean')) throw new BadRequestException('行字段无效');
    }
    const orders=await this.orders(actor,true),today=reportToday();
+   if(b.reportDate!==undefined&&b.reportDate!==today)throw new BadRequestException('日期已变化，请重新打开今天的报告后提交');
    const plans=b.automaticPlans as AutomaticPlanInput[]|undefined;
    let automaticRows:AutoRow[]=[];
    if(plans!==undefined){
@@ -152,6 +158,7 @@ export class WorkReportsService {
     for(const p of plans){if(!p||typeof p.key!=='string'||!allowed.has(p.key)||seen.has(p.key)||typeof p.title!=='string'||p.title.length>200||typeof p.date!=='string'||p.date!==''&&!validReportDate(p.date)||(['done','needsHelp'] as const).some(k=>p[k]!==undefined&&typeof p[k]!=='boolean'))throw new BadRequestException('待办已更新或安排格式无效，请刷新后再试');seen.add(p.key);}
    }
    return this.db.transaction(async em=>{
+     if(reportToday()!==today)throw new BadRequestException('日期已变化，请重新打开今天的报告后提交');
      await em.query("INSERT IGNORE INTO work_report_plans(owner_id,version,tasks) VALUES (?,0,'[]')",[owner]);
      const [state]:PlanState[]=await em.query('SELECT version,tasks FROM work_report_plans WHERE owner_id=? FOR UPDATE',[owner]);
      if(state.version!==b.version) throw new ConflictException('安排已在其他窗口更新，请先刷新再编辑');
@@ -163,7 +170,7 @@ export class WorkReportsService {
      const json=JSON.stringify(next);
      await em.query('UPDATE work_report_plans SET tasks=?,version=version+1 WHERE owner_id=?',[json,owner]);
      await em.query('INSERT INTO work_report_snapshots(owner_id,report_date,tasks) VALUES (?,?,?) ON DUPLICATE KEY UPDATE tasks=VALUES(tasks)',[owner,today,json]);
-     return {version:state.version+1,tasks:next};
+     return {version:state.version+1,tasks:next,submitted:true};
    });
  }
 }
