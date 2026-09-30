@@ -6,6 +6,7 @@ import { User } from '../entities/user.entity';
 import { parseStoredColorSizeSnapshot } from '../finished-goods-stock/finished-goods-stock-query.utils';
 import { getPendingDetailStatus } from './inventory-pending-outbound.helpers';
 import { formatDateTimeForResponse } from '../common/date-time.util';
+import { withColorImages } from '../common/color-image.util';
 
 export interface PendingListItem {
   id: number;
@@ -22,7 +23,7 @@ export interface PendingListItem {
   remark: string;
   createdAt: string;
   /** 本批入库/次品的颜色×尺码真值快照（来自尾部入库登记） */
-  colorSizeSnapshot: { headers: string[]; rows: Array<{ colorName: string; quantities: number[] }> } | null;
+  colorSizeSnapshot: { headers: string[]; rows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }> } | null;
   detailStatus: 'recorded' | 'missing' | 'not_applicable' | 'unknown';
 }
 
@@ -117,6 +118,7 @@ export async function getPendingInventoryList(
       .createQueryBuilder('p')
       .innerJoin(Order, 'o', 'o.id = p.order_id')
       .leftJoin(Product, 'pr', 'pr.sku_code = p.sku_code')
+      .leftJoin('order_ext', 'oe', 'oe.order_id = p.order_id')
       .where('p.status = :status', { status: 'pending' })
       .select([
         'p.id AS id',
@@ -129,6 +131,7 @@ export async function getPendingInventoryList(
         'p.source_type AS sourceType',
         'p.created_at AS createdAt',
         'p.color_size_snapshot AS colorSizeSnapshot',
+        'oe.color_size_rows AS orderColorRows',
       ]);
 
     if (orderNo?.trim()) {
@@ -165,6 +168,7 @@ export async function getPendingInventoryList(
         sourceType: string;
         createdAt: Date;
         colorSizeSnapshot: unknown;
+        orderColorRows: unknown;
       }>();
 
     const parseSnapshot = (raw: unknown): PendingListItem['colorSizeSnapshot'] => {
@@ -176,7 +180,7 @@ export async function getPendingInventoryList(
     const detailRequiredOrderIds = await loadOrdersRequiringColorSizeDetail(pendingRepo.manager, orderIds);
 
     const list: PendingListItem[] = rows.map((r) => {
-      const snapshot = parseSnapshot(r.colorSizeSnapshot);
+      const snapshot = withColorImages(parseSnapshot(r.colorSizeSnapshot), r.orderColorRows);
       const requiresDetail = detailRequiredOrderIds.has(Number(r.orderId));
       const detailStatus: PendingListItem['detailStatus'] = getPendingDetailStatus(snapshot, r.quantity, requiresDetail);
       return {

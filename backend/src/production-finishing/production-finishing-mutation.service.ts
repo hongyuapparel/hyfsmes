@@ -11,6 +11,7 @@ import { User } from '../entities/user.entity';
 import { OrderOperationLog } from '../entities/order-operation-log.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 import { formatColorSizeOperationDetail } from '../common/operation-log-format.util';
+import { withColorImages } from '../common/color-image.util';
 import {
   type ColorSizeQuantityRow,
   assertColorRowsShape,
@@ -396,10 +397,10 @@ export class ProductionFinishingMutationService {
 
     const opUser = (actorUsername ?? '').trim();
     const inboundSnapshot = inboundThisByColor && sizeHeaders.length > 0
-      ? { headers: sizeHeaders.slice(), rows: inboundThisByColor }
+      ? withColorImages({ headers: sizeHeaders.slice(), rows: inboundThisByColor }, ext?.colorSizeRows)
       : null;
     const defectSnapshot = defectThisByColor && sizeHeaders.length > 0
-      ? { headers: sizeHeaders.slice(), rows: defectThisByColor }
+      ? withColorImages({ headers: sizeHeaders.slice(), rows: defectThisByColor }, ext?.colorSizeRows)
       : null;
 
     // 原子写入：finishing 累计 + order 状态 + 本次 pending 记录在同一事务内。
@@ -630,10 +631,10 @@ export class ProductionFinishingMutationService {
     finishing.remark = remark?.trim() || null;
 
     const amendInboundSnapshot = amendInboundByColor && sizeHeaders.length > 0
-      ? { headers: sizeHeaders.slice(), rows: amendInboundByColor }
+      ? withColorImages({ headers: sizeHeaders.slice(), rows: amendInboundByColor }, ext?.colorSizeRows)
       : null;
     const amendDefectSnapshot = amendDefectByColor && sizeHeaders.length > 0
-      ? { headers: sizeHeaders.slice(), rows: amendDefectByColor }
+      ? withColorImages({ headers: sizeHeaders.slice(), rows: amendDefectByColor }, ext?.colorSizeRows)
       : null;
 
     // 原子写入并原位修订待仓批次；保留既有 ID / batch_no，避免外部引用失效。

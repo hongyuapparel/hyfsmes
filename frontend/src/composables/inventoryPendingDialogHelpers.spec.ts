@@ -22,6 +22,15 @@ function baseRow(overrides: Partial<PendingListItem> = {}): PendingListItem {
 }
 
 describe('buildOutboundDialogItem', () => {
+  it('入库预览与发货矩阵保留各自颜色图，不改变数量', () => {
+    const row = baseRow({ quantity: 5, colorSizeSnapshot: { headers: ['均码'], rows: [
+      { colorName: '蓝色', quantities: [2], imageUrl: '/blue.png' },
+      { colorName: '红色', quantities: [3], imageUrl: '/red.png' },
+    ] } })
+    expect(buildOutboundDialogItem(row).item.rows.map(r => r.imageUrl)).toEqual(['/blue.png', '/red.png'])
+    expect(buildInboundPreviewItem(row).rows.map(r => r.imageUrl)).toEqual(['/blue.png', '/red.png'])
+    expect(buildInboundPreviewItem(row).rows.map(r => r.values)).toEqual([[2], [3]])
+  })
   it('keeps quantities aligned when a total column is not the last column', () => {
     const row = baseRow({ quantity: 5, colorSizeSnapshot: { headers: ['合计', 'S', 'M'], rows: [{ colorName: '杏色', quantities: [5, 2, 3] }] } })
     expect(buildOutboundDialogItem(row).item.rows[0].quantities).toEqual([2, 3])

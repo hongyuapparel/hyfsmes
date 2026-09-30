@@ -12,6 +12,7 @@ import { UserRole } from '../entities/user-role.entity';
 import type { ColorSizeSnapshot, FinishedOutboundItemInput } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import { buildFinishedOutboundLogRemark } from './finished-goods-stock-log-summary';
+import { withColorImages } from '../common/color-image.util';
 import { subtractColorSizeSnapshots } from './finished-goods-stock-query.utils';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
 
@@ -189,6 +190,7 @@ export class FinishedGoodsStockOutboundService {
   private stockAdjustSnapshot(stock: FinishedGoodsStock, colorSizeSnapshot?: ColorSizeSnapshot | null): Record<string, unknown> {
     return {
       skuCode: stock.skuCode ?? '',
+      productName: stock.productName ?? '',
       customerName: stock.customerName ?? '',
       department: stock.department ?? '',
       inventoryTypeId: stock.inventoryTypeId ?? null,
@@ -250,11 +252,7 @@ export class FinishedGoodsStockOutboundService {
   ): string {
     if (!colorImages?.size) return '';
     const colorNames = snapshot?.rows.map((row) => String(row.colorName ?? '').trim()).filter(Boolean) ?? [];
-    for (const colorName of colorNames) {
-      const imageUrl = colorImages.get(colorName);
-      if (imageUrl) return imageUrl;
-    }
-    return Array.from(colorImages.values()).find((imageUrl) => !!imageUrl) ?? '';
+    return colorNames.length === 1 ? colorImages.get(colorNames[0]) || '' : '';
   }
 
   private async resolvePickupUser(pickupUserId?: number | null): Promise<{ pickupId: number | null; pickupUserName: string }> {
@@ -288,6 +286,7 @@ export class FinishedGoodsStockOutboundService {
       orderId: number | null;
       orderNo: string;
       skuCode: string;
+      productName: string;
       imageUrl: string;
       customerName: string;
       quantity: number;
@@ -303,12 +302,13 @@ export class FinishedGoodsStockOutboundService {
   ): Promise<void> {
     const sizeBreakdown = payload.sizeBreakdown != null ? JSON.stringify(payload.sizeBreakdown) : null;
     const sqlWithImage =
-      'INSERT INTO finished_goods_outbound (finished_stock_id, order_id, order_no, sku_code, image_url, customer_name, quantity, department, warehouse_id, inventory_type_id, pickup_user_id, pickup_user_name, size_breakdown, operator_username, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+      'INSERT INTO finished_goods_outbound (finished_stock_id, order_id, order_no, sku_code, product_name, image_url, customer_name, quantity, department, warehouse_id, inventory_type_id, pickup_user_id, pickup_user_name, size_breakdown, operator_username, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     const paramsWithImage = [
       payload.finishedStockId,
       payload.orderId,
       payload.orderNo,
       payload.skuCode,
+      payload.productName,
       payload.imageUrl,
       payload.customerName,
       payload.quantity,
@@ -329,12 +329,13 @@ export class FinishedGoodsStockOutboundService {
       if (!(msg.includes('Unknown column') && msg.includes('image_url'))) throw e;
     }
     const sqlWithoutImage =
-      'INSERT INTO finished_goods_outbound (finished_stock_id, order_id, order_no, sku_code, customer_name, quantity, department, warehouse_id, inventory_type_id, pickup_user_id, pickup_user_name, size_breakdown, operator_username, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
+      'INSERT INTO finished_goods_outbound (finished_stock_id, order_id, order_no, sku_code, product_name, customer_name, quantity, department, warehouse_id, inventory_type_id, pickup_user_id, pickup_user_name, size_breakdown, operator_username, remark) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)';
     const paramsWithoutImage = [
       payload.finishedStockId,
       payload.orderId,
       payload.orderNo,
       payload.skuCode,
+      payload.productName,
       payload.customerName,
       payload.quantity,
       payload.department,
@@ -440,7 +441,8 @@ export class FinishedGoodsStockOutboundService {
             orderId: stock.orderId,
             orderNo: order?.orderNo ?? '',
             skuCode: stock.skuCode ?? '',
-            imageUrl: stock.imageUrl?.trim() || colorImageUrl || product?.imageUrl?.trim() || '',
+            productName: txStock.productName ?? '',
+            imageUrl: colorImageUrl || stock.imageUrl?.trim() || product?.imageUrl?.trim() || '',
             customerName: stock.customerName ?? '',
             quantity: item.quantity,
             department: stock.department?.trim() ?? '',
@@ -448,7 +450,9 @@ export class FinishedGoodsStockOutboundService {
             inventoryTypeId: stock.inventoryTypeId ?? null,
             pickupUserId: pickupInfo.pickupId,
             pickupUserName: pickupInfo.pickupUserName,
-            sizeBreakdown: item.sizeBreakdown ?? null,
+            sizeBreakdown: withColorImages(outgoingSnapshot, outgoingSnapshot?.rows.map(row => ({
+              colorName: row.colorName, imageUrl: colorImageMaps.get(item.id)?.get(row.colorName.trim()) || '',
+            }))),
             operatorUsername: operatorDisplayName,
             remark: (remark ?? '').trim(),
           });

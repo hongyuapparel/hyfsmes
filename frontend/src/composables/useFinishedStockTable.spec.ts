@@ -4,6 +4,18 @@ import type { FinishedStockRow } from '@/api/inventory'
 import { useFinishedStockTable } from './useFinishedStockTable'
 import { isStockTableParentRow } from '@/utils/finishedStockTableUtils'
 
+describe('成品库存品名分组展示', () => {
+  it('同SKU品名不一致时父行不冒用首条名称，子行保留原名', () => {
+    const { stockTableData } = useFinishedStockTable(ref([
+      { ...makeStock(1, ''), productName: '雨伞' },
+      { ...makeStock(2, ''), productName: '折叠雨伞' },
+    ]))
+    const parent = stockTableData.value[0]
+    expect(parent.productName).toBe('多个')
+    if (isStockTableParentRow(parent)) expect(parent._children.map(row => row.productName)).toEqual(['雨伞', '折叠雨伞'])
+  })
+})
+
 function makeStock(id: number, customerName: string): FinishedStockRow {
   return {
     id,

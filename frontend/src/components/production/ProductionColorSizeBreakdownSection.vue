@@ -20,7 +20,10 @@
           :key="ci"
           class="color-bd-block"
         >
-          <div class="color-bd-color-name">{{ color.colorName || '—' }}</div>
+          <div class="color-bd-color-name">
+            <AppImageThumb v-if="color.imageUrl" :raw-url="color.imageUrl" variant="compact" />
+            <span>{{ color.colorName || '—' }}</span>
+          </div>
           <table class="color-bd-table">
             <thead>
               <tr>
@@ -59,6 +62,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import { formatDisplayNumber } from '@/utils/display-number'
 import ProductionDetailSection from '@/components/production/ProductionDetailSection.vue'
 
@@ -79,7 +83,7 @@ const props = defineProps<{
   loading?: boolean
   error?: boolean
   sizeHeaders: string[]
-  colorRows: Array<{ colorName: string }>
+  colorRows: Array<{ colorName: string; imageUrl?: string }>
   stages: ColorSizeStageDef[]
   totals?: ColorSizeTotalItem[]
 }>()
@@ -126,6 +130,9 @@ function sumArr(values: number[]): number {
   margin-top: 12px;
 }
 .color-bd-color-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-weight: 600;
   margin-bottom: 6px;
   color: var(--el-text-color-primary);

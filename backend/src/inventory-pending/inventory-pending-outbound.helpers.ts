@@ -1,4 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
+import { withColorImages } from '../common/color-image.util';
 import type { ColorSizeSnapshot } from '../finished-goods-stock/finished-goods-stock.types';
 import {
   parseStoredColorSizeSnapshot,
@@ -74,7 +75,11 @@ export function applyPendingOutboundSizeDeduction(params: {
       }
       assertColorSizeSnapshotTotal(remainingSnapshot, remainQty, `${label} 扣减后剩余尺码与剩余数量不一致`);
     }
-    return { remainingSnapshot: remainQty > 0 ? remainingSnapshot : null, outgoingSnapshot };
+    return { remainingSnapshot: remainQty > 0 ? remainingSnapshot : null,
+      outgoingSnapshot: withColorImages({ headers: outgoingSnapshot.headers,
+        rows: outgoingSnapshot.rows.map(row => ({ colorName: row.colorName, quantities: row.quantities })),
+      }, currentSnapshot.rows),
+    };
   }
 
   if (remainQty > 0) {

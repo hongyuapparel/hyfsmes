@@ -29,6 +29,7 @@ function makeLine(overrides) {
     stockId: 1,
     customerName: '测试客户',
     skuCode: 'SKU-001',
+    productName: '折叠雨伞',
     colorName: '蓝色',
     sizeName: 'M',
     imageUrl,
@@ -74,22 +75,23 @@ test('库存导出保持列顺序、合并图片并生成失败清单', async ()
   const detail = workbook.getWorksheet('成品库存明细');
   assert.ok(detail);
   assert.deepEqual(detail.getRow(1).values.slice(1), [
-    'SKU', '图片', '颜色', '尺码', '数量', '出厂价', '总价', '库存类型', '仓库', '部门', '客户', '存放地址', '入库时间',
+    '品名', 'SKU', '图片', '颜色', '尺码', '数量', '出厂价', '总价', '库存类型', '仓库', '部门', '客户', '存放地址', '入库时间',
   ]);
-  assert.equal(detail.getCell('J2').value, '业务部');
-  assert.equal(detail.getCell('K2').value, '测试客户');
-  assert.equal(detail.getCell('L2').value, 'A-01');
-  assert.equal(detail.getCell('A3').master.address, 'A2');
+  assert.equal(detail.getCell('A2').value, '折叠雨伞');
+  assert.equal(detail.getCell('K2').value, '业务部');
+  assert.equal(detail.getCell('L2').value, '测试客户');
+  assert.equal(detail.getCell('M2').value, 'A-01');
   assert.equal(detail.getCell('B3').master.address, 'B2');
   assert.equal(detail.getCell('C3').master.address, 'C2');
-  assert.match(detail.getCell('B2').value.formula, /DISPIMG/);
-  assert.equal(detail.getCell('B4').value, '图片加载失败');
-  assert.equal(detail.getCell('E2').numFmt, '#,##0');
-  assert.equal(detail.getCell('F2').numFmt, '¥#,##0.00');
+  assert.equal(detail.getCell('D3').master.address, 'D2');
+  assert.match(detail.getCell('C2').value.formula, /DISPIMG/);
+  assert.equal(detail.getCell('C4').value, '图片加载失败');
+  assert.equal(detail.getCell('F2').numFmt, '#,##0');
   assert.equal(detail.getCell('G2').numFmt, '¥#,##0.00');
-  assert.equal(detail.getCell('A5').value, '合计');
-  assert.equal(detail.getCell('E5').value, 6);
-  assert.equal(detail.getCell('G5').value, 74.04);
+  assert.equal(detail.getCell('H2').numFmt, '¥#,##0.00');
+  assert.equal(detail.getCell('B5').value, '合计');
+  assert.equal(detail.getCell('F5').value, 6);
+  assert.equal(detail.getCell('H5').value, 74.04);
 
   const failures = workbook.getWorksheet('图片加载失败');
   assert.ok(failures);

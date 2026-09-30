@@ -214,6 +214,7 @@ export class FinishedGoodsStockInboundQueryService {
 
   async findMergeableFinishedStock(params: {
     skuCode: string;
+    productName?: string;
     customerId: number | null;
     customerName: string;
     warehouseId: number | null;
@@ -227,6 +228,7 @@ export class FinishedGoodsStockInboundQueryService {
       .createQueryBuilder('s')
       .addSelect('s.color_size_snapshot')
       .where('s.skuCode = :sku', { sku })
+      .andWhere('s.productName = :productName', { productName: params.productName ?? '' })
       .andWhere('s.department = :dep', { dep });
     if (params.customerId != null) qb.andWhere('s.customerId = :customerId', { customerId: params.customerId });
     else qb.andWhere('s.customerId IS NULL').andWhere('s.customerName = :customerName', { customerName: params.customerName.trim() });
@@ -241,6 +243,7 @@ export class FinishedGoodsStockInboundQueryService {
   stockAdjustSnapshot(stock: FinishedGoodsStock): Record<string, unknown> {
     return {
       skuCode: stock.skuCode ?? '',
+      productName: stock.productName ?? '',
       customerName: stock.customerName ?? '',
       department: stock.department ?? '',
       inventoryTypeId: stock.inventoryTypeId ?? null,
@@ -361,6 +364,7 @@ export class FinishedGoodsStockInboundQueryService {
       .createQueryBuilder('s')
       .addSelect('s.color_size_snapshot')
       .where('s.skuCode = :sku', { sku })
+      .andWhere('s.productName = :productName', { productName: seed.productName ?? '' })
       .andWhere('s.department = :dep', { dep });
     if (seed.customerId != null) qb.andWhere('s.customerId = :customerId', { customerId: seed.customerId });
     else qb.andWhere('s.customerId IS NULL').andWhere('s.customerName = :customerName', { customerName: String(seed.customerName ?? '').trim() });

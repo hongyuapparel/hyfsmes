@@ -12,7 +12,7 @@
           <thead><tr><th>颜色</th><th v-for="(header, i) in detail.headers" :key="i">{{ header }}</th><th>合计</th></tr></thead>
           <tbody>
             <tr v-for="(item, i) in detail.rows" :key="i">
-              <td>{{ item.colorName || '未记录颜色' }}</td>
+              <td><AppImageThumb v-if="item.imageUrl" :raw-url="item.imageUrl" variant="compact" />{{ item.colorName || '未记录颜色' }}</td>
               <td v-for="(value, j) in item.values" :key="j">{{ formatDisplayNumber(value) }}</td>
               <td>{{ formatDisplayNumber(getInboundPreviewRowTotal(item.values)) }}</td>
             </tr>
@@ -31,6 +31,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import type { PendingListItem } from '@/api/inventory'
 import { buildInboundPreviewItem, getInboundPreviewRowTotal } from '@/composables/inventoryPendingDialogHelpers'
 import { formatDisplayNumber } from '@/utils/display-number'

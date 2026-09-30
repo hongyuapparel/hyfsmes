@@ -41,6 +41,21 @@
       <span v-else>{{ stock.skuCode || '-' }}</span>
     </div>
 
+    <div class="detail-basic-label">品名</div>
+    <div class="detail-basic-value">
+      <el-input
+        v-if="metaEditing"
+        :model-value="editForm.productName"
+        maxlength="255"
+        clearable
+        size="small"
+        placeholder="选填"
+        title="修改品名将应用到当前 SKU 的全部库存；未修改则各记录保持原名"
+        @update:model-value="(value) => updateField('productName', String(value ?? ''))"
+      />
+      <span v-else>{{ stock.productName || '-' }}</span>
+    </div>
+
     <div class="detail-basic-label">部门</div>
     <div class="detail-basic-value">
       <el-select
@@ -161,6 +176,7 @@ import type { FinishedDetailEditForm } from '@/composables/useFinishedDetailData
 
 type StockInfo = {
   skuCode?: string
+  productName?: string
   inventoryTypeId?: number | null
   warehouseId?: number | null
   department?: string

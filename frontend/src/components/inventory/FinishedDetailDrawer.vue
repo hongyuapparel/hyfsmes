@@ -167,6 +167,7 @@ const stockInfo = computed(
       location: '',
     }) as {
       skuCode?: string
+      productName?: string
       inventoryTypeId?: number | null
       warehouseId?: number | null
       department?: string

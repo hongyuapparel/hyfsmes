@@ -25,6 +25,7 @@
           <el-table :data="toPreviewTableRows(item)" border size="small" class="inbound-preview-table">
             <el-table-column label="颜色" min-width="90" align="center">
               <template #default="{ row }">
+                <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
                 {{ row.colorName || '-' }}
               </template>
             </el-table-column>
@@ -117,6 +118,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 
 type InboundPreviewItem = {
@@ -125,10 +127,10 @@ type InboundPreviewItem = {
   skuCode: string
   quantity: number
   headers: string[]
-  rows: Array<{ colorName: string; values: number[] }>
+  rows: Array<{ colorName: string; values: number[]; imageUrl?: string }>
 }
 
-type PreviewRow = { colorName: string; values: number[] }
+type PreviewRow = { colorName: string; values: number[]; imageUrl?: string }
 
 defineProps<{
   visible: boolean

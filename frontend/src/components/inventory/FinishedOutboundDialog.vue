@@ -37,6 +37,7 @@
         <div v-for="group in groupedOutboundItems" :key="group.key" class="outbound-batch-card">
           <div class="outbound-card-meta">
             <div>SKU：{{ group.skuCode }}</div>
+            <div v-if="group.productNames.length">品名：{{ group.productNames.join('、') }}</div>
             <div>选中记录：{{ group.recordCount }} 条</div>
             <div>当前库存：{{ group.stockQuantity }}</div>
           </div>
@@ -150,6 +151,7 @@ type DisplayOutboundRow = {
 type OutboundSkuGroup = {
   key: string
   skuCode: string
+  productNames: string[]
   recordCount: number
   stockQuantity: number
   headers: string[]
@@ -171,9 +173,11 @@ const groupedOutboundItems = computed<OutboundSkuGroup[]>(() => {
     const key = skuCode === '-' ? `stock-${item.stock.id}` : skuCode.toLowerCase()
     let group = groups.get(key)
     if (!group) {
-      group = { key, skuCode, recordCount: 0, stockQuantity: 0, headers: [], rows: [] }
+      group = { key, skuCode, productNames: [], recordCount: 0, stockQuantity: 0, headers: [], rows: [] }
       groups.set(key, group)
     }
+    const productName = item.stock.productName?.trim()
+    if (productName && !group.productNames.includes(productName)) group.productNames.push(productName)
     group.recordCount += 1
     group.stockQuantity += Math.max(0, Math.trunc(Number(item.stock.quantity) || 0))
     group.headers = mergeHeaders(group.headers, item.headers)

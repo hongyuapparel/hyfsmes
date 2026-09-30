@@ -18,6 +18,7 @@ export class FinishedGoodsStockOperationService {
       orderNo?: string;
       inboundSource?: 'order' | 'manual';
       skuCode: string;
+      productName?: string;
       quantity: number;
       unitPrice?: string | number;
       warehouseId?: number | null;
@@ -29,8 +30,9 @@ export class FinishedGoodsStockOperationService {
       colorSize?: unknown;
     },
     operatorUsername = '',
+    preserveExistingColorImages = false,
   ): Promise<FinishedGoodsStock> {
-    return this.inboundService.createManual(dto, operatorUsername);
+    return this.inboundService.createManual(dto, operatorUsername, preserveExistingColorImages);
   }
 
   outbound(
@@ -47,6 +49,7 @@ export class FinishedGoodsStockOperationService {
     dto: {
       department?: string;
       skuCode?: string;
+      productName?: string;
       inventoryTypeId?: number | null;
       warehouseId?: number | null;
       location?: string;

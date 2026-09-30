@@ -127,11 +127,13 @@ function buildParentRow(groupKey: string, rows: StockTableLeafRow[]): StockTable
   const inventoryTypeIds = uniqueNullableNumbers(rows.map((item) => item.inventoryTypeId))
   const warehouseIds = uniqueNullableNumbers(rows.map((item) => item.warehouseId))
   const departments = uniqueStrings(rows.map((item) => item.department))
+  const productNames = uniqueStrings(rows.map((item) => item.productName))
   const customerNames = uniqueStrings(rows.map((item) => item.customerName))
   const locations = uniqueStrings(rows.map((item) => item.location))
   const orderNos = uniqueStrings(rows.map((item) => item.orderNo))
   return {
     ...first,
+    productName: productNames.length === 1 ? productNames[0] : '多个',
     quantity: rows.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
     unitPrice: unitPrices.length === 1 ? unitPrices[0] : '',
     inventoryTypeId: inventoryTypeIds.length === 1 ? inventoryTypeIds[0] : null,

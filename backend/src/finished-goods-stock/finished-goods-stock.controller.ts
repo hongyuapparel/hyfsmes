@@ -103,12 +103,14 @@ export class FinishedGoodsStockController {
     @Body('imageUrl') imageUrl?: string,
     @Body('remark') remark?: string,
     @Body('colorSize') colorSize?: unknown,
+    @Body('productName') productName?: string,
   ) {
     return this.operationService.createManual(
       {
         orderNo,
         inboundSource,
         skuCode,
+        productName,
         quantity: Number(quantity),
         unitPrice,
         warehouseId,
@@ -168,6 +170,7 @@ export class FinishedGoodsStockController {
   updateMeta(
     @Param('id') id: string,
     @Body('skuCode') skuCode: string | undefined,
+    @Body('productName') productName: string | undefined,
     @Body('department') department: string | undefined,
     @Body('inventoryTypeId') inventoryTypeId: number | null | undefined,
     @Body('warehouseId') warehouseId: number | null | undefined,
@@ -181,7 +184,7 @@ export class FinishedGoodsStockController {
   ) {
     return this.operationService.updateMeta(
       Number(id),
-      { skuCode, department, inventoryTypeId, warehouseId, location, unitPrice, imageUrl, remark, colorSize, colorImages },
+      { skuCode, productName, department, inventoryTypeId, warehouseId, location, unitPrice, imageUrl, remark, colorSize, colorImages },
       user?.username ?? '',
     );
   }
@@ -191,6 +194,7 @@ export class FinishedGoodsStockController {
   repartition(
     @Param('id') id: string,
     @Body('skuCode') skuCode: string | undefined,
+    @Body('productName') productName: string | undefined,
     @Body('imageUrl') imageUrl: string | undefined,
     @Body('remark') remark: string | undefined,
     @Body('headers') headers: string[] | undefined,
@@ -202,7 +206,7 @@ export class FinishedGoodsStockController {
   ) {
     return this.operationService.repartition(
       Number(id),
-      { skuCode, imageUrl, remark, headers: Array.isArray(headers) ? headers : [], colorMeta: Array.isArray(colorMeta) ? colorMeta : [] },
+      { skuCode, productName, imageUrl, remark, headers: Array.isArray(headers) ? headers : [], colorMeta: Array.isArray(colorMeta) ? colorMeta : [] },
       user?.username ?? '',
     );
   }

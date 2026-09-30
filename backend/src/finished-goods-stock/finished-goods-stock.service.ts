@@ -35,8 +35,9 @@ export class FinishedGoodsStockService {
       colorSize?: unknown;
     },
     operatorUsername = '',
+    preserveExistingColorImages = false,
   ) {
-    return this.operationService.createManual(dto, operatorUsername);
+    return this.operationService.createManual(dto, operatorUsername, preserveExistingColorImages);
   }
 
   getList(params: {

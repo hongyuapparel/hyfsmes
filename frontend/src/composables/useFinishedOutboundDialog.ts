@@ -14,6 +14,7 @@ export type FinishedOutboundStockInfo = {
   orderId: number | null
   orderNo: string
   skuCode: string
+  productName?: string
   customerName: string
   quantity: number
   imageUrl: string

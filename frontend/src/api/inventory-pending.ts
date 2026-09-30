@@ -19,7 +19,7 @@ export interface PendingListItem {
   /** 本批入库/次品的颜色×尺码真值快照（来自尾部入库登记） */
   colorSizeSnapshot?: {
     headers: string[]
-    rows: Array<{ colorName: string; quantities: number[] }>
+    rows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>
   } | null
   /** recorded=事实完整；missing=应有明细但缺失/不一致；not_applicable=无尺码维度；unknown=历史发货无明细且原因无法确认 */
   detailStatus: 'recorded' | 'missing' | 'not_applicable' | 'unknown'

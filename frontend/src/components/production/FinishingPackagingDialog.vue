@@ -54,8 +54,8 @@
           >
             <div class="color-register-title">
               <AppImageThumb
-                v-if="item.planColorRows[ri]?.imageUrl"
-                :raw-url="item.planColorRows[ri].imageUrl"
+                v-if="colorImage(item, plan.colorName)"
+                :raw-url="colorImage(item, plan.colorName)"
                 variant="compact"
               />
               <span>{{ plan.colorName }}</span>
@@ -232,6 +232,11 @@ watch(visible, (v) => emit('update:modelValue', v))
 type BlockRow =
   | { kind: 'readonly'; label: string; values: number[] }
   | { kind: 'input'; field: 'received' | 'inbound' | 'defect'; label: string }
+
+function colorImage(item: PackagingCompleteItem, colorName: string): string {
+  const images = new Set(item.planColorRows.filter(row => row.colorName.trim() === colorName.trim()).map(row => row.imageUrl || ''))
+  return images.size === 1 ? [...images][0] : ''
+}
 
 function hasNonZero(values: number[] | undefined | null): boolean {
   if (!Array.isArray(values)) return false

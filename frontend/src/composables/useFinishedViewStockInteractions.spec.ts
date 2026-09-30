@@ -4,6 +4,26 @@ import type { FinishedStockRow } from '@/api/inventory'
 import { useFinishedStockTable } from './useFinishedStockTable'
 import { useFinishedViewStockInteractions } from './useFinishedViewStockInteractions'
 
+describe('成品库存品名传递', () => {
+  it('补货继承品名，混合品名选择不能误用首条名称', () => {
+    const list = ref([{ ...stock(1, '10'), productName: '雨伞' }, { ...stock(2, '10'), productName: '包包' }])
+    const table = useFinishedStockTable(list)
+    const interaction = useFinishedViewStockInteractions({ list, ...table, getSharedProductImageUrl: () => '', load: async () => {} })
+    const parent = table.stockTableData.value[0]
+    interaction.onSelectionChange([parent])
+    interaction.openCreateDrawer()
+    expect(interaction.createDrawerVisible.value).toBe(false)
+    interaction.clearSelection()
+    const leaves = table.getGroupLeafRows(parent)
+    interaction.onSelectionChange([leaves[0]])
+    interaction.openCreateDrawer()
+    expect(interaction.createDrawerVisible.value).toBe(true)
+    expect(interaction.createSeed.value?.productName).toBe('雨伞')
+    interaction.openOutboundDialog()
+    expect(interaction.outboundDialog.items[0].productName).toBe('雨伞')
+  })
+})
+
 function stock(id: number, unitPrice: string): FinishedStockRow {
   return { id, type: 'stored', orderId: null, orderNo: '', skuCode: 'QA', quantity: 5,
     unitPrice, department: '仓库', warehouseId: 1, inventoryTypeId: 1, location: 'QA', createdAt: '',

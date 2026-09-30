@@ -1,6 +1,15 @@
 import { BadRequestException } from '@nestjs/common';
+import { withColorImages } from '../common/color-image.util';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { getSizeHeaderKey, normalizeSizeHeader, remapQuantitiesBySizeHeaders, sortSizeHeaders } from './size-header-order.util';
+
+export function normalizeStockProductName(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value !== 'string') throw new BadRequestException('品名必须为文本');
+  const name = value.trim();
+  if (name.length > 255) throw new BadRequestException('品名不能超过255个字符');
+  return name;
+}
 
 export function formatDateTimeForResponse(value: unknown): string {
   if (!value) return '';
@@ -127,7 +136,7 @@ export function parseStoredColorSizeSnapshot(raw: unknown): ColorSizeSnapshot | 
     rows.push({ colorName, quantities });
   }
   if (!rows.length) return null;
-  return normalizeColorSizeSnapshot({ headers, rows });
+  return withColorImages(normalizeColorSizeSnapshot({ headers, rows }), rowsRaw);
 }
 
 export function parseListSizeBreakdownFromSnapshot(raw: unknown): {
@@ -175,5 +184,5 @@ export function subtractColorSizeSnapshots(current: ColorSizeSnapshot | null, ou
     }))
     .filter((row) => row.quantities.some((qty) => qty > 0));
   if (!activeRows.length) return { headers: [], rows: [] };
-  return normalizeColorSizeSnapshot({ headers, rows: activeRows });
+  return withColorImages(normalizeColorSizeSnapshot({ headers, rows: activeRows }), current.rows);
 }

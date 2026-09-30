@@ -55,6 +55,7 @@
             >
               <el-table-column label="颜色" min-width="100">
                 <template #default="{ row }">
+                  <AppImageThumb v-if="row.imageUrl" :raw-url="row.imageUrl" variant="compact" />
                   {{ row.colorName || '-' }}
                 </template>
               </el-table-column>
@@ -106,6 +107,7 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import AppImageThumb from '@/components/AppImageThumb.vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 
 type PendingOutboundDialogItem = {

@@ -7,6 +7,7 @@ import { Role } from '../entities/role.entity';
 import { Product } from '../entities/product.entity';
 import { User, UserStatus } from '../entities/user.entity';
 import { UserRole } from '../entities/user-role.entity';
+import { withColorImages } from '../common/color-image.util';
 import { FinishedGoodsStockService } from '../finished-goods-stock/finished-goods-stock.service';
 import { applyPendingOutboundSizeDeduction, getPendingDetailStatus } from './inventory-pending-outbound.helpers';
 import { parseStoredColorSizeSnapshot } from '../finished-goods-stock/finished-goods-stock-query.utils';
@@ -77,6 +78,14 @@ export class InventoryPendingService {
         `订单 ${pending.skuCode || pending.id} 的本批颜色尺码明细未留存或与待处理数量不一致，请先在尾部纠错中按实际数据补录`,
       );
     }
+  }
+
+  private async loadOrderColorImages(manager: EntityManager, orderIds: number[]): Promise<Map<number, unknown>> {
+    if (!orderIds.length) return new Map();
+    const rows = await manager.query(
+      `SELECT order_id AS orderId, color_size_rows AS colorRows FROM order_ext WHERE order_id IN (${orderIds.map(() => '?').join(',')})`, orderIds,
+    ) as Array<{ orderId: number; colorRows: unknown }>;
+    return new Map(rows.map(row => [Number(row.orderId), row.colorRows]));
   }
 
   private async resolvePickupUser(pickupUserId?: number | null): Promise<{ pickupId: number | null; pickupUserName: string }> {
@@ -159,6 +168,7 @@ export class InventoryPendingService {
       orderMap.set(o.id, o);
     }
     const detailRequiredOrderIds = await this.loadOrdersRequiringColorSizeDetail(this.pendingRepo.manager, orderIds);
+    const imageSourcesByOrder = await this.loadOrderColorImages(this.pendingRepo.manager, orderIds);
     for (const p of pendings) {
       const order = orderMap.get(p.orderId);
       const snapshot = parseStoredColorSizeSnapshot((p as { colorSizeSnapshot?: unknown }).colorSizeSnapshot);
@@ -174,9 +184,10 @@ export class InventoryPendingService {
           department: department?.trim() ?? '',
           location: location?.trim() ?? '',
           imageUrl: img,
-          colorSize: snapshot,
+          colorSize: withColorImages(snapshot, imageSourcesByOrder.get(p.orderId)),
         },
         operatorUsername,
+        true,
       );
       p.status = 'completed';
       await this.pendingRepo.save(p);
@@ -267,6 +278,7 @@ export class InventoryPendingService {
     const execute = async (manager: EntityManager): Promise<void> => {
         const txPendingRepo = manager.getRepository(InboundPending);
         const txDetailRequiredOrderIds = await this.loadOrdersRequiringColorSizeDetail(manager, orderIds);
+        const imageSourcesByOrder = await this.loadOrderColorImages(manager, orderIds);
 
         for (const item of normalizedItems) {
           const txPending = await txPendingRepo
@@ -287,8 +299,9 @@ export class InventoryPendingService {
 
           const pending = pendingMap.get(item.id) ?? txPending;
           const label = `记录 ${txPending.skuCode || txPending.id}`;
-          const currentSnapshot = parseStoredColorSizeSnapshot(
-            (txPending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot,
+          const currentSnapshot = withColorImages(
+            parseStoredColorSizeSnapshot((txPending as { colorSizeSnapshot?: unknown }).colorSizeSnapshot),
+            imageSourcesByOrder.get(txPending.orderId),
           );
           this.assertRecordedDetail(
             txPending,

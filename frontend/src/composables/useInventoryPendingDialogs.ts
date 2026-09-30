@@ -23,7 +23,7 @@ type PendingPageTab = 'pending' | 'shipped'
 export type PendingOutboundDialogItem = {
   row: PendingListItem
   headers: string[]
-  rows: Array<{ colorName: string; quantities: number[]; availableQuantities: number[] }>
+  rows: Array<{ colorName: string; quantities: number[]; availableQuantities: number[]; imageUrl?: string }>
 }
 
 export type InboundPreviewItem = {
@@ -33,7 +33,7 @@ export type InboundPreviewItem = {
   skuCode: string
   quantity: number
   headers: string[]
-  rows: Array<{ colorName: string; values: number[] }>
+  rows: Array<{ colorName: string; values: number[]; imageUrl?: string }>
 }
 
 type UseInventoryPendingDialogsParams = {

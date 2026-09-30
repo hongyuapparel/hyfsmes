@@ -26,6 +26,7 @@ export type FinishedStockExportLine = {
   stockId: number;
   customerName: string;
   skuCode: string;
+  productName?: string;
   colorName: string;
   sizeName: string;
   imageUrl: string;
@@ -99,6 +100,7 @@ export function buildFinishedStockExportLines(
       stockId: Number(stock.id),
       customerName: normalizeText(stock.customerName) || '-',
       skuCode: normalizeText(stock.skuCode) || '-',
+      productName: normalizeText(stock.productName),
       unitPrice,
       inventoryType,
       warehouse,
