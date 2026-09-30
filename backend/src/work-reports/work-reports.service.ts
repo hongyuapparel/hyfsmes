@@ -97,7 +97,7 @@ export class WorkReportsService {
      const pending=date===today?(await this.finishing.getFinishingExportRows({tab:'all'})).filter(r=>r.finishingStatus!=='inbound'):[];
      const completed=await this.finishing.getFinishingExportRows({tab:'inbound',completedStart:date,completedEnd:date});
      const map=(r:typeof pending[number]):AutoRow=>({orderId:r.orderId,orderNo:r.orderNo,sku:r.skuCode,imageUrl:r.imageUrl,customer:r.customerName,title:r.finishingStatus==='inbound'?'包装完成':r.finishingStatus==='pending_receive'?'待收货':'待包装 / 分配',time:r.finishingStatus==='inbound'?r.completedAt||'':r.arrivedAt||'',quantity:r.finishingStatus==='inbound'?r.tailReceivedQty:r.quantity,factory:r.factoryName||'',remark:r.remark||''});
-     automatic.push({title:'当前尾部待办（部门）',note:queueNote,rows:pending.reverse().map(map)},{title:'当天尾部完成（部门）',note:'按包装完成时间统计；交仓不等于已出货。',rows:completed.map(map)});
+     automatic.push({title:'当前尾部待办（部门）',note:queueNote,rows:pending.reverse().map(map)},{title:'当天尾部完成（部门）',note:'按包装完成并转入待仓处理的时间统计；到此尾部工作结束，后续装箱和出货由仓管处理。',rows:completed.map(map)});
    }
    if(codes.includes('warehouse')) {
      const pending:AutoRow[]=date===today?await this.db.query(`SELECT p.id entryId,o.id orderId,o.order_no orderNo,p.sku_code sku,o.image_url imageUrl,o.customer_name customer,'待仓处理' title,DATE_FORMAT(p.created_at,'%Y-%m-%d %H:%i') time,p.quantity,'' factory FROM inbound_pending p JOIN orders o ON o.id=p.order_id WHERE p.status='pending' AND o.deleted_at IS NULL ORDER BY p.created_at,p.id`):[];
@@ -112,7 +112,7 @@ export class WorkReportsService {
      automatic.push({title:'当前待采购（部门）',note:date===today?'与采购页等待采购、采购中清单一致，按物料项展示；不包含领料。':'历史日期不展示当前待采购清单，系统尚无待采购历史快照。',rows:pending.map(map)});
      automatic.push({title:'当天采购完成（部门）',note:'与采购页完成记录一致，按所选日期和物料项统计；登记完成不等于仓库到货，不同物料数量不合计。',rows:completed.map(map)});
    }
-   if(codes.includes('finishing')||codes.includes('warehouse')||template.id==='merchandiser') {
+   if(codes.includes('warehouse')||template.id==='merchandiser') {
      const shipped:AutoRow[]=await this.db.query(`SELECT COALESCE(o.id,0) orderId,COALESCE(o.order_no,'') orderNo,
        i.style_no sku,i.image_url imageUrl,p.customer_name customer,CONCAT('装箱单 ',p.code) title,
        DATE_FORMAT(p.shipped_at,'%Y-%m-%d %H:%i') time,i.total_qty quantity,'' factory
