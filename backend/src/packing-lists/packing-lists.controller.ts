@@ -7,7 +7,8 @@ import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
 import { PackingListsShipService } from './packing-lists-ship.service';
 import { XiaomanService } from '../xiaoman/xiaoman.service';
-import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
+import { CopyPackingListToDraftDto, SavePackingListDto, SetPackingListHoldDto } from './dto';
+import { PackingListsHoldService } from './packing-lists-hold.service';
 
 @Controller('packing-lists')
 @UseGuards(JwtAuthGuard, PermissionGuard)
@@ -18,6 +19,7 @@ export class PackingListsController {
     private readonly pickableService: PackingListsPickableService,
     private readonly shipService: PackingListsShipService,
     private readonly xiaomanService: XiaomanService,
+    private readonly holdService: PackingListsHoldService,
   ) {}
 
   @Get('xiaoman/orders')
@@ -39,6 +41,11 @@ export class PackingListsController {
   async ship(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: { userId: number; username: string }) {
     const operatorName = await this.service.resolveOperatorName(user);
     return this.shipService.ship(id, operatorName);
+  }
+
+  @Post('hold')
+  async setHold(@Body() payload: SetPackingListHoldDto, @CurrentUser() user: { userId: number; username: string }) {
+    return this.holdService.setHold(payload, await this.service.resolveOperatorName(user));
   }
 
   @Post('copy-to-draft/:id')

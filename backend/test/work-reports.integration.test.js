@@ -9,10 +9,10 @@ test('isolated ERP report integration: permissions, persistence, conflict, histo
  const backups=[];let ownerId;
  try {
   const people=await api('people');assert.equal(people.status,200);assert.ok(people.data.length>10);
-  const own=(await api('people',employee)).data;assert.equal(own.length,1);
+  const own=(await api('people',employee)).data;assert.equal(own.length,people.data.length);
   const me=people.data.find(p=>p.username==='report_preview_0203');assert.ok(me);ownerId=me.id;for(const table of ['work_report_plans','work_report_snapshots']){const [rows]=await db.query('SELECT * FROM '+table+' WHERE owner_id=?',[ownerId]);backups.push([table,rows]);}
   const date=new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date());
-  assert.equal((await api(me.id+'?date='+date,employee)).status,403);
+  assert.equal((await api(me.id+'?date='+date,employee)).status,200);
   assert.equal((await api(me.id+'?date=invalid')).status,400);
   // Only disposable preview account report rows are cleared; business orders remain untouched.
   await db.query('DELETE FROM work_report_snapshots WHERE owner_id=?',[me.id]);

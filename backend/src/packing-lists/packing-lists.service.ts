@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, In, Repository, SelectQueryBuilder } from 'typeorm';
+import { EntityManager, In, Repository } from 'typeorm';
 import { PackingList } from '../entities/packing-list.entity';
 import { PackingListBox } from '../entities/packing-list-box.entity';
 import { PackingListItem } from '../entities/packing-list-item.entity';
@@ -9,52 +9,13 @@ import { User } from '../entities/user.entity';
 import { resolveOperatorDisplayName } from '../common/operator.util';
 import { buildPackingListUpdateSummary } from './packing-list-log-summary';
 import { CopyPackingListToDraftDto, SavePackingListDto } from './dto';
+import { PackingListsQuery, PackingListQuery } from './packing-lists-query';
+export type { PackingListQuery, PackingListRow, PackingListSummary } from './packing-lists-query';
 import {
   normalizePackingSizeHeaders,
   normalizePackingSizeQuantitiesForHeaders,
   packingQuantityTotal,
 } from './packing-list-quantities';
-
-export interface PackingListQuery {
-  status?: string;
-  customerName?: string;
-  /** 按明细款号/SKU 模糊匹配（命中任一明细即返回该单） */
-  keyword?: string;
-  /** 按小满单号模糊匹配 */
-  xiaomanOrderNo?: string;
-  /** 按业务员精确匹配（下拉选名单） */
-  serviceManager?: string;
-  dateFrom?: string;
-  dateTo?: string;
-  sortField?: string;
-  sortOrder?: 'asc' | 'desc';
-  page: number;
-  pageSize: number;
-}
-
-export interface PackingListRow {
-  id: number;
-  code: string;
-  customerId: number | null;
-  customerName: string;
-  serviceManager: string;
-  poNo: string;
-  xiaomanOrderNo: string;
-  xiaomanOrderId: string;
-  packDate: string | null;
-  status: string;
-  shippedAt: Date | null;
-  createdAt: Date;
-  boxCount: number;
-  totalQty: number;
-  totalWeight: number;
-  styleNos: string[];
-}
-
-export interface PackingListSummary {
-  boxCount: number;
-  totalQty: number;
-}
 
 export interface PackingBoxDetail {
   id: number;
@@ -91,6 +52,7 @@ export interface PackingListDetail {
   showCompany: boolean;
   sizeHeaders: string[];
   status: string;
+  holdReason: string;
   shippedAt: Date | null;
   operatorUsername: string;
   createdAt: Date;
@@ -123,122 +85,8 @@ export class PackingListsService {
     return resolveOperatorDisplayName(this.userRepo, actor ?? {});
   }
 
-  async getList(query: PackingListQuery): Promise<{ list: PackingListRow[]; total: number; summary: PackingListSummary }> {
-    const qb = this.listRepo.createQueryBuilder('pl');
-    this.applyListFilters(qb, query);
-    this.applyListOrdering(qb, query);
-
-    const page = Math.max(1, Number(query.page) || 1);
-    const pageSize = Math.min(100, Math.max(1, Number(query.pageSize) || 20));
-    const totalQb = qb.clone();
-    const [lists, total, summary] = await Promise.all([
-      qb
-        .skip((page - 1) * pageSize)
-        .take(pageSize)
-        .getMany(),
-      totalQb.getCount(),
-      this.getListSummary(query),
-    ]);
-
-    const ids = lists.map((l) => l.id);
-    const boxAgg = new Map<number, { boxCount: number; totalWeight: number }>();
-    const itemAgg = new Map<number, { totalQty: number; styleNos: string[] }>();
-    if (ids.length) {
-      const boxRows: Array<{ listId: string; boxCount: string; totalWeight: string | null }> = await this.boxRepo
-        .createQueryBuilder('b')
-        .select('b.packing_list_id', 'listId')
-        .addSelect('COUNT(*)', 'boxCount')
-        .addSelect('SUM(b.weight_kg)', 'totalWeight')
-        .where('b.packing_list_id IN (:...ids)', { ids })
-        .groupBy('b.packing_list_id')
-        .getRawMany();
-      for (const row of boxRows) {
-        boxAgg.set(Number(row.listId), {
-          boxCount: Number(row.boxCount) || 0,
-          totalWeight: Number(row.totalWeight) || 0,
-        });
-      }
-      const itemRows: Array<{ listId: string; totalQty: string | null; styleNos: string | null }> = await this.itemRepo
-        .createQueryBuilder('i')
-        .select('i.packing_list_id', 'listId')
-        .addSelect('SUM(i.total_qty)', 'totalQty')
-        .addSelect("GROUP_CONCAT(DISTINCT i.style_no SEPARATOR '\n')", 'styleNos')
-        .where('i.packing_list_id IN (:...ids)', { ids })
-        .groupBy('i.packing_list_id')
-        .getRawMany();
-      for (const row of itemRows) {
-        itemAgg.set(Number(row.listId), {
-          totalQty: Number(row.totalQty) || 0,
-          styleNos: (row.styleNos ?? '').split('\n').map((s) => s.trim()).filter((s) => !!s),
-        });
-      }
-    }
-
-    const list = lists.map((l) => ({
-      id: l.id,
-      code: l.code,
-      customerId: l.customerId,
-      customerName: l.customerName,
-      serviceManager: l.serviceManager,
-      poNo: l.poNo,
-      xiaomanOrderNo: l.xiaomanOrderNo,
-      xiaomanOrderId: l.xiaomanOrderId,
-      packDate: l.packDate,
-      status: l.status,
-      shippedAt: l.shippedAt,
-      createdAt: l.createdAt,
-      boxCount: boxAgg.get(l.id)?.boxCount ?? 0,
-      totalQty: itemAgg.get(l.id)?.totalQty ?? 0,
-      totalWeight: boxAgg.get(l.id)?.totalWeight ?? 0,
-      styleNos: itemAgg.get(l.id)?.styleNos ?? [],
-    }));
-    return { list, total, summary };
-  }
-
-  private applyListFilters(qb: SelectQueryBuilder<PackingList>, query: PackingListQuery): void {
-    if (query.status?.trim()) qb.andWhere('pl.status = :status', { status: query.status.trim() });
-    if (query.customerName?.trim()) {
-      qb.andWhere('pl.customer_name LIKE :customerName', { customerName: `%${query.customerName.trim()}%` });
-    }
-    if (query.keyword?.trim()) {
-      qb.andWhere(
-        'EXISTS (SELECT 1 FROM packing_list_items pli WHERE pli.packing_list_id = pl.id AND pli.style_no LIKE :keyword)',
-        { keyword: `%${query.keyword.trim()}%` },
-      );
-    }
-    if (query.xiaomanOrderNo?.trim()) {
-      qb.andWhere('pl.xiaoman_order_no LIKE :xom', { xom: `%${query.xiaomanOrderNo.trim()}%` });
-    }
-    if (query.serviceManager?.trim()) {
-      qb.andWhere('pl.service_manager = :serviceManager', { serviceManager: query.serviceManager.trim() });
-    }
-    if (query.dateFrom?.trim()) qb.andWhere('pl.pack_date >= :dateFrom', { dateFrom: query.dateFrom.trim() });
-    if (query.dateTo?.trim()) qb.andWhere('pl.pack_date <= :dateTo', { dateTo: query.dateTo.trim() });
-  }
-
-  private applyListOrdering(qb: SelectQueryBuilder<PackingList>, query: PackingListQuery): void {
-    if (query.sortField === 'packDate' && (query.sortOrder === 'asc' || query.sortOrder === 'desc')) {
-      const direction = query.sortOrder === 'asc' ? 'ASC' : 'DESC';
-      qb.orderBy('pl.pack_date', direction).addOrderBy('pl.id', 'DESC');
-      return;
-    }
-    qb.orderBy('pl.id', 'DESC');
-  }
-
-  private async getListSummary(query: PackingListQuery): Promise<PackingListSummary> {
-    const qb = this.listRepo.createQueryBuilder('pl');
-    this.applyListFilters(qb, query);
-    const row: { boxCount: string | null; totalQty: string | null } | undefined = await qb
-      .select('COALESCE(SUM((SELECT COUNT(*) FROM packing_list_boxes b WHERE b.packing_list_id = pl.id)), 0)', 'boxCount')
-      .addSelect(
-        'COALESCE(SUM((SELECT COALESCE(SUM(i.total_qty), 0) FROM packing_list_items i WHERE i.packing_list_id = pl.id)), 0)',
-        'totalQty',
-      )
-      .getRawOne();
-    return {
-      boxCount: Number(row?.boxCount) || 0,
-      totalQty: Number(row?.totalQty) || 0,
-    };
+  getList(query: PackingListQuery) {
+    return new PackingListsQuery(this.listRepo, this.boxRepo, this.itemRepo).getList(query);
   }
 
   async getDetail(id: number): Promise<PackingListDetail> {
@@ -271,6 +119,7 @@ export class PackingListsService {
       showCompany: !!list.showCompany,
       sizeHeaders: Array.isArray(list.sizeHeaders) ? list.sizeHeaders : [],
       status: list.status,
+      holdReason: list.holdReason ?? '',
       shippedAt: list.shippedAt,
       operatorUsername: operatorName,
       createdAt: list.createdAt,
@@ -471,7 +320,7 @@ export class PackingListsService {
   async remove(id: number, operatorUsername = ''): Promise<void> {
     const list = await this.listRepo.findOne({ where: { id } });
     if (!list) throw new NotFoundException('装箱单不存在');
-    if (list.status !== 'draft') throw new BadRequestException('已发货的装箱单不可删除');
+    if (list.status !== 'draft') throw new BadRequestException('仅草稿装箱单可删除，滞留单请先移回草稿');
     await this.listRepo.manager.transaction(async (manager) => {
       await manager.getRepository(PackingListItem).delete({ packingListId: id });
       await manager.getRepository(PackingListBox).delete({ packingListId: id });

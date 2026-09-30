@@ -38,7 +38,7 @@ onMounted(()=>{window.addEventListener('beforeunload',unload)})
 onBeforeUnmount(()=>window.removeEventListener('beforeunload',unload))
 </script>
 <style scoped>
-.report-settings {--table-font-size:var(--font-size-body);font-size:var(--font-size-body);line-height:1.5}
+.report-settings {font-size:var(--font-size-body);line-height:1.5}
 h1 {font-size:var(--font-size-subtitle);margin:0}
 .settings-toolbar {display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);margin-bottom:var(--space-md);flex-wrap:wrap}
 .settings-actions {display:flex;align-items:center}

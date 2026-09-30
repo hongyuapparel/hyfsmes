@@ -46,6 +46,8 @@ const ACTION_LABELS: Record<string, string> = {
   create: '新建',
   update: '修改',
   ship: '发货',
+  hold: '标记滞留',
+  resume: '移回草稿',
   delete: '删除',
   copy_to_draft: '复制为草稿',
   copy_from: '复制生成',
@@ -58,7 +60,7 @@ function formatAction(action: string): string {
 function actionType(action: string): 'primary' | 'success' | 'warning' | 'danger' {
   if (action === 'ship') return 'success'
   if (action === 'delete') return 'danger'
-  if (action === 'update') return 'warning'
+  if (action === 'update' || action === 'hold') return 'warning'
   return 'primary'
 }
 
@@ -67,6 +69,9 @@ defineOptions({ name: 'PackingListLogDrawer' })
 
 <style scoped>
 .packing-log-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
   padding: 8px 12px 12px;
 }
 

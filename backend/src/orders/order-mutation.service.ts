@@ -247,6 +247,7 @@ export class OrderMutationService {
       status: 'draft',
       statusTime: now,
     });
+    await this.orderQueryService.resolveCustomerNames([entity]);
     const saved = await this.saveOrderWithRetry(entity, () => this.generateNextOrderNo());
     const extPayload: Partial<OrderExt> = { orderId: saved.id };
     if (payload.materials && Array.isArray(payload.materials)) {
@@ -264,7 +265,7 @@ export class OrderMutationService {
     if (typeof payload.packagingMethod === 'string') extPayload.packagingMethod = payload.packagingMethod;
     if (payload.attachments && Array.isArray(payload.attachments)) extPayload.attachments = payload.attachments;
     if (Object.keys(extPayload).length > 1) await this.orderExtRepo.save(this.orderExtRepo.create(extPayload));
-    await this.orderStatusService.addLog(saved, actor, 'create', buildOrderCreateLogDetail(payload));
+    await this.orderStatusService.addLog(saved, actor, 'create', buildOrderCreateLogDetail({ ...payload, customerName: saved.customerName }));
     await this.orderStatusService.appendStatusHistory(saved.id, 'draft');
     return saved;
   }
@@ -295,6 +296,7 @@ export class OrderMutationService {
     if (payload.customerDueDate !== undefined) order.customerDueDate = payload.customerDueDate ? new Date(payload.customerDueDate) : null;
     if (payload.factoryName !== undefined) order.factoryName = payload.factoryName.trim();
     if (payload.imageUrl !== undefined) order.imageUrl = payload.imageUrl.trim();
+    await this.orderQueryService.resolveCustomerNames([order]);
     let saved = await this.orderRepo.save(order);
 
     if (
@@ -354,7 +356,7 @@ export class OrderMutationService {
       }
       await this.orderExtRepo.save(ext);
     }
-    await this.orderStatusService.addLog(saved, actor, 'update', buildOrderUpdateLogDetail(before, payload));
+    await this.orderStatusService.addLog(saved, actor, 'update', buildOrderUpdateLogDetail(before, { ...payload, customerName: saved.customerName }));
     if (shouldRebaseWorkflow) {
       saved = (await this.orderStatusService.rebaseWorkflowStatusAfterOrderEdit(id, actor)) ?? saved;
     }
@@ -407,6 +409,7 @@ export class OrderMutationService {
     if (!ids?.length) return [];
     const now = new Date();
     const sourceOrders = await this.orderRepo.find({ where: { id: In(ids) } });
+    await this.orderQueryService.resolveCustomerNames(sourceOrders);
     const sourceIds = sourceOrders.map((o) => o.id);
     const extList = await this.orderExtRepo.find({ where: { orderId: In(sourceIds) } });
     const extMap = new Map(extList.map((e) => [e.orderId, e]));

@@ -12,6 +12,7 @@ export interface PackingListRow {
   xiaomanOrderId: string
   packDate: string | null
   status: string
+  holdReason: string
   shippedAt: string | null
   createdAt: string
   boxCount: number
@@ -20,9 +21,12 @@ export interface PackingListRow {
   styleNos: string[]
 }
 
+export type PackingListTabCounts = Record<'all' | 'draft' | 'held' | 'shipped', number>
+
 export interface PackingListListRes {
   list: PackingListRow[]
   total: number
+  tabCounts: PackingListTabCounts
   summary: {
     boxCount: number
     totalQty: number
@@ -80,6 +84,7 @@ export interface PackingListDetail {
   showCompany: boolean
   sizeHeaders: string[]
   status: string
+  holdReason: string
   shippedAt: string | null
   operatorUsername: string
   createdAt: string
@@ -178,6 +183,10 @@ export function deletePackingList(id: number) {
 
 export function shipPackingList(id: number) {
   return request.post<void>(`/packing-lists/${id}/ship`)
+}
+
+export function setPackingListHold(payload: { ids: number[]; status: 'held' | 'draft'; reason?: string }) {
+  return request.post<{ changed: number }>('/packing-lists/hold', payload)
 }
 
 export function getPickablePending(params?: PickableQuery) {

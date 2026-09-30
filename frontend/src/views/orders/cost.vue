@@ -1,13 +1,23 @@
 <template>
   <div class="page-card order-cost-page">
-    <div class="page-header">
-      <div class="left">
-        <el-button link type="primary" :disabled="savingDraft || confirmingQuote" @click="goBack">返回列表</el-button>
-        <span class="title">订单成本</span>
-        <span v-if="order" class="sub-title">{{ order.orderNo }} · {{ order.skuCode }}</span>
-        <el-tag v-if="!initialLoading && !initialLoadFailed" :type="hasLocalDraftChanges ? 'warning' : 'info'">{{ hasLocalDraftChanges ? '有未保存修改' : '无未保存修改' }}</el-tag>
-      </div>
-    </div>
+    <section class="cost-workbench" aria-label="订单成本与报价操作">
+      <OrderCostSummary :order="order" :notice="costNotice" :ready="!initialLoading && !initialLoadFailed">
+        <template #heading>
+          <div class="left">
+            <el-button link type="primary" :disabled="savingDraft || confirmingQuote" @click="goBack">返回列表</el-button>
+            <span class="title">订单成本</span>
+            <span v-if="order" class="sub-title">{{ order.orderNo }} · {{ order.skuCode }}</span>
+            <el-tag v-if="!initialLoading && !initialLoadFailed" :type="hasLocalDraftChanges ? 'warning' : 'info'">{{ hasLocalDraftChanges ? '有未保存修改' : '无未保存修改' }}</el-tag>
+          </div>
+        </template>
+        <OrderCostActions
+          v-model:margin="profitMargin" :total="totalCost" :price="computedExFactoryPrice"
+          :disabled="editingDisabled || !canSubmitCost" :saving="savingDraft"
+          :confirming="confirmingQuote" :is-quote-queue="isQuoteQueue"
+          @save="saveDraft" @confirm="confirmQuote"
+        />
+      </OrderCostSummary>
+    </section>
 
     <el-card v-if="initialLoading" class="block-card" shadow="never">
       <el-skeleton :rows="10" animated />
@@ -23,7 +33,6 @@
     </el-result>
 
     <template v-else>
-    <OrderCostSummary :order="order" :notice="costNotice" />
     <el-alert v-if="optionsLoading || optionsLoadFailed" :title="optionsLoading ? '成本已显示，正在准备工序和物料选项…' : '工序或物料选项加载失败，请重试后编辑和提交。'" :type="optionsLoadFailed ? 'warning' : 'info'" :closable="false" show-icon>
       <el-button v-if="optionsLoadFailed" link type="primary" @click="retryOptions">重试选项</el-button>
     </el-alert>
@@ -121,11 +130,9 @@
 
     </fieldset>
     <OrderCostResult
-      v-model:margin="profitMargin" :material-total="materialTotal" :process-total="processItemTotal"
-      :production-total="productionProcessTotal" :total="totalCost" :price="computedExFactoryPrice"
-      :sale-price="order?.salePrice" :issues="costIssues" :disabled="editingDisabled || !canSubmitCost"
-      :saving="savingDraft" :confirming="confirmingQuote" :is-quote-queue="isQuoteQueue"
-      @back="goBack" @save="saveDraft" @confirm="confirmQuote"
+      :material-total="materialTotal" :process-total="processItemTotal"
+      :production-total="productionProcessTotal" :total="totalCost"
+      :sale-price="order?.salePrice" :issues="costIssues"
     />
     </template>
   </div>
@@ -140,6 +147,7 @@ import OrderCostProcessItemsCard from '@/components/orders/cost/OrderCostProcess
 import OrderCostProductionCard from '@/components/orders/cost/OrderCostProductionCard.vue'
 import OrderCostSummary from '@/components/orders/cost/OrderCostSummary.vue'
 import OrderCostResult from '@/components/orders/cost/OrderCostResult.vue'
+import OrderCostActions from '@/components/orders/cost/OrderCostActions.vue'
 
 const authStore = useAuthStore()
 const {

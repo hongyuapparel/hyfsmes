@@ -1,5 +1,5 @@
 .order-cost-page {
-  padding: var(--space-md);
+  padding: 0;
   font-size: var(--font-size-body);
 }
 
@@ -10,29 +10,41 @@
   min-width: 0;
 }
 
-.order-cost-page .page-header .left {
+.order-cost-page .cost-workbench {
+  position: sticky;
+  /* 抵消 MainLayout 的滚动容器内边距，固定后紧贴页签下沿。 */
+  top: calc(0px - var(--space-sm));
+  z-index: 10;
+  padding: calc(var(--space-md) / 2) var(--space-sm);
+  margin-bottom: calc(var(--space-md) / 2);
+  background: var(--el-bg-color);
+  border: 1px solid var(--el-border-color-lighter);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--el-box-shadow-lighter);
+}
+
+@media (max-width: 768px) {
+  .order-cost-page .cost-workbench {
+    top: calc(0px - var(--space-xs));
+  }
+}
+
+.order-cost-page .cost-summary-heading .left {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--space-sm);
+  gap: var(--space-xs);
 }
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-}
-
-.page-header .title {
+.order-cost-page .cost-summary-heading .title {
   font-size: var(--font-size-title);
   font-weight: 600;
 }
 
-.page-header .sub-title {
+.order-cost-page .cost-summary-heading .sub-title {
   font-size: var(--font-size-body);
   color: var(--el-text-color-secondary);
+  overflow-wrap: anywhere;
 }
 
 .header-actions {
@@ -41,17 +53,17 @@
   gap: var(--space-sm);
 }
 
-.block-card {
-  margin-bottom: var(--space-md);
+.order-cost-page .block-card {
+  margin-bottom: calc(var(--space-md) / 2);
 }
 
-.block-card .el-card__header {
-  padding: var(--space-sm) var(--space-md);
+.order-cost-page .block-card .el-card__header {
+  padding: var(--space-xs) var(--space-sm);
   font-size: var(--font-size-subtitle);
 }
 
-.block-card .el-card__body {
-  padding: var(--space-sm) var(--space-md);
+.order-cost-page .block-card .el-card__body {
+  padding: var(--space-xs) var(--space-sm);
 }
 
 .block-header {

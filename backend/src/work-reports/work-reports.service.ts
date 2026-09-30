@@ -8,10 +8,10 @@ import { defaultReportTemplateId } from './work-report-templates';
 import { patternHandoff } from './pattern-milestones';
 import { DataSource } from 'typeorm';
 import { randomUUID } from 'crypto';
-import { applyReportBatch, validReportDate, type WorkTask, type DraftRow } from './work-report-plan';
+import { applyReportBatch, applyAutomaticPlans, type AutomaticPlanInput, validReportDate, type WorkTask, type DraftRow } from './work-report-plan';
 
 export interface Person { id: number; name: string; username: string; codes: string; role: string }
-export interface CatalogOrder { id: number; no: string; sku: string; customer: string; salesperson: string; merchandiser: string; status: string; orderType: string; imageUrl: string; active: number }
+export interface CatalogOrder { id: number; no: string; sku: string; customer: string; salesperson: string; merchandiser: string; status: string; orderType: string; imageUrl: string; active: number; finished: number }
 interface PlanState { version: number; tasks: WorkTask[] | string }
 export interface AutoRow { planKey?:string; entryId?:number; orderId: number; orderNo: string; sku: string; title: string; time: string; quantity: number | null; factory: string; imageUrl: string; remark?:string; status?:string; customer?:string; materialIndex?:number }
 export const reportToday = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date());
@@ -25,23 +25,22 @@ export class WorkReportsService {
      WHERE p.code='work_reports_all' AND rp.role_id IN (SELECT role_id FROM users WHERE id=? UNION SELECT role_id FROM user_roles WHERE user_id=?) LIMIT 1`, [id,id]);
    return rows.length > 0;
  }
- async people(actor: number): Promise<Person[]> {
-   const all = await this.canReadAll(actor);
+ async people(_actor: number): Promise<Person[]> {
    return this.db.query(`SELECT u.id, COALESCE(NULLIF(u.display_name,''),u.username) name,u.username,
      GROUP_CONCAT(DISTINCT r.code) codes,GROUP_CONCAT(DISTINCT r.name SEPARATOR ' / ') role
      FROM users u JOIN roles r ON r.id=u.role_id OR r.id IN (SELECT role_id FROM user_roles WHERE user_id=u.id)
-     WHERE u.status='active' AND (?=1 OR u.id=?) GROUP BY u.id ORDER BY u.id`, [all?1:0,actor]);
+     WHERE u.status='active' GROUP BY u.id ORDER BY u.id`);
  }
- async orders(actor: number): Promise<CatalogOrder[]> {
-   const all = await this.canReadAll(actor);
+ async orders(actor: number, forEditing=false): Promise<CatalogOrder[]> {
+   const all = !forEditing || await this.canReadAll(actor);
    const [self]: Person[] = await this.db.query("SELECT id,username,COALESCE(NULLIF(display_name,''),username) name FROM users WHERE id=?", [actor]);
    const rows:CatalogOrder[]=await this.db.query(`SELECT o.id,o.order_no no,o.sku_code sku,o.customer_name customer,o.salesperson,o.merchandiser,
-     COALESCE(s.label,o.status) status,o.image_url imageUrl, IF(COALESCE(s.is_final,0)=0 AND o.status NOT IN ('draft','pending_review'),1,0) active,
+     COALESCE(s.label,o.status) status,o.image_url imageUrl, COALESCE(s.is_final,0) finished, IF(COALESCE(s.is_final,0)=0 AND o.status NOT IN ('draft','pending_review'),1,0) active,
      CASE WHEN opt.value='大货' OR parent.value='大货' THEN 'bulk' WHEN opt.value IN ('样品','头版','修改版','产前版','拍照版','销售版') OR parent.value='样品' THEN 'sample' ELSE 'unknown' END orderType
      FROM orders o LEFT JOIN order_statuses s ON s.code=o.status LEFT JOIN system_options opt ON opt.id=o.order_type_id
      LEFT JOIN system_options parent ON parent.id=opt.parent_id
      WHERE o.deleted_at IS NULL AND (?=1 OR o.merchandiser IN (?,?)) ORDER BY o.order_date,o.id`, [all?1:0,self.name,self.username]);
-   return rows.map(o=>({...o,active:Number(o.active)}));
+   return rows.map(o=>({...o,active:Number(o.active),finished:Number(o.finished)}));
  }
  private checkDate(date: string) { if (!date || !validReportDate(date)) throw new BadRequestException('报告日期无效'); }
  async report(actor: number, owner: number, date: string) {
@@ -143,14 +142,15 @@ export class WorkReportsService {
        || !['orders','sourceIds'].every(k=>Array.isArray(r[k]) && (r[k] as unknown[]).length<=1000 && (r[k] as unknown[]).every(v=>typeof v==='string'))
        || ['urgent','needsHelp','end'].some(k=>r[k]!==undefined && typeof r[k]!=='boolean')) throw new BadRequestException('行字段无效');
    }
-   const orders=await this.orders(actor),today=reportToday();
-   const plans=b.automaticPlans as {key:string;title:string;date:string}[]|undefined;
+   const orders=await this.orders(actor,true),today=reportToday();
+   const plans=b.automaticPlans as AutomaticPlanInput[]|undefined;
+   let automaticRows:AutoRow[]=[];
    if(plans!==undefined){
     if(!Array.isArray(plans)||plans.length>5000)throw new BadRequestException('自动待办安排格式无效');
     const own=await this.report(actor,owner,today),allowed=new Set(own.automatic.flatMap(g=>g.rows.map(r=>r.planKey).filter(Boolean))),seen=new Set<string>();
-    for(const p of plans){if(!p||typeof p.key!=='string'||!allowed.has(p.key)||seen.has(p.key)||typeof p.title!=='string'||p.title.length>200||typeof p.date!=='string'||p.date!==''&&!validReportDate(p.date))throw new BadRequestException('待办已更新或安排格式无效，请刷新后再试');seen.add(p.key);}
+    automaticRows=own.automatic.flatMap(g=>g.rows);
+    for(const p of plans){if(!p||typeof p.key!=='string'||!allowed.has(p.key)||seen.has(p.key)||typeof p.title!=='string'||p.title.length>200||typeof p.date!=='string'||p.date!==''&&!validReportDate(p.date)||(['done','needsHelp'] as const).some(k=>p[k]!==undefined&&typeof p[k]!=='boolean'))throw new BadRequestException('待办已更新或安排格式无效，请刷新后再试');seen.add(p.key);}
    }
-   for(const row of b.drafts as DraftRow[]) if(row.section!=='other' && row.orders?.some(no=>orders.find(o=>o.no===no)?.orderType!==row.section)) throw new BadRequestException('订单类型与板块不一致，或订单不可访问');
    return this.db.transaction(async em=>{
      await em.query("INSERT IGNORE INTO work_report_plans(owner_id,version,tasks) VALUES (?,0,'[]')",[owner]);
      const [state]:PlanState[]=await em.query('SELECT version,tasks FROM work_report_plans WHERE owner_id=? FOR UPDATE',[owner]);
@@ -159,8 +159,7 @@ export class WorkReportsService {
      try { next=applyReportBatch(parseTasks(state.tasks).filter(t=>!t.automaticKey),b.drafts as DraftRow[],randomUUID,{owner:String(owner),today,orders}); }
      catch(e) { throw new BadRequestException(e instanceof Error?e.message:'保存失败'); }
      const previous=parseTasks(state.tasks).filter(t=>t.automaticKey);
-     next.push(...previous.filter(t=>!plans?.some(p=>p.key===t.automaticKey)));
-     for(const p of plans||[]) if(p.title.trim()||p.date) next.push({id:previous.find(t=>t.automaticKey===p.key)?.id||randomUUID(),automaticKey:p.key,owner:String(owner),order:'',orders:[],section:'other',title:p.title.trim(),date:p.date,status:'todo',completedDate:'',recordedDate:today,history:[]});
+     next.push(...applyAutomaticPlans(previous,plans||[],randomUUID,String(owner),today,automaticRows));
      const json=JSON.stringify(next);
      await em.query('UPDATE work_report_plans SET tasks=?,version=version+1 WHERE owner_id=?',[json,owner]);
      await em.query('INSERT INTO work_report_snapshots(owner_id,report_date,tasks) VALUES (?,?,?) ON DUPLICATE KEY UPDATE tasks=VALUES(tasks)',[owner,today,json]);

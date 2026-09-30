@@ -13,6 +13,14 @@ test('admin edits another report repeatedly without changing ownership; normal u
  assert.ok(report.tasks.filter(t=>t.automaticKey).every(t=>t.owner===String(id)));
  const stale=await fetch('http://127.0.0.1:3013/work-reports/'+id+'/plan',{method:'PUT',headers,body:JSON.stringify({version:report.version-1,drafts,automaticPlans:[]})});assert.equal(stale.status,409);
  await save([{key:keys[0],title:'再次编辑',date:''}]);assert.equal(report.tasks.find(t=>t.automaticKey===keys[0]).title,'再次编辑');
+ await save([{key:keys[0],title:'再次编辑',date:'2026-09-23',needsHelp:true}]);
+ await save([{key:keys[0],title:'再次编辑',date:'2026-09-26',needsHelp:true}]);
+ assert.ok(report.tasks.some(t=>t.status==='deferred'&&t.date==='2026-09-23'&&t.revision.includes('2026-09-26')));
+ assert.equal(report.tasks.find(t=>t.automaticKey===keys[0]).needsHelp,true);
+ const queueBefore=report.automatic.flatMap(g=>g.rows.map(r=>r.planKey).filter(Boolean));
+ await save([{key:keys[0],title:'再次编辑',date:'2026-09-26',done:true}]);
+ assert.ok(!report.tasks.some(t=>t.automaticKey===keys[0]));assert.ok(report.tasks.some(t=>t.status==='done'&&t.title==='再次编辑'));
+ assert.deepEqual(report.automatic.flatMap(g=>g.rows.map(r=>r.planKey).filter(Boolean)),queueBefore);
  const normal=await(await fetch('http://127.0.0.1:3013/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:'report_employee_0203',password:'ReportPreview2026!'})})).json();
  assert.equal((await fetch('http://127.0.0.1:3013/work-reports/'+id+'/plan',{method:'PUT',headers:{Authorization:'Bearer '+normal.access_token,'Content-Type':'application/json'},body:JSON.stringify({version:report.version,drafts:[],automaticPlans:[]})})).status,403);
  const [adminAfter]=await db.query('SELECT version,tasks FROM work_report_plans WHERE owner_id=?',[adminId]);assert.deepEqual(adminAfter,adminBefore);

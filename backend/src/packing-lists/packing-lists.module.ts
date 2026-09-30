@@ -22,6 +22,7 @@ import { PackingListsController } from './packing-lists.controller';
 import { PackingListsService } from './packing-lists.service';
 import { PackingListsPickableService } from './packing-lists-pickable.service';
 import { PackingListsShipService } from './packing-lists-ship.service';
+import { PackingListsHoldService } from './packing-lists-hold.service';
 
 @Module({
   imports: [
@@ -47,6 +48,6 @@ import { PackingListsShipService } from './packing-lists-ship.service';
     XiaomanModule,
   ],
   controllers: [PackingListsController],
-  providers: [PackingListsService, PackingListsPickableService, PackingListsShipService],
+  providers: [PackingListsService, PackingListsPickableService, PackingListsShipService, PackingListsHoldService],
 })
 export class PackingListsModule {}

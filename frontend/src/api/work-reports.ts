@@ -10,8 +10,8 @@ export interface ReportSettings { version:number; configured:boolean; rules:Repo
 export const getReportDirectory = () => request.get<{configured:boolean;people:ReportDirectoryPerson[]}>('/work-reports/directory')
 export const getReportSettings = () => request.get<ReportSettings & {people:ReportPerson[]}>('/work-reports/settings')
 export const saveReportSettings = (version:number,rules:ReportRule[],templates:ReportTemplate[]) => request.put<ReportSettings>('/work-reports/settings',{version,rules,templates})
-export interface ReportOrder extends DemoOrder { id:number; merchandiser:string; active:number }
-export interface AutomaticPlan {key:string;title:string;date:string}
+export interface ReportOrder extends DemoOrder { id:number; merchandiser:string; active:number; finished?:number }
+export interface AutomaticPlan {key:string;title:string;date:string;needsHelp?:boolean;done?:boolean}
 export interface AutomaticRow {planKey?:string; orderId:number; orderNo:string; sku:string; title:string; time:string; quantity:number|null; factory:string; imageUrl:string;remark?:string;status?:string;customer?:string;materialIndex?:number }
 export interface LiveReport { today:string; person:ReportPerson; template:ReportTemplate; version:number; tasks:WorkTask[]; automatic:{title:string;note:string;rows:AutomaticRow[]}[];pendingOrders?:ReportOrder[];historicalMissing:boolean }
 export const getReportPeople = () => request.get<ReportPerson[]>('/work-reports/people')

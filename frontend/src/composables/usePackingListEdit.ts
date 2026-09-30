@@ -47,6 +47,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
   const pickedLines = ref<PickableLine[]>([])
 
   const isShipped = computed(() => detail.value?.status === 'shipped')
+  const isHeld = computed(() => detail.value?.status === 'held')
   const code = computed(() => detail.value?.code ?? '')
 
   async function loadOptions() {
@@ -226,6 +227,7 @@ export function usePackingListEdit(grid: ReturnType<typeof usePackingGridRows>) 
     loading,
     saving,
     isShipped,
+    isHeld,
     code,
     customerOptions,
     salespersonOptions,

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS packing_lists (
   show_company TINYINT NOT NULL DEFAULT 1,
   size_headers JSON NULL,
   status VARCHAR(16) NOT NULL DEFAULT 'draft',
+  hold_reason VARCHAR(500) NOT NULL DEFAULT '',
   shipped_at DATETIME NULL,
   operator_username VARCHAR(255) NOT NULL DEFAULT '',
   created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,

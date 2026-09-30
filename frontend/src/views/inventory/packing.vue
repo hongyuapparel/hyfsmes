@@ -1,7 +1,7 @@
 <template>
   <div class="page-card page-card--fill inventory-packing-page">
     <el-tabs v-model="statusTab" class="inventory-tabs packing-status-tabs" @tab-change="onStatusTabChange">
-      <el-tab-pane v-for="tab in STATUS_TABS" :key="tab.name" :label="tab.label" :name="tab.name" />
+      <el-tab-pane v-for="tab in STATUS_TABS" :key="tab.name" :label="getTabLabel(tab)" :name="tab.name" />
     </el-tabs>
 
     <el-form class="filter-bar has-filter-collapse" @submit.prevent>
@@ -95,6 +95,8 @@
     <div v-if="selectedRows.length" class="packing-batch-bar">
       <span class="packing-batch-info">已选 {{ selectedRows.length }} 项</span>
       <el-button size="small" @click="batchExport">批量导出</el-button>
+      <el-button size="small" :disabled="!canHold" @click="openHold(selectedRows, 'held')">标记滞留</el-button>
+      <el-button size="small" :disabled="!canResume" @click="openHold(selectedRows, 'draft')">移回草稿</el-button>
       <el-button size="small" type="danger" @click="batchDelete">批量删除</el-button>
       <el-button size="small" text @click="clearSelection">取消</el-button>
     </div>
@@ -149,19 +151,27 @@
         <el-table-column label="总重(kg)" width="84" align="center" header-align="center">
           <template #default="{ row }">{{ row.totalWeight > 0 ? row.totalWeight : '-' }}</template>
         </el-table-column>
-        <el-table-column label="状态" width="76" align="center" header-align="center">
+        <el-table-column label="状态" width="100" align="center" header-align="center">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'shipped' ? 'success' : 'info'" size="small">{{ statusLabel(row.status) }}</el-tag>
+            <el-tag :type="row.status === 'shipped' ? 'success' : row.status === 'held' ? 'warning' : 'info'" size="small">{{ statusLabel(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" :width="isMobile ? 56 : 240" align="center" header-align="center">
+        <el-table-column v-if="statusTab === 'held' || statusTab === 'all'" label="滞留原因" prop="holdReason" width="160" show-overflow-tooltip align="center">
+          <template #default="{ row }">{{ row.status === 'held' ? row.holdReason || '未填写' : '-' }}</template>
+        </el-table-column>
+        <el-table-column v-if="statusTab === 'held'" label="装箱已过" width="100" align="center">
+          <template #default="{ row }">{{ packingAgeLabel(row.packDate) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" :width="isMobile ? 56 : 320" fixed="right" align="center" header-align="center">
           <template #default="{ row }">
             <TableRowActions
               :actions="[
-                { key: 'edit', label: row.status === 'draft' ? '编辑' : '查看', onClick: () => goEdit(row), type: 'primary' },
+                { key: 'edit', label: row.status === 'shipped' ? '查看' : '编辑', onClick: () => goEdit(row), type: 'primary' },
                 { key: 'doc', label: '客户单', onClick: () => openDoc(row), type: 'primary' },
                 { key: 'labels', label: '箱贴', onClick: () => openLabels(row), type: 'info' },
                 { key: 'copy', label: '拆分', onClick: () => openCopyDialog(row), type: 'warning', show: row.status === 'draft' },
+                { key: 'hold', label: '标记滞留', onClick: () => openHold([row], 'held'), type: 'warning', show: row.status === 'draft' },
+                { key: 'resume', label: '移回草稿', onClick: () => openHold([row], 'draft'), type: 'primary', show: row.status === 'held' },
                 { key: 'log', label: '记录', onClick: () => openLog(row), type: 'info' },
               ]"
             />
@@ -184,6 +194,7 @@
       @size-change="onPageSizeChange"
     />
 
+    <PackingHoldDialog :state="holdDialog" @submit="submitHold" />
     <PackingListLogDrawer
       v-model:visible="logDrawer.visible"
       :title="logDrawer.title"
@@ -229,7 +240,6 @@
 <script setup lang="ts">
 import { computed, onActivated, onMounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { useCompactTableStyle } from '@/composables/useCompactTableStyle'
 import {
@@ -242,9 +252,11 @@ import {
 } from '@/composables/useFilterBarHelpers'
 import { usePackingListActions } from '@/composables/usePackingListActions'
 import { formatDisplayNumber } from '@/utils/display-number'
-import { getErrorMessage, isErrorHandled } from '@/api/request'
 import { getSalespeople } from '@/api/customers'
-import { getPackingLists, type PackingListQuery, type PackingListRow, type PackingListListRes } from '@/api/packing-lists'
+import type { PackingListQuery, PackingListRow } from '@/api/packing-lists'
+import { usePackingListData } from '@/composables/usePackingListData'
+import { PACKING_STATUS_TABS as STATUS_TABS, packingStatusLabel as statusLabel, packingAgeLabel, usePackingListHold } from '@/composables/usePackingListHold'
+import PackingHoldDialog from '@/components/inventory/PackingHoldDialog.vue'
 import AppDialog from '@/components/AppDialog.vue'
 import AppPaginationBar from '@/components/AppPaginationBar.vue'
 import PackingListLogDrawer from '@/components/inventory/PackingListLogDrawer.vue'
@@ -255,11 +267,6 @@ import { usePackingListCopyToDraft } from '@/composables/usePackingListCopyToDra
 import { useTableColumnWidthPersist } from '@/composables/useTableColumnWidthPersist'
 import { useTableSort } from '@/composables/useTableSort'
 
-const STATUS_TABS = [
-  { label: '全部', name: 'all', status: '' },
-  { label: '草稿', name: 'draft', status: 'draft' },
-  { label: '已发货', name: 'shipped', status: 'shipped' },
-] as const
 type StatusTabName = (typeof STATUS_TABS)[number]['name']
 
 const { compactHeaderCellStyle, compactCellStyle, compactRowStyle } = useCompactTableStyle()
@@ -280,16 +287,17 @@ const activeFilterCount = computed(() => {
   if (dateRange.value) n++
   return n
 })
-const list = ref<PackingListRow[]>([])
-const loading = ref(false)
-const pagination = reactive({ page: 1, pageSize: 20, total: 0 })
-const filterSummary = reactive({ boxCount: 0, totalQty: 0 })
+const { list, loading, pagination, filterSummary, getTabLabel, load } = usePackingListData(buildListQuery, () => {
+  clearSelection()
+  restorePackingColumnWidths(tableRef.value)
+})
 const tableShellRef = ref<HTMLElement>()
 const tableHeight = ref<number | undefined>(undefined)
 
 const { tableRef, selectedRows, onSelectionChange, clearSelection, batchExport, batchDelete, logDrawer, openLog } =
   usePackingListActions(load)
 const { copyDialog, copyRangeCount, openCopyDialog, submitCopyToDraft } = usePackingListCopyToDraft(load)
+const { holdDialog, canHold, canResume, openHold, submitHold } = usePackingListHold(selectedRows, load, clearSelection)
 const { onHeaderDragEnd: onPackingHeaderDragEnd, restoreColumnWidths: restorePackingColumnWidths } =
   useTableColumnWidthPersist('inventory-packing-list')
 const { onSortChange, sortParams } = useTableSort(() => {
@@ -298,7 +306,6 @@ const { onSortChange, sortParams } = useTableSort(() => {
 })
 
 let searchTimer: ReturnType<typeof setTimeout> | null = null
-let loadSeq = 0
 
 const selectedBoxCount = computed(() => selectedRows.value.reduce((sum, row) => sum + (Number(row.boxCount) || 0), 0))
 const selectedTotalQty = computed(() => selectedRows.value.reduce((sum, row) => sum + (Number(row.totalQty) || 0), 0))
@@ -307,15 +314,6 @@ const footerBoxCount = computed(() => hasSelectedRows.value ? selectedBoxCount.v
 const footerTotalQty = computed(() => hasSelectedRows.value ? selectedTotalQty.value : filterSummary.totalQty)
 const footerBoxLabel = computed(() => hasSelectedRows.value ? '已选箱数' : '全部箱数')
 const footerQtyLabel = computed(() => hasSelectedRows.value ? '已选件数' : '全部件数')
-
-interface PackingFooterSummary {
-  boxCount: number
-  totalQty: number
-}
-
-function statusLabel(status: string): string {
-  return status === 'shipped' ? '已发货' : '草稿'
-}
 
 /** 客户名为空或纯数字（如"1"等无效占位）时列表显示"-"，不改数据 */
 function displayCustomer(name: string): string {
@@ -329,7 +327,7 @@ function styleSummary(row: PackingListRow): string {
   return row.styleNos.length > 1 ? `${first} 等${row.styleNos.length}款` : first
 }
 
-function buildListQuery(page = pagination.page, pageSize = pagination.pageSize): PackingListQuery {
+function buildListQuery(): PackingListQuery {
   return {
     customerName: filter.customerName || undefined,
     status: filter.status || undefined,
@@ -339,72 +337,6 @@ function buildListQuery(page = pagination.page, pageSize = pagination.pageSize):
     dateFrom: dateRange.value?.[0] || undefined,
     dateTo: dateRange.value?.[1] || undefined,
     ...sortParams(),
-    page,
-    pageSize,
-  }
-}
-
-function normalizeSummary(summary: PackingListListRes['summary'] | undefined): PackingFooterSummary | null {
-  if (!summary) return null
-  return {
-    boxCount: Math.max(0, Number(summary.boxCount) || 0),
-    totalQty: Math.max(0, Number(summary.totalQty) || 0),
-  }
-}
-
-function sumRows(rows: PackingListRow[]): PackingFooterSummary {
-  return rows.reduce<PackingFooterSummary>(
-    (sum, row) => ({
-      boxCount: sum.boxCount + (Number(row.boxCount) || 0),
-      totalQty: sum.totalQty + (Number(row.totalQty) || 0),
-    }),
-    { boxCount: 0, totalQty: 0 },
-  )
-}
-
-async function resolveFilterSummary(params: PackingListQuery, firstResponse: PackingListListRes): Promise<PackingFooterSummary> {
-  const directSummary = normalizeSummary(firstResponse.summary)
-  const currentPageSummary = sumRows(firstResponse.list ?? [])
-  const directSummaryLooksStale =
-    !!directSummary &&
-    directSummary.boxCount === 0 &&
-    directSummary.totalQty === 0 &&
-    (currentPageSummary.boxCount > 0 || currentPageSummary.totalQty > 0)
-  if (directSummary && !directSummaryLooksStale) return directSummary
-
-  const total = Math.max(0, Number(firstResponse.total) || 0)
-  if (!total) return { boxCount: 0, totalQty: 0 }
-
-  const pageSize = 100
-  const pageCount = Math.ceil(total / pageSize)
-  const rows: PackingListRow[] = []
-  for (let page = 1; page <= pageCount; page += 1) {
-    const res = await getPackingLists({ ...params, page, pageSize })
-    const summary = normalizeSummary(res.data.summary)
-    if (summary) return summary
-    rows.push(...(res.data.list ?? []))
-  }
-  return sumRows(rows)
-}
-
-async function load() {
-  const seq = ++loadSeq
-  loading.value = true
-  try {
-    const params = buildListQuery()
-    const res = await getPackingLists(params)
-    if (seq !== loadSeq) return
-    list.value = res.data.list
-    pagination.total = res.data.total
-    const summary = await resolveFilterSummary(params, res.data)
-    if (seq !== loadSeq) return
-    filterSummary.boxCount = summary.boxCount
-    filterSummary.totalQty = summary.totalQty
-    restorePackingColumnWidths(tableRef.value)
-  } catch (e) {
-    if (!isErrorHandled(e)) ElMessage.error(getErrorMessage(e, '加载装箱单失败'))
-  } finally {
-    if (seq === loadSeq) loading.value = false
   }
 }
 

@@ -8,6 +8,7 @@
         </el-button>
         <span class="edit-code">{{ edit.code.value ? `装箱单 ${edit.code.value}` : '新建装箱单' }}</span>
         <el-tag v-if="edit.isShipped.value" type="success" size="small">已发货</el-tag>
+        <el-tag v-else-if="edit.isHeld.value" type="warning" size="small">滞留待发</el-tag>
         <el-tag v-else-if="edit.listId.value" type="info" size="small">草稿</el-tag>
         <span v-if="edit.isShipped.value" class="edit-shipped-tip">可修改装箱方式，保存不影响库存</span>
       </div>
@@ -17,13 +18,16 @@
         <el-button v-if="edit.detail.value" @click="onExport">导出 Excel</el-button>
         <el-button @click="grid.addBox()">加箱</el-button>
         <template v-if="!edit.isShipped.value">
-          <el-button :loading="edit.saving.value" @click="edit.save()">保存草稿</el-button>
-          <el-button v-if="canShipPacking" type="primary" :loading="shipping" @click="onShip">确认发货</el-button>
+          <el-button :loading="edit.saving.value" @click="edit.save()">{{ edit.isHeld.value ? '保存修改' : '保存草稿' }}</el-button>
+          <el-button v-if="canShipPacking && !edit.isHeld.value" type="primary" :loading="shipping" @click="onShip">确认发货</el-button>
         </template>
         <el-button v-else type="primary" :loading="edit.saving.value" @click="edit.save()">保存修改</el-button>
       </div>
     </div>
 
+    <el-alert v-if="edit.isHeld.value" type="warning" :closable="false" show-icon
+      title="滞留待发：可继续编辑和打印；出货前请在列表移回草稿。"
+      :description="`滞留原因：${edit.detail.value?.holdReason || '未填写'}`" />
     <el-form class="head-form" label-width="76px" @submit.prevent>
       <div class="head-form-grid">
         <el-form-item label="小满单号">
@@ -315,6 +319,10 @@ function onPicked(lines: PickableLine[]) {
 }
 
 async function onShip() {
+  if (edit.isHeld.value) {
+    ElMessage.warning('请先在列表将滞留单移回草稿')
+    return
+  }
   if (!canShipPacking.value) {
     ElMessage.warning('没有确认发货权限，请在角色与权限中授权')
     return

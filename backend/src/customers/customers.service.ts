@@ -1,3 +1,4 @@
+import { customerProfile } from '../xiaoman/xiaoman-customer-profile';
 import { Injectable, NotFoundException, ConflictException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -204,7 +205,17 @@ export class CustomersService {
     }
     if (dto.cooperation_date !== undefined) customer.cooperationDate = dto.cooperation_date ? new Date(dto.cooperation_date) : null;
 
-    const saved = await this.customerRepo.save(customer);
+    const saved = await this.customerRepo.manager.transaction(async (manager) => {
+      const savedCustomer = await manager.save(Customer, customer);
+      // 同一客户的所有订单（含已完成、回收站）一起更新，不能按旧名称匹配。
+      // 改客户资料不算订单活动，保留订单更新时间和生产状态。
+      await manager.createQueryBuilder().update(Order)
+        .set({ customerName: savedCustomer.companyName, updatedAt: () => 'updated_at' })
+        .where('customer_id = :id', { id })
+        .andWhere('BINARY customer_name <> BINARY :name', { name: savedCustomer.companyName })
+        .execute();
+      return savedCustomer;
+    });
     const productGroup =
       saved.productGroupId != null
         ? await this.systemOptionsService.getProductGroupPathById(saved.productGroupId)
@@ -276,71 +287,6 @@ export class CustomersService {
     return qb.getOne();
   }
 
-  /** 从小满获取客户列表（供前端选择），支持 keyword 模糊搜索 */
-  async getXiaomanList(page = 1, pageSize = 20, keyword?: string) {
-    const { list, total } = await this.xiaomanService.getCompanyList(page, pageSize, keyword);
-    if (!list.length) {
-      return { list: [], total };
-    }
-    // 为当前页公司补充主联系人姓名信息
-    const details = await this.xiaomanService.getCompanyDetailsBatch(list.map((c) => c.company_id));
-
-    const withContact = list.map((item, index) => {
-      const d = details[index];
-      let contactPerson = '';
-      let coopDate = item.order_time || '';
-      if (d) {
-        const anyDetail = d as unknown as {
-          main_contact_name?: string;
-          main_contact?: { name?: string } | null;
-          contacts?: { name?: string; contact_name?: string; nickname?: string; nick_name?: string }[] | null;
-          customers?: {
-            name?: string;
-            nickname?: string;
-            nick_name?: string;
-            main_customer_flag?: number;
-          }[];
-          contact_person?: string;
-          contact_name?: string;
-          contact_nickname?: string;
-          linkman?: string;
-          cooperation_date?: string;
-          cooperationDate?: string;
-          order_time?: string;
-        };
-        const mainCustomer =
-          (Array.isArray(anyDetail.customers) &&
-            (anyDetail.customers.find((c) => c.main_customer_flag === 1) ?? anyDetail.customers[0])) ||
-          null;
-        contactPerson =
-          anyDetail.main_contact_name?.trim() ||
-          anyDetail.main_contact?.name?.trim() ||
-          mainCustomer?.nickname?.trim() ||
-          mainCustomer?.nick_name?.trim() ||
-          mainCustomer?.name?.trim() ||
-          (Array.isArray(anyDetail.contacts) &&
-            (anyDetail.contacts[0]?.nickname?.trim() ||
-              anyDetail.contacts[0]?.nick_name?.trim() ||
-              anyDetail.contacts[0]?.name?.trim() ||
-              anyDetail.contacts[0]?.contact_name?.trim())) ||
-          anyDetail.contact_nickname?.trim() ||
-          anyDetail.contact_person?.trim() ||
-          anyDetail.contact_name?.trim() ||
-          anyDetail.linkman?.trim() ||
-          '';
-        const rawCoopDate =
-          anyDetail.cooperation_date ||
-          anyDetail.cooperationDate ||
-          d.order_time;
-        if (typeof rawCoopDate === 'string' && rawCoopDate.trim()) {
-          coopDate = rawCoopDate.split(' ')[0];
-        }
-      }
-      return { ...item, contactPerson, order_time: coopDate };
-    });
-    return { list: withContact, total };
-  }
-
   /** 从小满导入选中客户：客户编号、国家、联系人、合作日期、产品分组、联系电话
    *  导入人自动记为业务员（当前登录账号）
    */
@@ -361,15 +307,12 @@ export class CustomersService {
         errors.push(`公司 ${d.name} 无客户编号，已跳过`);
         continue;
       }
-      const exists = await this.customerRepo.findOne({ where: { customerId } });
+      const exists = await this.customerRepo.findOne({ where: [{ customerId }, { xiaomanCompanyId: String(d.company_id) }] });
       if (exists) {
         skipped++;
         continue;
       }
-      // 国家优先使用小满返回的中文名称，其次使用英文代码
-      const anyCountry = d as unknown as { country_name?: string; country?: string; country_region?: { country?: string } };
-      const country = anyCountry.country_name ?? anyCountry.country ?? anyCountry.country_region?.country ?? '';
-      const contactInfo = Array.isArray(d.tel) ? d.tel.filter(Boolean).join('; ') : '';
+      const { country, contactInfo, contactPerson, order_time } = customerProfile(d);
       const pathFromXiaoman = (d.product_group_names ?? '').trim();
       let productGroupId: number | null = null;
       if (pathFromXiaoman) {
@@ -378,52 +321,7 @@ export class CustomersService {
         if (match) productGroupId = match.id;
       }
 
-      // 主联系人姓名，同步到本地客户 contactPerson 字段，便于后续展示
-      const anyDetail = d as unknown as {
-        main_contact_name?: string;
-        main_contact?: { name?: string } | null;
-        contacts?: { name?: string; contact_name?: string; nickname?: string; nick_name?: string }[] | null;
-        customers?: {
-          name?: string;
-          nickname?: string;
-          nick_name?: string;
-          main_customer_flag?: number;
-        }[];
-        contact_person?: string;
-        contact_name?: string;
-        contact_nickname?: string;
-        linkman?: string;
-        cooperation_date?: string;
-        cooperationDate?: string;
-        order_time?: string;
-      };
-      const mainCustomer =
-        (Array.isArray(anyDetail.customers) &&
-          (anyDetail.customers.find((c) => c.main_customer_flag === 1) ?? anyDetail.customers[0])) ||
-        null;
-      const contactPerson =
-        anyDetail.main_contact_name?.trim() ||
-        anyDetail.main_contact?.name?.trim() ||
-        mainCustomer?.nickname?.trim() ||
-        mainCustomer?.nick_name?.trim() ||
-        mainCustomer?.name?.trim() ||
-        (Array.isArray(anyDetail.contacts) &&
-          (anyDetail.contacts[0]?.nickname?.trim() ||
-            anyDetail.contacts[0]?.nick_name?.trim() ||
-            anyDetail.contacts[0]?.name?.trim() ||
-            anyDetail.contacts[0]?.contact_name?.trim())) ||
-        anyDetail.contact_nickname?.trim() ||
-        anyDetail.contact_person?.trim() ||
-        anyDetail.contact_name?.trim() ||
-        anyDetail.linkman?.trim() ||
-        '';
-
-      const rawCoopDate =
-        anyDetail.cooperation_date ||
-        anyDetail.cooperationDate ||
-        d.order_time;
-      const cooperationDate =
-        typeof rawCoopDate === 'string' && rawCoopDate.trim() ? rawCoopDate.split(' ')[0] : null;
+      const cooperationDate = order_time.trim() ? order_time.split(' ')[0] : null;
 
       // 导入人作为默认业务员：优先用 displayName，其次 username
       let salesperson = '';
@@ -438,6 +336,7 @@ export class CustomersService {
         await this.customerRepo.save(
           this.customerRepo.create({
             customerId,
+            xiaomanCompanyId: String(d.company_id),
             country,
             companyName: d.name || d.short_name || customerId,
             contactPerson,

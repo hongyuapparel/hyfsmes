@@ -34,12 +34,12 @@
   --color-foreground: var(--color-text);
   --color-muted: var(--color-border);
 
-  /* ========== 2. 字体系统（4 档，禁止硬编码其他字号）========== */
+  /* ========== 2. 字体系统（3 档，禁止硬编码其他字号）========== */
   --font-family-ui: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
     system-ui, sans-serif;
 
-  /* 标题 20px | 副标题 16px | 正文 14px | 辅助 12px */
-  --font-size-title: 20px;
+  /* 标题 16px | 正文、表格与输入 14px | 辅助 12px */
+  --font-size-title: 16px;
   --font-size-subtitle: 16px;
   --font-size-body: 14px;
   --font-size-caption: 12px;
@@ -109,7 +109,11 @@
 
   --el-font-family: var(--font-family-ui);
   --el-font-size-base: var(--font-size-body);
-  --el-font-size-small: var(--font-size-caption);
+  --el-font-size-small: var(--font-size-body);
+  --el-font-size-extra-small: var(--font-size-caption);
+  --el-font-size-medium: var(--font-size-body);
+  --el-font-size-large: var(--font-size-subtitle);
+  --el-font-size-extra-large: var(--font-size-title);
 
   --el-box-shadow: 0 1px 3px rgba(45, 61, 80, 0.08),
     0 1px 2px rgba(45, 61, 80, 0.04);
@@ -245,7 +249,7 @@ a:hover {
 
 .el-table,
 .el-table .el-table__cell {
-  font-size: var(--table-font-size, var(--font-size-caption));
+  font-size: var(--font-size-body);
 }
 
 .el-pagination,
@@ -666,7 +670,7 @@ a:hover {
 .editable-grid .el-textarea__inner,
 .editable-grid .el-select__selected-item,
 .editable-grid .el-select__placeholder {
-  font-size: var(--table-font-size, var(--font-size-caption));
+  font-size: var(--font-size-body);
   text-align: center;
 }
 .editable-grid .el-select__wrapper {

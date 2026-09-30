@@ -13,7 +13,6 @@ export function applyReportBatch(current: WorkTask[], drafts: DraftRow[], newId:
   const SELF_ID = context.owner, DEMO_DATE = context.today;
   const getOrder = (no: string) => context.orders.find(o => o.no === no);
   const validateInput = (input: TaskInput) => {
-    if (input.section !== 'other' && !getOrder(input.order)) return '请选择一个订单';
     if ((input.section === 'other' && !input.title.trim()) || input.title.length > 200) return '请填写200字以内的工作安排';
     if (input.date && !validReportDate(input.date)) return '请选择有效的预计执行日期';
     return '';
@@ -22,10 +21,16 @@ export function applyReportBatch(current: WorkTask[], drafts: DraftRow[], newId:
   if (new Set(drafts.map(r => r.id)).size !== drafts.length) throw new Error('存在重复行')
   const originals = current.filter(t => t.owner === SELF_ID && t.status === 'todo')
   const sources = (r: DraftRow) => r.sourceIds || (current.some(t => t.id === r.id) ? [r.id] : [])
+  // Existing plans belong to their report owner even after an order is reassigned,
+  // reclassified or removed. Trust only persisted sources, never client ownership.
+  const isExistingOrder = (r: DraftRow, no: string) => originals.some(t =>
+    sources(r).includes(t.id) && t.section === r.section && taskOrders(t).includes(no))
   drafts.forEach((r, i) => {
     const orders = taskOrders(r)
-    if (r.section === 'other' ? orders.length > 0 : !orders.length || orders.some(o => !getOrder(o))) throw new Error(`第 ${i + 1} 行：请检查关联订单`)
-    if (r.section !== 'other' && new Set(orders.map(o => getOrder(o)?.orderType)).size !== 1) throw new Error('样品和大货请分别安排')
+    if (r.section === 'other' ? orders.length > 0 : !orders.length) throw new Error(`第 ${i + 1} 行：请检查关联订单`)
+    if (r.section !== 'other') for (const no of orders) {
+      if (!isExistingOrder(r, no) && getOrder(no)?.orderType !== r.section) throw new Error(`第 ${i + 1} 行，订单 ${no}：订单类型与板块不一致，或订单不可访问`)
+    }
     const error = validateInput({ ...r, order: orders[0] })
     if (error) throw new Error(`第 ${i + 1} 行：${error}`)
     for (const id of sources(r)) {
@@ -75,4 +80,18 @@ export function applyReportBatch(current: WorkTask[], drafts: DraftRow[], newId:
 
 export function validReportDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value + 'T12:00:00Z')) && new Date(value + 'T12:00:00Z').toISOString().slice(0, 10) === value;
+}
+
+export interface AutomaticPlanInput { key:string; title:string; date:string; needsHelp?:boolean; done?:boolean }
+export function applyAutomaticPlans(previous:WorkTask[], plans:AutomaticPlanInput[], newId:()=>string, owner:string, today:string, rows:{planKey?:string;orderNo:string}[]):WorkTask[] {
+ const next=previous.filter(t=>!plans.some(p=>p.key===t.automaticKey));
+ for(const p of plans){
+  const old=previous.find(t=>t.automaticKey===p.key), title=p.title.trim();
+  if(old && !p.done && old.title===title && old.date===p.date && !!old.needsHelp===!!p.needsHelp){next.push(old);continue}
+  if(old){const order=rows.find(r=>r.planKey===p.key)?.orderNo||'';
+   next.push({...old,id:newId(),automaticKey:undefined,order,orders:order?[order]:[],status:p.done?'done':'deferred',completedDate:p.done?today:'',recordedDate:today,revision:p.done?'手写动作已完成，生产进度以岗位工作页为准':('调整为：'+(title||'未填写')+'（'+(p.date||'未安排')+'）'+(p.needsHelp?' · 需要协助':'')),history:[...old.history]});
+  }
+  if(!p.done&&(title||p.date||p.needsHelp))next.push({id:old?.id||newId(),automaticKey:p.key,owner,order:'',orders:[],section:'other',title,date:p.date,needsHelp:!!p.needsHelp,status:'todo',completedDate:'',recordedDate:today,history:[...(old?.history||[]),today+'｜保存工作安排']});
+ }
+ return next;
 }
