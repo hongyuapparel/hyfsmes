@@ -11,16 +11,18 @@ import { SystemOptionsModule } from '../system-options/system-options.module';
 import { XiaomanModule } from '../xiaoman/xiaoman.module';
 import { CustomersController } from './customers.controller';
 import { CustomersService } from './customers.service';
+import { CustomerXiaomanSyncService } from './customer-xiaoman-sync.service';
+import { XiaomanSyncState } from '../entities/xiaoman-sync-state.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Customer, Order, User, Role, UserRole, RolePermission]),
+    TypeOrmModule.forFeature([Customer, Order, User, Role, UserRole, RolePermission, XiaomanSyncState]),
     SystemOptionsModule,
     AuthModule,
     XiaomanModule,
   ],
   controllers: [CustomersController],
-  providers: [CustomersService],
+  providers: [CustomersService, CustomerXiaomanSyncService],
   exports: [CustomersService],
 })
 export class CustomersModule {}

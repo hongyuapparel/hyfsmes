@@ -14,6 +14,7 @@ export interface FinishedStockRow {
   orderId: number | null
   orderNo: string
   customerName?: string
+  productName?: string
   skuCode: string
   quantity: number
   unitPrice?: string
@@ -141,6 +142,7 @@ export function getFinishedStockDetail(id: number) {
 export function updateFinishedStockMeta(
   id: number,
   body: {
+    productName?: string
     skuCode?: string
     department?: string
     inventoryTypeId?: number | null
@@ -170,6 +172,7 @@ export function upsertFinishedStockColorImage(
 export function repartitionFinishedStockDetail(
   id: number,
   body: {
+    productName?: string
     skuCode?: string
     imageUrl?: string
     remark?: string
@@ -200,6 +203,7 @@ export interface FinishedOutboundRecord {
   finishedStockId: number
   orderId: number | null
   orderNo: string
+  productName?: string
   skuCode: string
   customerName: string
   quantity: number
@@ -236,6 +240,7 @@ export function getFinishedOutboundRecords(params?: {
 export function createFinishedStock(body: {
   orderNo?: string
   inboundSource?: 'order' | 'manual'
+  productName?: string
   skuCode: string
   quantity: number
   unitPrice?: string | number

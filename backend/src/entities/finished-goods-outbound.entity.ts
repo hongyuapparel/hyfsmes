@@ -22,6 +22,10 @@ export class FinishedGoodsOutbound {
   @Column({ name: 'sku_code', length: 64, default: '' })
   skuCode: string;
 
+  /** 出库当时的库存品名，后续改名不追溯覆盖。 */
+  @Column({ name: 'product_name', length: 255, default: '' })
+  productName: string;
+
   /** 出库时图片快照（优先库存图，其次产品图） */
   @Column({ name: 'image_url', length: 512, default: '' })
   imageUrl: string;

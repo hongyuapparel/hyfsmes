@@ -21,6 +21,10 @@ export class FinishedGoodsStock {
   @Column({ name: 'sku_code', length: 64, default: '' })
   skuCode: string;
 
+  /** 库存品名，独立于生产产品档案；未填写时保留空值。 */
+  @Column({ name: 'product_name', length: 255, default: '' })
+  productName: string;
+
   @Column({ name: 'quantity', type: 'int', default: 0 })
   quantity: number;
 

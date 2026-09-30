@@ -61,7 +61,7 @@ export class FinishedGoodsStockListQueryService {
       qb.andWhere('o.order_no LIKE :orderNo', { orderNo: `%${filters.orderNo.trim()}%` });
     }
     if (filters.skuCode?.trim()) {
-      qb.andWhere('s.sku_code LIKE :skuCode', { skuCode: `%${filters.skuCode.trim()}%` });
+      qb.andWhere('(s.sku_code LIKE :skuCode OR s.product_name LIKE :skuCode)', { skuCode: `%${filters.skuCode.trim()}%` });
     }
     if (filters.customerName?.trim()) {
       qb.andWhere('s.customer_name LIKE :customerName', {
@@ -106,6 +106,7 @@ export class FinishedGoodsStockListQueryService {
         "COALESCE(o.order_no, '') AS orderNo",
         's.customer_name AS customerName',
         's.sku_code AS skuCode',
+        's.product_name AS productName',
         's.quantity AS quantity',
         `${this.getStoredUnitPriceSql()} AS unitPrice`,
         's.warehouse_id AS warehouseId',
@@ -266,6 +267,7 @@ export class FinishedGoodsStockListQueryService {
           orderNo: r.orderNo ?? '',
           customerName: r.customerName ?? '',
           skuCode: r.skuCode ?? '',
+          productName: r.productName ?? '',
           quantity: r.quantity ?? 0,
           unitPrice: r.unitPrice ?? '0',
           warehouseId: r.warehouseId ?? null,
@@ -382,7 +384,7 @@ export class FinishedGoodsStockListQueryService {
           .leftJoin(Order, 'o', 'o.id = s.order_id')
           .select(['s.id AS id', 's.created_at AS createdAt']);
         if (orderNo?.trim()) qb.andWhere('o.order_no LIKE :allSOrderNo', { allSOrderNo: `%${orderNo.trim()}%` });
-        if (skuCode?.trim()) qb.andWhere('s.sku_code LIKE :allSSkuCode', { allSSkuCode: `%${skuCode.trim()}%` });
+        if (skuCode?.trim()) qb.andWhere('(s.sku_code LIKE :allSSkuCode OR s.product_name LIKE :allSSkuCode)', { allSSkuCode: `%${skuCode.trim()}%` });
         if (customerName?.trim()) qb.andWhere('s.customer_name LIKE :allSCustomer', { allSCustomer: `%${customerName.trim()}%` });
         if (inventoryTypeId != null) qb.andWhere('s.inventory_type_id = :allSInvType', { allSInvType: inventoryTypeId });
         if (department?.trim()) qb.andWhere('s.department = :allSDepartment', { allSDepartment: department.trim() });

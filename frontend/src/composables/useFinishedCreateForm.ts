@@ -45,6 +45,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   const createForm = reactive({
     orderNo: '',
     skuCode: '',
+        productName: '',
     quantity: 1,
     unitPrice: '',
     warehouseId: null as number | null,
@@ -95,6 +96,15 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
         row.quantities.push(...Array(len - row.quantities.length).fill(0))
       else if (row.quantities.length > len) row.quantities.splice(len)
     })
+  }
+
+  function useOneSize() {
+    if (sizeTotalQuantity.value > 0) {
+      ElMessage.warning('已有尺码数量，请先清空数量再切换均码，避免改变明细')
+      return
+    }
+    createSizeHeaders.value = ['均码']
+    createSizeRows.value.forEach((row) => { row.quantities = [0] })
   }
 
   function addCreateSizeColumn() {
@@ -216,6 +226,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     try {
       createForm.orderNo = String(source.orderNo ?? '')
       createForm.skuCode = String(source.skuCode ?? '')
+      createForm.productName = String(source.productName ?? '')
       createForm.unitPrice = source.unitPrice != null ? String(source.unitPrice) : ''
       createForm.warehouseId = source.warehouseId ?? null
       createForm.inventoryTypeId = source.inventoryTypeId ?? null
@@ -238,6 +249,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
       Object.assign(createForm, {
         orderNo: '',
         skuCode: '',
+    productName: '',
         quantity: 1,
         unitPrice: '',
         warehouseId: null,
@@ -345,7 +357,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
   async function submitCreate() {
     const skuCode = String(createForm.skuCode ?? '').trim()
     if (!skuCode) {
-      ElMessage.warning('请选择SKU')
+      ElMessage.warning('请填写或选择SKU')
       return
     }
     const valid = await createFormRef.value?.validate().then(() => true).catch(() => false)
@@ -372,6 +384,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
           orderNo: createForm.orderNo?.trim() || undefined,
           inboundSource: quickAddSource.value ? 'manual' : (createForm.orderNo?.trim() ? 'order' : 'manual'),
           skuCode,
+          productName: createForm.productName.trim(),
           quantity: groupQty,
           unitPrice: createForm.unitPrice?.trim() || undefined,
           warehouseId: g.warehouseId,
@@ -423,6 +436,7 @@ export function useFinishedCreateForm(onCreated: () => void, onClose: () => void
     createRowTotalPrice,
     getCreateColorSizeSummary,
     addCreateSizeColumn,
+    useOneSize,
     addCreateColorRow,
     removeCreateColorRow,
     removeCreateSizeColumn,

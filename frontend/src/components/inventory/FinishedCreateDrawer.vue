@@ -21,11 +21,15 @@
         <FinishedBasicInfoGrid title="基础信息与产品图" image-label="产品图">
           <div class="detail-basic-label">SKU</div>
           <div class="detail-basic-value">
-            <el-input v-model="createForm.skuCode" placeholder="选择 SKU" clearable size="small" :disabled="Boolean(quickAddSource)">
+            <el-input v-model="createForm.skuCode" placeholder="手填或选择 SKU" clearable size="small" :disabled="Boolean(quickAddSource)">
               <template #suffix>
                 <el-button v-if="!quickAddSource" link type="primary" size="small" @click.stop="openCreateSkuDialog">选择</el-button>
               </template>
             </el-input>
+          </div>
+          <div class="detail-basic-label">品名</div>
+          <div class="detail-basic-value">
+            <el-input v-model="createForm.productName" placeholder="选填，如折叠雨伞" maxlength="255" clearable size="small" :disabled="Boolean(quickAddSource)" />
           </div>
           <div class="detail-basic-label">部门</div>
           <div class="detail-basic-value">
@@ -79,6 +83,10 @@
           </template>
         </FinishedBasicInfoGrid>
 
+        <div v-if="!quickAddSource" class="text-secondary">
+          无尺码商品可使用均码：
+          <el-button link type="primary" @click="useOneSize">使用均码</el-button>
+        </div>
         <FinishedCreateSizeMatrix
           v-model:size-headers="createSizeHeaders"
           v-model:size-rows="createSizeRows"
@@ -188,6 +196,7 @@ const {
   createRowTotalPrice,
   getCreateColorSizeSummary,
   addCreateSizeColumn,
+  useOneSize,
   addCreateColorRow,
   removeCreateColorRow,
   removeCreateSizeColumn,

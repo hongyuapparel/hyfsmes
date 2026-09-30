@@ -161,6 +161,7 @@ function formatMetaValue(value: unknown): string {
 function buildMetaChangeSummary(before: Record<string, unknown>, after: Record<string, unknown>): string[] {
   const items: string[] = [];
   if (formatMetaValue(before.skuCode) !== formatMetaValue(after.skuCode)) items.push(`SKU改为${formatMetaValue(after.skuCode)}`);
+  if (formatMetaValue(before.productName) !== formatMetaValue(after.productName)) items.push(`品名「${formatMetaValue(before.productName)}」→「${formatMetaValue(after.productName)}」`);
   if (formatMetaValue(before.department) !== formatMetaValue(after.department)) items.push(`部门改为${formatMetaValue(after.department)}`);
   if ((before.inventoryTypeId ?? null) !== (after.inventoryTypeId ?? null)) items.push(`库存类型改为${formatMetaValue(after.inventoryTypeId)}`);
   if ((before.warehouseId ?? null) !== (after.warehouseId ?? null)) items.push(`仓库改为${formatMetaValue(after.warehouseId)}`);
@@ -219,6 +220,7 @@ function buildFinishedGroupEditSummary(
 
   const fields: Array<[string, string]> = [
     ['skuCode', 'SKU'],
+    ['productName', '品名'],
     ['department', '部门'],
     ['inventoryTypeId', '库存类型'],
     ['warehouseId', '仓库'],

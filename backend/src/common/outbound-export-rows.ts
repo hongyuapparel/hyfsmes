@@ -12,7 +12,7 @@ const quantity = column('quantity', '出库数量', 12);
 const detail = column('detail', '实际颜色/尺码明细', 42);
 const tail = [column('pickupUserName', '领取人/收货人'), column('operatorUsername', '操作人'), column('remark', '备注', 36)];
 export const outboundColumns: Record<OutboundExportKind, OutboundExportColumn[]> = {
-  finished: [time, column('orderNo', '订单号'), column('skuCode', 'SKU'), image, detail, quantity,
+  finished: [time, column('orderNo', '订单号'), column('skuCode', 'SKU'), column('productName', '品名', 26), image, detail, quantity,
     column('inventoryType', '库存类型'), column('warehouse', '仓库'), column('department', '部门'), column('customerName', '客户'), ...tail],
   pending: [time, column('orderNo', '订单号'), column('skuCode', 'SKU'), image, column('customerName', '客户'), detail, quantity, ...tail],
   accessories: [time, column('orderNo', '订单号'), column('name', '辅料名称', 26), image, column('customerName', '客户'),
@@ -30,7 +30,7 @@ function sizeText(snapshot: ColorSizeSnapshot | null | undefined): string {
 
 export function finishedOutboundLine(row: FinishedGoodsOutboundRecord, labels: Map<number, string>): OutboundExportLine {
   return { key: row.exportKey ?? String(row.id), imageUrl: row.imageUrl ?? '', values: {
-    createdAt: row.createdAt, orderNo: row.orderNo, skuCode: row.skuCode, customerName: row.customerName,
+    createdAt: row.createdAt, orderNo: row.orderNo, skuCode: row.skuCode, productName: row.productName ?? '', customerName: row.customerName,
     quantity: row.quantity, detail: sizeText(row.sizeBreakdown), department: row.department,
     inventoryType: (row.inventoryTypeId == null ? undefined : labels.get(row.inventoryTypeId)) ?? '未记录/已失效',
     warehouse: (row.warehouseId == null ? undefined : labels.get(row.warehouseId)) ?? '未记录/已失效',

@@ -7,11 +7,13 @@ import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-ad
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
 import { buildFinishedInboundLogDetails } from './finished-goods-stock-log-summary';
+import { normalizeStockProductName } from './finished-goods-stock-query.utils';
 
 type ManualInboundDto = {
   orderNo?: string;
   inboundSource?: 'order' | 'manual';
   skuCode: string;
+  productName?: string;
   quantity: number;
   unitPrice?: string | number;
   warehouseId?: number | null;
@@ -25,6 +27,7 @@ type ManualInboundDto = {
 
 type UpdateMetaDto = {
   skuCode?: string;
+  productName?: string;
   department?: string;
   inventoryTypeId?: number | null;
   warehouseId?: number | null;
@@ -70,9 +73,11 @@ export class FinishedGoodsStockInboundService {
   private async persistColorImagesForStock(
     stockId: number,
     imageRows: Array<{ colorName: string; imageUrl: string }>,
+    preserveExisting = false,
   ): Promise<void> {
     for (const { colorName, imageUrl } of imageRows) {
       if (!colorName) continue;
+      if (preserveExisting && !imageUrl) continue;
       try {
         if (!imageUrl) {
           const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: stockId, colorName } });
@@ -80,6 +85,7 @@ export class FinishedGoodsStockInboundService {
           continue;
         }
         const existing = await this.colorImageRepo.findOne({ where: { finishedStockId: stockId, colorName } });
+        if (preserveExisting && existing?.imageUrl?.trim()) continue;
         if (existing) { existing.imageUrl = imageUrl; await this.colorImageRepo.save(existing); }
         else await this.colorImageRepo.save(this.colorImageRepo.create({ finishedStockId: stockId, colorName, imageUrl }));
       } catch (e) {
@@ -237,7 +243,7 @@ export class FinishedGoodsStockInboundService {
     return saved;
   }
 
-  async createManual(dto: ManualInboundDto, operatorUsername = ''): Promise<FinishedGoodsStock> {
+  async createManual(dto: ManualInboundDto, operatorUsername = '', preserveExistingColorImages = false): Promise<FinishedGoodsStock> {
     const orderNo = dto.orderNo?.trim();
     const parsedColorSize = this.inboundQueryService.parseColorSizeInput(dto.colorSize);
     let snapshot = parsedColorSize.snapshot;
@@ -271,8 +277,10 @@ export class FinishedGoodsStockInboundService {
     if (!skuCode) throw new BadRequestException('SKU不能为空');
     const department = dto.department?.trim() ?? '', location = dto.location?.trim() ?? '';
 
+    const productName = normalizeStockProductName(dto.productName);
     const existing = await this.inboundQueryService.findMergeableFinishedStock({
       skuCode,
+      productName,
       customerId,
       customerName,
       warehouseId,
@@ -316,7 +324,7 @@ export class FinishedGoodsStockInboundService {
       }
       try {
         const saved = await this.stockRepo.save(existing);
-        await this.persistColorImagesForStock(saved.id, imageRows);
+        await this.persistColorImagesForStock(saved.id, imageRows, preserveExistingColorImages);
         await this.appendFinishedStockAdjustLog(
           saved.id,
           operatorUsername,
@@ -333,10 +341,10 @@ export class FinishedGoodsStockInboundService {
       }
     }
 
-    const stock = this.stockRepo.create({ orderId, skuCode, quantity: q, unitPrice: unitPriceStr, warehouseId, inventoryTypeId, department, location, customerId, customerName, imageUrl, colorSizeSnapshot: snapshot });
+    const stock = this.stockRepo.create({ orderId, skuCode, productName, quantity: q, unitPrice: unitPriceStr, warehouseId, inventoryTypeId, department, location, customerId, customerName, imageUrl, colorSizeSnapshot: snapshot });
     try {
       const saved = await this.stockRepo.save(stock);
-      await this.persistColorImagesForStock(saved.id, imageRows);
+      await this.persistColorImagesForStock(saved.id, imageRows, preserveExistingColorImages);
       await this.appendFinishedStockAdjustLog(
         saved.id,
         operatorUsername,
@@ -365,6 +373,7 @@ export class FinishedGoodsStockInboundService {
       if (!skuCode) throw new BadRequestException('SKU不能为空');
       stock.skuCode = skuCode;
     }
+    if (dto.productName !== undefined) stock.productName = normalizeStockProductName(dto.productName);
     if (dto.department !== undefined) stock.department = (dto.department ?? '').trim();
     if (dto.inventoryTypeId !== undefined) stock.inventoryTypeId = dto.inventoryTypeId != null ? Number(dto.inventoryTypeId) : null;
     if (dto.warehouseId !== undefined) stock.warehouseId = dto.warehouseId != null ? Number(dto.warehouseId) : null;

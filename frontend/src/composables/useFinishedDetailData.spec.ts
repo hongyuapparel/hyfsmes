@@ -4,6 +4,26 @@ const api = vi.hoisted(() => ({ detail: vi.fn(), save: vi.fn(), rollback: vi.fn(
 vi.mock('@/api/inventory', () => ({ getFinishedStockDetail: api.detail, repartitionFinishedStockDetail: api.save, rollbackFinishedStockChange: api.rollback }))
 import { useFinishedDetailData } from './useFinishedDetailData'
 
+describe('成品库存品名编辑', () => {
+  it('未改品名不覆盖同SKU其他记录，修改或清空时才发送', async () => {
+    api.detail.mockResolvedValue({ data: { stock: { id: 1, skuCode: 'A', productName: '雨伞' }, colorImages: [] } })
+    const state = useFinishedDetailData({ inventoryTypeOptions: () => [], warehouseOptions: () => [],
+      onColorImagesSynced: vi.fn(), onColorImageSaved: vi.fn(), onMetaSaved: async () => {} })
+    state.openDetail({ stockId: 1, groupProductImage: '', groupSizeHeaders: [], groupColorSizeSnapshot: null,
+      groupColorImages: [], initialColorName: null, initialQuantity: null })
+    await flushPromises()
+    expect(state.editForm.productName).toBe('雨伞')
+    await state.saveMeta(1)
+    expect(api.save.mock.lastCall?.[1]).not.toHaveProperty('productName')
+    state.editForm.productName = '  折叠雨伞  '
+    await state.saveMeta(1)
+    expect(api.save.mock.lastCall?.[1].productName).toBe('折叠雨伞')
+    state.editForm.productName = ''
+    await state.saveMeta(1)
+    expect(api.save.mock.lastCall?.[1].productName).toBe('')
+  })
+})
+
 describe('成品详情请求顺序', () => {
   it.each(['save', 'rollback'] as const)('%s 请求期间打开新详情，只刷新列表且保留新编辑状态', async action => {
     let finish!: () => void

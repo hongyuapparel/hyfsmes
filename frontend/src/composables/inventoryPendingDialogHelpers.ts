@@ -27,6 +27,7 @@ export function buildOutboundDialogItem(
     const headers = columns.map(c => c.header)
     const dialogRows = snap.rows.map((r) => ({
       colorName: r.colorName || '',
+      ...(r.imageUrl !== undefined ? { imageUrl: r.imageUrl } : {}),
       quantities: columns.map(c => r.quantities[c.index]),
       availableQuantities: columns.map(c => r.quantities[c.index]),
     }))
@@ -70,6 +71,7 @@ export function buildInboundPreviewItem(
       headers,
       rows: snap.rows.map((r) => ({
         colorName: r.colorName || '',
+        ...(r.imageUrl !== undefined ? { imageUrl: r.imageUrl } : {}),
         values: columns.map(c => r.quantities[c.index]),
       })),
     }
@@ -132,6 +134,7 @@ export function getOutboundTableSummaries(
 export function toInboundPreviewTableRows(item: InboundPreviewItem) {
   return item.rows.map((row) => ({
     colorName: row.colorName,
+    ...(row.imageUrl !== undefined ? { imageUrl: row.imageUrl } : {}),
     values: item.headers.map((_, idx) => Number(row.values?.[idx] ?? 0)),
   }))
 }

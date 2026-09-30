@@ -6,6 +6,7 @@ export interface FinishedStockRow {
   orderNo: string;
   customerName: string;
   skuCode: string;
+  productName?: string;
   quantity: number;
   unitPrice: string;
   warehouseId: number | null;
@@ -31,7 +32,7 @@ export type FinishedOutboundItemInput = {
 
 export type ColorSizeSnapshot = {
   headers: string[];
-  rows: Array<{ colorName: string; quantities: number[] }>;
+  rows: Array<{ colorName: string; quantities: number[]; imageUrl?: string }>;
 };
 
 export type FinishedGoodsOutboundRecord = {
@@ -41,6 +42,7 @@ export type FinishedGoodsOutboundRecord = {
   orderId: number | null;
   orderNo: string;
   skuCode: string;
+  productName?: string;
   customerName: string;
   quantity: number;
   department: string;

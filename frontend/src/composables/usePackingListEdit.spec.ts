@@ -13,7 +13,7 @@ vi.mock('@/api/customers', () => ({ getAllCustomerCompanyOptions: vi.fn(), getSa
 function detail(): PackingListDetail {
   return { id: 1, code: 'TEST', customerId: null, customerName: '', serviceManager: '', poNo: '', country: '',
     postalCode: '', xiaomanOrderNo: '', xiaomanOrderId: '', packDate: null, remark: '', showCompany: true,
-    sizeHeaders: ['OSFA'], status: 'draft', shippedAt: null, operatorUsername: '', createdAt: '',
+    sizeHeaders: ['OSFA'], status: 'draft', holdReason: '', shippedAt: null, operatorUsername: '', createdAt: '',
     boxes: [{ id: 1, boxSeq: 1, weightKg: null, cartonSize: '', remark: '', items: [{ id: 1, styleNo: 'manual',
       styleName: '', colorName: '', imageUrl: '', sizeQuantities: { OSFA: 5 }, totalQty: 5, sourceType: 'manual', sourceId: null }] }],
   }

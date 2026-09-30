@@ -131,6 +131,7 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
       orderId: row.orderId ?? null,
       orderNo: row.orderNo || '',
       skuCode: row.skuCode || '',
+      productName: row.productName || '',
       customerName: row.customerName || '',
       quantity: Number(row.quantity) || 0,
       imageUrl: String(row._effectiveImageUrl || getSharedProductImageUrl(row) || row.imageUrl || '').trim(),
@@ -142,6 +143,10 @@ export function useFinishedViewStockInteractions(options: StockInteractionsOptio
   }
 
   function openCreateDrawer() {
+    if (new Set(storedRows.value.map(row => row.productName?.trim() || '')).size > 1) {
+      ElMessage.warning('所选库存品名不同，请分别选择同品名记录补货')
+      return
+    }
     if (storedRows.value.length >= 1) {
       createSeed.value = buildFinishedQuickAddSourceFromRows(
         storedRows.value,

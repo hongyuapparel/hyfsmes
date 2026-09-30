@@ -1,4 +1,4 @@
-import { ArrayMaxSize, IsArray, IsBoolean, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsIn, IsInt, IsNumber, IsOptional, IsString, MaxLength, Min, ValidateNested } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PackingItemPayloadDto {
@@ -154,4 +154,21 @@ export class CopyPackingListToDraftDto {
   @IsString()
   @MaxLength(1000)
   remark?: string;
+}
+
+export class SetPackingListHoldDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(100)
+  @IsInt({ each: true })
+  @Min(1, { each: true })
+  ids: number[];
+
+  @IsIn(['held', 'draft'])
+  status: 'held' | 'draft';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  reason?: string;
 }

@@ -43,6 +43,7 @@ export class PackingListsShipService {
 
   async ship(id: number, operatorUsername: string): Promise<void> {
     const detail = await this.listsService.getDetail(id);
+    if (detail.status === 'held') throw new BadRequestException('该装箱单滞留待发，请先移回草稿再确认发货');
     if (detail.status !== 'draft') throw new BadRequestException('该装箱单已发货');
 
     // 混合发货：只要单子里有明细行就放行。库存来源行(pending/finished)照常扣减出库；
@@ -72,6 +73,7 @@ export class PackingListsShipService {
         .setLock('pessimistic_write')
         .getOne();
       if (!lockedList) throw new BadRequestException('装箱单不存在');
+      if (lockedList.status === 'held') throw new BadRequestException('该装箱单已标记滞留，请先移回草稿再确认发货');
       if (lockedList.status !== 'draft') throw new BadRequestException('该装箱单已发货');
 
       if (pendingItems.length) {

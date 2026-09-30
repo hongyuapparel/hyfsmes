@@ -389,6 +389,13 @@ async function ensurePackingListTables(dataSource: DataSource) {
     await dataSource.query(`ALTER TABLE packing_lists ADD COLUMN postal_code VARCHAR(32) NOT NULL DEFAULT '' AFTER country`);
   }
 
+  const holdReasonColumns: Array<{ cnt: number }> = await dataSource.query(`
+    SELECT COUNT(*) AS cnt FROM information_schema.columns
+    WHERE table_schema = DATABASE() AND table_name = 'packing_lists' AND column_name = 'hold_reason'
+  `);
+  if (Number(holdReasonColumns?.[0]?.cnt) === 0) {
+    await dataSource.query(`ALTER TABLE packing_lists ADD COLUMN hold_reason VARCHAR(500) NOT NULL DEFAULT '' AFTER status`);
+  }
   console.log('[Schema] Ensured packing list tables');
 }
 

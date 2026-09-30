@@ -6,7 +6,7 @@ import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-c
 import { FinishedGoodsStockAdjustLog } from '../entities/finished-goods-stock-adjust-log.entity';
 import type { ColorSizeSnapshot } from './finished-goods-stock.types';
 import { FinishedGoodsStockInboundQueryService } from './finished-goods-stock-inbound-query.service';
-import { isTableMissingError, normalizeOrderUnitPrice } from './finished-goods-stock-query.utils';
+import { isTableMissingError, normalizeOrderUnitPrice, normalizeStockProductName } from './finished-goods-stock-query.utils';
 import { buildFinishedEditLogRemark } from './finished-goods-stock-log-summary';
 
 export type ColorMetaInput = {
@@ -23,6 +23,7 @@ export type ColorMetaInput = {
 
 export type RepartitionDto = {
   skuCode?: string;
+  productName?: string;
   imageUrl?: string;
   remark?: string;
   /** colorMeta.quantities 对应的尺码表头 */
@@ -32,6 +33,7 @@ export type RepartitionDto = {
 
 type ColorUnit = {
   originId: number;
+  productName: string;
   customerId: number | null;
   customerName: string;
   colorName: string;
@@ -52,6 +54,7 @@ type UndoRecord = {
   customerId: number | null;
   customerName: string;
   skuCode: string;
+  productName?: string;
   quantity: number;
   unitPrice: string;
   warehouseId: number | null;
@@ -103,6 +106,7 @@ export class FinishedGoodsStockRepartitionService {
   private bucketKey(unit: ColorUnit): string {
     return JSON.stringify([
       unit.customerName,
+      unit.productName,
       unit.department,
       unit.inventoryTypeId ?? null,
       unit.warehouseId ?? null,
@@ -148,6 +152,7 @@ export class FinishedGoodsStockRepartitionService {
       customerId: record.customerId ?? null,
       customerName: this.norm(record.customerName),
       skuCode: this.norm(record.skuCode),
+      productName: this.norm(record.productName),
       quantity: Math.max(0, Math.trunc(Number(record.quantity) || 0)),
       unitPrice: this.normalizePrice(record.unitPrice),
       warehouseId: record.warehouseId ?? null,
@@ -190,6 +195,7 @@ export class FinishedGoodsStockRepartitionService {
         const useEnteredQty = !!cm && Array.isArray(cm.quantities) && requestHeaders.length > 0;
         units.push({
           originId: record.id,
+          productName: this.norm(record.productName),
           customerId: record.customerId ?? null,
           customerName: this.norm(record.customerName),
           colorName,
@@ -219,6 +225,7 @@ export class FinishedGoodsStockRepartitionService {
     if (!seed) throw new NotFoundException('库存记录不存在');
     const sku = this.norm(dto.skuCode) || this.norm(seed.skuCode);
     if (!sku) throw new BadRequestException('SKU不能为空');
+    const productName = dto.productName === undefined ? undefined : normalizeStockProductName(dto.productName);
 
     const group = await this.stockRepo
       .createQueryBuilder('stock')
@@ -243,6 +250,7 @@ export class FinishedGoodsStockRepartitionService {
 
     const requestHeaders = Array.isArray(dto.headers) ? dto.headers.map((h) => this.norm(h)).filter(Boolean) : [];
     const units = await this.buildColorUnits(group, metaMap, imageMap, requestHeaders);
+    if (productName !== undefined) units.forEach((unit) => { unit.productName = productName; });
 
     // 按 客户 + 部门 + 库存类型 + 仓库 + 出厂价 + 存放地址 分桶：
     // 同色且这些信息全相同 → 落入同一桶（码数相加合并）；任一不同 → 不同桶（存为两行）
@@ -264,6 +272,7 @@ export class FinishedGoodsStockRepartitionService {
           (record) =>
             !usedRecordIds.has(record.id) &&
             this.norm(record.customerName) === sample.customerName &&
+            (productName !== undefined || this.norm(record.productName) === sample.productName) &&
             this.norm(record.department) === sample.department &&
             (record.inventoryTypeId ?? null) === (sample.inventoryTypeId ?? null) &&
             (record.warehouseId ?? null) === (sample.warehouseId ?? null) &&
@@ -303,6 +312,7 @@ export class FinishedGoodsStockRepartitionService {
 
       // 同桶内 部门/类型/仓库/单价/存放地址 全相同，直接取样本值即可（不做加权，单价精确）
       record.skuCode = sku;
+      record.productName = sample.productName;
       record.customerName = sample.customerName;
       record.customerId = sample.customerId ?? record.customerId ?? null;
       record.department = sample.department;
@@ -329,6 +339,12 @@ export class FinishedGoodsStockRepartitionService {
 
       for (const keeper of keepers) {
         await stockRepo.save(keeper.record);
+      }
+
+      // 整组改名也覆盖未参与颜色重分配的零库存记录，不改动其数量和图片。
+      if (productName !== undefined) {
+        const untouchedIds = group.filter((record) => !originIdsWithUnits.has(record.id)).map((record) => record.id);
+        if (untouchedIds.length) await stockRepo.update({ id: In(untouchedIds) }, { productName });
       }
 
       // 颜色图片：只清理「被重建的 keeper + 被删除的记录」的旧图片，再按最终归属重建；
@@ -437,6 +453,7 @@ export class FinishedGoodsStockRepartitionService {
           customerId: b.customerId ?? null,
           customerName: this.norm(b.customerName),
           skuCode: this.norm(b.skuCode),
+          ...(b.productName !== undefined ? { productName: this.norm(b.productName) } : {}),
           quantity: Math.max(0, Math.trunc(Number(b.quantity) || 0)),
           unitPrice: this.normalizePrice(b.unitPrice),
           warehouseId: b.warehouseId ?? null,

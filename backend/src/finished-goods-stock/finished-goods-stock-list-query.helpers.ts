@@ -4,6 +4,7 @@ export type StoredStockRawRow = {
   orderNo: string;
   customerName: string;
   skuCode: string;
+  productName?: string;
   quantity: number;
   unitPrice: string;
   warehouseId: number | null;

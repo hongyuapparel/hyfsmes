@@ -43,10 +43,10 @@ export function usePackingListActions(reload: () => void) {
     const drafts = selectedRows.value.filter((r) => r.status === 'draft')
     const skipped = selectedRows.value.length - drafts.length
     if (!drafts.length) {
-      ElMessage.warning('选中的装箱单均已发货，不可删除')
+      ElMessage.warning('仅草稿可删除，滞留单请先移回草稿')
       return
     }
-    const tip = skipped > 0 ? `（${skipped} 个已发货将跳过）` : ''
+    const tip = skipped > 0 ? `（${skipped} 个非草稿将跳过）` : ''
     try {
       await ElMessageBox.confirm(`确定删除选中的 ${drafts.length} 个草稿装箱单吗？${tip}`, '批量删除确认', { type: 'warning' })
     } catch {

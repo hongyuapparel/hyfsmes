@@ -38,6 +38,7 @@ export type FinishedCreateQuickAddSizeRow = {
 }
 
 export type FinishedCreateQuickAddSource = {
+  productName?: string
   orderNo?: string
   skuCode?: string
   unitPrice?: string | number

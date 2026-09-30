@@ -16,15 +16,15 @@
       </el-input>
       <el-input
         v-model="outboundFilter.skuCode"
-        placeholder="SKU编号"
+        placeholder="SKU / 品名"
         clearable
         class="filter-bar-item"
-        :style="getAdaptiveSelectStyle(outboundFilter.skuCode ? `SKU编号：${outboundFilter.skuCode}` : '', 'SKU编号')"
+        :style="getAdaptiveSelectStyle(outboundFilter.skuCode ? `SKU / 品名：${outboundFilter.skuCode}` : '', 'SKU / 品名')"
         :input-style="getFilterInputStyle(outboundFilter.skuCode)"
         @keyup.enter="emit('search', true)"
       >
         <template #prefix>
-          <span v-if="outboundFilter.skuCode" :style="{ color: ACTIVE_FILTER_COLOR }">SKU编号：</span>
+          <span v-if="outboundFilter.skuCode" :style="{ color: ACTIVE_FILTER_COLOR }">SKU / 品名：</span>
         </template>
       </el-input>
       <FilterCollapseToggle v-model:collapsed="collapsed" :active-count="activeFilterCount" />

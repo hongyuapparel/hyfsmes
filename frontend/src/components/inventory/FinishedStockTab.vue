@@ -3,16 +3,16 @@
     <div class="filter-bar has-filter-collapse">
       <el-input
         v-model="filter.skuCode"
-        placeholder="SKU编号"
+        placeholder="SKU / 品名"
         clearable
         class="filter-bar-item"
-        :style="getSkuCodeFilterStyle(filter.skuCode, skuCodeLabelVisible)"
+        :style="getTextFilterStyle('SKU / 品名：', filter.skuCode, skuCodeLabelVisible)"
         :input-style="getFilterInputStyle(filter.skuCode)"
         @input="emit('debounced-search')"
         @keyup.enter="emit('search', true)"
       >
         <template #prefix>
-          <span v-if="filter.skuCode && skuCodeLabelVisible" :style="{ color: activeFilterColor }">SKU编号：</span>
+          <span v-if="filter.skuCode && skuCodeLabelVisible" :style="{ color: activeFilterColor }">SKU / 品名：</span>
         </template>
       </el-input>
       <el-select
@@ -243,7 +243,7 @@ import type { TableInstance } from 'element-plus'
 import { rangeShortcuts } from '@/utils/date-shortcuts'
 import { formatDisplayNumber, formatMoneyAligned } from '@/utils/display-number'
 import { useFinishedViewColumns } from '@/composables/useFinishedViewColumns'
-import { getFilterInputStyle, getSkuCodeFilterStyle, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
+import { getFilterInputStyle, getTextFilterStyle, getFilterRangeStyle, getAdaptiveSelectStyle } from '@/composables/useFilterBarHelpers'
 import { isStockTableParentRow, type StockTableLeafRow, type StockTableRow } from '@/utils/finishedStockTableUtils'
 import {
   buildFinishedStockTableSelection,

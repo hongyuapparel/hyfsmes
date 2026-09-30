@@ -138,6 +138,7 @@ export async function buildFinishedStockWorkbook(
     pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
   worksheet.columns = [
+    { header: '品名', key: 'productName', width: 24 },
     { header: 'SKU', key: 'skuCode', width: 16 },
     { header: '图片', key: 'image', width: 15 },
     { header: '颜色', key: 'colorName', width: 15 },
@@ -152,29 +153,29 @@ export async function buildFinishedStockWorkbook(
     { header: '存放地址', key: 'location', width: 18 },
     { header: '入库时间', key: 'createdAt', width: 20 },
   ];
-  worksheet.getColumn(1).numFmt = '@';
+  worksheet.getColumn(2).numFmt = '@';
   styleHeader(worksheet.getRow(1));
 
   lines.forEach((line) => {
     const row = worksheet.addRow({ ...line, image: '' });
     row.height = 28;
     row.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-    row.getCell(5).numFmt = '#,##0';
-    row.getCell(6).numFmt = '¥#,##0.00';
-    row.getCell(7).numFmt = '¥#,##0.00';
+    row.getCell('quantity').numFmt = '#,##0';
+    row.getCell('unitPrice').numFmt = '¥#,##0.00';
+    row.getCell('totalPrice').numFmt = '¥#,##0.00';
   });
 
   const detailEndRow = lines.length + 1;
-  worksheet.autoFilter = { from: 'A1', to: `M${detailEndRow}` };
+  worksheet.autoFilter = { from: 'A1', to: `N${detailEndRow}` };
   buildDisplayGroups(lines, prepared).forEach((group) => {
     const startRow = group.startIndex + 2;
     const endRow = group.endIndex + 2;
     if (endRow > startRow) {
-      worksheet.mergeCells(startRow, 1, endRow, 1);
       worksheet.mergeCells(startRow, 2, endRow, 2);
       worksheet.mergeCells(startRow, 3, endRow, 3);
+      worksheet.mergeCells(startRow, 4, endRow, 4);
     }
-    const imageCell = worksheet.getCell(startRow, 2);
+    const imageCell = worksheet.getCell(startRow, 3);
     imageCell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
     if (!group.imageUrl) {
       imageCell.value = '无图片';
@@ -196,8 +197,8 @@ export async function buildFinishedStockWorkbook(
   totalRow.font = { bold: true };
   totalRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEAF0F8' } };
   totalRow.alignment = { horizontal: 'center', vertical: 'middle' };
-  totalRow.getCell(5).numFmt = '#,##0';
-  totalRow.getCell(7).numFmt = '¥#,##0.00';
+  totalRow.getCell('quantity').numFmt = '#,##0';
+  totalRow.getCell('totalPrice').numFmt = '¥#,##0.00';
   applyBorders(worksheet);
 
   const failedImages = collectFailedImages(lines, prepared);

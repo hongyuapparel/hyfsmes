@@ -1,14 +1,14 @@
 import { getFilterRangeStyle } from '@/composables/useFilterBarHelpers'
 
 export type FinishedStockColumn = {
-  prop: 'skuCode' | 'department' | 'customerName' | 'location' | 'createdAt'
+  prop: 'productName' | 'skuCode' | 'department' | 'customerName' | 'location' | 'createdAt'
   label: string
   minWidth?: number
   width?: number
 }
 
 export type FinishedOutboundColumn = {
-  prop: 'createdAt' | 'skuCode' | 'department' | 'pickupUserName' | 'operatorUsername' | 'remark'
+  prop: 'createdAt' | 'productName' | 'skuCode' | 'department' | 'pickupUserName' | 'operatorUsername' | 'remark'
   label: string
   minWidth?: number
   width?: number
@@ -16,6 +16,7 @@ export type FinishedOutboundColumn = {
 
 const stockPrimaryColumns: FinishedStockColumn[] = [
   { prop: 'skuCode', label: 'SKU', minWidth: 100 },
+  { prop: 'productName', label: '品名', minWidth: 140 },
 ]
 
 const stockTailColumns: FinishedStockColumn[] = [
@@ -28,6 +29,7 @@ const stockTailColumns: FinishedStockColumn[] = [
 const outboundPrimaryColumns: FinishedOutboundColumn[] = [
   { prop: 'createdAt', label: '出库时间', width: 160 },
   { prop: 'skuCode', label: 'SKU', minWidth: 100 },
+  { prop: 'productName', label: '品名', minWidth: 140 },
 ]
 
 const outboundTailColumns: FinishedOutboundColumn[] = [

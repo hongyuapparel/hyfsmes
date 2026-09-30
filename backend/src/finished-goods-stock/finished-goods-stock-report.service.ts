@@ -6,6 +6,7 @@ import { Product } from '../entities/product.entity';
 import { FinishedGoodsStockColorImage } from '../entities/finished-goods-stock-color-image.entity';
 import { User } from '../entities/user.entity';
 import { SystemOption } from '../entities/system-option.entity';
+import { withColorImages } from '../common/color-image.util';
 import type { ColorSizeSnapshot, FinishedGoodsOutboundListResult } from './finished-goods-stock.types';
 
 type OutboundRawRow = {
@@ -14,6 +15,7 @@ type OutboundRawRow = {
   orderId: string | number | null;
   orderNo: string | null;
   skuCode: string | null;
+  productName?: string | null;
   imageUrlSnapshot?: string | null;
   customerName: string | null;
   quantity: string | number;
@@ -92,7 +94,7 @@ export class FinishedGoodsStockReportService {
       rows.push({ colorName, quantities });
     }
     if (!rows.length) return null;
-    return { headers, rows };
+    return withColorImages({ headers, rows }, rowsRaw);
   }
 
   private async getColorImageMapsForStocks(stockIds: number[]): Promise<Map<number, Map<string, string>>> {
@@ -123,13 +125,8 @@ export class FinishedGoodsStockReportService {
     snapshot: { rows: Array<{ colorName: string }> } | null,
     colorImages: Map<string, string> | undefined,
   ): string {
-    if (!colorImages?.size) return '';
     const colorNames = snapshot?.rows.map((row) => String(row.colorName ?? '').trim()).filter(Boolean) ?? [];
-    for (const colorName of colorNames) {
-      const imageUrl = colorImages.get(colorName);
-      if (imageUrl) return imageUrl;
-    }
-    return Array.from(colorImages.values()).find((imageUrl) => !!imageUrl) ?? '';
+    return colorNames.length === 1 ? colorImages?.get(colorNames[0]) || '' : '';
   }
 
   private getSnapshotTotal(snapshot: ColorSizeSnapshot | null): number {
@@ -162,7 +159,9 @@ export class FinishedGoodsStockReportService {
     colorImages: Map<string, string> | undefined,
   ): OutboundResponseRow {
     const imageUrl =
-      this.pickColorImageForSnapshot(row.sizeBreakdown, colorImages) ||
+      (row.sizeBreakdown?.rows.length === 1 && row.sizeBreakdown.rows[0].imageUrl !== undefined
+        ? row.sizeBreakdown.rows[0].imageUrl
+        : this.pickColorImageForSnapshot(row.sizeBreakdown, colorImages)) ||
       String(row.imageUrl ?? '').trim() ||
       row.productImageUrl ||
       '';
@@ -178,16 +177,16 @@ export class FinishedGoodsStockReportService {
     const activeRows = snapshot.rows.filter((item) =>
       item.quantities.some((quantity) => Math.max(0, Math.trunc(Number(quantity) || 0)) > 0),
     );
-    if (activeRows.length <= 1) return [this.withResolvedImage(row, colorImages)];
+    if (!activeRows.length) return [this.withResolvedImage(row, colorImages)];
     return activeRows.map((item) => {
       const singleSnapshot: ColorSizeSnapshot = {
         headers: [...snapshot.headers],
-        rows: [{ colorName: item.colorName, quantities: [...item.quantities] }],
+        rows: [{ ...item, quantities: [...item.quantities] }],
       };
       return this.withResolvedImage(
         {
           ...row,
-          quantity: this.getSnapshotTotal(singleSnapshot),
+          quantity: activeRows.length === 1 ? row.quantity : this.getSnapshotTotal(singleSnapshot),
           sizeBreakdown: singleSnapshot,
         },
         colorImages,
@@ -217,6 +216,7 @@ export class FinishedGoodsStockReportService {
           'o.order_id AS orderId',
           'o.order_no AS orderNo',
           'o.sku_code AS skuCode',
+          'o.product_name AS productName',
           ...(withSnapshotImage ? ['o.image_url AS imageUrlSnapshot'] : []),
           'o.customer_name AS customerName',
           'o.quantity AS quantity',
@@ -234,7 +234,7 @@ export class FinishedGoodsStockReportService {
             : "COALESCE(p.image_url, '') AS imageUrl",
         ]);
       if (orderNo?.trim()) qb.andWhere('o.order_no COLLATE utf8mb4_general_ci LIKE :orderNo', { orderNo: `%${orderNo.trim()}%` });
-      if (skuCode?.trim()) qb.andWhere('o.sku_code COLLATE utf8mb4_general_ci LIKE :skuCode', { skuCode: `%${skuCode.trim()}%` });
+      if (skuCode?.trim()) qb.andWhere('(o.sku_code COLLATE utf8mb4_general_ci LIKE :skuCode OR o.product_name COLLATE utf8mb4_general_ci LIKE :skuCode)', { skuCode: `%${skuCode.trim()}%` });
       if (customerName?.trim()) {
         qb.andWhere('o.customer_name COLLATE utf8mb4_general_ci LIKE :customerName', { customerName: `%${customerName.trim()}%` });
       }
@@ -270,6 +270,7 @@ export class FinishedGoodsStockReportService {
       orderId: r.orderId != null ? Number(r.orderId) : null,
       orderNo: r.orderNo ?? '',
       skuCode: r.skuCode ?? '',
+      productName: r.productName ?? '',
       imageUrl: String(r.imageUrlSnapshot ?? '').trim(),
       productImageUrl: String(r.imageUrl ?? '').trim(),
       customerName: r.customerName ?? '',

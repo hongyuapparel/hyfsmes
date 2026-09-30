@@ -11,6 +11,7 @@ import type { NormalizedStoredBreakdownSnapshot } from '@/utils/finishedStockTab
 
 export type FinishedDetailEditForm = {
   skuCode: string
+  productName: string
   department: string
   inventoryTypeId: number | null
   warehouseId: number | null
@@ -42,7 +43,7 @@ type OpenDetailPayload = {
 
 type FinishedDetailData = FinishedStockDetailRes & { groupSizeHeaders?: string[] }
 
-type StockMeta = Partial<Record<'skuCode' | 'department' | 'location' | 'imageUrl' | 'remark', string>> & {
+type StockMeta = Partial<Record<'productName' | 'skuCode' | 'department' | 'location' | 'imageUrl' | 'remark', string>> & {
   inventoryTypeId?: number | null
   warehouseId?: number | null
   unitPrice?: number | string | null
@@ -65,6 +66,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
 
   const editForm = reactive<FinishedDetailEditForm>({
     skuCode: '',
+    productName: '',
     department: '',
     inventoryTypeId: null,
     warehouseId: null,
@@ -123,6 +125,7 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
   function fillEditFormFromStock() {
     const stock = data.value?.stock as StockMeta | undefined
     editForm.skuCode = stock?.skuCode ?? ''
+    editForm.productName = stock?.productName ?? ''
     editForm.department = stock?.department ?? ''
     editForm.inventoryTypeId = stock?.inventoryTypeId ?? null
     editForm.warehouseId = stock?.warehouseId ?? null
@@ -173,6 +176,9 @@ export function useFinishedDetailData(options: UseFinishedDetailDataOptions) {
     try {
       await repartitionFinishedStockDetail(stockId, {
         skuCode: editForm.skuCode?.trim() || '',
+        // 不改品名时不发送，避免覆盖同 SKU 下其他记录的品名。
+        ...(editForm.productName.trim() !== (data.value?.stock.productName ?? '')
+          ? { productName: editForm.productName.trim() } : {}),
         imageUrl: editForm.imageUrl?.trim() || '',
         remark: editForm.remark || undefined,
         headers: options.buildColorMetaHeaders?.() ?? [],
