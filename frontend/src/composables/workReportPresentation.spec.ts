@@ -2,6 +2,10 @@ import {it,expect} from 'vitest'
 import {reportCount,reportQueues} from './workReportPresentation'
 import type {AutomaticRow,LiveReport} from '@/api/work-reports'
 const row=(orderId:number,title:string,quantity:number|null):AutomaticRow=>({orderId,orderNo:orderId?'O'+orderId:'',title,quantity,sku:'款',time:'',factory:'',imageUrl:'',planKey:'key'+orderId})
+it('仓库正常货和次品分区，不按数量隐藏记录',()=>{
+ const report={automatic:[{title:'当前仓库待处理（部门）',note:'',rows:[row(1,'待仓处理',100),row(2,'次品待处理',1)]}]} as LiveReport
+ const groups=reportQueues(report);expect(groups).toHaveLength(2);expect(groups[1].rows[0].quantity).toBe(1);expect(groups[1].rows[0].planKey).toBe('key2')
+})
 it('尾部按状态分区且保留原计划键，完成记录只放统计',()=>{
  const report={automatic:[{title:'当前尾部待办（部门）',note:'',rows:[row(1,'待收货',10),row(2,'待包装 / 分配',20)]},{title:'当天尾部完成（部门）',note:'',rows:[row(3,'完成',30)]}]} as LiveReport
  const groups=reportQueues(report);expect(groups).toHaveLength(2);expect(groups[0].rows[0].planKey).toBe('key1');expect(groups[1].title).toContain('待包装')

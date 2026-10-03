@@ -8,13 +8,15 @@ import { defaultReportTemplateId } from './work-report-templates';
 import { patternHandoff } from './pattern-milestones';
 import { DataSource } from 'typeorm';
 import { randomUUID } from 'crypto';
+import { beijingCalendarDay } from '../common/date-time.util';
+import { warehousePackingTodos } from './warehouse-report';
 import { applyReportBatch, applyAutomaticPlans, type AutomaticPlanInput, validReportDate, type WorkTask, type DraftRow } from './work-report-plan';
 
 export interface Person { id: number; name: string; username: string; codes: string; role: string }
 export interface CatalogOrder { id: number; no: string; sku: string; customer: string; salesperson: string; merchandiser: string; status: string; orderType: string; imageUrl: string; active: number; finished: number }
 interface PlanState { version: number; tasks: WorkTask[] | string }
 export interface AutoRow { planKey?:string; entryId?:number; orderId: number; orderNo: string; sku: string; title: string; time: string; quantity: number | null; factory: string; imageUrl: string; remark?:string; status?:string; customer?:string; materialIndex?:number }
-export const reportToday = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Shanghai' }).format(new Date());
+export const reportToday = beijingCalendarDay;
 const parseTasks = (value: WorkTask[] | string): WorkTask[] => typeof value === 'string' ? JSON.parse(value) : value;
 
 @Injectable()
@@ -105,9 +107,10 @@ export class WorkReportsService {
      automatic.push({title:'当前尾部待办（部门）',note:queueNote,rows:pending.reverse().map(map)},{title:'当天尾部完成（部门）',note:'按包装完成并转入待仓处理的时间统计；到此尾部工作结束，后续装箱和出货由仓管处理。',rows:completed.map(map)});
    }
    if(codes.includes('warehouse')) {
-     const pending:AutoRow[]=date===today?await this.db.query(`SELECT p.id entryId,o.id orderId,o.order_no orderNo,p.sku_code sku,o.image_url imageUrl,o.customer_name customer,'待仓处理' title,DATE_FORMAT(p.created_at,'%Y-%m-%d %H:%i') time,p.quantity,'' factory FROM inbound_pending p JOIN orders o ON o.id=p.order_id WHERE p.status='pending' AND o.deleted_at IS NULL ORDER BY p.created_at,p.id`):[];
+     const pending:AutoRow[]=date===today?await this.db.query(`SELECT p.id entryId,o.id orderId,o.order_no orderNo,p.sku_code sku,o.image_url imageUrl,o.customer_name customer,CASE WHEN p.source_type='defect' THEN '次品待处理' ELSE '待仓处理' END title,DATE_FORMAT(p.created_at,'%Y-%m-%d %H:%i') time,p.quantity,'' factory FROM inbound_pending p JOIN orders o ON o.id=p.order_id WHERE p.status='pending' AND o.deleted_at IS NULL ORDER BY p.created_at,p.id`):[];
      const completed:AutoRow[]=await this.db.query(`SELECT COALESCE(o.id,0) orderId,COALESCE(o.order_no,'') orderNo,p.sku_code sku,COALESCE(o.image_url,'') imageUrl,'出库完成' title,DATE_FORMAT(p.created_at,'%Y-%m-%d %H:%i') time,p.quantity,'' factory,p.remark FROM finished_goods_outbound p LEFT JOIN orders o ON o.id=p.order_id WHERE p.created_at>=? AND p.created_at<DATE_ADD(?,INTERVAL 1 DAY)`,[date,date]);
      automatic.push({title:'当前仓库待处理（部门）',note:queueNote,rows:pending},{title:'当天仓库出库完成（部门）',note:'按实际出库记录统计。待入库表没有完成时间，暂不把创建时间当作入库完成时间。',rows:completed});
+     automatic.push(...await warehousePackingTodos(this.db,date===today));
    }
    if(codes.includes('purchase')) {
      // No actor is passed: the shared query cannot trigger purchase workflow reconciliation.

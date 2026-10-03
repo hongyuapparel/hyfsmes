@@ -1,4 +1,4 @@
-import { isReportScheduled } from './workReportSchedule'
+import { isReportScheduled, reportCalendarDay } from './workReportSchedule'
 import { computed, ref } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { getReportSubmissions,type ReportSubmission,getReportDirectory,getReportOrders,getLiveReport,saveReportPlans,type ReportDirectoryPerson,type ReportOrder,type LiveReport,type AutomaticRow,type AutomaticPlan } from '@/api/work-reports'
@@ -7,7 +7,7 @@ import { taskOrders, type DraftRow, type WorkTask } from './workReportDemo'
 import { getErrorMessage } from '@/api/request'
 export function useLiveWorkReport() {
  const auth=useAuthStore(),people=ref<ReportDirectoryPerson[]>([]),catalog=ref<ReportOrder[]>([]),report=ref<LiveReport|null>(null)
- const date=ref(new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date())),owner=ref(auth.user?.id||0)
+ const date=ref(reportCalendarDay()),owner=ref(auth.user?.id||0)
  const configured=ref(false),message=ref(''),submissions=ref<ReportSubmission[]>([]),listDate=ref(date.value)
  const days=computed(()=>Array.from({length:3},(_,i)=>{const d=new Date(listDate.value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-i);return d.toISOString().slice(0,10)}))
  const submittedPeople=(day:string)=>people.value.filter(p=>isReportScheduled(p.rule)&&submissions.value.some(s=>s.ownerId===p.id&&s.reportDate===day))
@@ -19,7 +19,7 @@ export function useLiveWorkReport() {
  const automaticDrafts=ref<AutomaticPlan[]>([])
  const draftState=()=>JSON.stringify([drafts.value,automaticDrafts.value])
  const dirty=computed(()=>editing.value&&baseline.value!==draftState())
- const today=computed(()=>report.value?.today||new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date()))
+ const today=computed(()=>report.value?.today||reportCalendarDay())
  const mine=computed(()=>(owner.value===auth.user?.id||auth.user?.roleCode==='admin'||auth.user?.roleCodes?.includes('admin'))&&date.value===today.value)
  const tasks=computed(()=>(report.value?.tasks||[]).filter(t=>!t.automaticKey))
  const unplanned=computed(()=>(report.value?.pendingOrders||[]).filter(o=>report.value?.template.manualSections.includes(o.orderType)&&!tasks.value.some(t=>t.status==='todo'&&taskOrders(t).includes(o.no))))

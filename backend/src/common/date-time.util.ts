@@ -1,3 +1,5 @@
+export const beijingCalendarDay = (now = new Date()): string => new Date(now.getTime() + 8 * 60 * 60 * 1000).toISOString().slice(0, 10);
+
 export function formatDateTimeForResponse(value: unknown): string {
   if (!value) return '';
   const date = value instanceof Date ? value : new Date(value as string | number);

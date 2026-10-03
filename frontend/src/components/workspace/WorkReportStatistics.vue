@@ -2,9 +2,9 @@
  <section class="statistics"><h2>工作数据</h2><p class="muted">按所选日期统计，点击数字所在条目查看订单明细。</p>
   <el-collapse style="--el-collapse-header-font-size:var(--font-size-body);--el-collapse-content-font-size:var(--font-size-body)">
    <el-collapse-item v-for="group in groups" :key="group.title" :name="group.title">
-    <template #title><span class="stat-title">{{ group.title }}</span><strong v-if="historical && group.title.startsWith('当前')">未保存历史快照</strong><strong v-else>{{ count(group).orders }} 单<span v-if="group.title.includes('采购')"> · {{ count(group).items }} 项物料</span><span v-if="count(group).quantity!==null"> · {{ count(group).quantity }} 件</span><span v-if="count(group).unlinked"> · {{ count(group).unlinked }} 条未关联订单</span></strong></template>
+    <template #title><span class="stat-title">{{ group.title }}</span><strong v-if="historical && group.title.startsWith('当前')">未保存历史快照</strong><strong v-else><template v-if="packingTodos(group.title)">{{ count(group).items }} 张装箱单</template><template v-else>{{ count(group).orders }} 单</template><span v-if="group.title.includes('采购')"> · {{ count(group).items }} 项物料</span><span v-if="count(group).quantity!==null"> · {{ count(group).quantity }} 件</span><span v-if="count(group).unlinked && !packingTodos(group.title)"> · {{ count(group).unlinked }} 条未关联订单</span></strong></template>
     <p class="muted">{{ group.note }}</p>
-    <el-table v-if="group.rows.length" :data="group.rows" :max-height="320"><el-table-column label="订单 / 款式" min-width="190"><template #default="{row}">{{ row.orderNo || '未关联订单' }} · {{ row.sku }}</template></el-table-column><el-table-column prop="title" label="事项" min-width="150" /><el-table-column prop="quantity" label="数量" width="90" /><el-table-column prop="time" label="记录时间" min-width="150" /></el-table><p v-else class="muted">暂无记录</p>
+    <el-table v-if="group.rows.length" :data="group.rows" :max-height="320"><el-table-column :label="packingTodos(group.title)?'装箱单':'订单 / 款式'" min-width="190"><template #default="{row}"><template v-if="packingTodos(group.title)">{{ row.sku }}</template><template v-else>{{ row.orderNo || '未关联订单' }} · {{ row.sku }}</template></template></el-table-column><el-table-column prop="title" label="事项" min-width="150" /><el-table-column prop="quantity" label="数量" width="90" /><el-table-column prop="time" label="记录时间" min-width="150" /></el-table><p v-else class="muted">暂无记录</p>
    </el-collapse-item>
   </el-collapse>
  </section>
@@ -14,6 +14,7 @@ import type {AutomaticRow} from '@/api/work-reports'
 import {reportCount} from '@/composables/workReportPresentation'
 defineProps<{groups:{title:string;note:string;rows:AutomaticRow[]}[];historical:boolean}>()
 const count=(group:{title:string;rows:AutomaticRow[]})=>reportCount(group.rows,group.title)
+const packingTodos=(title:string)=>title.startsWith('当前')&&title.includes('装箱单')
 </script>
 <style scoped>
 .statistics {margin-top:var(--space-lg)}

@@ -11,6 +11,7 @@
       <el-button v-else link type="primary" @click="editingOrderId=row.id">{{ row.order?'更改关联订单':'选择订单' }}</el-button>
      </template>
      <div v-for="no in taskOrders(row)" :key="no" class="order-line"><AppImageThumb class="order-thumb" :src="info(row,no)?.imageUrl" variant="compact" :width="32" :height="32" /><div class="order-copy"><strong>{{ no }} · {{ info(row,no)?.sku }}</strong><div class="order-meta order-customer" :title="[info(row,no)?.salesperson,info(row,no)?.customer].filter(Boolean).join(' · ')">{{ [info(row,no)?.salesperson,info(row,no)?.customer].filter(Boolean).join(' · ') }}</div></div></div>
+     <div v-if="queue && !taskOrders(row).length" class="order-copy"><strong>{{ queueInfo(row)?.sku || '未关联订单' }}</strong><div class="order-meta">{{ queueInfo(row)?.customer }}</div></div>
      <el-button v-if="editable && !queue && taskOrders(row).length>1" link type="primary" @click="emit('split',row.id)">拆开订单</el-button>
     </template>
    </el-table-column>

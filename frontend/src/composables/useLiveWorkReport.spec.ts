@@ -4,6 +4,19 @@ vi.mock('@/api/work-reports',()=>api)
 vi.mock('@/api/request',()=>({getErrorMessage:()=> '读取失败'}))
 vi.mock('@/stores/auth',()=>({useAuthStore:()=>({user:{id:1,displayName:'纸样乙',username:'pattern'}})}))
 import { useLiveWorkReport } from './useLiveWorkReport'
+import { reportCalendarDay } from './workReportSchedule'
+import { beijingCalendarDay } from '../../../backend/src/common/date-time.util'
+
+it('报告日期不依赖浏览器地区支持，北京时间跨日仍为有效 ISO 日期',()=>{
+ const locale=vi.spyOn(Intl,'DateTimeFormat').mockImplementation(()=>{throw new Error('unsupported locale')})
+ try {
+  expect(reportCalendarDay(new Date('2026-10-02T15:59:59Z'))).toBe('2026-10-02')
+  expect(reportCalendarDay(new Date('2026-10-02T16:00:00Z'))).toBe('2026-10-03')
+  expect(reportCalendarDay(new Date('2026-12-31T16:00:00Z'))).toBe('2027-01-01')
+  expect(beijingCalendarDay(new Date('2026-10-02T16:00:00Z'))).toBe('2026-10-03')
+  expect(useLiveWorkReport().date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+ } finally {locale.mockRestore()}
+})
 describe('报告设置返回缓存页',()=>{
  it('同一个人的报告方式改变后，名单及右侧内容同步，不重置所选日期',async()=>{
   const person={id:1,name:'纸样乙',username:'pattern',role:'纸样',codes:'pattern',rule:{ownerId:1,enabled:true,templateId:'general'}}

@@ -43,6 +43,7 @@ import WorkReportTaskEditor from '@/components/workspace/WorkReportTaskEditor.vu
 import WorkReportTaskTable from '@/components/workspace/WorkReportTaskTable.vue'
 import {reportQueues,compareReportPlans,planOverdueDays} from '@/composables/workReportPresentation'
 import {useLiveWorkReport} from '@/composables/useLiveWorkReport'
+import {reportCalendarDay} from '@/composables/workReportSchedule'
 import type {DraftRow,WorkTask} from '@/composables/workReportDemo'
 import type {AutomaticRow} from '@/api/work-reports'
 const router=useRouter(),reportArticle=ref<HTMLElement|null>(null)
@@ -58,7 +59,7 @@ const adjustments=computed(()=>tasks.value.filter(t=>t.status==='deferred'&&t.re
 const queues=computed(()=>report.value?reportQueues(report.value):[])
 const statistics=computed(()=>[...queues.value,...(report.value?.automatic.filter(g=>!g.title.startsWith('当前'))||[]),...sections.value.filter(g=>g.type!=='other').map(g=>({title:'当前'+g.label,note:'负责跟进的订单，按订单去重；不代表当日产量。',rows:g.rows.flatMap(t=>(t.orders?.length?t.orders:[t.order]).map(no=>({orderId:catalog.value.find(o=>o.no===no)?.id||0,orderNo:no,sku:catalog.value.find(o=>o.no===no)?.sku||'',title:t.title,time:'',quantity:null,factory:'',imageUrl:''})))}))])
 const viewDrafts=(rows:WorkTask[]):DraftRow[]=>rows.map(t=>({...t,title:t.id.startsWith('auto-')?'':t.title,sourceIds:[t.id],done:false}))
-const queueDrafts=(rows:AutomaticRow[]):DraftRow[]=>rows.map<DraftRow>(r=>({id:r.planKey!,order:r.orderNo,orders:[r.orderNo],section:'bulk',title:automaticPlan(r.planKey!)?.title||'',date:automaticPlan(r.planKey!)?.date||'',needsHelp:!!automaticPlan(r.planKey!)?.needsHelp,sourceIds:[],done:!!(automaticPlan(r.planKey!) as {done?:boolean})?.done})).sort((a,b)=>compareReportPlans(editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===a.id)?.date||''}:a,editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===b.id)?.date||''}:b))
+const queueDrafts=(rows:AutomaticRow[]):DraftRow[]=>rows.map<DraftRow>(r=>({id:r.planKey!,order:r.orderNo,orders:r.orderNo?[r.orderNo]:[],section:'bulk',title:automaticPlan(r.planKey!)?.title||'',date:automaticPlan(r.planKey!)?.date||'',needsHelp:!!automaticPlan(r.planKey!)?.needsHelp,sourceIds:[],done:!!(automaticPlan(r.planKey!) as {done?:boolean})?.done})).sort((a,b)=>compareReportPlans(editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===a.id)?.date||''}:a,editing.value?{date:report.value?.tasks.find(t=>t.automaticKey===b.id)?.date||''}:b))
 const attentionFilter=ref<'all'|'overdue'|'finished'>('all')
 watch([owner,date],()=>{attentionFilter.value='all'})
 const finishedNos=computed(()=>new Set(date.value===today.value?catalog.value.filter(o=>o.finished===1).map(o=>o.no):[]))
@@ -93,7 +94,7 @@ async function leave(shouldSave:boolean){
 onBeforeRouteLeave(to=>{if(saving.value)return false;if(dirty.value){navigate({route:to.fullPath});return false}return true})
 function unload(e:BeforeUnloadEvent){if(dirty.value){e.preventDefault();e.returnValue=''}}
 let initialized=false
-const calendarDay=()=>new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Shanghai'}).format(new Date())
+const calendarDay=reportCalendarDay
 let lastDay=calendarDay()
 function advanceDay(){const current=calendarDay();if(current===lastDay||editing.value||saving.value)return false;if(date.value===lastDay)date.value=current;if(listDate.value===lastDay)listDate.value=current;lastDay=current;return true}
 function focus(){if(advanceDay())void refreshDirectory()}
